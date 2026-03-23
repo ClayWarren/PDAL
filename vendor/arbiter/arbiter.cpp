@@ -1921,49 +1921,53 @@ std::unique_ptr<S3::Auth> S3::Auth::create(
         }
         catch (...) { }
 
-        std::string token;
-
-        try
+        const auto allowInstanceProfile = env("AWS_ALLOW_INSTANCE_PROFILE");
+        if (allowInstanceProfile && *allowInstanceProfile == "true")
         {
-            // The below request is for the IMDSv2 token.  On EC2 instances
-            // which only support v1, this request will fail.  That's ok, the
-            // next request looks the same anyway (except without the token of
-            // course), and that corresponds to the IMDSv1 flow as a fallback.
-            const auto res = httpDriver.internalPut(
-                ec2TokenBase,
-                std::vector<char>(),
-                {{ "X-aws-ec2-metadata-token-ttl-seconds", "21600" }},
+            std::string token;
+
+            try
+            {
+                // The below request is for the IMDSv2 token.  On EC2 instances
+                // which only support v1, this request will fail.  That's ok, the
+                // next request looks the same anyway (except without the token of
+                // course), and that corresponds to the IMDSv1 flow as a fallback.
+                const auto res = httpDriver.internalPut(
+                    ec2TokenBase,
+                    std::vector<char>(),
+                    {{ "X-aws-ec2-metadata-token-ttl-seconds", "21600" }},
+                    {{ }},
+                    0,
+                    1);
+
+
+                if (!res.ok()) throw ArbiterError("Failed to get IMDSv2 token");
+
+                const auto tokenvec = res.data();
+                token = std::string(tokenvec.data(), tokenvec.size());
+            }
+            catch (...) { }
+
+            http::Headers headers;
+            if (!token.empty()) headers["X-aws-ec2-metadata-token"] = token;
+
+            const auto res = httpDriver.internalGet(
+                ec2CredBase,
+                headers,
                 {{ }},
                 0,
+                0,
                 1);
+            if (!res.ok()) throw ArbiterError("Failed to get IAM role");
 
+            const auto rolevec = res.data();
+            const auto iamRole = std::string(rolevec.begin(), rolevec.end());
 
-            if (!res.ok()) throw ArbiterError("Failed to get IMDSv2 token");
-
-            const auto tokenvec = res.data();
-            token = std::string(tokenvec.data(), tokenvec.size());
-        }
-        catch (...) { }
-
-        http::Headers headers;
-        if (!token.empty()) headers["X-aws-ec2-metadata-token"] = token;
-
-        const auto res = httpDriver.internalGet(
-            ec2CredBase,
-            headers,
-            {{ }},
-            0,
-            0,
-            1);
-        if (!res.ok()) throw ArbiterError("Failed to get IAM role");
-
-        const auto rolevec = res.data();
-        const auto iamRole = std::string(rolevec.begin(), rolevec.end());
-
-        if (!iamRole.empty())
-        {
-            const ReauthMethod reauthMethod = !token.empty() ? ReauthMethod::IMDS_V2 : ReauthMethod::IMDS_V1;
-            return makeUnique<Auth>(ec2CredBase + "/" + iamRole, reauthMethod);
+            if (!iamRole.empty())
+            {
+                const ReauthMethod reauthMethod = !token.empty() ? ReauthMethod::IMDS_V2 : ReauthMethod::IMDS_V1;
+                return makeUnique<Auth>(ec2CredBase + "/" + iamRole, reauthMethod);
+            }
         }
     }
     catch (...) { }
@@ -6159,7 +6163,6 @@ std::string stripProfile(std::string protocol)
 // //////////////////////////////////////////////////////////////////////
 // End of content of file: arbiter/util/util.cpp
 // //////////////////////////////////////////////////////////////////////
-
 
 
 
