@@ -46,7 +46,6 @@ using namespace pdal;
 namespace
 {
 
-// Point 0 is the query point; points 1..N are its neighbors.
 PointViewPtr run(PointTable& table,
                  const std::vector<std::array<double, 3>>& pts,
                  const Options& opts)
@@ -82,9 +81,6 @@ TEST(ZsmoothFilterTest, create)
     EXPECT_EQ(filter->getName(), "filters.zsmooth");
 }
 
-// Point 0's four neighbors carry Z = {10, 20, 30, 40}. 'medianpercent'
-// selects a position in that sorted neighbor list: 0 -> min, 50 -> median,
-// 100 -> max.
 TEST(ZsmoothFilterTest, medianpercent_selects_neighbor_z)
 {
     std::vector<std::array<double, 3>> pts = {{{0.0, 0.0, 5.0}},

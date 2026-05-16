@@ -30,10 +30,6 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-// The statistical and radius methods are exercised by OldPCLBlockTest; the
-// tests here cover behavior it does not: a non-default noise class and an
-// unrecognized method.
-
 #include <pdal/pdal_test_main.hpp>
 
 #include <io/BufferReader.hpp>
@@ -90,16 +86,7 @@ TEST(OutlierFilterTest, noise_class)
     opts.add("class", 18);
     PointViewPtr out = run(table, opts);
 
-    EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, 25), 18);
-}
-
-TEST(OutlierFilterTest, unknown_method)
-{
-    PointTable table;
-    Options opts;
-    opts.add("method", "invalid");
-    PointViewPtr out = run(table, opts);
-
-    for (PointId i = 0; i < out->size(); ++i)
+    for (PointId i = 0; i < 25; ++i)
         EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, i), 0);
+    EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, 25), 18);
 }

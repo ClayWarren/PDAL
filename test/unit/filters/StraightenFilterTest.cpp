@@ -112,8 +112,6 @@ TEST(StraightenFilterTest, invalid_polyline_throws)
     EXPECT_THROW(filter->prepare(table), pdal_error);
 }
 
-// Straightening against a Y-aligned track is a genuine coordinate transform
-// (the along-track distance becomes X); unstraightening must invert it.
 TEST(StraightenFilterTest, straighten_then_unstraighten_round_trips)
 {
     const std::string poly = "LINESTRING ZM (0 0 0 0, 0 100 0 0)";
@@ -126,7 +124,6 @@ TEST(StraightenFilterTest, straighten_then_unstraighten_round_trips)
     std::vector<Pt> straightened = coords(run(t1, orig, straightenOpts));
     ASSERT_EQ(straightened.size(), orig.size());
 
-    // The transform is non-trivial: along-track distance lands in X.
     EXPECT_GT(straightened[0][0], 10.0);
 
     PointTable t2;

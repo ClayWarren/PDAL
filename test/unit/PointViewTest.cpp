@@ -227,7 +227,7 @@ TEST(PointViewTest, pointRef)
 
     PointRef first(view, 0);
     PointRef second(view, 1);
-    swap(first, second);
+    PointRef::swap(first, second);
     EXPECT_EQ(first.pointId(), 1u);
     EXPECT_EQ(second.pointId(), 0u);
     EXPECT_DOUBLE_EQ(first.getFieldAs<double>(Dimension::Id::X), 30.0);

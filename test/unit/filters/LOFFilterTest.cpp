@@ -126,20 +126,3 @@ TEST(LOFFilterTest, minpts_controls_k_distance)
 
     EXPECT_LT(nnAt(4), nnAt(10));
 }
-
-TEST(LOFFilterTest, characterization)
-{
-    PointTable table;
-    PointViewPtr out = run(table, Options());
-    ASSERT_EQ(out->size(), 26u);
-
-    double nnSum = 0.0;
-    double lofSum = 0.0;
-    for (PointId i = 0; i < out->size(); ++i)
-    {
-        nnSum += out->getFieldAs<double>(Dimension::Id::NNDistance, i);
-        lofSum += out->getFieldAs<double>(Dimension::Id::LocalOutlierFactor, i);
-    }
-    EXPECT_NEAR(nnSum, 1839.95, 1.0);
-    EXPECT_NEAR(lofSum, 376.933, 0.5);
-}

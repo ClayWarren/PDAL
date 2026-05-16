@@ -54,7 +54,8 @@ PointViewPtr makeView(PointTable& table, const std::vector<double>& xs)
     return view;
 }
 
-point_count_t runSize(PointTable& table, PointViewPtr view, const Options& opts)
+point_count_t runSize(PointTable& table, const PointViewPtr& view,
+                      const Options& opts)
 {
     BufferReader r;
     r.addView(view);
@@ -76,8 +77,6 @@ TEST(MADFilterTest, create)
     EXPECT_EQ(m.getName(), "filters.mad");
 }
 
-// A tight cluster of values plus one gross outlier: the MAD fence drops only
-// the outlier and keeps every inlier.
 TEST(MADFilterTest, drops_outlier)
 {
     PointTable table;
@@ -99,7 +98,6 @@ TEST(MADFilterTest, drops_outlier)
         EXPECT_LE(out->getFieldAs<double>(Dimension::Id::X, i), 9.0);
 }
 
-// With no outliers present, every point survives.
 TEST(MADFilterTest, keeps_clean_data)
 {
     PointTable table;
@@ -112,7 +110,6 @@ TEST(MADFilterTest, keeps_clean_data)
     EXPECT_EQ(runSize(table, view, opts), 20u);
 }
 
-// A required dimension that does not exist is an error.
 TEST(MADFilterTest, missing_dimension_throws)
 {
     PointTable table;
@@ -126,11 +123,8 @@ TEST(MADFilterTest, missing_dimension_throws)
     EXPECT_THROW(filter.prepare(table), pdal_error);
 }
 
-// A smaller deviation count 'k' tightens the fence and rejects more points;
-// a larger 'mad_multiplier' widens the spread estimate and rejects fewer.
 TEST(MADFilterTest, parameters_affect_fence)
 {
-    // A spread of inliers plus a moderately distant value.
     const std::vector<double> data = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
                                       11, 12, 13, 14, 15, 16, 17, 18, 19, 40};
 
@@ -145,9 +139,7 @@ TEST(MADFilterTest, parameters_affect_fence)
         return runSize(table, view, opts);
     };
 
-    // Tighter k keeps no more points than a looser k.
     EXPECT_LE(sizeWith(1.0, 1.4862), sizeWith(8.0, 1.4862));
-    // A tiny k rejects the distant value; a huge k keeps everything.
     EXPECT_LT(sizeWith(1.0, 1.4862), 20u);
     EXPECT_EQ(sizeWith(50.0, 1.4862), 20u);
 }

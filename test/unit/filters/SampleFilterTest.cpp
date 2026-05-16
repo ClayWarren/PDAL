@@ -186,9 +186,6 @@ TEST(SampleFilterTest, radius_boundary)
     EXPECT_EQ(countKept(0.9, 0.0), 1u);
     EXPECT_EQ(countKept(1.1, 0.0), 2u);
 
-    // The cull test is a strict '<': a point exactly 'radius' away is kept.
-    // The origin shift puts the pair in adjacent voxels, exercising the
-    // neighbor-voxel distance check as well as the enclosing-voxel one.
     EXPECT_EQ(countKept(1.0, 0.0), 2u);
     EXPECT_EQ(countKept(1.0, -0.6), 2u);
 }
@@ -252,9 +249,25 @@ std::vector<std::array<double, 3>> denseGrid()
     return pts;
 }
 
+void expectMinDistance(const PointViewPtr& view, double minDistance)
+{
+    const double minSqr = minDistance * minDistance;
+    for (PointId i = 0; i < view->size(); ++i)
+        for (PointId j = i + 1; j < view->size(); ++j)
+        {
+            const double dx = view->getFieldAs<double>(Dimension::Id::X, i) -
+                              view->getFieldAs<double>(Dimension::Id::X, j);
+            const double dy = view->getFieldAs<double>(Dimension::Id::Y, i) -
+                              view->getFieldAs<double>(Dimension::Id::Y, j);
+            const double dz = view->getFieldAs<double>(Dimension::Id::Z, i) -
+                              view->getFieldAs<double>(Dimension::Id::Z, j);
+            EXPECT_GE(dx * dx + dy * dy + dz * dz, minSqr);
+        }
+}
+
 } // unnamed namespace
 
-TEST(SampleFilterTest, characterization_radius)
+TEST(SampleFilterTest, dense_grid_radius_spacing)
 {
     PointTable table;
 
@@ -266,15 +279,10 @@ TEST(SampleFilterTest, characterization_radius)
     PointViewPtr out = runSample(table, denseGrid(), opts);
 
     EXPECT_EQ(out->size(), 18u);
-    double coordSum = 0.0;
-    for (PointId i = 0; i < out->size(); ++i)
-        coordSum += out->getFieldAs<double>(Dimension::Id::X, i) +
-                    out->getFieldAs<double>(Dimension::Id::Y, i) +
-                    out->getFieldAs<double>(Dimension::Id::Z, i);
-    EXPECT_NEAR(coordSum, 48.15, 0.01);
+    expectMinDistance(out, 1.0);
 }
 
-TEST(SampleFilterTest, characterization_cell)
+TEST(SampleFilterTest, dense_grid_cell_spacing)
 {
     PointTable table;
 
@@ -286,10 +294,5 @@ TEST(SampleFilterTest, characterization_cell)
     PointViewPtr out = runSample(table, denseGrid(), opts);
 
     EXPECT_EQ(out->size(), 18u);
-    double coordSum = 0.0;
-    for (PointId i = 0; i < out->size(); ++i)
-        coordSum += out->getFieldAs<double>(Dimension::Id::X, i) +
-                    out->getFieldAs<double>(Dimension::Id::Y, i) +
-                    out->getFieldAs<double>(Dimension::Id::Z, i);
-    EXPECT_NEAR(coordSum, 48.15, 0.01);
+    expectMinDistance(out, 1.0);
 }

@@ -82,9 +82,6 @@ TEST(SparseSurfaceFilterTest, create)
     EXPECT_EQ(filter->getName(), "filters.sparsesurface");
 }
 
-// Two vertical columns far apart in XY. Processing lowest-Z first, each
-// column's bottom point is kept as ground (2); the points stacked above it,
-// being within the XY radius, are masked as low noise (7).
 TEST(SparseSurfaceFilterTest, lowest_is_ground_rest_low_noise)
 {
     std::vector<std::array<double, 3>> pts = {

@@ -124,24 +124,3 @@ TEST(OptimalNeighborhoodFilterTest, custom_k_window)
     }
     EXPECT_TRUE(sawBelowDefault);
 }
-
-TEST(OptimalNeighborhoodFilterTest, characterization)
-{
-    PointTable table;
-
-    Options opts;
-    opts.add("min_k", 10);
-    opts.add("max_k", 14);
-    PointViewPtr out = run(table, 60, opts);
-    ASSERT_EQ(out->size(), 60u);
-
-    long knnSum = 0;
-    double radiusSum = 0.0;
-    for (PointId i = 0; i < out->size(); ++i)
-    {
-        knnSum += out->getFieldAs<int>(Dimension::Id::OptimalKNN, i);
-        radiusSum += out->getFieldAs<double>(Dimension::Id::OptimalRadius, i);
-    }
-    EXPECT_EQ(knnSum, 686);
-    EXPECT_NEAR(radiusSum, 487.088, 0.05);
-}

@@ -54,7 +54,8 @@ PointViewPtr makeView(PointTable& table, const std::vector<double>& xs)
     return view;
 }
 
-PointViewPtr run(PointTable& table, PointViewPtr view, const Options& opts)
+PointViewPtr run(PointTable& table, const PointViewPtr& view,
+                 const Options& opts)
 {
     BufferReader r;
     r.addView(view);
@@ -85,8 +86,6 @@ TEST(IQRFilterTest, create)
     EXPECT_EQ(i.getName(), "filters.iqr");
 }
 
-// Twenty evenly spaced values plus one gross high outlier: the interquartile
-// fence drops only the outlier.
 TEST(IQRFilterTest, drops_high_outlier)
 {
     PointTable table;
@@ -100,7 +99,6 @@ TEST(IQRFilterTest, drops_high_outlier)
         EXPECT_LE(out->getFieldAs<double>(Dimension::Id::X, i), 20.0);
 }
 
-// The lower fence is exercised symmetrically: a gross low outlier is dropped.
 TEST(IQRFilterTest, drops_low_outlier)
 {
     PointTable table;
@@ -114,9 +112,6 @@ TEST(IQRFilterTest, drops_low_outlier)
         EXPECT_GE(out->getFieldAs<double>(Dimension::Id::X, i), 1.0);
 }
 
-// The fence is a strict inequality: a point exactly on the fence is dropped,
-// one just inside it is kept. For {1..20, x}: pc25=6, pc75=16, iqr=10, so the
-// upper fence at k=1.5 is 16 + 1.5*10 = 31.
 TEST(IQRFilterTest, fence_boundary_is_strict)
 {
     auto sizeWithLast = [](double last)
@@ -129,11 +124,10 @@ TEST(IQRFilterTest, fence_boundary_is_strict)
         return run(table, makeView(table, xs), dimX())->size();
     };
 
-    EXPECT_EQ(sizeWithLast(30.0), 21u); // inside the fence -> kept
-    EXPECT_EQ(sizeWithLast(31.0), 20u); // exactly on the fence -> dropped
+    EXPECT_EQ(sizeWithLast(30.0), 21u);
+    EXPECT_EQ(sizeWithLast(31.0), 20u);
 }
 
-// A wider multiplier widens the fence; a mild outlier then survives.
 TEST(IQRFilterTest, multiplier_widens_fence)
 {
     auto runWith = [](double k)
@@ -150,7 +144,6 @@ TEST(IQRFilterTest, multiplier_widens_fence)
     EXPECT_EQ(runWith(20.0), 21u);
 }
 
-// A required dimension that does not exist is an error.
 TEST(IQRFilterTest, missing_dimension_throws)
 {
     PointTable table;

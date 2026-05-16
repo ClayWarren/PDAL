@@ -53,15 +53,15 @@ PointViewPtr makeView(PointTable& table)
     return view;
 }
 
-MetadataNode findChild(MetadataNode node, const std::string& name)
+MetadataNode findChild(const MetadataNode& node, const std::string& name)
 {
-    return node.findChild([&name](MetadataNode child)
+    return node.findChild([&name](const MetadataNode& child)
                           { return child.name() == name; });
 }
 
-point_count_t countForValue(MetadataNode statistic, double value)
+point_count_t countForValue(const MetadataNode& statistic, double value)
 {
-    for (MetadataNode bin : statistic.children("bins"))
+    for (const MetadataNode& bin : statistic.children("bins"))
     {
         MetadataNode valueNode = findChild(bin, "value");
         if (valueNode.empty() || valueNode.value<double>() != value)
