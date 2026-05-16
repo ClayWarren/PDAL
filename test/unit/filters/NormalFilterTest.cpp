@@ -81,6 +81,59 @@ TEST(NormalFilterTest, XYPlane)
     }
 }
 
+TEST(NormalFilterTest, ViewpointOverridesAlwaysUp)
+{
+    using namespace Dimension;
+
+    PointTable table;
+    table.layout()->registerDims({Id::X, Id::Y, Id::Z});
+
+    FauxReader reader;
+    Options readerOps;
+    readerOps.add("mode", "grid");
+    readerOps.add("bounds", "([0, 2], [0, 2], [0, 0])");
+    readerOps.add("count", 4);
+    reader.setOptions(readerOps);
+    NormalFilter filter;
+    Options filterOps;
+    filterOps.add("knn", 3);
+    filterOps.add("viewpoint", "POINT Z (0 0 -1)");
+    filter.setInput(reader);
+    filter.setOptions(filterOps);
+    filter.prepare(table);
+
+    PointViewSet viewSet = filter.execute(table);
+    PointViewPtr outView = *viewSet.begin();
+
+    Dimension::Id nx = table.layout()->findDim("NormalX");
+    Dimension::Id ny = table.layout()->findDim("NormalY");
+    Dimension::Id nz = table.layout()->findDim("NormalZ");
+
+    for (const PointRef& p : *outView)
+    {
+        ASSERT_FLOAT_EQ(p.getFieldAs<float>(nx), 0.0f);
+        ASSERT_FLOAT_EQ(p.getFieldAs<float>(ny), 0.0f);
+        ASSERT_FLOAT_EQ(p.getFieldAs<float>(nz), -1.0f);
+    }
+}
+
+TEST(NormalFilterTest, RejectsKnnAndRadius)
+{
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+
+    FauxReader reader;
+    NormalFilter filter;
+    Options filterOps;
+    filterOps.add("knn", 3);
+    filterOps.add("radius", 2.0);
+    filter.setInput(reader);
+    filter.setOptions(filterOps);
+
+    EXPECT_THROW(filter.prepare(table), pdal_error);
+}
+
 TEST(NormalFilterTest, XZPlane)
 {
     using namespace Dimension;
