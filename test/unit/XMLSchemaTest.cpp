@@ -40,9 +40,9 @@ using namespace pdal;
 namespace
 {
 
-MetadataNode findName(MetadataNode node, const std::string& name)
+MetadataNode findName(const MetadataNode& node, const std::string& name)
 {
-    return node.findChild([&name](MetadataNode child)
+    return node.findChild([&name](const MetadataNode& child)
                           { return child.name() == name; });
 }
 

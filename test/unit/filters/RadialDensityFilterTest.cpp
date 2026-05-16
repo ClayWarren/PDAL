@@ -81,9 +81,6 @@ TEST(RadialDensityFilterTest, create)
     EXPECT_EQ(filter->getName(), "filters.radialdensity");
 }
 
-// Density is the neighbor count (including the point itself) over the volume
-// of the search sphere. Five mutually-close points each see all five; the
-// lone point sees only itself.
 TEST(RadialDensityFilterTest, density)
 {
     std::vector<std::array<double, 3>> pts = {
