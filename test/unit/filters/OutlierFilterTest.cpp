@@ -30,12 +30,16 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
+// The statistical and radius methods are exercised by OldPCLBlockTest; the
+// tests here cover behavior it does not: a non-default noise class and an
+// unrecognized method.
+
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/EstimateRankFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 
 using namespace pdal;
@@ -43,77 +47,59 @@ using namespace pdal;
 namespace
 {
 
-PointViewPtr makeView(PointTable& table)
+PointViewPtr makeCloud(PointTable& table)
 {
-    return PointViewPtr(new PointView(table));
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    PointViewPtr view(new PointView(table));
+    PointId id = 0;
+    for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 5; ++j)
+        {
+            view->setField(Dimension::Id::X, id, i * 0.5);
+            view->setField(Dimension::Id::Y, id, j * 0.5);
+            view->setField(Dimension::Id::Z, id, 0.0);
+            ++id;
+        }
+    view->setField(Dimension::Id::X, id, 1000.0);
+    view->setField(Dimension::Id::Y, id, 1000.0);
+    view->setField(Dimension::Id::Z, id, 1000.0);
+    return view;
+}
+
+PointViewPtr run(PointTable& table, const Options& opts)
+{
+    BufferReader reader;
+    StageFactory f;
+    Stage* filter(f.createStage("filters.outlier"));
+    filter->setInput(reader);
+    filter->setOptions(opts);
+    filter->prepare(table);
+    reader.addView(makeCloud(table));
+    return *filter->execute(table).begin();
 }
 
 } // unnamed namespace
 
-TEST(EstimateRankFilterTest, create)
-{
-    StageFactory f;
-    Stage* filter(f.createStage("filters.estimaterank"));
-    EXPECT_TRUE(filter);
-}
-
-TEST(EstimateRankFilterTest, planar)
+TEST(OutlierFilterTest, noise_class)
 {
     PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    Options opts;
+    opts.add("method", "radius");
+    opts.add("radius", 1.0);
+    opts.add("class", 18);
+    PointViewPtr out = run(table, opts);
 
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    EXPECT_EQ(filter.getName(), "filters.estimaterank");
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    PointId idx = 0;
-    for (int x = 0; x < 5; ++x)
-        for (int y = 0; y < 5; ++y, ++idx)
-        {
-            view->setField(Dimension::Id::X, idx, (double)x);
-            view->setField(Dimension::Id::Y, idx, (double)y);
-            view->setField(Dimension::Id::Z, idx, 0.0);
-        }
-    r.addView(view);
-
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 25u);
-    for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 2);
+    EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, 25), 18);
 }
 
-TEST(EstimateRankFilterTest, linear)
+TEST(OutlierFilterTest, unknown_method)
 {
     PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    Options opts;
+    opts.add("method", "invalid");
+    PointViewPtr out = run(table, opts);
 
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    for (PointId i = 0; i < 12; ++i)
-    {
-        view->setField(Dimension::Id::X, i, (double)i);
-        view->setField(Dimension::Id::Y, i, 0.0);
-        view->setField(Dimension::Id::Z, i, 0.0);
-    }
-    r.addView(view);
-
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 12u);
     for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 1);
+        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, i), 0);
 }

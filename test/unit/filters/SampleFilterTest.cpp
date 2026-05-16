@@ -46,19 +46,9 @@ using namespace pdal;
 namespace
 {
 
-// Build a view from explicit coordinate triples, registering 'extraDim' first
-// (when non-empty) so the layout is final before any point exists.
 PointViewPtr makeView(PointTable& table,
-                      const std::vector<std::array<double, 3>>& pts,
-                      const std::string& extraDim = "")
+                      const std::vector<std::array<double, 3>>& pts)
 {
-    if (!extraDim.empty())
-        table.layout()->registerOrAssignDim(extraDim,
-                                            Dimension::Type::Unsigned8);
-    table.layout()->registerDim(Dimension::Id::X);
-    table.layout()->registerDim(Dimension::Id::Y);
-    table.layout()->registerDim(Dimension::Id::Z);
-
     PointViewPtr view(new PointView(table));
     for (PointId i = 0; i < pts.size(); ++i)
     {
@@ -69,15 +59,19 @@ PointViewPtr makeView(PointTable& table,
     return view;
 }
 
-PointViewPtr runSample(PointTable& table, PointViewPtr view,
+PointViewPtr runSample(PointTable& table,
+                       const std::vector<std::array<double, 3>>& pts,
                        const Options& opts)
 {
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+
     BufferReader r;
-    r.addView(view);
     SampleFilter filter;
     filter.setInput(r);
     filter.setOptions(opts);
     filter.prepare(table);
+    r.addView(makeView(table, pts));
     return *filter.execute(table).begin();
 }
 
@@ -92,21 +86,16 @@ TEST(SampleFilterTest, create)
     EXPECT_EQ(s.getName(), "filters.sample");
 }
 
-// With a 1.0 radius the second point of each tightly spaced pair is culled,
-// leaving one representative per pair.
 TEST(SampleFilterTest, culls_close_points)
 {
     PointTable table;
-    PointViewPtr view = makeView(table, {{{0.0, 0.0, 0.0}},
-                                         {{0.1, 0.0, 0.0}},
-                                         {{5.0, 0.0, 0.0}},
-                                         {{5.1, 0.0, 0.0}},
-                                         {{10.0, 0.0, 0.0}},
-                                         {{10.1, 0.0, 0.0}}});
+    std::vector<std::array<double, 3>> pts = {
+        {{0.0, 0.0, 0.0}}, {{0.1, 0.0, 0.0}},  {{5.0, 0.0, 0.0}},
+        {{5.1, 0.0, 0.0}}, {{10.0, 0.0, 0.0}}, {{10.1, 0.0, 0.0}}};
 
     Options opts;
     opts.add("radius", 1.0);
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, pts, opts);
 
     ASSERT_EQ(out->size(), 3u);
     EXPECT_DOUBLE_EQ(out->getFieldAs<double>(Dimension::Id::X, 0), 0.0);
@@ -114,42 +103,39 @@ TEST(SampleFilterTest, culls_close_points)
     EXPECT_DOUBLE_EQ(out->getFieldAs<double>(Dimension::Id::X, 2), 10.0);
 }
 
-// Points farther apart than the radius are all retained.
 TEST(SampleFilterTest, keeps_distant_points)
 {
     PointTable table;
-    PointViewPtr view = makeView(table, {{{0.0, 0.0, 0.0}},
-                                         {{10.0, 0.0, 0.0}},
-                                         {{20.0, 0.0, 0.0}},
-                                         {{30.0, 0.0, 0.0}}});
+    std::vector<std::array<double, 3>> pts = {{{0.0, 0.0, 0.0}},
+                                              {{10.0, 0.0, 0.0}},
+                                              {{20.0, 0.0, 0.0}},
+                                              {{30.0, 0.0, 0.0}}};
 
     Options opts;
     opts.add("radius", 1.0);
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, pts, opts);
 
     EXPECT_EQ(out->size(), 4u);
 }
 
-// 'cell' is an alternative to 'radius' (radius = cell/2 * sqrt(3)); setting
-// both is an error, setting neither is an error.
 TEST(SampleFilterTest, cell_mode)
 {
     PointTable table;
-    PointViewPtr view = makeView(table, {{{0.0, 0.0, 0.0}},
-                                         {{0.1, 0.0, 0.0}},
-                                         {{20.0, 0.0, 0.0}},
-                                         {{20.1, 0.0, 0.0}}});
+    std::vector<std::array<double, 3>> pts = {{{0.0, 0.0, 0.0}},
+                                              {{0.1, 0.0, 0.0}},
+                                              {{20.0, 0.0, 0.0}},
+                                              {{20.1, 0.0, 0.0}}};
 
     Options opts;
-    opts.add("cell", 4.0); // radius = 2 * sqrt(3) ~= 3.46
-    PointViewPtr out = runSample(table, view, opts);
+    opts.add("cell", 4.0);
+    PointViewPtr out = runSample(table, pts, opts);
 
-    // Each 0.1-spaced pair collapses to one point; the pairs are far apart.
     EXPECT_EQ(out->size(), 2u);
 
     PointTable bad;
+    bad.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
     BufferReader r;
-    r.addView(makeView(bad, {{{0.0, 0.0, 0.0}}}));
     SampleFilter both;
     both.setInput(r);
     Options bo;
@@ -157,69 +143,92 @@ TEST(SampleFilterTest, cell_mode)
     bo.add("radius", 1.0);
     both.setOptions(bo);
     EXPECT_THROW(both.prepare(bad), pdal_error);
+
+    SampleFilter neither;
+    neither.setInput(r);
+    neither.setOptions(Options());
+    EXPECT_THROW(neither.prepare(bad), pdal_error);
 }
 
-// A point in a voxel adjacent to an already-kept point must still be culled
-// when it falls within the radius -- this exercises the neighbor-voxel search.
-// Distinct non-zero coordinates make the squared-distance terms asymmetric.
 TEST(SampleFilterTest, culls_across_voxels)
 {
     PointTable table;
-    // A and B land in adjacent voxels; dist(A,B)^2 = 0.64+0.04+0.16 = 0.84 < 1.
-    // C is far from both.
-    PointViewPtr view = makeView(
-        table, {{{0.5, 0.5, 0.5}}, {{1.3, 0.7, 0.9}}, {{50.0, 50.0, 50.0}}});
+    std::vector<std::array<double, 3>> pts = {
+        {{0.5, 0.5, 0.5}}, {{1.3, 0.7, 0.9}}, {{50.0, 50.0, 50.0}}};
 
     Options opts;
     opts.add("radius", 1.0);
     opts.add("origin_x", 0.0);
     opts.add("origin_y", 0.0);
     opts.add("origin_z", 0.0);
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, pts, opts);
 
     ASSERT_EQ(out->size(), 2u);
     EXPECT_DOUBLE_EQ(out->getFieldAs<double>(Dimension::Id::X, 0), 0.5);
     EXPECT_DOUBLE_EQ(out->getFieldAs<double>(Dimension::Id::X, 1), 50.0);
 }
 
-// Just outside the radius the neighbor is kept; just inside it is culled.
 TEST(SampleFilterTest, radius_boundary)
 {
-    auto countKept = [](double bx)
+    auto countKept = [](double bx, double originX)
     {
         PointTable table;
-        PointViewPtr view =
-            makeView(table, {{{0.0, 0.0, 0.0}}, {{bx, 0.0, 0.0}}});
+        std::vector<std::array<double, 3>> pts = {{{0.0, 0.0, 0.0}},
+                                                  {{bx, 0.0, 0.0}}};
         Options opts;
         opts.add("radius", 1.0);
-        opts.add("origin_x", 0.0);
+        opts.add("origin_x", originX);
         opts.add("origin_y", 0.0);
         opts.add("origin_z", 0.0);
-        return runSample(table, view, opts)->size();
+        return runSample(table, pts, opts)->size();
     };
 
-    EXPECT_EQ(countKept(0.9), 1u); // within radius -> culled
-    EXPECT_EQ(countKept(1.1), 2u); // beyond radius -> kept
+    EXPECT_EQ(countKept(0.9, 0.0), 1u);
+    EXPECT_EQ(countKept(1.1, 0.0), 2u);
+
+    // The cull test is a strict '<': a point exactly 'radius' away is kept.
+    // The origin shift puts the pair in adjacent voxels, exercising the
+    // neighbor-voxel distance check as well as the enclosing-voxel one.
+    EXPECT_EQ(countKept(1.0, 0.0), 2u);
+    EXPECT_EQ(countKept(1.0, -0.6), 2u);
 }
 
-// In 'dimension' mode no points are dropped; instead each point is flagged
-// 1 (kept) or 0 (would have been culled).
+TEST(SampleFilterTest, repeated_execute_resets_voxels)
+{
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    PointViewPtr view =
+        makeView(table, {{{0.0, 0.0, 0.0}}, {{10.0, 0.0, 0.0}}});
+
+    BufferReader r;
+    r.addView(view);
+
+    SampleFilter filter;
+    filter.setInput(r);
+    Options opts;
+    opts.add("radius", 1.0);
+    filter.setOptions(opts);
+    filter.prepare(table);
+
+    PointViewPtr first = *filter.execute(table).begin();
+    PointViewPtr second = *filter.execute(table).begin();
+
+    EXPECT_EQ(first->size(), 2u);
+    EXPECT_EQ(second->size(), 2u);
+}
+
 TEST(SampleFilterTest, dimension_mode_flags_points)
 {
     PointTable table;
-    PointViewPtr view = makeView(table,
-                                 {{{0.0, 0.0, 0.0}},
-                                  {{0.1, 0.0, 0.0}},
-                                  {{5.0, 0.0, 0.0}},
-                                  {{5.1, 0.0, 0.0}},
-                                  {{10.0, 0.0, 0.0}},
-                                  {{10.1, 0.0, 0.0}}},
-                                 "Sampled");
+    std::vector<std::array<double, 3>> pts = {
+        {{0.0, 0.0, 0.0}}, {{0.1, 0.0, 0.0}},  {{5.0, 0.0, 0.0}},
+        {{5.1, 0.0, 0.0}}, {{10.0, 0.0, 0.0}}, {{10.1, 0.0, 0.0}}};
 
     Options opts;
     opts.add("radius", 1.0);
     opts.add("dimension", "Sampled");
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, pts, opts);
 
     ASSERT_EQ(out->size(), 6u);
     Dimension::Id sampled = table.layout()->findDim("Sampled");
@@ -233,7 +242,6 @@ TEST(SampleFilterTest, dimension_mode_flags_points)
 namespace
 {
 
-// A fixed 5x5x5 grid of points spaced 0.45 apart.
 std::vector<std::array<double, 3>> denseGrid()
 {
     std::vector<std::array<double, 3>> pts;
@@ -246,26 +254,18 @@ std::vector<std::array<double, 3>> denseGrid()
 
 } // unnamed namespace
 
-// Characterization (radius mode): a dense grid sampled at radius 1.0 culls a
-// fixed number of points. The explicit non-zero, distinct origin makes the
-// per-axis voxel-index arithmetic ((coord - origin) / cell) decision-relevant,
-// so any change to the voxelization, neighbor search, or distance arithmetic
-// alters the survivor count and trips this test.
 TEST(SampleFilterTest, characterization_radius)
 {
     PointTable table;
-    PointViewPtr view = makeView(table, denseGrid());
 
     Options opts;
     opts.add("radius", 1.0);
     opts.add("origin_x", 3.0);
     opts.add("origin_y", 7.0);
     opts.add("origin_z", 11.0);
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, denseGrid(), opts);
 
     EXPECT_EQ(out->size(), 18u);
-    // Sum the survivors' coordinates: this pins *which* points survive, not
-    // just how many -- catching mutations that swap one survivor for another.
     double coordSum = 0.0;
     for (PointId i = 0; i < out->size(); ++i)
         coordSum += out->getFieldAs<double>(Dimension::Id::X, i) +
@@ -274,19 +274,16 @@ TEST(SampleFilterTest, characterization_radius)
     EXPECT_NEAR(coordSum, 48.15, 0.01);
 }
 
-// Characterization (cell mode): same grid, exercising the cell -> radius
-// conversion path in ready() (radius = cell/2 * sqrt(3)).
 TEST(SampleFilterTest, characterization_cell)
 {
     PointTable table;
-    PointViewPtr view = makeView(table, denseGrid());
 
     Options opts;
     opts.add("cell", 1.1547);
     opts.add("origin_x", 3.0);
     opts.add("origin_y", 7.0);
     opts.add("origin_z", 11.0);
-    PointViewPtr out = runSample(table, view, opts);
+    PointViewPtr out = runSample(table, denseGrid(), opts);
 
     EXPECT_EQ(out->size(), 18u);
     double coordSum = 0.0;

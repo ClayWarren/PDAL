@@ -32,9 +32,7 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <random>
-
-#include <filters/OptimalNeighborhoodFilter.hpp>
+#include <filters/ApproximateCoplanarFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
@@ -45,103 +43,83 @@ using namespace pdal;
 namespace
 {
 
-PointViewPtr makeCloud(PointTable& table, PointId n)
-{
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<double> coord(0.0, 20.0);
-    PointViewPtr view(new PointView(table));
-    for (PointId i = 0; i < n; ++i)
-    {
-        view->setField(Dimension::Id::X, i, coord(gen));
-        view->setField(Dimension::Id::Y, i, coord(gen));
-        view->setField(Dimension::Id::Z, i, coord(gen));
-    }
-    return view;
-}
-
-PointViewPtr run(PointTable& table, PointId n, const Options& opts)
+PointViewPtr makePlane(PointTable& table)
 {
     table.layout()->registerDims(
         {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    PointViewPtr view(new PointView(table));
+    PointId id = 0;
+    for (double x : {0.0, 1.0, 2.0, 3.0, 4.0})
+        for (double y : {0.0, 1.0, 2.0, 3.0, 4.0})
+        {
+            view->setField(Dimension::Id::X, id, x);
+            view->setField(Dimension::Id::Y, id, y);
+            view->setField(Dimension::Id::Z, id, 0.01 * x + 0.02 * y);
+            ++id;
+        }
+    return view;
+}
 
-    BufferReader r;
-    OptimalNeighborhood filter;
-    filter.setInput(r);
+PointViewPtr makeVolume(PointTable& table)
+{
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    PointViewPtr view(new PointView(table));
+    PointId id = 0;
+    for (double x : {0.0, 1.0, 2.0})
+        for (double y : {0.0, 1.0, 2.0})
+            for (double z : {0.0, 1.0, 2.0})
+            {
+                view->setField(Dimension::Id::X, id, x);
+                view->setField(Dimension::Id::Y, id, y);
+                view->setField(Dimension::Id::Z, id, z);
+                ++id;
+            }
+    return view;
+}
+
+using ViewMaker = PointViewPtr (*)(PointTable&);
+
+PointViewPtr run(PointTable& table, ViewMaker makeView)
+{
+    BufferReader reader;
+    ApproximateCoplanarFilter filter;
+    filter.setInput(reader);
+    Options opts;
+    opts.add("knn", 8);
     filter.setOptions(opts);
     filter.prepare(table);
-    r.addView(makeCloud(table, n));
+    reader.addView(makeView(table));
     return *filter.execute(table).begin();
 }
 
 } // unnamed namespace
 
-TEST(OptimalNeighborhoodFilterTest, create)
+TEST(ApproximateCoplanarFilterTest, create)
 {
     StageFactory f;
-    Stage* filter(f.createStage("filters.optimalneighborhood"));
+    Stage* filter(f.createStage("filters.approximatecoplanar"));
     EXPECT_TRUE(filter);
-    OptimalNeighborhood s;
-    EXPECT_EQ(s.getName(), "filters.optimalneighborhood");
+    ApproximateCoplanarFilter c;
+    EXPECT_EQ(c.getName(), "filters.approximatecoplanar");
 }
 
-TEST(OptimalNeighborhoodFilterTest, k_within_bounds)
+TEST(ApproximateCoplanarFilterTest, labels_plane)
 {
     PointTable table;
+    PointViewPtr out = run(table, makePlane);
 
-    Options opts;
-    opts.add("min_k", 10);
-    opts.add("max_k", 14);
-    PointViewPtr out = run(table, 60, opts);
-    ASSERT_EQ(out->size(), 60u);
-
+    PointId coplanar = 0;
     for (PointId i = 0; i < out->size(); ++i)
-    {
-        int k = out->getFieldAs<int>(Dimension::Id::OptimalKNN, i);
-        EXPECT_GE(k, 10);
-        EXPECT_LE(k, 14);
-        EXPECT_GT(out->getFieldAs<double>(Dimension::Id::OptimalRadius, i),
-                  0.0);
-    }
+        coplanar += out->getFieldAs<unsigned>(Dimension::Id::Coplanar, i);
+    EXPECT_GE(coplanar, 20u);
 }
 
-TEST(OptimalNeighborhoodFilterTest, custom_k_window)
+TEST(ApproximateCoplanarFilterTest, rejects_volume)
 {
     PointTable table;
+    PointViewPtr out = run(table, makeVolume);
 
-    Options opts;
-    opts.add("min_k", 5);
-    opts.add("max_k", 8);
-    PointViewPtr out = run(table, 60, opts);
-
-    bool sawBelowDefault = false;
     for (PointId i = 0; i < out->size(); ++i)
-    {
-        int k = out->getFieldAs<int>(Dimension::Id::OptimalKNN, i);
-        EXPECT_GE(k, 5);
-        EXPECT_LE(k, 8);
-        if (k < 10)
-            sawBelowDefault = true;
-    }
-    EXPECT_TRUE(sawBelowDefault);
-}
-
-TEST(OptimalNeighborhoodFilterTest, characterization)
-{
-    PointTable table;
-
-    Options opts;
-    opts.add("min_k", 10);
-    opts.add("max_k", 14);
-    PointViewPtr out = run(table, 60, opts);
-    ASSERT_EQ(out->size(), 60u);
-
-    long knnSum = 0;
-    double radiusSum = 0.0;
-    for (PointId i = 0; i < out->size(); ++i)
-    {
-        knnSum += out->getFieldAs<int>(Dimension::Id::OptimalKNN, i);
-        radiusSum += out->getFieldAs<double>(Dimension::Id::OptimalRadius, i);
-    }
-    EXPECT_EQ(knnSum, 686);
-    EXPECT_NEAR(radiusSum, 487.088, 0.05);
+        EXPECT_EQ(out->getFieldAs<unsigned>(Dimension::Id::Coplanar, i), 0u);
 }

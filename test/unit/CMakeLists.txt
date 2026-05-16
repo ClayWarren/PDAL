@@ -32,6 +32,7 @@ target_include_directories(${PDAL_TEST_SUPPORT_OBJS}
 PDAL_TARGET_COMPILE_SETTINGS(${PDAL_TEST_SUPPORT_OBJS})
 
 PDAL_ADD_TEST(pdal_bounds_test FILES BoundsTest.cpp)
+PDAL_ADD_TEST(pdal_charbuf_test FILES CharbufTest.cpp)
 PDAL_ADD_TEST(pdal_config_test FILES ConfigTest.cpp)
 PDAL_ADD_TEST(pdal_eigen_test
     FILES
@@ -131,6 +132,8 @@ PDAL_ADD_TEST(pdal_polygon_test
     LINK_WITH
         GDAL::GDAL
 )
+PDAL_ADD_TEST(pdal_quad_index_test FILES QuadIndexTest.cpp)
+PDAL_ADD_TEST(pdal_scaling_test FILES ScalingTest.cpp)
 
 PDAL_ADD_TEST(pdal_segmentation_test FILES SegmentationTest.cpp)
 PDAL_ADD_TEST(pdal_spatial_reference_test
@@ -145,8 +148,15 @@ PDAL_ADD_TEST(pdal_spatial_reference_test
 PDAL_ADD_TEST(pdal_stage_factory_test FILES StageFactoryTest.cpp)
 PDAL_ADD_TEST(pdal_streaming_test FILES StreamingTest.cpp)
 PDAL_ADD_TEST(pdal_support_test FILES SupportTest.cpp)
+PDAL_ADD_TEST(pdal_thread_pool_test FILES ThreadPoolTest.cpp)
 PDAL_ADD_TEST(pdal_utils_test FILES UtilsTest.cpp)
 PDAL_ADD_TEST(pdal_uuid_test FILES UuidTest.cpp)
+PDAL_ADD_TEST(pdal_xml_schema_test
+    FILES
+        XMLSchemaTest.cpp
+    LINK_WITH
+        LibXml2::LibXml2
+)
 if (PDAL_HAVE_ZLIB)
 PDAL_ADD_TEST(pdal_deflate_test FILES DeflateTest.cpp)
 endif()
@@ -432,6 +442,17 @@ PDAL_ADD_TEST(pdal_filters_returns_test FILES filters/ReturnsFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_shell_test FILES filters/ShellFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_skewness_test FILES filters/SkewnessFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_grid_decimation_test FILES filters/GridDecimationFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_expressionstats_test FILES filters/ExpressionStatsFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_eigenvalues_test
+    FILES
+        filters/EigenvaluesFilterTest.cpp
+    INCLUDES
+        ${PDAL_VENDOR_EIGEN_DIR})
+PDAL_ADD_TEST(pdal_filters_approximatecoplanar_test
+    FILES
+        filters/ApproximateCoplanarFilterTest.cpp
+    INCLUDES
+        ${PDAL_VENDOR_EIGEN_DIR})
 PDAL_ADD_TEST(pdal_filters_estimaterank_test FILES filters/EstimateRankFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_cluster_test FILES filters/ClusterFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_mad_test FILES filters/MADFilterTest.cpp)
@@ -440,6 +461,13 @@ PDAL_ADD_TEST(pdal_filters_lof_test FILES filters/LOFFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_dbscan_test FILES filters/DBSCANFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_optimalneighborhood_test FILES filters/OptimalNeighborhoodFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_sample_test FILES filters/SampleFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_outlier_test FILES filters/OutlierFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_fps_test FILES filters/FarthestPointSamplingFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_radialdensity_test FILES filters/RadialDensityFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_sparsesurface_test FILES filters/SparseSurfaceFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_zsmooth_test FILES filters/ZsmoothFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_straighten_test FILES filters/StraightenFilterTest.cpp)
+PDAL_ADD_TEST(pdal_filters_litree_test FILES filters/LiTreeFilterTest.cpp)
 
 PDAL_ADD_TEST(pdal_filters_smrf_test FILES filters/SMRFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_sort_test

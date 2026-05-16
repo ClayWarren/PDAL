@@ -32,88 +32,75 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/EstimateRankFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 
 using namespace pdal;
 
-namespace
-{
-
-PointViewPtr makeView(PointTable& table)
-{
-    return PointViewPtr(new PointView(table));
-}
-
-} // unnamed namespace
-
-TEST(EstimateRankFilterTest, create)
+TEST(LiTreeFilterTest, create)
 {
     StageFactory f;
-    Stage* filter(f.createStage("filters.estimaterank"));
+    Stage* filter(f.createStage("filters.litree"));
     EXPECT_TRUE(filter);
+    EXPECT_EQ(filter->getName(), "filters.litree");
 }
 
-TEST(EstimateRankFilterTest, planar)
+TEST(LiTreeFilterTest, missing_hag_throws)
 {
     PointTable table;
     table.layout()->registerDims(
         {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    BufferReader reader;
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 0.0);
+    reader.addView(view);
 
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    EXPECT_EQ(filter.getName(), "filters.estimaterank");
-    filter.prepare(table);
+    StageFactory f;
+    Stage* filter(f.createStage("filters.litree"));
+    filter->setInput(reader);
+    EXPECT_THROW(filter->prepare(table), pdal_error);
+}
 
-    PointViewPtr view = makeView(table);
+// A single tight, tall cluster (HeightAboveGround rising to 10) is segmented
+// into one tree: its points are labeled with ClusterID 1.
+TEST(LiTreeFilterTest, segments_a_tree)
+{
+    PointTable table;
+    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
+                                  Dimension::Id::Z,
+                                  Dimension::Id::HeightAboveGround});
 
-    PointId idx = 0;
-    for (int x = 0; x < 5; ++x)
-        for (int y = 0; y < 5; ++y, ++idx)
+    BufferReader reader;
+    StageFactory f;
+    Stage* filter(f.createStage("filters.litree"));
+    filter->setInput(reader);
+    filter->prepare(table);
+
+    PointViewPtr view(new PointView(table));
+    PointId id = 0;
+    for (int i = 0; i < 6; ++i)
+        for (int j = 0; j < 6; ++j, ++id)
         {
-            view->setField(Dimension::Id::X, idx, (double)x);
-            view->setField(Dimension::Id::Y, idx, (double)y);
-            view->setField(Dimension::Id::Z, idx, 0.0);
+            double hag = 1.0 + (static_cast<double>(id) / 35.0) * 9.0;
+            view->setField(Dimension::Id::X, id, i * 0.2);
+            view->setField(Dimension::Id::Y, id, j * 0.2);
+            view->setField(Dimension::Id::Z, id, hag);
+            view->setField(Dimension::Id::HeightAboveGround, id, hag);
         }
-    r.addView(view);
+    reader.addView(view);
 
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
+    PointViewPtr out = *filter->execute(table).begin();
+    ASSERT_EQ(out->size(), 36u);
 
-    ASSERT_EQ(out->size(), 25u);
+    // Characterization: the segmentation assigns exactly 25 of the 36 points
+    // to the tree. Any change to the dt threshold, the classify-point test,
+    // or the minimum-size gate shifts this count.
+    int inTree = 0;
     for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 2);
-}
-
-TEST(EstimateRankFilterTest, linear)
-{
-    PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
-
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    for (PointId i = 0; i < 12; ++i)
-    {
-        view->setField(Dimension::Id::X, i, (double)i);
-        view->setField(Dimension::Id::Y, i, 0.0);
-        view->setField(Dimension::Id::Z, i, 0.0);
-    }
-    r.addView(view);
-
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 12u);
-    for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 1);
+        if (out->getFieldAs<int>(Dimension::Id::ClusterID, i) == 1)
+            ++inTree;
+    EXPECT_EQ(inTree, 25);
 }

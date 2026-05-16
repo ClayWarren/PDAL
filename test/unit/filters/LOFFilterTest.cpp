@@ -43,16 +43,8 @@ using namespace pdal;
 namespace
 {
 
-// A uniform 5x5 grid (spacing 2, z=0) plus one far-flung outlier at id 25.
 PointViewPtr makeGridWithOutlier(PointTable& table)
 {
-    table.layout()->registerDim(Dimension::Id::X);
-    table.layout()->registerDim(Dimension::Id::Y);
-    table.layout()->registerDim(Dimension::Id::Z);
-    table.layout()->registerDim(Dimension::Id::NNDistance);
-    table.layout()->registerDim(Dimension::Id::LocalReachabilityDistance);
-    table.layout()->registerDim(Dimension::Id::LocalOutlierFactor);
-
     PointViewPtr view(new PointView(table));
     PointId idx = 0;
     for (int i = 0; i < 5; ++i)
@@ -68,14 +60,17 @@ PointViewPtr makeGridWithOutlier(PointTable& table)
     return view;
 }
 
-PointViewPtr run(PointTable& table, PointViewPtr view, const Options& opts)
+PointViewPtr run(PointTable& table, const Options& opts)
 {
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+
     BufferReader r;
-    r.addView(view);
     LOFFilter filter;
     filter.setInput(r);
     filter.setOptions(opts);
     filter.prepare(table);
+    r.addView(makeGridWithOutlier(table));
     return *filter.execute(table).begin();
 }
 
@@ -90,15 +85,12 @@ TEST(LOFFilterTest, create)
     EXPECT_EQ(l.getName(), "filters.lof");
 }
 
-// The outlier scores a markedly higher local outlier factor and neighbor
-// distance than a point in the dense interior of the grid.
 TEST(LOFFilterTest, flags_outlier)
 {
     PointTable table;
-    PointViewPtr out = run(table, makeGridWithOutlier(table), Options());
+    PointViewPtr out = run(table, Options());
     ASSERT_EQ(out->size(), 26u);
 
-    // Point id 12 is the center of the 5x5 grid; 25 is the outlier.
     const double nnInlier =
         out->getFieldAs<double>(Dimension::Id::NNDistance, 12);
     const double nnOutlier =
@@ -108,26 +100,19 @@ TEST(LOFFilterTest, flags_outlier)
     const double lofOutlier =
         out->getFieldAs<double>(Dimension::Id::LocalOutlierFactor, 25);
 
-    // NNDistance is the distance to the (minpts+1)-th neighbor. On this grid
-    // (spacing 2) the 11th-nearest neighbor of the center point lies at
-    // offset (4,0) from it -- a distance of exactly 4.0.
     EXPECT_NEAR(nnInlier, 4.0, 1e-6);
     EXPECT_GT(
         out->getFieldAs<double>(Dimension::Id::LocalReachabilityDistance, 12),
         0.0);
 
-    // The outlier sits much farther from its neighbors.
     EXPECT_GT(nnOutlier, nnInlier);
     EXPECT_GT(nnOutlier, 100.0);
 
-    // And is scored as a far stronger outlier; a grid interior point is not.
     EXPECT_GT(lofOutlier, lofInlier);
     EXPECT_GT(lofOutlier, 2.0);
     EXPECT_LT(lofInlier, 2.0);
 }
 
-// 'minpts' selects which neighbor sets the k-distance; a smaller value yields
-// a nearer neighbor and thus a smaller NNDistance.
 TEST(LOFFilterTest, minpts_controls_k_distance)
 {
     auto nnAt = [](size_t minpts)
@@ -135,20 +120,17 @@ TEST(LOFFilterTest, minpts_controls_k_distance)
         PointTable table;
         Options opts;
         opts.add("minpts", minpts);
-        PointViewPtr out = run(table, makeGridWithOutlier(table), opts);
+        PointViewPtr out = run(table, opts);
         return out->getFieldAs<double>(Dimension::Id::NNDistance, 12);
     };
 
     EXPECT_LT(nnAt(4), nnAt(10));
 }
 
-// Characterization: the three-pass reachability/LOF arithmetic is hard to
-// derive by hand, so pin the aggregate for the fixed grid+outlier cloud. Any
-// change to the reachability-distance or LOF math shifts these sums.
 TEST(LOFFilterTest, characterization)
 {
     PointTable table;
-    PointViewPtr out = run(table, makeGridWithOutlier(table), Options());
+    PointViewPtr out = run(table, Options());
     ASSERT_EQ(out->size(), 26u);
 
     double nnSum = 0.0;
@@ -158,7 +140,6 @@ TEST(LOFFilterTest, characterization)
         nnSum += out->getFieldAs<double>(Dimension::Id::NNDistance, i);
         lofSum += out->getFieldAs<double>(Dimension::Id::LocalOutlierFactor, i);
     }
-    // Pinned for the fixed grid+outlier cloud.
     EXPECT_NEAR(nnSum, 1839.95, 1.0);
     EXPECT_NEAR(lofSum, 376.933, 0.5);
 }

@@ -32,10 +32,10 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/EstimateRankFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 
 using namespace pdal;
@@ -43,77 +43,74 @@ using namespace pdal;
 namespace
 {
 
-PointViewPtr makeView(PointTable& table)
+PointViewPtr makePlane(PointTable& table)
 {
-    return PointViewPtr(new PointView(table));
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    PointViewPtr view(new PointView(table));
+    PointId id = 0;
+    for (double x : {0.0, 1.0, 2.0})
+        for (double y : {0.0, 1.0, 2.0})
+        {
+            view->setField(Dimension::Id::X, id, x);
+            view->setField(Dimension::Id::Y, id, y);
+            view->setField(Dimension::Id::Z, id, 0.0);
+            ++id;
+        }
+    return view;
+}
+
+PointViewPtr run(PointTable& table, const Options& opts)
+{
+    BufferReader reader;
+    StageFactory f;
+    Stage* filter(f.createStage("filters.eigenvalues"));
+    filter->setInput(reader);
+    filter->setOptions(opts);
+    filter->prepare(table);
+    reader.addView(makePlane(table));
+    return *filter->execute(table).begin();
 }
 
 } // unnamed namespace
 
-TEST(EstimateRankFilterTest, create)
+TEST(EigenvaluesFilterTest, create)
 {
     StageFactory f;
-    Stage* filter(f.createStage("filters.estimaterank"));
+    Stage* filter(f.createStage("filters.eigenvalues"));
     EXPECT_TRUE(filter);
+    EXPECT_EQ(filter->getName(), "filters.eigenvalues");
 }
 
-TEST(EstimateRankFilterTest, planar)
+TEST(EigenvaluesFilterTest, planar_neighborhood)
 {
     PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    Options opts;
+    opts.add("knn", 8);
+    PointViewPtr out = run(table, opts);
 
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    EXPECT_EQ(filter.getName(), "filters.estimaterank");
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    PointId idx = 0;
-    for (int x = 0; x < 5; ++x)
-        for (int y = 0; y < 5; ++y, ++idx)
-        {
-            view->setField(Dimension::Id::X, idx, (double)x);
-            view->setField(Dimension::Id::Y, idx, (double)y);
-            view->setField(Dimension::Id::Z, idx, 0.0);
-        }
-    r.addView(view);
-
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 25u);
     for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 2);
-}
-
-TEST(EstimateRankFilterTest, linear)
-{
-    PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
-
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    for (PointId i = 0; i < 12; ++i)
     {
-        view->setField(Dimension::Id::X, i, (double)i);
-        view->setField(Dimension::Id::Y, i, 0.0);
-        view->setField(Dimension::Id::Z, i, 0.0);
+        EXPECT_NEAR(out->getFieldAs<double>(Dimension::Id::Eigenvalue0, i), 0.0,
+                    1e-12);
+        EXPECT_GT(out->getFieldAs<double>(Dimension::Id::Eigenvalue1, i), 0.0);
+        EXPECT_GT(out->getFieldAs<double>(Dimension::Id::Eigenvalue2, i), 0.0);
     }
-    r.addView(view);
+}
 
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
+TEST(EigenvaluesFilterTest, normalized_eigenvalues_sum_to_one)
+{
+    PointTable table;
+    Options opts;
+    opts.add("knn", 8);
+    opts.add("normalize", true);
+    PointViewPtr out = run(table, opts);
 
-    ASSERT_EQ(out->size(), 12u);
     for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 1);
+    {
+        double sum = out->getFieldAs<double>(Dimension::Id::Eigenvalue0, i) +
+                     out->getFieldAs<double>(Dimension::Id::Eigenvalue1, i) +
+                     out->getFieldAs<double>(Dimension::Id::Eigenvalue2, i);
+        EXPECT_NEAR(sum, 1.0, 1e-12);
+    }
 }

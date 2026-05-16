@@ -32,7 +32,7 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/EstimateRankFilter.hpp>
+#include <filters/ExpressionStatsFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
@@ -45,75 +45,67 @@ namespace
 
 PointViewPtr makeView(PointTable& table)
 {
-    return PointViewPtr(new PointView(table));
+    table.layout()->registerDim(Dimension::Id::X);
+    PointViewPtr view(new PointView(table));
+    const std::vector<double> xs = {1.0, 1.0, 2.0, 3.0, 3.0, 4.0};
+    for (PointId i = 0; i < xs.size(); ++i)
+        view->setField(Dimension::Id::X, i, xs[i]);
+    return view;
+}
+
+MetadataNode findChild(MetadataNode node, const std::string& name)
+{
+    return node.findChild([&name](MetadataNode child)
+                          { return child.name() == name; });
+}
+
+point_count_t countForValue(MetadataNode statistic, double value)
+{
+    for (MetadataNode bin : statistic.children("bins"))
+    {
+        MetadataNode valueNode = findChild(bin, "value");
+        if (valueNode.empty() || valueNode.value<double>() != value)
+            continue;
+        return findChild(bin, "count").value<point_count_t>();
+    }
+    return 0;
 }
 
 } // unnamed namespace
 
-TEST(EstimateRankFilterTest, create)
+TEST(ExpressionStatsFilterTest, create)
 {
     StageFactory f;
-    Stage* filter(f.createStage("filters.estimaterank"));
+    Stage* filter(f.createStage("filters.expressionstats"));
     EXPECT_TRUE(filter);
+    ExpressionStatsFilter s;
+    EXPECT_EQ(s.getName(), "filters.expressionstats");
 }
 
-TEST(EstimateRankFilterTest, planar)
+TEST(ExpressionStatsFilterTest, metadata_bins_by_expression)
 {
     PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    BufferReader reader;
+    reader.addView(makeView(table));
 
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    EXPECT_EQ(filter.getName(), "filters.estimaterank");
+    ExpressionStatsFilter filter;
+    filter.setInput(reader);
+    Options opts;
+    opts.add("dimension", "X");
+    opts.add("expressions", "X < 3");
+    opts.add("expressions", "X >= 3");
+    filter.setOptions(opts);
     filter.prepare(table);
+    filter.execute(table);
 
-    PointViewPtr view = makeView(table);
+    MetadataNode metadata = filter.getMetadata();
+    EXPECT_EQ(findChild(metadata, "dimension").value(), "X");
 
-    PointId idx = 0;
-    for (int x = 0; x < 5; ++x)
-        for (int y = 0; y < 5; ++y, ++idx)
-        {
-            view->setField(Dimension::Id::X, idx, (double)x);
-            view->setField(Dimension::Id::Y, idx, (double)y);
-            view->setField(Dimension::Id::Z, idx, 0.0);
-        }
-    r.addView(view);
+    std::vector<MetadataNode> stats = metadata.children("statistic");
+    ASSERT_EQ(stats.size(), 2u);
 
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 25u);
-    for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 2);
-}
-
-TEST(EstimateRankFilterTest, linear)
-{
-    PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
-
-    BufferReader r;
-    EstimateRankFilter filter;
-    filter.setInput(r);
-    filter.prepare(table);
-
-    PointViewPtr view = makeView(table);
-
-    for (PointId i = 0; i < 12; ++i)
-    {
-        view->setField(Dimension::Id::X, i, (double)i);
-        view->setField(Dimension::Id::Y, i, 0.0);
-        view->setField(Dimension::Id::Z, i, 0.0);
-    }
-    r.addView(view);
-
-    PointViewSet viewSet = filter.execute(table);
-    PointViewPtr out = *viewSet.begin();
-
-    ASSERT_EQ(out->size(), 12u);
-    for (PointId i = 0; i < out->size(); ++i)
-        EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Rank, i), 1);
+    EXPECT_EQ(countForValue(stats[0], 1.0), 2u);
+    EXPECT_EQ(countForValue(stats[0], 2.0), 1u);
+    EXPECT_EQ(countForValue(stats[1], 3.0), 2u);
+    EXPECT_EQ(countForValue(stats[1], 4.0), 1u);
 }
