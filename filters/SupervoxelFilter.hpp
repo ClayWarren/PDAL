@@ -62,7 +62,7 @@ private:
     virtual void filter(PointView& view);
 
     double dist(const PointRef& i, const PointRef& j);
-    double lambda0(PointView &view, std::vector<PointIdList> &G);
+    double lambda0(PointView& view, std::vector<PointIdList>& G);
 };
 
 } // namespace pdal

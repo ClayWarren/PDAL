@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2016, Howard Butler (howard@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Howard Butler (howard@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 #pragma once
 
 #include <pdal/Log.hpp>
@@ -47,8 +47,8 @@ class OGRGeometry;
 #if __has_include(<gdal_fwd.h>)
 #include <gdal_fwd.h>
 #else
-using OGRGeometryH = void *;
-using OGRSpatialReferenceH = void *;
+using OGRGeometryH = void*;
+using OGRSpatialReferenceH = void*;
 #endif
 
 namespace pdal
@@ -61,24 +61,31 @@ class PDAL_EXPORT Geometry
 
 public:
     Geometry(const std::string& wkt_or_wkb_or_json,
-           SpatialReference ref = SpatialReference());
+             SpatialReference ref = SpatialReference());
     Geometry() = default;
     Geometry(const Geometry&);
-    Geometry(double x, double y, double z, SpatialReference ref = SpatialReference());
+    Geometry(double x, double y, double z,
+             SpatialReference ref = SpatialReference());
     Geometry(Geometry&&);
 
-    // The redirection to the construct function is to deal with GDAL types changing
-    // depending on debug.
+    // The redirection to the construct function is to deal with GDAL types
+    // changing depending on debug.
     Geometry(OGRGeometryH g)
-        { construct(reinterpret_cast<void *>(g)); }
+    {
+        construct(reinterpret_cast<void*>(g));
+    }
     Geometry(OGRGeometryH g, const SpatialReference& srs)
-        { construct(reinterpret_cast<void *>(g), srs); }
+    {
+        construct(reinterpret_cast<void*>(g), srs);
+    }
 
     Geometry& operator=(const Geometry&);
     virtual ~Geometry() = default;
 
     OGRGeometryH getOGRHandle()
-    { return reinterpret_cast<OGRGeometryH>(m_geom.get()); }
+    {
+        return reinterpret_cast<OGRGeometryH>(m_geom.get());
+    }
 
     virtual void update(const std::string& wkt_or_json);
     virtual bool valid() const;
@@ -89,14 +96,16 @@ public:
     SpatialReference getSpatialReference() const;
     Utils::StatusWithReason transform(SpatialReference ref);
 
-    std::string wkt(double precision=15, bool bOutputZ=false) const;
+    std::string wkt(double precision = 15, bool bOutputZ = false) const;
     std::string wkb() const;
-    std::string json(double precision=15) const;
+    std::string json(double precision = 15) const;
 
     BOX3D bounds() const;
 
-    operator bool () const
-        { return m_geom != NULL; }
+    operator bool() const
+    {
+        return m_geom != NULL;
+    }
     static void throwNoGeos();
 
     double distance(double x, double y, double z) const;
@@ -105,18 +114,19 @@ public:
 protected:
     struct PDAL_EXPORT OGRGeometryDeleter
     {
-        void operator()(OGRGeometry *geom);
+        void operator()(OGRGeometry* geom);
     };
     std::unique_ptr<OGRGeometry, OGRGeometryDeleter> m_geom;
 
-    void construct(void *geom);  // geom is an OGRGeometry handle.
-    void construct(void *geom, const SpatialReference& srs);  // geom is an OGRGeometry handle.
+    void construct(void* geom); // geom is an OGRGeometry handle.
+    void
+    construct(void* geom,
+              const SpatialReference& srs); // geom is an OGRGeometry handle.
 
     friend PDAL_EXPORT std::ostream& operator<<(std::ostream& ostr,
-        const Geometry& p);
+                                                const Geometry& p);
     friend PDAL_EXPORT std::istream& operator>>(std::istream& istr,
-        Geometry& p);
+                                                Geometry& p);
 };
 
 } // namespace pdal
-

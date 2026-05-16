@@ -40,22 +40,20 @@
 namespace pdal
 {
 
-static PluginInfo const s_info
-{
-    "writers.matlab",
-    "Matlab .mat file writer.",
-    "https://pdal.org/stages/writers.matlab.html"
-};
+static PluginInfo const s_info{"writers.matlab", "Matlab .mat file writer.",
+                               "https://pdal.org/stages/writers.matlab.html"};
 
 CREATE_SHARED_STAGE(MatlabWriter, s_info)
-std::string MatlabWriter::getName() const { return s_info.name; }
+std::string MatlabWriter::getName() const
+{
+    return s_info.name;
+}
 
 void MatlabWriter::addArgs(ProgramArgs& args)
 {
     args.add("output_dims", "Output dimensions", m_outputDims);
     args.add("struct", "Matlab struct name", m_structName, "PDAL");
 }
-
 
 void MatlabWriter::prepared(PointTableRef table)
 {
@@ -67,16 +65,16 @@ void MatlabWriter::prepared(PointTableRef table)
     {
         for (std::string& s : m_outputDims)
         {
-//             DimType dimType = table.layout()->findDimType(s);
+            //             DimType dimType = table.layout()->findDimType(s);
             Dimension::Id id = table.layout()->findDim(s);
             if (id == Dimension::Id::Unknown)
-                throwError("Invalid dimension '" + s + "' specified for "
-                    "'output_dims' option.");
+                throwError("Invalid dimension '" + s +
+                           "' specified for "
+                           "'output_dims' option.");
             m_dims.push_back(id);
         }
     }
 }
-
 
 void MatlabWriter::ready(PointTableRef table)
 {
@@ -87,17 +85,16 @@ void MatlabWriter::ready(PointTableRef table)
     m_tableMetadata = table.metadata();
 }
 
-
 void MatlabWriter::write(const PointViewPtr view)
 {
 
-    mxArray* data = mlang::Script::setMatlabStruct(view, m_dims, "", m_tableMetadata, log());
+    mxArray* data = mlang::Script::setMatlabStruct(view, m_dims, "",
+                                                   m_tableMetadata, log());
     if (matPutVariable(m_matfile, m_structName.c_str(), data))
         throwError("Could not write points to file '" + filename() + "'.");
 
     mxDestroyArray(data);
 }
-
 
 void MatlabWriter::done(PointTableRef table)
 {

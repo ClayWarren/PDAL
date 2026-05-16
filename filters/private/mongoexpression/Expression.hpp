@@ -43,10 +43,9 @@ namespace pdal
 class Expression
 {
 public:
-    Expression() : m_layout(nullptr)
-    {}
+    Expression() : m_layout(nullptr) {}
 
-    Expression(const PointLayout *layout, const NL::json& json)
+    Expression(const PointLayout* layout, const NL::json& json)
         : m_layout(layout)
     {
         build(m_root, json);
@@ -65,7 +64,7 @@ public:
 private:
     void build(LogicGate& gate, const NL::json& json);
 
-    const PointLayout *m_layout;
+    const PointLayout* m_layout;
     LogicalAnd m_root;
 };
 
@@ -76,4 +75,3 @@ inline std::ostream& operator<<(std::ostream& os, const Expression& expression)
 }
 
 } // namespace pdal
-

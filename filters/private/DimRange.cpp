@@ -121,15 +121,14 @@ std::string::size_type DimRange::subParse(const std::string& r)
     return pos;
 }
 
-
 bool DimRange::valuePasses(double v) const
 {
     // Determine if a point passes a range.
-    bool fail = std::isnan(v) ||
-        ((m_inclusive_lower_bound && v < m_lower_bound) ||
-        (!m_inclusive_lower_bound && v <= m_lower_bound) ||
-        (m_inclusive_upper_bound && v > m_upper_bound) ||
-        (!m_inclusive_upper_bound && v >= m_upper_bound));
+    bool fail =
+        std::isnan(v) || ((m_inclusive_lower_bound && v < m_lower_bound) ||
+                          (!m_inclusive_lower_bound && v <= m_lower_bound) ||
+                          (m_inclusive_upper_bound && v > m_upper_bound) ||
+                          (!m_inclusive_upper_bound && v >= m_upper_bound));
     if (m_negate)
         fail = !fail;
     return !fail;
@@ -170,14 +169,12 @@ void DimRange::parse(const std::string& r)
         throw error("Invalid characters following valid range.");
 }
 
-
-bool operator < (const DimRange& r1, const DimRange& r2)
+bool operator<(const DimRange& r1, const DimRange& r2)
 {
-    return (r1.m_name < r2.m_name ? true :
-        r1.m_name > r2.m_name ? false :
-        &r1 < &r2);
+    return (r1.m_name < r2.m_name   ? true
+            : r1.m_name > r2.m_name ? false
+                                    : &r1 < &r2);
 }
-
 
 std::istream& operator>>(std::istream& in, DimRange& r)
 {
@@ -187,7 +184,6 @@ std::istream& operator>>(std::istream& in, DimRange& r)
     r.parse(s);
     return in;
 }
-
 
 std::ostream& operator<<(std::ostream& out, const DimRange& r)
 {
@@ -202,4 +198,3 @@ std::ostream& operator<<(std::ostream& out, const DimRange& r)
 }
 
 } // namespace pdal
-

@@ -42,16 +42,14 @@ namespace pdal
 class PDAL_EXPORT SkewnessBalancingFilter : public Filter
 {
 public:
-    SkewnessBalancingFilter() : Filter()
-    {
-    }
+    SkewnessBalancingFilter() : Filter() {}
 
     std::string getName() const;
 
 private:
     uint8_t m_groundClass;
     uint8_t m_otherClass;
-    bool m_onlyGround;    
+    bool m_onlyGround;
 
     virtual void addArgs(ProgramArgs& args);
     virtual void addDimensions(PointLayoutPtr layout);

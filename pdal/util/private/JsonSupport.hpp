@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2024, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2024, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -58,7 +58,7 @@ inline StatusWithReason parseJson(const std::string& s, NL::json& json)
         auto pos = s.find(']');
         if (pos != std::string::npos)
             s = s.substr(pos + 1);
-        return { -1, s };
+        return {-1, s};
     }
     return true;
 }
@@ -112,28 +112,31 @@ inline NL::json handleReaderArgs(NL::json rawReaderArgs)
         array_args.push_back(rawReaderArgs);
         rawReaderArgs = array_args;
     }
-    for (auto& opts: rawReaderArgs)
+    for (auto& opts : rawReaderArgs)
         if (!opts.is_object())
-            throw pdal_error("Reader Args for each reader must be a valid JSON object");
+            throw pdal_error(
+                "Reader Args for each reader must be a valid JSON object");
 
     NL::json readerArgs;
-    for (const NL::json& readerPipeline: rawReaderArgs)
+    for (const NL::json& readerPipeline : rawReaderArgs)
     {
         if (!readerPipeline.contains("type"))
-            throw pdal_error("No \"type\" key found in supplied reader arguments.");
+            throw pdal_error(
+                "No \"type\" key found in supplied reader arguments.");
 
         std::string driver = jsonValue<std::string>(readerPipeline, "type");
         if (rawReaderArgs.contains(driver))
-            throw pdal_error("Multiple instances of the same driver in supplied reader arguments.");
-        readerArgs[driver] = { };
+            throw pdal_error("Multiple instances of the same driver in "
+                             "supplied reader arguments.");
+        readerArgs[driver] = {};
 
-        for (auto& arg: readerPipeline.items())
+        for (auto& arg : readerPipeline.items())
         {
             if (arg.key() == "type")
                 continue;
 
             std::string key = arg.key();
-            readerArgs[driver][key] = { };
+            readerArgs[driver][key] = {};
             readerArgs[driver][key] = arg.value();
         }
     }
@@ -141,11 +144,13 @@ inline NL::json handleReaderArgs(NL::json rawReaderArgs)
 }
 
 inline Options setReaderOptions(const NL::json& readerArgs,
-    const std::string& driver, const std::string& filename)
+                                const std::string& driver,
+                                const std::string& filename)
 {
     Options readerOptions;
     bool filenameSet = false;
-    if (readerArgs.contains(driver)) {
+    if (readerArgs.contains(driver))
+    {
         NL::json args = jsonValue(readerArgs, driver);
         for (auto& arg : args.items())
         {
@@ -156,14 +161,15 @@ inline Options setReaderOptions(const NL::json& readerArgs,
             if (key == "filename")
             {
                 if (!val.is_object())
-                    throw pdal_error("value for " + driver + " 'filename' argument " +
-                        "must be a valid JSON object.");
+                    throw pdal_error("value for " + driver +
+                                     " 'filename' argument " +
+                                     "must be a valid JSON object.");
                 if (val.contains("path"))
                     val.erase("path");
                 val += {"path", filename};
 
-                // This doesn't check if the driver supports headers/queries: if not,
-                // the reader will only use the filename
+                // This doesn't check if the driver supports headers/queries: if
+                // not, the reader will only use the filename
                 readerOptions.replace("filename", val.dump());
                 filenameSet = true;
                 continue;
@@ -187,4 +193,3 @@ inline Options setReaderOptions(const NL::json& readerArgs,
 
 } // namespace Utils
 } // namespace pdal
-

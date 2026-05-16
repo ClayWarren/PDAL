@@ -1,46 +1,46 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
 #include <random>
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/StageFactory.hpp>
 #include <filters/StatsFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
+#include <pdal/PDALUtils.hpp>
+#include <pdal/StageFactory.hpp>
 
 #include "Support.hpp"
 
@@ -85,7 +85,6 @@ TEST(Stats, handcalc)
     EXPECT_NEAR(xstats.sampleExcessKurtosis(), -1.862062002, 0.000000001);
 }
 
-
 TEST(Stats, baseline)
 {
     PointTable table;
@@ -119,7 +118,6 @@ TEST(Stats, baseline)
     EXPECT_EQ(xstats.populationKurtosis(), 0.0);
     EXPECT_EQ(xstats.populationExcessKurtosis(), 0.0);
 }
-
 
 TEST(Stats, simple)
 {
@@ -219,7 +217,6 @@ TEST(Stats, advanced)
     EXPECT_NEAR(statsZ.sampleExcessKurtosis(), -1.2, .00001);
 }
 
-
 TEST(Stats, stream)
 {
     BOX3D bounds(1.0, 2.0, 3.0, 101.0, 102.0, 103.0);
@@ -263,7 +260,6 @@ TEST(Stats, stream)
     EXPECT_DOUBLE_EQ(statsZ.average(), 3.0);
 }
 
-
 TEST(Stats, dimset)
 {
     BOX3D bounds(1.0, 2.0, 3.0, 101.0, 102.0, 103.0);
@@ -305,7 +301,6 @@ TEST(Stats, dimset)
     EXPECT_DOUBLE_EQ(statsZ.average(), 3.0);
 }
 
-
 TEST(Stats, metadata)
 {
     BOX3D bounds(1.0, 2.0, 3.0, 101.0, 102.0, 103.0);
@@ -331,11 +326,11 @@ TEST(Stats, metadata)
     MetadataNode m = filter.getMetadata();
     std::vector<MetadataNode> children = m.children("statistic");
 
-    auto findNode = [](MetadataNode m,
-        const std::string name, const std::string val)
+    auto findNode =
+        [](MetadataNode m, const std::string name, const std::string val)
     {
         auto findNameVal = [name, val](MetadataNode m)
-            { return (m.name() == name && m.value() == val); };
+        { return (m.name() == name && m.value() == val); };
 
         return m.find(findNameVal);
     };
@@ -358,7 +353,6 @@ TEST(Stats, metadata)
         }
     }
 }
-
 
 TEST(Stats, enum)
 {
@@ -432,10 +426,9 @@ TEST(Stats, global)
     const stats::Summary& statsZ = filter.getStats(Dimension::Id::Z);
 
     EXPECT_DOUBLE_EQ(statsZ.median(), 555.55555555555554);
-	EXPECT_DOUBLE_EQ(statsZ.mad(), 333.33333333333331);
-	EXPECT_DOUBLE_EQ(statsZ.minimum(), 0.0);
-	EXPECT_DOUBLE_EQ(statsZ.maximum(), 1000.0);
-
+    EXPECT_DOUBLE_EQ(statsZ.mad(), 333.33333333333331);
+    EXPECT_DOUBLE_EQ(statsZ.minimum(), 0.0);
+    EXPECT_DOUBLE_EQ(statsZ.maximum(), 1000.0);
 }
 
 TEST(Stats, merge)
@@ -447,7 +440,8 @@ TEST(Stats, merge)
         std::array<SummaryPtr, 10> parts;
 
         for (SummaryPtr& part : parts)
-            part.reset(new stats::Summary("test", stats::Summary::NoEnum, true));
+            part.reset(
+                new stats::Summary("test", stats::Summary::NoEnum, true));
         stats::Summary whole("test", stats::Summary::NoEnum, true);
 
         stats::Summary* part = parts[0].get();
@@ -468,7 +462,8 @@ TEST(Stats, merge)
         EXPECT_DOUBLE_EQ(whole.minimum(), p.minimum());
         EXPECT_DOUBLE_EQ(whole.maximum(), p.maximum());
         EXPECT_FLOAT_EQ((float)whole.average(), (float)p.average());
-        EXPECT_FLOAT_EQ((float)whole.populationVariance(), (float)p.populationVariance());
+        EXPECT_FLOAT_EQ((float)whole.populationVariance(),
+                        (float)p.populationVariance());
         EXPECT_FLOAT_EQ((float)whole.skewness(), (float)p.skewness());
         EXPECT_FLOAT_EQ((float)whole.kurtosis(), (float)p.kurtosis());
     }
@@ -479,7 +474,8 @@ TEST(Stats, merge)
         std::array<SummaryPtr, 10> parts;
 
         for (SummaryPtr& part : parts)
-            part.reset(new stats::Summary("test", stats::Summary::Enumerate, false));
+            part.reset(
+                new stats::Summary("test", stats::Summary::Enumerate, false));
         stats::Summary whole("test", stats::Summary::Enumerate, false);
 
         stats::Summary* part = parts[0].get();
@@ -540,11 +536,11 @@ TEST(Stats, counts)
 
     MetadataNode m = filter.getMetadata();
     std::vector<MetadataNode> children = m.children("statistic");
-    auto findNode = [](MetadataNode m,
-        const std::string name, const std::string val)
+    auto findNode =
+        [](MetadataNode m, const std::string name, const std::string val)
     {
         auto findNameVal = [name, val](MetadataNode m)
-            { return (m.name() == name && m.value() == val); };
+        { return (m.name() == name && m.value() == val); };
 
         return m.find(findNameVal);
     };
@@ -555,12 +551,14 @@ TEST(Stats, counts)
         {
             for (int i = 1; i < 32; ++i)
             {
-                MetadataNode m = mi->findChild("bins:" + std::to_string((double)i));
+                MetadataNode m =
+                    mi->findChild("bins:" + std::to_string((double)i));
                 EXPECT_EQ(m.value<int>(), i);
             }
             std::vector<MetadataNode> nodes = mi->children("counts");
             for (int i = 1; i < 32; ++i)
-                EXPECT_EQ(nodes[i - 1].value(), std::to_string((double)i) + "/" + std::to_string(i));
+                EXPECT_EQ(nodes[i - 1].value(),
+                          std::to_string((double)i) + "/" + std::to_string(i));
         }
     }
 }

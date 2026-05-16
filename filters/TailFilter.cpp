@@ -36,12 +36,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.tail",
-    "Return N points from end of the point cloud.",
-    "https://pdal.org/stages/filters.tail.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.tail", "Return N points from end of the point cloud.",
+    "https://pdal.org/stages/filters.tail.html"};
 
 CREATE_STATIC_STAGE(TailFilter, s_info)
 

@@ -8,7 +8,8 @@ namespace expr
 bool BaseParser::checkEnd()
 {
     Token tok = peekToken();
-    return std::find(m_endTokens.begin(), m_endTokens.end(), tok) != m_endTokens.end();
+    return std::find(m_endTokens.begin(), m_endTokens.end(), tok) !=
+           m_endTokens.end();
 }
 
 Token BaseParser::peekToken()

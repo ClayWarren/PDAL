@@ -3,11 +3,11 @@
 //
 #pragma once
 
-#include <vector>
-#include <string>
+#include <fstream>
 #include <iostream>
 #include <memory>
-#include <fstream>
+#include <string>
+#include <vector>
 
 #include "Args.hpp"
 #include "Pulse.hpp"
@@ -34,13 +34,13 @@ private:
     std::vector<Pulse> m_multiBuf;
     std::vector<Pulse> m_singleBuf;
 
-    void addPoint(double time, const Eigen::Vector3d& startPos, const Eigen::Vector3d& endPos,
-        double angle);
+    void addPoint(double time, const Eigen::Vector3d& startPos,
+                  const Eigen::Vector3d& endPos, double angle);
     bool usingMulti() const;
     bool usingSingle() const;
     void registerMulti(const std::vector<Pulse>& buf);
     void registerSingle(const std::vector<Pulse>& buf);
-    
+
     // Estimate pos + vel at t based on pulses within +/- tblock at t.
     bool EstimatedPositionVelocity(double t, Eigen::Vector3d& r,
                                    Eigen::Vector3d& v) const;
@@ -61,8 +61,8 @@ public:
     void Add(double t, const Eigen::Vector3d& r, int num, int ret, double ang);
     void Solve();
 
-    Eigen::Vector3d Trajectory(double t,
-                               Eigen::Vector3d& v, Eigen::Vector3d& a) const;
+    Eigen::Vector3d Trajectory(double t, Eigen::Vector3d& v,
+                               Eigen::Vector3d& a) const;
     Eigen::Vector2d Attitude(double t, Eigen::Vector2d& v) const;
 };
 

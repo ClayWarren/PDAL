@@ -1,33 +1,33 @@
 /******************************************************************************
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "HagDelaunayFilter.hpp"
 
@@ -36,9 +36,9 @@
 
 #include "private/delaunator.hpp"
 
+#include <cmath>
 #include <string>
 #include <vector>
-#include <cmath>
 
 namespace pdal
 {
@@ -52,7 +52,7 @@ namespace
 // (I suppose the point could be on a edge of two triangles, but the
 //  result is the same, so this is still good.)
 double delaunay_interp_ground(double x0, double y0, PointViewPtr gView,
-    const PointIdList& ids)
+                              const PointIdList& ids)
 {
     using namespace pdal::Dimension;
 
@@ -70,9 +70,9 @@ double delaunay_interp_ground(double x0, double y0, PointViewPtr gView,
 
     for (size_t j = 0; j < triangles.size(); j += 3)
     {
-        auto ai = triangles[j+0];
-        auto bi = triangles[j+1];
-        auto ci = triangles[j+2];
+        auto ai = triangles[j + 0];
+        auto bi = triangles[j + 1];
+        auto ci = triangles[j + 2];
         double ax = gView->getFieldAs<double>(Id::X, ids[ai]);
         double ay = gView->getFieldAs<double>(Id::Y, ids[ai]);
         double az = gView->getFieldAs<double>(Id::Z, ids[ai]);
@@ -86,8 +86,8 @@ double delaunay_interp_ground(double x0, double y0, PointViewPtr gView,
         double cz = gView->getFieldAs<double>(Id::Z, ids[ci]);
 
         // Returns infinity unless the point x0/y0 is in the triangle.
-        double z1 = math::barycentricInterpolation(ax, ay, az, bx, by, bz,
-                cx, cy, cz, x0, y0);
+        double z1 = math::barycentricInterpolation(ax, ay, az, bx, by, bz, cx,
+                                                   cy, cz, x0, y0);
         if (z1 != std::numeric_limits<double>::infinity())
             return z1;
     }
@@ -99,14 +99,11 @@ double delaunay_interp_ground(double x0, double y0, PointViewPtr gView,
 
 } // unnamed namespace
 
-
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.hag_delaunay",
     "Computes height above ground using delaunay interpolation of "
-        "ground returns.",
-    "https://pdal.org/stages/filters.hag_delaunay.html"
-};
+    "ground returns.",
+    "https://pdal.org/stages/filters.hag_delaunay.html"};
 
 CREATE_STATIC_STAGE(HagDelaunayFilter, s_info)
 
@@ -115,28 +112,26 @@ std::string HagDelaunayFilter::getName() const
     return s_info.name;
 }
 
-
-HagDelaunayFilter::HagDelaunayFilter()
-{}
-
+HagDelaunayFilter::HagDelaunayFilter() {}
 
 void HagDelaunayFilter::addArgs(ProgramArgs& args)
 {
-    args.add("count", "The number of points to fetch to determine the "
-        "ground point [Default: 10].", m_count, point_count_t(10));
-    args.add("allow_extrapolation", "Allow extrapolation for points "
-        "outside of the local triangulations. [Default: true].",
-        m_allowExtrapolation, true);
-    args.add("class", "Class to use for ground points. [Default: 2]",
-        m_class, ClassLabel::Ground);
+    args.add("count",
+             "The number of points to fetch to determine the "
+             "ground point [Default: 10].",
+             m_count, point_count_t(10));
+    args.add("allow_extrapolation",
+             "Allow extrapolation for points "
+             "outside of the local triangulations. [Default: true].",
+             m_allowExtrapolation, true);
+    args.add("class", "Class to use for ground points. [Default: 2]", m_class,
+             ClassLabel::Ground);
 }
-
 
 void HagDelaunayFilter::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDim(Dimension::Id::HeightAboveGround);
 }
-
 
 void HagDelaunayFilter::prepared(PointTableRef table)
 {
@@ -148,7 +143,6 @@ void HagDelaunayFilter::prepared(PointTableRef table)
         throwError("Missing Classification dimension in input PointView.");
 }
 
-
 void HagDelaunayFilter::filter(PointView& view)
 {
     using namespace pdal::Dimension;
@@ -159,8 +153,7 @@ void HagDelaunayFilter::filter(PointView& view)
     // Separate into ground and non-ground views.
     for (PointId i = 0; i < view.size(); ++i)
     {
-        if (view.getFieldAs<uint8_t>(Id::Classification, i) ==
-            m_class)
+        if (view.getFieldAs<uint8_t>(Id::Classification, i) == m_class)
         {
             view.setField(Id::HeightAboveGround, i, 0);
             gView->appendPoint(view, i);
@@ -174,7 +167,7 @@ void HagDelaunayFilter::filter(PointView& view)
     // Bail if there weren't any points classified as ground.
     if (gView->size() == 0)
         log()->get(LogLevel::Error) << "Input PointView does not have any "
-            "points classified as ground.\n";
+                                       "points classified as ground.\n";
 
     // Build the 2D KD-tree.
     const KD2Index& kdi = gView->build2dIndex();
@@ -221,8 +214,9 @@ void HagDelaunayFilter::filter(PointView& view)
             {
                 z1 = delaunay_interp_ground(x0, y0, gView, ids);
             }
-            // In degenerate cases (ids are collinear or duplicates), the above will throw,
-            // so treat x0/y0 as outside and assign the current value.
+            // In degenerate cases (ids are collinear or duplicates), the above
+            // will throw, so treat x0/y0 as outside and assign the current
+            // value.
             catch (...)
             {
                 z1 = z0;

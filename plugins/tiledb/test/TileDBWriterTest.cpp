@@ -504,7 +504,8 @@ TEST_F(TileDBWriterTest, no_dup_points)
 
     Options writer_options = getTileDBOptions();
     writer_options.add("array_name", pth);
-    // force flush on every point  so that we can write duplicates to separate fragments
+    // force flush on every point  so that we can write duplicates to separate
+    // fragments
     writer_options.add("chunk_size", 1);
     writer_options.add("allow_dups", false);
 
@@ -534,9 +535,9 @@ TEST_F(TileDBWriterTest, no_dup_points)
 
     auto result_num = (int)q.result_buffer_elements()["X"].second;
     EXPECT_EQ(1, result_num); // test de-duplication allow_dups set to false
-    EXPECT_EQ(xs[0], 1.0); // points are always at the minimum of the box
-    EXPECT_EQ(ys[0], 1.0); // points are always at the minimum of the box
-    EXPECT_EQ(zs[0], 1.0); // points are always at the minimum of the box
+    EXPECT_EQ(xs[0], 1.0);    // points are always at the minimum of the box
+    EXPECT_EQ(ys[0], 1.0);    // points are always at the minimum of the box
+    EXPECT_EQ(zs[0], 1.0);    // points are always at the minimum of the box
 }
 
 TEST_F(TileDBWriterTest, sf_curve)
@@ -726,8 +727,7 @@ TEST(AdditionalTileDBWriterTest, domain_from_quickinfo)
         tiledb::ArraySchema schema(ctx, uri);
         auto domain = schema.domain();
         EXPECT_EQ(domain.ndim(), 3);
-        tiledb::FilterList fl =
-            schema.domain().dimension("X").filter_list();
+        tiledb::FilterList fl = schema.domain().dimension("X").filter_list();
 
         tiledb::Array array(ctx, uri, TILEDB_READ);
         tiledb::Query q(ctx, array, TILEDB_READ);
@@ -749,19 +749,19 @@ TEST(AdditionalTileDBWriterTest, domain_from_quickinfo)
         std::pair<double, double> x_domain =
             domain.dimension(0).domain<double>();
         EXPECT_NEAR(x_domain.first, 636000.76, 0.1);
-        EXPECT_NEAR(x_domain.second,  637180.21, 0.1);
+        EXPECT_NEAR(x_domain.second, 637180.21, 0.1);
 
         // Check Y domain.
         std::pair<double, double> y_domain =
             domain.dimension(1).domain<double>();
         EXPECT_NEAR(y_domain.first, 848934.19, 0.1);
-        EXPECT_NEAR(y_domain.second,  849498.9, 0.1);
+        EXPECT_NEAR(y_domain.second, 849498.9, 0.1);
 
         // Check Z domain.
         std::pair<double, double> z_domain =
             domain.dimension(2).domain<double>();
         EXPECT_NEAR(z_domain.first, 405.25, 0.1);
-        EXPECT_NEAR(z_domain.second,  521.5, 0.1);
+        EXPECT_NEAR(z_domain.second, 521.5, 0.1);
 
         // Check filters
         EXPECT_EQ(fl.nfilters(), 4U);
@@ -838,7 +838,6 @@ TEST(AdditionalTileDBWriterTest, domain_from_stats)
         EXPECT_DOUBLE_EQ(z_domain.first, -1.0);
         EXPECT_DOUBLE_EQ(z_domain.second, 30.0);
     }
-
 }
 
 } // namespace pdal

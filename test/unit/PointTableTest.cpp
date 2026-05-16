@@ -1,42 +1,42 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/PointTable.hpp>
-#include <io/LasReader.hpp>
 #include "Support.hpp"
+#include <io/LasReader.hpp>
+#include <pdal/PointTable.hpp>
 
 namespace pdal
 {
@@ -116,28 +116,30 @@ TEST(PointTable, userView)
 
     public:
         PointId addPoint()
-            { return 0; }
-        char *getPoint(PointId idx)
-            { return NULL; }
-        void setFieldInternal(Dimension::Id id, PointId idx,
-            const void *value)
         {
-            if (id == Dimension::Id::X)
-               m_x = *(const double *)value;
-            else if (id == Dimension::Id::Y)
-               m_y = *(const double *)value;
-            else if (id == Dimension::Id::Z)
-               m_z = *(const double *)value;
+            return 0;
         }
-        void getFieldInternal(Dimension::Id id, PointId idx,
-            void *value) const
+        char* getPoint(PointId idx)
+        {
+            return NULL;
+        }
+        void setFieldInternal(Dimension::Id id, PointId idx, const void* value)
         {
             if (id == Dimension::Id::X)
-               *(double *)value = m_x;
+                m_x = *(const double*)value;
             else if (id == Dimension::Id::Y)
-               *(double *)value = m_y;
+                m_y = *(const double*)value;
             else if (id == Dimension::Id::Z)
-               *(double *)value = m_z;
+                m_z = *(const double*)value;
+        }
+        void getFieldInternal(Dimension::Id id, PointId idx, void* value) const
+        {
+            if (id == Dimension::Id::X)
+                *(double*)value = m_x;
+            else if (id == Dimension::Id::Y)
+                *(double*)value = m_y;
+            else if (id == Dimension::Id::Z)
+                *(double*)value = m_z;
         }
     };
 
@@ -181,9 +183,24 @@ TEST(PointTable, userView)
 
 TEST(PointTable, srs)
 {
-   SpatialReference srs1("GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]");
+    SpatialReference srs1(
+        "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
+        "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
+        "\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\","
+        "\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\","
+        "\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]");
 
-   SpatialReference srs2("PROJCS[\"WGS 84 / UTM zone 17N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0.0174532925199433],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-81],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AUTHORITY[\"EPSG\",\"32617\"]]");
+    SpatialReference srs2(
+        "PROJCS[\"WGS 84 / UTM zone 17N\",GEOGCS[\"WGS "
+        "84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
+        "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
+        "\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0."
+        "0174532925199433],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION["
+        "\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],"
+        "PARAMETER[\"central_meridian\",-81],PARAMETER[\"scale_factor\",0.9996]"
+        ",PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],"
+        "UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AUTHORITY[\"EPSG\","
+        "\"32617\"]]");
 
     PointTable table;
 
@@ -235,7 +252,7 @@ void simpleTest(PointTableRef table)
             EXPECT_EQ(id + 1, v.getFieldAs<PointId>(Dimension::Id::Y, id));
             EXPECT_EQ(id + 2, v.getFieldAs<PointId>(Dimension::Id::Z, id));
             EXPECT_EQ((id * 100) % 6523,
-                v.getFieldAs<PointId>(Dimension::Id::Intensity, id));
+                      v.getFieldAs<PointId>(Dimension::Id::Intensity, id));
         }
         else
         {
@@ -247,7 +264,6 @@ void simpleTest(PointTableRef table)
     }
 }
 
-
 TEST(PointTable, simple)
 {
     PointTable t;
@@ -258,7 +274,7 @@ TEST(PointTable, layoutLimit)
 {
     PointTable t;
     PointLayoutPtr layout = t.layout();
-    layout->setAllowedDims({ "X", "Z"});
+    layout->setAllowedDims({"X", "Z"});
 
     layout->registerDim(Dimension::Id::X);
     layout->registerDim(Dimension::Id::Y);
@@ -303,4 +319,4 @@ TEST(PointTable, layoutLimit)
     }
 }
 
-} // namespace
+} // namespace pdal

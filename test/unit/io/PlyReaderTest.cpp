@@ -1,55 +1,53 @@
 /******************************************************************************
-* Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/Filter.hpp>
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/PlyReader.hpp>
 #include "Support.hpp"
+#include <io/PlyReader.hpp>
 
 namespace pdal
 {
 
-
-void checkPoint(const PointViewPtr& view, point_count_t idx,
-        double x, double y, double z)
+void checkPoint(const PointViewPtr& view, point_count_t idx, double x, double y,
+                double z)
 {
     EXPECT_DOUBLE_EQ(x, view->getFieldAs<double>(Dimension::Id::X, idx));
     EXPECT_DOUBLE_EQ(y, view->getFieldAs<double>(Dimension::Id::Y, idx));
     EXPECT_DOUBLE_EQ(z, view->getFieldAs<double>(Dimension::Id::Z, idx));
 }
-
 
 TEST(PlyReader, Constructor)
 {
@@ -59,7 +57,6 @@ TEST(PlyReader, Constructor)
     Stage* reader2(f.createStage("readers.ply"));
     EXPECT_TRUE(reader2);
 }
-
 
 TEST(PlyReader, ReadText)
 {
@@ -80,7 +77,6 @@ TEST(PlyReader, ReadText)
     checkPoint(view, 2, 1, 0, 0);
 }
 
-
 TEST(PlyReader, ReadTextExtraDims)
 {
     PlyReader reader;
@@ -95,7 +91,7 @@ TEST(PlyReader, ReadTextExtraDims)
     PointViewPtr view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
 
-    PointLayout *layout = view->layout();
+    PointLayout* layout = view->layout();
     EXPECT_FLOAT_EQ(view->getFieldAs<float>(Dimension::Id::X, 0), -2.64944f);
     EXPECT_FLOAT_EQ(view->getFieldAs<float>(Dimension::Id::Y, 0), -13.0955f);
     EXPECT_FLOAT_EQ(view->getFieldAs<float>(Dimension::Id::Z, 0), 0.00640115f);
@@ -108,7 +104,6 @@ TEST(PlyReader, ReadTextExtraDims)
     EXPECT_EQ(view->getFieldAs<int>(Dimension::Id::Alpha, 0), 255);
     EXPECT_EQ(view->getFieldAs<double>(layout->findDim("omg"), 0), 1234);
 }
-
 
 TEST(PlyReader, ReadBinary)
 {
@@ -129,14 +124,16 @@ TEST(PlyReader, ReadBinary)
     checkPoint(view, 2, 1, 0, 0);
 }
 
-
 TEST(PlyReader, ReadBinaryStream)
 {
     class Checker : public Filter, public Streamable
     {
     public:
         std::string getName() const
-            { return "checker"; }
+        {
+            return "checker";
+        }
+
     private:
         bool processOne(PointRef& point)
         {
@@ -144,29 +141,21 @@ TEST(PlyReader, ReadBinaryStream)
             if (cnt == 0)
             {
                 EXPECT_DOUBLE_EQ(-1,
-                    point.getFieldAs<double>(Dimension::Id::X));
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::Y));
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::Z));
+                                 point.getFieldAs<double>(Dimension::Id::X));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::Y));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::Z));
             }
             if (cnt == 1)
             {
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::X));
-                EXPECT_DOUBLE_EQ(1,
-                    point.getFieldAs<double>(Dimension::Id::Y));
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::Z));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::X));
+                EXPECT_DOUBLE_EQ(1, point.getFieldAs<double>(Dimension::Id::Y));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::Z));
             }
             if (cnt == 2)
             {
-                EXPECT_DOUBLE_EQ(1,
-                    point.getFieldAs<double>(Dimension::Id::X));
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::Y));
-                EXPECT_DOUBLE_EQ(0,
-                    point.getFieldAs<double>(Dimension::Id::Z));
+                EXPECT_DOUBLE_EQ(1, point.getFieldAs<double>(Dimension::Id::X));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::Y));
+                EXPECT_DOUBLE_EQ(0, point.getFieldAs<double>(Dimension::Id::Z));
             }
             cnt++;
             return true;
@@ -186,7 +175,6 @@ TEST(PlyReader, ReadBinaryStream)
     c.prepare(table);
     c.execute(table);
 }
-
 
 TEST(PlyReader, NoVertex)
 {
@@ -209,9 +197,12 @@ TEST(PlyReader, inspect)
     const QuickInfo qi = reader.preview();
     EXPECT_TRUE(qi.m_valid);
     EXPECT_EQ(qi.m_pointCount, 1u);
-    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "x") != qi.m_dimNames.end());
-    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "nx") != qi.m_dimNames.end());
-    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "red") != qi.m_dimNames.end());
+    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "x") !=
+                qi.m_dimNames.end());
+    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "nx") !=
+                qi.m_dimNames.end());
+    EXPECT_TRUE(std::find(qi.m_dimNames.begin(), qi.m_dimNames.end(), "red") !=
+                qi.m_dimNames.end());
 }
 
-}
+} // namespace pdal

@@ -1,55 +1,55 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
 #include <stdlib.h>
 
-#include <pdal/pdal_features.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/StageWrapper.hpp>
-#include <pdal/util/Algorithm.hpp>
-#include <pdal/util/FileUtils.hpp>
+#include <io/BpfReader.hpp>
 #include <io/BufferReader.hpp>
 #include <io/CopcWriter.hpp>
 #include <io/LasHeader.hpp>
 #include <io/LasReader.hpp>
 #include <io/LasWriter.hpp>
-#include <io/BpfReader.hpp>
 #include <io/private/las/Header.hpp>
 #include <io/private/las/Vlr.hpp>
+#include <pdal/PointView.hpp>
+#include <pdal/StageFactory.hpp>
+#include <pdal/StageWrapper.hpp>
+#include <pdal/pdal_features.hpp>
+#include <pdal/util/Algorithm.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <gdal_version.h>
 
@@ -60,22 +60,30 @@ namespace pdal
 
 namespace las
 {
-    struct Header;
+struct Header;
 }
 
-//ABELL - Should probably be moved to its own file.
+// ABELL - Should probably be moved to its own file.
 class LasTester
 {
 public:
     const las::Header& header(LasWriter& w)
-        { return w.header(); }
+    {
+        return w.header();
+    }
     const las::Header& header(LasReader& r)
-        { return r.lasHeader(); }
+    {
+        return r.lasHeader();
+    }
     SpatialReference srs(LasWriter& w)
-        { return w.m_srs; }
+    {
+        return w.m_srs;
+    }
     void addVlr(LasWriter& w, const std::string& userId, uint16_t recordId,
-        std::string description, std::vector<uint8_t>& data)
-        { w.addVlr(userId, recordId, description, data); }
+                std::string description, std::vector<uint8_t>& data)
+    {
+        w.addVlr(userId, recordId, description, data);
+    }
 };
 
 } // namespace pdal
@@ -84,47 +92,47 @@ using namespace pdal;
 
 namespace
 {
-    std::string wkt2DerivedProjected =
-        "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\",\n"
-        "    BASEPROJCRS[\"NAD83(2011) / Mississippi East (ftUS)\",\n"
-        "        BASEGEOGCRS[\"NAD83(2011)\",\n"
-        "            DATUM[\"NAD83 (National Spatial Reference System "
-        "2011)\",\n"
-        "                ELLIPSOID[\"GRS 1980\",6378137,298.257222101,\n"
-        "                    LENGTHUNIT[\"metre\",1]]],\n"
-        "            PRIMEM[\"Greenwich\",0,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433]]],\n"
-        "        CONVERSION[\"SPCS83 Mississippi East zone (US Survey "
-        "feet)\",\n"
-        "            METHOD[\"Transverse Mercator\",\n"
-        "                ID[\"EPSG\",9807]],\n"
-        "            PARAMETER[\"Latitude of natural origin\",29.5,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
-        "                ID[\"EPSG\",8801]],\n"
-        "            PARAMETER[\"Longitude of natural "
-        "origin\",-88.8333333333333,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
-        "                ID[\"EPSG\",8802]],\n"
-        "            PARAMETER[\"Scale factor at natural origin\",0.99995,\n"
-        "                SCALEUNIT[\"unity\",1],\n"
-        "                ID[\"EPSG\",8805]],\n"
-        "            PARAMETER[\"False easting\",984250,\n"
-        "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
-        "                ID[\"EPSG\",8806]],\n"
-        "            PARAMETER[\"False northing\",0,\n"
-        "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
-        "                ID[\"EPSG\",8807]]]],\n"
-        "    DERIVINGCONVERSION[\"Affine transformation as PROJ-based\",\n"
-        "        METHOD[\"PROJ-based operation method: "
-        "+proj=pipeline +step +proj=unitconvert +xy_in=m +xy_out=us-ft "
-        "+step +proj=affine +xoff=20 "
-        "+step +proj=unitconvert +xy_in=us-ft +xy_out=m\"]],\n"
-        "    CS[Cartesian,2],\n"
-        "        AXIS[\"northing (Y)\",north,\n"
-        "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
-        "        AXIS[\"easting (X)\",east,\n"
-        "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
-        "    REMARK[\"EPSG:6507 with 20 feet offset and axis inversion\"]]";
+std::string wkt2DerivedProjected =
+    "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\",\n"
+    "    BASEPROJCRS[\"NAD83(2011) / Mississippi East (ftUS)\",\n"
+    "        BASEGEOGCRS[\"NAD83(2011)\",\n"
+    "            DATUM[\"NAD83 (National Spatial Reference System "
+    "2011)\",\n"
+    "                ELLIPSOID[\"GRS 1980\",6378137,298.257222101,\n"
+    "                    LENGTHUNIT[\"metre\",1]]],\n"
+    "            PRIMEM[\"Greenwich\",0,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433]]],\n"
+    "        CONVERSION[\"SPCS83 Mississippi East zone (US Survey "
+    "feet)\",\n"
+    "            METHOD[\"Transverse Mercator\",\n"
+    "                ID[\"EPSG\",9807]],\n"
+    "            PARAMETER[\"Latitude of natural origin\",29.5,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
+    "                ID[\"EPSG\",8801]],\n"
+    "            PARAMETER[\"Longitude of natural "
+    "origin\",-88.8333333333333,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
+    "                ID[\"EPSG\",8802]],\n"
+    "            PARAMETER[\"Scale factor at natural origin\",0.99995,\n"
+    "                SCALEUNIT[\"unity\",1],\n"
+    "                ID[\"EPSG\",8805]],\n"
+    "            PARAMETER[\"False easting\",984250,\n"
+    "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
+    "                ID[\"EPSG\",8806]],\n"
+    "            PARAMETER[\"False northing\",0,\n"
+    "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
+    "                ID[\"EPSG\",8807]]]],\n"
+    "    DERIVINGCONVERSION[\"Affine transformation as PROJ-based\",\n"
+    "        METHOD[\"PROJ-based operation method: "
+    "+proj=pipeline +step +proj=unitconvert +xy_in=m +xy_out=us-ft "
+    "+step +proj=affine +xoff=20 "
+    "+step +proj=unitconvert +xy_in=us-ft +xy_out=m\"]],\n"
+    "    CS[Cartesian,2],\n"
+    "        AXIS[\"northing (Y)\",north,\n"
+    "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
+    "        AXIS[\"easting (X)\",east,\n"
+    "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
+    "    REMARK[\"EPSG:6507 with 20 feet offset and axis inversion\"]]";
 }
 
 TEST(LasWriterTest, srs)
@@ -149,7 +157,6 @@ TEST(LasWriterTest, srs)
     SpatialReference srs = tester.srs(writer);
     EXPECT_EQ(srs, "EPSG:26915");
 }
-
 
 TEST(LasWriterTest, srs2)
 {
@@ -279,7 +286,6 @@ TEST(LasWriterTest, auto_offset)
     FileUtils::deleteFile(FILENAME);
 }
 
-
 // Identical to above, but writes each input view to a separate output file.
 TEST(LasWriterTest, auto_offset2)
 {
@@ -341,7 +347,8 @@ TEST(LasWriterTest, auto_offset2)
         reader.setOptions(readerOps);
 
         reader.prepare(readTable);
-        EXPECT_DOUBLE_EQ((74529.00 + 1000000.02) * 0.5, reader.header().offsetX());
+        EXPECT_DOUBLE_EQ((74529.00 + 1000000.02) * 0.5,
+                         reader.header().offsetX());
         EXPECT_DOUBLE_EQ(0, reader.header().offsetY());
         EXPECT_DOUBLE_EQ((-123 + 945.23) * 0.5, reader.header().offsetZ());
 
@@ -390,7 +397,6 @@ TEST(LasWriterTest, auto_offset2)
     FileUtils::deleteFile(inname2);
 }
 
-
 // test autoscale with autooffset for a dataset with 0 variance in at least one
 // of it's spatial dimensions (e.g. points sampled from an axis alligned plane)
 TEST(LasWriterTest, auto_scale_with_auto_offset)
@@ -405,7 +411,8 @@ TEST(LasWriterTest, auto_scale_with_auto_offset)
 
     BufferReader bufferReader;
 
-    // in 'Z' there is 0 variance which causes PDAL LasWriter to fail (scale is 0)
+    // in 'Z' there is 0 variance which causes PDAL LasWriter to fail (scale is
+    // 0)
     PointViewPtr view(new PointView(table));
     // first point
     view->setField(Id::X, 0, 780.00);
@@ -467,7 +474,6 @@ TEST(LasWriterTest, auto_scale_with_auto_offset)
     FileUtils::deleteFile(FILENAME);
 }
 
-
 TEST(LasWriterTest, extra_dims)
 {
     Options readerOps;
@@ -492,19 +498,10 @@ TEST(LasWriterTest, extra_dims)
     LasTester tester;
     PointViewPtr pb = *viewSet.begin();
 
-    uint16_t colors[][3] = {
-        { 68, 77, 88 },
-        { 92, 100, 110 },
-        { 79, 87, 87 },
-        { 100, 102, 116 },
-        { 162, 114, 145 },
-        { 163, 137, 155 },
-        { 154, 131, 144 },
-        { 104, 111, 126 },
-        { 164, 136, 156 },
-        { 72, 87, 82 },
-        { 117, 117, 136 }
-    };
+    uint16_t colors[][3] = {{68, 77, 88},    {92, 100, 110},  {79, 87, 87},
+                            {100, 102, 116}, {162, 114, 145}, {163, 137, 155},
+                            {154, 131, 144}, {104, 111, 126}, {164, 136, 156},
+                            {72, 87, 82},    {117, 117, 136}};
 
     Options reader2Ops;
     reader2Ops.add("filename", Support::temppath("simple.las"));
@@ -580,11 +577,11 @@ TEST(LasWriterTest, all_extra_dims)
         using namespace Dimension;
 
         ASSERT_FLOAT_EQ(v->getFieldAs<float>(Id::X, i),
-            v->getFieldAs<float>(foo, i));
+                        v->getFieldAs<float>(foo, i));
         ASSERT_FLOAT_EQ(v->getFieldAs<float>(Id::Y, i),
-            v->getFieldAs<float>(bar, i));
+                        v->getFieldAs<float>(bar, i));
         ASSERT_FLOAT_EQ(v->getFieldAs<float>(Id::Z, i),
-            v->getFieldAs<float>(baz, i));
+                        v->getFieldAs<float>(baz, i));
     }
 }
 
@@ -608,7 +605,7 @@ TEST(LasWriterTest, forward)
     r2.addOptions(readerOps2);
 
     StageFactory sf;
-    Stage *m = sf.createStage("filters.merge");
+    Stage* m = sf.createStage("filters.merge");
     m->setInput(r1);
     m->setInput(r2);
 
@@ -696,7 +693,7 @@ TEST(LasWriterTest, forwardvlr)
     MetadataNode forward = t2.privateMetadata("lasforward");
 
     auto pred = [](MetadataNode temp)
-        { return Utils::startsWith(temp.name(), "vlr_"); };
+    { return Utils::startsWith(temp.name(), "vlr_"); };
     MetadataNodeList nodes = forward.findChildren(pred);
     EXPECT_EQ(nodes.size(), 388UL);
 }
@@ -704,8 +701,8 @@ TEST(LasWriterTest, forwardvlr)
 // Test that data from three input views gets written to separate output files.
 TEST(LasWriterTest, flex)
 {
-    std::array<std::string, 3> outname =
-        {{ "test_1.las", "test_2.las", "test_3.las" }};
+    std::array<std::string, 3> outname = {
+        {"test_1.las", "test_2.las", "test_3.las"}};
 
     Options readerOps;
     readerOps.add("filename", Support::datapath("las/simple.las"));
@@ -875,17 +872,16 @@ TEST(LasWriterTest, lazperf)
     size_t pointSize = view1->pointSize();
     EXPECT_EQ(view1->pointSize(), view2->pointSize());
 
-   // Validate some point data.
+    // Validate some point data.
     std::vector<char> buf1(pointSize);
     std::vector<char> buf2(pointSize);
     for (PointId i = 0; i < view1->pointSize(); i += 100)
     {
-       view1->getPackedPoint(dims, i, buf1.data());
-       view2->getPackedPoint(dims, i, buf2.data());
-       EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
+        view1->getPackedPoint(dims, i, buf1.data());
+        view2->getPackedPoint(dims, i, buf2.data());
+        EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
     }
 }
-
 
 // This is the same test as the above, but for a 1.4-specific point format.
 // LAZ files are normally written in chunks of 50,000, so a file of size
@@ -946,43 +942,43 @@ TEST(LasWriterTest, compressed1_4)
     size_t pointSize = view1->pointSize();
     EXPECT_EQ(view1->pointSize(), view2->pointSize());
 
-   // Validate some point data.
+    // Validate some point data.
     std::vector<char> buf1(pointSize);
     std::vector<char> buf2(pointSize);
     for (PointId idx = 0; idx < view1->size(); idx++)
     {
-       view1->getPackedPoint(dims, idx, buf1.data());
-       view2->getPackedPoint(dims, idx, buf2.data());
-       char *b1 = buf1.data();
-       char *b2 = buf2.data();
-       // Uncomment this to figure out the exact byte at which things are
-       // broken.
-       /**
-       for (size_t i = 0; i < pointSize; ++i)
-       {
-           if (*b1++ != *b2++)
-           {
-               {
-                   size_t s = 0;
-                   for (auto di = dims.begin(); di != dims.end(); ++di)
-                   {
-                       std::cerr << "Dim " << view1->dimName(di->m_id) <<
-                           " at " << s << "!\n";
-                       s += Dimension::size(di->m_type);
-                   }
-               }
-               throw pdal_error("Mismatch at byte = " + to_string(i) + "!");
-           }
-       }
-       **/
-       EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
+        view1->getPackedPoint(dims, idx, buf1.data());
+        view2->getPackedPoint(dims, idx, buf2.data());
+        char* b1 = buf1.data();
+        char* b2 = buf2.data();
+        // Uncomment this to figure out the exact byte at which things are
+        // broken.
+        /**
+        for (size_t i = 0; i < pointSize; ++i)
+        {
+            if (*b1++ != *b2++)
+            {
+                {
+                    size_t s = 0;
+                    for (auto di = dims.begin(); di != dims.end(); ++di)
+                    {
+                        std::cerr << "Dim " << view1->dimName(di->m_id) <<
+                            " at " << s << "!\n";
+                        s += Dimension::size(di->m_type);
+                    }
+                }
+                throw pdal_error("Mismatch at byte = " + to_string(i) + "!");
+            }
+        }
+        **/
+        EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
     }
 }
 
 TEST(LasWriterTest, flex_vlr)
 {
-    std::array<std::string, 3> outname =
-        {{ "test_1.laz", "test_2.laz", "test_3.laz" }};
+    std::array<std::string, 3> outname = {
+        {"test_1.laz", "test_2.laz", "test_3.laz"}};
 
     Options readerOps;
     readerOps.add("filename", Support::datapath("las/simple.las"));
@@ -1043,15 +1039,15 @@ TEST(LasWriterTest, flex_vlr)
         r.prepare(t);
         r.execute(t);
 
-	const char *data = nullptr;
-	EXPECT_TRUE(r.vlrData("laszip encoded", 22204, data) > 0);
-	EXPECT_TRUE(r.vlrData("PDAL", 12, data) > 0);
-	EXPECT_TRUE(r.vlrData("PDAL", 13, data) > 0);
+        const char* data = nullptr;
+        EXPECT_TRUE(r.vlrData("laszip encoded", 22204, data) > 0);
+        EXPECT_TRUE(r.vlrData("PDAL", 12, data) > 0);
+        EXPECT_TRUE(r.vlrData("PDAL", 13, data) > 0);
     }
 }
 
 void compareFiles(const std::string& name1, const std::string& name2,
-    size_t increment = 100)
+                  size_t increment = 100)
 {
     Options o1;
     o1.add("filename", name1);
@@ -1089,9 +1085,10 @@ void compareFiles(const std::string& name1, const std::string& name2,
 
     for (PointId i = 0; i < (std::min)(size1, size2); i += increment)
     {
-       v1->getPackedPoint(d1, i, buf1.data());
-       v2->getPackedPoint(d2, i, buf2.data());
-       EXPECT_EQ(memcmp(buf1.data(), buf2.data(), (std::min)(size1, size2)), 0);
+        v1->getPackedPoint(d1, i, buf1.data());
+        v2->getPackedPoint(d2, i, buf2.data());
+        EXPECT_EQ(memcmp(buf1.data(), buf2.data(), (std::min)(size1, size2)),
+                  0);
     }
 }
 
@@ -1153,7 +1150,8 @@ TEST(LasWriterTest, fix1063_1064_1065)
     FileUtils::deleteFile(outfile);
 
     std::string cmd = "pdal translate --writers.las.forward=all "
-        "--writers.las.a_srs=\"EPSG:4326\" " + infile + " " + outfile;
+                      "--writers.las.a_srs=\"EPSG:4326\" " +
+                      infile + " " + outfile;
     std::string output;
     Utils::run_shell_command(Support::binpath(cmd), output);
 
@@ -1183,9 +1181,8 @@ TEST(LasWriterTest, fix1063_1064_1065)
     SpatialReference ref = v->spatialReference();
     // This WKT is the leading common bit of WKT1 and WKT2 resolution.  When
     // we're just doing WKT2, this can be improved.
-    std::string wkt {
-        R"(GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]])"
-    };
+    std::string wkt{
+        R"(GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]])"};
     EXPECT_TRUE(Utils::startsWith(ref.getWKT(), wkt));
 }
 
@@ -1226,9 +1223,7 @@ TEST(LasWriterTest, pdal_metadata)
 
     EXPECT_EQ(reader2.getMetadata().children("pdal_metadata").size(), 1UL);
     EXPECT_EQ(reader2.getMetadata().children("pdal_pipeline").size(), 1UL);
-
 }
-
 
 TEST(LasWriterTest, pdal_add_vlr)
 {
@@ -1244,37 +1239,34 @@ TEST(LasWriterTest, pdal_add_vlr)
     readerOpts.add("filename", infile);
 
     std::string vlr1(
-      R"({
+        R"({
           "description": "A description under 32 bytes",
           "record_id": 42,
           "user_id": "hobu",
           "data": "dGhpcyBpcyBzb21lIHRleHQ="
-         })"
-    );
+         })");
     std::string vlr2(
-      R"({
+        R"({
           "description": "A description under 32 bytes",
           "record_id": 43,
           "user_id": "hobu",
-          "filename": ")" + Support::datapath("las/vlr-43.bin") + R"("})"
-    );
+          "filename": ")" +
+        Support::datapath("las/vlr-43.bin") + R"("})");
     std::string vlr3(
-      R"({
+        R"({
           "description": "A description under 32 bytes",
           "record_id": 44,
           "user_id": "hobu",
           "metadata": "software_id"
-          })"
-    );
+          })");
     std::string vlr4(
-      R"({
+        R"({
           "description": "An explicit EVLR",
           "record_id": 45,
           "user_id": "hobu",
           "evlr": true,
           "metadata": "software_id"
-          })"
-    );
+          })");
     Options writerOpts;
     writerOpts.add("vlrs", vlr1);
     writerOpts.add("vlrs", vlr2);
@@ -1379,7 +1371,7 @@ TEST(LasWriterTest, pdal_wkt2_vlr)
 
 TEST(LasWriterTest, pdal_wkt2_with_derivedprojcrs_vlr)
 {
-#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3,6,0)
+#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3, 6, 0)
     // not working with PROJ >= 9.2.0 https://github.com/OSGeo/gdal/pull/6800
     std::cerr << "Test disabled with GDAL <= 3.6.0" << std::endl;
     return;
@@ -1443,7 +1435,7 @@ TEST(LasWriterTest, pdal_wkt2_with_derivedprojcrs_vlr)
 
 TEST(LasWriterTest, pdal_wkt2_read_as_projjson)
 {
-#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3,6,0)
+#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3, 6, 0)
     // not working with PROJ >= 9.2.0 https://github.com/OSGeo/gdal/pull/6800
     std::cerr << "Test disabled with GDAL <= 3.6.0" << std::endl;
     return;
@@ -1502,7 +1494,8 @@ TEST(LasWriterTest, read_srs_order)
     Options readerOpts;
     readerOpts.add("filename", infile);
 
-    auto encodeToBase64 = [] (std::string input) {
+    auto encodeToBase64 = [](std::string input)
+    {
         std::vector<uint8_t> bytes(input.begin(), input.end());
         bytes.resize(bytes.size() + 1, 0);
         return Utils::base64_encode(bytes);
@@ -1518,7 +1511,7 @@ TEST(LasWriterTest, read_srs_order)
     std::string vlrProjJson =
         " { \"description\": \"created projjson vlr\", "
         "\"record_id\": 4225, \"user_id\": \"PDAL\", \"data\": \"" +
-        encodeToBase64(pdal::SpatialReference(utm33).getPROJJSON())  + "\" }";
+        encodeToBase64(pdal::SpatialReference(utm33).getPROJJSON()) + "\" }";
 
     std::string utm34("EPSG:32634");
 
@@ -1542,7 +1535,9 @@ TEST(LasWriterTest, read_srs_order)
     writer.prepare(table);
     writer.execute(table);
 
-    auto doTest = [outfile] (const std::string& preference, const std::string& srs_id) {
+    auto doTest =
+        [outfile](const std::string& preference, const std::string& srs_id)
+    {
         PointTable t2;
         Options readerOpts2;
         readerOpts2.add("filename", outfile);
@@ -1554,12 +1549,14 @@ TEST(LasWriterTest, read_srs_order)
         reader2.prepare(t2);
         reader2.execute(t2);
         pdal::SpatialReference srs(srs_id);
-        EXPECT_EQ(reader2.header().srs(), srs) << " using srs_vlr_order " << preference;;
+        EXPECT_EQ(reader2.header().srs(), srs)
+            << " using srs_vlr_order " << preference;
+        ;
     };
-    doTest ("projjson, wkt2, wkt1, geotiff", utm33);
-    doTest ("wkt2, projjson, wkt1, geotiff", utm32);
-    doTest ("", utm32); // default order reader
-    doTest ("wkt1, geotiff", utm34);
+    doTest("projjson, wkt2, wkt1, geotiff", utm33);
+    doTest("wkt2, projjson, wkt1, geotiff", utm32);
+    doTest("", utm32); // default order reader
+    doTest("wkt1, geotiff", utm34);
 }
 
 // Make sure we can read an array of VLRs in a pipeline.
@@ -1567,8 +1564,8 @@ TEST(LasWriterTest, issue2937)
 {
     std::string infile = Support::configuredpath("pipeline/issue2937.json");
 
-    std::string cmd = Support::binpath("pdal") + " pipeline --nostream " +
-        infile;
+    std::string cmd =
+        Support::binpath("pdal") + " pipeline --nostream " + infile;
     std::string output;
     Utils::run_shell_command(cmd, output);
 
@@ -1599,67 +1596,60 @@ TEST(LasWriterTest, badVlr)
     };
 
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42,
         "user_id": "hobu",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })", false
-    );
+      })",
+        false);
     doTest(
-      R"({
+        R"({
         "description": "A description over 32 bytes is one that's way too long",
         "record_id": 42,
         "user_id": "hobu",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42,
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42,
         "user_id": "A userID that's way too long",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42,
         "user_id": "hobu"
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42.234,
         "user_id": "hobu",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 422340,
         "user_id": "hobu",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      })"
-    );
+      })");
     doTest(
-      R"({
+        R"({
         "description": "A description under 32 bytes",
         "record_id": 42,
         "user_id": "hobu",
         "data": "dGhpcyBpcyBzb21lIHRleHQ="
-      } junk after valid VLR )"
-    );
+      } junk after valid VLR )");
 }
 
 TEST(LasWriterTest, evlrOffset)
@@ -1731,20 +1721,14 @@ TEST(LasWriterTest, forward_spec_3)
     auto pred = [](MetadataNode temp)
     {
         auto recPred = [](MetadataNode n)
-        {
-            return n.name() == "record_id" &&
-                n.value() == "3";
-        };
+        { return n.name() == "record_id" && n.value() == "3"; };
 
         auto userPred = [](MetadataNode n)
-        {
-            return n.name() == "user_id" &&
-                n.value() == "LASF_Spec";
-        };
+        { return n.name() == "user_id" && n.value() == "LASF_Spec"; };
 
         return Utils::startsWith(temp.name(), "vlr_") &&
-            !temp.findChild(recPred).empty() &&
-            !temp.findChild(userPred).empty();
+               !temp.findChild(recPred).empty() &&
+               !temp.findChild(userPred).empty();
     };
     MetadataNode origRoot = reader.getMetadata();
     MetadataNodeList origNodes = origRoot.findChildren(pred);
@@ -1785,7 +1769,6 @@ TEST(LasWriterTest, oversize_vlr)
         pdal_error);
 }
 
-
 // Test auto scale/offset for streaming mode.
 TEST(LasWriterTest, issue1940)
 {
@@ -1800,9 +1783,9 @@ TEST(LasWriterTest, issue1940)
 
     LasWriter w;
     Options wo;
-    //LogPtr log(new Log("TEST", &std::clog));
-    //log->setLevel((LogLevel)5);
-    //w.setLog(log);
+    // LogPtr log(new Log("TEST", &std::clog));
+    // log->setLevel((LogLevel)5);
+    // w.setLog(log);
     wo.add("filename", Support::temppath("out.las"));
     wo.add("scale_x", "auto");
     wo.add("offset_y", "auto");
@@ -1863,8 +1846,8 @@ TEST(LasWriterTest, issue2663)
     EXPECT_EQ(h.scaleZ(), .001);
 }
 
-// Make sure that we don't crash when writing scan angle values >90 && <-90 in point
-// formats 6 or higher.
+// Make sure that we don't crash when writing scan angle values >90 && <-90 in
+// point formats 6 or higher.
 TEST(LasWriterTest, issue3288)
 {
     point_count_t cnt;
@@ -1933,7 +1916,8 @@ TEST(LasWriterTest, issue2320)
 }
 
 // Make sure we can translate a LAS 1.0 format file into a LAS 1.0 format file
-// (class flags are included in the classification byte, in both source and dest)
+// (class flags are included in the classification byte, in both source and
+// dest)
 TEST(LasWriterTest, las10_classification_from_las10_classification)
 {
     using namespace Dimension;
@@ -1941,8 +1925,8 @@ TEST(LasWriterTest, las10_classification_from_las10_classification)
     const std::string FILENAME(Support::temppath("synthetic_test.las"));
     PointTable table;
 
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Classification,
-        Id::Synthetic});
+    table.layout()->registerDims(
+        {Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
 
     BufferReader bufferReader;
 
@@ -1977,14 +1961,16 @@ TEST(LasWriterTest, las10_classification_from_las10_classification)
     EXPECT_EQ(viewSet.size(), 1u);
     view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
-    EXPECT_EQ(ClassLabel::Ground, view->getFieldAs<uint8_t>(Id::Classification, 0));
+    EXPECT_EQ(ClassLabel::Ground,
+              view->getFieldAs<uint8_t>(Id::Classification, 0));
     EXPECT_TRUE(view->getFieldAs<bool>(Id::Synthetic, 0));
 
     FileUtils::deleteFile(FILENAME);
 }
 
 // Make sure we can translate a LAS 1.4 format file into a LAS 1.0 format file
-// (class flags are included in the classification byte in dest, but stored separately in source)
+// (class flags are included in the classification byte in dest, but stored
+// separately in source)
 TEST(LasWriterTest, las10_classification_from_las14_classflags)
 {
     using namespace Dimension;
@@ -1992,7 +1978,8 @@ TEST(LasWriterTest, las10_classification_from_las14_classflags)
     const std::string FILENAME(Support::temppath("synthetic_test.las"));
     PointTable table;
 
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
+    table.layout()->registerDims(
+        {Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
 
     BufferReader bufferReader;
 
@@ -2027,14 +2014,16 @@ TEST(LasWriterTest, las10_classification_from_las14_classflags)
     EXPECT_EQ(viewSet.size(), 1u);
     view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
-    EXPECT_EQ(ClassLabel::Ground, view->getFieldAs<uint8_t>(Id::Classification, 0));
+    EXPECT_EQ(ClassLabel::Ground,
+              view->getFieldAs<uint8_t>(Id::Classification, 0));
     EXPECT_TRUE(view->getFieldAs<bool>(Id::Synthetic, 0));
 
     FileUtils::deleteFile(FILENAME);
 }
 
 // Make sure we can translate a LAS 1.0 format file into a LAS 1.4 format file
-// (class flags are included in the classification byte in source, but stored separately in dest)
+// (class flags are included in the classification byte in source, but stored
+// separately in dest)
 TEST(LasWriterTest, las14_classflags_from_las10_classification)
 {
     using namespace Dimension;
@@ -2042,7 +2031,8 @@ TEST(LasWriterTest, las14_classflags_from_las10_classification)
     const std::string FILENAME(Support::temppath("synthetic_test.las"));
     PointTable table;
 
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
+    table.layout()->registerDims(
+        {Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
 
     BufferReader bufferReader;
 
@@ -2080,7 +2070,7 @@ TEST(LasWriterTest, las14_classflags_from_las10_classification)
     view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
     EXPECT_EQ(ClassLabel::Ground,
-        view->getFieldAs<uint8_t>(Id::Classification, 0));
+              view->getFieldAs<uint8_t>(Id::Classification, 0));
     EXPECT_TRUE(view->getFieldAs<bool>(Id::Synthetic, 0));
 
     FileUtils::deleteFile(FILENAME);
@@ -2095,7 +2085,8 @@ TEST(LasWriterTest, las14_classflags_from_las14_classflags)
     const std::string FILENAME(Support::temppath("synthetic_test.las"));
     PointTable table;
 
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
+    table.layout()->registerDims(
+        {Id::X, Id::Y, Id::Z, Id::Classification, Id::Synthetic});
 
     BufferReader bufferReader;
 
@@ -2133,7 +2124,7 @@ TEST(LasWriterTest, las14_classflags_from_las14_classflags)
     view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
     EXPECT_EQ(ClassLabel::Ground,
-        view->getFieldAs<uint8_t>(Id::Classification, 0));
+              view->getFieldAs<uint8_t>(Id::Classification, 0));
     EXPECT_TRUE(view->getFieldAs<bool>(Id::Synthetic, 0));
 
     FileUtils::deleteFile(FILENAME);
@@ -2263,8 +2254,8 @@ TEST(LasWriterTest, header_bbox)
     }
 }
 
-// Make sure that legacy return count is 0 when format is 1.4 with point data record >= 6
-// and is equal to return count on point data record < 6
+// Make sure that legacy return count is 0 when format is 1.4 with point data
+// record >= 6 and is equal to return count on point data record < 6
 TEST(LasWriterTest, issue2235)
 {
     // Read
@@ -2295,7 +2286,7 @@ TEST(LasWriterTest, issue2235)
         const las::Header& h41 = tester.header(writer41);
         EXPECT_EQ(h41.legacyPointCount, h41.pointCount());
 
-        for (int i=0; i<h41.LegacyReturnCount; i++)
+        for (int i = 0; i < h41.LegacyReturnCount; i++)
             EXPECT_EQ(h41.legacyPointsByReturn[i], h41.ePointsByReturn[i]);
     }
 
@@ -2319,7 +2310,7 @@ TEST(LasWriterTest, issue2235)
         EXPECT_EQ(h46.legacyPointCount, 0UL);
         EXPECT_NE(h46.pointCount(), 0UL);
 
-        for (int i=0; i<h46.LegacyReturnCount; i++)
+        for (int i = 0; i < h46.LegacyReturnCount; i++)
         {
             EXPECT_EQ(h46.legacyPointsByReturn[i], 0UL);
             if (i < returnsWithPoints)
@@ -2354,7 +2345,7 @@ TEST(LasWriterTest, issue2235)
         EXPECT_EQ(headerCopc.legacyPointCount, 0UL);
         EXPECT_NE(headerCopc.pointCount(), 0UL);
 
-        for (int i=0; i<headerCopc.LegacyReturnCount; i++)
+        for (int i = 0; i < headerCopc.LegacyReturnCount; i++)
         {
             EXPECT_EQ(headerCopc.legacyPointsByReturn[i], 0UL);
             if (i < returnsWithPoints)

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2012, Howard Butler hobu.inc@gmail.com
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2012, Howard Butler hobu.inc@gmail.com
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -42,8 +42,8 @@
 
 #include <map>
 #include <memory>
-#include <vector>
 #include <stdint.h>
+#include <vector>
 
 namespace pdal
 {
@@ -69,12 +69,16 @@ class PDAL_EXPORT MetadataNodeImpl
     friend class MetadataNode;
 
 private:
-    MetadataNodeImpl(const std::string& name, MetadataType kind = MetadataType::Instance) :
-        m_kind(kind)
-    { m_name = name; }
+    MetadataNodeImpl(const std::string& name,
+                     MetadataType kind = MetadataType::Instance)
+        : m_kind(kind)
+    {
+        m_name = name;
+    }
 
     MetadataNodeImpl(MetadataType kind = MetadataType::Instance) : m_kind(kind)
-    {}
+    {
+    }
 
     void makeArray(MetadataImplList& l)
     {
@@ -133,7 +137,7 @@ private:
         return node;
     }
 
-    bool operator == (const MetadataNodeImpl& m) const
+    bool operator==(const MetadataNodeImpl& m) const
     {
         if (m_name != m.m_name || m_descrip != m.m_descrip ||
             m_type != m.m_type || m_value != m.m_value)
@@ -162,19 +166,17 @@ private:
         return true;
     }
 
-    template <typename T>
-    inline void setValue(const T& t)
+    template <typename T> inline void setValue(const T& t)
     {
         m_type = "unknown";
         m_value = Utils::toString(t);
     }
 
-    template <std::size_t N>
-    inline void setValue(const char(& c)[N]);
+    template <std::size_t N> inline void setValue(const char (&c)[N]);
 
     void setValue(const double& d, size_t precision);
 
-    MetadataImplList& subnodes(const std::string &name)
+    MetadataImplList& subnodes(const std::string& name)
     {
         auto si = m_subnodes.find(name);
         if (si != m_subnodes.end())
@@ -186,7 +188,7 @@ private:
 
     const MetadataImplList& subnodes(const std::string& name) const
     {
-        MetadataNodeImpl *nc_this = const_cast<MetadataNodeImpl *>(this);
+        MetadataNodeImpl* nc_this = const_cast<MetadataNodeImpl*>(this);
         return nc_this->subnodes(name);
     }
 
@@ -209,43 +211,38 @@ private:
     MetadataSubnodes m_subnodes;
 };
 
-template <>
-inline void MetadataNodeImpl::setValue(const bool& b)
+template <> inline void MetadataNodeImpl::setValue(const bool& b)
 {
     m_type = "boolean";
     m_value = b ? "true" : "false";
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const std::string& s)
+template <> inline void MetadataNodeImpl::setValue(const std::string& s)
 {
     m_type = "string";
     m_value = s;
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const char * const & c)
+template <> inline void MetadataNodeImpl::setValue(const char* const& c)
 {
     m_type = "string";
     m_value = c;
 }
 
 template <std::size_t N>
-inline void MetadataNodeImpl::setValue(const char(& c)[N])
+inline void MetadataNodeImpl::setValue(const char (&c)[N])
 {
     m_type = "string";
     m_value = c;
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const float& f)
+template <> inline void MetadataNodeImpl::setValue(const float& f)
 {
     m_type = "float";
     m_value = Utils::toString(f);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue<double>(const double& d)
+template <> inline void MetadataNodeImpl::setValue<double>(const double& d)
 {
     m_type = "double";
 
@@ -256,8 +253,7 @@ inline void MetadataNodeImpl::setValue<double>(const double& d)
     m_value = Utils::toString(dd);
 }
 
-inline void MetadataNodeImpl::setValue(const double& d,
-    size_t precision)
+inline void MetadataNodeImpl::setValue(const double& d, size_t precision)
 {
     m_type = "double";
 
@@ -271,92 +267,79 @@ inline void MetadataNodeImpl::setValue(const double& d,
 template <>
 void PDAL_EXPORT MetadataNodeImpl::setValue(const SpatialReference& ref);
 
-template <>
-inline void MetadataNodeImpl::setValue(const BOX3D& b)
+template <> inline void MetadataNodeImpl::setValue(const BOX3D& b)
 {
     m_type = "bounds";
     m_value = Utils::toString(b);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const unsigned char& u)
+template <> inline void MetadataNodeImpl::setValue(const unsigned char& u)
 {
     m_type = "nonNegativeInteger";
     m_value = Utils::toString(u);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const unsigned short& u)
+template <> inline void MetadataNodeImpl::setValue(const unsigned short& u)
 {
     m_type = "nonNegativeInteger";
     m_value = Utils::toString(u);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const unsigned int& u)
+template <> inline void MetadataNodeImpl::setValue(const unsigned int& u)
 {
     m_type = "nonNegativeInteger";
     m_value = Utils::toString(u);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const unsigned long& u)
+template <> inline void MetadataNodeImpl::setValue(const unsigned long& u)
 {
     m_type = "nonNegativeInteger";
     m_value = Utils::toString(u);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const unsigned long long& u)
+template <> inline void MetadataNodeImpl::setValue(const unsigned long long& u)
 {
     m_type = "nonNegativeInteger";
     m_value = Utils::toString(u);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const char& i)
+template <> inline void MetadataNodeImpl::setValue(const char& i)
 {
     m_type = "integer";
     m_value = Utils::toString(i);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const signed char& i)
+template <> inline void MetadataNodeImpl::setValue(const signed char& i)
 {
     m_type = "integer";
     m_value = Utils::toString(i);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const short& s)
+template <> inline void MetadataNodeImpl::setValue(const short& s)
 {
     m_type = "integer";
     m_value = Utils::toString(s);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const int& i)
+template <> inline void MetadataNodeImpl::setValue(const int& i)
 {
     m_type = "integer";
     m_value = Utils::toString(i);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const long& l)
+template <> inline void MetadataNodeImpl::setValue(const long& l)
 {
     m_type = "integer";
     m_value = Utils::toString(l);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const long long& l)
+template <> inline void MetadataNodeImpl::setValue(const long long& l)
 {
     m_type = "integer";
     m_value = Utils::toString(l);
 }
 
-template <>
-inline void MetadataNodeImpl::setValue(const Uuid& u)
+template <> inline void MetadataNodeImpl::setValue(const Uuid& u)
 {
     m_type = "uuid";
     m_value = u.toString();
@@ -366,16 +349,16 @@ namespace MetadataDetail
 {
 
 class value_error
-{};
+{
+};
 
-template<typename T>
-T value(const std::string& type, const std::string& value)
+template <typename T> T value(const std::string& type, const std::string& value)
 {
     if (type == "base64Binary")
     {
         std::vector<uint8_t> encVal = Utils::base64_decode(value);
         encVal.resize(sizeof(T));
-        return *(reinterpret_cast<T *>(encVal.data()));
+        return *(reinterpret_cast<T*>(encVal.data()));
     }
 
     T t{};
@@ -384,8 +367,7 @@ T value(const std::string& type, const std::string& value)
     return t;
 }
 
-template<>
-inline bool value(const std::string& type, const std::string& value)
+template <> inline bool value(const std::string& type, const std::string& value)
 {
     if (type == "boolean")
     {
@@ -401,34 +383,43 @@ inline bool value(const std::string& type, const std::string& value)
     return b;
 }
 
-template<>
+template <>
 inline std::string value(const std::string&, const std::string& value)
-{ return value; }
+{
+    return value;
+}
 
 } // namespace MetadataDetail
-
 
 class PDAL_EXPORT MetadataNode
 {
     friend class Metadata;
-    friend inline
-        bool operator == (const MetadataNode& m1, const MetadataNode& m2);
-    friend inline
-        bool operator != (const MetadataNode& m1, const MetadataNode& m2);
+    friend inline bool operator==(const MetadataNode& m1,
+                                  const MetadataNode& m2);
+    friend inline bool operator!=(const MetadataNode& m1,
+                                  const MetadataNode& m2);
 
 public:
-    MetadataNode(MetadataType kind = MetadataType::Instance) : m_impl(new MetadataNodeImpl(kind))
-        {}
+    MetadataNode(MetadataType kind = MetadataType::Instance)
+        : m_impl(new MetadataNodeImpl(kind))
+    {
+    }
 
-    MetadataNode(const std::string& name, MetadataType kind = MetadataType::Instance) :
-        m_impl(new MetadataNodeImpl(name, kind))
-        {}
+    MetadataNode(const std::string& name,
+                 MetadataType kind = MetadataType::Instance)
+        : m_impl(new MetadataNodeImpl(name, kind))
+    {
+    }
 
     MetadataNode add(const std::string& name)
-        { return MetadataNode(m_impl->add(name)); }
+    {
+        return MetadataNode(m_impl->add(name));
+    }
 
     MetadataNode addList(const std::string& name)
-        { return MetadataNode(m_impl->addList(name)); }
+    {
+        return MetadataNode(m_impl->addList(name));
+    }
 
     MetadataNode clone(const std::string& name) const
     {
@@ -439,14 +430,18 @@ public:
     }
 
     MetadataNode add(MetadataNode node)
-        { return MetadataNode(m_impl->add(node.m_impl)); }
+    {
+        return MetadataNode(m_impl->add(node.m_impl));
+    }
 
     MetadataNode addList(MetadataNode node)
-        { return MetadataNode(m_impl->addList(node.m_impl)); }
+    {
+        return MetadataNode(m_impl->addList(node.m_impl));
+    }
 
-    MetadataNode addEncoded(const std::string& name,
-        const unsigned char *buf, size_t size,
-        const std::string& descrip = std::string())
+    MetadataNode addEncoded(const std::string& name, const unsigned char* buf,
+                            size_t size,
+                            const std::string& descrip = std::string())
     {
         MetadataNodeImplPtr impl = m_impl->add(name);
         impl->setValue(Utils::base64_encode(buf, size));
@@ -456,8 +451,8 @@ public:
     }
 
     MetadataNode addListEncoded(const std::string& name,
-        const unsigned char *buf, size_t size,
-        const std::string& descrip = std::string())
+                                const unsigned char* buf, size_t size,
+                                const std::string& descrip = std::string())
     {
         MetadataNodeImplPtr impl = m_impl->addList(name);
         impl->setValue(Utils::base64_encode(buf, size));
@@ -467,7 +462,8 @@ public:
     }
 
     MetadataNode addWithType(const std::string& name, const std::string& value,
-        const std::string& type, const std::string& descrip = std::string())
+                             const std::string& type,
+                             const std::string& descrip = std::string())
     {
         MetadataNodeImplPtr impl = m_impl->add(name);
         impl->m_type = type;
@@ -477,7 +473,8 @@ public:
     }
 
     MetadataNode add(const std::string& name, const double& value,
-        const std::string& descrip = std::string(), size_t precision = 10)
+                     const std::string& descrip = std::string(),
+                     size_t precision = 10)
     {
         MetadataNodeImplPtr impl = m_impl->add(name);
         impl->setValue(value, precision);
@@ -485,9 +482,9 @@ public:
         return MetadataNode(impl);
     }
 
-    template<typename T>
+    template <typename T>
     MetadataNode add(const std::string& name, const T& value,
-        const std::string& descrip = std::string())
+                     const std::string& descrip = std::string())
     {
         MetadataNodeImplPtr impl = m_impl->add(name);
         impl->setValue(value);
@@ -495,9 +492,9 @@ public:
         return MetadataNode(impl);
     }
 
-    template<typename T>
+    template <typename T>
     MetadataNode addList(const std::string& name, const T& value,
-        const std::string& descrip = std::string())
+                         const std::string& descrip = std::string())
     {
         MetadataNodeImplPtr impl = m_impl->addList(name);
         impl->setValue(value);
@@ -506,7 +503,8 @@ public:
     }
 
     MetadataNode addOrUpdate(const std::string& lname, const double& value,
-        const std::string& descrip = std::string(), size_t precision = 10)
+                             const std::string& descrip = std::string(),
+                             size_t precision = 10)
     {
         if (m_impl->nodeType(lname) == MetadataType::Array)
             throw pdal_error("Can't call addOrUpdate() on subnode list.");
@@ -520,7 +518,7 @@ public:
         return MetadataNode(impl);
     }
 
-    template<typename T>
+    template <typename T>
     MetadataNode addOrUpdate(const std::string& lname, const T& value)
     {
         if (m_impl->nodeType(lname) == MetadataType::Array)
@@ -535,9 +533,9 @@ public:
         return MetadataNode(impl);
     }
 
-    template<typename T>
+    template <typename T>
     MetadataNode addOrUpdate(const std::string& lname, const T& value,
-        const std::string& descrip)
+                             const std::string& descrip)
     {
         MetadataNode m = addOrUpdate(lname, value);
         m.m_impl->m_descrip = descrip;
@@ -558,16 +556,21 @@ public:
     }
 
     std::string type() const
-        { return m_impl->m_type; }
+    {
+        return m_impl->m_type;
+    }
 
     MetadataType kind() const
-        { return m_impl->m_kind; }
+    {
+        return m_impl->m_kind;
+    }
 
     std::string name() const
-        { return m_impl->m_name; }
+    {
+        return m_impl->m_name;
+    }
 
-    template<typename T>
-    T value() const
+    template <typename T> T value() const
     {
         T t{};
 
@@ -579,9 +582,10 @@ public:
         {
             // Reset in case the fromString conversion messed it up.
             t = T();
-            std::cerr << "Error converting metadata [" << name() <<
-                "] = " << m_impl->m_value << " to type " <<
-                Utils::typeidName<T>() << " -- return default initialized.";
+            std::cerr << "Error converting metadata [" << name()
+                      << "] = " << m_impl->m_value << " to type "
+                      << Utils::typeidName<T>()
+                      << " -- return default initialized.";
         }
         return t;
     }
@@ -613,7 +617,9 @@ public:
     }
 
     std::string description() const
-        { return m_impl->m_descrip; }
+    {
+        return m_impl->m_descrip;
+    }
 
     MetadataNodeList children() const
     {
@@ -644,7 +650,9 @@ public:
     }
 
     bool hasChildren() const
-        { return m_impl->m_subnodes.size(); }
+    {
+        return m_impl->m_subnodes.size();
+    }
 
     std::vector<std::string> childNames() const
     {
@@ -656,17 +664,24 @@ public:
         return names;
     }
 
-    operator bool () const
-        { return !empty(); }
-    bool operator ! ()
-        { return empty(); }
+    operator bool() const
+    {
+        return !empty();
+    }
+    bool operator!()
+    {
+        return empty();
+    }
     bool valid() const
-        { return !empty(); }
+    {
+        return !empty();
+    }
     bool empty() const
-        { return m_impl->m_name.empty() && !hasChildren(); }
+    {
+        return m_impl->m_name.empty() && !hasChildren();
+    }
 
-    template <typename PREDICATE>
-    MetadataNode find(PREDICATE p) const
+    template <typename PREDICATE> MetadataNode find(PREDICATE p) const
     {
         if (p(*this))
             return *this;
@@ -680,8 +695,7 @@ public:
         return MetadataNode();
     }
 
-    template <typename PREDICATE>
-    MetadataNodeList findChildren(PREDICATE p)
+    template <typename PREDICATE> MetadataNodeList findChildren(PREDICATE p)
     {
         MetadataNodeList matches;
 
@@ -695,8 +709,7 @@ public:
         return matches;
     }
 
-    template <typename PREDICATE>
-    MetadataNode findChild(PREDICATE p) const
+    template <typename PREDICATE> MetadataNode findChild(PREDICATE p) const
     {
         auto nodes = children();
         for (auto ai = nodes.begin(); ai != nodes.end(); ++ai)
@@ -708,8 +721,10 @@ public:
         return MetadataNode();
     }
 
-    MetadataNode findChild(const char *s) const
-        { return findChild(std::string(s)); }
+    MetadataNode findChild(const char* s) const
+    {
+        return findChild(std::string(s));
+    }
 
     MetadataNode findChild(std::string s) const
     {
@@ -747,8 +762,7 @@ public:
 private:
     MetadataNodeImplPtr m_impl;
 
-    MetadataNode(MetadataNodeImplPtr node) : m_impl(node)
-        {}
+    MetadataNode(MetadataNodeImplPtr node) : m_impl(node) {}
 
     std::string escapeQuotes(const std::string& in) const
     {
@@ -765,32 +779,32 @@ private:
     }
 };
 
-inline bool operator == (const MetadataNode& m1, const MetadataNode& m2)
+inline bool operator==(const MetadataNode& m1, const MetadataNode& m2)
 {
     return m1.m_impl == m2.m_impl;
 }
 
-inline bool operator != (const MetadataNode& m1, const MetadataNode& m2)
+inline bool operator!=(const MetadataNode& m1, const MetadataNode& m2)
 {
     return !(m1.m_impl == m2.m_impl);
 }
-
 
 class Metadata
 {
     friend class BasePointTable;
 
 public:
-    Metadata() : m_root("root"), m_private("private")
-    {}
+    Metadata() : m_root("root"), m_private("private") {}
 
-    Metadata(const std::string& name) : m_name(name)
-    {}
+    Metadata(const std::string& name) : m_name(name) {}
 
     MetadataNode getNode() const
-        { return m_root; }
+    {
+        return m_root;
+    }
 
     static std::string PDAL_EXPORT inferType(const std::string& val);
+
 private:
     MetadataNode m_root;
     MetadataNode m_private;
@@ -799,5 +813,3 @@ private:
 typedef std::shared_ptr<Metadata> MetadataPtr;
 
 } // namespace pdal
-
-

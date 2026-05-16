@@ -1,34 +1,34 @@
 /******************************************************************************
-* Copyright (c) 2014,  Hobu Inc., hobu@hobu.co
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the names of its contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014,  Hobu Inc., hobu@hobu.co
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of its contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/DbWriter.hpp>
 #include <pdal/util/Utils.hpp>
@@ -64,14 +64,14 @@ void DbWriter::prepared(PointTableRef table)
         if (dt.m_id == Id::Unknown)
         {
             std::ostringstream oss;
-            oss << "Invalid dimension '" << s << "' specified for "
-                "'output_dims' option.";
+            oss << "Invalid dimension '" << s
+                << "' specified for "
+                   "'output_dims' option.";
             throw pdal_error(oss.str());
         }
         m_dbDims.push_back(XMLDim(dt, layout->dimName(dt.m_id)));
     }
 }
-
 
 void DbWriter::ready(PointTableRef /*table*/)
 {
@@ -86,11 +86,12 @@ void DbWriter::ready(PointTableRef /*table*/)
         long id1 = Utils::toNative(d1.m_dimType.m_id);
         long id2 = Utils::toNative(d2.m_dimType.m_id);
 
-        const auto isXyz([](long native)->bool
-        {
-            const Id e(static_cast<Id>(native));
-            return (e == Id::X || e == Id::Y || e == Id::Z);
-        });
+        const auto isXyz(
+            [](long native) -> bool
+            {
+                const Id e(static_cast<Id>(native));
+                return (e == Id::X || e == Id::Y || e == Id::Z);
+            });
 
         // Put X, Y and Z at the end of the list.
         if (isXyz(id1))
@@ -149,7 +150,6 @@ void DbWriter::ready(PointTableRef /*table*/)
     }
 }
 
-
 /// Make sure that computed offsets are stored in the schema.
 void DbWriter::setAutoXForm(const PointViewPtr view)
 {
@@ -167,7 +167,6 @@ void DbWriter::setAutoXForm(const PointViewPtr view)
     }
 }
 
-
 /// Read a field from a PointView and write its value as formatted for output
 /// to the DB schema to the location as requested.
 /// \param[in] view     PointView to read from.
@@ -175,8 +174,8 @@ void DbWriter::setAutoXForm(const PointViewPtr view)
 /// \param[in] id       ID of the dimension to read.
 /// \param[in] idx      Index of point to read.
 /// \return  Size of field as read.
-size_t DbWriter::readField(const PointView& view, char *pos,
-    Dimension::Id id, PointId idx)
+size_t DbWriter::readField(const PointView& view, char* pos, Dimension::Id id,
+                           PointId idx)
 {
     using namespace Dimension;
 
@@ -228,21 +227,20 @@ size_t DbWriter::readField(const PointView& view, char *pos,
     return size;
 }
 
-
 /// Read a point's data packed into a buffer.
 /// \param[in] view  PointView to read from.
 /// \param[in] idx  Index of point to read.
 /// \param[in] outbuf  Buffer to write to.
 /// \return  Number of bytes written to buffer.
-size_t DbWriter::readPoint(const PointView& view, PointId idx, char *outbuf)
+size_t DbWriter::readPoint(const PointView& view, PointId idx, char* outbuf)
 {
     using namespace Dimension;
 
     // Read the data for the output dimensions from the view into the outbuf.
     view.getPackedPoint(m_dimTypes, idx, outbuf);
 
-    auto iconvert = [](const XForm& xform, Id dim,
-        const char *inpos, char *outpos)
+    auto iconvert =
+        [](const XForm& xform, Id dim, const char* inpos, char* outpos)
     {
         double d;
         int32_t i;
@@ -261,13 +259,13 @@ size_t DbWriter::readPoint(const PointView& view, PointId idx, char *outbuf)
 
     if (m_xOffsets.first >= 0)
         iconvert(m_scaling.m_xXform, Id::X, outbuf + (size_t)m_xOffsets.first,
-            outbuf + (size_t)m_xOffsets.second);
+                 outbuf + (size_t)m_xOffsets.second);
     if (m_yOffsets.first >= 0)
         iconvert(m_scaling.m_yXform, Id::Y, outbuf + (size_t)m_yOffsets.first,
-            outbuf + (size_t)m_yOffsets.second);
+                 outbuf + (size_t)m_yOffsets.second);
     if (m_zOffsets.first >= 0)
         iconvert(m_scaling.m_zXform, Id::Z, outbuf + (size_t)m_zOffsets.first,
-            outbuf + (size_t)m_zOffsets.second);
+                 outbuf + (size_t)m_zOffsets.second);
     return m_dbPointSize;
 }
 

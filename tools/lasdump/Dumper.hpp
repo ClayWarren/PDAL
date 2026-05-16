@@ -33,8 +33,8 @@
  ****************************************************************************/
 
 #include <deque>
-#include <string>
 #include <iostream>
+#include <string>
 
 #include "Header.hpp"
 #include "Vlr.hpp"
@@ -54,10 +54,14 @@ class Dumper
 
 public:
     Dumper(const std::deque<std::string>& args) : m_out(&std::cout)
-        { m_error = processArgs(args); }
+    {
+        m_error = processArgs(args);
+    }
     void dump();
     int error()
-        { return m_error; }
+    {
+        return m_error;
+    }
 
 private:
     std::string m_filename;
@@ -65,7 +69,7 @@ private:
     Vlr m_zipVlr;
     int m_error;
     std::ofstream m_fout;
-    std::ostream *m_out;
+    std::ostream* m_out;
 
     int processArgs(std::deque<std::string> args);
     void readPoints();
@@ -73,4 +77,3 @@ private:
 
 } // namespace lasdump
 } // namespace pdal
-

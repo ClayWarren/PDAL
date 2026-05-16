@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2021, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2021, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <iostream>
 #include <limits>
@@ -38,8 +38,8 @@
 #include "Output.hpp"
 
 #include <pdal/util/Algorithm.hpp>
-#include <pdal/util/OStream.hpp>
 #include <pdal/util/Extractor.hpp>
+#include <pdal/util/OStream.hpp>
 
 #include <lazperf/filestream.hpp>
 
@@ -53,7 +53,8 @@ namespace copcwriter
 Output::Output(const BaseInfo& b) : b(b)
 {
     m_header.file_source_id = b.opts.filesourceId.val();
-    m_header.global_encoding = b.opts.globalEncoding.val() | (1 << 4); // Set for WKT
+    m_header.global_encoding =
+        b.opts.globalEncoding.val() | (1 << 4); // Set for WKT
     b.opts.projectId.val().pack(m_header.guid);
     m_header.version.major = 1;
     m_header.version.minor = 4;
@@ -62,9 +63,10 @@ Output::Output(const BaseInfo& b) : b(b)
     m_header.creation.day = b.opts.creationDoy.val();
     m_header.creation.year = b.opts.creationYear.val();
     m_header.header_size = lazperf::header14::Size;
-    m_header.point_format_id = b.pointFormatId | (1 << 7);  // Bit for laszip
-    m_header.point_record_length = lazperf::baseCount(b.pointFormatId) + b.numExtraBytes;
-    //ABELL - Check this.
+    m_header.point_format_id = b.pointFormatId | (1 << 7); // Bit for laszip
+    m_header.point_record_length =
+        lazperf::baseCount(b.pointFormatId) + b.numExtraBytes;
+    // ABELL - Check this.
     m_header.scale.x = b.scaling.m_xXform.m_scale.m_val;
     m_header.scale.y = b.scaling.m_yXform.m_scale.m_val;
     m_header.scale.z = b.scaling.m_zXform.m_scale.m_val;
@@ -81,7 +83,8 @@ Output::Output(const BaseInfo& b) : b(b)
     m_header.maxz = b.stats[(int)stats::Index::Z].maximum();
 
     // legacy point counts are all zero, since COPC is LAS 1.4 only.
-    std::fill(std::begin(m_header.points_by_return), std::end(m_header.points_by_return), 0);
+    std::fill(std::begin(m_header.points_by_return),
+              std::end(m_header.points_by_return), 0);
     m_header.point_count = 0;
 
     for (int i = 1; i <= 15; ++i)
@@ -92,21 +95,23 @@ Output::Output(const BaseInfo& b) : b(b)
             count = b.stats[(int)stats::Index::ReturnNumber].values().at(i);
         }
         catch (const std::out_of_range&)
-        {}
+        {
+        }
 
         m_header.points_by_return_14[i - 1] = count;
     }
 
-    // Note that only these VLRs go in the standard VLR area. The rest are written as
-    // extended VLRs.
+    // Note that only these VLRs go in the standard VLR area. The rest are
+    // written as extended VLRs.
     setupVlrs();
     m_header.point_offset = lazperf::header14::Size + m_vlrBuf.size();
 
-    // The chunk table offset is written as the first 8 bytes of the point data in LAZ.
+    // The chunk table offset is written as the first 8 bytes of the point data
+    // in LAZ.
     m_chunkOffsetPos = m_header.point_offset;
 
-    // The actual point data comes after the chunk table offset. m_pointPos is updated
-    // as points are written.
+    // The actual point data comes after the chunk table offset. m_pointPos is
+    // updated as points are written.
     m_pointPos = m_chunkOffsetPos + sizeof(uint64_t);
 
     m_f.open(b.filename, std::ios::out | std::ios::binary);
@@ -125,8 +130,8 @@ void Output::setupVlrs()
 
 void Output::addCopcVlr()
 {
-    // The copc VLR isn't local because we need to fill in the hierarchy root node
-    // offset/size when we know it.
+    // The copc VLR isn't local because we need to fill in the hierarchy root
+    // node offset/size when we know it.
     m_copcVlr.center_x = (b.bounds.maxx / 2) + (b.bounds.minx / 2);
     m_copcVlr.center_y = (b.bounds.maxy / 2) + (b.bounds.miny / 2);
     m_copcVlr.center_z = (b.bounds.maxz / 2) + (b.bounds.minz / 2);
@@ -145,7 +150,8 @@ void Output::addCopcVlr()
 
 void Output::addLazVlr()
 {
-    lazperf::laz_vlr laz(b.pointFormatId, b.numExtraBytes, lazperf::laz_vlr::VariableChunkSize);
+    lazperf::laz_vlr laz(b.pointFormatId, b.numExtraBytes,
+                         lazperf::laz_vlr::VariableChunkSize);
 
     std::vector<char> buf = laz.header().data();
     m_vlrBuf.insert(m_vlrBuf.end(), buf.begin(), buf.end());
@@ -193,16 +199,16 @@ void Output::addEbVlr()
     m_header.vlr_count++;
 }
 
-
-void Output::finish(const std::unordered_map<VoxelKey, point_count_t>& childCounts)
+void Output::finish(
+    const std::unordered_map<VoxelKey, point_count_t>& childCounts)
 {
     writeChunkTable();
     writeHierarchy(childCounts);
     writeEvlrs();
 
     // These items are last because we don't have all their data until the end.
-    // Note that we call setupVlrs() a second time here to make sure the data describing
-    // the hierarchy is properly written.
+    // Note that we call setupVlrs() a second time here to make sure the data
+    // describing the hierarchy is properly written.
     writeHeader();
     setupVlrs();
     writeVlrData();
@@ -217,7 +223,7 @@ uint64_t Output::newChunk(const VoxelKey& key, int32_t size, int32_t count)
     // Chunks of size zero are a special case.
     if (count == 0)
     {
-        m_hierarchy[key] = { 0, 0, 0 };
+        m_hierarchy[key] = {0, 0, 0};
         return 0;
     }
 
@@ -226,7 +232,7 @@ uint64_t Output::newChunk(const VoxelKey& key, int32_t size, int32_t count)
     assert(count <= (std::numeric_limits<int32_t>::max)() && count >= 0);
     m_chunkTable.push_back({(uint64_t)count, (uint64_t)size});
     m_header.point_count_14 += count;
-    m_hierarchy[key] = { chunkStart, size, count };
+    m_hierarchy[key] = {chunkStart, size, count};
     return chunkStart;
 }
 
@@ -281,7 +287,8 @@ void Output::writeHierarchy(const CountMap& counts)
     uint64_t endPos = m_f.tellp();
 
     // Now write VLR header.
-    lazperf::evlr_header h { 0, "copc", 1000, (endPos - beginPos), "EPT Hierarchy" };
+    lazperf::evlr_header h{0, "copc", 1000, (endPos - beginPos),
+                           "EPT Hierarchy"};
     m_f.seekp(m_header.evlr_offset);
     h.write(m_f);
 }
@@ -308,11 +315,11 @@ Output::Entry Output::emitRoot(const VoxelKey& root, const CountMap& counts)
 
     // This is the information about where the hierarchy node was written, to be
     // written with the parent.
-    return { startPos, (int32_t)(endPos - startPos), -1 };
+    return {startPos, (int32_t)(endPos - startPos), -1};
 }
 
 void Output::emitChildren(const VoxelKey& p, const CountMap& counts,
-    Entries& entries, int stopLevel)
+                          Entries& entries, int stopLevel)
 {
     const int MinHierarchySize = 50;
 
@@ -322,8 +329,8 @@ void Output::emitChildren(const VoxelKey& p, const CountMap& counts,
         auto ci = counts.find(c);
         if (ci != counts.end())
         {
-            // If we're not at a stop level or the number of child nodes is less than 50,
-            // just stick them here.
+            // If we're not at a stop level or the number of child nodes is less
+            // than 50, just stick them here.
             if (c.level() != stopLevel || ci->second <= MinHierarchySize)
             {
                 entries.push_back({c, m_hierarchy[c]});
@@ -349,4 +356,3 @@ void Output::writeEvlrs()
 
 } // namespace copcwriter
 } // namespace pdal
-

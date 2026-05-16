@@ -1,47 +1,47 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
+#include <pdal/FileSpec.hpp>
+#include <pdal/Log.hpp>
+#include <pdal/Options.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/Options.hpp>
-#include <pdal/Log.hpp>
-#include <pdal/FileSpec.hpp>
 
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace pdal
 {
@@ -54,7 +54,7 @@ struct StageCreationOptions
 {
     std::string m_filename;
     std::string m_driver;
-    Stage *m_parent;
+    Stage* m_parent;
     Options m_options;
     std::string m_tag;
 };
@@ -63,7 +63,7 @@ struct ReaderCreationOptions
 {
     FileSpec m_filespec;
     std::string m_driver;
-    Stage *m_parent;
+    Stage* m_parent;
     Options m_options;
     std::string m_tag;
 };
@@ -71,14 +71,15 @@ struct ReaderCreationOptions
 class PDAL_EXPORT PipelineManager
 {
     FRIEND_TEST(json, tags);
+
 public:
     struct ExecResult
     {
-        ExecResult() : m_mode(ExecMode::None), m_count(0)
-        {}
-        ExecResult(ExecMode mode, point_count_t count) :
-            m_mode(mode), m_count(count)
-        {}
+        ExecResult() : m_mode(ExecMode::None), m_count(0) {}
+        ExecResult(ExecMode mode, point_count_t count)
+            : m_mode(mode), m_count(count)
+        {
+        }
 
         ExecMode m_mode;
         point_count_t m_count;
@@ -88,7 +89,9 @@ public:
     ~PipelineManager();
 
     void setProgressFd(int fd)
-        { m_progressFd = fd; }
+    {
+        m_progressFd = fd;
+    }
 
     void readPipeline(std::istream& input);
     void readPipeline(const std::string& filename);
@@ -102,7 +105,7 @@ public:
     // They're preferable to the above as they're more flexible and safer.
     Stage& makeReader(const std::string& inputFile, std::string driver);
     Stage& makeReader(const std::string& inputFile, std::string driver,
-        Options options);
+                      Options options);
     Stage& makeReader(StageCreationOptions& opts);
     Stage& makeReader(ReaderCreationOptions& opts);
 
@@ -110,16 +113,16 @@ public:
     Stage& makeFilter(const std::string& driver, Options options);
     Stage& makeFilter(const std::string& driver, Stage& parent);
     Stage& makeFilter(const std::string& driver, Stage& parent,
-        Options options);
+                      Options options);
     Stage& makeFilter(StageCreationOptions& ops);
 
     Stage& makeWriter(const std::string& outputFile, std::string driver);
     Stage& makeWriter(const std::string& outputFile, std::string driver,
-        Options options);
+                      Options options);
     Stage& makeWriter(const std::string& outputFile, std::string driver,
-        Stage& parent);
+                      Stage& parent);
     Stage& makeWriter(const std::string& outputFile, std::string driver,
-        Stage& parent, Options options);
+                      Stage& parent, Options options);
     Stage& makeWriter(StageCreationOptions& ops);
 
     // Return the first leaf stage of a pipeline, or nullptr if the pipeline
@@ -145,25 +148,35 @@ public:
 
     // Get the resulting point views.
     const PointViewSet& views() const
-        { return m_viewSet; }
+    {
+        return m_viewSet;
+    }
 
     // Get the point table data.
     PointTableRef pointTable() const
-        { return m_table; }
+    {
+        return m_table;
+    }
 
     MetadataNode getMetadata() const;
     Options& commonOptions()
-        { return m_commonOptions; }
+    {
+        return m_commonOptions;
+    }
     OptionsMap& stageOptions()
-        { return m_stageOptions; }
-    std::vector<Stage *> roots() const;
-    std::vector<Stage *> leaves() const;
-    void replace(Stage *sOld, Stage *sNew);
+    {
+        return m_stageOptions;
+    }
+    std::vector<Stage*> roots() const;
+    std::vector<Stage*> leaves() const;
+    void replace(Stage* sOld, Stage* sNew);
 
-    const std::vector<Stage *> stages() const
-        { return m_stages; }
-    void destroyStage(Stage *s = nullptr);
-    void addStage(Stage *s);
+    const std::vector<Stage*> stages() const
+    {
+        return m_stages;
+    }
+    void destroyStage(Stage* s = nullptr);
+    void addStage(Stage* s);
     void setAllowedDims(const StringList& dimNames);
 
 private:
@@ -180,11 +193,11 @@ private:
     PointViewSet m_viewSet;
     std::vector<Stage*> m_stages; // stage observer, never owner
     int m_progressFd;
-    std::istream *m_input;
+    std::istream* m_input;
     LogPtr m_log;
 
     PipelineManager& operator=(const PipelineManager&); // not implemented
-    PipelineManager(const PipelineManager&); // not implemented
+    PipelineManager(const PipelineManager&);            // not implemented
 };
 typedef std::unique_ptr<PipelineManager> PipelineManagerPtr;
 

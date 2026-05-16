@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
@@ -69,7 +69,6 @@ TEST(FauxReaderTest, test_constant_mode_sequential_iter)
     }
 }
 
-
 TEST(FauxReaderTest, test_random_mode)
 {
     BOX3D bounds(1.0, 2.0, 3.0, 101.0, 102.0, 103.0);
@@ -106,7 +105,6 @@ TEST(FauxReaderTest, test_random_mode)
         EXPECT_EQ(t, i);
     }
 }
-
 
 TEST(FauxReaderTest, test_ramp_mode_1)
 {
@@ -147,7 +145,6 @@ TEST(FauxReaderTest, test_ramp_mode_1)
     EXPECT_EQ(t1, 1u);
 }
 
-
 TEST(FauxReaderTest, test_ramp_mode_2)
 {
     BOX3D bounds(1.0, 2.0, 3.0, 101.0, 152.0, 203.0);
@@ -183,7 +180,6 @@ TEST(FauxReaderTest, test_ramp_mode_2)
     }
 }
 
-
 TEST(FauxReaderTest, test_return_number)
 {
     Options ops;
@@ -205,8 +201,8 @@ TEST(FauxReaderTest, test_return_number)
 
     for (point_count_t i = 0; i < view->size(); i++)
     {
-        uint8_t returnNumber = view->getFieldAs<uint8_t>(
-            Dimension::Id::ReturnNumber, i);
+        uint8_t returnNumber =
+            view->getFieldAs<uint8_t>(Dimension::Id::ReturnNumber, i);
         uint8_t numberOfReturns =
             view->getFieldAs<uint8_t>(Dimension::Id::NumberOfReturns, i);
 
@@ -254,9 +250,9 @@ TEST(FauxReaderTest, uniform)
     EXPECT_EQ(vs.size(), 1u);
     PointViewPtr v = *vs.begin();
     EXPECT_EQ(v->size(), 1000u);
-    double hx[10] {};
-    double hy[10] {};
-    double hz[10] {};
+    double hx[10]{};
+    double hy[10]{};
+    double hz[10]{};
     for (size_t i = 0; i < 1000; ++i)
     {
         int x = (int)(v->getFieldAs<double>(Dimension::Id::X, i) / 10);
@@ -267,9 +263,9 @@ TEST(FauxReaderTest, uniform)
         hz[z]++;
     }
 
-    int xtot[] = { 117, 95, 94, 93, 90, 118, 102, 97, 102, 92 };
-    int ytot[] = { 92, 110, 105, 100, 98, 114, 83, 93, 108, 97 };
-    int ztot[] = { 92, 99, 106, 100, 105, 106, 109, 88, 84, 111 };
+    int xtot[] = {117, 95, 94, 93, 90, 118, 102, 97, 102, 92};
+    int ytot[] = {92, 110, 105, 100, 98, 114, 83, 93, 108, 97};
+    int ztot[] = {92, 99, 106, 100, 105, 106, 109, 88, 84, 111};
 
     for (size_t i = 0; i < 10; ++i)
     {
@@ -301,9 +297,9 @@ TEST(FauxReaderTest, normal)
     EXPECT_EQ(vs.size(), 1u);
     PointViewPtr v = *vs.begin();
     EXPECT_EQ(v->size(), 1000u);
-    double hx[10] {};
-    double hy[10] {};
-    double hz[10] {};
+    double hx[10]{};
+    double hy[10]{};
+    double hz[10]{};
     for (size_t i = 0; i < 1000; ++i)
     {
         int x = v->getFieldAs<int>(Dimension::Id::X, i) / 10;
@@ -317,9 +313,9 @@ TEST(FauxReaderTest, normal)
         hz[z]++;
     }
 
-    int xtot[] = { 0, 3, 19, 145, 313, 340, 156, 22, 2, 0 };
-    int ytot[] = { 0, 1, 23, 129, 355, 333, 134, 23, 2, 0 };
-    int ztot[] = { 0, 0, 20, 131, 339, 357, 118, 31, 4, 0 };
+    int xtot[] = {0, 3, 19, 145, 313, 340, 156, 22, 2, 0};
+    int ytot[] = {0, 1, 23, 129, 355, 333, 134, 23, 2, 0};
+    int ztot[] = {0, 0, 20, 131, 339, 357, 118, 31, 4, 0};
 
     for (size_t i = 0; i < 10; ++i)
     {
@@ -358,8 +354,8 @@ void testGrid(point_count_t xlimit, point_count_t ylimit, point_count_t zlimit)
 
     Options ops;
 
-    ops.add("bounds", BOX3D(0, 0, 0,
-        (double)xlimit, (double)ylimit, (double)zlimit));
+    ops.add("bounds",
+            BOX3D(0, 0, 0, (double)xlimit, (double)ylimit, (double)zlimit));
     ops.add("mode", "grid");
     FauxReader reader;
     reader.setOptions(ops);
@@ -375,7 +371,7 @@ void testGrid(point_count_t xlimit, point_count_t ylimit, point_count_t zlimit)
     int x = 0;
     int y = 0;
     int z = 0;
-    for (PointId index =  0; index < size; index++)
+    for (PointId index = 0; index < size; index++)
     {
         EXPECT_EQ(x, view->getFieldAs<int>(Dimension::Id::X, index));
         EXPECT_EQ(y, view->getFieldAs<int>(Dimension::Id::Y, index));

@@ -37,8 +37,8 @@
 #include <pdal/pdal_config.hpp>
 #include <pdal/pdal_features.hpp>
 
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -90,24 +90,20 @@ bool hasFeature(Feature f)
     return enabled;
 }
 
-
 int versionMajor()
 {
     return pdalVersionMajor;
 }
-
 
 int versionMinor()
 {
     return pdalVersionMinor;
 }
 
-
 int versionPatch()
 {
     return pdalVersionPatch;
 }
-
 
 std::string versionString()
 {
@@ -116,16 +112,13 @@ std::string versionString()
 
 int versionInteger()
 {
-    return versionMajor() * 100 * 100 +
-        versionMinor() * 100 +
-        versionPatch();
+    return versionMajor() * 100 * 100 + versionMinor() * 100 + versionPatch();
 }
 
 std::string sha1()
 {
-	return pdalSha;
+    return pdalSha;
 }
-
 
 /// Tell the user a bit about PDAL's compilation
 std::string fullVersionString()
@@ -134,13 +127,12 @@ std::string fullVersionString()
 
     std::string sha = sha1();
     if (!Utils::iequals(sha, "Release"))
-        sha = sha.substr(0,6);
+        sha = sha.substr(0, 6);
 
     os << pdalVersion << " (git-version: " << sha << ")";
 
     return os.str();
 }
-
 
 std::string debugInformation()
 {
@@ -150,7 +142,7 @@ std::string debugInformation()
     std::ostringstream os;
 
     os << headline << std::endl;
-    os << "PDAL debug information" << std::endl ;
+    os << "PDAL debug information" << std::endl;
     os << headline << std::endl << std::endl;
 
     os << "Version information" << std::endl;
@@ -165,12 +157,12 @@ std::string debugInformation()
     os << "Enabled libraries" << std::endl;
     os << headline << std::endl << std::endl;
 
-    os << "GDAL (" << GDALVersionInfo("RELEASE_NAME") << ") - " <<
-        "http://www.gdal.org" << std::endl;
+    os << "GDAL (" << GDALVersionInfo("RELEASE_NAME") << ") - "
+       << "http://www.gdal.org" << std::endl;
 
 #ifdef PDAL_HAVE_LIBXML2
-    os << "libxml (" << LIBXML_DOTTED_VERSION << ") - " <<
-              "http://www.xmlsoft.org/" << std::endl;
+    os << "libxml (" << LIBXML_DOTTED_VERSION << ") - "
+       << "http://www.xmlsoft.org/" << std::endl;
 #endif
 
     return os.str();

@@ -58,10 +58,9 @@ private:
     std::string m_structName;
     StringList m_outputDims; ///< List of dimensions to write
     // Can't use unique_ptr b/c MATFile is an incomplete type.
-    MATFile * m_matfile;
+    MATFile* m_matfile;
     Dimension::IdList m_dims;
     MetadataNode m_tableMetadata;
 };
 
-
-}
+} // namespace pdal

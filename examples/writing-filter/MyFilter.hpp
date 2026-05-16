@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <pdal/pdal_internal.hpp>
 #include <pdal/Filter.hpp>
+#include <pdal/pdal_internal.hpp>
 
 namespace pdal
 {
@@ -11,8 +11,7 @@ namespace pdal
 class MyFilter : public Filter
 {
 public:
-    MyFilter() : Filter()
-    {}
+    MyFilter() : Filter() {}
     std::string getName() const;
 
 private:
@@ -24,7 +23,7 @@ private:
     virtual PointViewSet run(PointViewPtr view);
 
     MyFilter& operator=(const MyFilter&); // not implemented
-    MyFilter(const MyFilter&); // not implemented
+    MyFilter(const MyFilter&);            // not implemented
 };
 
 } // namespace pdal

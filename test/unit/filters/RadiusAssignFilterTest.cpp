@@ -1,8 +1,8 @@
 #include <pdal/pdal_test_main.hpp>
 
+#include "Support.hpp"
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include "Support.hpp"
 
 #include <filters/StatsFilter.hpp>
 
@@ -12,7 +12,8 @@ namespace pdal
 TEST(RadiusAssignFilterTest, basic_usage)
 {
     Options ro;
-    ro.add("filename", Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
+    ro.add("filename",
+           Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
     StageFactory factory;
     Stage& r = *(factory.createStage("readers.text"));
     r.setOptions(ro);
@@ -54,22 +55,22 @@ TEST(RadiusAssignFilterTest, basic_usage)
         for (PointId id = 0; id < view->size(); ++id)
         {
             point.setPointId(id);
-            if (view->getFieldAs<unsigned int>(Dimension::Id::Classification, id) == 2)
+            if (view->getFieldAs<unsigned int>(Dimension::Id::Classification,
+                                               id) == 2)
                 nbUpdatedPoints[ii] += 1;
         }
         // Check that some points are updated
         EXPECT_TRUE(nbUpdatedPoints[ii] == nbExpectedUpdatedPoints[ii])
             << "Found: '" << nbUpdatedPoints[ii] << "'" << std::endl
-            << "expected: '" << nbExpectedUpdatedPoints[ii] <<"'" << std::endl;
+            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << std::endl;
     }
 }
-
-
 
 TEST(RadiusAssignFilterTest, with_z_limit)
 {
     Options ro;
-    ro.add("filename", Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
+    ro.add("filename",
+           Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
     StageFactory factory;
     Stage& r = *(factory.createStage("readers.text"));
     r.setOptions(ro);
@@ -97,7 +98,6 @@ TEST(RadiusAssignFilterTest, with_z_limit)
         fo.add("max2d_above", maxs2dAbove[ii]);
         fo.add("max2d_below", maxs2dBelow[ii]);
 
-
         Stage& f = *(factory.createStage("filters.radiusassign"));
         f.setInput(a);
         f.setOptions(fo);
@@ -114,20 +114,22 @@ TEST(RadiusAssignFilterTest, with_z_limit)
         for (PointId id = 0; id < view->size(); ++id)
         {
             point.setPointId(id);
-            if (view->getFieldAs<unsigned int>(Dimension::Id::Classification, id) == 2)
+            if (view->getFieldAs<unsigned int>(Dimension::Id::Classification,
+                                               id) == 2)
                 nbUpdatedPoints[ii] += 1;
         }
         // Check that some points are updated
         EXPECT_TRUE(nbUpdatedPoints[ii] == nbExpectedUpdatedPoints[ii])
             << "Found: '" << nbUpdatedPoints[ii] << "'" << std::endl
-            << "expected: '" << nbExpectedUpdatedPoints[ii] <<"'" << std::endl;
+            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << std::endl;
     }
 }
 
 TEST(RadiusAssignFilterTest, with_src_domain)
 {
     Options ro;
-    ro.add("filename", Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
+    ro.add("filename",
+           Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
     StageFactory factory;
     Stage& r = *(factory.createStage("readers.text"));
     r.setOptions(ro);
@@ -147,7 +149,6 @@ TEST(RadiusAssignFilterTest, with_src_domain)
     fo.add("update_expression", "Classification = 2");
     fo.add("radius", 1);
 
-
     Stage& f = *(factory.createStage("filters.radiusassign"));
     f.setInput(a);
     f.setOptions(fo);
@@ -161,20 +162,19 @@ TEST(RadiusAssignFilterTest, with_src_domain)
 
     PointRef point(*view, 0);
 
-    size_t nbUpdatedPoints=0;
+    size_t nbUpdatedPoints = 0;
     for (PointId id = 0; id < view->size(); ++id)
     {
         point.setPointId(id);
-        if (view->getFieldAs<unsigned int>(Dimension::Id::Classification, id) == 2)
+        if (view->getFieldAs<unsigned int>(Dimension::Id::Classification, id) ==
+            2)
             nbUpdatedPoints += 1;
     }
     // Check that some points are updated
     EXPECT_TRUE(nbUpdatedPoints == 6)
         << "Found: '" << nbUpdatedPoints << "'" << std::endl
         << "expected: '5'" << std::endl;
-
 }
-
 
 TEST(RadiusAssignFilterTest, missing_param)
 {
@@ -201,6 +201,5 @@ TEST(RadiusAssignFilterTest, missing_param)
     EXPECT_ANY_THROW(f.prepare(table));
     PointViewSet viewSet = f.execute(table);
 }
-
 
 } // namespace pdal

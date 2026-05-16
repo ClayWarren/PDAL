@@ -1,35 +1,35 @@
 /******************************************************************************
-* Copyright (c) 2018, Hobu Inc., (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the names of contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2018, Hobu Inc., (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <iostream>
 #include <string>
@@ -48,7 +48,7 @@ std::string appName()
 {
     return Support::binpath("pdal info");
 }
-}
+} // namespace
 
 void test(const std::string options, const std::string validation)
 {
@@ -56,17 +56,17 @@ void test(const std::string options, const std::string validation)
 
     std::string output;
     cmd = appName() + " " + options + " " +
-        Support::datapath("las/autzen_trim.las") + " 2>&1";
+          Support::datapath("las/autzen_trim.las") + " 2>&1";
 
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
     EXPECT_NE(output.find(validation), std::string::npos)
         << "Found: '" << output << "'" << std::endl
-        << "expected: '" << validation<<"'" << std::endl;
+        << "expected: '" << validation << "'" << std::endl;
 }
 
 TEST(Info, point)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
   "points":
   {
     "point":
@@ -102,7 +102,7 @@ std::string r = R"foo(
 
 TEST(Info, query)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
       {
         "Blue": 100,
         "Classification": 1,
@@ -134,7 +134,7 @@ std::string r = R"foo(
 
 TEST(Info, stats)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
     "statistic":
     [
       {
@@ -162,28 +162,29 @@ std::string r = R"foo(
     SCOPED_TRACE("stats");
     test("", r);
 
-// 10-Jan-20 - Broken by a change to proj which converts meters to ft, I think.
-/**
-std::string s = R"foo(
-      "EPSG:4326":
-      {
-        "bbox":
-        {
-          "maxx": -123.0689038,
-          "maxy": 44.0515451,
-          "maxz": 158.651448,
-          "minx": -123.0734481,
-          "miny": 44.04990077,
-          "minz": 123.828048
-        },
-)foo";
-    test("", s);
-**/
+    // 10-Jan-20 - Broken by a change to proj which converts meters to ft, I
+    // think.
+    /**
+    std::string s = R"foo(
+          "EPSG:4326":
+          {
+            "bbox":
+            {
+              "maxx": -123.0689038,
+              "maxy": 44.0515451,
+              "maxz": 158.651448,
+              "minx": -123.0734481,
+              "miny": 44.04990077,
+              "minz": 123.828048
+            },
+    )foo";
+        test("", s);
+    **/
 }
 
 TEST(Info, schema)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
       {
         "name": "Z",
         "size": 8,
@@ -201,7 +202,7 @@ std::string r = R"foo(
 
 TEST(Info, all)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
       {
         "name": "Z",
         "size": 8,
@@ -219,7 +220,7 @@ std::string r = R"foo(
 
 TEST(Info, stac)
 {
-std::string r = R"foo(
+    std::string r = R"foo(
     "properties":
     {
       "datetime": "2015-09-10T00:00:00Z",
@@ -229,9 +230,8 @@ std::string r = R"foo(
     SCOPED_TRACE("stac");
     test("--stac", r);
 
-
-//anything other than message and status is a success
-std::string validation = R"foo(
+    // anything other than message and status is a success
+    std::string validation = R"foo(
   "stac":
   {
     "message": "Failed to create STAC Feature with missing key. 'EPSG:4326'",
@@ -243,10 +243,10 @@ std::string validation = R"foo(
 
     std::string output;
     cmd = appName() + " " + "--stac" + " " +
-        Support::datapath("las/sample_c.las") + " 2>&1";
+          Support::datapath("las/sample_c.las") + " 2>&1";
 
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
     EXPECT_NE(output.find(validation), std::string::npos)
         << "Found: '" << output << "'" << std::endl
-        << "expected: '" << validation<<"'" << std::endl;
+        << "expected: '" << validation << "'" << std::endl;
 }

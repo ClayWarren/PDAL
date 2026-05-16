@@ -3,8 +3,8 @@
 
 #include "Support.hpp"
 
-#include <pdal/StageFactory.hpp>
 #include <pdal/PipelineManager.hpp>
+#include <pdal/StageFactory.hpp>
 
 #include "SpzReader.hpp"
 
@@ -14,7 +14,7 @@ TEST(SpzReaderTest, test1)
 {
     Options opts;
     opts.add("filename", Support::datapath("spz/fourth_st.spz"));
-    
+
     SpzReader reader;
     reader.setOptions(opts);
 
@@ -25,7 +25,7 @@ TEST(SpzReaderTest, test1)
 
     EXPECT_EQ(view->size(), 131199);
     ASSERT_TRUE(table.layout()->hasDim(Dimension::Id::X));
-    //check custom dimensions too
+    // check custom dimensions too
     Dimension::Id rot0 = table.layout()->findProprietaryDim("rot_0");
     Dimension::Id sh2 = table.layout()->findProprietaryDim("f_dc_2");
     ASSERT_TRUE(table.layout()->hasDim(rot0));
@@ -36,7 +36,7 @@ TEST(SpzReaderTest, orientation_metadata)
 {
     Options opts;
     opts.add("filename", Support::datapath("spz/fourth_st.spz"));
-    
+
     SpzReader reader;
     reader.setOptions(opts);
 
@@ -44,6 +44,7 @@ TEST(SpzReaderTest, orientation_metadata)
     reader.prepare(table);
     PointViewSet set = reader.execute(table);
 
-    std::string val = table.metadata().findChild("coordinate_orientation").value();
+    std::string val =
+        table.metadata().findChild("coordinate_orientation").value();
     EXPECT_EQ(val, "RUB");
 }

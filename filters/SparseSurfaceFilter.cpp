@@ -41,8 +41,9 @@ namespace pdal
 
 using namespace Dimension;
 
-static PluginInfo const s_info{"filters.sparsesurface", "Sparse Surface Filter",
-                               "https://pdal.org/stages/filters.sparsesurface.html"};
+static PluginInfo const s_info{
+    "filters.sparsesurface", "Sparse Surface Filter",
+    "https://pdal.org/stages/filters.sparsesurface.html"};
 
 CREATE_STATIC_STAGE(SparseSurfaceFilter, s_info)
 
@@ -53,14 +54,16 @@ std::string SparseSurfaceFilter::getName() const
 
 void SparseSurfaceFilter::addArgs(ProgramArgs& args)
 {
-    args.add("radius", "Mask neighbor points as low noise",
-             m_radius, 1.0);
-    args.add("ground_class", "Classification value of ground points."
-        " [Default: 2]", m_groundClass, ClassLabel::Ground);
-    args.add("low_point_class", "Classification value of non-ground points."
-        " [Default: 7]", m_lowPointClass, ClassLabel::LowPoint);
+    args.add("radius", "Mask neighbor points as low noise", m_radius, 1.0);
+    args.add("ground_class",
+             "Classification value of ground points."
+             " [Default: 2]",
+             m_groundClass, ClassLabel::Ground);
+    args.add("low_point_class",
+             "Classification value of non-ground points."
+             " [Default: 7]",
+             m_lowPointClass, ClassLabel::LowPoint);
 }
-
 
 void SparseSurfaceFilter::prepared(PointTableRef table)
 {
@@ -70,14 +73,13 @@ void SparseSurfaceFilter::prepared(PointTableRef table)
     }
 }
 
-
 void SparseSurfaceFilter::filter(PointView& view)
 {
     uint8_t lower = std::min(m_groundClass, m_lowPointClass);
     uint8_t higher = std::max(m_groundClass, m_lowPointClass);
-    const uint8_t unclassifiedLabel =
-        (higher - lower > 1) ? lower + 1
-        : (lower > 0) ? lower - 1 : higher + 1;
+    const uint8_t unclassifiedLabel = (higher - lower > 1) ? lower + 1
+                                      : (lower > 0)        ? lower - 1
+                                                           : higher + 1;
 
     // Step 1: Relabel all points as unclassified
     for (auto point : view)
@@ -87,9 +89,10 @@ void SparseSurfaceFilter::filter(PointView& view)
     PointIdList zIndex(view.size());
     std::iota(zIndex.begin(), zIndex.end(), 0);
 
-    auto zComparator = [&view](size_t a, size_t b) {
-        return view.getFieldAs<double>(Id::Z, a) < 
-                view.getFieldAs<double>(Id::Z, b);
+    auto zComparator = [&view](size_t a, size_t b)
+    {
+        return view.getFieldAs<double>(Id::Z, a) <
+               view.getFieldAs<double>(Id::Z, b);
     };
 
     std::sort(zIndex.begin(), zIndex.end(), zComparator);
@@ -98,9 +101,11 @@ void SparseSurfaceFilter::filter(PointView& view)
     pdal::KD2Index& index = view.build2dIndex();
 
     // Steps 3-5: Ground labeling and neighbor processing
-    for (PointId idx : zIndex) {
+    for (PointId idx : zIndex)
+    {
         // Check if the point is already labeled
-        uint8_t classification = view.getFieldAs<uint8_t>(Id::Classification, idx);
+        uint8_t classification =
+            view.getFieldAs<uint8_t>(Id::Classification, idx);
         if (classification != unclassifiedLabel)
             continue;
 
@@ -109,13 +114,16 @@ void SparseSurfaceFilter::filter(PointView& view)
 
         // Find neighbors within radius R and label them as low noise
         PointIdList neighbors = index.radius(idx, m_radius);
-        for (PointId neighborIdx : neighbors) {
-            uint8_t neighborClass = view.getFieldAs<uint8_t>(Id::Classification, neighborIdx);
-            if (neighborClass == unclassifiedLabel) {
+        for (PointId neighborIdx : neighbors)
+        {
+            uint8_t neighborClass =
+                view.getFieldAs<uint8_t>(Id::Classification, neighborIdx);
+            if (neighborClass == unclassifiedLabel)
+            {
                 view.setField(Id::Classification, neighborIdx, m_lowPointClass);
             }
         }
     }
 }
 
-}
+} // namespace pdal

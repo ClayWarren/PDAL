@@ -41,17 +41,15 @@ namespace pdal
 
 class PDAL_EXPORT CpdFilter : public Filter
 {
-  public:
+public:
     static std::string defaultMethod();
 
-    CpdFilter() : Filter(), m_fixed(nullptr), m_method(""), m_complete(false)
-    {
-    }
+    CpdFilter() : Filter(), m_fixed(nullptr), m_method(""), m_complete(false) {}
     std::string getName() const;
 
     virtual PointViewSet run(PointViewPtr view);
 
-  private:
+private:
     virtual void addArgs(ProgramArgs& args);
     virtual void done(PointTableRef _);
 

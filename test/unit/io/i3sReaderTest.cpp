@@ -2,24 +2,26 @@
 
 #include "Support.hpp"
 
-#include <pdal/PipelineManager.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <filters/StreamCallbackFilter.hpp>
+#include <pdal/PipelineManager.hpp>
+#include <pdal/PointView.hpp>
+#include <pdal/StageFactory.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <io/LasReader.hpp>
 #include <io/LasWriter.hpp>
 
 using namespace pdal;
-//test full autzen lidar i3s with bounds that hold the entire data
-//also tests that default depth pulls full resolution of data
+// test full autzen lidar i3s with bounds that hold the entire data
+// also tests that default depth pulls full resolution of data
 TEST(i3sReaderTest, options_test)
 {
     StageFactory f;
-    //create args
+    // create args
     Options i3s_options;
-    i3s_options.add("filename", "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
+    i3s_options.add("filename",
+                    "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/"
+                    "arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
     i3s_options.add("threads", 4);
     i3s_options.add("dimensions", "RGB, intenSITY");
 
@@ -35,17 +37,16 @@ TEST(i3sReaderTest, options_test)
     ASSERT_TRUE(table.layout()->hasDim(Dimension::Id::Red));
     ASSERT_TRUE(table.layout()->hasDim(Dimension::Id::Intensity));
     ASSERT_FALSE(table.layout()->hasDim(Dimension::Id::NumberOfReturns));
-
-
 }
-
 
 TEST(i3sReaderTest, density_test)
 {
     StageFactory f;
 
     Options i3s_options;
-    i3s_options.add("filename", "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
+    i3s_options.add("filename",
+                    "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/"
+                    "arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
     i3s_options.add("threads", 4);
     i3s_options.add("min_density", 0);
     i3s_options.add("max_density", 0.5);
@@ -59,17 +60,18 @@ TEST(i3sReaderTest, density_test)
     PointViewSet viewSet = reader.execute(table);
     PointViewPtr view = *viewSet.begin();
 
-    //1,709,518 points in the autzen data between 0 and 0.5
+    // 1,709,518 points in the autzen data between 0 and 0.5
     EXPECT_EQ(view->size(), 1709518u);
 }
-
 
 TEST(i3sReaderTest, density_stream_test)
 {
     StageFactory f;
 
     Options i3s_options;
-    i3s_options.add("filename", "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
+    i3s_options.add("filename",
+                    "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/"
+                    "arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
     i3s_options.add("threads", 4);
     i3s_options.add("min_density", 0);
     i3s_options.add("max_density", 0.5);
@@ -92,13 +94,12 @@ TEST(i3sReaderTest, density_stream_test)
     filt.prepare(table);
     filt.execute(table);
 
-    //1,709,518 points in the autzen data between 0 and 0.5
+    // 1,709,518 points in the autzen data between 0 and 0.5
     EXPECT_EQ(cnt, 1709518u);
 }
 
-
-//Test full autzen lidar i3s bounded compared to the full without bounds.
-//ABELL - Comment out until we can figure out why it's failing.
+// Test full autzen lidar i3s bounded compared to the full without bounds.
+// ABELL - Comment out until we can figure out why it's failing.
 /**
 TEST(i3sReaderTest, bounds_test)
 {
@@ -106,7 +107,8 @@ TEST(i3sReaderTest, bounds_test)
 
     //create args
     Options i3s_options;
-    i3s_options.add("filename", "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
+    i3s_options.add("filename",
+"i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
     i3s_options.add("threads", 64);
     i3s_options.add("bounds", Bounds(bounds));
     i3s_options.add("min_density", 1);
@@ -123,7 +125,8 @@ TEST(i3sReaderTest, bounds_test)
     //second run
     StageFactory f2;
     Options options2;
-    options2.add("filename", "i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
+    options2.add("filename",
+"i3s://https://tiles.arcgis.com/tiles/8cv2FuXuWSfF0nbL/arcgis/rest/services/AUTZEN_LiDAR/SceneServer");
     options2.add("threads", 64);
     options2.add("min_density", 1);
     options2.add("max_density", 1.5);
@@ -161,4 +164,3 @@ TEST(i3sReaderTest, bounds_test)
     EXPECT_EQ(view->size(), pointcount);
 }
 **/
-

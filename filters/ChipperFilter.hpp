@@ -50,7 +50,6 @@ namespace pdal
 
 class Stage;
 
-
 class PDAL_EXPORT ChipperFilter;
 
 class PDAL_EXPORT ChipPtRef
@@ -64,12 +63,11 @@ private:
     size_t m_oindex;
 
 public:
-    bool operator < (const ChipPtRef& pt) const
+    bool operator<(const ChipPtRef& pt) const
     {
         return m_pos < pt.m_pos;
     }
 };
-
 
 class PDAL_EXPORT ChipRefList
 {
@@ -108,7 +106,6 @@ private:
     }
 };
 
-
 class PDAL_EXPORT ChipperFilter : public pdal::Filter
 {
 public:
@@ -119,13 +116,13 @@ private:
     virtual void addArgs(ProgramArgs& args);
     virtual PointViewSet run(PointViewPtr view);
 
-    void load(PointView& view, ChipRefList& xvec,
-        ChipRefList& yvec, ChipRefList& spare);
+    void load(PointView& view, ChipRefList& xvec, ChipRefList& yvec,
+              ChipRefList& spare);
     void partition(point_count_t size);
-    void decideSplit(ChipRefList& v1, ChipRefList& v2,
-        ChipRefList& spare, PointId left, PointId right);
-    void split(ChipRefList& wide, ChipRefList& narrow,
-        ChipRefList& spare, PointId left, PointId right);
+    void decideSplit(ChipRefList& v1, ChipRefList& v2, ChipRefList& spare,
+                     PointId left, PointId right);
+    void split(ChipRefList& wide, ChipRefList& narrow, ChipRefList& spare,
+               PointId left, PointId right);
     void emit(ChipRefList& wide, PointId widemin, PointId widemax);
 
     PointId m_threshold;
@@ -137,8 +134,7 @@ private:
     ChipRefList m_spare;
 
     ChipperFilter& operator=(const ChipperFilter&); // not implemented
-    ChipperFilter(const ChipperFilter&); // not implemented
+    ChipperFilter(const ChipperFilter&);            // not implemented
 };
 
 } // namespace pdal
-

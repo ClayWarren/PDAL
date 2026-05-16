@@ -51,13 +51,11 @@ namespace pdal
 
 using namespace Dimension;
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.reciprocity",
     "Returns the percentage of neighbors that do NOT have the query point as a "
     "neighbor",
-    "https://pdal.org/stages/filters.reciprocity.html"
-};
+    "https://pdal.org/stages/filters.reciprocity.html"};
 
 CREATE_STATIC_STAGE(ReciprocityFilter, s_info)
 
@@ -82,19 +80,20 @@ void ReciprocityFilter::filter(PointView& view)
 {
     point_count_t npoints = view.size();
     point_count_t chunk_size = npoints / m_threads;
-    if (npoints % m_threads) chunk_size++;
+    if (npoints % m_threads)
+        chunk_size++;
     std::vector<std::thread> threadList(m_threads);
 
     for (int t = 0; t < m_threads; t++)
     {
         threadList[t] = std::thread(
-            [&](const PointId start, const PointId end) {
+            [&](const PointId start, const PointId end)
+            {
                 for (PointId i = start; i < end; i++)
                     setReciprocity(view, i);
             },
             t * chunk_size,
-            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size
-        );
+            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size);
     }
 
     for (auto& t : threadList)

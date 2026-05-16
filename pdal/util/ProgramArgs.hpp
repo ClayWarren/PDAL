@@ -1,24 +1,24 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc., hobu@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc., hobu@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ ****************************************************************************/
 
 #pragma once
 
@@ -26,23 +26,25 @@
 #include <memory>
 #include <vector>
 
-#include <pdal/util/Utils.hpp>
 #include <pdal/pdal_types.hpp>
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
 #ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4251)
+#pragma warning(push)
+#pragma warning(disable : 4251)
 #endif
 class PDAL_EXPORT arg_error
 {
 public:
-    arg_error(const std::string& error) : m_error(error)
-    {}
+    arg_error(const std::string& error) : m_error(error) {}
 
     std::string what() const
-        { return m_error; }
+    {
+        return m_error;
+    }
+
 private:
     std::string m_error;
 };
@@ -51,12 +53,11 @@ private:
 class PDAL_EXPORT arg_val_error : public arg_error
 {
 public:
-    arg_val_error(const std::string& error) : arg_error(error)
-    {}
+    arg_val_error(const std::string& error) : arg_error(error) {}
 };
 
 #ifdef _MSC_VER
-#pragma warning (pop)
+#pragma warning(pop)
 #endif
 
 namespace
@@ -69,9 +70,7 @@ class ArgValList
         std::string m_val;
         bool m_consumed;
 
-        ArgVal(const std::string& s) :
-            m_val(s), m_consumed(false)
-        {}
+        ArgVal(const std::string& s) : m_val(s), m_consumed(false) {}
     };
 
 public:
@@ -114,20 +113,28 @@ public:
     }
 
     size_t size() const
-        { return m_vals.size(); }
+    {
+        return m_vals.size();
+    }
     const std::string& operator[](size_t i) const
-        { return m_vals[i].m_val; }
+    {
+        return m_vals[i].m_val;
+    }
     bool consumed(size_t i) const
-        { return m_vals[i].m_consumed; }
+    {
+        return m_vals[i].m_consumed;
+    }
     size_t firstUnconsumed() const
-        { return m_unconsumedStart; }
+    {
+        return m_unconsumedStart;
+    }
+
 private:
     std::vector<ArgVal> m_vals;
     size_t m_unconsumedStart;
 };
 
 } // unnamed namespace
-
 
 /**
    Description of an argument that can be parsed by \class ProgramArgs.
@@ -139,15 +146,15 @@ private:
 class Arg
 {
 public:
-/**
-  Positional type.  Either None, Optional or Required.
-*/
-enum class PosType
-{
-    None,       ///< Not positional
-    Required,   ///< Required positional
-    Optional    ///< Optional positional
-};
+    /**
+      Positional type.  Either None, Optional or Required.
+    */
+    enum class PosType
+    {
+        None,     ///< Not positional
+        Required, ///< Required positional
+        Optional  ///< Optional positional
+    };
 
 protected:
     /**
@@ -160,14 +167,15 @@ protected:
       \param description  Argument description.
     */
     Arg(const std::string& longname, const std::string& shortname,
-        const std::string& description) : m_longname(longname),
-        m_shortname(shortname), m_description(description), m_set(false),
-        m_hidden(false), m_positional(PosType::None)
-    {}
+        const std::string& description)
+        : m_longname(longname), m_shortname(shortname),
+          m_description(description), m_set(false), m_hidden(false),
+          m_positional(PosType::None)
+    {
+    }
 
 public:
-    virtual ~Arg()
-    {}
+    virtual ~Arg() {}
 
     /**
       Indicate that the argument shouldn't be shown in help text.
@@ -224,14 +232,18 @@ public:
       Return whether the argument was set during command-line parsing.
     */
     bool set() const
-        { return m_set; }
+    {
+        return m_set;
+    }
     /**
       Return whether a default value was provided for the argument.
 
       \return  Whether a default was provided.
     */
     virtual bool defaultProvided() const
-        { return false; }
+    {
+        return false;
+    }
     /**
       Return a string representation of an Arg's default value, or an
       empty string if none exists.
@@ -239,7 +251,9 @@ public:
       \return  Default value as a string.
     */
     virtual std::string defaultVal() const
-        { return std::string(); }
+    {
+        return std::string();
+    }
 
 public:
     /**
@@ -248,7 +262,9 @@ public:
       \note  Not intended to be called from user code.
     */
     virtual bool needsValue() const
-        { return true; }
+    {
+        return true;
+    }
 
     /**
       Set a an argument's value from a string.
@@ -276,22 +292,25 @@ public:
 
       \param vals  The list of command-line argument values.
     */
-    virtual void assignPositional(ArgValList& vals)
-    {}
+    virtual void assignPositional(ArgValList& vals) {}
 
     /**
       Returns the positional type of the argument.
       \note  Not intended to be called from user code.
     */
     PosType positional() const
-        { return m_positional; }
+    {
+        return m_positional;
+    }
 
     /**
       Returns whether the argument is hidden or not.
       \note  Not intended to be called from user code.
     */
     bool hidden() const
-        { return m_hidden; }
+    {
+        return m_hidden;
+    }
 
     /**
       Returns the description of the argument.
@@ -299,7 +318,9 @@ public:
       \return  Argument description.
     */
     std::string description() const
-        { return m_description; }
+    {
+        return m_description;
+    }
 
     /**
       Returns the longname of the argument.
@@ -307,7 +328,9 @@ public:
       \return  Argument long name.
     */
     std::string longname() const
-        { return m_longname; }
+    {
+        return m_longname;
+    }
 
     /**
       Returns text indicating the longname and shortname of the option
@@ -331,7 +354,7 @@ public:
     {
         std::string s;
         if (m_positional == PosType::Required)
-            s =  m_longname;
+            s = m_longname;
         else if (m_positional == PosType::Optional)
             s += '[' + m_longname + ']';
         return s;
@@ -352,8 +375,7 @@ protected:
   Description of an argument.  Boolean arguments and vector (list-based)
   arguments are handled separately.
 */
-template <typename T>
-class TArg : public Arg
+template <typename T> class TArg : public Arg
 {
 public:
     /**
@@ -369,10 +391,12 @@ public:
       \param def  Default value to be assigned to the bound variable.
     */
     TArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, T& variable, T def) :
-        Arg(longname, shortname, description), m_var(variable),
-        m_defaultVal(def), m_defaultProvided(true)
-    { m_var = m_defaultVal; }
+         const std::string& description, T& variable, T def)
+        : Arg(longname, shortname, description), m_var(variable),
+          m_defaultVal(def), m_defaultProvided(true)
+    {
+        m_var = m_defaultVal;
+    }
 
     /**
       Constructor.
@@ -386,10 +410,12 @@ public:
         be bound.
     */
     TArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, T& variable) :
-        Arg(longname, shortname, description), m_var(variable),
-        m_defaultVal(T()), m_defaultProvided(false)
-    { m_var = m_defaultVal; }
+         const std::string& description, T& variable)
+        : Arg(longname, shortname, description), m_var(variable),
+          m_defaultVal(T()), m_defaultProvided(false)
+    {
+        m_var = m_defaultVal;
+    }
 
     /**
       Set a an argument's value from a string.
@@ -406,12 +432,12 @@ public:
         if (m_set)
         {
             throw arg_val_error("Attempted to set value twice for argument '" +
-                m_longname + "'.");
+                                m_longname + "'.");
         }
         if (s.empty())
         {
             throw arg_val_error("Argument '" + m_longname +
-                "' needs a value and none was provided.");
+                                "' needs a value and none was provided.");
         }
 
         m_rawVal = s;
@@ -424,10 +450,10 @@ public:
             {
                 if (status.what().size())
                     error = "Invalid value for argument '" + m_longname +
-                        "': " + status.what();
+                            "': " + status.what();
                 else
                     error = "Invalid value '" + s + "' for argument '" +
-                        m_longname + "'.";
+                            m_longname + "'.";
             }
             throw arg_val_error(error);
         }
@@ -472,7 +498,7 @@ public:
         }
         if (m_positional == PosType::Required)
             throw arg_error("Missing value for positional argument '" +
-                m_longname + "'.");
+                            m_longname + "'.");
     }
 
     /**
@@ -481,7 +507,9 @@ public:
       \return  Whether a default was provided.
     */
     virtual bool defaultProvided() const
-        { return m_defaultProvided; }
+    {
+        return m_defaultProvided;
+    }
 
     /**
       Return a string representation of an Arg's default value.
@@ -489,7 +517,9 @@ public:
       \return  Default value as a string.
     */
     virtual std::string defaultVal() const
-        { return Utils::toString(m_defaultVal); }
+    {
+        return Utils::toString(m_defaultVal);
+    }
 
 private:
     T& m_var;
@@ -498,12 +528,11 @@ private:
 };
 
 /**
-  Description of a boolean argument.  Boolean arguments only take the values "true" or "false".
-  Setting a boolean argument without a value inverts its default value.  Boolean arguments
-  are normally 'false' by default.
+  Description of a boolean argument.  Boolean arguments only take the values
+  "true" or "false". Setting a boolean argument without a value inverts its
+  default value.  Boolean arguments are normally 'false' by default.
 */
-template <>
-class TArg<bool> : public Arg
+template <> class TArg<bool> : public Arg
 {
 public:
     /**
@@ -519,10 +548,12 @@ public:
       \param def  Default value to be assigned to the bound variable.
     */
     TArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, bool& variable, bool def) :
-        Arg(longname, shortname, description), m_val(variable),
-        m_defaultVal(def), m_defaultProvided(true)
-    { m_val = m_defaultVal; }
+         const std::string& description, bool& variable, bool def)
+        : Arg(longname, shortname, description), m_val(variable),
+          m_defaultVal(def), m_defaultProvided(true)
+    {
+        m_val = m_defaultVal;
+    }
 
     /**
       Constructor for boolean arguments without default value.
@@ -536,10 +567,12 @@ public:
         be bound.
     */
     TArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, bool& variable) :
-        Arg(longname, shortname, description), m_val(variable),
-        m_defaultVal(false), m_defaultProvided(false)
-    { m_val = m_defaultVal; }
+         const std::string& description, bool& variable)
+        : Arg(longname, shortname, description), m_val(variable),
+          m_defaultVal(false), m_defaultProvided(false)
+    {
+        m_val = m_defaultVal;
+    }
 
     /**
       Return whether an option needs a value to be valid.
@@ -548,7 +581,9 @@ public:
       \note  Not intended to be called from user code.
     */
     virtual bool needsValue() const
-        { return false; }
+    {
+        return false;
+    }
 
     /**
       Set a an argument's value from a string.
@@ -565,7 +600,7 @@ public:
         if (s.size() && s[0] == '-')
         {
             throw arg_val_error("Argument '" + m_longname +
-                "' needs a value and none was provided.");
+                                "' needs a value and none was provided.");
         }
         if (s == "invert")
             m_val = !m_defaultVal;
@@ -599,7 +634,7 @@ public:
     virtual Arg& setPositional()
     {
         throw arg_error("Boolean argument '" + m_longname +
-            "' can't be positional.");
+                        "' can't be positional.");
         return *this;
     }
 
@@ -612,7 +647,7 @@ public:
     virtual Arg& setOptionalPositional()
     {
         throw arg_error("Boolean argument '" + m_longname +
-            "' can't be positional.");
+                        "' can't be positional.");
         return *this;
     }
     /**
@@ -621,14 +656,18 @@ public:
       \return  Whether a default was provided.
     */
     virtual bool defaultProvided() const
-        { return m_defaultProvided; }
+    {
+        return m_defaultProvided;
+    }
     /**
       Return a string representation of an Arg's default value.
 
       \return  Default value as a string.
     */
     virtual std::string defaultVal() const
-        { return Utils::toString(m_defaultVal); }
+    {
+        return Utils::toString(m_defaultVal);
+    }
 
 private:
     bool& m_val;
@@ -655,9 +694,10 @@ public:
       \param description  Argument description.
     */
     BaseVArg(const std::string& longname, const std::string& shortname,
-        const std::string& description) : Arg(longname, shortname, description),
-        m_defaultProvided(false)
-    {}
+             const std::string& description)
+        : Arg(longname, shortname, description), m_defaultProvided(false)
+    {
+    }
 
     /**
       Set the argument's value from the command-line args.
@@ -693,7 +733,7 @@ public:
         if (cnt == 0 && m_positional == PosType::Required)
         {
             throw arg_error("Missing value for positional argument '" +
-                m_longname + "'.");
+                            m_longname + "'.");
         }
     }
 
@@ -703,7 +743,9 @@ public:
       \return  Whether a default was provided.
     */
     virtual bool defaultProvided() const
-        { return m_defaultProvided; }
+    {
+        return m_defaultProvided;
+    }
 
 protected:
     bool m_defaultProvided;
@@ -713,8 +755,7 @@ protected:
   Description of a generic list-based (vector) argument.
   \note  Doesn't properly support list-based boolean values.
 */
-template <typename T>
-class VArg : public BaseVArg
+template <typename T> class VArg : public BaseVArg
 {
 public:
     /**
@@ -729,10 +770,10 @@ public:
       \param def  Default value.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<T>& variable,
-        std::vector<T> def) :
-        BaseVArg(longname, shortname, description), m_var(variable),
-        m_defaultVal(def)
+         const std::string& description, std::vector<T>& variable,
+         std::vector<T> def)
+        : BaseVArg(longname, shortname, description), m_var(variable),
+          m_defaultVal(def)
     {
         m_var = def;
         m_defaultProvided = true;
@@ -749,8 +790,8 @@ public:
       \param variable  Variable to which the argument value(s) should be bound.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<T>& variable) :
-        BaseVArg(longname, shortname, description), m_var(variable)
+         const std::string& description, std::vector<T>& variable)
+        : BaseVArg(longname, shortname, description), m_var(variable)
     {
         // Clearing the vector resets to "default" value.
         m_var.clear();
@@ -779,10 +820,10 @@ public:
             {
                 if (status.what().size())
                     error = "Invalid value for argument '" + m_longname +
-                        "': " + status.what();
+                            "': " + status.what();
                 else
                     error = "Invalid value '" + s + "' for argument '" +
-                        m_longname + "'.";
+                            m_longname + "'.";
             }
             throw arg_val_error(error);
         }
@@ -830,8 +871,7 @@ private:
     std::vector<T> m_defaultVal;
 };
 
-template<>
-class VArg<RegEx>: public BaseVArg
+template <> class VArg<RegEx> : public BaseVArg
 {
 public:
     /**
@@ -846,10 +886,10 @@ public:
       \param def  Default value.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<RegEx>& variable,
-        std::vector<RegEx> def) :
-        BaseVArg(longname, shortname, description), m_var(variable),
-        m_defaultVal(def)
+         const std::string& description, std::vector<RegEx>& variable,
+         std::vector<RegEx> def)
+        : BaseVArg(longname, shortname, description), m_var(variable),
+          m_defaultVal(def)
     {
         m_var = def;
         m_defaultProvided = true;
@@ -866,9 +906,10 @@ public:
       \param variable  Variable to which the argument value(s) should be bound.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<RegEx>& variable) :
-        BaseVArg(longname, shortname, description), m_var(variable)
-    {}
+         const std::string& description, std::vector<RegEx>& variable)
+        : BaseVArg(longname, shortname, description), m_var(variable)
+    {
+    }
 
     /**
       Set a an argument's value from a string.
@@ -931,8 +972,7 @@ private:
 /**
   Description of an argument tied to a string vector.
 */
-template <>
-class VArg<std::string> : public BaseVArg
+template <> class VArg<std::string> : public BaseVArg
 {
 public:
     /**
@@ -947,10 +987,10 @@ public:
       \param def  Default value.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<std::string>& variable,
-        std::vector<std::string> def) :
-        BaseVArg(longname, shortname, description), m_var(variable),
-        m_defaultVal(def)
+         const std::string& description, std::vector<std::string>& variable,
+         std::vector<std::string> def)
+        : BaseVArg(longname, shortname, description), m_var(variable),
+          m_defaultVal(def)
     {
         m_var = def;
         m_defaultProvided = true;
@@ -967,9 +1007,10 @@ public:
       \param variable  Variable to which the argument value(s) should be bound.
     */
     VArg(const std::string& longname, const std::string& shortname,
-        const std::string& description, std::vector<std::string>& variable) :
-        BaseVArg(longname, shortname, description), m_var(variable)
-    {}
+         const std::string& description, std::vector<std::string>& variable)
+        : BaseVArg(longname, shortname, description), m_var(variable)
+    {
+    }
 
     /**
       Set a an argument's value from a string.
@@ -988,7 +1029,7 @@ public:
 
         if (slist.empty())
             throw arg_val_error("Missing value for argument '" + m_longname +
-                "'.");
+                                "'.");
         m_rawVal = s;
         if (!m_set)
             m_var.clear();
@@ -1057,7 +1098,7 @@ public:
       \return  Reference to the new argument.
     */
     Arg& add(const std::string& name, const std::string description,
-        std::string& var, std::string def)
+             std::string& var, std::string def)
     {
         return add<std::string>(name, description, var, def);
     }
@@ -1073,7 +1114,7 @@ public:
       \return  Reference to the new argument.
     */
     Arg& add(const std::string& name, const std::string& description,
-        std::vector<std::string>& var)
+             std::vector<std::string>& var)
     {
         return add<std::string>(name, description, var);
     }
@@ -1084,7 +1125,7 @@ public:
     */
     bool set(const std::string& name) const
     {
-        Arg *arg = findLongArg(name);
+        Arg* arg = findLongArg(name);
         if (arg)
             return arg->set();
         return false;
@@ -1100,14 +1141,14 @@ public:
       \param var  Reference to variable to bind to argument.
       \return  Reference to the new argument.
     */
-    template<typename T>
+    template <typename T>
     Arg& add(const std::string& name, const std::string& description,
-        std::vector<T>& var)
+             std::vector<T>& var)
     {
         std::string longname, shortname;
         splitName(name, longname, shortname);
 
-        Arg *arg = new VArg<T>(longname, shortname, description, var);
+        Arg* arg = new VArg<T>(longname, shortname, description, var);
         addLongArg(longname, arg);
         addShortArg(shortname, arg);
         m_args.push_back(std::unique_ptr<Arg>(arg));
@@ -1124,14 +1165,14 @@ public:
       \param var  Reference to variable to bind to argument.
       \return  Reference to the new argument.
     */
-    template<typename T>
+    template <typename T>
     Arg& add(const std::string& name, const std::string& description,
-        std::vector<T>& var, std::vector<T> def)
+             std::vector<T>& var, std::vector<T> def)
     {
         std::string longname, shortname;
         splitName(name, longname, shortname);
 
-        Arg *arg = new VArg<T>(longname, shortname, description, var, def);
+        Arg* arg = new VArg<T>(longname, shortname, description, var, def);
         addLongArg(longname, arg);
         addShortArg(shortname, arg);
         m_args.push_back(std::unique_ptr<Arg>(arg));
@@ -1149,14 +1190,14 @@ public:
       \param def  Default value of argument.
       \return  Reference to the new argument.
     */
-    template<typename T>
+    template <typename T>
     Arg& add(const std::string& name, const std::string description, T& var,
-        T def)
+             T def)
     {
         std::string longname, shortname;
         splitName(name, longname, shortname);
 
-        Arg *arg = new TArg<T>(longname, shortname, description, var, def);
+        Arg* arg = new TArg<T>(longname, shortname, description, var, def);
         addLongArg(longname, arg);
         addShortArg(shortname, arg);
         m_args.push_back(std::unique_ptr<Arg>(arg));
@@ -1173,13 +1214,13 @@ public:
       \param var  Reference to variable to bind to argument.
       \return  Reference to the new argument.
     */
-    template<typename T>
+    template <typename T>
     Arg& add(const std::string& name, const std::string description, T& var)
     {
         std::string longname, shortname;
         splitName(name, longname, shortname);
 
-        Arg *arg = new TArg<T>(longname, shortname, description, var);
+        Arg* arg = new TArg<T>(longname, shortname, description, var);
         addLongArg(longname, arg);
         addShortArg(shortname, arg);
         m_args.push_back(std::unique_ptr<Arg>(arg));
@@ -1227,7 +1268,7 @@ public:
         // line not already consumed.
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *arg = ai->get();
+            Arg* arg = ai->get();
             try
             {
                 arg->assignPositional(vals);
@@ -1237,7 +1278,8 @@ public:
                 throw;
             }
             catch (arg_error&)
-            {}
+            {
+            }
         }
         s = vals.unconsumedArgs();
     }
@@ -1272,11 +1314,11 @@ public:
         // line not already consumed.
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *arg = ai->get();
+            Arg* arg = ai->get();
             arg->assignPositional(vals);
         }
-        //NOTE - Perhaps we should error here if there are still
-        //  unconsumed arguments.
+        // NOTE - Perhaps we should error here if there are still
+        //   unconsumed arguments.
     }
 
     /**
@@ -1287,13 +1329,14 @@ public:
     */
     void addSynonym(const std::string& name, const std::string& synonym)
     {
-        Arg *arg = findLongArg(name);
+        Arg* arg = findLongArg(name);
         if (!arg)
-            throw arg_error("Can't set synonym for argument '" + name + "'. "
-                "Argument doesn't exist.");
+            throw arg_error("Can't set synonym for argument '" + name +
+                            "'. "
+                            "Argument doesn't exist.");
         if (synonym.empty())
-            throw arg_error("Invalid (empty) synonym for argument '" +
-                name + "'.");
+            throw arg_error("Invalid (empty) synonym for argument '" + name +
+                            "'.");
         addLongArg(synonym, arg);
     }
 
@@ -1317,7 +1360,7 @@ public:
 
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *a = ai->get();
+            Arg* a = ai->get();
 
             if (a->hidden())
                 continue;
@@ -1348,7 +1391,7 @@ public:
 
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *a = ai->get();
+            Arg* a = ai->get();
             if (a->hidden())
                 continue;
 
@@ -1379,12 +1422,12 @@ public:
             else
             {
                 name.resize(namelen, ' ');
-                out << name << std::string(postNameSpacing, ' ') <<
-                    descrip[0] << std::endl;
+                out << name << std::string(postNameSpacing, ' ') << descrip[0]
+                    << std::endl;
             }
             for (size_t ii = 1; ii < descrip.size(); ++ii)
-                out << std::string(secondIndent, ' ') <<
-                    descrip[ii] << std::endl;
+                out << std::string(secondIndent, ' ') << descrip[ii]
+                    << std::endl;
         }
     }
 
@@ -1400,12 +1443,12 @@ public:
 
     */
     void dump2(std::ostream& out, size_t nameIndent, size_t descripIndent,
-        size_t totalWidth) const
+               size_t totalWidth) const
     {
         size_t width = totalWidth - descripIndent;
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *a = ai->get();
+            Arg* a = ai->get();
             out << std::string(nameIndent, ' ') << a->longname();
             if (a->defaultProvided())
                 out << " [" << a->defaultVal() << "]";
@@ -1432,7 +1475,7 @@ public:
         bool bFirst(true);
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *a = ai->get();
+            Arg* a = ai->get();
 
             if (!bFirst)
                 out << ",";
@@ -1440,9 +1483,11 @@ public:
             out << "{\"name\":\"" << a->longname() << "\"";
 
             if (a->defaultProvided())
-                out << ",\"default\":\"" << Utils::escapeJSON(a->defaultVal()) << "\"";
+                out << ",\"default\":\"" << Utils::escapeJSON(a->defaultVal())
+                    << "\"";
 
-            out << ",\"description\":\"" << Utils::escapeJSON(a->description()) << "\"}";
+            out << ",\"description\":\"" << Utils::escapeJSON(a->description())
+                << "\"}";
 
             bFirst = false;
         }
@@ -1458,7 +1503,7 @@ private:
       \param[out] shortname  Parsed shortname.
     */
     void splitName(const std::string& name, std::string& longname,
-        std::string& shortname)
+                   std::string& shortname)
     {
         // Arg names must be specified as "longname[,shortname]" where
         // shortname is a single character.
@@ -1481,7 +1526,7 @@ private:
       \param name  Argument longname.
       \param arg   Pointer to argument.
     */
-    void addLongArg(const std::string& name, Arg *arg)
+    void addLongArg(const std::string& name, Arg* arg)
     {
         if (name.empty())
             return;
@@ -1496,7 +1541,7 @@ private:
       \param name  Argument shortname.
       \param arg   Pointer to argument.
     */
-    void addShortArg(const std::string& name, Arg *arg)
+    void addShortArg(const std::string& name, Arg* arg)
     {
         if (name.empty())
             return;
@@ -1511,7 +1556,7 @@ private:
       \param s  Longname of argument.
       \return  Pointer to matching argument, or NULL if none was found.
     */
-    Arg *findLongArg(const std::string& s) const
+    Arg* findLongArg(const std::string& s) const
     {
         auto si = m_longargs.find(s);
         if (si != m_longargs.end())
@@ -1525,7 +1570,7 @@ private:
       \param c  Shortnamn of argument.
       \return  Pointer to matching argument, or NULL if none was found.
     */
-    Arg *findShortArg(char c) const
+    Arg* findShortArg(char c) const
     {
         std::string s(1, c);
         auto si = m_shortargs.find(s);
@@ -1588,7 +1633,7 @@ private:
             value.clear();
         }
 
-        Arg *arg = findLongArg(name);
+        Arg* arg = findLongArg(name);
         if (!arg)
             throw arg_error("Unexpected argument '" + name + "'.");
 
@@ -1599,8 +1644,8 @@ private:
                 if (value != "true" && value != "false")
                 {
                     throw arg_error("Value '" + value +
-                        "' provided for argument '" + name +
-                        "' when 'true' or 'false' is expected.");
+                                    "' provided for argument '" + name +
+                                    "' when 'true' or 'false' is expected.");
                 }
             }
             else
@@ -1628,10 +1673,10 @@ private:
             throw arg_error("No argument found following '-'.");
         assert(name.size() == 2);
 
-        Arg *arg = findShortArg(name[1]);
+        Arg* arg = findShortArg(name[1]);
         if (!arg)
             throw arg_error("Unexpected argument '-" + std::string(1, name[1]) +
-                "'.");
+                            "'.");
 
         int cnt;
         if (arg->needsValue())
@@ -1640,8 +1685,9 @@ private:
             // rather than a value.
             if (value.empty() || value[0] == '-')
             {
-                throw arg_error("Short option '" + name + "' expects value "
-                    "but none directly follows.");
+                throw arg_error("Short option '" + name +
+                                "' expects value "
+                                "but none directly follows.");
             }
             else
             {
@@ -1666,19 +1712,19 @@ private:
         bool opt = false;
         for (auto ai = m_args.begin(); ai != m_args.end(); ++ai)
         {
-            Arg *arg = ai->get();
+            Arg* arg = ai->get();
             if (arg->positional() == Arg::PosType::Optional)
                 opt = true;
             if (opt && (arg->positional() == Arg::PosType::Required))
                 throw arg_error("Found required positional argument '" +
-                    arg->longname() + "' after optional positional argument.");
+                                arg->longname() +
+                                "' after optional positional argument.");
         }
     }
 
-    std::vector<std::unique_ptr<Arg>> m_args;  /// Storage for arguments
-    std::map<std::string, Arg *> m_shortargs;  /// Map from shortname to args
-    std::map<std::string, Arg *> m_longargs;  /// Map from longname to args
+    std::vector<std::unique_ptr<Arg>> m_args; /// Storage for arguments
+    std::map<std::string, Arg*> m_shortargs;  /// Map from shortname to args
+    std::map<std::string, Arg*> m_longargs;   /// Map from longname to args
 };
 
 } // namespace pdal
-

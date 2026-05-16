@@ -38,6 +38,8 @@
 #include <pdal/SpatialReference.hpp>
 #include <pdal/util/Bounds.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include "FixedPointLayout.hpp"
 
 namespace pdal
@@ -45,7 +47,7 @@ namespace pdal
 
 namespace connector
 {
-    class Connector;
+class Connector;
 }
 
 namespace ept
@@ -64,17 +66,47 @@ public:
     EptInfo(const std::string& info);
     EptInfo(const std::string& filename, const connector::Connector& connector);
 
-    const BOX3D& bounds() const { return m_bounds; }
-    const BOX3D& boundsConforming() const { return m_boundsConforming; }
-    uint64_t points() const { return m_points; }
-    uint64_t span() const { return m_span; }
-    DataType dataType() const { return m_dataType; }
-    const SpatialReference& srs() const { return m_srs; }
-    const NL::json& json() { return m_info; }
-    std::string version() const { return m_version; }
-    std::map<std::string, DimType>& dims() { return m_dims; }
+    const BOX3D& bounds() const
+    {
+        return m_bounds;
+    }
+    const BOX3D& boundsConforming() const
+    {
+        return m_boundsConforming;
+    }
+    uint64_t points() const
+    {
+        return m_points;
+    }
+    uint64_t span() const
+    {
+        return m_span;
+    }
+    DataType dataType() const
+    {
+        return m_dataType;
+    }
+    const SpatialReference& srs() const
+    {
+        return m_srs;
+    }
+    const NL::json& json()
+    {
+        return m_info;
+    }
+    std::string version() const
+    {
+        return m_version;
+    }
+    std::map<std::string, DimType>& dims()
+    {
+        return m_dims;
+    }
     DimType dimType(Dimension::Id id) const;
-    PointLayout& remoteLayout() const { return m_remoteLayout; }
+    PointLayout& remoteLayout() const
+    {
+        return m_remoteLayout;
+    }
     std::string dataDir() const;
     std::string hierarchyDir() const;
     std::string sourcesDir() const;
@@ -105,4 +137,3 @@ private:
 
 } // namespace ept
 } // namespace pdal
-

@@ -10,38 +10,42 @@
 namespace hexer
 {
 
-H3Grid::~H3Grid()
-{}
+H3Grid::~H3Grid() {}
 
 void H3Grid::processHeight(double height)
 {
     // bins for H3 auto resolution:
     // - H3 level roughly equivalent to hexer hexagon size at same edge value
-    //     - (since our coords are in degrees, the appropriate values will vary based on
-    //       location. Some way of scaling this by latitude would be more accurate)
-    // - does not automatically make very large (>1km^2) or very small (<6m^2) hexagons
-    // We ignore resolutions 1 through 7, so add 8 to the entry we find..
-    static const double resHeights[] { 2.0, 2.62e-4, 6.28e-5, 2.09e-5,
-                                        8.73e-6, 3.32e-6, 1.4e-6 };
+    //     - (since our coords are in degrees, the appropriate values will vary
+    //     based on
+    //       location. Some way of scaling this by latitude would be more
+    //       accurate)
+    // - does not automatically make very large (>1km^2) or very small (<6m^2)
+    // hexagons We ignore resolutions 1 through 7, so add 8 to the entry we
+    // find..
+    static const double resHeights[]{2.0,     2.62e-4, 6.28e-5, 2.09e-5,
+                                     8.73e-6, 3.32e-6, 1.4e-6};
 
-    for (size_t i = 0; i < 6; ++i) {
+    for (size_t i = 0; i < 6; ++i)
+    {
         if (height < resHeights[i])
             m_res = i + 8;
     }
     if (m_res == -1)
         throw hexer_error("unable to calculate H3 grid size!");
-    //std::cout << "H3 resolution: " << m_res << std::endl;
+    // std::cout << "H3 resolution: " << m_res << std::endl;
 }
 
 HexId H3Grid::findHexagon(Point p)
 {
     H3Index index(0);
     LatLng ll{p.m_y, p.m_x};
-    if (PDALH3latLngToCell(&ll, m_res, &index) != E_SUCCESS) {
-            std::ostringstream oss;
-            oss << "Can't convert LatLng (" << ll.lat <<
-                ", " << ll.lng <<") to H3Index.";
-            throw hexer_error(oss.str());
+    if (PDALH3latLngToCell(&ll, m_res, &index) != E_SUCCESS)
+    {
+        std::ostringstream oss;
+        oss << "Can't convert LatLng (" << ll.lat << ", " << ll.lng
+            << ") to H3Index.";
+        throw hexer_error(oss.str());
     }
     if (!m_origin)
         m_origin = index;
@@ -53,11 +57,13 @@ HexId H3Grid::findHexagon(Point p)
 Point H3Grid::findPoint(Segment& s)
 {
     DirEdge dir_edge;
-    if (PDALH3cellsToDirectedEdge(ij2h3(s.hex), ij2h3(edgeHex(s.hex, s.edge)), &dir_edge) != E_SUCCESS) {
+    if (PDALH3cellsToDirectedEdge(ij2h3(s.hex), ij2h3(edgeHex(s.hex, s.edge)),
+                                  &dir_edge) != E_SUCCESS)
+    {
         std::ostringstream oss;
-        oss << "Can't get directed edge between hexagons (" << s.hex.i <<
-            ", " << s.hex.j <<") and (" << edgeHex(s.hex, s.edge).i <<", " <<
-            edgeHex(s.hex, s.edge).j << ").";
+        oss << "Can't get directed edge between hexagons (" << s.hex.i << ", "
+            << s.hex.j << ") and (" << edgeHex(s.hex, s.edge).i << ", "
+            << edgeHex(s.hex, s.edge).j << ").";
         throw hexer_error(oss.str());
     }
 
@@ -86,7 +92,8 @@ HexId H3Grid::edgeHex(HexId hex, int edge) const
                    (- I)
     **/
 
-    static const HexId offsets[] {{1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {0, 1}, {1, 1}};
+    static const HexId offsets[]{{1, 0},  {0, -1}, {-1, -1},
+                                 {-1, 0}, {0, 1},  {1, 1}};
     return hex + offsets[edge];
 }
 
@@ -106,8 +113,8 @@ Segment H3Grid::nextSegment(const Segment& s) const
     //   \____/      \
     //
     */
-    static const int next[] { 1, 2, 3, 4, 5, 0 };
-    static const int prev[] { 5, 0, 1, 2, 3, 4 };
+    static const int next[]{1, 2, 3, 4, 5, 0};
+    static const int prev[]{5, 0, 1, 2, 3, 4};
 
     Segment right(s.hex, next[s.edge]);
     Segment left(edgeHex(s.hex, right.edge), prev[s.edge]);

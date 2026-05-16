@@ -33,14 +33,14 @@
  ****************************************************************************/
 
 #ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4251)
+#pragma warning(push)
+#pragma warning(disable : 4251)
 #endif
 
 #include <lazperf/readers.hpp>
 
 #ifdef _MSC_VER
-#pragma warning (pop)
+#pragma warning(pop)
 #endif
 
 #include <io/LasReader.hpp>
@@ -58,15 +58,16 @@ void Tile::read()
 {
     try
     {
-        std::vector<char> buf = m_connector.getBinary(m_entry.m_offset, m_entry.m_byteSize);
-        lazperf::reader::chunk_decompressor d(m_header.pointFormat(), m_header.ebCount(),
-            buf.data());
+        std::vector<char> buf =
+            m_connector.getBinary(m_entry.m_offset, m_entry.m_byteSize);
+        lazperf::reader::chunk_decompressor d(m_header.pointFormat(),
+                                              m_header.ebCount(), buf.data());
 
         // Resize our vector to accommodate the decompressed data.
         m_data.resize(m_entry.m_pointCount * m_header.pointSize);
 
         int32_t cnt = m_entry.m_pointCount;
-        char *p = m_data.data();
+        char* p = m_data.data();
         while (cnt--)
         {
             d.decompress(p);
@@ -85,4 +86,3 @@ void Tile::read()
 
 } // namespace copc
 } // namespace pdal
-

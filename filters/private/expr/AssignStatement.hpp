@@ -3,8 +3,8 @@
 #include "AssignParser.hpp"
 #include "ConditionalExpression.hpp"
 #include "IdentExpression.hpp"
-#include "MathExpression.hpp"
 #include "Lexer.hpp"
+#include "MathExpression.hpp"
 
 namespace pdal
 {
@@ -19,8 +19,7 @@ public:
     AssignStatement(AssignStatement&&) = default;
     AssignStatement& operator=(const AssignStatement&) = default;
 
-    virtual ~AssignStatement()
-    {}
+    virtual ~AssignStatement() {}
 
     MathExpression& valueExpr();
     IdentExpression& identExpr();
@@ -43,16 +42,16 @@ private:
 namespace Utils
 {
 
-template<>
+template <>
 inline StatusWithReason fromString(const std::string& from,
-    pdal::expr::AssignStatement& stmt)
+                                   pdal::expr::AssignStatement& stmt)
 {
     expr::Lexer lexer(from);
     expr::AssignParser parser(lexer);
     bool ok = parser.statement(stmt) && parser.checkEnd();
-    return { ok ? 0 : -1, parser.error() };
+    return {ok ? 0 : -1, parser.error()};
 }
 
-} // namespace Util
+} // namespace Utils
 
 } // namespace pdal

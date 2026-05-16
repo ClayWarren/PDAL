@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2014, Bradley J Chambers (brad.chambers@gmail.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Bradley J Chambers (brad.chambers@gmail.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <cctype>
 #include <iostream>
@@ -38,8 +38,8 @@
 #include <pdal/Kernel.hpp>
 #include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
-#include <pdal/pdal_config.hpp>
 #include <pdal/StageFactory.hpp>
+#include <pdal/pdal_config.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -51,21 +51,19 @@
 namespace pdal
 {
 
-Kernel::Kernel() : m_showTime(false), m_hardCoreDebug(false)
-{}
-
+Kernel::Kernel() : m_showTime(false), m_hardCoreDebug(false) {}
 
 // Overridden in PipelineKernel to accept "stage" as well.
 bool Kernel::isStagePrefix(const std::string& stageType)
 {
-   return (stageType == "readers" || stageType == "writers" ||
-        stageType == "filters");
+    return (stageType == "readers" || stageType == "writers" ||
+            stageType == "filters");
 }
 
-
-Kernel::ParseStageResult
-Kernel::parseStageOption(std::string o, std::string& stage, std::string& option,
-    std::string& value)
+Kernel::ParseStageResult Kernel::parseStageOption(std::string o,
+                                                  std::string& stage,
+                                                  std::string& option,
+                                                  std::string& value)
 {
     value.clear();
     if ((o.size() < 2) || (o[0] != '-') || (o[1] != '-'))
@@ -80,8 +78,7 @@ Kernel::parseStageOption(std::string o, std::string& stage, std::string& option,
 
     // This awfulness is to work around the multiply-defined islower.  Seems
     // a bit better than the cast solution.
-    auto islc = [](char c)
-        { return std::islower(c); };
+    auto islc = [](char c) { return std::islower(c); };
 
     std::string::size_type pos = 0;
     std::string::size_type count = 0;
@@ -126,13 +123,11 @@ Kernel::parseStageOption(std::string o, std::string& stage, std::string& option,
     return ParseStageResult::Invalid;
 }
 
-
 std::ostream& operator<<(std::ostream& ostr, const Kernel& kernel)
 {
     ostr << "  Name: " << kernel.getName() << std::endl;
     return ostr;
 }
-
 
 StringList Kernel::extractStageOptions(const StringList& cmdArgs)
 {
@@ -154,13 +149,13 @@ StringList Kernel::extractStageOptions(const StringList& cmdArgs)
             stringArgs.push_back(cmd);
         else if (res == ParseStageResult::Invalid)
             throw pdal_error("Stage option '" + cmd + "' not valid.");
-        else  // ParseStageResult::Ok
+        else // ParseStageResult::Ok
         {
             if (value.empty())
             {
                 if (++it == cmdArgs.end())
                     throw pdal_error("Stage option '" + stageName + "." +
-                        opName + "' has no value.");
+                                     opName + "' has no value.");
                 value = *it;
             }
             Option op(opName, value);
@@ -199,12 +194,10 @@ bool Kernel::doSwitches(const StringList& cmdArgs, ProgramArgs& args)
     return true;
 }
 
-
 int Kernel::doStartup()
 {
     return 0;
 }
-
 
 // this just wraps ALL the code in total catch block
 int Kernel::run(const StringList& cmdArgs, LogPtr& log)
@@ -235,7 +228,6 @@ int Kernel::run(const StringList& cmdArgs, LogPtr& log)
     return doExecution(args);
 }
 
-
 int Kernel::doExecution(ProgramArgs& args)
 {
     if (m_hardCoreDebug)
@@ -265,7 +257,6 @@ int Kernel::doExecution(ProgramArgs& args)
     return status;
 }
 
-
 int Kernel::innerRun(ProgramArgs& args)
 {
     try
@@ -283,7 +274,6 @@ int Kernel::innerRun(ProgramArgs& args)
     return execute();
 }
 
-
 void Kernel::outputHelp()
 {
     ProgramArgs basicArgs;
@@ -292,25 +282,25 @@ void Kernel::outputHelp()
     ProgramArgs args;
     addSwitches(args);
 
-    std::cout << "usage: " << "pdal " << getShortName() << " [options] " <<
-        args.commandLine() << std::endl;
+    std::cout << "usage: " << "pdal " << getShortName() << " [options] "
+              << args.commandLine() << std::endl;
 
     std::cout << "standard options:" << std::endl;
     basicArgs.dump(std::cout, 2, Utils::screenWidth());
     std::cout << "options:" << std::endl;
     args.dump(std::cout, 2, Utils::screenWidth());
 
-    std::cout <<"\nFor more information, see the full documentation for "
-        "PDAL at https://pdal.org/\n" << std::endl;
+    std::cout << "\nFor more information, see the full documentation for "
+                 "PDAL at https://pdal.org/\n"
+              << std::endl;
 }
-
 
 void Kernel::addBasicSwitches(ProgramArgs& args)
 {
     static bool s_help;
 
     args.add("developer-debug",
-        "Enable developer debug (don't trap exceptions)", m_hardCoreDebug);
+             "Enable developer debug (don't trap exceptions)", m_hardCoreDebug);
     args.add("label", "A string to label the process with", m_label);
     args.add("driver", "Override reader driver", m_driverOverride);
     args.add("help", "Print help and exit", s_help);
@@ -321,57 +311,56 @@ Stage& Kernel::makeReader(const std::string& inputFile, std::string driver)
     return m_manager.makeReader(inputFile, driver);
 }
 
-
 Stage& Kernel::makeReader(const std::string& inputFile, std::string driver,
-    Options options)
+                          Options options)
 {
     return m_manager.makeReader(inputFile, driver, options);
 }
-
 
 Stage& Kernel::makeFilter(const std::string& driver)
 {
     return m_manager.makeFilter(driver);
 }
 
-
 Stage& Kernel::makeFilter(const std::string& driver, Stage& parent)
 {
     return m_manager.makeFilter(driver, parent);
 }
 
-
 Stage& Kernel::makeFilter(const std::string& driver, Stage& parent,
-    Options options)
+                          Options options)
 {
     return m_manager.makeFilter(driver, parent, options);
 }
 
-
 Stage& Kernel::makeWriter(const std::string& outputFile, Stage& parent,
-    std::string driver)
+                          std::string driver)
 {
     return m_manager.makeWriter(outputFile, driver, parent);
 }
 
-
 Stage& Kernel::makeWriter(const std::string& outputFile, Stage& parent,
-    std::string driver, Options options)
+                          std::string driver, Options options)
 {
     return m_manager.makeWriter(outputFile, driver, parent, options);
 }
 
-
-Kernel::ParseStageResult Kernel::test_parseStageOption(
-    std::string o, std::string& stage, std::string& option, std::string& value)
+Kernel::ParseStageResult Kernel::test_parseStageOption(std::string o,
+                                                       std::string& stage,
+                                                       std::string& option,
+                                                       std::string& value)
 {
     class TestKernel : public Kernel
     {
     public:
         virtual std::string getName() const
-            { return "TestKernel"; }
+        {
+            return "TestKernel";
+        }
         int execute()
-            { return 0; }
+        {
+            return 0;
+        }
     };
 
     TestKernel k;

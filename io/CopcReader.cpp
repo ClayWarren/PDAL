@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2021, Hobu, Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2021, Hobu, Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "CopcReader.hpp"
 
@@ -47,10 +47,10 @@
 #include <pdal/Scaling.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
+#include <pdal/private/SrsTransform.hpp>
+#include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/Charbuf.hpp>
 #include <pdal/util/ThreadPool.hpp>
-#include <pdal/private/gdal/GDALUtils.hpp>
-#include <pdal/private/SrsTransform.hpp>
 
 #include "private/connector/Connector.hpp"
 #include "private/copc/Entry.hpp"
@@ -67,13 +67,10 @@ namespace pdal
 namespace
 {
 
-const StaticPluginInfo s_info
-{
-    "readers.copc",
-    "COPC Reader",
-    "https://pdal.org/stages/reader.copc.html",
-    { "copc" }
-};
+const StaticPluginInfo s_info{"readers.copc",
+                              "COPC Reader",
+                              "https://pdal.org/stages/reader.copc.html",
+                              {"copc"}};
 
 void reprogrow(BOX3D& b, SrsTransform& xform, double x, double y, double z)
 {
@@ -117,7 +114,7 @@ BOX3D reprojectBoundsBcbfToLonLat(BOX3D src, SrsTransform& xform)
     }
 
     // Round the minimum longitude up to the nearest multiple of 90 degrees.
-    int x = (int) std::ceil(src.minx);
+    int x = (int)std::ceil(src.minx);
     const int remainder = std::abs(x) % 90;
     if (x < 0)
         x = -(std::abs(x) - remainder);
@@ -125,7 +122,7 @@ BOX3D reprojectBoundsBcbfToLonLat(BOX3D src, SrsTransform& xform)
         x = x + 90 - remainder;
 
     // And include the reprojected bounds at every 90 degrees within the query.
-    for ( ; x <= src.maxx; x += 90)
+    for (; x <= src.maxx; x += 90)
     {
         reprogrow(b, xform, x, src.miny, src.minz);
         reprogrow(b, xform, x, src.maxy, src.minz);
@@ -152,43 +149,48 @@ struct SrsOrderSpec
 namespace Utils
 {
 
-template<>
-StatusWithReason fromString(const std::string& from,
-    SrsOrderSpec& srsOrder)
+template <>
+StatusWithReason fromString(const std::string& from, SrsOrderSpec& srsOrder)
 {
     using namespace las;
 
-     static const std::map<std::string, SrsType> typemap =
-        { { "wkt2", SrsType::Wkt2 },
-          { "wkt1", SrsType::Wkt1 },
-          { "projjson", SrsType::Proj } };
+    static const std::map<std::string, SrsType> typemap = {
+        {"wkt2", SrsType::Wkt2},
+        {"wkt1", SrsType::Wkt1},
+        {"projjson", SrsType::Proj}};
 
     StringList srsTypes = Utils::split2(from, ',');
     std::transform(srsTypes.cbegin(), srsTypes.cend(), srsTypes.begin(),
-        [](std::string s){ Utils::trim(s); return Utils::tolower(s); });
+                   [](std::string s)
+                   {
+                       Utils::trim(s);
+                       return Utils::tolower(s);
+                   });
 
     for (std::string& stype : srsTypes)
     {
         auto it = typemap.find(stype);
         if (it == typemap.end())
-            return { -1, "Invalid SRS type '" + stype + "'. Must be one of 'wkt1', "
-                "'wkt' or 'projjson'." };
+            return {-1, "Invalid SRS type '" + stype +
+                            "'. Must be one of 'wkt1', "
+                            "'wkt' or 'projjson'."};
         SrsType type = it->second;
         if (Utils::contains(srsOrder.types, type))
-            return { -1,
-                "Duplicate SRS type '" + stype + "' in 'vlr_srs_order'" };
+            return {-1,
+                    "Duplicate SRS type '" + stype + "' in 'vlr_srs_order'"};
         srsOrder.types.push_back(type);
     }
     return true;
 }
 
-template<>
-std::string toString(const SrsOrderSpec& srsOrder)
+template <> std::string toString(const SrsOrderSpec& srsOrder)
 {
     using namespace las;
 
-    // Note: geotiff is invalid for COPC and should never appear in a valid SrsOrderSpec.
-    static const std::array<std::string, 4> srsTypeNames { "wkt1", "geotiff", "projjson", "wkt2" };
+    // Note: geotiff is invalid for COPC and should never appear in a valid
+    // SrsOrderSpec.
+    static const std::array<std::string, 4> srsTypeNames{"wkt1", "geotiff",
+                                                         "projjson", "wkt2"};
 
     std::string out;
     for (SrsType type : srsOrder.types)
@@ -259,24 +261,23 @@ public:
     SrsTransform llToBcbfTransform;
 };
 
-CopcReader::CopcReader() : m_args(new CopcReader::Args), m_p(new CopcReader::Private)
-{}
-
+CopcReader::CopcReader()
+    : m_args(new CopcReader::Args), m_p(new CopcReader::Private)
+{
+}
 
 CopcReader::~CopcReader()
 {
-    // We join the pool rather than let the dtor do it because the workers use m_p
-    // which will get 0'ed in the dtor before access through m_p is complete in
-    // the workers.
+    // We join the pool rather than let the dtor do it because the workers use
+    // m_p which will get 0'ed in the dtor before access through m_p is complete
+    // in the workers.
     done();
 }
-
 
 std::string CopcReader::getName() const
 {
     return s_info.name;
 }
-
 
 void CopcReader::addArgs(ProgramArgs& args)
 {
@@ -293,30 +294,38 @@ void CopcReader::addArgs(ProgramArgs& args)
     }
 
     args.add("bounds", "Retangular clip region", m_args->clip);
-    args.add("requests", "Number of worker threads", m_args->threads, (size_t)defaultThreads);
+    args.add("requests", "Number of worker threads", m_args->threads,
+             (size_t)defaultThreads);
     args.addSynonym("requests", "threads");
     args.add("resolution", "Resolution limit", m_args->resolution);
-    args.add("polygon", "Bounding polygon(s) to crop requests",
-        m_args->polys).setErrorText("Invalid polygon specification. Must be valid GeoJSON/WKT");
+    args.add("polygon", "Bounding polygon(s) to crop requests", m_args->polys)
+        .setErrorText(
+            "Invalid polygon specification. Must be valid GeoJSON/WKT");
     args.add("ogr", "OGR filter geometries", m_args->ogr);
-    args.add("fix_dims", "Make invalid dimension names valid by changing invalid "
-        "characters to '_'", m_args->fixNames, true);
+    args.add("fix_dims",
+             "Make invalid dimension names valid by changing invalid "
+             "characters to '_'",
+             m_args->fixNames, true);
     args.add("vlr", "Read LAS VLRs and add to metadata.", m_args->doVlrs, true);
-    args.add("keep_alive", "Number of chunks to keep alive in memory when working",
-            m_args->keepAliveChunkCount, 10);
-    args.add("srs_vlr_order", "Preference order to read SRS VLRs "
-        "(list of 'wkt1', 'wkt2' or 'projjson'", m_args->srsVlrOrder);
+    args.add("keep_alive",
+             "Number of chunks to keep alive in memory when working",
+             m_args->keepAliveChunkCount, 10);
+    args.add("srs_vlr_order",
+             "Preference order to read SRS VLRs "
+             "(list of 'wkt1', 'wkt2' or 'projjson'",
+             m_args->srsVlrOrder);
     args.add("nosrs", "Skip reading/processing file SRS", m_args->nosrs, false);
 }
-
 
 void CopcReader::initialize(PointTableRef table)
 {
     if (m_args->threads > 100)
-        log()->get(LogLevel::Warning) << "Using a large thread count: " <<
-            m_args->threads << " threads" << std::endl;
+        log()->get(LogLevel::Warning)
+            << "Using a large thread count: " << m_args->threads << " threads"
+            << std::endl;
     // Make sure we allow at least as many chunks as we have threads.
-    m_args->keepAliveChunkCount = (std::max)(m_args->threads, (size_t)m_args->keepAliveChunkCount);
+    m_args->keepAliveChunkCount =
+        (std::max)(m_args->threads, (size_t)m_args->keepAliveChunkCount);
 
     m_p->connector.reset(new connector::Connector(m_filespec));
 
@@ -343,8 +352,8 @@ void CopcReader::initialize(PointTableRef table)
 
     using namespace std::placeholders;
     las::VlrCatalog catalog(std::bind(&CopcReader::fetch, this, _1, _2));
-    catalog.load(las::Header::Size14, m_p->header.vlrCount, m_p->header.evlrOffset,
-        m_p->header.evlrCount);
+    catalog.load(las::Header::Size14, m_p->header.vlrCount,
+                 m_p->header.evlrOffset, m_p->header.evlrCount);
     las::Vlr ebVlr = fetchEbVlr(catalog);
 
     las::VlrList srsVlrs = fetchSrsVlrs(catalog);
@@ -355,48 +364,53 @@ void CopcReader::initialize(PointTableRef table)
     if (m_args->doVlrs)
     {
         int i = 0;
-        // This simply avoids re-requesting the VLR data from a remote source for those
-        // VLRs where we already have data.
+        // This simply avoids re-requesting the VLR data from a remote source
+        // for those VLRs where we already have data.
         if (ebVlr.dataSize())
-            las::addVlrMetadata(ebVlr, "vlr_" + std::to_string(i++), forward, m);
+            las::addVlrMetadata(ebVlr, "vlr_" + std::to_string(i++), forward,
+                                m);
         for (const las::Vlr& vlr : srsVlrs)
             if (vlr.dataSize())
-                las::addVlrMetadata(vlr, "vlr_" + std::to_string(i++), forward, m);
+                las::addVlrMetadata(vlr, "vlr_" + std::to_string(i++), forward,
+                                    m);
 
         las::VlrList ignored = las::parseIgnoreVlrs({});
         for (const las::VlrCatalog::Entry& e : catalog)
         {
             las::Vlr vlr(e.userId, e.recordId);
-            if (las::shouldIgnoreVlr(vlr, ignored) || vlr == ebVlr || Utils::contains(srsVlrs, vlr))
+            if (las::shouldIgnoreVlr(vlr, ignored) || vlr == ebVlr ||
+                Utils::contains(srsVlrs, vlr))
                 continue;
-            vlr.dataVec = catalog.fetchWithDescription(e.userId, e.recordId, vlr.description);
+            vlr.dataVec = catalog.fetchWithDescription(e.userId, e.recordId,
+                                                       vlr.description);
             las::addVlrMetadata(vlr, "vlr_" + std::to_string(i++), forward, m);
         }
     }
 
     createSpatialFilters();
 
-    // Calculate how many levels we need to descend to meet the resolution requirement.
+    // Calculate how many levels we need to descend to meet the resolution
+    // requirement.
     if (m_args->resolution < 0)
         throwError("Can't set `resolution` to a value less than 0.");
-    m_p->depthEnd = m_args->resolution ?
-        (std::max)(1, (int)ceil(log2(m_p->copc_info.spacing / m_args->resolution)) + 1) :
-        0;
+    m_p->depthEnd = m_args->resolution
+                        ? (std::max)(1, (int)ceil(log2(m_p->copc_info.spacing /
+                                                       m_args->resolution)) +
+                                            1)
+                        : 0;
 
     if (m_args->resolution)
-        log()->get(LogLevel::Debug) << "Maximum depth: " << m_p->depthEnd << std::endl;
+        log()->get(LogLevel::Debug)
+            << "Maximum depth: " << m_p->depthEnd << std::endl;
 
     // Initialize our threadpool
     m_p->pool.reset(new ThreadPool(m_args->threads));
-
 }
-
 
 std::vector<char> CopcReader::fetch(uint64_t offset, int32_t size)
 {
     return m_p->connector->getBinary(offset, size);
 }
-
 
 void CopcReader::fetchHeader()
 {
@@ -404,7 +418,7 @@ void CopcReader::fetchHeader()
     int size = 589;
     std::vector<char> data = fetch(0, size);
 
-    const char *d = data.data();
+    const char* d = data.data();
     m_p->header.fill(d, data.size());
     m_p->scaling.m_xXform = XForm(m_p->header.scale.x, m_p->header.offset.x);
     m_p->scaling.m_yXform = XForm(m_p->header.scale.y, m_p->header.offset.y);
@@ -425,10 +439,8 @@ void CopcReader::fetchHeader()
     {
         std::stringstream msg;
         msg << "The first VLR in a COPC file is required to have "
-            << "user_id of 'copc' and this file has '" << vlr.userId
-            << "'";
+            << "user_id of 'copc' and this file has '" << vlr.userId << "'";
         throwError(msg.str());
-
     }
 
     if (size != 160)
@@ -440,29 +452,31 @@ void CopcReader::fetchHeader()
     }
     m_p->copc_info.fill(d, size);
 
-    m_p->rootNodeExtent = BOX3D(
-        m_p->copc_info.center_x - m_p->copc_info.halfsize,
-        m_p->copc_info.center_y - m_p->copc_info.halfsize,
-        m_p->copc_info.center_z - m_p->copc_info.halfsize,
-        m_p->copc_info.center_x + m_p->copc_info.halfsize,
-        m_p->copc_info.center_y + m_p->copc_info.halfsize,
-        m_p->copc_info.center_z + m_p->copc_info.halfsize);
+    m_p->rootNodeExtent =
+        BOX3D(m_p->copc_info.center_x - m_p->copc_info.halfsize,
+              m_p->copc_info.center_y - m_p->copc_info.halfsize,
+              m_p->copc_info.center_z - m_p->copc_info.halfsize,
+              m_p->copc_info.center_x + m_p->copc_info.halfsize,
+              m_p->copc_info.center_y + m_p->copc_info.halfsize,
+              m_p->copc_info.center_z + m_p->copc_info.halfsize);
 
     validateHeader(m_p->header);
     validateVlrInfo(vlr, m_p->copc_info);
 }
 
-
 las::VlrList CopcReader::fetchSrsVlrs(const las::VlrCatalog& catalog)
 {
     las::VlrList vlrs;
 
-    auto fetchVlr = [&catalog, &vlrs] (const std::string userId, uint16_t recordId) {
+    auto fetchVlr =
+        [&catalog, &vlrs](const std::string userId, uint16_t recordId)
+    {
         if (!catalog.exists(userId, recordId))
             return;
 
         las::Vlr vlr(userId, recordId);
-        vlr.dataVec = catalog.fetchWithDescription(userId, recordId, vlr.description);
+        vlr.dataVec =
+            catalog.fetchWithDescription(userId, recordId, vlr.description);
         vlrs.push_back(std::move(vlr));
     };
 
@@ -476,25 +490,24 @@ las::VlrList CopcReader::fetchSrsVlrs(const las::VlrCatalog& catalog)
     return vlrs;
 }
 
-
 las::Vlr CopcReader::fetchEbVlr(const las::VlrCatalog& catalog)
 {
     las::Vlr vlr(las::SpecUserId, las::ExtraBytesRecordId);
-    vlr.dataVec = catalog.fetchWithDescription(las::SpecUserId, las::ExtraBytesRecordId,
-        vlr.description);
+    vlr.dataVec = catalog.fetchWithDescription(
+        las::SpecUserId, las::ExtraBytesRecordId, vlr.description);
     if (vlr.dataVec.empty())
         return vlr;
 
     if (vlr.dataVec.size() % las::ExtraBytesSpecSize != 0)
     {
-        log()->get(LogLevel::Warning) << "Bad size for extra bytes VLR.  Ignoring.";
+        log()->get(LogLevel::Warning)
+            << "Bad size for extra bytes VLR.  Ignoring.";
         return vlr;
     }
-    m_p->extraDims = las::ExtraBytesIf::toExtraDims(vlr.data(), vlr.dataSize(),
-        las::baseCount(m_p->header.pointFormat()));
+    m_p->extraDims = las::ExtraBytesIf::toExtraDims(
+        vlr.data(), vlr.dataSize(), las::baseCount(m_p->header.pointFormat()));
     return vlr;
 }
-
 
 void CopcReader::validateHeader(const las::Header& h)
 {
@@ -502,19 +515,18 @@ void CopcReader::validateHeader(const las::Header& h)
         throwError("Invalid LAS header in COPC file");
     int pdrf = h.pointFormat();
     if (pdrf < 6 || pdrf > 8)
-        throwError("COPC file has invalid point format '" + std::to_string(pdrf) +
-            "'. Must be 6-8.");
+        throwError("COPC file has invalid point format '" +
+                   std::to_string(pdrf) + "'. Must be 6-8.");
 }
-
 
 void CopcReader::validateVlrInfo(const las::Vlr& v, const copc::Info& i)
 {
     if (v.userId != las::CopcUserId || v.recordId != las::CopcInfoRecordId)
-        throwError("COPC VLR invalid. Found user ID '" + v.userId + "' and record ID '" +
-            std::to_string(v.recordId) + "'. Expected '" + las::CopcUserId +"' and '" +
-            std::to_string(las::CopcInfoRecordId) + "'.");
+        throwError("COPC VLR invalid. Found user ID '" + v.userId +
+                   "' and record ID '" + std::to_string(v.recordId) +
+                   "'. Expected '" + las::CopcUserId + "' and '" +
+                   std::to_string(las::CopcInfoRecordId) + "'.");
 }
-
 
 // Create boxes/polygons and associated transforms for spatial filters.
 void CopcReader::createSpatialFilters()
@@ -525,7 +537,8 @@ void CopcReader::createSpatialFilters()
         const SpatialReference& boundsSrs = m_args->clip.spatialReference();
         if (m_args->clip.is2d())
         {
-            if (boundsSrs.isGeographic() && !getSpatialReference().isGeographic())
+            if (boundsSrs.isGeographic() &&
+                !getSpatialReference().isGeographic())
                 throwError("For lon/lat 'bounds', bounds must be 3D");
 
             m_p->clip.box = BOX3D(m_args->clip.to2d());
@@ -563,12 +576,11 @@ void CopcReader::createSpatialFilters()
             xform.set(getSpatialReference(), poly.getSpatialReference());
         for (Polygon& p : exploded)
         {
-            PolyXform ps { std::move(p), xform };
+            PolyXform ps{std::move(p), xform};
             m_p->polys.push_back(ps);
         }
     }
 }
-
 
 QuickInfo CopcReader::inspect()
 {
@@ -596,13 +608,14 @@ QuickInfo CopcReader::inspect()
 
         qi.m_pointCount = m_p->hierarchy.pointCount();
 
-        //ABELL - This is wrong since we're not transforming the tile bounds to the
-        //  SRS of each clip region, but that seems like a lot of mess for
-        //  little value. Wait until someone complains. (Note that's it's a bit
-        //  different from queryOverlaps or we'd just call that.)
-        // Clip the resulting bounds to the intersection of:
-        //  - the query bounds (from an explicit bounds or an origin query)
-        //  - the extents of the polygon selection
+        // ABELL - This is wrong since we're not transforming the tile bounds to
+        // the
+        //   SRS of each clip region, but that seems like a lot of mess for
+        //   little value. Wait until someone complains. (Note that's it's a bit
+        //   different from queryOverlaps or we'd just call that.)
+        //  Clip the resulting bounds to the intersection of:
+        //   - the query bounds (from an explicit bounds or an origin query)
+        //   - the extents of the polygon selection
         BOX3D b;
         b.grow(m_p->clip.box);
         for (const auto& poly : m_args->polys)
@@ -616,7 +629,6 @@ QuickInfo CopcReader::inspect()
     return qi;
 }
 
-
 void CopcReader::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDims(las::pdrfDims(m_p->header.pointFormat()));
@@ -625,12 +637,14 @@ void CopcReader::addDimensions(PointLayoutPtr layout)
     for (auto& dim : m_p->extraDims)
     {
         if (dim.m_size > ebLen)
-            throwError("Extra byte specification exceeds point length beyond base format length.");
+            throwError("Extra byte specification exceeds point length beyond "
+                       "base format length.");
         ebLen -= dim.m_size;
 
         Dimension::Type type = dim.m_dimType.m_type;
 
-        // There is the awful concept of unspecified extra bytes. We don't register them.
+        // There is the awful concept of unspecified extra bytes. We don't
+        // register them.
         if (type == Dimension::Type::None)
             continue;
         if (dim.m_dimType.m_xform.nonstandard())
@@ -641,12 +655,10 @@ void CopcReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
-
 void CopcReader::ready(PointTableRef table)
 {
-    // We may need to reset these after initialize(), since the reader could be being run
-    // multiple times without re-initializing.
+    // We may need to reset these after initialize(), since the reader could be
+    // being run multiple times without re-initializing.
     if (m_p->done)
     {
         m_p->pool.reset(new ThreadPool(m_args->threads));
@@ -670,16 +682,17 @@ void CopcReader::ready(PointTableRef table)
         totalPoints += entry.m_pointCount;
 
     if (totalPoints > 1e8)
-        log()->get(LogLevel::Warning) << totalPoints << " points will be downloaded" << std::endl;
+        log()->get(LogLevel::Warning)
+            << totalPoints << " points will be downloaded" << std::endl;
 
     m_p->tileCount = m_p->hierarchy.size();
-    log()->get(LogLevel::Debug) << m_p->tileCount << " overlapping nodes" << std::endl;
+    log()->get(LogLevel::Debug)
+        << m_p->tileCount << " overlapping nodes" << std::endl;
 
     m_p->done = false;
     for (const copc::Entry& entry : m_p->hierarchy)
         load(entry);
 }
-
 
 void CopcReader::loadHierarchy()
 {
@@ -687,13 +700,14 @@ void CopcReader::loadHierarchy()
     // hierarchy:
     copc::Key key;
 
-    // In case a point count was specified, don't fetch more hierarchy than necessary.
+    // In case a point count was specified, don't fetch more hierarchy than
+    // necessary.
     m_p->hierarchyPointCount = count();
     if (!passesFilter(key))
         return;
 
     copc::HierarchyPage page(fetch(m_p->copc_info.root_hier_offset,
-        (uint32_t)m_p->copc_info.root_hier_size));
+                                   (uint32_t)m_p->copc_info.root_hier_size));
 
     copc::Entry entry = page.find(key);
     if (!entry.valid())
@@ -702,9 +716,9 @@ void CopcReader::loadHierarchy()
     m_p->pool->await();
 }
 
-
-void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::HierarchyPage& page,
-    const copc::Entry& entry)
+void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy,
+                               const copc::HierarchyPage& page,
+                               const copc::Entry& entry)
 {
     if (entry.isDataEntry())
     {
@@ -715,7 +729,8 @@ void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::Hierarchy
             if (entry.m_pointCount)
             {
                 m_p->hierarchyPointCount -=
-                    (std::min)((point_count_t)entry.m_pointCount, m_p->hierarchyPointCount);
+                    (std::min)((point_count_t)entry.m_pointCount,
+                               m_p->hierarchyPointCount);
                 hierarchy.insert(entry);
             }
         }
@@ -733,23 +748,25 @@ void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::Hierarchy
     }
     else // New page
     {
-        m_p->pool->add([this, &hierarchy, entry]()
-        {
-            copc::HierarchyPage page(fetch(entry.m_offset, entry.m_byteSize));
-            copc::Entry rootDataEntry = page.find(entry.m_key);
-            if (!rootDataEntry.valid())
-                throwError("Hierarchy page " + entry.m_key.toString() + " missing root entry.");
-            loadHierarchy(hierarchy, page, rootDataEntry);
-        });
+        m_p->pool->add(
+            [this, &hierarchy, entry]()
+            {
+                copc::HierarchyPage page(
+                    fetch(entry.m_offset, entry.m_byteSize));
+                copc::Entry rootDataEntry = page.find(entry.m_key);
+                if (!rootDataEntry.valid())
+                    throwError("Hierarchy page " + entry.m_key.toString() +
+                               " missing root entry.");
+                loadHierarchy(hierarchy, page, rootDataEntry);
+            });
     }
 }
 
-
 bool CopcReader::passesFilter(const copc::Key& key) const
 {
-    return ((m_p->depthEnd == 0 || key.d < m_p->depthEnd) && passesSpatialFilter(key));
+    return ((m_p->depthEnd == 0 || key.d < m_p->depthEnd) &&
+            passesSpatialFilter(key));
 }
-
 
 bool CopcReader::passesSpatialFilter(const copc::Key& key) const
 {
@@ -762,7 +779,8 @@ bool CopcReader::passesSpatialFilter(const copc::Key& key) const
 
         if (m_p->llToBcbfTransform.valid())
         {
-            return reprojectBoundsBcbfToLonLat(m_p->clip.box, m_p->llToBcbfTransform)
+            return reprojectBoundsBcbfToLonLat(m_p->clip.box,
+                                               m_p->llToBcbfTransform)
                 .overlaps(tileBounds);
         }
 
@@ -770,8 +788,8 @@ bool CopcReader::passesSpatialFilter(const copc::Key& key) const
             .overlaps(m_p->clip.box);
     };
 
-    // Check the box of the key against our query polygon(s). If it doesn't overlap,
-    // we can skip
+    // Check the box of the key against our query polygon(s). If it doesn't
+    // overlap, we can skip
     auto polysOverlap = [this, &tileBounds]() -> bool
     {
         if (m_p->polys.empty())
@@ -779,7 +797,8 @@ bool CopcReader::passesSpatialFilter(const copc::Key& key) const
 
         for (auto& ps : m_p->polys)
         {
-            if (!ps.poly.disjoint(reprojectBoundsViaCorner(tileBounds, ps.xform)))
+            if (!ps.poly.disjoint(
+                    reprojectBoundsViaCorner(tileBounds, ps.xform)))
                 return true;
         }
         return false;
@@ -796,16 +815,15 @@ bool CopcReader::passesSpatialFilter(const copc::Key& key) const
     return boxOverlaps() && polysOverlap();
 }
 
-
 bool CopcReader::hasSpatialFilter() const
 {
     return !m_p->polys.empty() || m_p->clip.box.valid();
 }
 
-
 void CopcReader::load(const copc::Entry& entry)
 {
-    m_p->pool->add([this, entry]()
+    m_p->pool->add(
+        [this, entry]()
         {
             // Read the tile.
             copc::Tile tile(entry, *m_p->connector, m_p->header);
@@ -813,19 +831,22 @@ void CopcReader::load(const copc::Entry& entry)
 
             // Put the tile on the output queue.
             std::unique_lock<std::mutex> l(m_p->mutex);
-            m_p->consumedCv.wait(l, [this] {
-                return (m_p->done ||
-                    m_p->contents.size() < (size_t)m_args->keepAliveChunkCount);});
+            m_p->consumedCv.wait(
+                l,
+                [this]
+                {
+                    return (m_p->done ||
+                            m_p->contents.size() <
+                                (size_t)m_args->keepAliveChunkCount);
+                });
             m_p->contents.push(std::move(tile));
             l.unlock();
             m_p->contentsCv.notify_one();
-        }
-    );
+        });
 }
 
-
 // This code runs in a single thread, so doesn't need locking.
-bool CopcReader::processPoint(const char *inbuf, PointRef& dst)
+bool CopcReader::processPoint(const char* inbuf, PointRef& dst)
 {
     using namespace Dimension;
 
@@ -875,7 +896,6 @@ bool CopcReader::processPoint(const char *inbuf, PointRef& dst)
     return true;
 }
 
-
 point_count_t CopcReader::read(PointViewPtr view, point_count_t count)
 {
     if (m_p->tileCount == 0)
@@ -916,12 +936,12 @@ void CopcReader::checkTile(const copc::Tile& tile)
     }
 }
 
-
 // Put the contents of a tile into the destination point view.
-void CopcReader::process(PointViewPtr dstView, const copc::Tile& tile, point_count_t count)
+void CopcReader::process(PointViewPtr dstView, const copc::Tile& tile,
+                         point_count_t count)
 {
     PointRef dstPoint(*dstView);
-    const char *p = tile.dataPtr();
+    const char* p = tile.dataPtr();
     for (PointId idx = 0; idx < tile.size(); ++idx)
     {
         if (count-- == 0)
@@ -931,7 +951,6 @@ void CopcReader::process(PointViewPtr dstView, const copc::Tile& tile, point_cou
         p += m_p->header.pointSize;
     }
 }
-
 
 bool CopcReader::processOne(PointRef& point)
 {
@@ -950,7 +969,8 @@ top:
             std::unique_lock<std::mutex> l(m_p->mutex);
             if (m_p->contents.size())
             {
-                m_p->currentTile.reset(new copc::Tile(std::move(m_p->contents.front())));
+                m_p->currentTile.reset(
+                    new copc::Tile(std::move(m_p->contents.front())));
                 m_p->contents.pop();
                 break;
             }
@@ -962,7 +982,8 @@ top:
         m_p->tilePointNum = 0;
     }
 
-    const char *p = m_p->currentTile->dataPtr() + (m_p->tilePointNum * m_p->header.pointSize);
+    const char* p = m_p->currentTile->dataPtr() +
+                    (m_p->tilePointNum * m_p->header.pointSize);
     bool ok = processPoint(p, point);
     m_p->tilePointNum++;
 
@@ -980,7 +1001,6 @@ top:
 
     return true;
 }
-
 
 void CopcReader::done(PointTableRef)
 {

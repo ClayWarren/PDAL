@@ -40,12 +40,10 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.locate",
     "Return a single point with min/max value in the named dimension.",
-    "https://pdal.org/stages/filters.locate.html"
-};
+    "https://pdal.org/stages/filters.locate.html"};
 
 CREATE_STATIC_STAGE(LocateFilter, s_info)
 
@@ -58,7 +56,7 @@ void LocateFilter::addArgs(ProgramArgs& args)
 {
     args.add("dimension", "Dimension in which to locate max", m_dimName);
     args.add("minmax", "Whether to search for the minimum or maximum value",
-        m_minmax, "max");
+             m_minmax, "max");
 }
 
 void LocateFilter::prepared(PointTableRef table)
@@ -104,4 +102,4 @@ PointViewSet LocateFilter::run(PointViewPtr inView)
     return viewSet;
 }
 
-} // pdal
+} // namespace pdal

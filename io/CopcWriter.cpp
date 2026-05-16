@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2021, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2021, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/FileUtils.hpp>
@@ -43,12 +43,12 @@
 #include "CopcWriter.hpp"
 #include <arbiter/arbiter.hpp>
 
-#include "private/las/Header.hpp"
-#include "private/las/Utils.hpp"
 #include "private/copcwriter/BuPyramid.hpp"
 #include "private/copcwriter/CellManager.hpp"
 #include "private/copcwriter/Grid.hpp"
 #include "private/copcwriter/Reprocessor.hpp"
+#include "private/las/Header.hpp"
+#include "private/las/Utils.hpp"
 
 namespace pdal
 {
@@ -56,25 +56,23 @@ namespace pdal
 namespace
 {
 
-const StaticPluginInfo s_info
-{
-    "writers.copc",
-    "COPC Writer",
-    "https://pdal.org/stages/writer.copc.html",
-    {}
-};
+const StaticPluginInfo s_info{"writers.copc",
+                              "COPC Writer",
+                              "https://pdal.org/stages/writer.copc.html",
+                              {}};
 
 }
 
 CREATE_STATIC_STAGE(CopcWriter, s_info);
 
-CopcWriter::CopcWriter() : b(new copcwriter::BaseInfo), isRemote(false)
-{}
+CopcWriter::CopcWriter() : b(new copcwriter::BaseInfo), isRemote(false) {}
 
-CopcWriter::~CopcWriter()
-{}
+CopcWriter::~CopcWriter() {}
 
-std::string CopcWriter::getName() const { return s_info.name; }
+std::string CopcWriter::getName() const
+{
+    return s_info.name;
+}
 
 void CopcWriter::initialize(PointTableRef table)
 {
@@ -102,49 +100,57 @@ void CopcWriter::addArgs(ProgramArgs& args)
         doy += ptm->tm_yday;
     }
 
-    args.add("forward", "Dimensions to forward from LAS reader", b->opts.forwardSpec);
+    args.add("forward", "Dimensions to forward from LAS reader",
+             b->opts.forwardSpec);
 
     args.add("filesource_id", "File source ID number.", b->opts.filesourceId,
-        decltype(b->opts.filesourceId)(0));
+             decltype(b->opts.filesourceId)(0));
     args.add("global_encoding", "Global encoding byte", b->opts.globalEncoding,
-        decltype(b->opts.globalEncoding)(0));
+             decltype(b->opts.globalEncoding)(0));
     args.add("project_id", "Project ID", b->opts.projectId);
-    args.add("system_id", "System ID", b->opts.systemId, decltype(b->opts.systemId)("PDAL"));
+    args.add("system_id", "System ID", b->opts.systemId,
+             decltype(b->opts.systemId)("PDAL"));
     args.add("software_id", "Software ID", b->opts.softwareId,
-        decltype(b->opts.softwareId)(las::generateSoftwareId()));
+             decltype(b->opts.softwareId)(las::generateSoftwareId()));
     args.add("creation_doy", "Creation day of year", b->opts.creationDoy,
-        decltype(b->opts.creationDoy)(doy));
+             decltype(b->opts.creationDoy)(doy));
     args.add("creation_year", "Creation year", b->opts.creationYear,
-        decltype(b->opts.creationYear)(year));
-    args.add("scale_x", "X scale factor", b->opts.scaleX, decltype(b->opts.scaleX)(".01"));
-    args.add("scale_y", "Y scale factor", b->opts.scaleY, decltype(b->opts.scaleY)(".01"));
-    args.add("scale_z", "Z scale factor", b->opts.scaleZ, decltype(b->opts.scaleZ)(".01"));
+             decltype(b->opts.creationYear)(year));
+    args.add("scale_x", "X scale factor", b->opts.scaleX,
+             decltype(b->opts.scaleX)(".01"));
+    args.add("scale_y", "Y scale factor", b->opts.scaleY,
+             decltype(b->opts.scaleY)(".01"));
+    args.add("scale_z", "Z scale factor", b->opts.scaleZ,
+             decltype(b->opts.scaleZ)(".01"));
     args.add("offset_x", "X offset", b->opts.offsetX);
     args.add("offset_y", "Y offset", b->opts.offsetY);
     args.add("offset_z", "Z offset", b->opts.offsetZ);
     args.add("vlrs", "List of VLRs to set", b->opts.userVlrs);
     args.add("pipeline", "Emit a JSON-represetation of the pipeline as a VLR",
-        b->opts.emitPipeline);
-    args.add("pdal_metadata", "Emit a JSON-represetation of the pipeline's metadata as a VLR",
-        b->opts.emitMetadata);
-    args.add("fixed_seed", "Fix the random seed", b->opts.fixedSeed).setHidden();
+             b->opts.emitPipeline);
+    args.add("pdal_metadata",
+             "Emit a JSON-represetation of the pipeline's metadata as a VLR",
+             b->opts.emitMetadata);
+    args.add("fixed_seed", "Fix the random seed", b->opts.fixedSeed)
+        .setHidden();
     args.add("a_srs", "Spatial reference to use to write output", b->opts.aSrs);
     args.add("threads", "", b->opts.threadCount).setHidden();
-    args.add("enhanced_srs_vlrs", "Write WKT2 and PROJJSON as VLR?", b->opts.enhancedSrsVlrs,
-        decltype(b->opts.enhancedSrsVlrs)(false));
-    args.add("extra_dims", "List of dimension names to write in addition to those of the "
-        "point format or 'all' for all available dimensions", b->opts.extraDimSpec);
+    args.add("enhanced_srs_vlrs", "Write WKT2 and PROJJSON as VLR?",
+             b->opts.enhancedSrsVlrs, decltype(b->opts.enhancedSrsVlrs)(false));
+    args.add("extra_dims",
+             "List of dimension names to write in addition to those of the "
+             "point format or 'all' for all available dimensions",
+             b->opts.extraDimSpec);
 }
 
 void CopcWriter::fillForwardList()
 {
-    static const StringList header {
-        "dataformat_id", "major_version", "minor_version", "filesource_id",
-        "global_encoding", "project_id", "system_id", "software_id",
-        "creation_doy", "creation_year"
-    };
-    static const StringList scale { "scale_x", "scale_y", "scale_z" };
-    static const StringList offset { "offset_x", "offset_y", "offset_z" };
+    static const StringList header{
+        "dataformat_id",   "major_version", "minor_version", "filesource_id",
+        "global_encoding", "project_id",    "system_id",     "software_id",
+        "creation_doy",    "creation_year"};
+    static const StringList scale{"scale_x", "scale_y", "scale_z"};
+    static const StringList offset{"offset_x", "offset_y", "offset_z"};
 
     // Build the forward list, replacing special keywords with the proper
     // field names.
@@ -168,17 +174,18 @@ void CopcWriter::fillForwardList()
         else if (name == "vlr")
             b->forwardVlrs = true;
         else if (Utils::contains(header, name) ||
-                Utils::contains(scale, name) ||
-                Utils::contains(offset, name))
+                 Utils::contains(scale, name) || Utils::contains(offset, name))
             b->forwards.insert(name);
         else
             throwError("Error in 'forward' option.  Unknown field for "
-                "forwarding: '" + name + "'.");
+                       "forwarding: '" +
+                       name + "'.");
     }
 }
 
 template <typename T>
-void CopcWriter::handleHeaderForward(const std::string& s, T& headerVal, const MetadataNode& base)
+void CopcWriter::handleHeaderForward(const std::string& s, T& headerVal,
+                                     const MetadataNode& base)
 {
     if (Utils::contains(b->forwards, s) && !headerVal.valSet())
     {
@@ -219,8 +226,8 @@ void CopcWriter::handleForwardVlrs(MetadataNode& forwards)
     if (!b->forwardVlrs)
         return;
 
-    MetadataNodeList nodes = forwards.findChildren([](MetadataNode n)
-        { return Utils::startsWith(n.name(), "vlr_"); });
+    MetadataNodeList nodes = forwards.findChildren(
+        [](MetadataNode n) { return Utils::startsWith(n.name(), "vlr_"); });
     for (auto& n : nodes)
     {
         const MetadataNode& userIdNode = n.findChild("user_id");
@@ -229,11 +236,13 @@ void CopcWriter::handleForwardVlrs(MetadataNode& forwards)
         {
 
             const MetadataNode& descriptionNode = n.findChild("description");
-            const std::vector<uint8_t>& data = Utils::base64_decode(n.findChild("data").value());
-            const char *d = (const char *)data.data();
+            const std::vector<uint8_t>& data =
+                Utils::base64_decode(n.findChild("data").value());
+            const char* d = (const char*)data.data();
             std::vector<char> buf(d, d + data.size());
-            las::Evlr e(userIdNode.value(), (uint16_t)std::stoi(recordIdNode.value()),
-                descriptionNode.value(), std::move(buf));
+            las::Evlr e(userIdNode.value(),
+                        (uint16_t)std::stoi(recordIdNode.value()),
+                        descriptionNode.value(), std::move(buf));
             b->vlrs.push_back(e);
         }
     }
@@ -256,11 +265,11 @@ void CopcWriter::prepared(PointTableRef table)
     Dimension::IdList stdDims = las::pdrfDims(b->pointFormatId);
     std::sort(allDims.begin(), allDims.end());
     std::sort(stdDims.begin(), stdDims.end());
-    // Fill in the extraDim lists with the difference between the total list and the
-    // standard list.
+    // Fill in the extraDim lists with the difference between the total list and
+    // the standard list.
     Dimension::IdList edIds;
-    std::set_difference(allDims.begin(), allDims.end(), stdDims.begin(), stdDims.end(),
-        std::inserter(edIds, edIds.end()));
+    std::set_difference(allDims.begin(), allDims.end(), stdDims.begin(),
+                        stdDims.end(), std::inserter(edIds, edIds.end()));
 
     // If 'all' was specified, add all extra dimensions to the list.
     if (b->extraDims.size() == 1 && b->extraDims[0].m_name == "all")
@@ -282,20 +291,22 @@ void CopcWriter::prepared(PointTableRef table)
     {
         dim.m_dimType.m_id = layout->findDim(dim.m_name);
         if (dim.m_dimType.m_id == Dimension::Id::Unknown)
-            throwError("Dimension '" + dim.m_name + "' specified in "
-                "'extra_dim' option not found.");
+            throwError("Dimension '" + dim.m_name +
+                       "' specified in "
+                       "'extra_dim' option not found.");
         if (Utils::contains(stdDims, dim.m_dimType.m_id))
-            throwError("Dimension '" + dim.m_name + "' specified in "
-                "'extra_dim' option is a standard dimension.");
+            throwError("Dimension '" + dim.m_name +
+                       "' specified in "
+                       "'extra_dim' option is a standard dimension.");
 
-        // Point loader works on offsets from the start of the buffer. EB arg parsing
-        // works from zero.
+        // Point loader works on offsets from the start of the buffer. EB arg
+        // parsing works from zero.
         dim.m_byteOffset += las::baseCount(b->pointFormatId);
         b->numExtraBytes += Dimension::size(dim.m_dimType.m_type);
-        log()->get(LogLevel::Info) << getName() << ": Writing dimension " <<
-            dim.m_name <<
-            "(" << Dimension::interpretationName(dim.m_dimType.m_type) <<
-            ") " << " to COPC extra bytes." << std::endl;
+        log()->get(LogLevel::Info)
+            << getName() << ": Writing dimension " << dim.m_name << "("
+            << Dimension::interpretationName(dim.m_dimType.m_type) << ") "
+            << " to COPC extra bytes." << std::endl;
     }
 }
 
@@ -330,7 +341,8 @@ void CopcWriter::handlePipelineVlr()
     const std::string& json = ostr.str();
     std::vector<char> data(json.begin(), json.end());
 
-    las::Evlr v(las::PdalUserId, las::PdalPipelineRecordId, "PDAL pipeline", std::move(data));
+    las::Evlr v(las::PdalUserId, las::PdalPipelineRecordId, "PDAL pipeline",
+                std::move(data));
     b->vlrs.push_back(v);
 }
 
@@ -338,10 +350,10 @@ void CopcWriter::handleMetadataVLR(MetadataNode& forward)
 {
     std::string json = Utils::toJSON(forward);
     std::vector<char> data(json.begin(), json.end());
-    las::Evlr v(las::PdalUserId, las::PdalMetadataRecordId, "PDAL metadata", std::move(data));
+    las::Evlr v(las::PdalUserId, las::PdalMetadataRecordId, "PDAL metadata",
+                std::move(data));
     b->vlrs.push_back(v);
 }
-
 
 void CopcWriter::handleUserVlrs(MetadataNode m)
 {
@@ -358,13 +370,16 @@ void CopcWriter::write(const PointViewPtr v)
 
     if (v->empty())
     {
-        log()->get(LogLevel::Warning) << "writers.copc skipping empty point view.\n";
+        log()->get(LogLevel::Warning)
+            << "writers.copc skipping empty point view.\n";
         return;
     }
 
     if (++b->viewCount > 1)
-        log()->get(LogLevel::Warning) << "writers.copc does not support multiple views "
-            "and will overwrite files for earlier views. Consider adding a merge filter.\n";
+        log()->get(LogLevel::Warning)
+            << "writers.copc does not support multiple views "
+               "and will overwrite files for earlier views. Consider adding a "
+               "merge filter.\n";
 
     BOX3D box;
     v->calculateBounds(box);
@@ -391,11 +406,12 @@ void CopcWriter::write(const PointViewPtr v)
         cell->appendPoint(*v, p.pointId());
     }
 
-    // New cells from reprocessing go on the reprocessing manager. They get merged
-    // at the end.
-    //ABELL - This should be threaded. These reprocessors should be able to run independently
-    // since their data doesn't overlap spatially. Probably need a separate CellManager
-    // for each that is merged under lock at completion.
+    // New cells from reprocessing go on the reprocessing manager. They get
+    // merged at the end.
+    // ABELL - This should be threaded. These reprocessors should be able to run
+    // independently
+    // since their data doesn't overlap spatially. Probably need a separate
+    // CellManager for each that is merged under lock at completion.
     CellManager reprocessMgr(v);
     auto it = mgr.begin();
     while (it != mgr.end())
@@ -416,15 +432,17 @@ void CopcWriter::write(const PointViewPtr v)
     b->bounds = grid.processingBounds();
     b->trueBounds = grid.conformingBounds();
     if (!b->opts.aSrs.empty())
-       b->srs = b->opts.aSrs;
+        b->srs = b->opts.aSrs;
     else
-       b->srs = v->spatialReference();
+        b->srs = v->spatialReference();
 
-    if (b->opts.enhancedSrsVlrs) {
-        auto addVlr = [&](const std::string& userId, uint16_t recordId, const std::string& desc,
-            const std::string& str)
+    if (b->opts.enhancedSrsVlrs)
+    {
+        auto addVlr = [&](const std::string& userId, uint16_t recordId,
+                          const std::string& desc, const std::string& str)
         {
-            if (!str.empty()) {
+            if (!str.empty())
+            {
                 std::vector<char> strBytes(str.begin(), str.end());
                 strBytes.resize(strBytes.size() + 1, 0);
                 las::Evlr v(userId, recordId, desc, std::move(strBytes));
@@ -432,9 +450,9 @@ void CopcWriter::write(const PointViewPtr v)
             }
         };
         addVlr(las::TransformUserId, las::LASFWkt2recordId, "PDAL WKT2 Record",
-            b->srs.getWKT2());
-        addVlr(las::PdalUserId, las::PdalProjJsonRecordId, "PDAL PROJJSON Record",
-            b->srs.getPROJJSON());
+               b->srs.getWKT2());
+        addVlr(las::PdalUserId, las::PdalProjJsonRecordId,
+               "PDAL PROJJSON Record", b->srs.getPROJJSON());
     }
 
     // Set the input string into scaling.

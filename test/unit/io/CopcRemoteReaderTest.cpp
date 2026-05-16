@@ -38,15 +38,15 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/CopcReader.hpp>
-#include <io/LasReader.hpp>
 #include <filters/CropFilter.hpp>
 #include <filters/ReprojectionFilter.hpp>
 #include <filters/SortFilter.hpp>
+#include <io/CopcReader.hpp>
+#include <io/LasReader.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include "Support.hpp"
 
@@ -55,13 +55,13 @@ namespace pdal
 
 namespace
 {
-    const std::string copcPath(Support::datapath("copc/lone-star.copc.laz"));
-    const std::string copcAutzenPath(Support::datapath("copc/1.2-with-color.copc.laz"));
-    const BOX3D pointBounds(515368.60225, 4918340.364, 2322.89625,
-        515401.043, 4918381.12375, 2338.5755);
-    const point_count_t numPoints(518862);
-}
-
+const std::string copcPath(Support::datapath("copc/lone-star.copc.laz"));
+const std::string
+    copcAutzenPath(Support::datapath("copc/1.2-with-color.copc.laz"));
+const BOX3D pointBounds(515368.60225, 4918340.364, 2322.89625, 515401.043,
+                        4918381.12375, 2338.5755);
+const point_count_t numPoints(518862);
+} // namespace
 
 void testURLs(const std::string& url, const BOX2D& bounds)
 {
@@ -81,9 +81,7 @@ void testURLs(const std::string& url, const BOX2D& bounds)
 
     pdal::BOX3D bounds3d = qi.m_bounds;
     EXPECT_EQ(pdal::Bounds(bounds).to2d(), pdal::Bounds(bounds3d).to2d());
-
 }
-
 
 TEST(CopcRemoteReaderTest, vsi)
 {
@@ -97,14 +95,13 @@ TEST(CopcRemoteReaderTest, vsi)
           "minz": 406.56
     */
 
-    BOX2D bounds(635700,848900, 637000, 853300);
-    std::string url( "https://github.com/PDAL/data/raw/refs/heads/main/autzen/autzen-classified.copc.laz");
-    std::string vsi ("/vsicurl/"+url);
+    BOX2D bounds(635700, 848900, 637000, 853300);
+    std::string url("https://github.com/PDAL/data/raw/refs/heads/main/autzen/"
+                    "autzen-classified.copc.laz");
+    std::string vsi("/vsicurl/" + url);
 
     testURLs(url, bounds);
     testURLs(vsi, bounds);
-
-
 }
 
 } // namespace pdal

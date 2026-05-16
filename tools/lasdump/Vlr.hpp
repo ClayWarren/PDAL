@@ -47,11 +47,17 @@ class Vlr
 {
 public:
     bool matches(std::string userId, uint16_t recordId)
-        { return userId == m_userId && recordId == m_recordId; }
-    const char *data() const
-        { return (const char *)m_data.data(); }
+    {
+        return userId == m_userId && recordId == m_recordId;
+    }
+    const char* data() const
+    {
+        return (const char*)m_data.data();
+    }
     uint64_t dataLen() const
-        { return m_data.size(); }
+    {
+        return m_data.size();
+    }
 
 protected:
     uint16_t m_recordSig;
@@ -110,4 +116,3 @@ inline ILeStream& operator>>(ILeStream& in, EVlr& v)
 
 } // namespace lasdump
 } // namespace pdal
-

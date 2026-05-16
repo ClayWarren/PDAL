@@ -13,10 +13,8 @@ namespace expr
 class Lexer
 {
 public:
-    Lexer() : m_pos(0), m_tokPos(0)
-    {}
-    Lexer(const std::string& s) : m_buf(s), m_pos(0), m_tokPos(0)
-    {}
+    Lexer() : m_pos(0), m_tokPos(0) {}
+    Lexer(const std::string& s) : m_buf(s), m_pos(0), m_tokPos(0) {}
 
     void reset(const std::string& s)
     {
@@ -53,4 +51,3 @@ private:
 
 } // namespace expr
 } // namespace pdal
-

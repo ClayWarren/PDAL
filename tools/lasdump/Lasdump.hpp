@@ -36,8 +36,8 @@
 
 #include <string.h>
 
-#include <string>
 #include <ostream>
+#include <string>
 
 namespace pdal
 {
@@ -46,23 +46,22 @@ namespace lasdump
 
 struct Exception
 {
-    Exception(const std::string& text) : m_text(text)
-        {}
+    Exception(const std::string& text) : m_text(text) {}
 
     std::string m_text;
 };
 
-inline std::ostream& operator << (std::ostream& out, const Exception& ex)
+inline std::ostream& operator<<(std::ostream& out, const Exception& ex)
 {
     out << ex.m_text;
     return out;
 }
 
-inline uint32_t cksum(const void *c, size_t size)
+inline uint32_t cksum(const void* c, size_t size)
 {
     uint32_t sum = 0;
 
-    const uint32_t *p = static_cast<const uint32_t *>(c);
+    const uint32_t* p = static_cast<const uint32_t*>(c);
     while (size)
     {
         uint32_t val = 0;
@@ -77,14 +76,13 @@ inline uint32_t cksum(const void *c, size_t size)
 
 inline uint32_t cksum(const std::vector<char>& v)
 {
-    return cksum(static_cast<const void *>(v.data()), v.size());
+    return cksum(static_cast<const void*>(v.data()), v.size());
 }
 
 inline uint32_t cksum(const std::vector<unsigned char>& v)
 {
-    return cksum(static_cast<const void *>(v.data()), v.size());
+    return cksum(static_cast<const void*>(v.data()), v.size());
 }
 
 } // namespace lasdump
 } // namespace pdal
-

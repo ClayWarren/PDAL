@@ -119,7 +119,8 @@ Affine3d TeaserFilter::fpfh()
     // A short lambda to facilitate offsetting and scaling PointView
     // coordinates to fit within the unit cube, while creating the required
     // TEASER PointCloud.
-    auto pv2pc = [&bounds = m_bounds, &scale = m_scale](PointViewPtr view) {
+    auto pv2pc = [&bounds = m_bounds, &scale = m_scale](PointViewPtr view)
+    {
         teaser::PointCloud pc;
         pc.reserve(view->size());
         for (PointRef p : *view)
@@ -186,7 +187,8 @@ Affine3d TeaserFilter::nofpfh()
     // A short lambda to facilitate offsetting and scaling PointView
     // coordinates to fit within the unit cube, while creating the required
     // Matrix3N.
-    auto pv2mat = [&bounds = m_bounds, &scale = m_scale](PointViewPtr view) {
+    auto pv2mat = [&bounds = m_bounds, &scale = m_scale](PointViewPtr view)
+    {
         Matrix3N mat(3, view->size());
         for (PointRef p : *view)
         {

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2016, Bradley J Chambers (brad.chambers@gmail.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Bradley J Chambers (brad.chambers@gmail.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "PoissonFilter.hpp"
 #include "NormalFilter.hpp"
@@ -52,11 +52,12 @@ namespace pdal
 class PointViewSource : public PointSource
 {
 public:
-    PointViewSource(PointView& view) : m_view(view), m_current(0)
-        {}
+    PointViewSource(PointView& view) : m_view(view), m_current(0) {}
 
     virtual void reset()
-        { m_current = 0; }
+    {
+        m_current = 0;
+    }
     virtual bool nextPoint(Point& point)
     {
         using namespace Dimension;
@@ -81,11 +82,12 @@ private:
 class ColorPointViewSource : public ColorPointSource
 {
 public:
-    ColorPointViewSource(PointView& view) : m_view(view), m_current(0)
-        {}
+    ColorPointViewSource(PointView& view) : m_view(view), m_current(0) {}
 
     virtual void reset()
-        { m_current = 0; }
+    {
+        m_current = 0;
+    }
     virtual bool nextPoint(Point& point, Point3D<double>& color)
     {
         using namespace Dimension;
@@ -113,16 +115,21 @@ private:
 class PointViewMesh : public Kazhdan::Mesh
 {
 public:
-    PointViewMesh(PointView& view, bool color) :
-        m_view(view), m_mesh(*(m_view.createMesh("poisson"))), m_doColor(color)
+    PointViewMesh(PointView& view, bool color)
+        : m_view(view), m_mesh(*(m_view.createMesh("poisson"))),
+          m_doColor(color)
     {
         resetIterator();
     }
 
     virtual int pointCount() const
-        { return static_cast<int>(m_view.size()); }
+    {
+        return static_cast<int>(m_view.size());
+    }
     virtual int polygonCount() const
-        { return m_mesh.size(); }
+    {
+        return m_mesh.size();
+    }
     virtual int newPoint(const std::array<double, 3>& position)
     {
         PointId cnt = m_view.size();
@@ -143,7 +150,7 @@ public:
     }
 
     virtual int newPoint(const std::array<double, 3>& position,
-        const std::array<uint8_t, 3>& color)
+                         const std::array<uint8_t, 3>& color)
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -156,7 +163,7 @@ public:
     }
 
     virtual int newPoint(const std::array<double, 3>& position,
-        const std::array<uint8_t, 3>& color, double density)
+                         const std::array<uint8_t, 3>& color, double density)
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -176,7 +183,9 @@ public:
     }
 
     virtual bool hasDensity() const
-        { return m_view.hasDim(Dimension::Id::Density); }
+    {
+        return m_view.hasDim(Dimension::Id::Density);
+    }
 
     virtual void resetIterator()
     {
@@ -190,7 +199,7 @@ public:
             return false;
 
         const Triangle& t = m_mesh[m_polyIdx];
-        poly.insert(poly.end(), { (int)t.m_a, (int)t.m_b, (int)t.m_c } );
+        poly.insert(poly.end(), {(int)t.m_a, (int)t.m_b, (int)t.m_c});
         m_polyIdx++;
         return true;
     }
@@ -199,22 +208,22 @@ public:
     {
         if (m_pointIdx > m_view.size())
             return false;
-        point.m_position[0] = m_view.getFieldAs<double>(Dimension::Id::X,
-            m_pointIdx);
-        point.m_position[1] = m_view.getFieldAs<double>(Dimension::Id::Y,
-            m_pointIdx);
-        point.m_position[2] = m_view.getFieldAs<double>(Dimension::Id::Z,
-            m_pointIdx);
-        point.m_density = m_view.getFieldAs<double>(Dimension::Id::Density,
-            m_pointIdx);
+        point.m_position[0] =
+            m_view.getFieldAs<double>(Dimension::Id::X, m_pointIdx);
+        point.m_position[1] =
+            m_view.getFieldAs<double>(Dimension::Id::Y, m_pointIdx);
+        point.m_position[2] =
+            m_view.getFieldAs<double>(Dimension::Id::Z, m_pointIdx);
+        point.m_density =
+            m_view.getFieldAs<double>(Dimension::Id::Density, m_pointIdx);
         if (m_doColor)
         {
-            point.m_color[0] = m_view.getFieldAs<uint8_t>(Dimension::Id::Red,
-                m_pointIdx);
-            point.m_color[1] = m_view.getFieldAs<uint8_t>(Dimension::Id::Green,
-                m_pointIdx);
-            point.m_color[2] = m_view.getFieldAs<uint8_t>(Dimension::Id::Blue,
-                m_pointIdx);
+            point.m_color[0] =
+                m_view.getFieldAs<uint8_t>(Dimension::Id::Red, m_pointIdx);
+            point.m_color[1] =
+                m_view.getFieldAs<uint8_t>(Dimension::Id::Green, m_pointIdx);
+            point.m_color[2] =
+                m_view.getFieldAs<uint8_t>(Dimension::Id::Blue, m_pointIdx);
         }
         m_pointIdx++;
         return true;
@@ -228,16 +237,16 @@ private:
     bool m_doColor;
 };
 
-static StaticPluginInfo const s_info
-{
-    "filters.poisson",
-    "Poisson Surface Reconstruction Filter",
-    "https://pdal.org/stages/filters.poisson.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.poisson", "Poisson Surface Reconstruction Filter",
+    "https://pdal.org/stages/filters.poisson.html"};
 
 CREATE_STATIC_STAGE(PoissonFilter, s_info)
 
-std::string PoissonFilter::getName() const { return s_info.name; }
+std::string PoissonFilter::getName() const
+{
+    return s_info.name;
+}
 
 void PoissonFilter::addDimensions(PointLayoutPtr layout)
 {
@@ -251,24 +260,22 @@ void PoissonFilter::addDimensions(PointLayoutPtr layout)
         if ((!layout->hasDim(Dimension::Id::NormalY)) ||
             (!layout->hasDim(Dimension::Id::NormalZ)))
             throwError("If normals are provided as part of the input "
-                "dataset, all of X, Y and Z must be provided.");
+                       "dataset, all of X, Y and Z must be provided.");
         m_normalsProvided = true;
     }
     else
-        layout->registerDims( {Dimension::Id::NormalX, Dimension::Id::NormalY,
-             Dimension::Id::NormalZ} );
+        layout->registerDims({Dimension::Id::NormalX, Dimension::Id::NormalY,
+                              Dimension::Id::NormalZ});
     if (m_density)
         layout->registerDim(Dimension::Id::Density);
 }
-
 
 void PoissonFilter::addArgs(ProgramArgs& args)
 {
     args.add("density", "Output density estimates", m_density);
     args.add("depth", "Maximum depth of the octree used for reconstruction",
-        m_depth, 8);
+             m_depth, 8);
 }
-
 
 PointViewSet PoissonFilter::run(PointViewPtr view)
 {

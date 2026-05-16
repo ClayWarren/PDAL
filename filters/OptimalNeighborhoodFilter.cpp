@@ -133,7 +133,7 @@ void OptimalNeighborhood::filter(PointView& view)
             B(1, 2) = B(2, 1) = B(2, 1) + s * dy * dz;
 
             // perform the eigen decomposition
-	    Eigen::SelfAdjointEigenSolver<Matrix3d> solver(B / (n - 1));
+            Eigen::SelfAdjointEigenSolver<Matrix3d> solver(B / (n - 1));
             if (solver.info() != Eigen::Success)
                 throwError("Cannot perform eigen decomposition.");
             Vector3d ev = solver.eigenvalues();

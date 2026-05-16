@@ -44,12 +44,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.outlier",
-    "Outlier removal",
-    "https://pdal.org/stages/filters.outlier.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.outlier", "Outlier removal",
+    "https://pdal.org/stages/filters.outlier.html"};
 
 CREATE_STATIC_STAGE(OutlierFilter, s_info)
 
@@ -66,7 +63,8 @@ void OutlierFilter::addArgs(ProgramArgs& args)
     args.add("radius", "Radius", m_radius, 1.0);
     args.add("mean_k", "Mean number of neighbors", m_meanK, 8);
     args.add("multiplier", "Standard deviation threshold", m_multiplier, 2.0);
-    args.add("class", "Class to use for noise points", m_class, ClassLabel::LowPoint);
+    args.add("class", "Class to use for noise points", m_class,
+             ClassLabel::LowPoint);
 }
 
 void OutlierFilter::addDimensions(PointLayoutPtr layout)
@@ -121,8 +119,10 @@ Indices OutlierFilter::processStatistical(PointViewPtr inView)
             double delta = std::sqrt(sqr_dists[j]) - distances[i];
             distances[i] += (delta / j);
         }
-        indices.clear(); indices.resize(count);
-        sqr_dists.clear(); sqr_dists.resize(count);
+        indices.clear();
+        indices.resize(count);
+        sqr_dists.clear();
+        sqr_dists.resize(count);
     }
 
     size_t n(0);

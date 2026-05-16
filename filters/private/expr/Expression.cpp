@@ -5,22 +5,22 @@ namespace pdal
 namespace expr
 {
 
-Node::Node(NodeType type) : m_type(type)
-{}
+Node::Node(NodeType type) : m_type(type) {}
 
-Node::~Node()
-{}
+Node::~Node() {}
 
 NodeType Node::type() const
-{ return m_type; }
-
+{
+    return m_type;
+}
 
 //
 // NotNode
 //
-NotNode::NotNode(NodeType type, NodePtr sub) :
-    LogicalNode(type), m_sub(std::move(sub))
-{}
+NotNode::NotNode(NodeType type, NodePtr sub)
+    : LogicalNode(type), m_sub(std::move(sub))
+{
+}
 
 std::string NotNode::print() const
 {
@@ -37,13 +37,13 @@ Result NotNode::eval(PointRef& p) const
     return !(m_sub->eval(p).m_bval);
 }
 
-
 //
 // UnMathNode
 //
-UnMathNode::UnMathNode(NodeType type, NodePtr sub) :
-    ValueNode(type), m_sub(std::move(sub))
-{}
+UnMathNode::UnMathNode(NodeType type, NodePtr sub)
+    : ValueNode(type), m_sub(std::move(sub))
+{
+}
 
 std::string UnMathNode::print() const
 {
@@ -60,13 +60,13 @@ Result UnMathNode::eval(PointRef& p) const
     return -(m_sub->eval(p).m_dval);
 }
 
-
 //
 // BinMathNode
 //
-BinMathNode::BinMathNode(NodeType type, NodePtr left, NodePtr right) :
-    ValueNode(type), m_left(std::move(left)), m_right(std::move(right))
-{}
+BinMathNode::BinMathNode(NodeType type, NodePtr left, NodePtr right)
+    : ValueNode(type), m_left(std::move(left)), m_right(std::move(right))
+{
+}
 
 std::string BinMathNode::print() const
 {
@@ -128,9 +128,10 @@ Result BinMathNode::eval(PointRef& p) const
 //
 // Bool node
 //
-BoolNode::BoolNode(NodeType type, NodePtr left, NodePtr right) :
-    LogicalNode(type), m_left(std::move(left)), m_right(std::move(right))
-{}
+BoolNode::BoolNode(NodeType type, NodePtr left, NodePtr right)
+    : LogicalNode(type), m_left(std::move(left)), m_right(std::move(right))
+{
+}
 
 std::string BoolNode::print() const
 {
@@ -178,9 +179,10 @@ Result BoolNode::eval(PointRef& p) const
 //
 // FuncNode
 //
-FuncNode::FuncNode(NodeType type, Func1 func, NodePtr sub) :
-    ValueNode(type), m_func(func), m_sub(std::move(sub))
-{}
+FuncNode::FuncNode(NodeType type, Func1 func, NodePtr sub)
+    : ValueNode(type), m_func(func), m_sub(std::move(sub))
+{
+}
 
 Utils::StatusWithReason FuncNode::prepare(PointLayoutPtr l)
 {
@@ -200,9 +202,10 @@ std::string FuncNode::print() const
 //
 // BoolFuncNode
 //
-BoolFuncNode::BoolFuncNode(NodeType type, BoolFunc1 func, NodePtr sub) :
-    LogicalNode(type), m_func(func), m_sub(std::move(sub))
-{}
+BoolFuncNode::BoolFuncNode(NodeType type, BoolFunc1 func, NodePtr sub)
+    : LogicalNode(type), m_func(func), m_sub(std::move(sub))
+{
+}
 
 Utils::StatusWithReason BoolFuncNode::prepare(PointLayoutPtr l)
 {
@@ -222,9 +225,10 @@ std::string BoolFuncNode::print() const
 //
 // CompareNode
 //
-CompareNode::CompareNode(NodeType type, NodePtr left, NodePtr right) :
-    LogicalNode(type), m_left(std::move(left)), m_right(std::move(right))
-{}
+CompareNode::CompareNode(NodeType type, NodePtr left, NodePtr right)
+    : LogicalNode(type), m_left(std::move(left)), m_right(std::move(right))
+{
+}
 
 Utils::StatusWithReason CompareNode::prepare(PointLayoutPtr l)
 {
@@ -292,8 +296,8 @@ Result CompareNode::eval(PointRef& p) const
 // ConstValueNode
 //
 ConstValueNode::ConstValueNode(double d) : ValueNode(NodeType::Value), m_val(d)
-{}
-
+{
+}
 
 std::string ConstValueNode::print() const
 {
@@ -318,10 +322,10 @@ double ConstValueNode::value() const
 //
 // ConstLogicalNode
 //
-ConstLogicalNode::ConstLogicalNode(bool b) :
-    LogicalNode(NodeType::Value), m_val(b)
-{}
-
+ConstLogicalNode::ConstLogicalNode(bool b)
+    : LogicalNode(NodeType::Value), m_val(b)
+{
+}
 
 std::string ConstLogicalNode::print() const
 {
@@ -346,9 +350,10 @@ bool ConstLogicalNode::value() const
 //
 // Var Node
 //
-VarNode::VarNode(const std::string& s) : ValueNode(NodeType::Identifier),
-    m_name(s), m_id(Dimension::Id::Unknown)
-{}
+VarNode::VarNode(const std::string& s)
+    : ValueNode(NodeType::Identifier), m_name(s), m_id(Dimension::Id::Unknown)
+{
+}
 
 std::string VarNode::print() const
 {
@@ -369,7 +374,7 @@ Utils::StatusWithReason VarNode::prepare(PointLayoutPtr l)
 {
     m_id = l->findDim(m_name);
     if (m_id == Dimension::Id::Unknown)
-        return { -1, "Unknown dimension '" + m_name + "' in assignment." };
+        return {-1, "Unknown dimension '" + m_name + "' in assignment."};
     return true;
 }
 
@@ -377,11 +382,9 @@ Utils::StatusWithReason VarNode::prepare(PointLayoutPtr l)
 // Expression
 //
 
-Expression::Expression()
-{}
+Expression::Expression() {}
 
-Expression::~Expression()
-{}
+Expression::~Expression() {}
 
 // This is a strange copy ctor that ignores the source.  At this point we
 // don't need it to do anything, but we do need the an expression to
@@ -397,9 +400,10 @@ Expression::Expression(const Expression& expr)
 // noexcept is important here. Without, vector won't call the move ctor when
 //   resizing. Instead, it will call the copy ctor, which is bad, since our
 //   copy ctor is busted.
-Expression::Expression(Expression&& expr) noexcept :
-    m_error(expr.m_error), m_nodes(std::move(expr.m_nodes))
-{}
+Expression::Expression(Expression&& expr) noexcept
+    : m_error(expr.m_error), m_nodes(std::move(expr.m_nodes))
+{
+}
 
 Expression& Expression::operator=(Expression&& expr)
 {
@@ -408,11 +412,10 @@ Expression& Expression::operator=(Expression&& expr)
     return *this;
 }
 
-// This is a strange assignment operator that ignores the source.  At this point we
-// don't need it to do anything, but we do need the an expression to
-// be assigned in order to be used by ProgramArgs.
-// In order to copy, we'd actually have to deep-copy the nodes, but there is
-// no way to do that right now.
+// This is a strange assignment operator that ignores the source.  At this point
+// we don't need it to do anything, but we do need the an expression to be
+// assigned in order to be used by ProgramArgs. In order to copy, we'd actually
+// have to deep-copy the nodes, but there is no way to do that right now.
 Expression& Expression::operator=(const Expression& expr)
 {
     if (m_nodes.size())
@@ -456,12 +459,12 @@ void Expression::pushNode(NodePtr node)
     m_nodes.push(std::move(node));
 }
 
-Node *Expression::topNode()
+Node* Expression::topNode()
 {
     return m_nodes.size() ? m_nodes.top().get() : nullptr;
 }
 
-const Node *Expression::topNode() const
+const Node* Expression::topNode() const
 {
     return m_nodes.size() ? m_nodes.top().get() : nullptr;
 }
@@ -481,4 +484,3 @@ std::ostream& operator<<(std::ostream& out, const Expression& expr)
 
 } // namespace expr
 } // namespace pdal
-

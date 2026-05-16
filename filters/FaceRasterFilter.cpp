@@ -34,19 +34,16 @@
 
 #include "FaceRasterFilter.hpp"
 
-#include <pdal/util/Utils.hpp>
 #include <pdal/private/MathUtils.hpp>
 #include <pdal/private/Raster.hpp>
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.faceraster",
-    "Face Raster Filter",
-    "https://pdal.org/stages/filters.faceraster.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.faceraster", "Face Raster Filter",
+    "https://pdal.org/stages/filters.faceraster.html"};
 
 CREATE_STATIC_STAGE(FaceRasterFilter, s_info)
 
@@ -55,30 +52,28 @@ std::string FaceRasterFilter::getName() const
     return s_info.name;
 }
 
+FaceRasterFilter::FaceRasterFilter() : m_limits(new RasterLimits) {}
 
-FaceRasterFilter::FaceRasterFilter() : m_limits(new RasterLimits)
-{}
-
-FaceRasterFilter::~FaceRasterFilter()
-{}
+FaceRasterFilter::~FaceRasterFilter() {}
 
 void FaceRasterFilter::addArgs(ProgramArgs& args)
 {
     m_limits->addArgs(args);
     args.add("mesh", "Mesh name", m_meshName);
-    args.add("nodata", "No data value", m_noData, std::numeric_limits<double>::quiet_NaN());
+    args.add("nodata", "No data value", m_noData,
+             std::numeric_limits<double>::quiet_NaN());
     args.add("max_triangle_edge_length", "Max triangle edge length",
-             m_maxTriangleEdgeLength,std::numeric_limits<double>::infinity());
+             m_maxTriangleEdgeLength, std::numeric_limits<double>::infinity());
 }
 
 void FaceRasterFilter::prepared(PointTableRef)
 {
     int cnt = m_limits->checkArgs();
     if (cnt != 0 && cnt != 4)
-        throwError("Must specify all or none of 'origin_x', 'origin_y', 'width' and 'height'.");
+        throwError("Must specify all or none of 'origin_x', 'origin_y', "
+                   "'width' and 'height'.");
     m_computeLimits = (cnt == 0);
 }
-
 
 void FaceRasterFilter::filter(PointView& v)
 {
@@ -92,14 +87,18 @@ void FaceRasterFilter::filter(PointView& v)
         v.calculateBounds(bounds);
         m_limits->xOrigin = bounds.minx - halfEdge;
         m_limits->yOrigin = bounds.miny - halfEdge;
-        m_limits->width = (int)(((bounds.maxx - m_limits->xOrigin) / m_limits->edgeLength) + 1);
-        m_limits->height = (int)(((bounds.maxy - m_limits->yOrigin) / m_limits->edgeLength) + 1);
+        m_limits->width =
+            (int)(((bounds.maxx - m_limits->xOrigin) / m_limits->edgeLength) +
+                  1);
+        m_limits->height =
+            (int)(((bounds.maxy - m_limits->yOrigin) / m_limits->edgeLength) +
+                  1);
     }
-    Rasterd *raster = v.createRaster("faceraster", *m_limits, m_noData);
+    Rasterd* raster = v.createRaster("faceraster", *m_limits, m_noData);
     if (!raster)
         throwError("Raster already exists");
 
-    TriangularMesh *m = v.mesh(m_meshName);
+    TriangularMesh* m = v.mesh(m_meshName);
     if (!m)
         throwError("Mesh '" + m_meshName + "' does not exist.");
 
@@ -131,12 +130,13 @@ void FaceRasterFilter::filter(PointView& v)
         double ymax = (std::max)((std::max)(y1, y2), y3);
         double ymin = (std::min)((std::min)(y1, y2), y3);
 
-        // Since we're checking cell centers, we add 1/2 the edge length to avoid testing cells
-        // where we know the limiting position can't intersect the cell center.  The
-        // subtraction of edgeBit for the lower bound is to allow for the case where the
-        // minimum position is exactly aligned with a cell center (we could simply start one cell
-        // lower and to the left, but this small adjustment eliminates that extra row/col in most
-        // cases).
+        // Since we're checking cell centers, we add 1/2 the edge length to
+        // avoid testing cells where we know the limiting position can't
+        // intersect the cell center.  The subtraction of edgeBit for the lower
+        // bound is to allow for the case where the minimum position is exactly
+        // aligned with a cell center (we could simply start one cell lower and
+        // to the left, but this small adjustment eliminates that extra row/col
+        // in most cases).
         bool okX, okY;
         int ax = raster->xCell(xmin + halfEdge - edgeBit, okX);
         int ay = raster->yCell(ymin + halfEdge - edgeBit, okY);
@@ -145,7 +145,8 @@ void FaceRasterFilter::filter(PointView& v)
         if (!okY)
             throwError("Y value out of range for raster.");
 
-        // edgeBit adjustment not necessary here since we're rounding up for exact values.
+        // edgeBit adjustment not necessary here since we're rounding up for
+        // exact values.
         int bx = raster->xCell(xmax + halfEdge, okX);
         int by = raster->yCell(ymax + halfEdge, okY);
         if (!okX)
@@ -173,8 +174,8 @@ void FaceRasterFilter::filter(PointView& v)
                 double x = raster->xCellPos(xi);
                 double y = raster->yCellPos(yi);
 
-                double val = math::barycentricInterpolation(x1, y1, z1,
-                    x2, y2, z2, x3, y3, z3, x, y);
+                double val = math::barycentricInterpolation(
+                    x1, y1, z1, x2, y2, z2, x3, y3, z3, x, y);
                 if (val != std::numeric_limits<double>::infinity())
                     raster->at(xi, yi) = val;
             }

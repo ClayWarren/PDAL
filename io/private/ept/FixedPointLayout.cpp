@@ -40,7 +40,7 @@ namespace pdal
 {
 
 bool FixedPointLayout::update(Dimension::Detail dimDetail,
-    const std::string& name)
+                              const std::string& name)
 {
     if (m_finalized)
         return m_propIds.count(name);
@@ -60,15 +60,16 @@ bool FixedPointLayout::update(Dimension::Detail dimDetail,
 }
 
 void FixedPointLayout::registerFixedDim(const Dimension::Id id,
-    const Dimension::Type type)
+                                        const Dimension::Type type)
 {
     Dimension::Detail dd = m_detail[Utils::toNative(id)];
     dd.setType(type);
     update(dd, Dimension::name(id));
 }
 
-Dimension::Id FixedPointLayout::registerOrAssignFixedDim(const std::string name,
-    const Dimension::Type type)
+Dimension::Id
+FixedPointLayout::registerOrAssignFixedDim(const std::string name,
+                                           const Dimension::Type type)
 {
     Dimension::Id id = Dimension::id(name);
     if (id != Dimension::Id::Unknown)
@@ -80,4 +81,3 @@ Dimension::Id FixedPointLayout::registerOrAssignFixedDim(const std::string name,
 }
 
 } // namespace pdal
-

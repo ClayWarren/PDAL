@@ -101,8 +101,8 @@ void Expression::build(LogicGate& gate, const NL::json& json)
         }
     }
 
-    if (outer) gate.push(std::move(outer));
+    if (outer)
+        gate.push(std::move(outer));
 }
 
 } // namespace pdal
-

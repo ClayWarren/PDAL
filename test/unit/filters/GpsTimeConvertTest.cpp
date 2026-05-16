@@ -34,8 +34,8 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/BufferReader.hpp>
 #include <filters/GpsTimeConvert.hpp>
+#include <io/BufferReader.hpp>
 
 namespace pdal
 {
@@ -62,7 +62,7 @@ TEST(gws2gtTest, HandlesWrappedWeekSeconds)
 
     Options options;
     options.add("in_time", "gws");
-    options.add("out_time","gt");
+    options.add("out_time", "gt");
     options.add("start_date", "2020-12-12");
     options.add("wrapped", true);
 
@@ -94,7 +94,7 @@ TEST(gds2gtTest, HandlesWrappedWeekSeconds)
 
     Options options;
     options.add("in_time", "gds");
-    options.add("out_time","gt");
+    options.add("out_time", "gt");
     options.add("start_date", "2020-12-12");
     options.add("wrapped", true);
 
@@ -237,7 +237,6 @@ TEST(gds2gstTest, HandlesWrappedDaySeconds)
     checkTime(outView, 0, 291852799.5);
     checkTime(outView, 1, 291852800.5);
 }
-
 
 TEST(gws2gstTest, HandlesUnwrappedWeekSeconds)
 {

@@ -333,7 +333,6 @@ TEST(FilterFactory, user_set_bit_width_reduction)
     }
 }
 
-
 #ifdef TILEDB_WEBP
 TEST(FilterFactory, user_set_webp)
 {

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2018, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2018, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "InfoFilter.hpp"
 
@@ -42,28 +42,27 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.info",
-    "Gather basic info about points.",
-    "https://pdal.org/stages/filters.info.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.info", "Gather basic info about points.",
+    "https://pdal.org/stages/filters.info.html"};
 
 CREATE_STATIC_STAGE(InfoFilter, s_info)
 
-std::string InfoFilter::getName() const { return s_info.name; }
+std::string InfoFilter::getName() const
+{
+    return s_info.name;
+}
 
 void InfoFilter::addArgs(ProgramArgs& args)
 {
     args.add("point,p", "Point to dump\n--point=\"1-5,10,100-200\" (0 indexed)",
-        m_pointSpec);
+             m_pointSpec);
     args.add("query",
-         "Return points in order of distance from the specified "
-         "location (2D or 3D)\n"
-         "--query Xcoord,Ycoord[,Zcoord][/count]",
-         m_querySpec);
+             "Return points in order of distance from the specified "
+             "location (2D or 3D)\n"
+             "--query Xcoord,Ycoord[,Zcoord][/count]",
+             m_querySpec);
 }
-
 
 void InfoFilter::parsePointSpec()
 {
@@ -76,14 +75,14 @@ void InfoFilter::parsePointSpec()
         return i;
     };
 
-    auto addRange = [this, &parseInt](const std::string& begin,
-        const std::string& end)
+    auto addRange =
+        [this, &parseInt](const std::string& begin, const std::string& end)
     {
         PointId low = parseInt(begin);
         PointId high = parseInt(end);
         if (low > high)
-            throwError("Invalid range in 'point' option: '" +
-            begin + "-" + end);
+            throwError("Invalid range in 'point' option: '" + begin + "-" +
+                       end);
         while (low <= high)
             m_idList.push_back(low++);
     };
@@ -103,7 +102,6 @@ void InfoFilter::parsePointSpec()
     }
 }
 
-
 void InfoFilter::parseQuerySpec()
 {
     // See if there's a provided point count.
@@ -115,16 +113,16 @@ void InfoFilter::parseQuerySpec()
     }
     else if (parts.size() != 1)
         throwError("Invalid point location specification. Sytax: "
-            "--query=\"X,Y[/count]\"");
+                   "--query=\"X,Y[/count]\"");
 
-    //ABELL - This doesn't match syntax below, but keeping because
-    // history.
+    // ABELL - This doesn't match syntax below, but keeping because
+    //  history.
     auto seps = [](char c) { return (c == ',' || c == '|' || c == ' '); };
 
     StringList tokens = Utils::split2(parts[0], seps);
     if (tokens.size() != 2 && tokens.size() != 3)
         throwError("Invalid point location specification. Sytax: "
-            "--query=\"X,Y[/count]\"");
+                   "--query=\"X,Y[/count]\"");
 
     bool ok = true;
     ok &= Utils::fromString(tokens[0], m_queryX);
@@ -133,9 +131,8 @@ void InfoFilter::parseQuerySpec()
         ok &= Utils::fromString(tokens[1], m_queryZ);
     if (!ok)
         throwError("Invalid point location specification. Sytax: "
-            "--query=\"X,Y[/count]\"");
+                   "--query=\"X,Y[/count]\"");
 }
-
 
 void InfoFilter::prepared(PointTableRef table)
 {
@@ -147,19 +144,16 @@ void InfoFilter::prepared(PointTableRef table)
         parseQuerySpec();
 }
 
-
 void InfoFilter::initialize(PointTableRef table)
 {
     getMetadata().add(table.layout()->toMetadata());
 }
-
 
 void InfoFilter::ready(PointTableRef)
 {
     m_count = 0;
     m_idCur = m_idList.begin();
 }
-
 
 void InfoFilter::filter(PointView& view)
 {
@@ -170,7 +164,6 @@ void InfoFilter::filter(PointView& view)
         processOne(point);
     }
 }
-
 
 bool InfoFilter::processOne(PointRef& point)
 {
@@ -214,20 +207,19 @@ bool InfoFilter::processOne(PointRef& point)
     return true;
 }
 
-
 void InfoFilter::done(PointTableRef table)
 {
     // Point list
     MetadataNode points("points");
-    for (NearPoint& np: m_results)
+    for (NearPoint& np : m_results)
     {
         MetadataNode node("point");
-        const char *buf = np.m_data.data();
+        const char* buf = np.m_data.data();
         Everything e;
         for (DimType& dt : m_dims)
         {
             size_t dimSize = Dimension::size(dt.m_type);
-            std::copy(buf, buf + dimSize, reinterpret_cast<char *>(&e));
+            std::copy(buf, buf + dimSize, reinterpret_cast<char*>(&e));
             double d = Utils::toDouble(e, dt.m_type);
             node.add(table.layout()->dimName(dt.m_id), d);
             buf += dimSize;

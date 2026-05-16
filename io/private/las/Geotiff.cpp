@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "Geotiff.hpp"
 
@@ -50,8 +50,14 @@ struct geotiff_dir_printer
 {
     geotiff_dir_printer() {}
 
-    std::string output() const { return m_oss.str(); }
-    std::string::size_type size() const { return m_oss.str().size(); }
+    std::string output() const
+    {
+        return m_oss.str();
+    }
+    std::string::size_type size() const
+    {
+        return m_oss.str().size();
+    }
 
     void operator()(char* data, void* /*aux*/)
     {
@@ -72,20 +78,21 @@ private:
 extern "C"
 {
 
-// These functions are available from GDAL, but they aren't provided in a header file.
-char PDAL_EXPORT * GTIFGetOGISDefn(GTIF*, GTIFDefn*);
-int PDAL_EXPORT GTIFSetFromOGISDefn(GTIF*, const char*);
+    // These functions are available from GDAL, but they aren't provided in a
+    // header file.
+    char PDAL_EXPORT* GTIFGetOGISDefn(GTIF*, GTIFDefn*);
+    int PDAL_EXPORT GTIFSetFromOGISDefn(GTIF*, const char*);
 #ifndef VSIFree
-void VSIFree(void *data);
+    void VSIFree(void* data);
 #endif
 
-int PDALGeoTIFFPrint(char* data, void* aux)
-{
-    pdal::las::geotiff_dir_printer* printer =
-        reinterpret_cast<pdal::las::geotiff_dir_printer*>(aux);
-    (*printer)(data, 0);
-    return static_cast<int>(printer->size());
-}
+    int PDALGeoTIFFPrint(char* data, void* aux)
+    {
+        pdal::las::geotiff_dir_printer* printer =
+            reinterpret_cast<pdal::las::geotiff_dir_printer*>(aux);
+        (*printer)(data, 0);
+        return static_cast<int>(printer->size());
+    }
 
 } // extern "C"
 
@@ -115,8 +122,8 @@ public:
         ST_Destroy(tiff);
     }
 
-    ST_TIFF *tiff;
-    GTIF *gtiff;
+    ST_TIFF* tiff;
+    GTIF* gtiff;
     TIFFMethod methods;
 };
 
@@ -126,9 +133,9 @@ static void PDALGTIFErrorFunction(GTIF* gt, int level, const char* msg, ...)
     (void)gt;
 
     va_start(list, msg);
-    if( level == LIBGEOTIFF_WARNING )
+    if (level == LIBGEOTIFF_WARNING)
         fprintf(stderr, "GEOTIFF Warning: ");
-    else if( level == LIBGEOTIFF_ERROR )
+    else if (level == LIBGEOTIFF_ERROR)
         fprintf(stderr, "GEOTIFF Error: ");
     vfprintf(stderr, msg, list);
     fprintf(stderr, "\n");
@@ -149,8 +156,9 @@ struct Entry
 #pragma pack(pop)
 
 GeotiffSrs::GeotiffSrs(const std::vector<char>& directoryRec,
-    const std::vector<char>& doublesRec,
-    const std::vector<char>& asciiRec, LogPtr log) : m_log(log)
+                       const std::vector<char>& doublesRec,
+                       const std::vector<char>& asciiRec, LogPtr log)
+    : m_log(log)
 {
     GeotiffCtx ctx;
 
@@ -169,45 +177,43 @@ GeotiffSrs::GeotiffSrs(const std::vector<char>& directoryRec,
     };
 #pragma pack(pop)
 
-    const ShortKeyHeader *header = (const ShortKeyHeader *)directoryRec.data();
+    const ShortKeyHeader* header = (const ShortKeyHeader*)directoryRec.data();
     size_t declaredSize = (header->numKeys + 1) * 4;
     if (directoryRec.size() < declaredSize)
         return;
 
-    validateDirectory((const Entry *)(header + 1), header->numKeys,
-        doublesRec.size() / sizeof(double), asciiRec.size());
+    validateDirectory((const Entry*)(header + 1), header->numKeys,
+                      doublesRec.size() / sizeof(double), asciiRec.size());
 
-    char *dirData = const_cast<char *>(directoryRec.data());
-    ST_SetKey(ctx.tiff, GeotiffDirectoryRecordId,
-        (1 + header->numKeys) * 4, STT_SHORT, (void *)dirData);
+    char* dirData = const_cast<char*>(directoryRec.data());
+    ST_SetKey(ctx.tiff, GeotiffDirectoryRecordId, (1 + header->numKeys) * 4,
+              STT_SHORT, (void*)dirData);
 
     if (doublesRec.size())
     {
-        char *doubleData = const_cast<char *>(doublesRec.data());
+        char* doubleData = const_cast<char*>(doublesRec.data());
         ST_SetKey(ctx.tiff, GeotiffDoublesRecordId,
-            doublesRec.size() / sizeof(double), STT_DOUBLE,
-            (void *)doubleData);
+                  doublesRec.size() / sizeof(double), STT_DOUBLE,
+                  (void*)doubleData);
     }
 
     if (asciiRec.size())
     {
-        char *asciiData = const_cast<char *>(asciiRec.data());
-        ST_SetKey(ctx.tiff, GeotiffAsciiRecordId,
-            asciiRec.size(), STT_ASCII, (void *)asciiData);
+        char* asciiData = const_cast<char*>(asciiRec.data());
+        ST_SetKey(ctx.tiff, GeotiffAsciiRecordId, asciiRec.size(), STT_ASCII,
+                  (void*)asciiData);
     }
 
-    ctx.gtiff = GTIFNewWithMethodsEx(ctx.tiff,
-                                     &ctx.methods,
-                                     PDALGTIFErrorFunction,
-                                     (void*) this);
+    ctx.gtiff = GTIFNewWithMethodsEx(ctx.tiff, &ctx.methods,
+                                     PDALGTIFErrorFunction, (void*)this);
     if (!ctx.gtiff)
         throw Geotiff::error("Couldn't create Geotiff tags from "
-            "Geotiff definition.");
+                             "Geotiff definition.");
 
     GTIFDefn sGTIFDefn;
     if (GTIFGetDefn(ctx.gtiff, &sGTIFDefn))
     {
-        char *wkt = GTIFGetOGISDefn(ctx.gtiff, &sGTIFDefn);
+        char* wkt = GTIFGetOGISDefn(ctx.gtiff, &sGTIFDefn);
         if (wkt)
         {
             m_srs.set(wkt);
@@ -221,33 +227,36 @@ GeotiffSrs::GeotiffSrs(const std::vector<char>& directoryRec,
     m_gtiff_print_string = geotiff_printer.output();
 }
 
-
-void GeotiffSrs::validateDirectory(const Entry *ent, size_t numEntries,
-    size_t numDoubles, size_t asciiSize)
+void GeotiffSrs::validateDirectory(const Entry* ent, size_t numEntries,
+                                   size_t numDoubles, size_t asciiSize)
 {
     for (size_t i = 0; i < numEntries; ++i)
     {
         if (ent->count == 0)
-            m_log->get(LogLevel::Warning) << "Geotiff directory contains " <<
-                "key " << ent->key << " with 0 count." << std::endl;
+            m_log->get(LogLevel::Warning)
+                << "Geotiff directory contains " << "key " << ent->key
+                << " with 0 count." << std::endl;
         if (ent->location == 0 && ent->count != 1)
-            m_log->get(LogLevel::Error) << "Geotiff directory contains key " <<
-                ent->key << " with short entry and more than one value." <<
-                std::endl;
+            m_log->get(LogLevel::Error)
+                << "Geotiff directory contains key " << ent->key
+                << " with short entry and more than one value." << std::endl;
         if (ent->location == GeotiffDirectoryRecordId)
             if (ent->offset + ent->count > numDoubles)
-                m_log->get(LogLevel::Error) << "Geotiff directory contains " <<
-                    "key " << ent->key << " with count/offset outside of valid "
-                    "range of doubles record." << std::endl;
+                m_log->get(LogLevel::Error)
+                    << "Geotiff directory contains " << "key " << ent->key
+                    << " with count/offset outside of valid "
+                       "range of doubles record."
+                    << std::endl;
         if (ent->location == GeotiffAsciiRecordId)
             if (ent->offset + ent->count > asciiSize)
-                m_log->get(LogLevel::Error) << "Geotiff directory contains " <<
-                    " key " << ent->key << " with count/offset outside of "
-                    "valid range of ascii record." << std::endl;
+                m_log->get(LogLevel::Error)
+                    << "Geotiff directory contains " << " key " << ent->key
+                    << " with count/offset outside of "
+                       "valid range of ascii record."
+                    << std::endl;
         ent++;
     }
 }
-
 
 GeotiffTags::GeotiffTags(const SpatialReference& srs)
 {
@@ -275,23 +284,23 @@ GeotiffTags::GeotiffTags(const SpatialReference& srs)
 
     int count;
     int st_type;
-    char *data;
-    if (ST_GetKey(ctx.tiff, GeotiffDirectoryRecordId,
-        &count, &st_type, (void **)&data))
+    char* data;
+    if (ST_GetKey(ctx.tiff, GeotiffDirectoryRecordId, &count, &st_type,
+                  (void**)&data))
     {
         size_t size = sizeFromType(st_type, count);
         m_directoryRec.resize(size);
         std::copy(data, data + size, m_directoryRec.begin());
     }
-    if (ST_GetKey(ctx.tiff, GeotiffDoublesRecordId,
-        &count, &st_type, (void **)&data))
+    if (ST_GetKey(ctx.tiff, GeotiffDoublesRecordId, &count, &st_type,
+                  (void**)&data))
     {
         size_t size = sizeFromType(st_type, count);
         m_doublesRec.resize(size);
         std::copy(data, data + size, m_doublesRec.begin());
     }
-    if (ST_GetKey(ctx.tiff, GeotiffAsciiRecordId,
-        &count, &st_type, (void **)&data))
+    if (ST_GetKey(ctx.tiff, GeotiffAsciiRecordId, &count, &st_type,
+                  (void**)&data))
     {
         size_t size = sizeFromType(st_type, count);
         m_asciiRec.resize(size);

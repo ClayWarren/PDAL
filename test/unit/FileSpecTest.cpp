@@ -1,9 +1,9 @@
 
 #include <pdal/pdal_test_main.hpp>
 
+#include <nlohmann/json.hpp>
 #include <pdal/FileSpec.hpp>
 #include <pdal/private/FileSpecHelper.hpp>
-#include <nlohmann/json.hpp>
 
 using namespace pdal;
 
@@ -19,8 +19,8 @@ TEST(FileSpecTest, create)
     // create from json
     NL::json json{};
     json["path"] = inFile;
-    json["headers"] = {{"some_header_key","some_header_val"}};
-    json["query"] = {{"some_query_key","some_query_val"}};
+    json["headers"] = {{"some_header_key", "some_header_val"}};
+    json["query"] = {{"some_query_key", "some_query_val"}};
 
     StringMap headersMap = json.at("headers").get<StringMap>();
     StringMap queryMap = json.at("query").get<StringMap>();
@@ -36,26 +36,29 @@ TEST(FileSpecTest, parse_errors)
 {
     NL::json json{};
     json["path"] = "foo.laz";
-    json["headers"] = {{"some_header_key","some_header_val"}};
-    json["query"] = {{"some_query_key","some_query_val"}};
+    json["headers"] = {{"some_header_key", "some_header_val"}};
+    json["query"] = {{"some_query_key", "some_query_val"}};
 
     FileSpec spec;
     NL::json testJson = json;
-    testJson["query"] = {"some_query_key","some_query_val"};
+    testJson["query"] = {"some_query_key", "some_query_val"};
     Utils::StatusWithReason status = FileSpecHelper::parse(spec, testJson);
-    EXPECT_EQ(status.what(), "'filename' sub-argument 'query' must be an object of string key-value pairs.");
+    EXPECT_EQ(status.what(), "'filename' sub-argument 'query' must be an "
+                             "object of string key-value pairs.");
 
     spec = FileSpec();
     testJson = json;
     testJson["path"] = {"foo.laz"};
     status = FileSpecHelper::parse(spec, testJson);
-    EXPECT_EQ(status.what(), "'filename' object 'path' member must be specified as a string.");
+    EXPECT_EQ(status.what(),
+              "'filename' object 'path' member must be specified as a string.");
 
     spec = FileSpec();
     testJson = json;
     testJson["foo"] = "test";
     status = FileSpecHelper::parse(spec, testJson);
-    EXPECT_EQ(status.what(), "Invalid item in filename object: {\"foo\":\"test\"}");
+    EXPECT_EQ(status.what(),
+              "Invalid item in filename object: {\"foo\":\"test\"}");
 
     spec = FileSpec();
     testJson = json;

@@ -42,8 +42,7 @@ namespace pdal
 class PDAL_EXPORT MortonOrderFilter : public pdal::Filter
 {
 public:
-    MortonOrderFilter()
-    {}
+    MortonOrderFilter() {}
     MortonOrderFilter& operator=(const MortonOrderFilter&) = delete;
     MortonOrderFilter(const MortonOrderFilter&) = delete;
 

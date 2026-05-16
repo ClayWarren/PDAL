@@ -38,8 +38,8 @@
 #include <io/BufferReader.hpp>
 #include <io/LasReader.hpp>
 #include <memory>
-#include <pdal/pdal_test_main.hpp>
 #include <pdal/StageFactory.hpp>
+#include <pdal/pdal_test_main.hpp>
 #include <pdal/private/MathUtils.hpp>
 
 namespace pdal
@@ -86,7 +86,7 @@ void checkPointsEqualReader(const PointViewSet& pointViewSet, double tolerance)
                     actual->getFieldAs<double>(Dimension::Id::Z, i), tolerance);
     }
 }
-}
+} // namespace
 
 TEST(IcpFilterTest, DefaultIdentity)
 {
@@ -173,7 +173,7 @@ TEST(IcpFilterTest, RecoverTranslationWithNoise)
     view2->setField(Id::Z, 1, 3);
     view2->setField(Id::Z, 2, 3);
     reader2.addView(view2);
-    
+
     auto filter = newFilter();
     Options icpOptions;
     icpOptions.add("max_dist", 5.0);
@@ -229,7 +229,7 @@ TEST(IcpFilterTest, RecoverTranslationWithNoise2)
     view2->setField(Id::Z, 1, 3);
     view2->setField(Id::Z, 2, 3);
     reader2.addView(view2);
-    
+
     auto filter = newFilter();
     filter->setInput(reader1);
     filter->setInput(reader2);
@@ -279,7 +279,7 @@ TEST(IcpFilterTest, RecoverTranslationWithGuess)
     view2->setField(Id::Z, 1, 3);
     view2->setField(Id::Z, 2, 3);
     reader2.addView(view2);
-    
+
     auto filter = newFilter();
     Options icpOptions;
     // Start with the actual transformation for the initial guess.
@@ -300,8 +300,9 @@ TEST(IcpFilterTest, RecoverTranslationWithGuess)
     EXPECT_NEAR(-3.0, transform(2, 3), tolerance);
 }
 
-//ABELL - This broke when an update happened to Eigen. Not sure why and not sure I want to
-// investigate since this seems a pointless test anyway.
+// ABELL - This broke when an update happened to Eigen. Not sure why and not
+// sure I want to
+//  investigate since this seems a pointless test anyway.
 /**
 TEST(IcpFilterTest, RecoverTranslationWithBadGuess)
 {
@@ -336,14 +337,13 @@ TEST(IcpFilterTest, RecoverTranslationWithBadGuess)
     view2->setField(Id::Z, 1, 3);
     view2->setField(Id::Z, 2, 3);
     reader2.addView(view2);
-    
+
     auto filter = newFilter();
     Options icpOptions;
 
     // Provide a bad initial guess for the tranformation.
-    icpOptions.add("init", "0.996 0 0.087 -50 0 1 0 100 0.996 0 0.087 -300 0 0 0 1");
-    filter->setInput(reader1);
-    filter->setInput(reader2);
+    icpOptions.add("init", "0.996 0 0.087 -50 0 1 0 100 0.996 0 0.087 -300 0 0 0
+1"); filter->setInput(reader1); filter->setInput(reader2);
     filter->setOptions(icpOptions);
 
     filter->prepare(table);
@@ -352,12 +352,12 @@ TEST(IcpFilterTest, RecoverTranslationWithBadGuess)
     MetadataNode root = filter->getMetadata();
     Eigen::MatrixXd transform =
         root.findChild("transform").value<Eigen::MatrixXd>();
-    //ABELL - Eigen 3.3.9 broke this. Not sure why. After some research, chambbj and I
+    //ABELL - Eigen 3.3.9 broke this. Not sure why. After some research, chambbj
+and I
     // decided to comment this out until people felt it was important.
     //
-    // No reason to check exact values, only that they are LT/GT the expected values.
-    EXPECT_GT(-1.0, transform(0, 3));
-    EXPECT_LT(-2.0, transform(1, 3));
+    // No reason to check exact values, only that they are LT/GT the expected
+values. EXPECT_GT(-1.0, transform(0, 3)); EXPECT_LT(-2.0, transform(1, 3));
     EXPECT_GT(-3.0, transform(2, 3));
 }
 **/
@@ -395,7 +395,7 @@ TEST(IcpFilterTest, RecoverTranslationWithMalformedGuess)
     view2->setField(Id::Z, 1, 3);
     view2->setField(Id::Z, 2, 3);
     reader2.addView(view2);
-    
+
     auto filter = newFilter();
     Options icpOptions;
     // Provide a malformed initial guess (too many entries).
@@ -413,7 +413,8 @@ TEST(IcpFilterTest, RecoverRotation)
     auto reader2 = newReader();
     TransformationFilter transformationFilter;
     Options transformationOptions;
-    transformationOptions.add("matrix", "0.996 0 0.087 0\n0 1 0 0\n-0.087 0 0.996 0\n0 0 0 1");
+    transformationOptions.add(
+        "matrix", "0.996 0 0.087 0\n0 1 0 0\n-0.087 0 0.996 0\n0 0 0 1");
     transformationFilter.setOptions(transformationOptions);
     transformationFilter.setInput(*reader2);
 
@@ -463,4 +464,4 @@ TEST(IcpFilterTest, ThreeInputs)
     PointViewSet pointViewSet = filter->execute(table);
     EXPECT_EQ(2ul, pointViewSet.size());
 }
-}
+} // namespace pdal

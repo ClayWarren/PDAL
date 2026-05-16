@@ -45,12 +45,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.elm",
-    "Marks low points as noise.",
-    "https://pdal.org/stages/filters.elm.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.elm", "Marks low points as noise.",
+    "https://pdal.org/stages/filters.elm.html"};
 
 CREATE_STATIC_STAGE(ELMFilter, s_info)
 
@@ -62,7 +59,8 @@ std::string ELMFilter::getName() const
 void ELMFilter::addArgs(ProgramArgs& args)
 {
     args.add("cell", "Cell size", m_cell, 10.0);
-    args.add("class", "Class to use for noise points", m_class, ClassLabel::LowPoint);
+    args.add("class", "Class to use for noise points", m_class,
+             ClassLabel::LowPoint);
     args.add("threshold", "Threshold value", m_threshold, 1.0);
 }
 

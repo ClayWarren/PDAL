@@ -1,48 +1,48 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
-#include <stdint.h>
 #include <cstdlib>
 #include <istream>
 #include <locale>
 #include <map>
+#include <regex>
 #include <stdexcept>
+#include <stdint.h>
 #include <string>
 #include <vector>
-#include <regex>
 
 #include <iostream>
 
@@ -71,15 +71,15 @@ typedef union
     uint64_t u64;
 } Everything;
 
-struct RegEx{
-    RegEx(): m_str()
-    {}
+struct RegEx
+{
+    RegEx() : m_str() {}
 
-    RegEx(std::string expr): m_str(expr)
-    {}
+    RegEx(std::string expr) : m_str(expr) {}
 
     std::string m_str;
-    bool valid() {
+    bool valid()
+    {
         if (!m_str.empty())
         {
             return true;
@@ -87,9 +87,15 @@ struct RegEx{
         return false;
     }
 
-    std::regex regex() { return std::regex(m_str); }
+    std::regex regex()
+    {
+        return std::regex(m_str);
+    }
 
-    std::string str() { return m_str; }
+    std::string str()
+    {
+        return m_str;
+    }
 
     friend std::ostream& operator<<(std::ostream& out, const RegEx& regex);
 
@@ -137,11 +143,9 @@ struct XForm
 {
     struct XFormComponent
     {
-        XFormComponent() : m_val(0.0), m_auto(false)
-        {}
+        XFormComponent() : m_val(0.0), m_auto(false) {}
 
-        XFormComponent(double val) : m_val(val), m_auto(false)
-        {}
+        XFormComponent(double val) : m_val(val), m_auto(false) {}
 
         double m_val;
         bool m_auto;
@@ -172,14 +176,12 @@ struct XForm
 
         friend std::istream& operator>>(std::istream& in, XFormComponent& xfc);
         friend std::ostream& operator<<(std::ostream& in,
-            const XFormComponent& xfc);
+                                        const XFormComponent& xfc);
     };
 
-    XForm() : m_scale(1.0), m_offset(0.0)
-    {}
+    XForm() : m_scale(1.0), m_offset(0.0) {}
 
-    XForm(double scale, double offset) : m_scale(scale), m_offset(offset)
-    {}
+    XForm(double scale, double offset) : m_scale(scale), m_offset(offset) {}
 
     // Scale component of the transform.
     XFormComponent m_scale;
@@ -187,15 +189,19 @@ struct XForm
     XFormComponent m_offset;
 
     double toScaled(double val) const
-        { return (val - m_offset.m_val) / m_scale.m_val; }
+    {
+        return (val - m_offset.m_val) / m_scale.m_val;
+    }
 
     double fromScaled(double val) const
-        { return (val * m_scale.m_val) + m_offset.m_val; }
+    {
+        return (val * m_scale.m_val) + m_offset.m_val;
+    }
 
     bool nonstandard() const
     {
-        return m_scale.m_auto || m_offset.m_auto ||
-            m_scale.m_val != 1.0 || m_offset.m_val != 0.0;
+        return m_scale.m_auto || m_offset.m_auto || m_scale.m_val != 1.0 ||
+               m_offset.m_val != 0.0;
     }
 };
 
@@ -210,7 +216,7 @@ inline std::istream& operator>>(std::istream& in, XForm::XFormComponent& xfc)
 }
 
 inline std::ostream& operator<<(std::ostream& out,
-    const XForm::XFormComponent& xfc)
+                                const XForm::XFormComponent& xfc)
 {
     if (xfc.m_auto)
         out << "auto";
@@ -235,37 +241,37 @@ enum class LogLevel
 
 namespace ClassLabel
 {
-    const uint8_t CreatedNeverClassified = 0;
-    const uint8_t Unclassified = 1;
-    const uint8_t Ground = 2;
-    const uint8_t LowVegetation = 3;
-    const uint8_t MediumVegetation = 4;
-    const uint8_t HighVegetation = 5;
-    const uint8_t Building = 6;
-    const uint8_t LowPoint = 7;
-    const uint8_t ModelKeypoint = 8;
-    const uint8_t Water = 9;
-    const uint8_t Rail = 10;
-    const uint8_t RoadSurface = 11;
-    // The value 12 is now reserved in favor of a dedicated Overlap flag, but
-    // may still be found in legacy PDRFs.
-    const uint8_t LegacyOverlap = 12;
-    const uint8_t WireGuard = 13;
-    const uint8_t WireConductor = 14;
-    const uint8_t TransmissionTower = 15;
-    const uint8_t WireStructureConnector = 16;
-    const uint8_t BridgeDeck = 17;
-    const uint8_t HighNoise = 18;
-    const uint8_t OverheadStructure = 19;
-    const uint8_t IgnoredGround = 20;
-    const uint8_t Snow = 21;
-    const uint8_t TemporalExclusion = 22;
-}
+const uint8_t CreatedNeverClassified = 0;
+const uint8_t Unclassified = 1;
+const uint8_t Ground = 2;
+const uint8_t LowVegetation = 3;
+const uint8_t MediumVegetation = 4;
+const uint8_t HighVegetation = 5;
+const uint8_t Building = 6;
+const uint8_t LowPoint = 7;
+const uint8_t ModelKeypoint = 8;
+const uint8_t Water = 9;
+const uint8_t Rail = 10;
+const uint8_t RoadSurface = 11;
+// The value 12 is now reserved in favor of a dedicated Overlap flag, but
+// may still be found in legacy PDRFs.
+const uint8_t LegacyOverlap = 12;
+const uint8_t WireGuard = 13;
+const uint8_t WireConductor = 14;
+const uint8_t TransmissionTower = 15;
+const uint8_t WireStructureConnector = 16;
+const uint8_t BridgeDeck = 17;
+const uint8_t HighNoise = 18;
+const uint8_t OverheadStructure = 19;
+const uint8_t IgnoredGround = 20;
+const uint8_t Snow = 21;
+const uint8_t TemporalExclusion = 22;
+} // namespace ClassLabel
 
 namespace
 {
-    const StringList logNames { "error", "warning", "info", "debug", "debug1",
-        "debug2", "debug3", "debug4", "debug5" };
+const StringList logNames{"error",  "warning", "info",   "debug", "debug1",
+                          "debug2", "debug3",  "debug4", "debug5"};
 }
 
 inline std::istream& operator>>(std::istream& in, LogLevel& level)
@@ -302,12 +308,11 @@ inline std::ostream& operator<<(std::ostream& out, const LogLevel& level)
     if ((size_t)level < logNames.size())
     {
         sval = logNames[(size_t)level];
-        sval[0] = (char)toupper(sval[0]);   // Make "Debug", "Error", etc.
+        sval[0] = (char)toupper(sval[0]); // Make "Debug", "Error", etc.
     }
     out << sval;
     return out;
 }
-
 
 enum class Orientation
 {
@@ -318,8 +323,7 @@ enum class Orientation
 class PDAL_EXPORT_UNIX pdal_error : public std::runtime_error
 {
 public:
-    inline pdal_error(std::string const& msg) : std::runtime_error(msg)
-        {}
+    inline pdal_error(std::string const& msg) : std::runtime_error(msg) {}
 };
 
 enum class ExecMode
@@ -331,4 +335,3 @@ enum class ExecMode
 };
 
 } // namespace pdal
-

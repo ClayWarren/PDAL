@@ -36,15 +36,14 @@
 
 #include <io/BufferReader.hpp>
 #include <io/GltfWriter.hpp>
+#include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/OStream.hpp>
-#include <pdal/StageFactory.hpp>
 
 #include "Support.hpp"
 
 namespace pdal
 {
-
 
 void testWrite(bool writeNormals, bool writeColors, std::string path)
 {
@@ -54,13 +53,15 @@ void testWrite(bool writeNormals, bool writeColors, std::string path)
     t.layout()->registerDim(Dimension::Id::Y);
     t.layout()->registerDim(Dimension::Id::Z);
 
-    if (writeNormals) {
+    if (writeNormals)
+    {
         t.layout()->registerDim(Dimension::Id::NormalX);
         t.layout()->registerDim(Dimension::Id::NormalY);
         t.layout()->registerDim(Dimension::Id::NormalZ);
     }
 
-    if (writeColors) {
+    if (writeColors)
+    {
         t.layout()->registerDim(Dimension::Id::Red);
         t.layout()->registerDim(Dimension::Id::Blue);
         t.layout()->registerDim(Dimension::Id::Green);
@@ -82,7 +83,6 @@ void testWrite(bool writeNormals, bool writeColors, std::string path)
     v->setField(Dimension::Id::X, 3, 2);
     v->setField(Dimension::Id::Y, 3, 2);
     v->setField(Dimension::Id::Z, 3, 2);
-
 
     if (writeNormals)
     {
@@ -130,7 +130,7 @@ void testWrite(bool writeNormals, bool writeColors, std::string path)
     r.addView(v);
 
     StageFactory factory;
-    Stage *writer = factory.createStage("writers.gltf");
+    Stage* writer = factory.createStage("writers.gltf");
 
     Options writerOptions;
     writerOptions.add("filename", path);
@@ -142,14 +142,12 @@ void testWrite(bool writeNormals, bool writeColors, std::string path)
     writer->execute(t);
 }
 
-
 TEST(GltfWriter, Write)
 {
     std::string path = Support::temppath("out.glb");
     testWrite(false, false, path);
     ASSERT_EQ(FileUtils::fileSize(path), 5100);
 }
-
 
 TEST(GltfWriter, WriteWithNormals)
 {
@@ -158,14 +156,12 @@ TEST(GltfWriter, WriteWithNormals)
     ASSERT_EQ(FileUtils::fileSize(path), 5148);
 }
 
-
 TEST(GltfWriter, WriteWithColors)
 {
     std::string path = Support::temppath("out_colors.glb");
     testWrite(false, true, path);
     ASSERT_EQ(FileUtils::fileSize(path), 5148);
 }
-
 
 TEST(GltfWriter, WriteWithNormalsAndColors)
 {

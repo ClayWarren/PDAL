@@ -1,43 +1,43 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <math.h>
 #include <memory>
-#include <string>
-#include <vector>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <pdal/pdal_internal.hpp>
 #include <pdal/private/Raster.hpp>
@@ -70,14 +70,15 @@ public:
 
     struct error : public std::runtime_error
     {
-        error(const std::string& err) : std::runtime_error(err)
-        {}
+        error(const std::string& err) : std::runtime_error(err) {}
     };
 
     // Exported for testing.
-    PDAL_EXPORT GDALGrid(double xOrigin, double yOrigin, size_t width, size_t height,
-        double edgeLength, double radius, int outputTypes, size_t windowSize,
-        double power, bool binMode=false, std::vector<int> percentileValues={});
+    PDAL_EXPORT GDALGrid(double xOrigin, double yOrigin, size_t width,
+                         size_t height, double edgeLength, double radius,
+                         int outputTypes, size_t windowSize, double power,
+                         bool binMode = false,
+                         std::vector<int> percentileValues = {});
 
     void expandToInclude(double x, double y);
 
@@ -85,10 +86,10 @@ public:
     int numBands() const;
 
     // Return a pointer to the data in a raster band, row-major ordered.
-    double *data(const std::string& name);
+    double* data(const std::string& name);
 
     // Return a pointer to the data in a percentile raster band, if it exists.
-    double *pctlData(int pct) const;
+    double* pctlData(int pct) const;
 
     // Add a point to the bins being used to calculate percentiles.
     void accumulateValue(double x, double y, double z);
@@ -99,14 +100,15 @@ public:
     // Compute final values after all points have been added.
     void finalize();
 
-    bool usesPctls() const 
-        { return !m_pctls.empty(); }
+    bool usesPctls() const
+    {
+        return !m_pctls.empty();
+    }
 
     int width() const;
     int height() const;
     double xOrigin() const;
     double yOrigin() const;
-
 
 private:
     int m_windowSize;
@@ -132,11 +134,15 @@ private:
 
     // Determine if a cell i, j has no associated points.
     bool empty(size_t i, size_t j) const
-        { return m_count->at(i, j) <= 0; }
+    {
+        return m_count->at(i, j) <= 0;
+    }
 
     // Determine if a cell with index \c idx has no associated points.
     bool empty(size_t idx) const
-        { return (m_count->at(idx) <= 0); }
+    {
+        return (m_count->at(idx) <= 0);
+    }
 
     // Determine the distance from the center of cell at coordinate i, j to
     // a point at absolute coordinate x, y.
@@ -169,10 +175,10 @@ private:
 
     // Cumulate data from a source cell to a destination cell when doing
     // a window fill.
-    void windowFillCell(int srcI, int srcJ, int dstI, int dstJ, double distance);
-
+    void windowFillCell(int srcI, int srcJ, int dstI, int dstJ,
+                        double distance);
 
     void fillPercentiles(const size_t& idx, std::vector<double>& values);
 };
 
-} //namespace pdal
+} // namespace pdal

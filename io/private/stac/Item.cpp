@@ -47,26 +47,24 @@ namespace stac
 
 using namespace StacUtils;
 
-Item::Item(const NL::json& json,
-        const std::string& itemPath,
-        const connector::Connector& connector,
-        bool validate):
-    m_json(json), m_path(itemPath), m_connector(connector),
-    m_validate(validate)
-{}
+Item::Item(const NL::json& json, const std::string& itemPath,
+           const connector::Connector& connector, bool validate)
+    : m_json(json), m_path(itemPath), m_connector(connector),
+      m_validate(validate)
+{
+}
 
+Item::~Item() {}
 
-Item::~Item()
-{}
-
-Item::Item(const Item& item):
-    m_json(item.m_json), m_path(item.m_path), m_connector(item.m_connector),
-    m_driver(item.m_driver), m_schemaUrls(item.m_schemaUrls),
-    m_readerOptions(item.m_readerOptions)
-{}
+Item::Item(const Item& item)
+    : m_json(item.m_json), m_path(item.m_path), m_connector(item.m_connector),
+      m_driver(item.m_driver), m_schemaUrls(item.m_schemaUrls),
+      m_readerOptions(item.m_readerOptions)
+{
+}
 
 bool Item::init(const Filters& filters, NL::json rawReaderArgs,
-        SchemaUrls schemaUrls)
+                SchemaUrls schemaUrls)
 {
 
     if (!filter(filters))
@@ -77,7 +75,8 @@ bool Item::init(const Filters& filters, NL::json rawReaderArgs,
         validate();
 
     NL::json readerArgs = Utils::handleReaderArgs(rawReaderArgs);
-    m_readerOptions = Utils::setReaderOptions(readerArgs, m_driver, m_assetPath);
+    m_readerOptions =
+        Utils::setReaderOptions(readerArgs, m_driver, m_assetPath);
     return true;
 }
 
@@ -105,13 +104,10 @@ std::string Item::extractDriverFromItem(const NL::json& asset) const
 {
     std::string output;
 
-    std::map<std::string, std::string> contentTypes =
-    {
-        { "application/vnd.laszip+copc", "readers.copc"}
-    };
+    std::map<std::string, std::string> contentTypes = {
+        {"application/vnd.laszip+copc", "readers.copc"}};
 
-    std::string assetPath = stacValue<std::string>(
-        asset, "href", m_json);
+    std::string assetPath = stacValue<std::string>(asset, "href", m_json);
     std::string dataUrl = handleRelativePath(m_path, assetPath);
 
     std::string contentType;
@@ -119,7 +115,7 @@ std::string Item::extractDriverFromItem(const NL::json& asset) const
     if (asset.contains("type"))
     {
         contentType = stacValue<std::string>(asset, "type", m_json);
-        for(const auto& ct: contentTypes)
+        for (const auto& ct : contentTypes)
             if (Utils::iequals(ct.first, contentType))
                 return ct.second;
     }
@@ -139,15 +135,15 @@ std::string Item::extractDriverFromItem(const NL::json& asset) const
             if (headers.find("Content-Type") != headers.end())
             {
                 contentType = headers["Content-Type"];
-                for(const auto& ct: contentTypes)
+                for (const auto& ct : contentTypes)
                     if (Utils::iequals(ct.first, contentType))
                         return ct.second;
             }
         }
-        catch(std::exception& e)
+        catch (std::exception& e)
         {
-            throw stac_error(m_id, "item", "Failed to HEAD " + dataUrl +
-                ". " + e.what());
+            throw stac_error(m_id, "item",
+                             "Failed to HEAD " + dataUrl + ". " + e.what());
         }
     }
 
@@ -158,44 +154,43 @@ void Item::validate()
 {
 
     nlohmann::json_schema::json_validator val(
-        [this](const nlohmann::json_uri& json_uri, nlohmann::json& json) {
-            json = m_connector.getJson(json_uri.url());
-        },
-        [](const std::string &, const std::string &) {}
-    );
+        [this](const nlohmann::json_uri& json_uri, nlohmann::json& json)
+        { json = m_connector.getJson(json_uri.url()); },
+        [](const std::string&, const std::string&) {});
 
     // Validate against base Item schema first
     NL::json schemaJson = m_connector.getJson(m_schemaUrls.item);
     val.set_root_schema(schemaJson);
-    try {
+    try
+    {
         val.validate(m_json);
     }
-    catch (std::exception &e)
+    catch (std::exception& e)
     {
         throw stac_error(m_id, "item",
-            "STAC schema validation Error in root schema: " +
-            m_schemaUrls.item + ". \n\n" + e.what());
+                         "STAC schema validation Error in root schema: " +
+                             m_schemaUrls.item + ". \n\n" + e.what());
     }
 
     // Validate against stac extensions if present
     if (m_json.contains("stac_extensions"))
     {
         NL::json extensions = stacValue(m_json, "stac_extensions");
-        for (auto& extSchemaUrl: extensions)
+        for (auto& extSchemaUrl : extensions)
         {
             std::string url = stacValue<std::string>(extSchemaUrl, "", m_json);
 
-            try {
+            try
+            {
                 NL::json schemaJson = m_connector.getJson(url);
                 val.set_root_schema(schemaJson);
                 val.validate(m_json);
             }
-            catch (std::exception& e) {
-                std::string msg  =
-                    "STAC Validation Error in extension: " + url +
-                    ". Errors found: \n" + e.what();
+            catch (std::exception& e)
+            {
+                std::string msg = "STAC Validation Error in extension: " + url +
+                                  ". Errors found: \n" + e.what();
                 throw stac_error(m_id, "item", msg);
-
             }
         }
     }
@@ -210,55 +205,53 @@ void validateForFilter(NL::json json)
 }
 
 bool matchProperty(std::string key, NL::json val, NL::json properties,
-    NL::detail::value_t type)
+                   NL::detail::value_t type)
 {
     switch (type)
     {
-        case NL::detail::value_t::string:
-        {
-            std::string desired = Utils::jsonValue<std::string>(val);
-            std::string value = Utils::jsonValue<std::string>(properties, key);
-            return value == desired;
-            break;
-        }
-        case NL::detail::value_t::number_unsigned:
-        {
-            uint64_t value = Utils::jsonValue<uint64_t>(properties, key);
-            uint64_t desired = Utils::jsonValue<uint64_t>(val);
-            return value == desired;
-            break;
-        }
-        case NL::detail::value_t::number_integer:
-        {
-            int value = Utils::jsonValue<int>(properties,key);
-            int desired = Utils::jsonValue<int>(val);
-            return value == desired;
-            break;
-        }
-        case NL::detail::value_t::number_float:
-        {
-            double value = Utils::jsonValue<double>(properties, key);
-            double desired = Utils::jsonValue<double>(val);
-            return value == desired;
-            break;
-        }
-        case NL::detail::value_t::boolean:
-        {
-            bool value = Utils::jsonValue<bool>(properties, key);
-            bool desired = Utils::jsonValue<bool>(val);
-            return value == desired;
-            break;
-        }
-        default:
-        {
-            throw pdal_error("Data type of " + key +
-                " is not supported for filtering.");
-        }
+    case NL::detail::value_t::string:
+    {
+        std::string desired = Utils::jsonValue<std::string>(val);
+        std::string value = Utils::jsonValue<std::string>(properties, key);
+        return value == desired;
+        break;
+    }
+    case NL::detail::value_t::number_unsigned:
+    {
+        uint64_t value = Utils::jsonValue<uint64_t>(properties, key);
+        uint64_t desired = Utils::jsonValue<uint64_t>(val);
+        return value == desired;
+        break;
+    }
+    case NL::detail::value_t::number_integer:
+    {
+        int value = Utils::jsonValue<int>(properties, key);
+        int desired = Utils::jsonValue<int>(val);
+        return value == desired;
+        break;
+    }
+    case NL::detail::value_t::number_float:
+    {
+        double value = Utils::jsonValue<double>(properties, key);
+        double desired = Utils::jsonValue<double>(val);
+        return value == desired;
+        break;
+    }
+    case NL::detail::value_t::boolean:
+    {
+        bool value = Utils::jsonValue<bool>(properties, key);
+        bool desired = Utils::jsonValue<bool>(val);
+        return value == desired;
+        break;
+    }
+    default:
+    {
+        throw pdal_error("Data type of " + key +
+                         " is not supported for filtering.");
+    }
     }
     return true;
 }
-
-
 
 bool Item::filter(const Filters& filters)
 {
@@ -283,10 +276,8 @@ bool Item::filter(const Filters& filters)
     if (!filterBounds(filters.bounds))
         return false;
 
-
     return true;
 }
-
 
 SpatialReference extractSRS(NL::json& props)
 {
@@ -301,15 +292,18 @@ SpatialReference extractSRS(NL::json& props)
     {
         NL::json projjson = Utils::jsonValue(props, "proj:projjson");
         srs.set(projjson.dump());
-    } else if (haveWKT2)
+    }
+    else if (haveWKT2)
     {
         std::string wkt = Utils::jsonValue(props, "proj:wkt2");
         srs.set(wkt);
-    } else if (haveEPSG)
+    }
+    else if (haveEPSG)
     {
         int projepsg = Utils::jsonValue(props, "proj:epsg");
         srs.set("EPSG:" + std::to_string(projepsg));
-    } else if (haveWKT)
+    }
+    else if (haveWKT)
     {
         std::string wkt = Utils::jsonValue(props, "proj:wkt");
         srs.set(wkt);
@@ -327,18 +321,18 @@ bool Item::filterBounds(Polygon bounds)
     if (!bounds.area())
         return true;
 
-    //If stac item has null geometry and bounds have been included
-    //for filtering, then the Item will be excluded.
+    // If stac item has null geometry and bounds have been included
+    // for filtering, then the Item will be excluded.
     NL::json geometry = stacValue(m_json, "geometry");
     if (geometry.type() == NL::detail::value_t::null)
         return false;
 
-    //STAC's base geometries will always be represented in 4326.
+    // STAC's base geometries will always be represented in 4326.
     const SpatialReference stacSrs("EPSG:4326");
     Polygon stacPolygon(geometry.dump(), stacSrs);
     if (!stacPolygon.valid())
         throw stac_error(m_id, "item",
-            "Polygon created from STAC 'geometry' key is invalid");
+                         "Polygon created from STAC 'geometry' key is invalid");
 
     // If the user didn't provide an SRS via option, we can only filter
     // assuming it is 4326.
@@ -362,7 +356,6 @@ bool Item::filterBounds(Polygon bounds)
         return true;
 
     return false;
-
 }
 
 bool Item::filterProperties(const NL::json& filterProps)
@@ -370,7 +363,7 @@ bool Item::filterProperties(const NL::json& filterProps)
     NL::json itemProperties = stacValue(m_json, "properties");
     if (!filterProps.empty())
     {
-        for (auto &it: filterProps.items())
+        for (auto& it : filterProps.items())
         {
             std::string key = it.key();
             NL::json stacVal = stacValue(itemProperties, key, m_json);
@@ -379,17 +372,16 @@ bool Item::filterProperties(const NL::json& filterProps)
             NL::json filterVal = it.value();
             NL::detail::value_t filterType = filterVal.type();
 
-            //Array of possibilities are Or'd together
+            // Array of possibilities are Or'd together
             if (filterType == NL::detail::value_t::array)
             {
-                bool arrFlag (true);
-                for (auto& val: filterVal)
+                bool arrFlag(true);
+                for (auto& val : filterVal)
                     if (matchProperty(key, val, itemProperties, stacType))
                         return true;
             }
-            else
-                if (matchProperty(key, filterVal, itemProperties, stacType))
-                    return true;
+            else if (matchProperty(key, filterVal, itemProperties, stacType))
+                return true;
         }
 
         return false;
@@ -409,13 +401,12 @@ bool Item::filterDates(DatePairs dates)
         if (properties.contains("datetime") &&
             properties.at("datetime").type() != NL::detail::value_t::null)
         {
-            std::string stacDateStr = stacValue(properties,
-                "datetime", m_json);
+            std::string stacDateStr = stacValue(properties, "datetime", m_json);
 
             try
             {
                 std::time_t stacTime = getStacTime(stacDateStr);
-                for (const auto& range: dates)
+                for (const auto& range : dates)
                     if (stacTime >= range.first && stacTime <= range.second)
                         return true;
             }
@@ -427,45 +418,46 @@ bool Item::filterDates(DatePairs dates)
             return false;
         }
         else if (properties.contains("start_datetime") &&
-            properties.contains("end_datetime"))
+                 properties.contains("end_datetime"))
         {
-                // Handle if STAC object has start and end datetimes instead of one
-                std::string endDateStr = stacValue(properties,
-                    "end_datetime", m_json);
-                std::string startDateStr = stacValue(properties,
-                    "end_datetime", m_json);
+            // Handle if STAC object has start and end datetimes instead of one
+            std::string endDateStr =
+                stacValue(properties, "end_datetime", m_json);
+            std::string startDateStr =
+                stacValue(properties, "end_datetime", m_json);
 
-                std::time_t stacEndTime = getStacTime(endDateStr);
-                std::time_t stacStartTime = getStacTime(startDateStr);
+            std::time_t stacEndTime = getStacTime(endDateStr);
+            std::time_t stacStartTime = getStacTime(startDateStr);
 
-                for (const auto& range: dates)
-                {
-                    // If any of the date ranges overlap with the date range of the STAC
-                    // object, do not prune.
-                    std::time_t userMinTime = range.first;
-                    std::time_t userMaxTime = range.second;
+            for (const auto& range : dates)
+            {
+                // If any of the date ranges overlap with the date range of the
+                // STAC object, do not prune.
+                std::time_t userMinTime = range.first;
+                std::time_t userMaxTime = range.second;
 
-                    if (userMinTime >= stacStartTime && userMinTime <= stacEndTime)
-                        return true;
-                    else if (userMaxTime >= stacStartTime && userMaxTime <= stacEndTime)
-                        return true;
-                    else if (userMinTime <= stacStartTime && userMaxTime >= stacEndTime)
-                        return true;
-                }
-                return false;
+                if (userMinTime >= stacStartTime && userMinTime <= stacEndTime)
+                    return true;
+                else if (userMaxTime >= stacStartTime &&
+                         userMaxTime <= stacEndTime)
+                    return true;
+                else if (userMinTime <= stacStartTime &&
+                         userMaxTime >= stacEndTime)
+                    return true;
+            }
+            return false;
         }
         else
             throw stac_error(m_id, "item", "Unexpected layout of STAC dates");
     }
     return true;
-
 }
 
 bool Item::filterAssets(std::vector<std::string> assetNames)
 {
     NL::json asset;
     NL::json assetList = stacValue(m_json, "assets");
-    for (auto& name: assetNames)
+    for (auto& name : assetNames)
     {
         if (assetList.contains(name))
         {
@@ -485,7 +477,7 @@ bool Item::filterIds(std::vector<RegEx> ids)
 {
     if (!ids.empty())
     {
-        for (auto& id: ids)
+        for (auto& id : ids)
             if (std::regex_match(m_id, id.regex()))
                 return true;
         return false;
@@ -500,18 +492,16 @@ bool Item::filterCol(std::vector<RegEx> ids)
         if (!m_json.contains("collection"))
             return false;
 
-        std::string colId = stacValue<std::string>(
-            m_json, "collection");
-        for (auto& id: ids)
+        std::string colId = stacValue<std::string>(m_json, "collection");
+        for (auto& id : ids)
             if (std::regex_match(colId, id.regex()))
                 return true;
 
         return false;
     }
     return true;
-
 }
 
-} //namespace stac
+} // namespace stac
 
-} //namespace pdal
+} // namespace pdal

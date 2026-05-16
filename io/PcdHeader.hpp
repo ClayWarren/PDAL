@@ -119,4 +119,3 @@ std::ostream& operator<<(std::ostream& out, PcdHeader& header);
 OLeStream& operator<<(OLeStream& out, PcdHeader& header);
 
 } // namespace pdal
-

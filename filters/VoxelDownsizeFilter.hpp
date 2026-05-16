@@ -53,6 +53,7 @@ class PDAL_EXPORT VoxelDownsizeFilter : public Filter, public Streamable
         First,
         Center
     };
+
 public:
     VoxelDownsizeFilter();
     VoxelDownsizeFilter& operator=(const VoxelDownsizeFilter&) = delete;
@@ -76,9 +77,9 @@ private:
     Mode m_mode;
 
     friend std::istream& operator>>(std::istream& in,
-        VoxelDownsizeFilter::Mode&);
+                                    VoxelDownsizeFilter::Mode&);
     friend std::ostream& operator<<(std::ostream& out,
-        const VoxelDownsizeFilter::Mode&);    
+                                    const VoxelDownsizeFilter::Mode&);
 };
 
 } // namespace pdal

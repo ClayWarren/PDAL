@@ -64,8 +64,8 @@ PDAL_EXPORT std::vector<std::string> supportedE57Types();
 /// true otherwise returns false. if not found, minmax will be a pair of
 /// {0.0, 0.0} (double values).
 PDAL_EXPORT bool getLimits(const e57::StructureNode& prototype,
-                        const std::string& fieldName,
-                        std::pair<double, double>& minmax);
+                           const std::string& fieldName,
+                           std::pair<double, double>& minmax);
 
 /// Get the bounds of a given dimension as expected by pdal
 /// This will give positive bounds to default data type for id.

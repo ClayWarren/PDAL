@@ -49,8 +49,8 @@ void PcdHeader::clear()
     m_width = 1;
     m_height = 0;
     m_pointCount = 0;
-    m_origin = { 0, 0, 0, 0 };
-    m_orientation = { 1, 0, 0, 0 };
+    m_origin = {0, 0, 0, 0};
+    m_orientation = {1, 0, 0, 0};
     m_dataOffset = 0;
     m_fields.clear();
     m_numLines = 0;
@@ -446,4 +446,4 @@ OLeStream& operator<<(OLeStream& out, PcdHeader& header)
 
     return out;
 }
-}
+} // namespace pdal

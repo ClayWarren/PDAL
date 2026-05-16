@@ -82,7 +82,7 @@ void comparePcdLas(const std::string& pcdFilename, Options& pcdOptions,
     if (checkGpsTime)
         for (PointId i = 0; i < lv->size(); ++i)
             EXPECT_DOUBLE_EQ(tv->getFieldAs<float>(Dimension::Id::GpsTime, i),
-                    lv->getFieldAs<float>(Dimension::Id::GpsTime, i));
+                             lv->getFieldAs<float>(Dimension::Id::GpsTime, i));
 }
 
 void comparePcdLas(const std::string& pcdFilename,
@@ -211,4 +211,3 @@ TEST(PcdReaderTest, canReadDoubles)
     comparePcdLas(Support::datapath("pcd/autzen-utm.pcd"), pcdOptions,
                   Support::datapath("autzen/autzen-utm.las"), readGpstime);
 }
-

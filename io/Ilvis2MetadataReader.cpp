@@ -1,40 +1,40 @@
 /******************************************************************************
-* Copyright (c) 2015, Howard Butler (howard@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Howard Butler (howard@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable: 4251)
+#pragma warning(disable : 4251)
 #endif
 
 #include <ogr_geometry.h>
@@ -49,7 +49,7 @@ namespace pdal
 {
 
 void Ilvis2MetadataReader::readMetadataFile(std::string filename,
-    MetadataNode* m)
+                                            MetadataNode* m)
 {
     xmlDocPtr doc;
     xmlNodePtr node;
@@ -69,9 +69,8 @@ void Ilvis2MetadataReader::readMetadataFile(std::string filename,
     xmlMemoryDump();
 }
 
-
 void Ilvis2MetadataReader::parseGranuleMetaDataFile(xmlNodePtr node,
-    MetadataNode* m)
+                                                    MetadataNode* m)
 {
     assertElementIs(node, "GranuleMetaDataFile");
 
@@ -91,9 +90,8 @@ void Ilvis2MetadataReader::parseGranuleMetaDataFile(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
 void Ilvis2MetadataReader::parseGranuleURMetaData(xmlNodePtr node,
-    MetadataNode* m)
+                                                  MetadataNode* m)
 {
     assertElementIs(node, "GranuleURMetaData");
 
@@ -192,9 +190,8 @@ void Ilvis2MetadataReader::parseGranuleURMetaData(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
 void Ilvis2MetadataReader::parseCollectionMetaData(xmlNodePtr node,
-    MetadataNode * m)
+                                                   MetadataNode* m)
 {
     assertElementIs(node, "CollectionMetaData");
 
@@ -210,15 +207,14 @@ void Ilvis2MetadataReader::parseCollectionMetaData(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseDataFiles(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseDataFiles(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "DataFiles");
 
     xmlNodePtr child = getFirstChildElementNode(node);
     assertElementIs(child, "DataFileContainer");
 
-    while(nodeElementIs(child, "DataFileContainer"))
+    while (nodeElementIs(child, "DataFileContainer"))
     {
         MetadataNode n = m->addList("DataFile");
         parseDataFileContainer(child, &n);
@@ -228,9 +224,8 @@ void Ilvis2MetadataReader::parseDataFiles(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
 void Ilvis2MetadataReader::parseDataFileContainer(xmlNodePtr node,
-    MetadataNode * m)
+                                                  MetadataNode* m)
 {
     assertElementIs(node, "DataFileContainer");
 
@@ -264,9 +259,7 @@ void Ilvis2MetadataReader::parseDataFileContainer(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseECSDataGranule(xmlNodePtr node,
-    MetadataNode * m)
+void Ilvis2MetadataReader::parseECSDataGranule(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "ECSDataGranule");
 
@@ -294,8 +287,7 @@ void Ilvis2MetadataReader::parseECSDataGranule(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseRangeDateTime(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseRangeDateTime(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "RangeDateTime");
 
@@ -319,9 +311,8 @@ void Ilvis2MetadataReader::parseRangeDateTime(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
 void Ilvis2MetadataReader::parseSpatialDomainContainer(xmlNodePtr node,
-    MetadataNode * m)
+                                                       MetadataNode* m)
 {
     assertElementIs(node, "SpatialDomainContainer");
 
@@ -338,8 +329,7 @@ void Ilvis2MetadataReader::parseSpatialDomainContainer(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseGPolygon(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseGPolygon(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "GPolygon");
 
@@ -351,18 +341,18 @@ void Ilvis2MetadataReader::parseGPolygon(xmlNodePtr node, MetadataNode * m)
 
     // NOTE: Ownership of these rings is transferred to an OGR geometry and
     //   deleted with that geometry.
-    std::vector<OGRLinearRing *> rings;
+    std::vector<OGRLinearRing*> rings;
     while (nodeElementIs(child, "Boundary"))
     {
         // There must be at least 3 points to be valid per the schema.
         int numPoints = countChildElements(child, "Point");
         if (numPoints < 3)
             throw error("Found a polygon boundary with less than 3 points, "
-                "invalid for this schema");
+                        "invalid for this schema");
 
         xmlNodePtr bdChild = getFirstChildElementNode(child);
 
-        OGRLinearRing *lr = new OGRLinearRing();
+        OGRLinearRing* lr = new OGRLinearRing();
         while (nodeElementIs(bdChild, "Point"))
         {
             xmlNodePtr ptChild = getFirstChildElementNode(bdChild);
@@ -392,27 +382,26 @@ void Ilvis2MetadataReader::parseGPolygon(xmlNodePtr node, MetadataNode * m)
     std::unique_ptr<OGRGeometry> geom;
     if (numBoundaries > 1)
     {
-        OGRMultiPolygon *mp = new OGRMultiPolygon();
+        OGRMultiPolygon* mp = new OGRMultiPolygon();
         for (auto lr : rings)
             mp->addGeometryDirectly(lr);
         geom.reset(mp);
     }
     else
     {
-        OGRPolygon *p = new OGRPolygon();
+        OGRPolygon* p = new OGRPolygon();
         // Should only be one.
         for (auto lr : rings)
             p->addRingDirectly(lr);
         geom.reset(p);
     }
-    char *polyStr;
+    char* polyStr;
     geom->exportToWkt(&polyStr);
     m->add("ConvexHull", polyStr);
     CPLFree(polyStr);
 }
 
-
-void Ilvis2MetadataReader::parsePlatform(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parsePlatform(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "Platform");
 
@@ -422,7 +411,7 @@ void Ilvis2MetadataReader::parsePlatform(xmlNodePtr node, MetadataNode * m)
     m->add("PlatformShortName", extractString(child));
 
     child = getNextElementNode(child);
-    while(nodeElementIs(child, "Instrument"))
+    while (nodeElementIs(child, "Instrument"))
     {
         MetadataNode inst = m->addList("Instrument");
         parseInstrument(child, &inst);
@@ -432,8 +421,7 @@ void Ilvis2MetadataReader::parsePlatform(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseInstrument(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseInstrument(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "Instrument");
 
@@ -459,8 +447,7 @@ void Ilvis2MetadataReader::parseInstrument(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseSensor(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseSensor(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "Sensor");
 
@@ -479,9 +466,8 @@ void Ilvis2MetadataReader::parseSensor(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
 void Ilvis2MetadataReader::parseSensorCharacteristic(xmlNodePtr node,
-    MetadataNode * m)
+                                                     MetadataNode* m)
 {
     assertElementIs(node, "SensorCharacteristic");
 
@@ -497,8 +483,7 @@ void Ilvis2MetadataReader::parseSensorCharacteristic(xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parseCampaign(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parseCampaign(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "Campaign");
 
@@ -511,8 +496,7 @@ void Ilvis2MetadataReader::parseCampaign(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parsePSAs(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parsePSAs(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "PSAs");
 
@@ -527,8 +511,7 @@ void Ilvis2MetadataReader::parsePSAs(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
-void Ilvis2MetadataReader::parsePSA(xmlNodePtr node, MetadataNode * m)
+void Ilvis2MetadataReader::parsePSA(xmlNodePtr node, MetadataNode* m)
 {
     assertElementIs(node, "PSA");
 
@@ -546,11 +529,10 @@ void Ilvis2MetadataReader::parsePSA(xmlNodePtr node, MetadataNode * m)
     assertEndOfElements(child);
 }
 
-
 // Since the Browse, PH, QA, and MP product nodes have the same structure
 // just differing prefixes, they can share this code.
 void Ilvis2MetadataReader::parseXXProduct(std::string type, xmlNodePtr node,
-    MetadataNode * m)
+                                          MetadataNode* m)
 {
     std::string fullBase = type + "Product";
     std::string fullSub = type + "GranuleId";
@@ -568,9 +550,7 @@ void Ilvis2MetadataReader::parseXXProduct(std::string type, xmlNodePtr node,
     assertEndOfElements(child);
 }
 
-
 // BEGIN PRIVATE METHODS
-
 
 std::string Ilvis2MetadataReader::extractString(xmlNodePtr node)
 {
@@ -578,24 +558,20 @@ std::string Ilvis2MetadataReader::extractString(xmlNodePtr node)
     return nodeStr;
 }
 
-
 double Ilvis2MetadataReader::extractDouble(xmlNodePtr node)
 {
     return atof((char*)node->children->content);
 }
-
 
 int Ilvis2MetadataReader::extractInt(xmlNodePtr node)
 {
     return atoi((char*)node->children->content);
 }
 
-
 long Ilvis2MetadataReader::extractLong(xmlNodePtr node)
 {
     return atol((char*)node->children->content);
 }
-
 
 // private
 
@@ -638,31 +614,29 @@ bool Ilvis2MetadataReader::nodeElementIs(xmlNodePtr node, std::string expected)
     }
 
     return xmlStrcmp(node->name,
-            reinterpret_cast<const xmlChar*>(expected.c_str())) == 0;
+                     reinterpret_cast<const xmlChar*>(expected.c_str())) == 0;
 }
 
-
 // Throws an error if the next element is not what it expects
-void Ilvis2MetadataReader::assertElementIs(xmlNodePtr node, std::string expected)
+void Ilvis2MetadataReader::assertElementIs(xmlNodePtr node,
+                                           std::string expected)
 {
     if (!node || !nodeElementIs(node, expected))
         throw error("Expected element '" + expected + "', found '" +
-            std::string((const char *)node->name) + "'");
+                    std::string((const char*)node->name) + "'");
 }
-
 
 // Throws an error if the node is not null
 void Ilvis2MetadataReader::assertEndOfElements(xmlNodePtr node)
 {
     if (node)
         throw("Expected to find no more elements, found '" +
-            std::string((const char *)node->name) + "'");
+              std::string((const char*)node->name) + "'");
 }
-
 
 // Counts the number of child element nodes with a given name
 int Ilvis2MetadataReader::countChildElements(xmlNodePtr node,
-    std::string childName)
+                                             std::string childName)
 {
     xmlNodePtr child = getFirstChildElementNode(node);
     int ctr = 0;
@@ -680,4 +654,3 @@ int Ilvis2MetadataReader::countChildElements(xmlNodePtr node,
 }
 
 } // namespace pdal
-

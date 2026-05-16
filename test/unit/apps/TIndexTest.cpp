@@ -1,42 +1,42 @@
 /******************************************************************************
-* Copyright (c) 2015, Hobu Inc., (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the names of contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Hobu Inc., (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <iostream>
 #include <string>
 
+#include <pdal/Polygon.hpp>
 #include <pdal/pdal_test_main.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <pdal/Polygon.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -50,34 +50,37 @@ TEST(TIndex, test1)
     std::string outSpec(Support::temppath("tindex.json"));
     std::string outPoints(Support::temppath("points.txt"));
 
-    std::string cmd = Support::binpath("pdal") + " tindex create " +
-        outSpec + " \"" + inSpec + "\" -f GeoJSON --log=stdout";
+    std::string cmd = Support::binpath("pdal") + " tindex create " + outSpec +
+                      " \"" + inSpec + "\" -f GeoJSON --log=stdout";
 
     FileUtils::deleteFile(outSpec);
 
     std::string output;
     Utils::run_shell_command(cmd, output);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 3],[1.25, 3])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 3],[1.25, 3])\"";
 
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     std::string::size_type pos = output.find("Merge filecount: 3");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 2],[1.25, 2])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 2],[1.25, 2])\"";
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     pos = output.find("Merge filecount: 2");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     pos = output.find("Merge filecount: 1");
@@ -92,35 +95,36 @@ TEST(TIndex, test2)
     std::string inSpec(Support::datapath("tindex/*.txt"));
     std::string outSpec(Support::temppath("tindex.json"));
 
-     std::string cmd = Support::binpath("pdal") + " tindex create --stdin " +
-        outSpec + " \"" + inSpec + "\" -f GeoJSON 2>&1";
+    std::string cmd = Support::binpath("pdal") + " tindex create --stdin " +
+                      outSpec + " \"" + inSpec + "\" -f GeoJSON 2>&1";
 
     std::string output;
     Utils::run_shell_command(cmd, output);
     std::string::size_type pos = output.find("Can't specify more than one");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " tindex create --stdin " +
-        outSpec + " -f GeoJSON --filespec=\"" + inSpec + "\" 2>&1";
+    cmd = Support::binpath("pdal") + " tindex create --stdin " + outSpec +
+          " -f GeoJSON --filespec=\"" + inSpec + "\" 2>&1";
     Utils::run_shell_command(cmd, output);
     pos = output.find("Can't specify more than one");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " tindex create --filelist \"" + 
-        inSpec + "\" --stdin " + outSpec + " -f GeoJSON 2>&1";
+    cmd = Support::binpath("pdal") + " tindex create --filelist \"" + inSpec +
+          "\" --stdin " + outSpec + " -f GeoJSON 2>&1";
     Utils::run_shell_command(cmd, output);
     pos = output.find("Can't specify more than one");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " tindex create --glob \"" + inSpec + 
-        "\" --filelist \"" + inSpec + "\" --tindex=" + outSpec + " -f GeoJSON 2>&1";
+    cmd = Support::binpath("pdal") + " tindex create --glob \"" + inSpec +
+          "\" --filelist \"" + inSpec + "\" --tindex=" + outSpec +
+          " -f GeoJSON 2>&1";
     Utils::run_shell_command(cmd, output);
     pos = output.find("Can't specify more than one");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " tindex create " + outSpec + 
-        " -f GeoJSON --path_prefix=\"a\" --write_absolute_path=true " +
-        "--filespec=\"" + inSpec + "\" 2>&1";
+    cmd = Support::binpath("pdal") + " tindex create " + outSpec +
+          " -f GeoJSON --path_prefix=\"a\" --write_absolute_path=true " +
+          "--filespec=\"" + inSpec + "\" 2>&1";
     Utils::run_shell_command(cmd, output);
     pos = output.find("Can't specify both");
     EXPECT_NE(pos, std::string::npos);
@@ -137,32 +141,36 @@ TEST(TIndex, test3)
     std::string outPoints(Support::temppath("points.txt"));
 
     std::string cmd = "find " + Support::datapath("tindex") +
-        " -name \"*.txt\" | " + Support::binpath("pdal") +
-        " tindex create --stdin " + outSpec + " -f GeoJSON --log=stdout";
+                      " -name \"*.txt\" | " + Support::binpath("pdal") +
+                      " tindex create --stdin " + outSpec +
+                      " -f GeoJSON --log=stdout";
 
     std::string output;
     Utils::run_shell_command(cmd, output);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 3],[1.25, 3])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 3],[1.25, 3])\"";
 
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     std::string::size_type pos = output.find("Merge filecount: 3");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 2],[1.25, 2])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 2],[1.25, 2])\"";
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     pos = output.find("Merge filecount: 2");
     EXPECT_NE(pos, std::string::npos);
 
-    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " +
-        outSpec + " " + outPoints + " --log=stdout "
-        "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
+    cmd = Support::binpath("pdal") + " --verbose=info tindex merge " + outSpec +
+          " " + outPoints +
+          " --log=stdout "
+          "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
     FileUtils::deleteFile(outPoints);
     Utils::run_shell_command(cmd, output);
     pos = output.find("Merge filecount: 1");
@@ -190,12 +198,14 @@ StringList getGeometry(std::string& json)
 
 // testing the internal filter
 TEST(TIndex, test4)
-{   std::string inSpec(Support::datapath("tindex/t1.txt"));
+{
+    std::string inSpec(Support::datapath("tindex/t1.txt"));
 
     // specifying some hexbin boundary options
     std::string cmd = Support::binpath("pdal") + " tindex create " +
-        "--tindex=\"/vsistdout/\" -f GeoJSON --threshold=1 " +
-        "--resolution=1.0 --simplify=\"false\" --filespec=\"" + inSpec + "\"";
+                      "--tindex=\"/vsistdout/\" -f GeoJSON --threshold=1 " +
+                      "--resolution=1.0 --simplify=\"false\" --filespec=\"" +
+                      inSpec + "\"";
     std::string output;
     Utils::run_shell_command(cmd, output);
 
@@ -204,17 +214,17 @@ TEST(TIndex, test4)
 
     // simplify = true
     cmd = Support::binpath("pdal") + " tindex create --tindex=\"/vsistdout/\"" +
-        " -f \"GeoJSON\" --threshold=1 --resolution=1.0" + 
-        " --filespec=\"" + inSpec + "\"";
+          " -f \"GeoJSON\" --threshold=1 --resolution=1.0" + " --filespec=\"" +
+          inSpec + "\"";
     Utils::run_shell_command(cmd, output);
 
     p = getGeometry(output)[0];
     EXPECT_NEAR(6.49519, p.area(), 0.001);
 
     // where expression
-    cmd = Support::binpath("pdal") + " tindex create --tindex=\"/vsistdout/\""+ 
-        " -f \"GeoJSON\" --threshold=1 --resolution=1.0" + 
-        " --where=\"X>1\" --simplify=\"false\" --filespec=\"" + inSpec + "\"";
+    cmd = Support::binpath("pdal") + " tindex create --tindex=\"/vsistdout/\"" +
+          " -f \"GeoJSON\" --threshold=1 --resolution=1.0" +
+          " --where=\"X>1\" --simplify=\"false\" --filespec=\"" + inSpec + "\"";
     Utils::run_shell_command(cmd, output);
 
     p = getGeometry(output)[0];
@@ -227,30 +237,33 @@ TEST(TIndex, test5)
     std::string inSpec(Support::datapath("tindex/autzen_clip_*.copc.laz"));
     std::string outSpec(Support::temppath("tindex.json"));
 
-    std::string cmd = Support::binpath("pdal") + " tindex create " +
-        outSpec + " \"" + inSpec + "\" -f GeoJSON --log=stdout --fast_boundary=true";
+    std::string cmd = Support::binpath("pdal") + " tindex create " + outSpec +
+                      " \"" + inSpec +
+                      "\" -f GeoJSON --log=stdout --fast_boundary=true";
 
     std::string output;
     Utils::run_shell_command(cmd, output);
-    std::string::size_type pos = output.find("does not match the SRS of other files in the tileindex");
+    std::string::size_type pos =
+        output.find("does not match the SRS of other files in the tileindex");
     EXPECT_NE(pos, std::string::npos);
     FileUtils::deleteFile(outSpec);
 
-    cmd = Support::binpath("pdal") + " tindex create " +
-        outSpec + " \"" + inSpec + "\" -f GeoJSON --log=stdout --fast_boundary=true " +
-        "--skip_different_srs=true";
+    cmd = Support::binpath("pdal") + " tindex create " + outSpec + " \"" +
+          inSpec + "\" -f GeoJSON --log=stdout --fast_boundary=true " +
+          "--skip_different_srs=true";
 
     Utils::run_shell_command(cmd, output);
-    pos = output.find("does not match the SRS of other files in the tileindex. Skipping this file");
+    pos = output.find("does not match the SRS of other files in the tileindex. "
+                      "Skipping this file");
     EXPECT_NE(pos, std::string::npos);
     FileUtils::deleteFile(outSpec);
 
     // Testing rejection of long SRS w/ shapefile driver
     outSpec = Support::temppath("tindexOut");
 
-    cmd = Support::binpath("pdal") + " tindex create " +
-    outSpec + " \"" + inSpec + "\" -f \"ESRI Shapefile\" --log=stdout " +
-    "--fast_boundary=true 2>&1";
+    cmd = Support::binpath("pdal") + " tindex create " + outSpec + " \"" +
+          inSpec + "\" -f \"ESRI Shapefile\" --log=stdout " +
+          "--fast_boundary=true 2>&1";
 
     Utils::run_shell_command(cmd, output);
     pos = output.find("supports a maximum of 254");
@@ -264,15 +277,16 @@ TEST(TIndex, test6)
     std::string inSpec(Support::datapath("tindex/*.txt"));
     std::string outSpec(Support::temppath("tindex.json"));
 
-    std::string cmd = Support::binpath("pdal") + " tindex create " +
-        outSpec + " \"" + inSpec + "\" -f GeoJSON --log=stdout " +
-        "--filters.hexbin.smooth=false";
+    std::string cmd = Support::binpath("pdal") + " tindex create " + outSpec +
+                      " \"" + inSpec + "\" -f GeoJSON --log=stdout " +
+                      "--filters.hexbin.smooth=false";
 
     FileUtils::deleteFile(outSpec);
     std::string output;
     Utils::run_shell_command(cmd, output);
 
-    std::string::size_type pos = output.find("Argument references invalid/unused stage");
+    std::string::size_type pos =
+        output.find("Argument references invalid/unused stage");
     EXPECT_NE(pos, std::string::npos);
 
     FileUtils::deleteFile(outSpec);
@@ -285,13 +299,14 @@ TEST(TIndex, test7)
     std::string inList(Support::temppath("input_files_list.txt"));
     std::string outSpec("/vsistdout/");
 
-    std::string cmd = "find " + Support::datapath("tindex") +
-        " -name \"*.txt\" > " + inList;
+    std::string cmd =
+        "find " + Support::datapath("tindex") + " -name \"*.txt\" > " + inList;
     std::string output;
     Utils::run_shell_command(cmd, output);
 
     cmd = Support::binpath("pdal") + " tindex create --tindex=\"/vsistdout/\"" +
-        " --filelist=\"" + inList + "\" -f GeoJSON --threshold=1 --resolution=1.0";
+          " --filelist=\"" + inList +
+          "\" -f GeoJSON --threshold=1 --resolution=1.0";
     Utils::run_shell_command(cmd, output);
     StringList geoms = getGeometry(output);
 
@@ -311,9 +326,9 @@ TEST(TIndex, test8)
     std::string inSpec(Support::datapath("tindex/*.txt"));
 
     std::string cmd = Support::binpath("pdal") + " tindex create " +
-        "--tindex=\"/vsistdout/\" -f GeoJSON --threshold=1 " +
-        "--resolution=1.0 --lco=\"DESCRIPTION=foo\" " +
-        "--filespec=\"" + inSpec + "\"";
+                      "--tindex=\"/vsistdout/\" -f GeoJSON --threshold=1 " +
+                      "--resolution=1.0 --lco=\"DESCRIPTION=foo\" " +
+                      "--filespec=\"" + inSpec + "\"";
     std::string output;
     Utils::run_shell_command(cmd, output);
 

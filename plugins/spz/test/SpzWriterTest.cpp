@@ -4,12 +4,12 @@
 #include "Support.hpp"
 
 #include <io/BufferReader.hpp>
-#include <pdal/StageFactory.hpp>
 #include <pdal/PipelineManager.hpp>
+#include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
 
-#include "SpzWriter.hpp"
 #include "SpzReader.hpp"
+#include "SpzWriter.hpp"
 
 using namespace pdal;
 
@@ -56,7 +56,7 @@ TEST(SpzWriterTest, xyz_only_test)
     SpzReader reader;
     // using same options, just the filename
     reader.setOptions(opts);
-    
+
     PointTable readTable;
     reader.prepare(readTable);
     PointViewSet viewSet = reader.execute(readTable);
@@ -64,7 +64,7 @@ TEST(SpzWriterTest, xyz_only_test)
     EXPECT_EQ(readView->size(), 3);
 
     // Checking X values. These are packed/unpacked with more precision
-    //than the other fields.
+    // than the other fields.
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::X, 0), 1.0);
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::X, 1), 2.0);
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::X, 2), 1.0);
@@ -76,7 +76,8 @@ TEST(SpzWriterTest, all_dimensions_test)
     BufferReader r;
 
     // registering dims
-    Dimension::Id alphaId = table.layout()->assignDim("opacity", Dimension::Type::Float);
+    Dimension::Id alphaId =
+        table.layout()->assignDim("opacity", Dimension::Type::Float);
 
     Dimension::IdList scaleIds;
     Dimension::IdList colorIds;
@@ -84,20 +85,20 @@ TEST(SpzWriterTest, all_dimensions_test)
     Dimension::IdList rotIds;
     for (int i = 0; i < 3; ++i)
     {
-        scaleIds.push_back(table.layout()->assignDim("scale_" + std::to_string(i),
-            Dimension::Type::Float));
-        colorIds.push_back(table.layout()->assignDim("f_dc_" + std::to_string(i),
-            Dimension::Type::Float));
+        scaleIds.push_back(table.layout()->assignDim(
+            "scale_" + std::to_string(i), Dimension::Type::Float));
+        colorIds.push_back(table.layout()->assignDim(
+            "f_dc_" + std::to_string(i), Dimension::Type::Float));
     }
     for (int i = 0; i < 4; ++i)
         rotIds.push_back(table.layout()->assignDim("rot_" + std::to_string(i),
-            Dimension::Type::Float));
+                                                   Dimension::Type::Float));
     for (int i = 0; i < 9; ++i)
         shIds.push_back(table.layout()->assignDim("f_rest_" + std::to_string(i),
-            Dimension::Type::Float));
-        
+                                                  Dimension::Type::Float));
+
     PointViewPtr v = setXYZ(table);
-    
+
     // setting dims - set rotation later
     // using the same values for each dimension (except rotation)
     std::array<float, 3> values{0.2, 0.4, 0.6};
@@ -111,15 +112,17 @@ TEST(SpzWriterTest, all_dimensions_test)
         for (auto sh : shIds)
             v->setField(sh, i, values[i]);
     }
-        
+
     // Set rotation dimension:
     // make a valid quaternion
     std::array<float, 4> in{0.1, 0.5, 0.3, 0.2};
-    float norm = std::sqrt(in[0] * in[0] + in[1] * in[1] + in[2] * in[2] + in[3] * in[3]);
-    std::array<float, 4> quat{in[0] / norm, in[1] / norm, in[2] / norm, in[3] / norm};
+    float norm = std::sqrt(in[0] * in[0] + in[1] * in[1] + in[2] * in[2] +
+                           in[3] * in[3]);
+    std::array<float, 4> quat{in[0] / norm, in[1] / norm, in[2] / norm,
+                              in[3] / norm};
     // Set rotation
     for (auto i = 0; i < 4; i++)
-       v->setField(rotIds[i], 0, quat[i]);
+        v->setField(rotIds[i], 0, quat[i]);
 
     r.addView(v);
 
@@ -137,7 +140,7 @@ TEST(SpzWriterTest, all_dimensions_test)
     SpzReader reader;
     // using same options, just the filename
     reader.setOptions(opts);
-    
+
     PointTable readTable;
     reader.prepare(readTable);
     PointViewSet viewSet = reader.execute(readTable);
@@ -145,24 +148,29 @@ TEST(SpzWriterTest, all_dimensions_test)
     EXPECT_EQ(readView->size(), 3);
 
     // Values in the resulting spz are very off. It's on
-    //their end AFAIK (the packing/unpacking is lossy)
+    // their end AFAIK (the packing/unpacking is lossy)
     float tolerance = 0.03;
     // alphas are packed/unpacked more accurately.
     float alphaTolerance = 0.01;
     for (PointId i = 0; i < readView->size(); ++i)
     {
-        EXPECT_NEAR(readView->getFieldAs<float>(alphaId, i), values[i], alphaTolerance);
+        EXPECT_NEAR(readView->getFieldAs<float>(alphaId, i), values[i],
+                    alphaTolerance);
         for (auto s : scaleIds)
-            EXPECT_NEAR(readView->getFieldAs<float>(s, i), values[i], tolerance);
+            EXPECT_NEAR(readView->getFieldAs<float>(s, i), values[i],
+                        tolerance);
         for (auto c : colorIds)
-            EXPECT_NEAR(readView->getFieldAs<float>(c, i), values[i], tolerance);
+            EXPECT_NEAR(readView->getFieldAs<float>(c, i), values[i],
+                        tolerance);
         for (auto sh : shIds)
-            EXPECT_NEAR(readView->getFieldAs<float>(sh, i), values[i], tolerance);
+            EXPECT_NEAR(readView->getFieldAs<float>(sh, i), values[i],
+                        tolerance);
     }
 
     // check rotation (first point only)
     for (int i = 0; i < 4; ++i)
-        EXPECT_NEAR(readView->getFieldAs<float>(rotIds[i], 0), quat[i], tolerance);
+        EXPECT_NEAR(readView->getFieldAs<float>(rotIds[i], 0), quat[i],
+                    tolerance);
 }
 
 TEST(SpzWriterTest, orientation_metadata_test)
@@ -197,7 +205,7 @@ TEST(SpzWriterTest, orientation_metadata_test)
     EXPECT_EQ(readView->size(), 3);
 
     // Checking Y values; when converting from RUB to RDF, the signs
-    //flip on the Y dimension.
+    // flip on the Y dimension.
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::Y, 0), -1.0);
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::Y, 1), -1.0);
     EXPECT_FLOAT_EQ(readView->getFieldAs<float>(Dimension::Id::Y, 2), -2.0);

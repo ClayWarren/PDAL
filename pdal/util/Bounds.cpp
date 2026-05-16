@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <assert.h>
 #include <iostream>
@@ -53,12 +53,14 @@ namespace
 const double LOWEST = (std::numeric_limits<double>::lowest)();
 const double HIGHEST = (std::numeric_limits<double>::max)();
 
-}
+} // namespace
 
 void BOX2D::clear()
 {
-    minx = HIGHEST; miny = HIGHEST;
-    maxx = LOWEST; maxy = LOWEST;
+    minx = HIGHEST;
+    miny = HIGHEST;
+    maxx = LOWEST;
+    maxy = LOWEST;
     wkt = "";
 }
 
@@ -72,25 +74,24 @@ void BOX3D::clear()
 
 bool BOX2D::empty() const
 {
-    return  minx == HIGHEST && maxx == LOWEST &&
-        miny == HIGHEST && maxy == LOWEST;
+    return minx == HIGHEST && maxx == LOWEST && miny == HIGHEST &&
+           maxy == LOWEST;
 }
 
 bool BOX2D::valid() const
 {
-    return  !empty();
+    return !empty();
 }
 
 bool BOX3D::empty() const
 {
-    return  BOX2D::empty() && minz == HIGHEST && maxz == LOWEST;
+    return BOX2D::empty() && minz == HIGHEST && maxz == LOWEST;
 }
 
 bool BOX3D::valid() const
 {
     return !empty();
 }
-
 
 BOX2D& BOX2D::grow(double dist)
 {
@@ -102,22 +103,27 @@ BOX2D& BOX2D::grow(double dist)
     return *this;
 }
 
-
 BOX2D& BOX2D::grow(double x, double y)
 {
-    if (x < minx) minx = x;
-    if (x > maxx) maxx = x;
+    if (x < minx)
+        minx = x;
+    if (x > maxx)
+        maxx = x;
 
-    if (y < miny) miny = y;
-    if (y > maxy) maxy = y;
+    if (y < miny)
+        miny = y;
+    if (y > maxy)
+        maxy = y;
     return *this;
 }
 
 BOX3D& BOX3D::grow(double x, double y, double z)
 {
     BOX2D::grow(x, y);
-    if (z < minz) minz = z;
-    if (z > maxz) maxz = z;
+    if (z < minz)
+        minz = z;
+    if (z > maxz)
+        maxz = z;
     return *this;
 }
 
@@ -127,16 +133,13 @@ const BOX2D& BOX2D::getDefaultSpatialExtent()
     return v;
 }
 
-
 const BOX3D& BOX3D::getDefaultSpatialExtent()
 {
     static BOX3D v(LOWEST, LOWEST, LOWEST, HIGHEST, HIGHEST, HIGHEST);
     return v;
 }
 
-Bounds::Bounds(const BOX3D& box) : m_box(box)
-{}
-
+Bounds::Bounds(const BOX3D& box) : m_box(box) {}
 
 Bounds::Bounds(const BOX2D& box) : m_box(box)
 {
@@ -149,7 +152,6 @@ void Bounds::reset(const BOX3D& box)
     m_box = box;
 }
 
-
 void Bounds::reset(const BOX2D& box)
 {
     m_box.minx = box.minx;
@@ -160,7 +162,6 @@ void Bounds::reset(const BOX2D& box)
     m_box.maxz = LOWEST;
     m_box.wkt = box.wkt;
 }
-
 
 // We don't allow implicit conversion from a BOX2D to BOX3D.  Use the explicit
 // BOX3D ctor that takes a BOX2D if that's what you want.
@@ -176,30 +177,25 @@ BOX2D Bounds::to2d() const
     return m_box.to2d();
 }
 
-
 bool Bounds::is2d() const
 {
     return (valid() && !is3d());
 }
-
 
 bool Bounds::is3d() const
 {
     return (m_box.minz != HIGHEST || m_box.maxz != LOWEST);
 }
 
-
 bool Bounds::valid() const
 {
     return m_box.valid();
 }
 
-
 bool Bounds::empty() const
 {
     return m_box.empty();
 }
-
 
 void Bounds::grow(double x, double y)
 {
@@ -212,7 +208,6 @@ void Bounds::grow(double x, double y)
     }
 }
 
-
 void Bounds::grow(double x, double y, double z)
 {
     if (!is2d())
@@ -221,12 +216,10 @@ void Bounds::grow(double x, double y, double z)
     }
 }
 
-
 void Bounds::set(const BOX3D& box)
 {
     m_box = box;
 }
-
 
 void Bounds::set(const BOX2D& box)
 {
@@ -277,7 +270,6 @@ void parsePair(std::istringstream& ss, double& low, double& high)
 
 } // unnamed namespace
 
-
 // This parses the guts of a 2D range.
 void BOX2D::parse(const std::string& s, std::string::size_type& pos)
 {
@@ -293,7 +285,8 @@ void BOX2D::parse(const std::string& s, std::string::size_type& pos)
         isJson = true;
         isArray = b.is_array();
         isObject = b.is_object();
-    } catch (std::exception& e)
+    }
+    catch (std::exception& e)
     {
         jsonParseMessage = e.what();
         isJson = false;
@@ -304,7 +297,8 @@ void BOX2D::parse(const std::string& s, std::string::size_type& pos)
         if (b.size() != 4)
         {
             std::stringstream msg;
-            msg << "GeoJSON array size must be 4 for BOX2d. It was " << b.size();
+            msg << "GeoJSON array size must be 4 for BOX2d. It was "
+                << b.size();
             throw error(msg.str());
         }
         minx = b[0].get<double>();
@@ -344,7 +338,6 @@ void BOX2D::parse(const std::string& s, std::string::size_type& pos)
         // parsed. we are done
         pos = s.size();
         return;
-
     }
 
     static thread_local Utils::IStringStreamClassicLocale ss;
@@ -370,7 +363,6 @@ void BOX2D::parse(const std::string& s, std::string::size_type& pos)
     pos = ss.eof() ? s.size() : (std::string::size_type)ss.tellg();
 }
 
-
 void BOX3D::parse(const std::string& s, std::string::size_type& pos)
 {
 
@@ -385,7 +377,8 @@ void BOX3D::parse(const std::string& s, std::string::size_type& pos)
         isJson = true;
         isArray = b.is_array();
         isObject = b.is_object();
-    } catch (std::exception& e)
+    }
+    catch (std::exception& e)
     {
         jsonParseMessage = e.what();
         isJson = false;
@@ -453,7 +446,6 @@ void BOX3D::parse(const std::string& s, std::string::size_type& pos)
     ss.clear();
     ss.str(s);
 
-
     moveForward(ss, pos);
 
     if (!discardSpacesBefore(ss, '('))
@@ -478,7 +470,6 @@ void BOX3D::parse(const std::string& s, std::string::size_type& pos)
     pos = ss.eof() ? s.size() : (std::string::size_type)ss.tellg();
 }
 
-
 std::istream& operator>>(std::istream& in, BOX2D& box)
 {
     std::string s;
@@ -491,7 +482,6 @@ std::istream& operator>>(std::istream& in, BOX2D& box)
         throw BOX2D::error("Invalid characters following valid 2d-bounds.");
     return in;
 }
-
 
 std::istream& operator>>(std::istream& in, BOX3D& box)
 {

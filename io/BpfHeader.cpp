@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2014, Howard Butler, hobu.inc@gmail.com
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Howard Butler, hobu.inc@gmail.com
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <iostream>
 
@@ -73,21 +73,19 @@ std::ostream& operator<<(std::ostream& out, const BpfFormat& format)
     return out;
 }
 
-ILeStream& operator >> (ILeStream& stream, BpfMuellerMatrix& m)
+ILeStream& operator>>(ILeStream& stream, BpfMuellerMatrix& m)
 {
     for (size_t i = 0; i < (sizeof(m.m_vals) / sizeof(m.m_vals[0])); ++i)
         stream >> m.m_vals[i];
     return stream;
 }
 
-
-OLeStream& operator << (OLeStream& stream, BpfMuellerMatrix& m)
+OLeStream& operator<<(OLeStream& stream, BpfMuellerMatrix& m)
 {
     for (size_t i = 0; i < (sizeof(m.m_vals) / sizeof(m.m_vals[0])); ++i)
         stream << m.m_vals[i];
     return stream;
 }
-
 
 bool BpfHeader::read(ILeStream& stream)
 {
@@ -98,8 +96,8 @@ bool BpfHeader::read(ILeStream& stream)
         if (!readV1(stream))
         {
             if (m_version < 1 || m_version > 3)
-                m_log->get(LogLevel::Error) << "Unsupported BPF version = " <<
-                    m_version << ".\n";
+                m_log->get(LogLevel::Error)
+                    << "Unsupported BPF version = " << m_version << ".\n";
             else
                 m_log->get(LogLevel::Error) << "Couldn't read BPF header.\n";
             return false;
@@ -124,9 +122,9 @@ bool BpfHeader::readV3(ILeStream& stream)
     Utils::fromString(m_ver, m_version);
 
     uint8_t numDim;
-    stream >> m_len >> numDim >> interleave >> m_compression >>
-        dummyChar >> m_numPts >> m_coordType >> m_coordId >> m_spacing >>
-        m_xform >> m_startTime >> m_endTime;
+    stream >> m_len >> numDim >> interleave >> m_compression >> dummyChar >>
+        m_numPts >> m_coordType >> m_coordId >> m_spacing >> m_xform >>
+        m_startTime >> m_endTime;
     m_numDim = (int32_t)numDim;
 
     switch (interleave)
@@ -148,7 +146,8 @@ bool BpfHeader::readV3(ILeStream& stream)
 
 bool BpfHeader::trySetSpatialReference(const SpatialReference& srs)
 {
-    m_log->get(LogLevel::Debug) << "Attempting to set coordinate system UTM zone \n";
+    m_log->get(LogLevel::Debug)
+        << "Attempting to set coordinate system UTM zone \n";
 
     int zone = srs.getUTMZone();
     if (zone)
@@ -198,7 +197,6 @@ bool BpfHeader::readV1(ILeStream& stream)
     return (bool)stream;
 }
 
-
 bool BpfHeader::write(OLeStream& stream)
 {
     uint8_t dummyChar = 0;
@@ -210,14 +208,14 @@ bool BpfHeader::write(OLeStream& stream)
     stream.put("BPF!");
     stream.put("0003");
 
-    stream << m_len << numDim << (uint8_t)m_pointFormat << m_compression <<
-        dummyChar << m_numPts << m_coordType << m_coordId << m_spacing <<
-        m_xform << m_startTime << m_endTime;
+    stream << m_len << numDim << (uint8_t)m_pointFormat << m_compression
+           << dummyChar << m_numPts << m_coordType << m_coordId << m_spacing
+           << m_xform << m_startTime << m_endTime;
     return (bool)stream;
 }
 
-
-bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims, bool fixNames)
+bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims,
+                               bool fixNames)
 {
     size_t staticCnt = m_staticDims.size();
 
@@ -226,9 +224,9 @@ bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims, bool f
     if (static_cast<std::size_t>(m_numDim) < staticCnt)
     {
         m_log->get(LogLevel::Error) << "BPF dimension range looks bad.\n";
-        m_log->get(LogLevel::Error) <<
-            "BPF: num dims: " << m_numDim << "\n" <<
-            "BPF: static count: " << staticCnt << "\n";
+        m_log->get(LogLevel::Error)
+            << "BPF: num dims: " << m_numDim << "\n"
+            << "BPF: static count: " << staticCnt << "\n";
 
         m_log->get(LogLevel::Error) << "Dims:\n";
         for (auto d : dims)
@@ -266,13 +264,11 @@ bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims, bool f
     return true;
 }
 
-
 // This just exists for symmetry.
 void BpfHeader::writeDimensions(OLeStream& stream, BpfDimensionList& dims)
 {
     BpfDimension::write(stream, dims);
 }
-
 
 void BpfHeader::dump()
 {
@@ -290,7 +286,6 @@ void BpfHeader::dump()
     cerr << "End time: " << m_endTime << "!\n";
 }
 
-
 bool BpfDimension::read(ILeStream& stream, BpfDimensionList& dims, size_t start)
 {
     for (size_t d = start; d < dims.size(); ++d)
@@ -304,7 +299,6 @@ bool BpfDimension::read(ILeStream& stream, BpfDimensionList& dims, size_t start)
     return (bool)stream;
 }
 
-
 bool BpfDimension::write(OLeStream& stream, BpfDimensionList& dims)
 {
     for (size_t d = 0; d < dims.size(); ++d)
@@ -317,7 +311,6 @@ bool BpfDimension::write(OLeStream& stream, BpfDimensionList& dims)
         stream.put(dims[d].m_label, 32);
     return (bool)stream;
 }
-
 
 bool BpfUlemHeader::read(ILeStream& stream)
 {
@@ -432,4 +425,3 @@ bool BpfPolarFrame::read(ILeStream& stream)
 }
 
 } // namespace pdal
-

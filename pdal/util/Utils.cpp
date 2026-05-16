@@ -1,43 +1,43 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/util/Utils.hpp>
 
 #include <array>
 #include <cassert>
-#include <cstdlib>
 #include <cctype>
+#include <cstdlib>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -45,15 +45,15 @@
 #ifndef _WIN32
 #include <cxxabi.h>
 #include <sys/ioctl.h>
-#include <sys/wait.h>  // WIFEXITED, WEXITSTATUS
+#include <sys/wait.h> // WIFEXITED, WEXITSTATUS
 #else
-#include <windows.h>  // GetConsoleScreenBufferInfo
+#include <windows.h> // GetConsoleScreenBufferInfo
 #endif
 
-#pragma warning(disable: 4127)  // conditional expression is constant
+#pragma warning(disable : 4127) // conditional expression is constant
 
-#include <stdio.h>
 #include <iomanip>
+#include <stdio.h>
 
 #include <utf8.h>
 
@@ -64,18 +64,16 @@ typedef std::vector<std::string> StringList;
 namespace pdal
 {
 
-
 void Utils::random_seed(unsigned int seed)
 {
     srand(seed);
 }
 
-
 double Utils::random(double minimum, double maximum)
 {
-    double r = (double)rand();  // [0..32767]
+    double r = (double)rand(); // [0..32767]
     double v = (maximum - minimum) / (double)RAND_MAX;
-    double s = r * v; // [0..(max-min)]
+    double s = r * v;       // [0..(max-min)]
     double t = minimum + s; // [min..max]
 
     assert(t >= minimum);
@@ -84,7 +82,6 @@ double Utils::random(double minimum, double maximum)
     return t;
 }
 
-
 int Utils::getenv(const std::string& name, std::string& val)
 {
     char* value = ::getenv(name.c_str());
@@ -92,9 +89,8 @@ int Utils::getenv(const std::string& name, std::string& val)
         val = value;
     else
         val.clear();
-    return value ?  0 : -1;
+    return value ? 0 : -1;
 }
-
 
 int Utils::setenv(const std::string& env, const std::string& val)
 {
@@ -105,7 +101,6 @@ int Utils::setenv(const std::string& env, const std::string& val)
 #endif
 }
 
-
 int Utils::unsetenv(const std::string& env)
 {
 #ifdef _WIN32
@@ -114,7 +109,6 @@ int Utils::unsetenv(const std::string& env)
     return ::unsetenv(env.c_str());
 #endif
 }
-
 
 void Utils::eatwhitespace(std::istream& s)
 {
@@ -129,7 +123,6 @@ void Utils::eatwhitespace(std::istream& s)
     }
 }
 
-
 void Utils::trimLeading(std::string& s)
 {
     size_t pos = 0;
@@ -140,7 +133,6 @@ void Utils::trimLeading(std::string& s)
     // Iterator version of erase doesn't throw.
     s.erase(s.begin(), s.begin() + pos);
 }
-
 
 void Utils::trimTrailing(std::string& s)
 {
@@ -162,7 +154,6 @@ void Utils::trimTrailing(std::string& s)
     s.erase(s.begin() + pos + 1, s.end());
 }
 
-
 bool Utils::eatcharacter(std::istream& s, char x)
 {
     const char c = (char)s.peek();
@@ -175,9 +166,8 @@ bool Utils::eatcharacter(std::istream& s, char x)
     return true;
 }
 
-
-std::string Utils::base64_encode(const unsigned char *bytes_to_encode,
-    size_t in_len)
+std::string Utils::base64_encode(const unsigned char* bytes_to_encode,
+                                 size_t in_len)
 {
     /*
         base64.cpp and base64.h
@@ -209,10 +199,9 @@ std::string Utils::base64_encode(const unsigned char *bytes_to_encode,
     if (in_len == 0)
         return std::string();
 
-    const std::string base64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/";
+    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                     "abcdefghijklmnopqrstuvwxyz"
+                                     "0123456789+/";
     std::string ret;
     int i = 0;
     int j = 0;
@@ -226,12 +215,12 @@ std::string Utils::base64_encode(const unsigned char *bytes_to_encode,
         {
             char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
             char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
-                ((char_array_3[1] & 0xf0) >> 4);
+                              ((char_array_3[1] & 0xf0) >> 4);
             char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
-                ((char_array_3[2] & 0xc0) >> 6);
+                              ((char_array_3[2] & 0xc0) >> 6);
             char_array_4[3] = char_array_3[2] & 0x3f;
 
-            for (i = 0; (i <4) ; i++)
+            for (i = 0; (i < 4); i++)
                 ret += base64_chars[char_array_4[i]];
             i = 0;
         }
@@ -243,10 +232,10 @@ std::string Utils::base64_encode(const unsigned char *bytes_to_encode,
             char_array_3[j] = '\0';
 
         char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
-            ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
-            ((char_array_3[2] & 0xc0) >> 6);
+        char_array_4[1] =
+            ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] =
+            ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
         char_array_4[3] = char_array_3[2] & 0x3f;
 
         for (j = 0; (j < i + 1); j++)
@@ -258,19 +247,16 @@ std::string Utils::base64_encode(const unsigned char *bytes_to_encode,
     return ret;
 }
 
-
 static inline bool is_base64(unsigned char c)
 {
     return (isalnum(c) || (c == '+') || (c == '/'));
 }
 
-
 std::vector<uint8_t> Utils::base64_decode(std::string const& encoded_string)
 {
-    const std::string base64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/";
+    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                     "abcdefghijklmnopqrstuvwxyz"
+                                     "0123456789+/";
 
     std::string::size_type in_len = encoded_string.size();
     int i = 0;
@@ -279,20 +265,21 @@ std::vector<uint8_t> Utils::base64_decode(std::string const& encoded_string)
     unsigned char char_array_4[4], char_array_3[3];
     std::vector<uint8_t> ret;
 
-    while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_]))
+    while (in_len-- && (encoded_string[in_] != '=') &&
+           is_base64(encoded_string[in_]))
     {
         char_array_4[i++] = encoded_string[in_];
         in_++;
         if (i == 4)
         {
-            for (i = 0; i <4; i++)
+            for (i = 0; i < 4; i++)
                 char_array_4[i] = static_cast<unsigned char>(
                     base64_chars.find(char_array_4[i]));
 
-            char_array_3[0] = (char_array_4[0] << 2) +
-                ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[0] =
+                (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
             char_array_3[1] = ((char_array_4[1] & 0xf) << 4) +
-                ((char_array_4[2] & 0x3c) >> 2);
+                              ((char_array_4[2] & 0x3c) >> 2);
             char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
             for (i = 0; (i < 3); i++)
@@ -303,14 +290,17 @@ std::vector<uint8_t> Utils::base64_decode(std::string const& encoded_string)
 
     if (i)
     {
-        for (j = i; j <4; j++)
+        for (j = i; j < 4; j++)
             char_array_4[j] = 0;
 
-        for (j = 0; j <4; j++)
-            char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
+        for (j = 0; j < 4; j++)
+            char_array_4[j] =
+                static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
 
-        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[0] =
+            (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] =
+            ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
         char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
         for (j = 0; (j < i - 1); j++)
@@ -318,7 +308,6 @@ std::vector<uint8_t> Utils::base64_decode(std::string const& encoded_string)
     }
     return ret;
 }
-
 
 FILE* Utils::portable_popen(const std::string& command, const std::string& mode)
 {
@@ -328,7 +317,6 @@ FILE* Utils::portable_popen(const std::string& command, const std::string& mode)
     return popen(command.c_str(), mode.c_str());
 #endif
 }
-
 
 int Utils::portable_pclose(FILE* fp)
 {
@@ -355,7 +343,6 @@ int Utils::portable_pclose(FILE* fp)
     return status;
 }
 
-
 int Utils::run_shell_command(const std::string& cmd, std::string& output)
 {
     const int maxbuf = 4096;
@@ -372,17 +359,19 @@ int Utils::run_shell_command(const std::string& cmd, std::string& output)
     {
         if (fgets(buf, maxbuf, fp) == NULL)
         {
-            if (feof(fp)) break;
-            if (ferror(fp)) break;
+            if (feof(fp))
+                break;
+            if (ferror(fp))
+                break;
         }
         output += buf;
     }
     return portable_pclose(fp);
 }
 
-
 std::string Utils::replaceAll(std::string result,
-    const std::string& replaceWhat, const std::string& replaceWithWhat)
+                              const std::string& replaceWhat,
+                              const std::string& replaceWithWhat)
 {
     size_t pos = 0;
     while (1)
@@ -398,8 +387,7 @@ std::string Utils::replaceAll(std::string result,
     return result;
 }
 
-
-std::string Utils::escapeJSON(const std::string &str)
+std::string Utils::escapeJSON(const std::string& str)
 {
 
     // All JSON is UTF-8. This will wipe off any non-utf-8
@@ -407,15 +395,13 @@ std::string Utils::escapeJSON(const std::string &str)
     std::string s;
     utf8::replace_invalid(str.begin(), str.end(), std::back_inserter(s));
 
-    std::array<std::string, 35> replacements {
-      { "\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004",
-        "\\u0005", "\\u0006", "\\u0007", "\\u0008", "\\t",
-        "\\n", "\\b", "\\f", "\\r", "\\u000E",
-        "\\u000F", "\\u0010", "\\u0011", "\\u0012", "\\u0013",
-        "\\u0014", "\\u0015", "\\u0016", "\\u0017", "\\u0018",
-        "\\u0019", "\\u001A", "\\u001B", "\\u001C", "\\u001D",
-        "\\u001E", "\\u001F", " ", "!", "\\\"" }
-    };
+    std::array<std::string, 35> replacements{
+        {"\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004", "\\u0005",
+         "\\u0006", "\\u0007", "\\u0008", "\\t",     "\\n",     "\\b",
+         "\\f",     "\\r",     "\\u000E", "\\u000F", "\\u0010", "\\u0011",
+         "\\u0012", "\\u0013", "\\u0014", "\\u0015", "\\u0016", "\\u0017",
+         "\\u0018", "\\u0019", "\\u001A", "\\u001B", "\\u001C", "\\u001D",
+         "\\u001E", "\\u001F", " ",       "!",       "\\\""}};
     for (std::string::size_type i = 0; i < s.size();)
     {
         unsigned char val = s[i];
@@ -436,9 +422,8 @@ std::string Utils::escapeJSON(const std::string &str)
     return s;
 }
 
-
 StringList Utils::wordWrap(std::string const& s, size_t lineLength,
-    size_t firstLength)
+                           size_t firstLength)
 {
     std::vector<std::string> output;
     if (s.empty())
@@ -477,9 +462,8 @@ StringList Utils::wordWrap(std::string const& s, size_t lineLength,
     return output;
 }
 
-
 StringList Utils::wordWrap2(std::string const& s, size_t lineLength,
-    size_t firstLength)
+                            size_t firstLength)
 {
     std::vector<std::string> output;
     if (s.empty())
@@ -521,7 +505,6 @@ StringList Utils::wordWrap2(std::string const& s, size_t lineLength,
     return output;
 }
 
-
 /// Demangle strings using the compiler-provided demangle function.
 /// \param[in] s  String to be demangled.
 /// \return  Demangled string
@@ -530,14 +513,13 @@ std::string Utils::demangle(const std::string& s)
 #ifndef _WIN32
     int status;
     std::unique_ptr<char[], void (*)(void*)> result(
-            abi::__cxa_demangle(s.c_str(), 0, 0, &status), std::free);
+        abi::__cxa_demangle(s.c_str(), 0, 0, &status), std::free);
     if (status == 0)
         return std::string(result.get());
 #endif
 
     return s;
 }
-
 
 int Utils::screenWidth()
 {
@@ -551,20 +533,21 @@ int Utils::screenWidth()
         return ws.ws_col;
     else
     {
-       if (errno  == EBADF)
-           throw std::runtime_error("screen width not a valid file descriptor");
-       else if (errno  == EFAULT)
-           throw std::runtime_error("Inaccessible memory access in ioctl");
-       else if (errno  == EINVAL)
-           throw std::runtime_error("Request invalid in gathering screenWidth");
-       else
-           // we are not a tty, so just return 80 *shrug*
-           return 80;
-   }
+        if (errno == EBADF)
+            throw std::runtime_error(
+                "screen width not a valid file descriptor");
+        else if (errno == EFAULT)
+            throw std::runtime_error("Inaccessible memory access in ioctl");
+        else if (errno == EINVAL)
+            throw std::runtime_error(
+                "Request invalid in gathering screenWidth");
+        else
+            // we are not a tty, so just return 80 *shrug*
+            return 80;
+    }
 
 #endif
 }
-
 
 std::string Utils::escapeNonprinting(const std::string& s)
 {
@@ -594,7 +577,6 @@ std::string Utils::escapeNonprinting(const std::string& s)
     return out;
 }
 
-
 double Utils::normalizeLongitude(double longitude)
 {
     longitude = fmod(longitude, 360.0);
@@ -604,8 +586,6 @@ double Utils::normalizeLongitude(double longitude)
         longitude -= 360;
     return longitude;
 }
-
-
 
 std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)
 {
@@ -640,7 +620,7 @@ std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)
             }
             else if (cmdline[i] == '"')
                 instring = true;
-            else if (cmdline[i] ==  '\\')
+            else if (cmdline[i] == '\\')
                 escape = true;
             else if (std::isspace(cmdline[i]))
             {
@@ -660,4 +640,3 @@ std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)
 }
 
 } // namespace pdal
-

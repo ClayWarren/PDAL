@@ -1,7 +1,7 @@
-#include <pdal/PointView.hpp>
-#include <pdal/PointTable.hpp>
 #include <pdal/Dimension.hpp>
 #include <pdal/Options.hpp>
+#include <pdal/PointTable.hpp>
+#include <pdal/PointView.hpp>
 #include <pdal/StageFactory.hpp>
 
 #include <io/BufferReader.hpp>
@@ -21,8 +21,8 @@ void fillView(pdal::PointViewPtr view)
     {
         Point p;
 
-        p.x = -93.0 + i*0.001;
-        p.y = 42.0 + i*0.001;
+        p.x = -93.0 + i * 0.001;
+        p.y = 42.0 + i * 0.001;
         p.z = 106.0 + i;
 
         view->setField(pdal::Dimension::Id::X, i, p.x);
@@ -30,7 +30,6 @@ void fillView(pdal::PointViewPtr view)
         view->setField(pdal::Dimension::Id::Z, i, p.z);
     }
 }
-
 
 int main(int argc, char* argv[])
 {
@@ -53,8 +52,9 @@ int main(int argc, char* argv[])
 
     StageFactory factory;
 
-    // StageFactory always "owns" stages it creates. They'll be destroyed with the factory.
-    Stage *writer = factory.createStage("writers.las");
+    // StageFactory always "owns" stages it creates. They'll be destroyed with
+    // the factory.
+    Stage* writer = factory.createStage("writers.las");
 
     writer->setInput(reader);
     writer->setOptions(options);

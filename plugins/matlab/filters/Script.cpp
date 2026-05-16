@@ -1,47 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2017, Howard Butler (howard@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2017, Howard Butler (howard@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "Script.hpp"
-
 
 namespace pdal
 {
 namespace mlang
 {
 
-
-std::ostream& operator << (std::ostream& os, Script const& script)
+std::ostream& operator<<(std::ostream& os, Script const& script)
 {
     os << "source=[" << script.m_source.size() << " bytes], ";
     os << std::endl;
@@ -84,15 +82,14 @@ std::string Script::getSRSWKT(mxArray* array, LogPtr log)
         {
             size_t len = mxGetN(s);
             std::string data;
-            data.resize(len+1);
-            int ret = mxGetString(s, const_cast<char*>(data.data()), len+1);
+            data.resize(len + 1);
+            int ret = mxGetString(s, const_cast<char*>(data.data()), len + 1);
             output = std::string(data);
         }
     }
 
     return output;
 }
-
 
 PointLayoutPtr Script::getStructLayout(mxArray* array, LogPtr log)
 {
@@ -104,7 +101,6 @@ PointLayoutPtr Script::getStructLayout(mxArray* array, LogPtr log)
     if (ml_id != mxSTRUCT_CLASS)
         throw pdal::pdal_error("Selected array must be a Matlab struct array!");
 
-
     int numFields = mxGetNumberOfFields(array);
 
     if (!numFields)
@@ -112,22 +108,16 @@ PointLayoutPtr Script::getStructLayout(mxArray* array, LogPtr log)
 
     // This needs to skip mxClassID types that
     // don't map to PDAL
-    for (int i=0; i < numFields; ++i)
+    for (int i = 0; i < numFields; ++i)
     {
         const char* fieldName = mxGetFieldNameByNumber(array, i);
         mxArray* f = mxGetFieldByNumber(array, 0, i);
         mxClassID mt = mxGetClassID(f);
         Dimension::Type pt = Script::getPDALDataType(mt);
-        if (mt == mxDOUBLE_CLASS ||
-            mt == mxSINGLE_CLASS ||
-            mt == mxINT8_CLASS   ||
-            mt == mxUINT8_CLASS  ||
-            mt == mxINT16_CLASS  ||
-            mt == mxUINT16_CLASS ||
-            mt == mxINT32_CLASS  ||
-            mt == mxUINT32_CLASS ||
-            mt == mxINT64_CLASS  ||
-            mt == mxUINT64_CLASS )
+        if (mt == mxDOUBLE_CLASS || mt == mxSINGLE_CLASS ||
+            mt == mxINT8_CLASS || mt == mxUINT8_CLASS || mt == mxINT16_CLASS ||
+            mt == mxUINT16_CLASS || mt == mxINT32_CLASS ||
+            mt == mxUINT32_CLASS || mt == mxINT64_CLASS || mt == mxUINT64_CLASS)
         {
             layout->registerOrAssignDim(fieldName, pt);
         }
@@ -137,8 +127,10 @@ PointLayoutPtr Script::getStructLayout(mxArray* array, LogPtr log)
     return layout;
 }
 
-
-void Script::getMatlabStruct(mxArray* array, PointViewPtr view, const Dimension::IdList& indims, std::string& pdalargs, MetadataNode pdalmetadata, LogPtr log)
+void Script::getMatlabStruct(mxArray* array, PointViewPtr view,
+                             const Dimension::IdList& indims,
+                             std::string& pdalargs, MetadataNode pdalmetadata,
+                             LogPtr log)
 {
     std::vector<mxArray*> arrays;
     std::vector<std::string> dimNames;
@@ -159,20 +151,20 @@ void Script::getMatlabStruct(mxArray* array, PointViewPtr view, const Dimension:
             {
                 size_t len = mxGetN(args);
                 std::string data;
-                data.resize(len+1);
-                int ret = mxGetString(args, const_cast<char*>(data.data()),
-                    len+1);
+                data.resize(len + 1);
+                int ret =
+                    mxGetString(args, const_cast<char*>(data.data()), len + 1);
                 pdalargs = std::string(data);
             }
         }
     }
-    Dimension::IdList  dims;
+    Dimension::IdList dims;
     if (!indims.size())
         dims = view->dims();
     else
         dims = indims;
 
-    for (auto d: dims)
+    for (auto d : dims)
     {
         std::string dimName = view->dimName(d);
 
@@ -180,7 +172,8 @@ void Script::getMatlabStruct(mxArray* array, PointViewPtr view, const Dimension:
         if (!f)
         {
             std::ostringstream oss;
-            oss << "No dimension named '" << dimName << "' exists on struct array.";
+            oss << "No dimension named '" << dimName
+                << "' exists on struct array.";
             throw pdal::pdal_error(oss.str());
         }
 
@@ -201,7 +194,8 @@ void Script::getMatlabStruct(mxArray* array, PointViewPtr view, const Dimension:
         if (!p)
         {
             std::ostringstream oss;
-            oss << "Unable to fetch Matlab pointer to array for dimension '" << dimName << "'";
+            oss << "Unable to fetch Matlab pointer to array for dimension '"
+                << dimName << "'";
             throw pdal::pdal_error(oss.str());
         }
 
@@ -215,13 +209,16 @@ void Script::getMatlabStruct(mxArray* array, PointViewPtr view, const Dimension:
     // TODO: add back metadata
 }
 
-mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& indims, const std::string& pdalargs, MetadataNode mdataNode,  LogPtr log)
+mxArray* Script::setMatlabStruct(PointViewPtr view,
+                                 const Dimension::IdList& indims,
+                                 const std::string& pdalargs,
+                                 MetadataNode mdataNode, LogPtr log)
 {
 
     std::vector<mxArray*> arrays;
     std::vector<std::string> dimNames;
 
-    Dimension::IdList  dims;
+    Dimension::IdList dims;
     if (!indims.size())
         dims = view->dims();
     else
@@ -232,13 +229,13 @@ mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& ind
     mdims[1] = 1;
 
     std::stringstream dimensionsString;
-    for (auto d: dims)
+    for (auto d : dims)
     {
         std::string dimName = Dimension::name(d);
-        mxArray* array = mxCreateNumericArray(  2,
-                                                mdims,
-                                                (mxClassID)mlang::Script::getMatlabDataType(view->dimType(d)),
-                                                (mxComplexity)0);
+        mxArray* array = mxCreateNumericArray(
+            2, mdims,
+            (mxClassID)mlang::Script::getMatlabDataType(view->dimType(d)),
+            (mxComplexity)0);
         arrays.push_back(array);
         dimNames.push_back(dimName);
     }
@@ -259,15 +256,11 @@ mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& ind
     }
 
     // Push the dimension names into a char**
-    auto convert = [](std::string& s)
-    {
-        return s.c_str();
-    };
+    auto convert = [](std::string& s) { return s.c_str(); };
     //
     // Going into a 1x1 struct
     mdims[0] = 1;
     mdims[1] = 1;
-
 
     std::vector<const char*> fieldNames;
 
@@ -282,9 +275,10 @@ mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& ind
     metadataDimNames.push_back("vertical");
     metadataDimNames.push_back("pdalargs");
 
-
-    std::transform(metadataDimNames.begin(), metadataDimNames.end(), std::back_inserter(fieldNames), convert);
-    mxArray* metadata = mxCreateStructArray(2, mdims, metadataDimNames.size(), fieldNames.data());
+    std::transform(metadataDimNames.begin(), metadataDimNames.end(),
+                   std::back_inserter(fieldNames), convert);
+    mxArray* metadata = mxCreateStructArray(2, mdims, metadataDimNames.size(),
+                                            fieldNames.data());
 
     std::stringstream strm;
     MetadataNode root = mdataNode.clone("metadata");
@@ -311,8 +305,10 @@ mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& ind
     mxSetField(metadata, 0, "pdalargs", pargs);
 
     fieldNames.clear();
-    std::transform(dimNames.begin(), dimNames.end(), std::back_inserter(fieldNames), convert);
-    mxArray* s = mxCreateStructArray(2, mdims, dimNames.size(), fieldNames.data());
+    std::transform(dimNames.begin(), dimNames.end(),
+                   std::back_inserter(fieldNames), convert);
+    mxArray* s =
+        mxCreateStructArray(2, mdims, dimNames.size(), fieldNames.data());
     for (size_t j = 0; j < dims.size(); ++j)
     {
         std::string dimName = dimNames[j];
@@ -322,10 +318,7 @@ mxArray* Script::setMatlabStruct(PointViewPtr view, const Dimension::IdList& ind
 
     mxSetField(s, 0, "metadata", metadata);
 
-
-
     return s;
-
 }
 
 Dimension::Type Script::getPDALDataType(mxClassID t)
@@ -396,6 +389,5 @@ int Script::getMatlabDataType(Dimension::Type t)
     return -1;
 }
 
-} //namespace plang
-} //namespace pdal
-
+} // namespace mlang
+} // namespace pdal

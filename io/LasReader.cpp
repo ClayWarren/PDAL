@@ -1,61 +1,60 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include "LasHeader.hpp"
 #include "LasReader.hpp"
+#include "LasHeader.hpp"
+#include "private/connector/Connector.hpp"
 #include "private/las/ChunkInfo.hpp"
 #include "private/las/Header.hpp"
 #include "private/las/Srs.hpp"
 #include "private/las/Tile.hpp"
 #include "private/las/Utils.hpp"
 #include "private/las/Vlr.hpp"
-#include "private/connector/Connector.hpp"
 
 #include <condition_variable>
 #include <mutex>
 #include <sstream>
 #include <string.h>
 
-#include <pdal/pdal_features.hpp>
+#include <lazperf/readers.hpp>
 #include <pdal/Metadata.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/QuickInfo.hpp>
+#include <pdal/pdal_features.hpp>
 #include <pdal/util/Extractor.hpp>
 #include <pdal/util/IStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <lazperf/readers.hpp>
-
 
 namespace pdal
 {
@@ -67,8 +66,7 @@ constexpr int DefaultNumThreads = 7;
 
 struct invalid_stream : public std::runtime_error
 {
-    invalid_stream(const std::string& msg) : std::runtime_error(msg)
-        {}
+    invalid_stream(const std::string& msg) : std::runtime_error(msg) {}
 };
 
 struct SrsOrderSpec
@@ -81,43 +79,47 @@ struct SrsOrderSpec
 namespace Utils
 {
 
-template<>
-StatusWithReason fromString(const std::string& from,
-    SrsOrderSpec& srsOrder)
+template <>
+StatusWithReason fromString(const std::string& from, SrsOrderSpec& srsOrder)
 {
     using namespace las;
 
-     static const std::map<std::string, SrsType> typemap =
-        { { "wkt2", SrsType::Wkt2 },
-          { "wkt1", SrsType::Wkt1 },
-          { "projjson", SrsType::Proj },
-          { "geotiff", SrsType::Geotiff } };
+    static const std::map<std::string, SrsType> typemap = {
+        {"wkt2", SrsType::Wkt2},
+        {"wkt1", SrsType::Wkt1},
+        {"projjson", SrsType::Proj},
+        {"geotiff", SrsType::Geotiff}};
 
     StringList srsTypes = Utils::split2(from, ',');
     std::transform(srsTypes.cbegin(), srsTypes.cend(), srsTypes.begin(),
-        [](std::string s){ Utils::trim(s); return Utils::tolower(s); });
+                   [](std::string s)
+                   {
+                       Utils::trim(s);
+                       return Utils::tolower(s);
+                   });
 
     for (std::string& stype : srsTypes)
     {
         auto it = typemap.find(stype);
         if (it == typemap.end())
-            return { -1, "Invalid SRS type '" + stype + "'. Must be one of 'wkt1', "
-                "'geotiff', 'wkt' or 'projjson'." };
+            return {-1, "Invalid SRS type '" + stype +
+                            "'. Must be one of 'wkt1', "
+                            "'geotiff', 'wkt' or 'projjson'."};
         SrsType type = it->second;
         if (Utils::contains(srsOrder.types, type))
-            return { -1,
-                "Duplicate SRS type '" + stype + "' in 'vlr_srs_order'" };
+            return {-1,
+                    "Duplicate SRS type '" + stype + "' in 'vlr_srs_order'"};
         srsOrder.types.push_back(type);
     }
     return true;
 }
 
-template<>
-std::string toString(const SrsOrderSpec& srsOrder)
+template <> std::string toString(const SrsOrderSpec& srsOrder)
 {
     using namespace las;
 
-    static const std::array<std::string, 4> srsTypeNames { "wkt1", "geotiff", "projjson", "wkt2" };
+    static const std::array<std::string, 4> srsTypeNames{"wkt1", "geotiff",
+                                                         "projjson", "wkt2"};
 
     std::string out;
     for (SrsType type : srsOrder.types)
@@ -132,7 +134,7 @@ std::string toString(const SrsOrderSpec& srsOrder)
 struct LasReader::Options
 {
     StringList extraDimSpec;
-    //ABELL
+    // ABELL
     std::string compression;
     bool useEbVlr;
     StringList ignoreVLROption;
@@ -167,50 +169,63 @@ struct LasReader::Private
     // The index of the chunk (tile) we want to read data from.
     uint32_t nextReadChunk;
     std::function<void()> queueNext;
-    std::function<void(PointRef&, const char *, size_t)> loadPoint;
+    std::function<void(PointRef&, const char*, size_t)> loadPoint;
     std::mutex mutex;
     std::condition_variable processedCv;
     bool isRemote;
     std::unique_ptr<connector::Connector> connector;
 
-    Private() : apiHeader(header, srs, vlrs), index(0), pool(DefaultNumThreads), isRemote(false)
-    {}
+    Private()
+        : apiHeader(header, srs, vlrs), index(0), pool(DefaultNumThreads),
+          isRemote(false)
+    {
+    }
 };
 
-LasReader::LasReader() : d(new Private)
-{}
+LasReader::LasReader() : d(new Private) {}
 
 LasReader::~LasReader()
-{ cleanup(); }
+{
+    cleanup();
+}
 
 void LasReader::addArgs(ProgramArgs& args)
 {
-    args.add("extra_dims", "Dimensions to assign to extra byte data", d->opts.extraDimSpec);
-    args.add("compression", "Decompressor to use", d->opts.compression, "EITHER");
-    args.add("use_eb_vlr", "Use extra bytes VLR for 1.0 - 1.3 files", d->opts.useEbVlr);
-    args.add("ignore_vlr", "VLR userid/recordid to ignore", d->opts.ignoreVLROption );
-    args.add("ignore_missing_vlrs", "Ignore any missing VLRs rather than throwing an error",
+    args.add("extra_dims", "Dimensions to assign to extra byte data",
+             d->opts.extraDimSpec);
+    args.add("compression", "Decompressor to use", d->opts.compression,
+             "EITHER");
+    args.add("use_eb_vlr", "Use extra bytes VLR for 1.0 - 1.3 files",
+             d->opts.useEbVlr);
+    args.add("ignore_vlr", "VLR userid/recordid to ignore",
+             d->opts.ignoreVLROption);
+    args.add("ignore_missing_vlrs",
+             "Ignore any missing VLRs rather than throwing an error",
              d->opts.ignoreMissingVLRs);
-    args.add("start", "Point at which reading should start (0-indexed).", d->opts.start);
-    args.add("fix_dims", "Make invalid dimension names valid by changing "
-        "invalid characters to '_'", d->opts.fixNames, true);
+    args.add("start", "Point at which reading should start (0-indexed).",
+             d->opts.start);
+    args.add("fix_dims",
+             "Make invalid dimension names valid by changing "
+             "invalid characters to '_'",
+             d->opts.fixNames, true);
     args.add("nosrs", "Skip reading/processing file SRS", d->opts.nosrs);
-    args.add("threads", "Thread pool size", d->opts.numThreads, DefaultNumThreads);
+    args.add("threads", "Thread pool size", d->opts.numThreads,
+             DefaultNumThreads);
     args.add("srs_vlr_order", "Preference order to read SRS VLRs",
-        d->opts.srsVlrOrder);
+             d->opts.srsVlrOrder);
 }
 
-
-static StaticPluginInfo const s_info {
-    "readers.las",
-    "ASPRS LAS 1.0 - 1.4 read support",
-    "https://pdal.org/stages/readers.las.html",
-    { "las", "laz" }
-};
+static StaticPluginInfo const s_info{"readers.las",
+                                     "ASPRS LAS 1.0 - 1.4 read support",
+                                     "https://pdal.org/stages/readers.las.html",
+                                     {"las", "laz"}};
 
 CREATE_STATIC_STAGE(LasReader, s_info)
 
-std::string LasReader::getName() const { return s_info.name; }
+std::string LasReader::getName() const
+{
+    return s_info.name;
+}
 
 const LasHeader& LasReader::header() const
 {
@@ -222,11 +237,12 @@ const las::Header& LasReader::lasHeader() const
     return d->header;
 }
 
-uint64_t LasReader::vlrData(const std::string& userId, uint16_t recordId, char const * & data)
+uint64_t LasReader::vlrData(const std::string& userId, uint16_t recordId,
+                            char const*& data)
 {
-    const las::Vlr *vlr = las::findVlr(userId, recordId, d->vlrs);
+    const las::Vlr* vlr = las::findVlr(userId, recordId, d->vlrs);
     if (!vlr)
-	return 0;
+        return 0;
     data = vlr->data();
     return vlr->dataVec.size();
 }
@@ -275,19 +291,20 @@ QuickInfo LasReader::inspect()
     return qi;
 }
 
-
-// IMPORTANT NOTE: Unless you're going to totally overhaul things, you *must* use this
-//  virtual function to create a stream that you *must* use. NITF files contain embedded
-//  LAS files and this allows native and embedded files to be accessed identically. All
-//  the file positioning works assuming that the file is pure LAS/LAZ thanks to this.
+// IMPORTANT NOTE: Unless you're going to totally overhaul things, you *must*
+// use this
+//  virtual function to create a stream that you *must* use. NITF files contain
+//  embedded LAS files and this allows native and embedded files to be accessed
+//  identically. All the file positioning works assuming that the file is pure
+//  LAS/LAZ thanks to this.
 LasReader::LasStreamPtr LasReader::createStream()
 {
     LasStreamPtr s(new LasStreamIf(m_filename));
     if (!s->isOpen())
     {
         std::ostringstream oss;
-        oss << "Unable to open stream for '"
-            << m_filename << "' with error '" << strerror(errno) << "'";
+        oss << "Unable to open stream for '" << m_filename << "' with error '"
+            << strerror(errno) << "'";
         throw pdal_error(oss.str());
     }
     return s;
@@ -326,32 +343,32 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
     if (errors.size())
         throwError(errors.front());
     if (d->header.has14PointFormat() && !d->header.useWkt())
-        log()->get(LogLevel::Warning) <<
-            "Global encoding WKT flag not set for point format 6 - 10.\n";
+        log()->get(LogLevel::Warning)
+            << "Global encoding WKT flag not set for point format 6 - 10.\n";
 
     // Set the queue function based on whether we're compressed or not.
-    d->queueNext = d->header.dataCompressed() ?
-        std::bind(&LasReader::queueNextCompressedChunk, this) :
-        std::bind(&LasReader::queueNextStandardChunk, this);
+    d->queueNext = d->header.dataCompressed()
+                       ? std::bind(&LasReader::queueNextCompressedChunk, this)
+                       : std::bind(&LasReader::queueNextStandardChunk, this);
 
     // Set the load function based on whether we're 1.4 format or not.
     using namespace std::placeholders;
-    d->loadPoint = d->header.has14PointFormat() ?
-        std::bind(&LasReader::loadPointV14, this, _1, _2, _3) :
-        std::bind(&LasReader::loadPointV10, this, _1, _2, _3);
+    d->loadPoint = d->header.has14PointFormat()
+                       ? std::bind(&LasReader::loadPointV14, this, _1, _2, _3)
+                       : std::bind(&LasReader::loadPointV10, this, _1, _2, _3);
 
     // Go peek into header and see if we are COPC
-    // If we over-read the file, the error state will be set, but things are really fine for
-    // a zero-point file, so clear the error.
+    // If we over-read the file, the error state will be set, but things are
+    // really fine for a zero-point file, so clear the error.
     stream.clear();
     stream.seekg(377);
-    char copcBuf[4] {};
+    char copcBuf[4]{};
     stream.read(copcBuf, 4);
     m.add("copc", ::memcmp(copcBuf, "copc", 4) == 0);
 
     // Read VLRs.
-    // Clear the error state since the seek or read above may have failed but the file could
-    // still be fine.
+    // Clear the error state since the seek or read above may have failed but
+    // the file could still be fine.
     stream.clear();
     stream.seekg(d->header.headerSize);
 
@@ -361,7 +378,7 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
     {
         las::Vlr vlr;
 
-        stream.read((char *)vlrHeaderBuf, las::Vlr::HeaderSize);
+        stream.read((char*)vlrHeaderBuf, las::Vlr::HeaderSize);
         if (stream.gcount() != las::Vlr::HeaderSize)
         {
             if (d->opts.ignoreMissingVLRs)
@@ -370,12 +387,14 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
                        ". End of file reached.");
         }
         vlr.fillHeader(vlrHeaderBuf);
-        if ((uint64_t)stream.tellg() + vlr.promisedDataSize > d->header.pointOffset)
+        if ((uint64_t)stream.tellg() + vlr.promisedDataSize >
+            d->header.pointOffset)
         {
             if (d->opts.ignoreMissingVLRs)
                 break;
             throwError("VLR " + std::to_string(i + 1) + "(" + vlr.userId + "/" +
-                       std::to_string(vlr.recordId) + ") "
+                       std::to_string(vlr.recordId) +
+                       ") "
                        "size too large -- flows into point data.");
         }
         if (las::shouldIgnoreVlr(vlr, d->ignoreVlrs))
@@ -405,16 +424,17 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
         {
             las::Evlr evlr;
 
-            stream.read((char *)evlrHeaderBuf, las::Evlr::HeaderSize);
+            stream.read((char*)evlrHeaderBuf, las::Evlr::HeaderSize);
             if (stream.gcount() != las::Evlr::HeaderSize)
                 throwError("Couldn't read EVLR " + std::to_string(i + 1) +
-                    ". End of file reached.");
+                           ". End of file reached.");
             evlr.fillHeader(evlrHeaderBuf);
 
             if ((uint64_t)stream.tellg() + evlr.promisedDataSize > fileSize)
-                throwError("EVLR " + std::to_string(i + 1) +
-                    "(" + evlr.userId + "/" + std::to_string(evlr.recordId) + ") "
-                    "size too large -- exceeds file size.");
+                throwError("EVLR " + std::to_string(i + 1) + "(" + evlr.userId +
+                           "/" + std::to_string(evlr.recordId) +
+                           ") "
+                           "size too large -- exceeds file size.");
             if (las::shouldIgnoreVlr(evlr, d->ignoreVlrs))
             {
                 stream.seekg(evlr.promisedDataSize, std::ios::cur);
@@ -425,26 +445,31 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
             stream.read(evlr.data(), evlr.promisedDataSize);
 
             if (stream.gcount() != (std::streamsize)evlr.promisedDataSize)
-                throwError("Couldn't read EVLR " + std::to_string(i + 1) + " at offset " +
-                    std::to_string(pos) + ". Location is past the end of the file.");
+                throwError("Couldn't read EVLR " + std::to_string(i + 1) +
+                           " at offset " + std::to_string(pos) +
+                           ". Location is past the end of the file.");
             d->vlrs.push_back(std::move(evlr));
         }
     }
 
     if (!d->opts.nosrs)
-        d->srs.init(d->vlrs, d->opts.srsVlrOrder.types, d->header.mustUseWkt(), log());
+        d->srs.init(d->vlrs, d->opts.srsVlrOrder.types, d->header.mustUseWkt(),
+                    log());
 
     d->end = d->header.pointCount();
     if (d->header.pointCount())
     {
         if (d->opts.start >= d->header.pointCount())
-            throwError("'start' value of " + std::to_string(d->opts.start) + " is too large. "
-                "File contains " + std::to_string(d->header.pointCount()) + " points.");
+            throwError("'start' value of " + std::to_string(d->opts.start) +
+                       " is too large. "
+                       "File contains " +
+                       std::to_string(d->header.pointCount()) + " points.");
 
         // maxPoints is positive because start is less than count from above.
         uint64_t maxPoints = d->header.pointCount() - d->opts.start;
 
-        // count() can be a crazy-high value -- don't overflow with the addition.
+        // count() can be a crazy-high value -- don't overflow with the
+        // addition.
         if (count() < maxPoints)
             d->end = d->opts.start + count();
     }
@@ -459,7 +484,6 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
     for (int i = 0; i < (int)d->vlrs.size(); ++i)
         las::addVlrMetadata(d->vlrs[i], "vlr_" + std::to_string(i), forward, m);
 }
-
 
 void LasReader::ready(PointTableRef table)
 {
@@ -476,15 +500,16 @@ void LasReader::ready(PointTableRef table)
     d->index = 0;
     if (d->header.dataCompressed())
     {
-        const las::Vlr *vlr = las::findVlr(las::LaszipUserId, las::LaszipRecordId, d->vlrs);
+        const las::Vlr* vlr =
+            las::findVlr(las::LaszipUserId, las::LaszipRecordId, d->vlrs);
         if (!vlr)
             throwError("LAZ file missing required laszip VLR.");
         lazperf::laz_vlr laz_vlr;
         laz_vlr.fill(vlr->data(), vlr->dataSize());
         try
         {
-            d->chunkInfo.load(stream, d->header.pointOffset, d->header.pointCount(),
-                laz_vlr.chunk_size);
+            d->chunkInfo.load(stream, d->header.pointOffset,
+                              d->header.pointCount(), laz_vlr.chunk_size);
         }
         catch (const pdal_error& e)
         {
@@ -498,7 +523,8 @@ void LasReader::ready(PointTableRef table)
             if (d->opts.start >= d->header.pointCount())
                 throwError("'start' option set past end of file.");
             d->nextFetchChunk = d->chunkInfo.chunk(d->opts.start);
-            d->nextFetchPoint = d->chunkInfo.index(d->opts.start, d->nextFetchChunk);
+            d->nextFetchPoint =
+                d->chunkInfo.index(d->opts.start, d->nextFetchChunk);
         }
         d->nextReadChunk = d->nextFetchChunk;
     }
@@ -522,50 +548,53 @@ void LasReader::queueNextCompressedChunk()
     uint32_t chunk = d->nextFetchChunk;
     uint32_t start = (uint32_t)d->nextFetchPoint;
 
-    d->pool.add([this, chunk, start]()
-    {
-        uint32_t chunkpoints = d->chunkInfo.chunkPoints(chunk);
-        uint64_t chunkoffset = d->chunkInfo.chunkOffset(chunk);
-        uint32_t chunksize = d->chunkInfo.chunkSize(chunk);
-
-        LasStreamPtr lasStream = createStream();
-        std::istream& in(*lasStream);
-
-        std::vector<char> buf(chunksize);
-        in.seekg(chunkoffset);
-        in.read(buf.data(), buf.size());
-
-        int32_t tilepoints = chunkpoints - start;
-        las::TilePtr tile = std::make_unique<las::Tile>(chunk, tilepoints * d->header.pointSize);
-
-        lazperf::reader::chunk_decompressor decomp(d->header.pointFormat(), d->header.ebCount(),
-            buf.data());
-
-        // We have to decompress all the points, even if we're discarding the points at
-        // the front because nextFetchPoint isn't 0. Just reuse the front of the tile
-        // buffer for discarded points.
-        char *pos = tile->data();
-        for (uint32_t i = 0; i < chunkpoints; ++i)
+    d->pool.add(
+        [this, chunk, start]()
         {
-            decomp.decompress(pos);
+            uint32_t chunkpoints = d->chunkInfo.chunkPoints(chunk);
+            uint64_t chunkoffset = d->chunkInfo.chunkOffset(chunk);
+            uint32_t chunksize = d->chunkInfo.chunkSize(chunk);
 
-            // Advance the point location in the tile if we're keeping the point.
-            if (i >= start)
-                pos += d->header.pointSize;
-        }
-        {
-            std::unique_lock l(d->mutex);
-            for (las::TilePtr& t : d->tiles)
-                if (!t)
-                {
-                    t = std::move(tile);
-                    goto done;
-                }
-            d->tiles.push_back(std::move(tile));
-        }
+            LasStreamPtr lasStream = createStream();
+            std::istream& in(*lasStream);
+
+            std::vector<char> buf(chunksize);
+            in.seekg(chunkoffset);
+            in.read(buf.data(), buf.size());
+
+            int32_t tilepoints = chunkpoints - start;
+            las::TilePtr tile = std::make_unique<las::Tile>(
+                chunk, tilepoints * d->header.pointSize);
+
+            lazperf::reader::chunk_decompressor decomp(
+                d->header.pointFormat(), d->header.ebCount(), buf.data());
+
+            // We have to decompress all the points, even if we're discarding
+            // the points at the front because nextFetchPoint isn't 0. Just
+            // reuse the front of the tile buffer for discarded points.
+            char* pos = tile->data();
+            for (uint32_t i = 0; i < chunkpoints; ++i)
+            {
+                decomp.decompress(pos);
+
+                // Advance the point location in the tile if we're keeping the
+                // point.
+                if (i >= start)
+                    pos += d->header.pointSize;
+            }
+            {
+                std::unique_lock l(d->mutex);
+                for (las::TilePtr& t : d->tiles)
+                    if (!t)
+                    {
+                        t = std::move(tile);
+                        goto done;
+                    }
+                d->tiles.push_back(std::move(tile));
+            }
         done:
-        d->processedCv.notify_one();
-    });
+            d->processedCv.notify_one();
+        });
     d->nextFetchChunk++;
     // After the first chunk, we always start at 0.
     d->nextFetchPoint = 0;
@@ -581,28 +610,30 @@ void LasReader::queueNextStandardChunk()
     int chunk = d->nextFetchChunk;
     uint64_t start = d->nextFetchPoint;
     uint64_t count = (std::min)(chunkSize, d->end - start);
-    d->pool.add([this, chunk, count, start]()
-    {
-        LasStreamPtr lasStream = createStream();
-        std::istream& in(*lasStream);
-
-        las::TilePtr tile = std::make_unique<las::Tile>(chunk, count * d->header.pointSize);
-        in.seekg(d->header.pointOffset + start * d->header.pointSize);
-        in.read(tile->data(), tile->size());
-
+    d->pool.add(
+        [this, chunk, count, start]()
         {
-            std::unique_lock l(d->mutex);
-            for (las::TilePtr& t : d->tiles)
-                if (!t)
-                {
-                    t = std::move(tile);
-                    goto done;
-                }
-            d->tiles.push_back(std::move(tile));
-        }
+            LasStreamPtr lasStream = createStream();
+            std::istream& in(*lasStream);
+
+            las::TilePtr tile =
+                std::make_unique<las::Tile>(chunk, count * d->header.pointSize);
+            in.seekg(d->header.pointOffset + start * d->header.pointSize);
+            in.read(tile->data(), tile->size());
+
+            {
+                std::unique_lock l(d->mutex);
+                for (las::TilePtr& t : d->tiles)
+                    if (!t)
+                    {
+                        t = std::move(tile);
+                        goto done;
+                    }
+                d->tiles.push_back(std::move(tile));
+            }
         done:
-        d->processedCv.notify_one();
-    });
+            d->processedCv.notify_one();
+        });
 
     // This check is just to prevent overflow.
     if (d->nextFetchPoint > (std::numeric_limits<uint64_t>::max)() - chunkSize)
@@ -617,12 +648,14 @@ void LasReader::readExtraBytesVlr()
     las::VlrList lVrlEB;
     for (auto vlr : d->vlrs)
     {
-        if (vlr.userId != las::SpecUserId || vlr.recordId != las::ExtraBytesRecordId)
+        if (vlr.userId != las::SpecUserId ||
+            vlr.recordId != las::ExtraBytesRecordId)
             continue;
 
         if (vlr.dataSize() % las::ExtraBytesSpecSize != 0)
         {
-            log()->get(LogLevel::Warning) << "Bad size for extra bytes VLR.  Ignoring.\n";
+            log()->get(LogLevel::Warning)
+                << "Bad size for extra bytes VLR.  Ignoring.\n";
             continue;
         }
         lVrlEB.push_back(vlr);
@@ -632,33 +665,35 @@ void LasReader::readExtraBytesVlr()
     if (d->extraDims.size())
     {
         if (lVrlEB.size())
-            log()->get(LogLevel::Warning) << "Ignoring extra bytes VLR(s) - `extra_dims` option "
-                "was specified.\n";
+            log()->get(LogLevel::Warning)
+                << "Ignoring extra bytes VLR(s) - `extra_dims` option "
+                   "was specified.\n";
         return;
     }
 
     if (lVrlEB.size() > 1)
-        log()->get(LogLevel::Warning) << "Found " << lVrlEB.size() << " extra byte VLRs. "
-            "Concatanating all extra byte records into one.\n";
+        log()->get(LogLevel::Warning)
+            << "Found " << lVrlEB.size()
+            << " extra byte VLRs. "
+               "Concatanating all extra byte records into one.\n";
 
     std::vector<las::ExtraDim> extraDims;
     for (auto vlr : lVrlEB)
     {
-        las::ExtraDims evlr = las::ExtraBytesIf::toExtraDims(vlr.data(), vlr.dataSize(),
-            d->header.baseCount());
+        las::ExtraDims evlr = las::ExtraBytesIf::toExtraDims(
+            vlr.data(), vlr.dataSize(), d->header.baseCount());
         extraDims.insert(extraDims.end(), evlr.begin(), evlr.end());
     }
     d->extraDims = std::move(extraDims);
 }
 
-
-//ABELL - Not sure why this is its own function, but leaving it so as not to break
-//  API.
+// ABELL - Not sure why this is its own function, but leaving it so as not to
+// break
+//   API.
 void LasReader::setSrs(MetadataNode& m)
 {
     setSpatialReference(m, d->srs.get());
 }
-
 
 void LasReader::addDimensions(PointLayoutPtr layout)
 {
@@ -668,7 +703,8 @@ void LasReader::addDimensions(PointLayoutPtr layout)
     for (auto& dim : d->extraDims)
     {
         if (dim.m_size > ebLen)
-            throwError("Extra byte specification exceeds point length beyond base format length.");
+            throwError("Extra byte specification exceeds point length beyond "
+                       "base format length.");
         ebLen -= dim.m_size;
 
         Dimension::Type type = dim.m_dimType.m_type;
@@ -682,12 +718,11 @@ void LasReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
 bool LasReader::processOne(PointRef& point)
 {
-    // This is called under lock. Note that we don't remove the tile *pointer* from the
-    // vector, it just gets set to null. When we add a tile, we'll look for a null
-    // entry before we add to the vector.
+    // This is called under lock. Note that we don't remove the tile *pointer*
+    // from the vector, it just gets set to null. When we add a tile, we'll look
+    // for a null entry before we add to the vector.
     auto getTile = [this](uint32_t chunk)
     {
         for (las::TilePtr& t : d->tiles)
@@ -699,7 +734,8 @@ bool LasReader::processOne(PointRef& point)
     if (eof())
         return false;
 
-    // If we don't have an active tile, get the next one or wait for it to be ready.
+    // If we don't have an active tile, get the next one or wait for it to be
+    // ready.
     if (!d->currentTile)
     {
         {
@@ -742,8 +778,7 @@ point_count_t LasReader::read(PointViewPtr view, point_count_t count)
     return (point_count_t)i;
 }
 
-
-void LasReader::loadPointV10(PointRef& point, const char *buf, size_t bufsize)
+void LasReader::loadPointV10(PointRef& point, const char* buf, size_t bufsize)
 {
     LeExtractor istream(buf, bufsize);
 
@@ -823,8 +858,7 @@ void LasReader::loadPointV10(PointRef& point, const char *buf, size_t bufsize)
         loadExtraDims(istream, point);
 }
 
-
-void LasReader::loadPointV14(PointRef& point, const char *buf, size_t bufsize)
+void LasReader::loadPointV14(PointRef& point, const char* buf, size_t bufsize)
 {
     LeExtractor istream(buf, bufsize);
 
@@ -899,7 +933,6 @@ void LasReader::loadPointV14(PointRef& point, const char *buf, size_t bufsize)
         loadExtraDims(istream, point);
 }
 
-
 void LasReader::loadExtraDims(LeExtractor& istream, PointRef& point)
 {
     for (auto& dim : d->extraDims)
@@ -924,7 +957,6 @@ void LasReader::loadExtraDims(LeExtractor& istream, PointRef& point)
     }
 }
 
-
 void LasReader::done(PointTableRef)
 {
     cleanup();
@@ -939,9 +971,9 @@ void LasReader::cleanup()
 
 bool LasReader::eof()
 {
-    // This breaks when the number of points is the maximum (2^64 - 1), but that's never happening.
+    // This breaks when the number of points is the maximum (2^64 - 1), but
+    // that's never happening.
     return d->index >= d->end;
 }
-
 
 } // namespace pdal

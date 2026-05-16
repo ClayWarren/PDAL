@@ -36,14 +36,12 @@
 
 #include "../io/MatlabWriter.hpp"
 
+#include "Support.hpp"
 #include <FauxReader.hpp>
 #include <pdal/StageFactory.hpp>
-#include "Support.hpp"
-
 
 namespace pdal
 {
-
 
 class MatlabWriterTest : public ::testing::Test
 {
@@ -57,15 +55,12 @@ protected:
     }
 
     FauxReader m_reader;
-
 };
-
 
 TEST_F(MatlabWriterTest, constructor)
 {
     MatlabWriter writer;
 }
-
 
 TEST_F(MatlabWriterTest, findStage)
 {
@@ -73,7 +68,6 @@ TEST_F(MatlabWriterTest, findStage)
     Stage* stage(factory.createStage("writers.matlab"));
     EXPECT_TRUE(stage);
 }
-
 
 TEST_F(MatlabWriterTest, write)
 {
@@ -87,7 +81,6 @@ TEST_F(MatlabWriterTest, write)
     writer.prepare(table);
     writer.execute(table);
 }
-
 
 TEST_F(MatlabWriterTest, outputDims)
 {
@@ -103,5 +96,4 @@ TEST_F(MatlabWriterTest, outputDims)
     writer.execute(table);
 }
 
-
-}
+} // namespace pdal

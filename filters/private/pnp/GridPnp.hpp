@@ -1,8 +1,8 @@
 #pragma once
 
 #include <random>
-#include <vector>
 #include <set>
+#include <vector>
 
 #include "../Comparison.hpp"
 #include "Grid.hpp"
@@ -13,10 +13,8 @@ namespace pdal
 
 struct grid_error : public std::runtime_error
 {
-    grid_error(const std::string& s) : std::runtime_error(s)
-    {}
+    grid_error(const std::string& s) : std::runtime_error(s) {}
 };
-
 
 class GridPnp
 {
@@ -42,19 +40,20 @@ public:
         setupGrid();
     }
 
-
     GridPnp(const Ring& outer)
     {
         validateRing(outer);
         calcBounds(outer);
 
-        std::vector<Ring> inners;  // no outers.
+        std::vector<Ring> inners; // no outers.
         fillRingList(outer, inners);
         setupGrid();
     }
 
     bool inside(const Point& p) const
-    { return inside(p.first, p.second); }
+    {
+        return inside(p.first, p.second);
+    }
 
     // Determine if a point is inside the polygon attached to this class.
     bool inside(double x, double y) const
@@ -94,27 +93,44 @@ private:
     class Cell
     {
     public:
-        Cell() : m_point(
-            {std::numeric_limits<double>::quiet_NaN(),
-             std::numeric_limits<double>::quiet_NaN() })
-        {}
+        Cell()
+            : m_point({std::numeric_limits<double>::quiet_NaN(),
+                       std::numeric_limits<double>::quiet_NaN()})
+        {
+        }
 
         void addEdge(size_t edge)
-            { m_edges.push_back(edge); }
+        {
+            m_edges.push_back(edge);
+        }
         bool empty() const
-            { return m_edges.empty(); }
+        {
+            return m_edges.empty();
+        }
         void setPoint(double x, double y)
-            { m_point = Point(x, y); }
+        {
+            m_point = Point(x, y);
+        }
         bool computed() const
-            { return !std::isnan(m_point.first); }
+        {
+            return !std::isnan(m_point.first);
+        }
         GridPnp::Point point() const
-            { return m_point; }
+        {
+            return m_point;
+        }
         const std::vector<size_t>& edges() const
-            { return m_edges; }
+        {
+            return m_edges;
+        }
         bool inside() const
-            { return m_inside; }
+        {
+            return m_inside;
+        }
         void setInside(bool inside)
-            { m_inside = inside; }
+        {
+            m_inside = inside;
+        }
 
     private:
         std::vector<size_t> m_edges;
@@ -126,7 +142,9 @@ private:
     {
     public:
         EdgeIt(const RingList& r) : m_points(r), m_id(0)
-        { skipInvalid(); }
+        {
+            skipInvalid();
+        }
 
         void next()
         {
@@ -134,19 +152,23 @@ private:
             skipInvalid();
         }
 
-        EdgeId operator * () const
-        { return m_id; }
+        EdgeId operator*() const
+        {
+            return m_id;
+        }
 
-        operator bool () const
-        { return m_id < m_points.size() - 1; }
+        operator bool() const
+        {
+            return m_id < m_points.size() - 1;
+        }
 
     private:
         void skipInvalid()
         {
             while (m_id < m_points.size() - 1 &&
-                (std::isnan(m_points[m_id].first) ||
-                 std::isnan(m_points[m_id + 1].first) ||
-                 (m_points[m_id] == m_points[m_id + 1])))
+                   (std::isnan(m_points[m_id].first) ||
+                    std::isnan(m_points[m_id + 1].first) ||
+                    (m_points[m_id] == m_points[m_id + 1])))
             {
                 m_id++;
             }
@@ -156,24 +178,31 @@ private:
         size_t m_id;
     };
 
-
     const Point& point1(EdgeId id) const
-        { return m_rings[id]; }
+    {
+        return m_rings[id];
+    }
     const Point& point2(EdgeId id) const
-        { return m_rings[id + 1]; }
+    {
+        return m_rings[id + 1];
+    }
     double xval(const Point& p) const
-        { return p.first; }
+    {
+        return p.first;
+    }
     double yval(const Point& p) const
-        { return p.second; }
+    {
+        return p.second;
+    }
 
     void validateRing(const Ring& r) const
     {
         if (r.size() < 4)
             throw grid_error("Invalid ring. Ring must consist of at least "
-                " four points.");
+                             " four points.");
         if (r[0] != r[r.size() - 1])
             throw grid_error("Invalid ring. First point is not equal to "
-                "the last point.");
+                             "the last point.");
     }
 
     // Calculate the bounding box of the polygon.  At the same time
@@ -204,7 +233,6 @@ private:
         }
     }
 
-
     void fillRingList(const Ring& inner, const std::vector<Ring>& outers)
     {
         double nan = std::numeric_limits<double>::quiet_NaN();
@@ -220,7 +248,6 @@ private:
         }
     }
 
-
     void setupGrid()
     {
         double xAvgLen;
@@ -231,7 +258,6 @@ private:
         createGrid(gridSize);
         assignEdges();
     }
-
 
     void calcAvgEdgeLen(double& xAvgLen, double& yAvgLen)
     {
@@ -275,8 +301,8 @@ private:
         size_t m = (std::max)((size_t)1000, m_rings.size());
 
         // See paper for this calc.
-        double scalex = ((m_xMax - m_xMin) * yAvgLen) /
-            ((m_yMax - m_yMin) * xAvgLen);
+        double scalex =
+            ((m_xMax - m_xMin) * yAvgLen) / ((m_yMax - m_yMin) * xAvgLen);
         double scaley = 1 / scalex;
         size_t mx = (size_t)std::sqrt(m * scalex);
         size_t my = (size_t)std::sqrt(m * scaley);
@@ -284,7 +310,6 @@ private:
         // We always round up, because why not.
         return XYIndex(mx + 1, my + 1);
     }
-
 
     // Figure out the grid origin.
     void createGrid(XYIndex gridSize)
@@ -298,14 +323,13 @@ private:
         double xOrigin = m_xMin - (cellWidth / 2);
         double yOrigin = m_yMin - (cellHeight / 2);
 
-        m_grid.reset(new Grid<Cell>(gridSize.first, gridSize.second,
-            cellWidth, cellHeight, xOrigin, yOrigin));
+        m_grid.reset(new Grid<Cell>(gridSize.first, gridSize.second, cellWidth,
+                                    cellHeight, xOrigin, yOrigin));
         m_xDistribution.reset(
             new std::uniform_real_distribution<>(0, m_grid->cellWidth()));
         m_yDistribution.reset(
             new std::uniform_real_distribution<>(0, m_grid->cellHeight()));
     }
-
 
     // Loop through edges.  Add the edge to each cell traversed.
     void assignEdges()
@@ -317,14 +341,13 @@ private:
             const Point& p2 = point2(id);
             Point origin = m_grid->origin();
             VoxelRayTrace vrt(m_grid->cellWidth(), m_grid->cellHeight(),
-                xval(origin), yval(origin),
-                xval(p1), yval(p1), xval(p2), yval(p2));
+                              xval(origin), yval(origin), xval(p1), yval(p1),
+                              xval(p2), yval(p2));
             VoxelRayTrace::CellList traversedCells = vrt.emit();
             for (auto& c : traversedCells)
                 m_grid->cell(XYIndex(c.first, c.second)).addEdge(id);
         }
     }
-
 
     // Determine if a point is collinear with an edge.
     bool pointCollinear(double x, double y, EdgeId edgeId) const
@@ -340,9 +363,8 @@ private:
 
         // This is the same as saying slopes are equal.
         return Comparison::closeEnough((x - x2) * (y - y1),
-            (y - y2) * (x - x1));
+                                       (y - y2) * (x - x1));
     }
-
 
     // Put a reference point in the cell.  Figure out if the reference point
     // is inside the polygon.
@@ -351,7 +373,6 @@ private:
         generateRefPoint(cell, pos);
         determinePointStatus(cell, pos);
     }
-
 
     // The paper uses point centers, but then has to deal with points that
     // are "singular" (rest on a polygon edge).  But there's nothing special
@@ -381,7 +402,6 @@ private:
         cell.setPoint(x, y);
     }
 
-
     // Determine the status of a cell's reference point by drawing a segment
     // from the reference point in the cell to the left and count crossings.
     // Knowing the number of edge crossings and the inside/outside status
@@ -408,7 +428,7 @@ private:
         }
         else
         {
-            XYIndex prevPos {pos.first - 1, pos.second};
+            XYIndex prevPos{pos.first - 1, pos.second};
             Cell& prevCell = m_grid->cell(prevPos);
             if (!prevCell.computed())
                 computeCell(prevCell, prevPos);
@@ -429,22 +449,20 @@ private:
         cell.setInside(intersectCount % 2 == 1);
     }
 
-
     // Determine the number of intersections between an edge and
     // all edges indexes by the 'edges' list.
-    template<typename EDGES>
+    template <typename EDGES>
     size_t intersections(Edge& e1, const EDGES& edges) const
     {
         size_t isect = 0;
         for (auto& edgeId : edges)
         {
-            Edge e2{ point1(edgeId), point2(edgeId) };
+            Edge e2{point1(edgeId), point2(edgeId)};
             if (intersects(e1, e2) != IntersectType::None)
                 isect++;
         }
         return isect;
     }
-
 
     // Determine if a point in a cell is inside the polygon or outside.
     // We're always calling a point that lies on an edge as 'inside'
@@ -454,9 +472,9 @@ private:
         Edge tester({x, y}, cell.point());
 
         bool inside = cell.inside();
-        for (auto edgeIdx: cell.edges())
+        for (auto edgeIdx : cell.edges())
         {
-            Edge other{ point1(edgeIdx), point2(edgeIdx) };
+            Edge other{point1(edgeIdx), point2(edgeIdx)};
             IntersectType intersection = intersects(tester, other);
             if (intersection == IntersectType::On)
                 return true;
@@ -479,30 +497,30 @@ private:
         using Vector = std::pair<double, double>;
 
         Vector p = e1.first;
-        Vector r { e1.second.first - e1.first.first,
-            e1.second.second - e1.first.second };
+        Vector r{e1.second.first - e1.first.first,
+                 e1.second.second - e1.first.second};
         Vector q = e2.first;
-        Vector s { e2.second.first - e2.first.first,
-            e2.second.second - e2.first.second };
+        Vector s{e2.second.first - e2.first.first,
+                 e2.second.second - e2.first.second};
 
         // Should never be 0.
         double rCrossS = r.first * s.second - r.second * s.first;
-        Vector pq = { q.first - p.first, q.second - p.second };
+        Vector pq = {q.first - p.first, q.second - p.second};
 
-        //ABELL - This can be improved to eliminate the division
-        //  because we're testing for 1 and 0.  Later...
+        // ABELL - This can be improved to eliminate the division
+        //   because we're testing for 1 and 0.  Later...
         double pqCrossS = pq.first * s.second - pq.second * s.first;
         double t = (pqCrossS / rCrossS);
-        bool tCloseEnough = Comparison::closeEnough(t, 0) ||
-            Comparison::closeEnough(t, 1);
+        bool tCloseEnough =
+            Comparison::closeEnough(t, 0) || Comparison::closeEnough(t, 1);
         bool intersect = (tCloseEnough || (t > 0 && t < 1));
         if (!intersect)
             return IntersectType::None;
 
         double pqCrossR = pq.first * r.second - pq.second * r.first;
         double u = (pqCrossR / rCrossS);
-        bool uCloseEnough = Comparison::closeEnough(u, 0) ||
-            Comparison::closeEnough(u, 1);
+        bool uCloseEnough =
+            Comparison::closeEnough(u, 0) || Comparison::closeEnough(u, 1);
         intersect = (uCloseEnough || (u > 0 && u < 1));
         if (intersect)
         {

@@ -33,22 +33,20 @@
  ****************************************************************************/
 
 #include <pdal/Metadata.hpp>
+#include <pdal/PDALUtils.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/util/Bounds.hpp>
-#include <pdal/PDALUtils.hpp>
 
 #include <pdal/private/gdal/ErrorHandler.hpp>
 
 namespace pdal
 {
 
-template <>
-void MetadataNodeImpl::setValue(const SpatialReference& ref)
+template <> void MetadataNodeImpl::setValue(const SpatialReference& ref)
 {
     m_type = "spatialreference";
     m_value = Utils::toString(ref);
 }
-
 
 std::string Metadata::inferType(const std::string& val)
 {
@@ -61,7 +59,8 @@ std::string Metadata::inferType(const std::string& val)
         l = std::stol(val, &pos);
     }
     catch (std::invalid_argument&)
-    {}
+    {
+    }
     if (pos == val.length())
         return (l < 0 ? "nonNegativeInteger" : "integer");
 
@@ -69,12 +68,13 @@ std::string Metadata::inferType(const std::string& val)
     {
         pos = 0;
 
-        // silence discarding return value of function with 'nodiscard' attribute
-        // with the (void) cast
+        // silence discarding return value of function with 'nodiscard'
+        // attribute with the (void) cast
         (void)std::stod(val, &pos);
     }
-    catch(std::invalid_argument&)
-    {}
+    catch (std::invalid_argument&)
+    {
+    }
 
     if (pos == val.length())
         return "double";
@@ -88,7 +88,8 @@ std::string Metadata::inferType(const std::string& val)
             return "bounds";
     }
     catch (const BOX2D::error&)
-    {}
+    {
+    }
 
     BOX3D b3d;
     std::istringstream iss2(val);
@@ -99,7 +100,8 @@ std::string Metadata::inferType(const std::string& val)
             return "bounds";
     }
     catch (const BOX3D::error&)
-    {}
+    {
+    }
 
     if (val == "true" || val == "false")
         return "boolean";
@@ -125,6 +127,5 @@ std::string Metadata::inferType(const std::string& val)
 
     return "string";
 }
-
 
 } // namespace pdal

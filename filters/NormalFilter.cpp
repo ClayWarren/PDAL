@@ -1,5 +1,6 @@
 /******************************************************************************
- * Copyright (c) 2016, 2017, 2019, 2020 Bradley J Chambers (brad.chambers@gmail.com)
+ * Copyright (c) 2016, 2017, 2019, 2020 Bradley J Chambers
+ *(brad.chambers@gmail.com)
  *
  * All rights reserved.
  *
@@ -44,8 +45,8 @@
 #include "private/Point.hpp"
 
 #include <pdal/KDIndex.hpp>
-#include <pdal/util/ProgramArgs.hpp>
 #include <pdal/private/MathUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
 
 #include <Eigen/Dense>
 
@@ -86,7 +87,7 @@ void NormalFilter::addArgs(ProgramArgs& args)
 {
     m_knnArg = &args.add("knn", "k-Nearest Neighbors", m_args->m_knn, 8);
     m_radiusArg = &args.add("radius", "Radius to use for neighbor search",
-        m_args->m_radius);
+                            m_args->m_radius);
     m_viewpointArg = &args.add("viewpoint", "Viewpoint as WKT or GeoJSON",
                                m_args->m_viewpoint);
     args.add("always_up", "Normals always oriented with positive Z?",
@@ -130,11 +131,10 @@ void NormalFilter::prepared(PointTableRef table)
     }
     else
     {
-        // The query point is returned as a neighbor of itself, so we must increase
-        // k by one to get the desired number of neighbors.
+        // The query point is returned as a neighbor of itself, so we must
+        // increase k by one to get the desired number of neighbors.
         ++m_args->m_knn;
     }
-
 }
 
 void NormalFilter::compute(PointView& view, KD3Index& kdi)
@@ -147,15 +147,16 @@ void NormalFilter::compute(PointView& view, KD3Index& kdi)
         // Perform eigen decomposition of covariance matrix computed from
         // neighborhood composed of k-nearest neighbors, or within radius.
         if (m_radiusArg->set())
-            result = math::findNormal(view, kdi.radius(p.pointId(), m_args->m_radius));
+            result = math::findNormal(
+                view, kdi.radius(p.pointId(), m_args->m_radius));
         else
-            result = math::findNormal(view, kdi.neighbors(p.pointId(), m_args->m_knn));
+            result = math::findNormal(
+                view, kdi.neighbors(p.pointId(), m_args->m_knn));
 
         if (result.normal.isZero())
         {
-            log()->get(LogLevel::Info)
-                << "Skipping point " << p.pointId()
-                << ": " << result.msg << "\n";
+            log()->get(LogLevel::Info) << "Skipping point " << p.pointId()
+                                       << ": " << result.msg << "\n";
             continue;
         }
 
@@ -168,7 +169,8 @@ void NormalFilter::compute(PointView& view, KD3Index& kdi)
             double dx = m_args->m_viewpoint.x() - p.getFieldAs<double>(Id::X);
             double dy = m_args->m_viewpoint.y() - p.getFieldAs<double>(Id::Y);
             double dz = m_args->m_viewpoint.z() - p.getFieldAs<double>(Id::Z);
-            result.normal = math::orientToViewpoint({ dx, dy, dz }, result.normal);
+            result.normal =
+                math::orientToViewpoint({dx, dy, dz}, result.normal);
         }
         else if (m_args->m_up)
             result.normal = math::orientUp(result.normal);

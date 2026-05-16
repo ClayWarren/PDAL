@@ -59,31 +59,42 @@ public:
 
     /// Determine if the header has a valid LAS signature.
     bool signatureValid() const
-        { return m_fileSig == "LASF"; }
-
+    {
+        return m_fileSig == "LASF";
+    }
 
     /// Get file source identifier.
     /// \exception No throw
     uint16_t fileSourceId() const
-        { return m_sourceId; }
+    {
+        return m_sourceId;
+    }
 
     uint16_t globalEncoding() const
-        { return m_globalEncoding; }
+    {
+        return m_globalEncoding;
+    }
 
     /// Get project identifier.
     /// \return Global Unique Identifier as an instance of liblas::guid class.
     Uuid projectId() const
-        { return m_projectGuid; }
+    {
+        return m_projectGuid;
+    }
 
     /// Get the LAS major version.
     /// \return  LAS major version
     uint8_t versionMajor() const
-        { return (uint8_t)1; }
+    {
+        return (uint8_t)1;
+    }
 
     /// Get minor component of version of LAS format.
     /// \return Valid values are 0, 1, 2, 3.
     uint8_t versionMinor() const
-        { return m_versionMinor; }
+    {
+        return m_versionMinor;
+    }
 
     /// Set minor component of version of LAS format.
     /// \exception std::out_of_range - invalid value given.
@@ -100,14 +111,18 @@ public:
     /// \param minor - Minor version.
     /// \return  Whether the version meets the criteria.
     bool versionAtLeast(uint8_t major, uint8_t minor) const
-        { return (1 >= major && m_versionMinor >= minor); }
+    {
+        return (1 >= major && m_versionMinor >= minor);
+    }
 
     /// Determine if the header is for a particular LAS file version.
     /// \param major - Major version.
     /// \param minor - Minor version.
     /// \return  Whether the version meets the criteria.
     bool versionEquals(uint8_t major, uint8_t minor) const
-        { return (major == 1 && minor == m_versionMinor); }
+    {
+        return (major == 1 && minor == m_versionMinor);
+    }
 
     /// Get system identifier.
     /// Default value is \b "libLAS" specified as the SystemIdentifier constant.
@@ -116,67 +131,95 @@ public:
     /// length of the returned string is <= 32 bytes.
     /// \return value of system identifier field.
     std::string systemId() const
-        { return m_systemId; }
+    {
+        return m_systemId;
+    }
 
     /// Set system identifier.
     /// \param v - system identifiers string.
     void setSystemId(std::string const& v)
-        { m_systemId = v; }
+    {
+        m_systemId = v;
+    }
 
     /// Get software identifier.
     /// Default value is \b "libLAS 1.0", specified as the SoftwareIdentifier
     /// constant.
     std::string softwareId() const
-        { return m_softwareId; }
+    {
+        return m_softwareId;
+    }
 
     /// Set software identifier.
     /// \param v - software identifiers string.
     void setSoftwareId(std::string const& v)
-        { m_softwareId = v; }
+    {
+        m_softwareId = v;
+    }
 
     /// Get day of year of file creation date.
     uint16_t creationDOY() const
-        { return m_createDOY; }
+    {
+        return m_createDOY;
+    }
 
     /// Set day of year of file creation date.
     /// \exception std::out_of_range - given value is higher than number 366.
     void setCreationDOY(uint16_t v)
-        { m_createDOY = v; }
+    {
+        m_createDOY = v;
+    }
 
     /// Set year of file creation date.
     uint16_t creationYear() const
-        { return m_createYear; }
+    {
+        return m_createYear;
+    }
 
     /// Get year of file creation date.
     /// \exception std::out_of_range - given value is higher than number 9999.
     void setCreationYear(uint16_t v)
-        { m_createYear = v; }
+    {
+        m_createYear = v;
+    }
 
     /// Get number of bytes of generic verion of public header block storage.
     /// Standard version of the public header block is 227 bytes long.
     uint16_t vlrOffset() const
-        { return m_vlrOffset; }
+    {
+        return m_vlrOffset;
+    }
 
     void setVlrOffset(uint16_t offset)
-        { m_vlrOffset = offset; }
+    {
+        m_vlrOffset = offset;
+    }
 
     /// Get number of bytes from the beginning to the first point record.
     uint32_t pointOffset() const
-        { return m_pointOffset; }
+    {
+        return m_pointOffset;
+    }
 
     /// Set number of bytes from the beginning to the first point record.
     /// \param  offset - Offset to start of point data.
     void setPointOffset(uint32_t offset)
-          { m_pointOffset = offset; }
+    {
+        m_pointOffset = offset;
+    }
 
     /// Set the point format.
     /// \param format  Point format
     void setPointFormat(uint8_t format)
-        { m_pointFormat = format; }
+    {
+        m_pointFormat = format;
+    }
 
     /// Get identifier of point data (record) format.
     uint8_t pointFormat() const
-        { return m_pointFormat; }
+    {
+        return m_pointFormat;
+    }
     bool pointFormatSupported() const
     {
         if (versionAtLeast(1, 4))
@@ -189,83 +232,123 @@ public:
     /// considered to be fixed in size, and the PointFormatName is used
     /// to determine the fixed portion of the dimensions in the point.
     uint16_t pointLen() const
-        { return m_pointLen; }
-	void setPointLen(uint16_t v)
-        { m_pointLen = v; }
+    {
+        return m_pointLen;
+    }
+    void setPointLen(uint16_t v)
+    {
+        m_pointLen = v;
+    }
     uint16_t basePointLen()
-        { return basePointLen(m_pointFormat); }
+    {
+        return basePointLen(m_pointFormat);
+    }
     uint16_t basePointLen(uint8_t format);
 
     /// Set the number of points.
     /// \param pointCount  Number of points in the file.
     void setPointCount(uint64_t pointCount)
-        { m_pointCount = pointCount; }
+    {
+        m_pointCount = pointCount;
+    }
     /// Get total number of point records stored in the LAS file.
     uint64_t pointCount() const
-        { return m_pointCount; }
+    {
+        return m_pointCount;
+    }
 
     /// Set values point count by return number.
     /// \param index - Return number.
     /// \param v - Point count for return number.
     void setPointCountByReturn(std::size_t index, uint64_t v)
-        { m_pointCountByReturn[index] = v; }
+    {
+        m_pointCountByReturn[index] = v;
+    }
 
     /// Get the point count by return number.
     /// \param index - Return number.
     /// \return - Point count.
     uint64_t pointCountByReturn(std::size_t index)
-        { return m_pointCountByReturn[index]; }
+    {
+        return m_pointCountByReturn[index];
+    }
 
     /// Get scale factor for X coordinate.
     double scaleX() const
-        { return m_scales[0]; }
+    {
+        return m_scales[0];
+    }
 
     /// Get scale factor for Y coordinate.
     double scaleY() const
-        { return m_scales[1]; }
+    {
+        return m_scales[1];
+    }
 
     /// Get scale factor for Z coordinate.
     double scaleZ() const
-        { return m_scales[2]; }
+    {
+        return m_scales[2];
+    }
 
     /// Get X coordinate offset.
     double offsetX() const
-        { return m_offsets[0]; }
+    {
+        return m_offsets[0];
+    }
 
     /// Get Y coordinate offset.
     double offsetY() const
-        { return m_offsets[1]; }
+    {
+        return m_offsets[1];
+    }
 
     /// Get Z coordinate offset.
     double offsetZ() const
-        { return m_offsets[2]; }
+    {
+        return m_offsets[2];
+    }
 
     /// Get minimum value of extent of X coordinate.
     double maxX() const
-        { return m_bounds.maxx; }
+    {
+        return m_bounds.maxx;
+    }
 
     /// Get maximum value of extent of X coordinate.
     double minX() const
-        { return m_bounds.minx; }
+    {
+        return m_bounds.minx;
+    }
 
     /// Get minimum value of extent of Y coordinate.
     double maxY() const
-        { return m_bounds.maxy; }
+    {
+        return m_bounds.maxy;
+    }
 
     /// Get maximum value of extent of Y coordinate.
     double minY() const
-        { return m_bounds.miny; }
+    {
+        return m_bounds.miny;
+    }
 
     /// Get minimum value of extent of Z coordinate.
     double maxZ() const
-        { return m_bounds.maxz; }
+    {
+        return m_bounds.maxz;
+    }
 
     /// Get maximum value of extent of Z coordinate.
     double minZ() const
-       { return m_bounds.minz; }
+    {
+        return m_bounds.minz;
+    }
 
     const pdal::BOX3D& getBounds() const
-        { return m_bounds; }
+    {
+        return m_bounds;
+    }
 
     bool hasTime() const
     {
@@ -291,21 +374,33 @@ public:
     /// Returns true iff the file is compressed (laszip),
     /// as determined by the high bit in the point type
     bool compressed() const
-        { return m_isCompressed; }
+    {
+        return m_isCompressed;
+    }
 
     /// Sets whether or not the points are compressed.
     void setCompressed(bool b)
-        { m_isCompressed = b; }
+    {
+        m_isCompressed = b;
+    }
 
     uint32_t vlrCount() const
-        { return m_vlrCount; }
+    {
+        return m_vlrCount;
+    }
     uint64_t eVlrOffset() const
-        { return m_eVlrOffset; }
+    {
+        return m_eVlrOffset;
+    }
     uint32_t eVlrCount() const
-        { return m_eVlrCount; }
+    {
+        return m_eVlrCount;
+    }
 
     std::string const& compressionInfo() const
-        { return m_compressionInfo; }
+    {
+        return m_compressionInfo;
+    }
 
     bool valid() const;
 
@@ -322,7 +417,7 @@ private:
     std::string m_softwareId;
     uint16_t m_createDOY;
     uint16_t m_createYear;
-    uint16_t m_vlrOffset;  // Same as header size.
+    uint16_t m_vlrOffset; // Same as header size.
     uint32_t m_pointOffset;
     uint32_t m_vlrCount;
     uint8_t m_pointFormat;
@@ -340,4 +435,3 @@ private:
 
 } // namespace lasdump
 } // namespace pdal
-

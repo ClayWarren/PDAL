@@ -36,27 +36,25 @@
 namespace pdal
 {
 
-SrsTransform::SrsTransform()
-{}
+SrsTransform::SrsTransform() {}
 
 SrsTransform::SrsTransform(const SrsTransform& src)
 {
     if (src.valid())
-        set(*(src.m_transform->GetSourceCS()), *(src.m_transform->GetTargetCS()));
+        set(*(src.m_transform->GetSourceCS()),
+            *(src.m_transform->GetTargetCS()));
 }
 
+SrsTransform::SrsTransform(SrsTransform&& src)
+    : m_transform(std::move(src.m_transform))
+{
+}
 
-SrsTransform::SrsTransform(SrsTransform&& src) : m_transform(std::move(src.m_transform))
-{}
-
-
-SrsTransform::~SrsTransform()
-{}
-
+SrsTransform::~SrsTransform() {}
 
 void SrsTransform::setSrcEpoch(double epoch)
 {
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,4,0)
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
     OGRSpatialReference target(*m_transform->GetTargetCS());
     OGRSpatialReference source(*m_transform->GetSourceCS());
     source.SetCoordinateEpoch(epoch);
@@ -66,7 +64,7 @@ void SrsTransform::setSrcEpoch(double epoch)
 
 void SrsTransform::setDstEpoch(double epoch)
 {
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,4,0)
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
     OGRSpatialReference target(*m_transform->GetTargetCS());
     OGRSpatialReference source(*m_transform->GetSourceCS());
     target.SetCoordinateEpoch(epoch);
@@ -80,17 +78,17 @@ SrsTransform& SrsTransform::operator=(SrsTransform&& src)
     return *this;
 }
 
-SrsTransform::SrsTransform(const SpatialReference& src, const SpatialReference& dst)
+SrsTransform::SrsTransform(const SpatialReference& src,
+                           const SpatialReference& dst)
 {
     set(src, dst);
 }
 
-
-SrsTransform::SrsTransform(const OGRSpatialReference& srcRef, const OGRSpatialReference& dstRef)
+SrsTransform::SrsTransform(const OGRSpatialReference& srcRef,
+                           const OGRSpatialReference& dstRef)
 {
     set(srcRef, dstRef);
 }
-
 
 SrsTransform::SrsTransform(const SpatialReference& src,
                            std::vector<int> srcOrder,
@@ -102,14 +100,14 @@ SrsTransform::SrsTransform(const SpatialReference& src,
     OGRSpatialReference dstRef(dst.getWKT2().data());
     dstRef.SetCoordinateEpoch(dst.getEpoch());
 
-// Starting with version 3, the axes (X, Y, Z or lon, lat, h or whatever)
-// are mapped according to the WKT definition.  In particular, this means
-// that for EPSG:4326 the mapping is X -> lat, Y -> lon, rather than the
-// more conventional X -> lon, Y -> lat.  Setting this flag reverses things
-// such that the traditional ordering is maintained.  There are other
-// SRSes where this comes up.  See "axis order issues" in the GDAL WKT2
-// discussion for more info.
-//
+    // Starting with version 3, the axes (X, Y, Z or lon, lat, h or whatever)
+    // are mapped according to the WKT definition.  In particular, this means
+    // that for EPSG:4326 the mapping is X -> lat, Y -> lon, rather than the
+    // more conventional X -> lon, Y -> lat.  Setting this flag reverses things
+    // such that the traditional ordering is maintained.  There are other
+    // SRSes where this comes up.  See "axis order issues" in the GDAL WKT2
+    // discussion for more info.
+    //
     if (srcOrder.size())
         srcRef.SetDataAxisToSRSAxisMapping(srcOrder);
     if (dstOrder.size())
@@ -126,41 +124,37 @@ void SrsTransform::set(const SpatialReference& src, const SpatialReference& dst)
     set(osrSrc, osrDst);
 }
 
-
 void SrsTransform::set(OGRSpatialReference src, OGRSpatialReference dst)
 {
-// Starting with version 3 of GDAL, the axes (X, Y, Z or lon, lat, h or whatever)
-// are mapped according to the WKT definition.  In particular, this means
-// that for EPSG:4326 the mapping is X -> lat, Y -> lon, rather than the
-// more conventional X -> lon, Y -> lat.  Setting this flag reverses things
-// such that the traditional ordering is maintained.  There are other
-// SRSes where this comes up.  See "axis order issues" in the GDAL WKT2
-// discussion for more info.
-//
+    // Starting with version 3 of GDAL, the axes (X, Y, Z or lon, lat, h or
+    // whatever) are mapped according to the WKT definition.  In particular,
+    // this means that for EPSG:4326 the mapping is X -> lat, Y -> lon, rather
+    // than the more conventional X -> lon, Y -> lat.  Setting this flag
+    // reverses things such that the traditional ordering is maintained.  There
+    // are other SRSes where this comes up.  See "axis order issues" in the GDAL
+    // WKT2 discussion for more info.
+    //
     src.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     dst.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     m_transform.reset(OGRCreateCoordinateTransformation(&src, &dst));
 }
 
-
-OGRCoordinateTransformation *SrsTransform::get() const
+OGRCoordinateTransformation* SrsTransform::get() const
 {
     return m_transform.get();
 }
-
 
 bool SrsTransform::transform(double& x, double& y, double& z) const
 {
     return m_transform && m_transform->Transform(1, &x, &y, &z);
 }
 
-
 bool SrsTransform::transform(std::vector<double>& x, std::vector<double>& y,
-    std::vector<double>& z) const
+                             std::vector<double>& z) const
 {
     if (x.size() != y.size() && y.size() != z.size())
         throw pdal_error("SrsTransform::called with vectors of different "
-            "sizes.");
+                         "sizes.");
     int err = m_transform->Transform(x.size(), x.data(), y.data(), z.data());
     return (err == OGRERR_NONE);
 }

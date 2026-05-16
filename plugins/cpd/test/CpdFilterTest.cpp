@@ -101,7 +101,7 @@ void checkPointsEqualReader(const PointViewSet& pointViewSet, double tolerance)
                     actual->getFieldAs<double>(Dimension::Id::Z, i), tolerance);
     }
 }
-}
+} // namespace
 
 TEST(CpdFilterTest, DefaultMethod)
 {

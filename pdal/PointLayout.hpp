@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2014, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -67,7 +67,9 @@ public:
       \return  Whether the PointLayout is finalized.
     */
     bool finalized() const
-        { return m_finalized; }
+    {
+        return m_finalized;
+    }
 
     /**
       Register a vector of dimensions.
@@ -82,7 +84,7 @@ public:
       \param id  Pointer to list of IDs to register.  The last ID in the list
         must have the value Unknown.
     */
-    void registerDims(Dimension::Id *id);
+    void registerDims(Dimension::Id* id);
 
     /**
       Register use of a standard dimension (declare that a point will contain
@@ -115,8 +117,7 @@ public:
       \param type  Minimum type to assign to the dimension.
       \return  ID of the new or existing dimension, or Unknown on failure.
     */
-    Dimension::Id assignDim(const std::string& name,
-        Dimension::Type type);
+    Dimension::Id assignDim(const std::string& name, Dimension::Type type);
 
     /**
       Register a dimension if one already exists with the given name using the
@@ -128,7 +129,7 @@ public:
       \return  ID of dimension registered or assigned.
     */
     Dimension::Id registerOrAssignDim(const std::string name,
-        Dimension::Type type);
+                                      Dimension::Type type);
 
     /**
       Get a list of DimType objects that define the layout.
@@ -254,8 +255,7 @@ public:
 private:
     virtual bool update(Dimension::Detail dd, const std::string& name);
 
-    Dimension::Type resolveType( Dimension::Type t1,
-        Dimension::Type t2);
+    Dimension::Type resolveType(Dimension::Type t1, Dimension::Type t2);
 
 protected:
     std::vector<Dimension::Detail> m_detail;
@@ -270,4 +270,3 @@ protected:
 typedef PointLayout* PointLayoutPtr;
 
 } // namespace pdal
-

@@ -44,12 +44,10 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.voxelcenternearestneighbor",
     "Voxel Center Nearest Neighbor Filter",
-    "https://pdal.org/stages/filters.voxelcenternearestneighbor.html"
-};
+    "https://pdal.org/stages/filters.voxelcenternearestneighbor.html"};
 
 CREATE_STATIC_STAGE(VoxelCenterNearestNeighborFilter, s_info)
 
@@ -71,8 +69,8 @@ PointViewSet VoxelCenterNearestNeighborFilter::run(PointViewPtr view)
     // Find distance from voxel center to point.  If the distance is less
     // than previous (or is the first one for the voxel), store the
     // point ID and distance.
-    std::map<std::tuple<size_t, size_t, size_t>,
-        std::tuple<PointId, double>> populated_voxels;
+    std::map<std::tuple<size_t, size_t, size_t>, std::tuple<PointId, double>>
+        populated_voxels;
     for (PointId id = 0; id < view->size(); ++id)
     {
         double x = view->getFieldAs<double>(Dimension::Id::X, id);
@@ -93,7 +91,7 @@ PointViewSet VoxelCenterNearestNeighborFilter::run(PointViewPtr view)
                 std::make_pair(t, std::make_tuple(id, dist)));
         else
         {
-            auto& t2 = pi->second;  // Get point/distance tuple.
+            auto& t2 = pi->second; // Get point/distance tuple.
             double curDist = std::get<1>(t2);
             if (dist < curDist)
                 t2 = std::make_tuple(id, dist);

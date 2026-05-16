@@ -1,51 +1,50 @@
 /******************************************************************************
-* Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com *
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <pdal/XMLSchema.hpp>
-#include <pdal/PipelineWriter.hpp>
 #include <pdal/PDALUtils.hpp>
+#include <pdal/PipelineWriter.hpp>
+#include <pdal/XMLSchema.hpp>
 
-#include <sstream>
-#include <iostream>
+#include <algorithm>
+#include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <list>
-#include <cstdlib>
 #include <map>
-#include <algorithm>
-#include <functional>
+#include <sstream>
 
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 namespace
 {
@@ -74,14 +73,14 @@ namespace pdal
 
 void SchemaStructuredErrorHandler
 #if LIBXML_VERSION >= 21200
-(void * /*userData*/, const xmlError *error)
+    (void* /*userData*/, const xmlError* error)
 #else
-(void * /*userData*/, xmlErrorPtr error)
+    (void* /*userData*/, xmlErrorPtr error)
 #endif
 {
     std::ostringstream oss;
 
-    oss << "XML error: '" << error->message <<"' ";
+    oss << "XML error: '" << error->message << "' ";
 
     if (error->str1)
         oss << " extra info1: '" << error->str1 << "' ";
@@ -93,7 +92,7 @@ void SchemaStructuredErrorHandler
 
     if (error->ctxt)
     {
-        xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) error->ctxt;
+        xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)error->ctxt;
         xmlParserInputPtr input = ctxt->input;
 
         xmlParserPrintFileContext(input);
@@ -103,28 +102,27 @@ void SchemaStructuredErrorHandler
 
 void SchemaParserStructuredErrorHandler
 #if LIBXML_VERSION >= 21200
-(void * /*userData*/, const xmlError *error)
+    (void* /*userData*/, const xmlError* error)
 #else
-(void * /*userData*/, xmlErrorPtr error)
+    (void* /*userData*/, xmlErrorPtr error)
 #endif
 {
-    std::cerr << "Schema parsing error: '" << error->message << "' " <<
-        "on line " << error->line << std::endl;
+    std::cerr << "Schema parsing error: '" << error->message << "' "
+              << "on line " << error->line << std::endl;
 }
 
 void SchemaValidationStructuredErrorHandler
 #if LIBXML_VERSION >= 21200
-(void * /*userData*/, const xmlError *error)
+    (void* /*userData*/, const xmlError* error)
 #else
-(void * /*userData*/, xmlErrorPtr error)
+    (void* /*userData*/, xmlErrorPtr error)
 #endif
 {
-    std::cerr << "Schema validation error: '" << error->message << "' " <<
-        "on line " << error->line << std::endl;
+    std::cerr << "Schema validation error: '" << error->message << "' "
+              << "on line " << error->line << std::endl;
 }
 
-void SchemaValidityError
-(void * /*ctx*/, const char* message, ...)
+void SchemaValidityError(void* /*ctx*/, const char* message, ...)
 {
     const int ERROR_MESSAGE_SIZE = 256;
     char error[ERROR_MESSAGE_SIZE];
@@ -137,8 +135,7 @@ void SchemaValidityError
     std::cerr << "Schema validity error: '" << error << "' " << std::endl;
 }
 
-void SchemaValidityDebug
-(void * /*ctx*/, const char* message, ...)
+void SchemaValidityDebug(void* /*ctx*/, const char* message, ...)
 {
     const int ERROR_MESSAGE_SIZE = 256;
     char error[ERROR_MESSAGE_SIZE];
@@ -151,9 +148,7 @@ void SchemaValidityDebug
     std::cout << "Schema validity debug: '" << error << "' " << "\n";
 }
 
-
-void SchemaGenericErrorHandler
-(void * /*ctx*/, const char* message, ...)
+void SchemaGenericErrorHandler(void* /*ctx*/, const char* message, ...)
 {
     const int ERROR_MESSAGE_SIZE = 256;
     char error[ERROR_MESSAGE_SIZE];
@@ -168,8 +163,8 @@ void SchemaGenericErrorHandler
     std::cerr << "Generic error: '" << error << "'" << std::endl;
 }
 
-XMLSchema::XMLSchema(std::string xml, std::string xsd,
-    Orientation orientation) : m_orientation(orientation)
+XMLSchema::XMLSchema(std::string xml, std::string xsd, Orientation orientation)
+    : m_orientation(orientation)
 {
     xmlDocPtr doc = init(xml, xsd);
     if (doc)
@@ -179,36 +174,35 @@ XMLSchema::XMLSchema(std::string xml, std::string xsd,
     }
 }
 
-
 XMLSchema::XMLSchema(const XMLDimList& dims, MetadataNode m,
-    Orientation orientation) : m_orientation(orientation), m_dims(dims),
-    m_metadata(m)
-{}
-
+                     Orientation orientation)
+    : m_orientation(orientation), m_dims(dims), m_metadata(m)
+{
+}
 
 XMLSchema::XMLSchema(const PointLayoutPtr& layout, MetadataNode m,
-    Orientation orientation) : m_orientation(orientation), m_metadata(m)
+                     Orientation orientation)
+    : m_orientation(orientation), m_metadata(m)
 {
     DimTypeList dimTypes = layout->dimTypes();
     for (DimType& d : dimTypes)
         m_dims.push_back(XMLDim(d, layout->dimName(d.m_id)));
 }
 
-
 std::string XMLSchema::xml() const
 {
-    xmlBuffer *b = xmlBufferCreate();
+    xmlBuffer* b = xmlBufferCreate();
     xmlTextWriterPtr w = xmlNewTextWriterMemory(b, 0);
 
     xmlTextWriterSetIndent(w, 1);
     xmlTextWriterStartDocument(w, NULL, "utf-8", NULL);
     xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-        (const xmlChar*)"PointCloudSchema", NULL);
-    xmlTextWriterWriteAttributeNS(w, (const xmlChar*) "xmlns",
-        (const xmlChar*)"pc", NULL,
+                                (const xmlChar*)"PointCloudSchema", NULL);
+    xmlTextWriterWriteAttributeNS(
+        w, (const xmlChar*)"xmlns", (const xmlChar*)"pc", NULL,
         (const xmlChar*)"http://pointcloud.org/schemas/PC/");
-    xmlTextWriterWriteAttributeNS(w, (const xmlChar*)"xmlns",
-        (const xmlChar*)"xsi", NULL,
+    xmlTextWriterWriteAttributeNS(
+        w, (const xmlChar*)"xmlns", (const xmlChar*)"xsi", NULL,
         (const xmlChar*)"http://www.w3.org/2001/XMLSchema-instance");
 
     writeXml(w);
@@ -216,13 +210,12 @@ std::string XMLSchema::xml() const
     xmlTextWriterEndElement(w);
     xmlTextWriterEndDocument(w);
 
-    std::string output((const char *)b->content, b->use);
+    std::string output((const char*)b->content, b->use);
     xmlFreeTextWriter(w);
     xmlBufferFree(b);
 
     return output;
 }
-
 
 DimTypeList XMLSchema::dimTypes() const
 {
@@ -233,7 +226,6 @@ DimTypeList XMLSchema::dimTypes() const
     return dimTypes;
 }
 
-
 xmlDocPtr XMLSchema::init(const std::string& xml, const std::string& xsd)
 {
     xmlParserOption parserOption(XML_PARSE_NONET);
@@ -241,12 +233,13 @@ xmlDocPtr XMLSchema::init(const std::string& xml, const std::string& xsd)
     LIBXML_TEST_VERSION
 
     xmlSetGenericErrorFunc(m_global_context,
-        (xmlGenericErrorFunc)&SchemaGenericErrorHandler);
-    xmlSetStructuredErrorFunc(m_global_context,
+                           (xmlGenericErrorFunc)&SchemaGenericErrorHandler);
+    xmlSetStructuredErrorFunc(
+        m_global_context,
         (xmlStructuredErrorFunc)&SchemaStructuredErrorHandler);
 
-    xmlDocPtr doc = xmlReadMemory(xml.c_str(), xml.size(), NULL, NULL,
-        parserOption);
+    xmlDocPtr doc =
+        xmlReadMemory(xml.c_str(), xml.size(), NULL, NULL, parserOption);
 
     if (xsd.size() && !validate(doc, xsd))
     {
@@ -257,20 +250,19 @@ xmlDocPtr XMLSchema::init(const std::string& xml, const std::string& xsd)
     return doc;
 }
 
-
 bool XMLSchema::validate(xmlDocPtr doc, const std::string& xsd)
 {
     xmlParserOption parserOption(XML_PARSE_NONET);
 
-    xmlDocPtr schemaDoc = xmlReadMemory(xsd.c_str(), xsd.size(),
-        NULL, NULL, parserOption);
+    xmlDocPtr schemaDoc =
+        xmlReadMemory(xsd.c_str(), xsd.size(), NULL, NULL, parserOption);
     xmlSchemaParserCtxtPtr parserCtxt = xmlSchemaNewDocParserCtxt(schemaDoc);
-    xmlSchemaSetParserStructuredErrors(parserCtxt,
-        &SchemaParserStructuredErrorHandler, m_global_context);
+    xmlSchemaSetParserStructuredErrors(
+        parserCtxt, &SchemaParserStructuredErrorHandler, m_global_context);
     xmlSchemaPtr schema = xmlSchemaParse(parserCtxt);
     xmlSchemaValidCtxtPtr validCtxt = xmlSchemaNewValidCtxt(schema);
     xmlSchemaSetValidErrors(validCtxt, &SchemaValidityError,
-        &SchemaValidityDebug, m_global_context);
+                            &SchemaValidityDebug, m_global_context);
     bool valid = (xmlSchemaValidateDoc(validCtxt, doc) == 0);
 
     xmlFreeDoc(schemaDoc);
@@ -281,56 +273,54 @@ bool XMLSchema::validate(xmlDocPtr doc, const std::string& xsd)
     return valid;
 }
 
-
 std::string XMLSchema::remapOldNames(const std::string& input)
 {
     if (Utils::iequals(input, "Unnamed field 512") ||
-            Utils::iequals(input, "Chipper Point ID"))
+        Utils::iequals(input, "Chipper Point ID"))
         return std::string("Chipper:PointID");
 
     if (Utils::iequals(input, "Unnamed field 513") ||
-            Utils::iequals(input, "Chipper Block ID"))
+        Utils::iequals(input, "Chipper Block ID"))
         return std::string("Chipper:BlockID");
 
     return input;
 }
 
-
-bool XMLSchema::loadMetadata(xmlNode *startNode, MetadataNode& input)
+bool XMLSchema::loadMetadata(xmlNode* startNode, MetadataNode& input)
 {
-//     Expect metadata in the following form
-//     We are going to skip the root element because we are
-//     expecting to be given one with our input
-//     <pc:metadata>
-//         <Metadata name="root" type="">
-//             <Metadata name="compression" type="string">lazperf</Metadata>
-//             <Metadata name="version" type="string">1.0</Metadata>
-//         </Metadata>
-//     </pc:metadata>
+    //     Expect metadata in the following form
+    //     We are going to skip the root element because we are
+    //     expecting to be given one with our input
+    //     <pc:metadata>
+    //         <Metadata name="root" type="">
+    //             <Metadata name="compression" type="string">lazperf</Metadata>
+    //             <Metadata name="version" type="string">1.0</Metadata>
+    //         </Metadata>
+    //     </pc:metadata>
 
-    xmlNode *node = startNode;
+    xmlNode* node = startNode;
     for (node = startNode; node; node = node->next)
     {
         if (node->type != XML_ELEMENT_NODE)
             continue;
         if (std::string((const char*)node->name) == "Metadata")
         {
-            char *fieldname =
-                (char*)xmlGetProp(node, (const xmlChar*)"name");
-            char *description =
-                (char*)xmlGetProp(node, (const xmlChar*) "description");
-            char *text = (char*)xmlNodeGetContent(node);
+            char* fieldname = (char*)xmlGetProp(node, (const xmlChar*)"name");
+            char* description =
+                (char*)xmlGetProp(node, (const xmlChar*)"description");
+            char* text = (char*)xmlNodeGetContent(node);
 
             if (!Utils::iequals(fieldname, "root"))
             {
                 if (!fieldname)
                 {
-                    std::cerr << "Unable to read metadata for node '" <<
-                        (const char*)node->name << "' no \"name\" was given";
+                    std::cerr << "Unable to read metadata for node '"
+                              << (const char*)node->name
+                              << "' no \"name\" was given";
                     return false;
                 }
                 input.add(fieldname, text ? text : "",
-                    description ? description : "");
+                          description ? description : "");
             }
             xmlFree(fieldname);
             xmlFree(description);
@@ -340,7 +330,6 @@ bool XMLSchema::loadMetadata(xmlNode *startNode, MetadataNode& input)
     }
     return true;
 }
-
 
 bool XMLSchema::load(xmlDocPtr doc)
 {
@@ -358,8 +347,8 @@ bool XMLSchema::load(xmlDocPtr doc)
 
     xmlNode* dimension = root->children;
     pdal::Metadata metadata;
-    for (xmlNode *dimension = root->children; dimension;
-        dimension = dimension->next)
+    for (xmlNode* dimension = root->children; dimension;
+         dimension = dimension->next)
     {
         // Read off orientation setting
         if (std::string((const char*)dimension->name) == "orientation")
@@ -394,17 +383,17 @@ bool XMLSchema::load(xmlDocPtr doc)
 
         XMLDim dim;
         dim.m_position = SENTINEL_POS;
-        for (xmlNode *properties = dimension->children; properties;
-            properties = properties->next)
+        for (xmlNode* properties = dimension->children; properties;
+             properties = properties->next)
         {
             if (properties->type != XML_ELEMENT_NODE)
                 continue;
 
-            std::string propName = (const char *)properties->name;
+            std::string propName = (const char*)properties->name;
             propName = Utils::tolower(propName);
             if (propName == "name")
             {
-                xmlChar *n = xmlNodeListGetString(doc, properties->children, 1);
+                xmlChar* n = xmlNodeListGetString(doc, properties->children, 1);
                 if (!n)
                 {
                     std::cerr << "Unable to fetch name from XML node.";
@@ -437,7 +426,7 @@ bool XMLSchema::load(xmlDocPtr doc)
             }
             if (propName == "minimum")
             {
-                xmlChar* n = xmlGetProp(properties, (const xmlChar*) "value");
+                xmlChar* n = xmlGetProp(properties, (const xmlChar*)"value");
                 if (!n)
                 {
                     std::cerr << "Unable to fetch minimum value.\n";
@@ -448,7 +437,7 @@ bool XMLSchema::load(xmlDocPtr doc)
             }
             if (propName == "maximum")
             {
-                xmlChar* n = xmlGetProp(properties, (const xmlChar*) "value");
+                xmlChar* n = xmlGetProp(properties, (const xmlChar*)"value");
                 if (!n)
                 {
                     std::cerr << "Unable to fetch maximum value.\n";
@@ -506,7 +495,6 @@ bool XMLSchema::load(xmlDocPtr doc)
     return true;
 }
 
-
 XMLDim& XMLSchema::xmlDim(Dimension::Id id)
 {
     static XMLDim nullDim;
@@ -516,7 +504,6 @@ XMLDim& XMLSchema::xmlDim(Dimension::Id id)
             return *di;
     return nullDim;
 }
-
 
 const XMLDim& XMLSchema::xmlDim(Dimension::Id id) const
 {
@@ -528,7 +515,6 @@ const XMLDim& XMLSchema::xmlDim(Dimension::Id id) const
     return nullDim;
 }
 
-
 XMLDim& XMLSchema::xmlDim(const std::string& name)
 {
     static XMLDim nullDim;
@@ -539,19 +525,21 @@ XMLDim& XMLSchema::xmlDim(const std::string& name)
     return nullDim;
 }
 
-
 namespace
 {
 
 void addMetadataEntry(xmlTextWriterPtr w, const MetadataNode& input)
 {
 
-    std::function<void (const MetadataNode&) >  collectMetadata = [&] (const MetadataNode& node)
+    std::function<void(const MetadataNode&)> collectMetadata =
+        [&](const MetadataNode& node)
     {
         xmlTextWriterStartElement(w, (const xmlChar*)"Metadata");
-        xmlTextWriterWriteAttribute(w, (const xmlChar*)"name",  (const xmlChar*)node.name().c_str());
-        xmlTextWriterWriteAttribute(w, (const xmlChar*)"type",  (const xmlChar*)node.type().c_str());
-        xmlTextWriterWriteString(w, (const xmlChar*) node.value().c_str());
+        xmlTextWriterWriteAttribute(w, (const xmlChar*)"name",
+                                    (const xmlChar*)node.name().c_str());
+        xmlTextWriterWriteAttribute(w, (const xmlChar*)"type",
+                                    (const xmlChar*)node.type().c_str());
+        xmlTextWriterWriteString(w, (const xmlChar*)node.value().c_str());
         for (auto& m : node.children())
             if (!m.empty())
                 collectMetadata(m);
@@ -560,19 +548,17 @@ void addMetadataEntry(xmlTextWriterPtr w, const MetadataNode& input)
     };
 
     xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-        (const xmlChar*)"metadata", NULL);
+                                (const xmlChar*)"metadata", NULL);
 
     for (auto& m : input.children())
         if (!m.empty())
             collectMetadata(m);
 
-     xmlTextWriterEndElement(w);
-        xmlTextWriterFlush(w);
+    xmlTextWriterEndElement(w);
+    xmlTextWriterFlush(w);
 }
 
-
 } // anonymous namespace
-
 
 void XMLSchema::writeXml(xmlTextWriterPtr w) const
 {
@@ -580,24 +566,25 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
     for (auto di = m_dims.begin(); di != m_dims.end(); ++di, ++pos)
     {
         xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-            (const xmlChar*)"dimension", NULL);
+                                    (const xmlChar*)"dimension", NULL);
 
         Utils::OStringStreamClassicLocale position;
         position << (pos + 1);
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-            (const xmlChar*)"position", NULL,
-            (const xmlChar*)position.str().c_str());
+                                    (const xmlChar*)"position", NULL,
+                                    (const xmlChar*)position.str().c_str());
 
         Utils::OStringStreamClassicLocale size;
         size << Dimension::size(di->m_dimType.m_type);
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-            (const xmlChar*)"size", NULL, (const xmlChar*)size.str().c_str());
+                                    (const xmlChar*)"size", NULL,
+                                    (const xmlChar*)size.str().c_str());
 
         std::string description = Dimension::description(di->m_dimType.m_id);
         if (description.size())
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                (const xmlChar*)"description", NULL,
-                (const xmlChar*)description.c_str());
+                                        (const xmlChar*)"description", NULL,
+                                        (const xmlChar*)description.c_str());
 
         XForm xform = di->m_dimType.m_xform;
         if (xform.nonstandard())
@@ -614,25 +601,27 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
 
             out << xform.m_scale.m_val;
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                (const xmlChar *)"scale", NULL,
-                (const xmlChar *)scale.data());
+                                        (const xmlChar*)"scale", NULL,
+                                        (const xmlChar*)scale.data());
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                (const xmlChar *)"offset", NULL,
-                (const xmlChar *)offset.data());
+                                        (const xmlChar*)"offset", NULL,
+                                        (const xmlChar*)offset.data());
         }
 
         std::string name = di->m_name;
         if (name.size())
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                (const xmlChar*)"name", NULL, (const xmlChar*)name.c_str());
+                                        (const xmlChar*)"name", NULL,
+                                        (const xmlChar*)name.c_str());
+
+        xmlTextWriterWriteElementNS(
+            w, (const xmlChar*)"pc", (const xmlChar*)"interpretation", NULL,
+            (const xmlChar*)Dimension::interpretationName(di->m_dimType.m_type)
+                .c_str());
 
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-            (const xmlChar*)"interpretation", NULL,
-            (const xmlChar*)
-                Dimension::interpretationName(di->m_dimType.m_type).c_str());
-
-        xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-            (const xmlChar*)"active", NULL, (const xmlChar*)"true");
+                                    (const xmlChar*)"active", NULL,
+                                    (const xmlChar*)"true");
 
         xmlTextWriterEndElement(w);
         xmlTextWriterFlush(w);
@@ -646,13 +635,13 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
     {
         addMetadataEntry(w, m_metadata);
     }
-    xmlTextWriterWriteElementNS(w, (const xmlChar*) "pc",
-        (const xmlChar*)"orientation", NULL,
-        (const xmlChar*)orientation.str().c_str());
+    xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
+                                (const xmlChar*)"orientation", NULL,
+                                (const xmlChar*)orientation.str().c_str());
 
     xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-        (const xmlChar*)"version", NULL,
-        (const xmlChar*)PDAL_XML_SCHEMA_VERSION);
+                                (const xmlChar*)"version", NULL,
+                                (const xmlChar*)PDAL_XML_SCHEMA_VERSION);
 
     xmlTextWriterEndElement(w);
     xmlTextWriterFlush(w);

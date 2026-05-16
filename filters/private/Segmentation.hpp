@@ -54,27 +54,37 @@ class PointClasses
     static const uint8_t Synthetic = 32;
     static const uint8_t Keypoint = 64;
     static const uint8_t Withheld = 128;
+
 public:
-    PointClasses() : m_classes(0)
-    {}
+    PointClasses() : m_classes(0) {}
 
     bool isWithheld() const
-    { return m_classes & Withheld; }
+    {
+        return m_classes & Withheld;
+    }
     bool isKeypoint() const
-    { return m_classes & Keypoint; }
+    {
+        return m_classes & Keypoint;
+    }
     bool isSynthetic() const
-    { return m_classes & Synthetic; }
+    {
+        return m_classes & Synthetic;
+    }
     bool isNone() const
-    { return m_classes == 0; }
+    {
+        return m_classes == 0;
+    }
     uint32_t bits() const
-    { return m_classes; }
+    {
+        return m_classes;
+    }
 
 private:
     uint32_t m_classes;
 
     friend std::istream& operator>>(std::istream& in, PointClasses& classes);
     friend std::ostream& operator<<(std::ostream& out,
-        const PointClasses& classes);
+                                    const PointClasses& classes);
 };
 
 std::istream& operator>>(std::istream& in, PointClasses& classes);
@@ -95,8 +105,9 @@ std::ostream& operator<<(std::ostream& out, const PointClasses& classes);
   \returns a deque of clusters (themselves vectors of PointIds).
 */
 template <class KDINDEX>
-PDAL_EXPORT std::deque<PointIdList> extractClusters(PointView& view, uint64_t min_points,
-                                                 uint64_t max_points, double tolerance)
+PDAL_EXPORT std::deque<PointIdList>
+extractClusters(PointView& view, uint64_t min_points, uint64_t max_points,
+                double tolerance)
 {
     // Index the incoming PointView for subsequent radius searches.
     KDINDEX kdi(view);
@@ -157,22 +168,23 @@ PDAL_EXPORT std::deque<PointIdList> extractClusters(PointView& view, uint64_t mi
     return clusters;
 }
 
-PDAL_EXPORT void ignoreDimRange(DimRange dr, PointViewPtr input, PointViewPtr keep,
-                             PointViewPtr ignore);
+PDAL_EXPORT void ignoreDimRange(DimRange dr, PointViewPtr input,
+                                PointViewPtr keep, PointViewPtr ignore);
 PDAL_EXPORT void ignoreDimRanges(std::vector<DimRange>& ranges,
-    PointViewPtr input, PointViewPtr keep, PointViewPtr ignore);
+                                 PointViewPtr input, PointViewPtr keep,
+                                 PointViewPtr ignore);
 
 PDAL_EXPORT void ignoreClassBits(PointViewPtr input, PointViewPtr keep,
-                              PointViewPtr ignore, PointClasses classbits);
+                                 PointViewPtr ignore, PointClasses classbits);
 
 PDAL_EXPORT void segmentLastReturns(PointViewPtr input, PointViewPtr last,
-                                 PointViewPtr other);
+                                    PointViewPtr other);
 
 PDAL_EXPORT void segmentReturns(PointViewPtr input, PointViewPtr first,
-                             PointViewPtr second, StringList returns);
+                                PointViewPtr second, StringList returns);
 
-
-PDAL_EXPORT PointIdList farthestPointSampling(PointView& view, point_count_t count);
+PDAL_EXPORT PointIdList farthestPointSampling(PointView& view,
+                                              point_count_t count);
 
 } // namespace Segmentation
 } // namespace pdal

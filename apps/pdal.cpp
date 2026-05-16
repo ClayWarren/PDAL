@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2013, Howard Butler (hobu.inc@gmail.com)
-* Copyright (c) 2014-2015, Bradley J Chambers (brad.chambers@gmail.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2013, Howard Butler (hobu.inc@gmail.com)
+ * Copyright (c) 2014-2015, Bradley J Chambers (brad.chambers@gmail.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/Kernel.hpp>
 #include <pdal/PluginManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/pdal_config.hpp>
+#include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/Backtrace.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <pdal/private/gdal/GDALUtils.hpp>
 
 #include <iomanip>
 #include <iostream>
@@ -62,8 +62,7 @@ std::string headline(Utils::screenWidth(), '-');
 class App
 {
 public:
-    App() : m_out(std::cout)
-    {}
+    App() : m_out(std::cout) {}
 
     int execute(StringList& cmdArgs, LogPtr& log);
 
@@ -73,7 +72,7 @@ private:
     void outputDrivers();
     void outputCommands(const std::string& leader);
     void outputOptions();
-    void outputOptions(const std::string& stageName,std::ostream& strm);
+    void outputOptions(const std::string& stageName, std::ostream& strm);
     void addArgs(ProgramArgs& args);
 
     std::ostream& m_out;
@@ -91,7 +90,6 @@ private:
     bool m_logtiming;
 };
 
-
 void App::outputVersion()
 {
     m_out << headline << std::endl;
@@ -99,7 +97,6 @@ void App::outputVersion()
     m_out << headline << std::endl;
     m_out << std::endl;
 }
-
 
 void App::outputHelp(const ProgramArgs& args)
 {
@@ -120,7 +117,6 @@ void App::outputHelp(const ProgramArgs& args)
     m_out << "See https://pdal.org/apps/ for more detail" << std::endl;
 }
 
-
 void App::outputDrivers()
 {
     // Force plugin loading.
@@ -134,16 +130,15 @@ void App::outputDrivers()
         int descripColLen(Utils::screenWidth() - nameColLen - 1);
 
         std::string tablehead(std::string(nameColLen, '=') + ' ' +
-            std::string(descripColLen, '='));
+                              std::string(descripColLen, '='));
 
         m_out << std::endl;
         m_out << tablehead << std::endl;
-        m_out << std::left << std::setw(nameColLen) << "Name" <<
-            " Description" << std::endl;
+        m_out << std::left << std::setw(nameColLen) << "Name" << " Description"
+              << std::endl;
         m_out << tablehead << std::endl;
 
         m_out << std::left;
-
 
         for (auto name : stages)
         {
@@ -151,8 +146,8 @@ void App::outputDrivers()
             StringList lines = Utils::wordWrap(descrip, descripColLen - 1);
             for (size_t i = 0; i < lines.size(); ++i)
             {
-                m_out << std::setw(nameColLen) << name << " " <<
-                    lines[i] << std::endl;
+                m_out << std::setw(nameColLen) << name << " " << lines[i]
+                      << std::endl;
                 name.clear();
             }
         }
@@ -165,22 +160,18 @@ void App::outputDrivers()
         StageExtensions& extensions = PluginManager<Stage>::extensions();
         for (auto name : stages)
         {
-            Stage *s = f.createStage(name);
+            Stage* s = f.createStage(name);
             std::string description = PluginManager<Stage>::description(name);
             std::string link = PluginManager<Stage>::link(name);
-            j.push_back(
-                { { "name", name },
-                  { "description", description },
-                  { "link", link },
-                  { "extensions", extensions.extensions(name) },
-                  { "streamable", s->pipelineStreamable() }
-                }
-            );
+            j.push_back({{"name", name},
+                         {"description", description},
+                         {"link", link},
+                         {"extensions", extensions.extensions(name)},
+                         {"streamable", s->pipelineStreamable()}});
         }
         m_out << std::setw(4) << j;
     }
 }
-
 
 void App::outputCommands(const std::string& leader)
 {
@@ -194,7 +185,6 @@ void App::outputCommands(const std::string& leader)
         m_out << leader << name << std::endl;
     }
 }
-
 
 void App::outputOptions(std::string const& stageName, std::ostream& strm)
 {
@@ -213,11 +203,11 @@ void App::outputOptions(std::string const& stageName, std::ostream& strm)
 
     if (!m_showJSON)
     {
-        strm  << stageName << " -- " << PluginManager<Stage>::link(stageName) <<
-            std::endl;
-        strm  << headline << std::endl;
+        strm << stageName << " -- " << PluginManager<Stage>::link(stageName)
+             << std::endl;
+        strm << headline << std::endl;
 
-        args.dump2(strm , 2, 6, headline.size());
+        args.dump2(strm, 2, 6, headline.size());
     }
     else
     {
@@ -230,13 +220,13 @@ void App::outputOptions(std::string const& stageName, std::ostream& strm)
             array = NL::json::parse(ostr.str());
         }
         catch (NL::json::parse_error&)
-        {}
+        {
+        }
 
-        NL::json object = { stageName, array };
-        strm  << object;
+        NL::json object = {stageName, array};
+        strm << object;
     }
 }
-
 
 void App::outputOptions()
 {
@@ -266,7 +256,8 @@ void App::outputOptions()
                 strm >> j;
             }
             catch (NL::json::parse_error&)
-            {}
+            {
+            }
             options.push_back(j);
             strm.str("");
         }
@@ -274,37 +265,38 @@ void App::outputOptions()
     }
 }
 
-
 void App::addArgs(ProgramArgs& args)
 {
     args.add("command", "The PDAL command", m_command).setPositional();
     args.add("debug", "Sets the output level to 3 (option deprecated)",
-        m_debug);
+             m_debug);
     args.add("verbose,v", "Sets the output level (0-8)", m_logLevel,
-        LogLevel::None);
+             LogLevel::None);
     args.add("drivers", "List available drivers", m_showDrivers);
     args.add("help,h", "Display help text", m_help);
     args.add("list-commands", "List available commands", m_showCommands);
     args.add("version", "Show program version", m_showVersion);
     args.add("options", "Show options for specified driver (or 'all')",
-        m_showOptions);
-    args.add("log", "Log filename (accepts stderr, stdout, stdlog, devnull"
-        " as special cases)", m_log, "stderr");
+             m_showOptions);
+    args.add("log",
+             "Log filename (accepts stderr, stdout, stdlog, devnull"
+             " as special cases)",
+             m_log, "stderr");
     args.add("logtiming", "Turn on timing for log messages", m_logtiming);
     Arg& json = args.add("showjson", "List options or drivers as JSON output",
-        m_showJSON);
+                         m_showJSON);
     json.setHidden();
 }
 
 namespace
 {
-    LogPtr logPtr(Log::makeLog("PDAL", "stderr"));
+LogPtr logPtr(Log::makeLog("PDAL", "stderr"));
 }
 
 #ifdef PDAL_WIN32_STL
-int wmain( int argc, wchar_t *argv[ ], wchar_t *envp[ ] )
+int wmain(int argc, wchar_t* argv[], wchar_t* envp[])
 #else
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 #endif
 {
     App pdal;
@@ -314,7 +306,6 @@ int main(int argc, char *argv[])
         cmdArgs.push_back(pdal::FileUtils::fromNative(argv[i]));
     return pdal.execute(cmdArgs, logPtr);
 }
-
 
 int App::execute(StringList& cmdArgs, LogPtr& log)
 {
@@ -342,15 +333,17 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
 #ifndef _WIN32
     if (m_debug)
     {
-        signal(SIGSEGV, [](int sig)
-        {
-            logPtr->get(LogLevel::Debug) << "Segmentation fault (signal 11)\n";
-            StringList lines = Utils::backtrace();
+        signal(SIGSEGV,
+               [](int sig)
+               {
+                   logPtr->get(LogLevel::Debug)
+                       << "Segmentation fault (signal 11)\n";
+                   StringList lines = Utils::backtrace();
 
-            for (const auto& l : lines)
-                logPtr->get(LogLevel::Debug) << l << std::endl;
-            exit(1);
-        });
+                   for (const auto& l : lines)
+                       logPtr->get(LogLevel::Debug) << l << std::endl;
+                   exit(1);
+               });
     }
 #endif
 
@@ -360,7 +353,7 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         int ret = 0;
         std::string name("kernels." + m_command);
 
-        Kernel *kernel = PluginManager<Kernel>::createObject(name);
+        Kernel* kernel = PluginManager<Kernel>::createObject(name);
         if (kernel)
         {
             if (m_help)
@@ -377,8 +370,9 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         }
         else
         {
-            log->get(LogLevel::Error) << "Command '" << m_command <<
-                "' not recognized" << std::endl << std::endl;
+            log->get(LogLevel::Error)
+                << "Command '" << m_command << "' not recognized" << std::endl
+                << std::endl;
             ret = 1;
         }
         return ret;

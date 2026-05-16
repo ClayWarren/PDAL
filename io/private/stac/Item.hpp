@@ -34,22 +34,21 @@
 
 #pragma once
 
-#include <pdal/Stage.hpp>
-#include <pdal/Reader.hpp>
-#include <pdal/StageFactory.hpp>
+#include <pdal/Log.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/Polygon.hpp>
-#include <pdal/Log.hpp>
+#include <pdal/Reader.hpp>
+#include <pdal/Stage.hpp>
+#include <pdal/StageFactory.hpp>
 
-#include "Utils.hpp"
 #include "../connector/Connector.hpp"
+#include "Utils.hpp"
 
 namespace pdal
 {
 
 namespace stac
 {
-
 
 struct SchemaUrls
 {
@@ -62,15 +61,14 @@ class Item
 {
 
 public:
-    Item(const NL::json& json,
-        const std::string& itemPath,
-        const connector::Connector& connector,
-        bool validate);
+    Item(const NL::json& json, const std::string& itemPath,
+         const connector::Connector& connector, bool validate);
 
     ~Item();
     Item(const Item& item);
 
-    struct Filters {
+    struct Filters
+    {
         std::vector<RegEx> ids;
         Polygon bounds;
         SpatialReference srs;
@@ -80,7 +78,8 @@ public:
         std::vector<RegEx> collections;
     };
 
-    bool init(const Filters& filters, NL::json rawReaderArgs, SchemaUrls schemaUrls);
+    bool init(const Filters& filters, NL::json rawReaderArgs,
+              SchemaUrls schemaUrls);
 
     std::string id();
     std::string driver();
@@ -88,7 +87,6 @@ public:
     std::string assetPath();
 
 private:
-
     const NL::json m_json;
     const std::string m_path;
 
@@ -103,8 +101,9 @@ private:
     std::string m_id;
 
     std::string extractDriverFromItem(const NL::json& asset) const;
-    Options setReaderOptions(const NL::json& readerArgs, const std::string& driver,
-        const std::string& filename) const;
+    Options setReaderOptions(const NL::json& readerArgs,
+                             const std::string& driver,
+                             const std::string& filename) const;
 
     NL::json handleReaderArgs(NL::json rawReaderArgs);
     void validate();
@@ -118,6 +117,5 @@ private:
     bool filterBounds(Polygon bounds);
 };
 
-
-}
-}
+} // namespace stac
+} // namespace pdal

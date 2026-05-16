@@ -42,17 +42,14 @@ namespace stac
 
 using namespace StacUtils;
 
-ItemCollection::ItemCollection(const NL::json& json,
-        const std::string& icPath,
-        const connector::Connector& connector,
-        bool validate):
-    m_json(json), m_path(icPath), m_connector(connector),
-    m_validate(validate)
-{}
+ItemCollection::ItemCollection(const NL::json& json, const std::string& icPath,
+                               const connector::Connector& connector,
+                               bool validate)
+    : m_json(json), m_path(icPath), m_connector(connector), m_validate(validate)
+{
+}
 
-
-ItemCollection::~ItemCollection()
-{}
+ItemCollection::~ItemCollection() {}
 
 ItemList ItemCollection::items()
 {
@@ -60,10 +57,10 @@ ItemList ItemCollection::items()
 }
 
 bool ItemCollection::init(const Filters& filters, NL::json rawReaderArgs,
-    SchemaUrls schemaUrls)
+                          SchemaUrls schemaUrls)
 {
     const NL::json itemList = stacValue(m_json, "features");
-    for (const NL::json& itemJson: itemList)
+    for (const NL::json& itemJson : itemList)
     {
         Item item(itemJson, m_path, m_connector, m_validate);
         if (item.init(*filters.itemFilters, rawReaderArgs, schemaUrls))
@@ -74,22 +71,22 @@ bool ItemCollection::init(const Filters& filters, NL::json rawReaderArgs,
     if (m_json.contains("links"))
     {
         const NL::json links = stacValue(m_json, "links");
-        for (const NL::json& link: links)
+        for (const NL::json& link : links)
         {
-            std::string target = stacValue<std::string>(
-                link, "rel", m_json);
+            std::string target = stacValue<std::string>(link, "rel", m_json);
             if (target == "next")
             {
-                std::string nextLinkPath = stacValue<std::string>(
-                    link, "href", m_json);
+                std::string nextLinkPath =
+                    stacValue<std::string>(link, "href", m_json);
                 std::string nextAbsPath =
                     handleRelativePath(m_path, nextLinkPath);
                 NL::json nextJson = m_connector.getJson(nextAbsPath);
 
-                ItemCollection ic(nextJson, nextAbsPath, m_connector, m_validate);
+                ItemCollection ic(nextJson, nextAbsPath, m_connector,
+                                  m_validate);
 
                 if (ic.init(filters, rawReaderArgs, schemaUrls))
-                    for (auto& item: ic.items())
+                    for (auto& item : ic.items())
                         m_itemList.push_back(item);
             }
         }
@@ -97,6 +94,6 @@ bool ItemCollection::init(const Filters& filters, NL::json rawReaderArgs,
     return true;
 }
 
-}//stac
+} // namespace stac
 
-}//pdal
+} // namespace pdal

@@ -1,48 +1,48 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <nlohmann/json.hpp>
 
 #include <pdal/Filter.hpp>
-#include <pdal/PipelineReaderJSON.hpp>
-#include <pdal/PipelineManager.hpp>
-#include <pdal/PluginManager.hpp>
 #include <pdal/Options.hpp>
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/util/Algorithm.hpp>
-#include <pdal/util/Utils.hpp>
+#include <pdal/PipelineManager.hpp>
+#include <pdal/PipelineReaderJSON.hpp>
+#include <pdal/PluginManager.hpp>
 #include <pdal/private/FileSpecHelper.hpp>
+#include <pdal/util/Algorithm.hpp>
+#include <pdal/util/FileUtils.hpp>
+#include <pdal/util/Utils.hpp>
 
 #include <memory>
 #include <vector>
@@ -50,7 +50,7 @@
 namespace pdal
 {
 
-using TagMap = std::map<std::string, Stage *>;
+using TagMap = std::map<std::string, Stage*>;
 
 namespace
 {
@@ -58,10 +58,12 @@ namespace
 std::string extractType(NL::json& node);
 std::string extractTag(NL::json& node, TagMap& tags);
 FileSpec extractFilename(NL::json& node);
-std::vector<Stage *> extractInputs(NL::json& node, TagMap& tags);
+std::vector<Stage*> extractInputs(NL::json& node, TagMap& tags);
 Options extractOptions(NL::json& node);
-bool extractOption(Options& options, const std::string& name, const NL::json& node);
-void handleInputTag(const std::string& tag, const TagMap& tags, std::vector<Stage *>& inputs);
+bool extractOption(Options& options, const std::string& name,
+                   const NL::json& node);
+void handleInputTag(const std::string& tag, const TagMap& tags,
+                    std::vector<Stage*>& inputs);
 
 void parsePipeline(NL::json& tree, PipelineManager& manager)
 {
@@ -95,7 +97,7 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
             options = extractOptions(node);
         }
 
-        Stage *s = nullptr;
+        Stage* s = nullptr;
 
         // The type is inferred from a filename as a reader if it's not
         // the last stage or if there's only one.
@@ -109,20 +111,22 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
             for (const std::string& path : files)
             {
                 spec.setFilePath(path);
-                ReaderCreationOptions ops { spec, type, nullptr, options, tag };
+                ReaderCreationOptions ops{spec, type, nullptr, options, tag};
                 s = &manager.makeReader(ops);
 
                 if (specifiedInputs.size())
                     throw pdal_error("JSON pipeline: Inputs not permitted for "
-                        " reader: '" + path + "'.");
+                                     " reader: '" +
+                                     path + "'.");
                 inputs.push_back(s);
             }
         }
         else if (type.empty() || Utils::startsWith(type, "writers."))
         {
-            StageCreationOptions ops { spec.u8string(), type, nullptr, options, tag };
+            StageCreationOptions ops{spec.u8string(), type, nullptr, options,
+                                     tag};
             s = &manager.makeWriter(ops);
-            for (Stage *ts : inputs)
+            for (Stage* ts : inputs)
                 s->setInput(*ts);
             inputs.clear();
             inputs.push_back(s);
@@ -131,9 +135,9 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
         {
             if (spec.valid())
                 options.add("filename", spec.u8string());
-            StageCreationOptions ops { "", type, nullptr, options, tag };
+            StageCreationOptions ops{"", type, nullptr, options, tag};
             s = &manager.makeFilter(ops);
-            for (Stage *ts : inputs)
+            for (Stage* ts : inputs)
                 s->setInput(*ts);
             inputs.clear();
             inputs.push_back(s);
@@ -145,13 +149,14 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
     }
 
     // Tell user if the pipeline seems wacky.
-    const std::vector<Stage *> llist = manager.leaves();
+    const std::vector<Stage*> llist = manager.leaves();
     if (llist.size() > 1)
     {
         const LogPtr& log = manager.log();
         log->get(LogLevel::Error) << "Pipeline has multiple leaf nodes.\n";
-        log->get(LogLevel::Error) << "Only the first of the following leaf nodes will be run.\n";
-        for (Stage *s : llist)
+        log->get(LogLevel::Error)
+            << "Only the first of the following leaf nodes will be run.\n";
+        for (Stage* s : llist)
         {
             std::string name = s->tag().size() ? s->tag() : s->getName();
             log->get(LogLevel::Error) << "    " << name << "\n";
@@ -173,17 +178,19 @@ std::string extractTag(NL::json& node, TagMap& tags)
             {
                 tag = val.get<std::string>();
                 if (tags.find(tag) != tags.end())
-                    throw pdal_error("JSON pipeline: duplicate tag '" +
-                        tag + "'.");
+                    throw pdal_error("JSON pipeline: duplicate tag '" + tag +
+                                     "'.");
             }
             else
                 throw pdal_error("JSON pipeline: tag must be "
-                    "specified as a string.");
+                                 "specified as a string.");
         }
         node.erase(it);
         std::string::size_type pos = 0;
         if (!Stage::parseTagName(tag, pos) || pos != tag.size())
-            throw pdal_error("JSON pipeline: Invalid tag name '" + tag + "'.  "
+            throw pdal_error(
+                "JSON pipeline: Invalid tag name '" + tag +
+                "'.  "
                 "Must start with letter.  Remainder can be letters, "
                 "digits or underscores.");
     }
@@ -205,9 +212,9 @@ FileSpec extractFilename(NL::json& node)
     return spec;
 }
 
-std::vector<Stage *> extractInputs(NL::json& node, TagMap& tags)
+std::vector<Stage*> extractInputs(NL::json& node, TagMap& tags)
 {
-    std::vector<Stage *> inputs;
+    std::vector<Stage*> inputs;
     std::string filename;
 
     auto it = node.find("inputs");
@@ -221,14 +228,15 @@ std::vector<Stage *> extractInputs(NL::json& node, TagMap& tags)
             for (auto& input : val)
             {
                 if (!input.is_string())
-                    throw pdal_error("JSON pipeline: 'inputs' tag must "
+                    throw pdal_error(
+                        "JSON pipeline: 'inputs' tag must "
                         " be specified as a string or array of strings.");
                 handleInputTag(input.get<std::string>(), tags, inputs);
             }
         }
         else
             throw pdal_error("JSON pipeline: 'inputs' tag must "
-                " be specified as a string or array of strings.");
+                             " be specified as a string or array of strings.");
         node.erase(it);
     }
     return inputs;
@@ -259,13 +267,14 @@ Options extractOptions(NL::json& node)
                     options.add(name, val);
                 else if (!extractOption(options, name, val))
                     throw pdal_error("JSON pipeline: Invalid value type for "
-                        "option list '" + name + "'.");
+                                     "option list '" +
+                                     name + "'.");
         }
         else if (subnode.is_object())
             options.add(name, subnode);
         else if (!extractOption(options, name, subnode))
-            throw pdal_error("JSON pipeline: Value of stage option '" +
-                name + "' cannot be converted.");
+            throw pdal_error("JSON pipeline: Value of stage option '" + name +
+                             "' cannot be converted.");
     }
     node.clear();
     return options;
@@ -285,14 +294,15 @@ std::string extractType(NL::json& node)
                 type = val.get<std::string>();
             else
                 throw pdal_error("JSON pipeline: 'type' must be specified as "
-                    "a string.");
+                                 "a string.");
         }
         node.erase(it);
     }
     return type;
 }
 
-bool extractOption(Options& options, const std::string& name, const NL::json& node)
+bool extractOption(Options& options, const std::string& name,
+                   const NL::json& node)
 {
     if (node.is_string())
         options.add(name, node.get<std::string>());
@@ -313,22 +323,24 @@ bool extractOption(Options& options, const std::string& name, const NL::json& no
     return true;
 }
 
-void handleInputTag(const std::string& tag, const TagMap& tags, std::vector<Stage *>& inputs)
+void handleInputTag(const std::string& tag, const TagMap& tags,
+                    std::vector<Stage*>& inputs)
 {
     auto ii = tags.find(tag);
     if (ii == tags.end())
         throw pdal_error("JSON pipeline: Invalid pipeline: "
-            "undefined stage tag '" + tag + "'.");
+                         "undefined stage tag '" +
+                         tag + "'.");
     else
         inputs.push_back(ii->second);
 }
 
-
 } // unnamed namespace
 
-PipelineReaderJSON::PipelineReaderJSON(PipelineManager& manager) :
-    m_manager(manager)
-{}
+PipelineReaderJSON::PipelineReaderJSON(PipelineManager& manager)
+    : m_manager(manager)
+{
+}
 
 void PipelineReaderJSON::readPipeline(const std::string& filename)
 {
@@ -336,7 +348,8 @@ void PipelineReaderJSON::readPipeline(const std::string& filename)
     if (!input)
     {
         throw pdal_error("Pipeline: Unable to open stream for "
-            "file \"" + filename + "\"");
+                         "file \"" +
+                         filename + "\"");
     }
 
     try
@@ -359,8 +372,8 @@ void PipelineReaderJSON::readPipeline(std::istream& input)
     try
     {
         root = NL::json::parse(input, /* callback */ nullptr,
-                                      /* allow exceptions */ true,
-                                      /* ignore_comments */ true);
+                               /* allow exceptions */ true,
+                               /* ignore_comments */ true);
     }
     catch (NL::json::parse_error& err)
     {

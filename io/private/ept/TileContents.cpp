@@ -59,10 +59,11 @@ void TileContents::read()
 #endif
         else
             throw pdal_error("Unrecognized EPT dataType");
-//ABELL - Should check that we read the number of points specified in the
-//  overlap.
-        // Read addon information after the native data, we'll possibly
-        // overwrite attributes.
+        // ABELL - Should check that we read the number of points specified in
+        // the
+        //   overlap.
+        //  Read addon information after the native data, we'll possibly
+        //  overwrite attributes.
         for (const Addon& addon : m_addons)
             readAddon(addon);
     }
@@ -97,7 +98,8 @@ void TileContents::readLaszip()
     reader.prepare(*m_table);
     PointViewSet viewset = reader.execute(*m_table);
     if ((*viewset.begin())->size() != size())
-        throw pdal_error("Invalid number of points in tile " + key().toString());
+        throw pdal_error("Invalid number of points in tile " +
+                         key().toString());
 }
 
 void TileContents::readBinary()
@@ -105,13 +107,15 @@ void TileContents::readBinary()
     std::string filename = m_info.dataDir() + key().toString() + ".bin";
     auto data(m_connector.getBinary(filename));
 
-    VectorPointTable *vpt = new VectorPointTable(m_info.remoteLayout());
+    VectorPointTable* vpt = new VectorPointTable(m_info.remoteLayout());
     vpt->buffer() = std::move(data);
     m_table.reset(vpt);
     // Have to check seperately in readBinary and readZstandard because m_table
-    // (BasePointTable) doesn't have a numPoints attribute, but VectorPointTable does
+    // (BasePointTable) doesn't have a numPoints attribute, but VectorPointTable
+    // does
     if (vpt->numPoints() != size())
-        throw pdal_error("Invalid number of points in tile " + key().toString());
+        throw pdal_error("Invalid number of points in tile " +
+                         key().toString());
 
     transform();
 }
@@ -123,23 +127,21 @@ void TileContents::readZstandard()
     auto compressed(m_connector.getBinary(filename));
     std::vector<char> data;
     pdal::ZstdDecompressor dec([&data](char* pos, std::size_t size)
-    {
-        data.insert(data.end(), pos, pos + size);
-    });
+                               { data.insert(data.end(), pos, pos + size); });
 
     dec.decompress(compressed.data(), compressed.size());
 
-    VectorPointTable *vpt = new VectorPointTable(m_info.remoteLayout());
+    VectorPointTable* vpt = new VectorPointTable(m_info.remoteLayout());
     vpt->buffer() = std::move(data);
     m_table.reset(vpt);
     if (vpt->numPoints() != size())
-        throw pdal_error("Invalid number of points in tile " + key().toString());
+        throw pdal_error("Invalid number of points in tile " +
+                         key().toString());
 
     transform();
 }
 #else
-void TileContents::readZstandard()
-{}
+void TileContents::readZstandard() {}
 #endif // PDAL_HAVE_ZSTD
 
 void TileContents::readAddon(const Addon& addon)
@@ -160,7 +162,7 @@ void TileContents::readAddon(const Addon& addon)
     if (size() * Dimension::size(addon.type()) != data.size())
         throw pdal_error("Invalid addon content length");
 
-    VectorPointTable *vpt = new VectorPointTable(addon.layout());
+    VectorPointTable* vpt = new VectorPointTable(addon.layout());
     vpt->buffer() = std::move(data);
     m_addonTables[addon.localId()] = BasePointTablePtr(vpt);
 }
@@ -181,14 +183,13 @@ void TileContents::transform()
 
         // Scale the XYZ values.
         p.setField(D::X, p.getFieldAs<double>(D::X) * xf.m_scale.m_val +
-            xf.m_offset.m_val);
+                             xf.m_offset.m_val);
         p.setField(D::Y, p.getFieldAs<double>(D::Y) * yf.m_scale.m_val +
-            yf.m_offset.m_val);
+                             yf.m_offset.m_val);
         p.setField(D::Z, p.getFieldAs<double>(D::Z) * zf.m_scale.m_val +
-            zf.m_offset.m_val);
+                             zf.m_offset.m_val);
     }
 }
 
 } // namespace ept
 } // namespace pdal
-

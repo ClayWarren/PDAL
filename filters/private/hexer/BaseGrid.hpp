@@ -1,17 +1,17 @@
 #pragma once
 
-#include <vector>
 #include <list>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
+#include <vector>
 
-#include <pdal/pdal_export.hpp>
 #include <pdal/SpatialReference.hpp>
+#include <pdal/pdal_export.hpp>
 
-#include "exception.hpp"
-#include "Point.hpp"
-#include "Path.hpp"
 #include "HexId.hpp"
+#include "Path.hpp"
+#include "Point.hpp"
+#include "exception.hpp"
 
 namespace hexer
 {
@@ -34,14 +34,22 @@ public:
     void flushSamples();
 
     void setSampleSize(int num)
-        { m_maxSample = num; }
-    std::vector<Path *> const& rootPaths() const
-        { return m_roots; }
+    {
+        m_maxSample = num;
+    }
+    std::vector<Path*> const& rootPaths() const
+    {
+        return m_roots;
+    }
     // returns all hexagons in the grid and their counts
     std::unordered_map<HexId, int> const& getHexes()
-        { return m_counts; }
+    {
+        return m_counts;
+    }
     int denseLimit() const
-        { return m_denseLimit; }
+    {
+        return m_denseLimit;
+    }
 
     // test function: adds pre-defined hexagon coordinates to the grid
     void setHexes(const std::vector<HexId>& hexes);
@@ -49,33 +57,43 @@ public:
     void sortPaths();
 
     virtual void addXY(double& x, double& y) = 0;
-    // returns a single point from a segment to be used as the vertex of a hexagon
+    // returns a single point from a segment to be used as the vertex of a
+    // hexagon
     virtual Point findPoint(Segment& s) = 0;
     virtual bool sampling() const = 0;
     virtual uint64_t getID(HexId ij) = 0;
     virtual double height() = 0;
 
     virtual H3Index ij2h3(HexId ij)
-        { return 0; }
+    {
+        return 0;
+    }
     virtual HexId h32ij(H3Index h3)
-        { return {0,0}; }
+    {
+        return {0, 0};
+    }
     virtual Point offset(int idx) const
-        { return Point{0,0}; }
+    {
+        return Point{0, 0};
+    }
     virtual int getRes() const
-        { return -1; }
+    {
+        return -1;
+    }
     virtual bool checkSRS(pdal::SpatialReference& srs)
-        { return true; }
+    {
+        return true;
+    }
 
 protected:
-    BaseGrid(int dense_limit) : m_denseLimit{dense_limit}
-    {}
+    BaseGrid(int dense_limit) : m_denseLimit{dense_limit} {}
     double distance(const Point& p1, const Point& p2);
     int increment(HexId hex);
 
     /// maximum sample size for auto hex size calculation
     int m_maxSample;
     /// map of cells bordering paths at side 0 or 3
-    std::unordered_map<HexId, Path *> m_hexPaths;
+    std::unordered_map<HexId, Path*> m_hexPaths;
     /// map of all hexagons containing points, and the number of points within.
     std::unordered_map<HexId, int> m_counts;
 
@@ -102,7 +120,7 @@ private:
     /// List of all paths
     std::list<Path> m_paths;
     /// List of pointers to paths in m_paths to be written as roots
-    std::vector<Path *> m_roots;
+    std::vector<Path*> m_roots;
     /// Minimum number of points for a cell to be dense
     int m_denseLimit;
 };

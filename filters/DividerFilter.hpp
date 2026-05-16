@@ -42,9 +42,7 @@ namespace pdal
 class PDAL_EXPORT DividerFilter : public Filter
 {
 public:
-
 public:
-
     DividerFilter();
     ~DividerFilter();
 
@@ -74,12 +72,12 @@ private:
     virtual void prepared(PointTableRef table);
 
     DividerFilter& operator=(const DividerFilter&); // not implemented
-    DividerFilter(const DividerFilter&); // not implemented
+    DividerFilter(const DividerFilter&);            // not implemented
 
     friend std::istream& operator>>(std::istream& in,
-        DividerFilter::Mode& mode);
+                                    DividerFilter::Mode& mode);
     friend std::ostream& operator<<(std::ostream& in,
-        const DividerFilter::Mode& mode);
+                                    const DividerFilter::Mode& mode);
 };
 
 } // namespace pdal

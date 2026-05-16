@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -53,38 +53,58 @@ public:
         Global
     };
 
-typedef std::map<double, point_count_t> EnumMap;
-typedef std::vector<double> DataVector;
+    typedef std::map<double, point_count_t> EnumMap;
+    typedef std::vector<double> DataVector;
 
 public:
-    Summary(std::string name, EnumType enumerate, bool advanced = true) :
-        m_name(name), m_enumerate(enumerate), m_advanced(advanced)
-    { reset(); }
+    Summary(std::string name, EnumType enumerate, bool advanced = true)
+        : m_name(name), m_enumerate(enumerate), m_advanced(advanced)
+    {
+        reset();
+    }
 
-    // Merge another summary with this one. 'name', 'enumerate' and 'advanced' must match
-    // or false is returned and no merge occurs.
+    // Merge another summary with this one. 'name', 'enumerate' and 'advanced'
+    // must match or false is returned and no merge occurs.
     bool merge(const Summary& s);
     double minimum() const
-        { return m_min; }
+    {
+        return m_min;
+    }
     double maximum() const
-        { return m_max; }
+    {
+        return m_max;
+    }
     double average() const
-        { return M1; }
+    {
+        return M1;
+    }
     double populationVariance() const
-        { return M2 / m_cnt; }
+    {
+        return M2 / m_cnt;
+    }
     double sampleVariance() const
-        { return M2 / (m_cnt - 1.0); }
+    {
+        return M2 / (m_cnt - 1.0);
+    }
     double variance() const
-        { return sampleVariance(); }
+    {
+        return sampleVariance();
+    }
     double populationStddev() const
-        { return std::sqrt(populationVariance()); }
+    {
+        return std::sqrt(populationVariance());
+    }
     double sampleStddev() const
-        { return std::sqrt(sampleVariance()); }
+    {
+        return std::sqrt(sampleVariance());
+    }
     double stddev() const
-        { return sampleStddev(); }
+    {
+        return sampleStddev();
+    }
     double populationSkewness() const
     {
-        if (!M2 || ! m_advanced)
+        if (!M2 || !m_advanced)
             return 0;
         return std::sqrt(double(m_cnt)) * M3 / std::pow(M2, 1.5);
     }
@@ -130,17 +150,27 @@ public:
         return sampleExcessKurtosis();
     }
     double median() const
-        { return m_median; }
+    {
+        return m_median;
+    }
     double mad() const
-        { return m_mad; }
+    {
+        return m_mad;
+    }
     point_count_t count() const
-        { return m_cnt; }
+    {
+        return m_cnt;
+    }
     std::string name() const
-        { return m_name; }
+    {
+        return m_name;
+    }
     const EnumMap& values() const
-        { return m_values; }
+    {
+        return m_values;
+    }
 
-    void extractMetadata(MetadataNode &m);
+    void extractMetadata(MetadataNode& m);
     void computeGlobalStats();
 
     void reset()
@@ -186,8 +216,8 @@ public:
         {
             double delta_n2 = pow(delta_n, 2.0);
             // Fourth moment - kurtosis (sum part)
-            M4 += term1 * delta_n2 * (n*n - 3*n + 3) +
-                (6 * delta_n2 * M2) - (4 * delta_n * M3);
+            M4 += term1 * delta_n2 * (n * n - 3 * n + 3) + (6 * delta_n2 * M2) -
+                  (4 * delta_n * M3);
             // Third moment - skewness (sum part)
             M3 += term1 * delta_n * (n - 2) - 3 * delta_n * M2;
         }
@@ -216,8 +246,7 @@ private:
 class PDAL_EXPORT StatsFilter : public Filter, public Streamable
 {
 public:
-    StatsFilter()
-        {}
+    StatsFilter() {}
 
     std::string getName() const;
 
@@ -226,7 +255,7 @@ public:
 
 private:
     StatsFilter& operator=(const StatsFilter&); // not implemented
-    StatsFilter(const StatsFilter&); // not implemented
+    StatsFilter(const StatsFilter&);            // not implemented
     virtual void addArgs(ProgramArgs& args);
     virtual bool processOne(PointRef& point);
     virtual void prepared(PointTableRef table);

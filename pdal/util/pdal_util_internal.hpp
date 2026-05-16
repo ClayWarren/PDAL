@@ -39,14 +39,14 @@
 
 #ifdef _WIN32
 #ifdef _MSC_VER
-#define PDAL_MSVC       // Using the MSVC compiler for WIN32.
-#define PDAL_WIN32_STL    // When you're using the MSVC compiler, you can use MSVC STL extensions
-#else // _MSC_VER
+#define PDAL_MSVC      // Using the MSVC compiler for WIN32.
+#define PDAL_WIN32_STL // When you're using the MSVC compiler, you can use MSVC
+                       // STL extensions
+#else                  // _MSC_VER
 #ifndef __MINGW32__
 #error "WIN32 without MSVC. Expected __MINGW32__ but not found."
 #endif
-#define PDAL_MINGW      // MinGW runs on WIN32 but isn't MSVC. It uses libc++std.
+#define PDAL_MINGW // MinGW runs on WIN32 but isn't MSVC. It uses libc++std.
 // MinGW use libstdc++
-#endif // _MSC_VER
-#endif // _WIN32
-
+#endif             // _MSC_VER
+#endif             // _WIN32

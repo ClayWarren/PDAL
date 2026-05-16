@@ -48,12 +48,12 @@ public:
     SrsTransform(const SrsTransform& src);
     SrsTransform(SrsTransform&& src);
     SrsTransform& operator=(SrsTransform&& src);
-    SrsTransform(const OGRSpatialReference& src, const OGRSpatialReference& dst);
+    SrsTransform(const OGRSpatialReference& src,
+                 const OGRSpatialReference& dst);
     SrsTransform(const SpatialReference& src, const SpatialReference& dst);
     SrsTransform(const SpatialReference& src, std::vector<int> srcOrder,
                  const SpatialReference& dst, std::vector<int> dstOrder);
     ~SrsTransform();
-
 
     void setSrcEpoch(double epoch);
     void setDstEpoch(double epoch);
@@ -63,7 +63,7 @@ public:
 
     /// Get the underlying transformation.
     /// \return  Pointer to the underlying coordinate transform.
-    OGRCoordinateTransformation *get() const;
+    OGRCoordinateTransformation* get() const;
 
     /// Transform the X, Y and Z of a point in place.
     /// \param x  X coordinate
@@ -78,16 +78,17 @@ public:
     /// \param z  Z coordinates
     /// \return  True if the transformation was successful
     bool transform(std::vector<double>& x, std::vector<double>& y,
-        std::vector<double>& z) const;
+                   std::vector<double>& z) const;
 
     /// Determine if this represents a valid transform.
     /// \return  Whether the transform is valid or not.
     bool valid() const
-    { return (bool)m_transform.get(); }
+    {
+        return (bool)m_transform.get();
+    }
 
 private:
     std::unique_ptr<OGRCoordinateTransformation> m_transform;
 };
 
 } // namespace pdal
-

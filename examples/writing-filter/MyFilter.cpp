@@ -7,16 +7,15 @@
 namespace pdal
 {
 
-static PluginInfo const s_info
-{
-    "filters.name",
-    "My awesome filter",
-    "http://link/to/documentation"
-};
+static PluginInfo const s_info{"filters.name", "My awesome filter",
+                               "http://link/to/documentation"};
 
 CREATE_SHARED_STAGE(MyFilter, s_info)
 
-std::string MyFilter::getName() const { return s_info.name; }
+std::string MyFilter::getName() const
+{
+    return s_info.name;
+}
 
 void MyFilter::addArgs(ProgramArgs& args)
 {
@@ -26,8 +25,8 @@ void MyFilter::addArgs(ProgramArgs& args)
 void MyFilter::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDim(Dimension::Id::Intensity);
-    m_myDimension = layout->registerOrAssignDim("MyDimension",
-            Dimension::Type::Unsigned8);
+    m_myDimension =
+        layout->registerOrAssignDim("MyDimension", Dimension::Type::Unsigned8);
 }
 
 PointViewSet MyFilter::run(PointViewPtr input)

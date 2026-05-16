@@ -58,10 +58,20 @@ void SampleFilter::addArgs(ProgramArgs& args)
 {
     m_cellArg = &args.add("cell", "Cell size", m_cell);
     m_radiusArg = &args.add("radius", "Minimum radius", m_radius);
-    m_dimensionArg = &args.add("dimension", "Emit 1 or 0 whether a point was sampled into this newly created dimension instead of culling points", m_dimensionName);
-    m_originXArg = &args.add("origin_x", "Voxelization origin X (default to first point)", m_originX);
-    m_originYArg = &args.add("origin_y", "Voxelization origin Y (default to first point)", m_originY);
-    m_originZArg = &args.add("origin_z", "Voxelization origin Z (default to first point)", m_originZ);
+    m_dimensionArg =
+        &args.add("dimension",
+                  "Emit 1 or 0 whether a point was sampled into this newly "
+                  "created dimension instead of culling points",
+                  m_dimensionName);
+    m_originXArg =
+        &args.add("origin_x", "Voxelization origin X (default to first point)",
+                  m_originX);
+    m_originYArg =
+        &args.add("origin_y", "Voxelization origin Y (default to first point)",
+                  m_originY);
+    m_originZArg =
+        &args.add("origin_z", "Voxelization origin Z (default to first point)",
+                  m_originZ);
     m_dimension = pdal::Dimension::Id::Unknown;
 }
 
@@ -77,9 +87,9 @@ void SampleFilter::prepared(PointTableRef table)
 
     if (m_dimensionArg->set())
     {
-        m_dimension = layout->registerOrAssignDim(m_dimensionName, Dimension::Type::Unsigned8);
+        m_dimension = layout->registerOrAssignDim(m_dimensionName,
+                                                  Dimension::Type::Unsigned8);
     }
-
 }
 
 void SampleFilter::ready(PointTableRef)
@@ -220,13 +230,13 @@ bool SampleFilter::voxelize(PointRef& point)
 
 bool SampleFilter::keepPoint(PointRef& point)
 {
-  bool keep = voxelize(point);
-  if (m_dimension != pdal::Dimension::Id::Unknown)
-  {
-    point.setField(m_dimension, keep);
-    keep = true;
-  }
-  return keep;
+    bool keep = voxelize(point);
+    if (m_dimension != pdal::Dimension::Id::Unknown)
+    {
+        point.setField(m_dimension, keep);
+        keep = true;
+    }
+    return keep;
 }
 
 bool SampleFilter::processOne(PointRef& point)

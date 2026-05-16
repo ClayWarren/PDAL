@@ -1,42 +1,42 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
 #include <pdal/Metadata.hpp>
-#include <pdal/SpatialReference.hpp>
 #include <pdal/PDALUtils.hpp>
+#include <pdal/SpatialReference.hpp>
 
 using namespace pdal;
 
@@ -68,10 +68,12 @@ TEST(MetadataTest, test_construction)
         MetadataNode m2 = m.addEncoded("name", v.data(), v.size());
         EXPECT_EQ(m2.type(), "base64Binary");
 
-        std::string base64("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiYw==");
+        std::string base64(
+            "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMD"
+            "EyMzQ1Njc4OTo7PD0+"
+            "P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiYw==");
         EXPECT_EQ(m2.value(), base64);
     }
-
 
     {
         MetadataNode m;
@@ -145,7 +147,7 @@ TEST(MetadataTest, typed_value)
     EXPECT_EQ(127, m2.value<int>());
 
     double d = 123.45;
-    MetadataNode m3 = m.addEncoded("name", (unsigned char *)&d, sizeof(d));
+    MetadataNode m3 = m.addEncoded("name", (unsigned char*)&d, sizeof(d));
     EXPECT_DOUBLE_EQ(d, m3.value<double>());
     EXPECT_EQ("zczMzMzcXkA=", m3.value());
 
@@ -157,7 +159,6 @@ TEST(MetadataTest, typed_value)
     Utils::restore(std::cerr, redir);
 }
 
-
 TEST(MetadataTest, test_construction_with_srs)
 {
     MetadataNode m;
@@ -165,21 +166,20 @@ TEST(MetadataTest, test_construction_with_srs)
     MetadataNode m2 = m.add("spatialreference", ref);
     EXPECT_EQ(m2.type(), "spatialreference");
 
-    //SpatialReference ref2 = m.getValue<SpatialReference>();
-    // std::string ref_text("GEOGCS[\"WGS 84\","
-    //     DATUM[\"WGS_1984\","
-    //         SPHEROID[\"WGS 84\",6378137,298.257223563,
-    //             AUTHORITY[\"EPSG\",\"7030\"]],
-    //         AUTHORITY[\"EPSG\",\"6326\"]],
-    //     PRIMEM[\"Greenwich\",0,
-    //         AUTHORITY[\"EPSG\",\"8901\"]],
-    //     UNIT[\"degree\",0.0174532925199433,
-    //         AUTHORITY[\"EPSG\",\"9122\"]],
-    //     AUTHORITY[\"EPSG\",\"4326\"]]");
+    // SpatialReference ref2 = m.getValue<SpatialReference>();
+    //  std::string ref_text("GEOGCS[\"WGS 84\","
+    //      DATUM[\"WGS_1984\","
+    //          SPHEROID[\"WGS 84\",6378137,298.257223563,
+    //              AUTHORITY[\"EPSG\",\"7030\"]],
+    //          AUTHORITY[\"EPSG\",\"6326\"]],
+    //      PRIMEM[\"Greenwich\",0,
+    //          AUTHORITY[\"EPSG\",\"8901\"]],
+    //      UNIT[\"degree\",0.0174532925199433,
+    //          AUTHORITY[\"EPSG\",\"9122\"]],
+    //      AUTHORITY[\"EPSG\",\"4326\"]]");
 
     // std::cout << m.getValue<SpatialReference>();
 }
-
 
 TEST(MetadataTest, test_metadata_copy)
 {
@@ -206,11 +206,13 @@ TEST(MetadataTest, test_metadata_set)
     class Predicate
     {
     public:
-        Predicate(const std::string& name) : m_name(name)
-        {}
+        Predicate(const std::string& name) : m_name(name) {}
 
         bool operator()(MetadataNode m)
-            { return m.name() == m_name; }
+        {
+            return m.name() == m_name;
+        }
+
     private:
         std::string m_name;
     };
@@ -237,21 +239,15 @@ TEST(MetadataTest, test_vlr_metadata)
     vlr.add("user_id", userId);
     // Find a node whose name starts with vlr and that has child nodes
     // with the name and recordId we're looking for.
-    auto pred = [recordId,userId](MetadataNode n)
+    auto pred = [recordId, userId](MetadataNode n)
     {
         auto recPred = [recordId](MetadataNode n)
-        {
-            return n.name() == "record_id" &&
-                n.value() == recordId;
-        };
+        { return n.name() == "record_id" && n.value() == recordId; };
         auto userPred = [userId](MetadataNode n)
-        {
-            return n.name() == "user_id" &&
-                n.value() == userId;
-        };
+        { return n.name() == "user_id" && n.value() == userId; };
         return (Utils::startsWith(n.name(), "vlr") &&
-            !n.findChild(recPred).empty() &&
-            !n.findChild(userPred).empty());
+                !n.findChild(recPred).empty() &&
+                !n.findChild(userPred).empty());
     };
 
     MetadataNode found = m.find(pred);
@@ -290,7 +286,8 @@ TEST(MetadataTest, test_float)
 TEST(MetadataTest, pointer)
 {
     class foo
-    {};
+    {
+    };
 
     foo f;
 
@@ -298,7 +295,7 @@ TEST(MetadataTest, pointer)
     MetadataNode n2 = n.add("test", &f);
 
     std::istringstream iss;
-    foo *f2 = n2.value<foo *>();
+    foo* f2 = n2.value<foo*>();
     EXPECT_EQ(f2, &f);
 }
 

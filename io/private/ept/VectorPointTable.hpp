@@ -42,25 +42,33 @@ namespace pdal
 class PDAL_EXPORT VectorPointTable : public SimplePointTable
 {
 public:
-    VectorPointTable(PointLayout& layout) : SimplePointTable(layout)
-    {}
+    VectorPointTable(PointLayout& layout) : SimplePointTable(layout) {}
 
     virtual PointId addPoint() override
-        { return 0; }
+    {
+        return 0;
+    }
     virtual bool supportsView() const override
-        { return true; }
+    {
+        return true;
+    }
     std::size_t numPoints() const
-        { return m_buffer.size() / m_layoutRef.pointSize(); }
+    {
+        return m_buffer.size() / m_layoutRef.pointSize();
+    }
     std::vector<char>& buffer()
-        { return m_buffer; }
+    {
+        return m_buffer;
+    }
 
 protected:
     virtual char* getPoint(PointId id) override
-        { return m_buffer.data() + pointsToBytes(id); }
+    {
+        return m_buffer.data() + pointsToBytes(id);
+    }
 
 private:
     std::vector<char> m_buffer;
 };
 
 } // namespace pdal
-

@@ -36,11 +36,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include "../connector/Connector.hpp"
+#include "Item.hpp"
 #include <pdal/PointView.hpp>
 #include <pdal/Stage.hpp>
 #include <pdal/util/ThreadPool.hpp>
-#include "../connector/Connector.hpp"
-#include "Item.hpp"
 
 namespace pdal
 {
@@ -52,15 +52,13 @@ class Catalog
 {
 
 public:
-    Catalog(const NL::json& json,
-        const std::string& catPath,
-        const connector::Connector& connector,
-        ThreadPool& pool,
-        bool validate,
-        LogPtr log);
+    Catalog(const NL::json& json, const std::string& catPath,
+            const connector::Connector& connector, ThreadPool& pool,
+            bool validate, LogPtr log);
     virtual ~Catalog();
 
-    struct Filters {
+    struct Filters
+    {
         std::vector<RegEx> ids;
         Item::Filters* itemFilters;
         Filters* colFilters;
@@ -72,8 +70,8 @@ public:
     ErrorList errors();
     GroupType type();
 
-    bool init(const Filters& filters, NL::json rawReaderArgs, SchemaUrls schemaUrls,
-            bool isRoot);
+    bool init(const Filters& filters, NL::json rawReaderArgs,
+              SchemaUrls schemaUrls, bool isRoot);
     bool filter(Filters filters);
 
     virtual void validate();
@@ -99,7 +97,8 @@ protected:
 
     void hoistNested();
     void collectErrors();
-    void handleItem(const Item::Filters& f, NL::json readerArgs, std::string path);
+    void handleItem(const Item::Filters& f, NL::json readerArgs,
+                    std::string path);
     void handleCat(const Filters& f, NL::json readerArgs, std::string path);
     void handleCol(const Filters& f, NL::json readerArgs, std::string path);
 };

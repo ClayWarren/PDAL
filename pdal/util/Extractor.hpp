@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2014, Hobu Inc., hobu@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Hobu Inc., hobu@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -55,9 +55,10 @@ public:
       \param buf  Buffer to extract from.
       \param size  Buffer size.
     */
-    Extractor(const char *buf, std::size_t size) : m_eback(buf),
-        m_egptr(buf + size), m_gptr(buf)
-    {}
+    Extractor(const char* buf, std::size_t size)
+        : m_eback(buf), m_egptr(buf + size), m_gptr(buf)
+    {
+    }
 
 public:
     /**
@@ -65,8 +66,10 @@ public:
 
       \return  Whether the buffer is good.
     */
-    operator bool ()
-        { return good(); }
+    operator bool()
+    {
+        return good();
+    }
 
     /**
       Seek to a position in the buffer.
@@ -74,7 +77,9 @@ public:
       \param pos  Position to seek in buffer.
     */
     void seek(std::size_t pos)
-        { m_gptr = m_eback + pos; }
+    {
+        m_gptr = m_eback + pos;
+    }
 
     /**
       Advance buffer position.
@@ -82,7 +87,9 @@ public:
       \param cnt  Number of bytes to skip in buffer.
     */
     void skip(std::size_t cnt)
-        { m_gptr += cnt; }
+    {
+        m_gptr += cnt;
+    }
 
     /**
       Return the get position of buffer.
@@ -90,7 +97,9 @@ public:
       \return  Get position.
     */
     size_t position() const
-        { return m_gptr - m_eback; }
+    {
+        return m_gptr - m_eback;
+    }
 
     /**
       Determine whether the extractor is good (the get pointer is in the
@@ -99,7 +108,9 @@ public:
       \return  Whether the get pointer is valid.
     */
     bool good() const
-        { return m_gptr < m_egptr; }
+    {
+        return m_gptr < m_egptr;
+    }
 
     /**
       Extract a string of a particular size from the buffer.  Trim trailing
@@ -132,7 +143,7 @@ public:
     */
     void get(std::vector<char>& buf)
     {
-        memcpy((char *)buf.data(), m_gptr, buf.size());
+        memcpy((char*)buf.data(), m_gptr, buf.size());
         m_gptr += buf.size();
     }
 
@@ -144,7 +155,7 @@ public:
     */
     void get(std::vector<unsigned char>& buf)
     {
-        memcpy((char *)buf.data(), m_gptr, buf.size());
+        memcpy((char*)buf.data(), m_gptr, buf.size());
         m_gptr += buf.size();
     }
 
@@ -154,7 +165,7 @@ public:
       \param buf  Pointer to buffer to which bytes should be extracted.
       \param size  Number of bytes to extract.
     */
-    void get(char *buf, size_t size)
+    void get(char* buf, size_t size)
     {
         memcpy(buf, m_gptr, size);
         m_gptr += size;
@@ -166,27 +177,27 @@ public:
       \param buf  Pointer to buffer to which bytes should be extracted.
       \param size  Number of bytes to extract.
     */
-    void get(unsigned char *buf, size_t size)
+    void get(unsigned char* buf, size_t size)
     {
         memcpy(buf, m_gptr, size);
         m_gptr += size;
     }
 
-    virtual Extractor& operator >> (uint8_t& v) = 0;
-    virtual Extractor& operator >> (int8_t& v) = 0;
-    virtual Extractor& operator >> (uint16_t& v) = 0;
-    virtual Extractor& operator >> (int16_t& v) = 0;
-    virtual Extractor& operator >> (uint32_t& v) = 0;
-    virtual Extractor& operator >> (int32_t& v) = 0;
-    virtual Extractor& operator >> (uint64_t& v) = 0;
-    virtual Extractor& operator >> (int64_t& v) = 0;
-    virtual Extractor& operator >> (float& v) = 0;
-    virtual Extractor& operator >> (double& v) = 0;
+    virtual Extractor& operator>>(uint8_t& v) = 0;
+    virtual Extractor& operator>>(int8_t& v) = 0;
+    virtual Extractor& operator>>(uint16_t& v) = 0;
+    virtual Extractor& operator>>(int16_t& v) = 0;
+    virtual Extractor& operator>>(uint32_t& v) = 0;
+    virtual Extractor& operator>>(int32_t& v) = 0;
+    virtual Extractor& operator>>(uint64_t& v) = 0;
+    virtual Extractor& operator>>(int64_t& v) = 0;
+    virtual Extractor& operator>>(float& v) = 0;
+    virtual Extractor& operator>>(double& v) = 0;
 
 protected:
-    const char *m_eback;  ///< Start of the buffer (name from std::streambuf)
-    const char *m_egptr;  ///< End of the buffer.
-    const char *m_gptr;   ///< Current get position.
+    const char* m_eback; ///< Start of the buffer (name from std::streambuf)
+    const char* m_egptr; ///< End of the buffer.
+    const char* m_gptr;  ///< Current get position.
 };
 
 /**
@@ -201,8 +212,7 @@ public:
       \param buf  Buffer from which to extract.
       \param size  Size of buffer.
     */
-    LeExtractor(const char *buf, std::size_t size) : Extractor(buf, size)
-    {}
+    LeExtractor(const char* buf, std::size_t size) : Extractor(buf, size) {}
 
     /**
       Extract an unsigned byte from a buffer.
@@ -210,9 +220,9 @@ public:
       \param v  Unsigned byte to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (uint8_t& v)
+    LeExtractor& operator>>(uint8_t& v)
     {
-        v = *(const uint8_t *)m_gptr++;
+        v = *(const uint8_t*)m_gptr++;
         return *this;
     }
 
@@ -222,9 +232,9 @@ public:
       \param v  Byte to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (int8_t& v)
+    LeExtractor& operator>>(int8_t& v)
     {
-        v = *(const int8_t *)m_gptr++;
+        v = *(const int8_t*)m_gptr++;
         return *this;
     }
 
@@ -234,7 +244,7 @@ public:
       \param v  Short to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (uint16_t& v)
+    LeExtractor& operator>>(uint16_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le16toh(v);
@@ -248,7 +258,7 @@ public:
       \param v  Short to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (int16_t& v)
+    LeExtractor& operator>>(int16_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int16_t)le16toh((uint16_t)v);
@@ -262,7 +272,7 @@ public:
       \param v  Unsigned int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (uint32_t& v)
+    LeExtractor& operator>>(uint32_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le32toh(v);
@@ -276,7 +286,7 @@ public:
       \param v  int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (int32_t& v)
+    LeExtractor& operator>>(int32_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int32_t)le32toh((uint32_t)v);
@@ -290,7 +300,7 @@ public:
       \param v  unsigned long int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (uint64_t& v)
+    LeExtractor& operator>>(uint64_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le64toh(v);
@@ -304,7 +314,7 @@ public:
       \param v  long int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (int64_t& v)
+    LeExtractor& operator>>(int64_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int64_t)le64toh((uint64_t)v);
@@ -318,10 +328,10 @@ public:
       \param v  float to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (float& v)
+    LeExtractor& operator>>(float& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
-        uint32_t tmp = le32toh(*(uint32_t *)(&v));
+        uint32_t tmp = le32toh(*(uint32_t*)(&v));
         memcpy(&v, &tmp, sizeof(tmp));
         m_gptr += sizeof(v);
         return *this;
@@ -333,16 +343,15 @@ public:
       \param v  double to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator >> (double& v)
+    LeExtractor& operator>>(double& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
-        uint64_t tmp = le64toh(*(uint64_t *)(&v));
+        uint64_t tmp = le64toh(*(uint64_t*)(&v));
         memcpy(&v, &tmp, sizeof(tmp));
         m_gptr += sizeof(v);
         return *this;
     }
 };
-
 
 /**
   Wrapper extraction of big-endian data from a buffer to host ordering.
@@ -356,8 +365,7 @@ public:
       \param buf  Buffer from which to extract.
       \param size  Size of buffer.
     */
-    BeExtractor(const char *buf, std::size_t size) : Extractor(buf, size)
-    {}
+    BeExtractor(const char* buf, std::size_t size) : Extractor(buf, size) {}
 
     /**
       Extract an unsigned byte from a buffer.
@@ -365,9 +373,9 @@ public:
       \param v  unsigned byte to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (uint8_t& v)
+    BeExtractor& operator>>(uint8_t& v)
     {
-        v = *(const uint8_t *)m_gptr++;
+        v = *(const uint8_t*)m_gptr++;
         return *this;
     }
 
@@ -377,9 +385,9 @@ public:
       \param v  byte to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (int8_t& v)
+    BeExtractor& operator>>(int8_t& v)
     {
-        v = *(const int8_t *)m_gptr++;
+        v = *(const int8_t*)m_gptr++;
         return *this;
     }
 
@@ -389,7 +397,7 @@ public:
       \param v  unsigned short to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (uint16_t& v)
+    BeExtractor& operator>>(uint16_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be16toh(v);
@@ -403,7 +411,7 @@ public:
       \param v  short to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (int16_t& v)
+    BeExtractor& operator>>(int16_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int16_t)be16toh((uint16_t)v);
@@ -417,7 +425,7 @@ public:
       \param v  unsigned int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (uint32_t& v)
+    BeExtractor& operator>>(uint32_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be32toh(v);
@@ -431,7 +439,7 @@ public:
       \param v  int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (int32_t& v)
+    BeExtractor& operator>>(int32_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int32_t)be32toh((uint32_t)v);
@@ -445,7 +453,7 @@ public:
       \param v  unsigned long int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (uint64_t& v)
+    BeExtractor& operator>>(uint64_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be64toh(v);
@@ -459,7 +467,7 @@ public:
       \param v  long int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (int64_t& v)
+    BeExtractor& operator>>(int64_t& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int64_t)be64toh((uint64_t)v);
@@ -473,10 +481,10 @@ public:
       \param v  float to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (float& v)
+    BeExtractor& operator>>(float& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
-        uint32_t tmp = be32toh(*(uint32_t *)(&v));
+        uint32_t tmp = be32toh(*(uint32_t*)(&v));
         memcpy(&v, &tmp, sizeof(tmp));
         m_gptr += sizeof(v);
         return *this;
@@ -488,16 +496,15 @@ public:
       \param v  double to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator >> (double& v)
+    BeExtractor& operator>>(double& v)
     {
         memcpy(&v, m_gptr, sizeof(v));
-        uint64_t tmp = be64toh(*(uint64_t *)(&v));
+        uint64_t tmp = be64toh(*(uint64_t*)(&v));
         memcpy(&v, &tmp, sizeof(tmp));
         m_gptr += sizeof(v);
         return *this;
     }
 };
-
 
 /**
   Wrapper extraction of data from a buffer to host ordering.  Endianness of
@@ -515,9 +522,9 @@ public:
       \param size  Buffer size.
     */
     SwitchableExtractor(const char* buf, std::size_t size)
-        : Extractor(buf, size)
-        , m_isLittleEndian(DefaultIsLittleEndian)
-    {}
+        : Extractor(buf, size), m_isLittleEndian(DefaultIsLittleEndian)
+    {
+    }
 
     /**
       Construct extractor for a buffer.
@@ -528,9 +535,9 @@ public:
         endian byte order
     */
     SwitchableExtractor(const char* buf, std::size_t size, bool isLittleEndian)
-        : Extractor(buf, size)
-        , m_isLittleEndian(isLittleEndian)
-    {}
+        : Extractor(buf, size), m_isLittleEndian(isLittleEndian)
+    {
+    }
 
     /**
       Returns whether the extractor converts from little endian.
@@ -538,19 +545,25 @@ public:
       \return  \c true if the extractor converts from little endian.
     */
     bool isLittleEndian() const
-        { return m_isLittleEndian; }
+    {
+        return m_isLittleEndian;
+    }
 
     /**
       Set to convert from little endian.
     */
     void switchToLittleEndian()
-        { m_isLittleEndian = true; }
+    {
+        m_isLittleEndian = true;
+    }
 
     /**
       Set to convert from big endian.
     */
     void switchToBigEndian()
-        { m_isLittleEndian = false; }
+    {
+        m_isLittleEndian = false;
+    }
 
     /**
       Extract an unsigned byte from a buffer.
@@ -700,4 +713,3 @@ private:
 };
 
 } // namespace pdal
-

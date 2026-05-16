@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 /*
 
@@ -168,37 +168,35 @@ Word #       Content
 
 #include <pdal/PointView.hpp>
 #include <pdal/util/Extractor.hpp>
-#include <pdal/util/portable_endian.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal/util/portable_endian.hpp>
 
 #include <algorithm>
 #include <map>
 
-#pragma warning(disable: 4127)  // conditional expression is constant
+#pragma warning(disable : 4127) // conditional expression is constant
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.qfit",
     "QFIT Reader",
     "https://pdal.org/stages/readers.qfit.html",
-    { "qi" }
-};
+    {"qi"}};
 
 CREATE_STATIC_STAGE(QfitReader, s_info)
 
-std::string QfitReader::getName() const { return s_info.name; }
+std::string QfitReader::getName() const
+{
+    return s_info.name;
+}
 
 QfitReader::QfitReader()
-    : pdal::Reader()
-    , m_format(QFIT_Format_Unknown)
-    , m_size(0)
-    , m_littleEndian(false)
-    , m_istream()
-{}
-
+    : pdal::Reader(), m_format(QFIT_Format_Unknown), m_size(0),
+      m_littleEndian(false), m_istream()
+{
+}
 
 void QfitReader::initialize()
 {
@@ -244,7 +242,7 @@ void QfitReader::initialize()
 
     if (int4 % 4 != 0)
         throwError("Base QFIT format is not a multiple of 4, "
-            "unrecognized format!");
+                   "unrecognized format!");
 
     m_size = int4;
     m_format = static_cast<QFIT_Format_Type>(m_size / sizeof(m_size));
@@ -264,15 +262,13 @@ void QfitReader::initialize()
     m_point_bytes = end - offset;
 }
 
-
 void QfitReader::addArgs(ProgramArgs& args)
 {
     args.add("flip_coordinates", "Flip coordinates from 0-360 to -180-180",
-        m_flip_x);
-    args.add("scale_z", "Z scale. Use 0.001 to go from mm to m",
-        m_scale_z, 0.001);
+             m_flip_x);
+    args.add("scale_z", "Z scale. Use 0.001 to go from mm to m", m_scale_z,
+             0.001);
 }
-
 
 void QfitReader::addDimensions(PointLayoutPtr layout)
 {
@@ -304,21 +300,19 @@ void QfitReader::addDimensions(PointLayoutPtr layout)
         layout->registerDim(Id::PassiveZ);
         m_size += 16;
     }
-    m_size += 4;  // For the GPS time that we currently discard.
+    m_size += 4; // For the GPS time that we currently discard.
 }
-
 
 void QfitReader::ready(PointTableRef)
 {
     m_numPoints = m_point_bytes / m_size;
     if (m_point_bytes % m_size)
         throwError("Error calculating file point count.  File size is "
-            "inconsistent with point size.");
+                   "inconsistent with point size.");
     m_index = 0;
     m_istream.reset(new IStream(m_filename));
     m_istream->seek(m_offset);
 }
-
 
 point_count_t QfitReader::read(PointViewPtr data, point_count_t count)
 {
@@ -352,9 +346,8 @@ point_count_t QfitReader::read(PointViewPtr data, point_count_t count)
             data->setField(Dimension::Id::Z, nextId, z * m_scale_z);
             data->setField(Dimension::Id::StartPulse, nextId, start_pulse);
             data->setField(Dimension::Id::ReflectedPulse, nextId,
-                reflected_pulse);
-            data->setField(Dimension::Id::Azimuth, nextId,
-                scan_angle / 1000.0);
+                           reflected_pulse);
+            data->setField(Dimension::Id::Azimuth, nextId, scan_angle / 1000.0);
             data->setField(Dimension::Id::Pitch, nextId, pitch / 1000.0);
             data->setField(Dimension::Id::Roll, nextId, roll / 1000.0);
         }
@@ -373,12 +366,13 @@ point_count_t QfitReader::read(PointViewPtr data, point_count_t count)
             double x = passive_x / 1000000.0;
             if (m_flip_x && x > 180)
                 x -= 360;
-            data->setField(Dimension::Id::PassiveSignal, nextId, passive_signal);
+            data->setField(Dimension::Id::PassiveSignal, nextId,
+                           passive_signal);
             data->setField(Dimension::Id::PassiveY, nextId,
-                passive_y / 1000000.0);
+                           passive_y / 1000000.0);
             data->setField(Dimension::Id::PassiveX, nextId, x);
             data->setField(Dimension::Id::PassiveZ, nextId,
-                passive_z * m_scale_z);
+                           passive_z * m_scale_z);
         }
         // GPS time is really a GPS offset from the start of the GPS day
         // encoded in this odd way: 153320100 = 15 hours 33 minutes
@@ -398,7 +392,6 @@ point_count_t QfitReader::read(PointViewPtr data, point_count_t count)
 
     return numRead;
 }
-
 
 void QfitReader::done(PointTableRef)
 {

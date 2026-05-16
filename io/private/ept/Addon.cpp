@@ -36,8 +36,8 @@
 
 #include <pdal/util/FileUtils.hpp>
 
-#include "Addon.hpp"
 #include "../connector/Connector.hpp"
+#include "Addon.hpp"
 
 namespace pdal
 {
@@ -60,8 +60,8 @@ std::string Addon::hierarchyDir() const
     return FileUtils::getDirectory(m_filename) + "ept-hierarchy/";
 }
 
-AddonList Addon::store(const connector::Connector& connector, const NL::json& spec,
-    const PointLayout& layout)
+AddonList Addon::store(const connector::Connector& connector,
+                       const NL::json& spec, const PointLayout& layout)
 {
     AddonList addons;
     std::string filename;
@@ -76,7 +76,9 @@ AddonList Addon::store(const connector::Connector& connector, const NL::json& sp
 
             Dimension::Id id = layout.findDim(dimName);
             if (id == Dimension::Id::Unknown)
-                throw pdal_error("Invalid dimension '" + dimName + "' in "
+                throw pdal_error(
+                    "Invalid dimension '" + dimName +
+                    "' in "
                     "addon specification. Does not exist in source data.");
             Dimension::Type type = layout.dimType(id);
             std::string typestring = Dimension::toName(Dimension::base(type));
@@ -104,7 +106,8 @@ AddonList Addon::store(const connector::Connector& connector, const NL::json& sp
     return addons;
 }
 
-AddonList Addon::load(const connector::Connector& connector, const NL::json& spec)
+AddonList Addon::load(const connector::Connector& connector,
+                      const NL::json& spec)
 {
     AddonList addons;
     std::string filename;
@@ -127,9 +130,8 @@ AddonList Addon::load(const connector::Connector& connector, const NL::json& spe
     return addons;
 }
 
-
 Addon Addon::loadAddon(const connector::Connector& connector,
-    const std::string& dimName, const std::string& filename)
+                       const std::string& dimName, const std::string& filename)
 {
     NL::json info = connector.getJson(filename);
     std::string typestring = info["type"].get<std::string>();
@@ -141,4 +143,3 @@ Addon Addon::loadAddon(const connector::Connector& connector,
 
 } // namespace ept
 } // namespace pdal
-

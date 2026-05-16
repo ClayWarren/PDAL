@@ -36,9 +36,9 @@
 
 #include "Support.hpp"
 
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/FlexWriter.hpp>
 #include <io/TextReader.hpp>
+#include <pdal/FlexWriter.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <regex>
 
@@ -63,16 +63,19 @@ TEST(WriterTest, issue4261)
     {
     public:
         std::string getName() const override
-            { return "FooWriter"; }
-        void readyFile(const std::string& filename, const SpatialReference& srs) override
+        {
+            return "FooWriter";
+        }
+        void readyFile(const std::string& filename,
+                       const SpatialReference& srs) override
         {
             std::string s = FileUtils::getFilename(filename);
-            std::regex re("1_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_foo.txt");
+            std::regex re("1_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-["
+                          "0-9a-f]{12}_foo.txt");
             std::smatch sm;
             EXPECT_TRUE(std::regex_match(s, sm, re));
         }
-        void writeView(const PointViewPtr view) override
-        {}
+        void writeView(const PointViewPtr view) override {}
     };
 
     FooWriter w;

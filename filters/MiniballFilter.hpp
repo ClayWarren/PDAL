@@ -44,8 +44,7 @@ namespace pdal
 class PDAL_EXPORT MiniballFilter : public Filter
 {
 public:
-    MiniballFilter()
-    {}
+    MiniballFilter() {}
     MiniballFilter& operator=(const MiniballFilter&) = delete;
     MiniballFilter(const MiniballFilter&) = delete;
 

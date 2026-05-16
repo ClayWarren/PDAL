@@ -8,13 +8,13 @@
 
 namespace pdal
 {
-  class MyReader : public Reader
-  {
-  public:
+class MyReader : public Reader
+{
+public:
     MyReader() : Reader() {};
     std::string getName() const;
 
-  private:
+private:
     std::unique_ptr<ILeStream> m_stream;
     point_count_t m_index;
     double m_scale_z;
@@ -24,5 +24,5 @@ namespace pdal
     virtual void ready(PointTableRef table);
     virtual point_count_t read(PointViewPtr view, point_count_t count);
     virtual void done(PointTableRef table);
-  };
-}
+};
+} // namespace pdal

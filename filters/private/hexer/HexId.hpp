@@ -8,8 +8,14 @@ namespace hexer
 
 struct HexId : public CoordIJ
 {
-    bool iodd() const { return i % 2 != 0; }
-    bool ieven() const { return !iodd(); }
+    bool iodd() const
+    {
+        return i % 2 != 0;
+    }
+    bool ieven() const
+    {
+        return !iodd();
+    }
 };
 
 inline bool operator<(HexId const& c1, HexId const& c2)
@@ -25,25 +31,26 @@ inline bool operator<(HexId const& c1, HexId const& c2)
     return c1.i < c2.i;
 }
 
-inline bool operator == (const HexId& h1, const HexId& h2)
+inline bool operator==(const HexId& h1, const HexId& h2)
 {
     return h1.i == h2.i && h1.j == h2.j;
 }
 
 inline HexId operator+(HexId const& c1, HexId const& c2)
-    {   return {c1.i + c2.i, c1.j + c2.j};  }
+{
+    return {c1.i + c2.i, c1.j + c2.j};
+}
 } // namespace hexer
 
 namespace std
 {
-    template<>
-    struct hash<hexer::HexId>
+template <> struct hash<hexer::HexId>
+{
+    std::size_t operator()(hexer::HexId const& id) const noexcept
     {
-        std::size_t operator()(hexer::HexId const & id) const noexcept
-        {
-            hash<uint32_t> h;
+        hash<uint32_t> h;
 
-            return h(id.i) ^ (h(id.j) << 1);
-        }
-    };
+        return h(id.i) ^ (h(id.j) << 1);
+    }
+};
 } // namespace std

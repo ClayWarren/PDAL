@@ -41,12 +41,14 @@ namespace pdal
 class StacKey
 {
 public:
-    StacKey(std::string key):
-        m_key(key)
-        {};
-    ~StacKey(){};
+    StacKey(std::string key) : m_key(key) {};
+    ~StacKey() {};
 
-    inline bool operator()(const MetadataNode& n) {return n.name() == m_key;};
+    inline bool operator()(const MetadataNode& n)
+    {
+        return n.name() == m_key;
+    };
+
 private:
     std::string m_key;
 };
@@ -63,22 +65,22 @@ inline MetadataNode getChild(MetadataNode& m, std::string key)
 
 inline std::string getDateStr(std::string year, std::string doy)
 {
-    std::tm tm = { };
+    std::tm tm = {};
     tm.tm_mday = std::stoi(doy);
     tm.tm_mon = 0;
-    tm.tm_year = std::stoi(year)-1900;
+    tm.tm_year = std::stoi(year) - 1900;
     tm.tm_isdst = -1;
     std::time_t time = std::mktime(&tm);
-    const struct std::tm *ntm = std::gmtime(&time);
+    const struct std::tm* ntm = std::gmtime(&time);
 
     std::ostringstream oss;
     oss << std::put_time(ntm, "%Y-%m-%dT00:00:00Z");
     return oss.str();
 }
 
-
 inline void stacPointcloud(MetadataNode& root, MetadataNode& statsMeta,
-    MetadataNode& readerMeta, MetadataNode& props, std::string pcType)
+                           MetadataNode& readerMeta, MetadataNode& props,
+                           std::string pcType)
 {
     std::string filename = getChild(root, "filename").value();
     std::string fileExt = FileUtils::extension(filename);
@@ -86,18 +88,19 @@ inline void stacPointcloud(MetadataNode& root, MetadataNode& statsMeta,
     uint32_t position(0);
     point_count_t count = 0;
     bool bNoPoints(true);
-    //Gather stac information for poinctloud extension
+    // Gather stac information for poinctloud extension
     auto pc_stats = statsMeta.findChildren([](MetadataNode& n)
-        { return n.name()=="statistic"; });
+                                           { return n.name() == "statistic"; });
     auto&& pc_count = getChild(readerMeta, "num_points");
-    auto pc_schemas = getChild(readerMeta, "schema").findChildren(
-        [](MetadataNode& n)
-        { return n.name()=="dimensions"; });
+    auto pc_schemas = getChild(readerMeta, "schema")
+                          .findChildren([](MetadataNode& n)
+                                        { return n.name() == "dimensions"; });
 
-    for (auto& stat: pc_stats) {
+    for (auto& stat : pc_stats)
+    {
         props.addList(stat.clone("pc:statistics"));
     }
-    for (auto& schema: pc_schemas)
+    for (auto& schema : pc_schemas)
     {
         props.addList(schema.clone("pc:schemas"));
     }
@@ -117,7 +120,7 @@ inline void addBox(MetadataNode& n, MetadataNode& box, std::string name)
 }
 
 inline void stacProjection(MetadataNode& root, MetadataNode& statsMeta,
-    MetadataNode& readerMeta, MetadataNode& stac)
+                           MetadataNode& readerMeta, MetadataNode& stac)
 {
     MetadataNode props = getChild(stac, "properties");
 
@@ -133,7 +136,9 @@ inline void stacProjection(MetadataNode& root, MetadataNode& statsMeta,
     // extension if need be.
     if (!bbox.findChild("native").empty())
     {
-        stac.add("stac_extensions", "https://stac-extensions.github.io/projection/v1.1.0/schema.json");
+        stac.add(
+            "stac_extensions",
+            "https://stac-extensions.github.io/projection/v1.1.0/schema.json");
         MetadataNode native = getChild(bbox, "native");
         MetadataNode projGeom = getChild(native, "boundary");
         MetadataNode projBbox = getChild(native, "bbox");
@@ -148,26 +153,29 @@ inline void stacProjection(MetadataNode& root, MetadataNode& statsMeta,
 }
 
 inline void addStacMetadata(MetadataNode& root, MetadataNode& statsMeta,
-    MetadataNode& readerMeta, MetadataNode& infoMeta, std::string pcType)
+                            MetadataNode& readerMeta, MetadataNode& infoMeta,
+                            std::string pcType)
 {
-    try {
+    try
+    {
         MetadataNode stac;
         std::string filename = getChild(root, "filename").value();
         std::string stem = FileUtils::stem(filename);
         std::string absPath = FileUtils::toAbsolutePath(filename);
 
-        //Base STAC object
+        // Base STAC object
         MetadataNode id = stac.add("id", stem);
         MetadataNode properties = stac.add("properties");
 
-        //TODO make sure these are available
-        //For now, if there isn't date similar to laz/las/copc then use now.
+        // TODO make sure these are available
+        // For now, if there isn't date similar to laz/las/copc then use now.
         try
         {
             std::string doy = getChild(readerMeta, "creation_doy").value();
             std::string year = getChild(readerMeta, "creation_year").value();
             properties.add("datetime", getDateStr(year, doy));
-        } catch (std::exception &)
+        }
+        catch (std::exception&)
         {
             auto&& datetime = getChild(infoMeta, "now");
             properties.add("datetime", datetime);
@@ -176,19 +184,21 @@ inline void addStacMetadata(MetadataNode& root, MetadataNode& statsMeta,
         stac.add("type", "Feature");
         stac.add("stac_version", "1.0.0");
 
-        //links
+        // links
         MetadataNode self = stac.addList("links");
         self.add("rel", "derived_from");
         self.add("href", absPath);
 
-        //assets - add source file to data asset
+        // assets - add source file to data asset
         MetadataNode assets = stac.add("assets");
         MetadataNode data;
         data.add("href", absPath);
         data.add("title", "Pointcloud data");
         assets.add(data.clone("data"));
 
-        stac.add("stac_extensions", "https://stac-extensions.github.io/pointcloud/v1.0.0/schema.json");
+        stac.add(
+            "stac_extensions",
+            "https://stac-extensions.github.io/pointcloud/v1.0.0/schema.json");
         stacPointcloud(root, statsMeta, infoMeta, properties, pcType);
         stacProjection(root, statsMeta, readerMeta, stac);
         root.add(stac.clone("stac"));
@@ -197,12 +207,12 @@ inline void addStacMetadata(MetadataNode& root, MetadataNode& statsMeta,
     {
         MetadataNode msg;
         std::stringstream message;
-        message << "Failed to create STAC Feature with missing key. '" << e.what() << "'";
+        message << "Failed to create STAC Feature with missing key. '"
+                << e.what() << "'";
         msg.addWithType("status", "error", "string", "Error status");
         msg.addWithType("message", message.str(), "string", "Error message");
         root.add(msg.clone("stac"));
     }
 }
 
-
-}
+} // namespace pdal

@@ -46,8 +46,7 @@ class ProgramArgs;
 class PDAL_EXPORT ClusterFilter : public Filter
 {
 public:
-    ClusterFilter() : Filter()
-    {}
+    ClusterFilter() : Filter() {}
     ClusterFilter& operator=(const ClusterFilter&) = delete;
     ClusterFilter(const ClusterFilter&) = delete;
 

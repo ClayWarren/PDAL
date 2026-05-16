@@ -33,10 +33,10 @@
  ****************************************************************************/
 #pragma once
 
-#include <vector>
-#include <ostream>
-#include <iostream>
 #include <algorithm>
+#include <iostream>
+#include <ostream>
+#include <vector>
 
 #include "Point.hpp"
 #include "Segment.hpp"
@@ -46,53 +46,70 @@ namespace hexer
 
 enum Orientation
 {
-    CLOCKWISE,     // Outer
-    ANTICLOCKWISE  // Hole
+    CLOCKWISE,    // Outer
+    ANTICLOCKWISE // Hole
 };
 
 class Path
 {
 public:
-    Path(HexId root_hex) : m_rootHex(root_hex), m_parent(NULL)
-    {}
+    Path(HexId root_hex) : m_rootHex(root_hex), m_parent(NULL) {}
 
     void toWKT(std::ostream& output) const;
 
-    void addChild(Path *path)
-        { m_children.push_back(path); }
-    void setParent(Path *p)
-        { m_parent = p; }
-    Path *parent()
-        { return m_parent; }
+    void addChild(Path* path)
+    {
+        m_children.push_back(path);
+    }
+    void setParent(Path* p)
+    {
+        m_parent = p;
+    }
+    Path* parent()
+    {
+        return m_parent;
+    }
     const std::vector<Path*>& subPaths() const
-        { return m_children; }
+    {
+        return m_children;
+    }
     const std::vector<Point>& points() const
     {
         return m_points;
     }
     HexId rootHex() const
-        { return m_rootHex; }
+    {
+        return m_rootHex;
+    }
     void addPoint(Point p)
-        { m_points.push_back(p); }
+    {
+        m_points.push_back(p);
+    }
     void finalize(Orientation o)
     {
         m_orientation = o;
         for (size_t i = 0; i < m_children.size(); ++i)
             m_children[i]->finalize(o == CLOCKWISE ? ANTICLOCKWISE : CLOCKWISE);
-        if (o == ANTICLOCKWISE){
+        if (o == ANTICLOCKWISE)
+        {
             std::reverse(m_points.begin(), m_points.end());
         }
     }
     int numChildren()
-        { return m_children.size(); }
+    {
+        return m_children.size();
+    }
     int numPoints()
-        { return m_points.size(); }
+    {
+        return m_points.size();
+    }
 
     // Test function
     void sortPath()
     {
-        std::sort(m_children.begin(), m_children.end(), [](const Path* p1, const Path* p2) 
-            { return p1->rootHex() < p2->rootHex(); });
+        std::sort(m_children.begin(), m_children.end(),
+                  [](const Path* p1, const Path* p2)
+                  { return p1->rootHex() < p2->rootHex(); });
         for (Path* p : m_children)
         {
             p->sortPath();
@@ -101,14 +118,14 @@ public:
 
 private:
     void writeRing(std::ostream& out) const;
-    std::vector<Path *> writePolygon(std::ostream& out) const;
+    std::vector<Path*> writePolygon(std::ostream& out) const;
 
     /// Hexagon associated with path, used for finding child paths
     HexId m_rootHex;
     /// Parent path (NULL if root)
-    Path *m_parent;
+    Path* m_parent;
     /// Children
-    std::vector<Path *> m_children;
+    std::vector<Path*> m_children;
     /// Orientation of path AT EXTRACTION - points are ordered clockwise
     /// until finalize() sets orientation.
     Orientation m_orientation;
@@ -116,4 +133,4 @@ private:
     std::vector<Point> m_points;
 };
 
-} //namespace hexer
+} // namespace hexer

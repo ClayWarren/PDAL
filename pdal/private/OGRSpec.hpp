@@ -23,8 +23,7 @@ struct OGRSpecOptions
 
 class OGRSpec
 {
-    friend std::ostream& operator<<(std::ostream& out,
-        const OGRSpec& bounds);
+    friend std::ostream& operator<<(std::ostream& out, const OGRSpec& bounds);
 
 public:
     OGRSpec(const std::string& ogrJsonStr);
@@ -35,17 +34,22 @@ public:
     void update(const NL::json& ogrJson);
 
     std::vector<Polygon> getPolygons()
-    { return m_geom; }
+    {
+        return m_geom;
+    }
     bool empty()
-    { return m_geom.empty(); }
+    {
+        return m_geom.empty();
+    }
     // test function
     int size()
-    { return m_geom.size(); }
+    {
+        return m_geom.size();
+    }
 
     struct error : public std::runtime_error
     {
-        error(const std::string& err) : std::runtime_error(err)
-        {}
+        error(const std::string& err) : std::runtime_error(err) {}
     };
 
 private:
@@ -54,14 +58,13 @@ private:
     void validateInput(const NL::json& ogrJson);
     void parse();
 
-    template <typename T>
-    void assignJSON(const NL::json& field, T& to)
+    template <typename T> void assignJSON(const NL::json& field, T& to)
     {
         try
         {
             field.get_to(to);
         }
-        catch(const NL::json::exception& e)
+        catch (const NL::json::exception& e)
         {
             std::string s(e.what());
             auto pos = s.find("]");
@@ -83,20 +86,20 @@ private:
 namespace Utils
 {
 
-    template<>
-    inline StatusWithReason fromString(const std::string& from, OGRSpec& to)
+template <>
+inline StatusWithReason fromString(const std::string& from, OGRSpec& to)
+{
+    try
     {
-        try
-        {
-            to.update(from);
-        }
-        catch (OGRSpec::error& e)
-        {
-            return StatusWithReason(-1, e.what());
-        }
-        return true;
+        to.update(from);
     }
+    catch (OGRSpec::error& e)
+    {
+        return StatusWithReason(-1, e.what());
+    }
+    return true;
+}
 
-} // nampespace utils
+} // namespace Utils
 
 } // namespace pdal

@@ -41,7 +41,7 @@
 
 namespace lazperf
 {
-    struct header14;
+struct header14;
 }
 
 namespace pdal
@@ -49,7 +49,7 @@ namespace pdal
 
 namespace connector
 {
-    class Connector;
+class Connector;
 }
 
 namespace copc
@@ -58,19 +58,29 @@ namespace copc
 class Tile
 {
 public:
-    Tile(const Entry& entry, const connector::Connector& connector, const las::Header& header) :
-        m_entry(entry), m_connector(connector), m_header(header)
-    {}
+    Tile(const Entry& entry, const connector::Connector& connector,
+         const las::Header& header)
+        : m_entry(entry), m_connector(connector), m_header(header)
+    {
+    }
 
     const Key& key() const
-        { return m_entry.m_key; }
+    {
+        return m_entry.m_key;
+    }
     point_count_t size() const
-        { return m_entry.m_pointCount; }
+    {
+        return m_entry.m_pointCount;
+    }
     const std::string& error() const
-        { return m_error; }
+    {
+        return m_error;
+    }
     void read();
-    const char *dataPtr() const
-        { return m_data.data(); }
+    const char* dataPtr() const
+    {
+        return m_data.data();
+    }
 
 private:
     Entry m_entry;
@@ -82,4 +92,3 @@ private:
 
 } // namespace copc
 } // namespace pdal
-

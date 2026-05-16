@@ -1,57 +1,56 @@
 /******************************************************************************
-* Copyright (c) 2019, Hobu Inc., info@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2019, Hobu Inc., info@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "MemoryViewReader.hpp"
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.memoryview",
     "Memory View Reader",
     "https://pdal.org/stages/readers.memoryview.html",
-    {}
-};
+    {}};
 
 CREATE_STATIC_STAGE(MemoryViewReader, s_info)
 
-std::string MemoryViewReader::getName() const { return s_info.name; }
+std::string MemoryViewReader::getName() const
+{
+    return s_info.name;
+}
 
-MemoryViewReader::MemoryViewReader() : m_prepared(false)
-{}
-
+MemoryViewReader::MemoryViewReader() : m_prepared(false) {}
 
 // NOTE: - Forces reading of the entire file.
 /**
@@ -89,7 +88,6 @@ QuickInfo MemoryViewReader::inspect()
 }
 **/
 
-
 void MemoryViewReader::pushField(const Field& f)
 {
     if (m_prepared)
@@ -98,11 +96,10 @@ void MemoryViewReader::pushField(const Field& f)
     for (auto& tempField : m_fields)
         if (tempField.m_name == f.m_name)
             throwError("Attempt to push duplicate field with name '" +
-                f.m_name + ".'");
+                       f.m_name + ".'");
 
     m_fields.emplace_back(f);
 }
-
 
 void MemoryViewReader::addDimensions(PointLayoutPtr layout)
 {
@@ -110,12 +107,10 @@ void MemoryViewReader::addDimensions(PointLayoutPtr layout)
         f.m_id = layout->registerOrAssignDim(f.m_name, f.m_type);
 }
 
-
 void MemoryViewReader::initialize()
 {
     m_prepared = false;
 }
-
 
 void MemoryViewReader::prepared(PointTableRef)
 {
@@ -133,10 +128,10 @@ void MemoryViewReader::prepared(PointTableRef)
         throwError("Fields must contain all or none of X, Y and Z.");
     if (xyz == 0 && !m_shape.valid())
         throwError("Fields don't contain X, Y and Z and no shape "
-            "was provided.");
+                   "was provided.");
     if (xyz == 7 && m_shape.valid())
         throwError("Can't provide `shape` option when Fields contain "
-            "X, Y and Z.");
+                   "X, Y and Z.");
     if (xyz == 0)
     {
         if (m_order == Order::RowMajor)
@@ -149,7 +144,7 @@ void MemoryViewReader::prepared(PointTableRef)
             m_yIter = m_shape.columns() * m_shape.rows();
             m_zIter = m_shape.columns() * m_shape.rows() * m_shape.depth();
         }
-        else   // Column Major
+        else // Column Major
         {
             m_xDiv = m_shape.depth() * m_shape.rows();
             m_yDiv = m_shape.depth();
@@ -163,14 +158,12 @@ void MemoryViewReader::prepared(PointTableRef)
     m_prepared = true;
 }
 
-
 void MemoryViewReader::ready(PointTableRef)
 {
     if (!m_incrementer)
         throwError("Points cannot be read without calling setIncrementer().");
     m_index = 0;
 }
-
 
 point_count_t MemoryViewReader::read(PointViewPtr v, point_count_t numPts)
 {
@@ -189,15 +182,14 @@ point_count_t MemoryViewReader::read(PointViewPtr v, point_count_t numPts)
     return cnt;
 }
 
-
 bool MemoryViewReader::processOne(PointRef& point)
 {
-    char *base = m_incrementer(m_index);
+    char* base = m_incrementer(m_index);
     if (!base)
         return false;
 
     for (const FullField& f : m_fields)
-        point.setField(f.m_id, f.m_type, (void *)(base + f.m_offset));
+        point.setField(f.m_id, f.m_type, (void*)(base + f.m_offset));
 
     if (m_shape.valid())
     {
@@ -211,4 +203,3 @@ bool MemoryViewReader::processOne(PointRef& point)
 }
 
 } // namespace pdal
-

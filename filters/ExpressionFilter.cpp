@@ -34,11 +34,9 @@
 
 #include "ExpressionFilter.hpp"
 
+#include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
-#include "./private/expr/ConditionalExpression.hpp"
-
-
 
 #include <cctype>
 #include <limits>
@@ -49,12 +47,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.expression",
-    "Pass only points given an expression",
-    "https://pdal.org/stages/filters.expression.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.expression", "Pass only points given an expression",
+    "https://pdal.org/stages/filters.expression.html"};
 
 CREATE_STATIC_STAGE(ExpressionFilter, s_info)
 
@@ -66,37 +61,32 @@ std::string ExpressionFilter::getName() const
 struct ExpressionFilter::Args
 {
     std::vector<expr::ConditionalExpression> m_expressions;
-    Arg *m_whereArg;
+    Arg* m_whereArg;
 };
 
+ExpressionFilter::ExpressionFilter() : m_args(new Args) {}
 
-ExpressionFilter::ExpressionFilter() : m_args(new Args)
-{}
-
-
-ExpressionFilter::~ExpressionFilter()
-{}
-
+ExpressionFilter::~ExpressionFilter() {}
 
 void ExpressionFilter::addArgs(ProgramArgs& args)
 {
     m_args->m_whereArg = &args.add("expression",
-        "Conditional expression describing points to be passed to this filter",
-        m_args->m_expressions).setPositional();
+                                   "Conditional expression describing points "
+                                   "to be passed to this filter",
+                                   m_args->m_expressions)
+                              .setPositional();
 
     args.addSynonym("expression", "limits");
 }
 
-
 void ExpressionFilter::prepared(PointTableRef table)
 {
-    for (auto& expression: m_args->m_expressions)
+    for (auto& expression : m_args->m_expressions)
     {
         if (!expression.valid())
         {
             std::stringstream oss;
-            oss << "The expression '" <<  expression
-                << "' is invalid";
+            oss << "The expression '" << expression << "' is invalid";
             throwError(oss.str());
         }
 
@@ -106,16 +96,15 @@ void ExpressionFilter::prepared(PointTableRef table)
     }
 }
 
-
 bool ExpressionFilter::processOne(PointRef& point)
 {
     if (m_args->m_expressions.size() != 1)
-        throwError("Streaming of expressions only works with a single expression");
+        throwError(
+            "Streaming of expressions only works with a single expression");
 
     bool status = m_args->m_expressions[0].eval(point);
     return status;
 }
-
 
 PointViewSet ExpressionFilter::run(PointViewPtr inView)
 {
@@ -126,7 +115,7 @@ PointViewSet ExpressionFilter::run(PointViewPtr inView)
     // make a view for each one of our expressions
 
     std::vector<PointViewPtr> views;
-    for (expr::ConditionalExpression& expr: m_args->m_expressions)
+    for (expr::ConditionalExpression& expr : m_args->m_expressions)
     {
         PointViewPtr outView = inView->makeNew();
         views.push_back(outView);
@@ -147,7 +136,7 @@ PointViewSet ExpressionFilter::run(PointViewPtr inView)
         }
     }
 
-    for(auto& v: views)
+    for (auto& v : views)
         viewSet.insert(v);
 
     return viewSet;

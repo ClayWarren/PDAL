@@ -39,17 +39,17 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/EptReader.hpp>
-#include <io/LasReader.hpp>
 #include <filters/CropFilter.hpp>
-#include <filters/ReprojectionFilter.hpp>
 #include <filters/HeadFilter.hpp>
 #include <filters/MergeFilter.hpp>
-#include <pdal/private/OGRSpec.hpp>
+#include <filters/ReprojectionFilter.hpp>
+#include <io/EptReader.hpp>
+#include <io/LasReader.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/Writer.hpp>
-#include <pdal/util/FileUtils.hpp>
+#include <pdal/private/OGRSpec.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include "Support.hpp"
 
@@ -58,50 +58,59 @@ namespace pdal
 
 namespace
 {
-    const BOX3D expBoundsConforming(515368, 4918340, 2322,
-            515402, 4918382, 2339);
-    const std::string expSrsWkt = R"(PROJCS["NAD83 / UTM zone 12N",GEOGCS["NAD83",DATUM["North_American_Datum_1983",SPHEROID["GRS 1980",6378137,298.257222101,AUTHORITY["EPSG","7019"]],TOWGS84[0,0,0,0,0,0,0],AUTHORITY["EPSG","6269"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4269"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-111],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["meter",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","26912"]])";
-    const point_count_t expNumPoints(518862);
-    const std::vector<std::string> expDimNames = {
-         "X", "Y", "Z", "Intensity", "ReturnNumber", "NumberOfReturns",
-         "ScanDirectionFlag", "EdgeOfFlightLine", "Classification",
-         "ScanAngleRank", "UserData", "PointSourceId", "GpsTime", "OriginId", "Withheld","KeyPoint",
-         "Synthetic", "Overlap"
-    };
+const BOX3D expBoundsConforming(515368, 4918340, 2322, 515402, 4918382, 2339);
+const std::string expSrsWkt =
+    R"(PROJCS["NAD83 / UTM zone 12N",GEOGCS["NAD83",DATUM["North_American_Datum_1983",SPHEROID["GRS 1980",6378137,298.257222101,AUTHORITY["EPSG","7019"]],TOWGS84[0,0,0,0,0,0,0],AUTHORITY["EPSG","6269"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4269"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-111],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["meter",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","26912"]])";
+const point_count_t expNumPoints(518862);
+const std::vector<std::string> expDimNames = {"X",
+                                              "Y",
+                                              "Z",
+                                              "Intensity",
+                                              "ReturnNumber",
+                                              "NumberOfReturns",
+                                              "ScanDirectionFlag",
+                                              "EdgeOfFlightLine",
+                                              "Classification",
+                                              "ScanAngleRank",
+                                              "UserData",
+                                              "PointSourceId",
+                                              "GpsTime",
+                                              "OriginId",
+                                              "Withheld",
+                                              "KeyPoint",
+                                              "Synthetic",
+                                              "Overlap"};
 
-    // Most of our tests will exercise this laz-based EPT dataset based on
-    // a 4-tile split of Lone Star Geyser.
-    const std::string sourceFilePath(
-            Support::datapath("ept/source/lone-star.laz"));
-    const std::string eptLaszipPath(
-            Support::datapath("ept/lone-star-laszip/ept.json"));
-    const std::string eptAutzenPath(
-            Support::datapath("ept/1.2-with-color/ept.json"));
-    const std::string attributesPath(
-            Support::datapath("autzen/attributes.json"));
+// Most of our tests will exercise this laz-based EPT dataset based on
+// a 4-tile split of Lone Star Geyser.
+const std::string sourceFilePath(Support::datapath("ept/source/lone-star.laz"));
+const std::string
+    eptLaszipPath(Support::datapath("ept/lone-star-laszip/ept.json"));
+const std::string
+    eptAutzenPath(Support::datapath("ept/1.2-with-color/ept.json"));
+const std::string attributesPath(Support::datapath("autzen/attributes.json"));
 
-    // Also test a basic read of binary/zstandard versions of a smaller dataset.
-    const std::string ellipsoidEptBinaryPath(
-            Support::datapath("ept/ellipsoid-binary/ept.json"));
-    const std::string ellipsoidEptZstandardPath(
-            Support::datapath("ept/ellipsoid-zstandard/ept.json"));
-    const std::string ellipsoidEptNoPointsPath(
-            Support::datapath("ept/ellipsoid-nopoints/ept.json"));
+// Also test a basic read of binary/zstandard versions of a smaller dataset.
+const std::string
+    ellipsoidEptBinaryPath(Support::datapath("ept/ellipsoid-binary/ept.json"));
+const std::string ellipsoidEptZstandardPath(
+    Support::datapath("ept/ellipsoid-zstandard/ept.json"));
+const std::string ellipsoidEptNoPointsPath(
+    Support::datapath("ept/ellipsoid-nopoints/ept.json"));
 
-    const std::string bcbfPath(
-            Support::datapath("ept/bcbf/ept.json"));
-    // This dataset has an invalid tile (random bits written to 2-2-2-2.laz)
-    const std::string invalidTilePath(
-            Support::datapath("ept/lone-star-invalid-tile/ept.json"));
-    const std::string badPointCountLazPath(
-            Support::datapath("ept/bad-pointcount/laszip/ept.json"));
-    const std::string badPointCountBinaryPath(
-            Support::datapath("ept/bad-pointcount/binary/ept.json"));
+const std::string bcbfPath(Support::datapath("ept/bcbf/ept.json"));
+// This dataset has an invalid tile (random bits written to 2-2-2-2.laz)
+const std::string
+    invalidTilePath(Support::datapath("ept/lone-star-invalid-tile/ept.json"));
+const std::string badPointCountLazPath(
+    Support::datapath("ept/bad-pointcount/laszip/ept.json"));
+const std::string badPointCountBinaryPath(
+    Support::datapath("ept/bad-pointcount/binary/ept.json"));
 
-    const point_count_t ellipsoidNumPoints(100000);
-    const BOX3D ellipsoidBoundsConforming(-8242746, 4966506, -50,
-            -8242446, 4966706, 50);
-}
+const point_count_t ellipsoidNumPoints(100000);
+const BOX3D ellipsoidBoundsConforming(-8242746, 4966506, -50, -8242446, 4966706,
+                                      50);
+} // namespace
 
 TEST(EptReaderTest, inspect)
 {
@@ -120,8 +129,8 @@ TEST(EptReaderTest, inspect)
     std::vector<std::string> dimNamesB(qi.m_dimNames);
     std::sort(dimNamesA.begin(), dimNamesA.end());
     std::sort(dimNamesB.begin(), dimNamesB.end());
-    EXPECT_TRUE(std::equal(dimNamesA.cbegin(), dimNamesA.cend(),
-        dimNamesB.cbegin()));
+    EXPECT_TRUE(
+        std::equal(dimNamesA.cbegin(), dimNamesA.cend(), dimNamesB.cbegin()));
 
     std::string wkt = qi.m_srs.getWKT();
     // Sometimes we get back "metre" when we're execting "meter".
@@ -229,12 +238,12 @@ TEST(EptReaderTest, unreadableTileFailure)
     Stage& writer = mgr.addWriter("writers.null");
     writer.setInput(reader);
 
-    auto timeoutRunner = std::async(std::launch::async, [&mgr] {
-        EXPECT_THROW(mgr.execute(), pdal_error);
-    });
+    auto timeoutRunner =
+        std::async(std::launch::async,
+                   [&mgr] { EXPECT_THROW(mgr.execute(), pdal_error); });
 
-    EXPECT_TRUE(timeoutRunner.wait_for(std::chrono::seconds(5)) 
-        != std::future_status::timeout);
+    EXPECT_TRUE(timeoutRunner.wait_for(std::chrono::seconds(5)) !=
+                std::future_status::timeout);
     // This will abort the whole EPT test on failure. Need to think of a better
     // way to do this.
     mgr.destroyStage(&reader);
@@ -246,9 +255,9 @@ TEST(EptReaderTest, unreadableTileFailureStreaming)
     {
     public:
         TestPointTable(PointView& view)
-            : StreamPointTable(*view.table().layout(), 1024)
-            , m_view(view)
-        { }
+            : StreamPointTable(*view.table().layout(), 1024), m_view(view)
+        {
+        }
 
     protected:
         virtual void reset() override
@@ -280,12 +289,12 @@ TEST(EptReaderTest, unreadableTileFailureStreaming)
     PointView streamView(streamTable);
     TestPointTable table(streamView);
 
-    auto timeoutRunner = std::async(std::launch::async, [&mgr, &table] {
-        EXPECT_THROW(mgr.executeStream(table), pdal_error);
-    });
+    auto timeoutRunner =
+        std::async(std::launch::async, [&mgr, &table]
+                   { EXPECT_THROW(mgr.executeStream(table), pdal_error); });
 
-    EXPECT_TRUE(timeoutRunner.wait_for(std::chrono::seconds(5)) 
-        != std::future_status::timeout);
+    EXPECT_TRUE(timeoutRunner.wait_for(std::chrono::seconds(5)) !=
+                std::future_status::timeout);
     // This will abort the whole EPT test on failure. Need to think of a better
     // way to do this.
     mgr.destroyStage(&reader);
@@ -320,7 +329,9 @@ TEST(EptReaderTest, unreadableDataIgnoredStreaming)
     class TestWriter : public NoFilenameWriter, public Streamable
     {
         std::string getName() const
-        { return "writers.test"; }
+        {
+            return "writers.test";
+        }
 
         bool processOne(PointRef& p)
         {
@@ -436,7 +447,6 @@ TEST(EptReaderTest, resolutionLimit)
     EXPECT_EQ(np, expectedCount);
 }
 
-
 TEST(EptReaderTest, boundedRead2d)
 {
     BOX2D bounds(515380, 4918350, 515400, 4918370);
@@ -465,8 +475,8 @@ TEST(EptReaderTest, boundedRead2d)
             y = view->getFieldAs<double>(Dimension::Id::Y, i);
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
-            ASSERT_TRUE(bounds.contains(x, y)) << bounds << ": " <<
-                x << ", " << y << ", " << z << std::endl;
+            ASSERT_TRUE(bounds.contains(x, y))
+                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
             ASSERT_TRUE(o < 4);
         }
     }
@@ -526,8 +536,8 @@ TEST(EptReaderTest, boundedRead3d)
             y = view->getFieldAs<double>(Dimension::Id::Y, i);
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
-            ASSERT_TRUE(bounds.contains(x, y, z)) << bounds << ": " <<
-                x << ", " << y << ", " << z << std::endl;
+            ASSERT_TRUE(bounds.contains(x, y, z))
+                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
             ASSERT_TRUE(o < 4);
         }
     }
@@ -610,7 +620,7 @@ TEST(EptReaderTest, originRead)
     const auto set(reader.execute(table));
 
     uint64_t np(0);
-//    uint64_t o;
+    //    uint64_t o;
     for (const PointViewPtr& view : set)
     {
         np += view->size();
@@ -647,11 +657,9 @@ void streamTest(const std::string src)
     normalReader.setOptions(ops);
     PointTable normalTable;
     const auto nodeIdDim = normalTable.layout()->registerOrAssignDim(
-        "EptNodeId",
-        Dimension::Type::Unsigned32);
+        "EptNodeId", Dimension::Type::Unsigned32);
     const auto pointIdDim = normalTable.layout()->registerOrAssignDim(
-        "EptPointId",
-        Dimension::Type::Unsigned32);
+        "EptPointId", Dimension::Type::Unsigned32);
     normalReader.prepare(normalTable);
     const auto views = normalReader.execute(normalTable);
     PointView& normalView = **views.begin();
@@ -663,9 +671,9 @@ void streamTest(const std::string src)
     {
     public:
         TestPointTable(PointView& view)
-            : StreamPointTable(*view.table().layout(), 1024)
-            , m_view(view)
-        { }
+            : StreamPointTable(*view.table().layout(), 1024), m_view(view)
+        {
+        }
 
     protected:
         virtual void reset() override
@@ -690,11 +698,9 @@ void streamTest(const std::string src)
     PointView streamView(streamTable);
     TestPointTable testTable(streamView);
     const auto streamNodeIdDim = streamTable.layout()->registerOrAssignDim(
-        "EptNodeId",
-        Dimension::Type::Unsigned32);
+        "EptNodeId", Dimension::Type::Unsigned32);
     const auto streamPointIdDim = streamTable.layout()->registerOrAssignDim(
-        "EptPointId",
-        Dimension::Type::Unsigned32);
+        "EptPointId", Dimension::Type::Unsigned32);
 
     ASSERT_EQ(streamNodeIdDim, nodeIdDim);
     ASSERT_EQ(streamPointIdDim, pointIdDim);
@@ -706,35 +712,35 @@ void streamTest(const std::string src)
     // we'll need to sort them since the EPT reader loads data asynchronously
     // so we can't rely on their order being the same.
     ASSERT_EQ(streamView.size(), normalView.size());
-    ASSERT_EQ(
-        streamTable.layout()->pointSize(),
-        normalTable.layout()->pointSize());
+    ASSERT_EQ(streamTable.layout()->pointSize(),
+              normalTable.layout()->pointSize());
 
     const std::size_t numPoints(normalView.size());
     const std::size_t pointSize(normalTable.layout()->pointSize());
 
-    normalView.sort([&v = normalView, nodeIdDim, pointIdDim](PointId id1, PointId id2)
+    normalView.sort(
+        [&v = normalView, nodeIdDim, pointIdDim](PointId id1, PointId id2)
         {
             if (v.compare(nodeIdDim, id1, id2))
                 return true;
-            return !v.compare(nodeIdDim, id1, id2) && v.compare(pointIdDim, id1, id2);
-        }
-    );
-    streamView.sort([&v = streamView, nodeIdDim, pointIdDim](PointId id1, PointId id2)
+            return !v.compare(nodeIdDim, id1, id2) &&
+                   v.compare(pointIdDim, id1, id2);
+        });
+    streamView.sort(
+        [&v = streamView, nodeIdDim, pointIdDim](PointId id1, PointId id2)
         {
             if (v.compare(nodeIdDim, id1, id2))
                 return true;
-            return !v.compare(nodeIdDim, id1, id2) && v.compare(pointIdDim, id1, id2);
-        }
-    );
+            return !v.compare(nodeIdDim, id1, id2) &&
+                   v.compare(pointIdDim, id1, id2);
+        });
 
     for (PointId i(0); i < normalView.size(); ++i)
     {
         for (const auto& id : normalTable.layout()->dims())
         {
-            ASSERT_EQ(
-                normalView.getFieldAs<double>(id, i),
-                streamView.getFieldAs<double>(id, i));
+            ASSERT_EQ(normalView.getFieldAs<double>(id, i),
+                      streamView.getFieldAs<double>(id, i));
         }
     }
 }
@@ -806,16 +812,17 @@ TEST(EptReaderTest, boundedCrop)
 
     EXPECT_EQ(eptNp, sourceNp);
 
-//ABELL - A change in proj changed the numbers, but we don't necessarily have proj.h
-/**
-#if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
-    EXPECT_EQ(eptNp, 45u);
-    EXPECT_EQ(sourceNp, 45u);
-#else
-    EXPECT_EQ(eptNp, 47u);
-    EXPECT_EQ(sourceNp, 47u);
-#endif
-**/
+    // ABELL - A change in proj changed the numbers, but we don't necessarily
+    // have proj.h
+    /**
+    #if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
+        EXPECT_EQ(eptNp, 45u);
+        EXPECT_EQ(sourceNp, 45u);
+    #else
+        EXPECT_EQ(eptNp, 47u);
+        EXPECT_EQ(sourceNp, 47u);
+    #endif
+    **/
     EXPECT_GE(eptNp, 45u);
     EXPECT_GE(sourceNp, 45u);
     EXPECT_LE(eptNp, 47u);
@@ -888,11 +895,11 @@ TEST(EptReaderTest, polygonAndBoundsCrop)
     for (const PointViewPtr& view : polygonCrop.execute(sourceTable))
     {
         sourceNp += view->size();
-        for (std::size_t i = 0; i < view->size(); ++i) {
-            EXPECT_TRUE(
-                box.contains(
-                    view->getFieldAs<double>(pdal::Dimension::Id::X, i),
-                    view->getFieldAs<double>(pdal::Dimension::Id::Y, i)));
+        for (std::size_t i = 0; i < view->size(); ++i)
+        {
+            EXPECT_TRUE(box.contains(
+                view->getFieldAs<double>(pdal::Dimension::Id::X, i),
+                view->getFieldAs<double>(pdal::Dimension::Id::Y, i)));
         }
     }
 
@@ -900,7 +907,6 @@ TEST(EptReaderTest, polygonAndBoundsCrop)
     EXPECT_EQ(eptNp, 38u);
     EXPECT_EQ(sourceNp, 38u);
 }
-
 
 TEST(EptReaderTest, boundedCropReprojection)
 {
@@ -962,22 +968,21 @@ TEST(EptReaderTest, boundedCropReprojection)
         sourceNp += view->size();
 
     EXPECT_EQ(eptNp, sourceNp);
-//ABELL - We don't necessarily have proj.h, so we can't do this:
-/**
-#if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
-    EXPECT_EQ(eptNp, 45u);
-    EXPECT_EQ(sourceNp, 45u);
-#else
-    EXPECT_EQ(eptNp, 47u);
-    EXPECT_EQ(sourceNp, 47u);
-#endif
-**/
+    // ABELL - We don't necessarily have proj.h, so we can't do this:
+    /**
+    #if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
+        EXPECT_EQ(eptNp, 45u);
+        EXPECT_EQ(sourceNp, 45u);
+    #else
+        EXPECT_EQ(eptNp, 47u);
+        EXPECT_EQ(sourceNp, 47u);
+    #endif
+    **/
     EXPECT_GE(eptNp, 45u);
     EXPECT_GE(sourceNp, 45u);
     EXPECT_LE(eptNp, 47u);
     EXPECT_LE(sourceNp, 47u);
 }
-
 
 TEST(EptReaderTest, ogrCrop)
 {
@@ -1009,7 +1014,8 @@ TEST(EptReaderTest, ogrCrop)
     LasReader source;
     {
         Options options;
-        options.add("filename", Support::datapath("autzen/autzen-attribute-cropped.las"));
+        options.add("filename",
+                    Support::datapath("autzen/autzen-attribute-cropped.las"));
         source.setOptions(options);
     }
     PointTable sourceTable;
@@ -1018,19 +1024,20 @@ TEST(EptReaderTest, ogrCrop)
     for (const PointViewPtr& view : source.execute(sourceTable))
         sourceNp += view->size();
 
-//ABELL - PROJ changed to make the number of points that pass the filter different from
-//  what's in the file we've got stored.
-//    EXPECT_EQ(eptNp, sourceNp);
-//ABELL -  We don't necessarily have proj.h, so can't do the following:
-/**
-#if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
-    EXPECT_EQ(eptNp, 89u);
-    EXPECT_EQ(sourceNp, 89u);
-#else
-    EXPECT_EQ(eptNp, 86u);
-    EXPECT_EQ(sourceNp, 86u);
-#endif
-**/
+    // ABELL - PROJ changed to make the number of points that pass the filter
+    // different from
+    //   what's in the file we've got stored.
+    //     EXPECT_EQ(eptNp, sourceNp);
+    // ABELL -  We don't necessarily have proj.h, so can't do the following:
+    /**
+    #if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
+        EXPECT_EQ(eptNp, 89u);
+        EXPECT_EQ(sourceNp, 89u);
+    #else
+        EXPECT_EQ(eptNp, 86u);
+        EXPECT_EQ(sourceNp, 86u);
+    #endif
+    **/
     EXPECT_LE(eptNp, 89u);
     EXPECT_LE(sourceNp, 89u);
     EXPECT_GE(eptNp, 86u);
@@ -1040,9 +1047,8 @@ TEST(EptReaderTest, ogrCrop)
 TEST(EptReaderTest, bcbfToLonLat2dBoundsThrows)
 {
     // A 2D bounds is not allowed for this lon/lat queries against BCBF data.
-    SrsBounds bounds(
-        BOX2D(-180, 80, 180, 90),
-        "+proj=longlat +R=1000 +no_defs +type=crs");
+    SrsBounds bounds(BOX2D(-180, 80, 180, 90),
+                     "+proj=longlat +R=1000 +no_defs +type=crs");
 
     EptReader reader;
     {
@@ -1057,9 +1063,8 @@ TEST(EptReaderTest, bcbfToLonLat2dBoundsThrows)
 
 TEST(EptReaderTest, bcbfToLonLat)
 {
-    SrsBounds bounds(
-        BOX3D(-180, 80, -50, 180, 90, 50),
-        "+proj=longlat +R=1000 +no_defs +type=crs");
+    SrsBounds bounds(BOX3D(-180, 80, -50, 180, 90, 50),
+                     "+proj=longlat +R=1000 +no_defs +type=crs");
 
     EptReader reader;
     {

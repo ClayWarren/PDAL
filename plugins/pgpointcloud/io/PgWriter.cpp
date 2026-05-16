@@ -1,59 +1,59 @@
 /******************************************************************************
-* Copyright (c) 2012, Howard Butler, hobu.inc@gmail.com
-* Copyright (c) 2013, Paul Ramsey, pramsey@cleverelephant.ca
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2012, Howard Butler, hobu.inc@gmail.com
+ * Copyright (c) 2013, Paul Ramsey, pramsey@cleverelephant.ca
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "PgWriter.hpp"
 
 #include <pdal/PointView.hpp>
 #include <pdal/XMLSchema.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <pdal/util/portable_endian.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal/util/portable_endian.hpp>
 
 namespace pdal
 {
 
-static PluginInfo const s_info
-{
-    "writers.pgpointcloud",
-    "Write points to PostgreSQL pgpointcloud output",
-    "https://pdal.org/stages/writers.pgpointcloud.html"
-};
+static PluginInfo const s_info{
+    "writers.pgpointcloud", "Write points to PostgreSQL pgpointcloud output",
+    "https://pdal.org/stages/writers.pgpointcloud.html"};
 
 CREATE_SHARED_STAGE(PgWriter, s_info)
 
-std::string PgWriter::getName() const { return s_info.name; }
+std::string PgWriter::getName() const
+{
+    return s_info.name;
+}
 
 // TO DO:
 // - change INSERT into COPY
@@ -68,21 +68,16 @@ std::string PgWriter::getName() const { return s_info.name; }
 // between loads? Leave to pre/post SQL?
 
 PgWriter::PgWriter()
-    : m_session(0)
-    , m_patch_compression_type(CompressionType::None)
-    , m_srid(0)
-    , m_pcid(0)
-    , m_overwrite(true)
-    , m_schema_is_initialized(false)
-{}
-
+    : m_session(0), m_patch_compression_type(CompressionType::None), m_srid(0),
+      m_pcid(0), m_overwrite(true), m_schema_is_initialized(false)
+{
+}
 
 PgWriter::~PgWriter()
 {
     if (m_session)
         PQfinish(m_session);
 }
-
 
 void PgWriter::addArgs(ProgramArgs& args)
 {
@@ -92,7 +87,7 @@ void PgWriter::addArgs(ProgramArgs& args)
     args.add("column", "Column name", m_column_name, "pa");
     args.add("schema", "Schema name", m_schema_name);
     args.add("compression", "Compression type", m_compressionSpec,
-        "dimensional");
+             "dimensional");
     args.add("overwrite", "Whether data should be overwritten", m_overwrite);
     args.add("srid", "SRID", m_srid, 4326U);
     args.add("pcid", "PCID", m_pcid);
@@ -100,13 +95,11 @@ void PgWriter::addArgs(ProgramArgs& args)
     args.add("post_sql", "SQL to execute after query", m_post_sql);
 }
 
-
 void PgWriter::initialize()
 {
     m_patch_compression_type = getCompressionType(m_compressionSpec);
     m_session = pg_connect(m_connection);
 }
-
 
 void PgWriter::writeInit()
 {
@@ -144,7 +137,7 @@ void PgWriter::writeInit()
     m_pcid = SetupSchema(m_srid);
 
     // Create the table!
-    if (! bHaveTable)
+    if (!bHaveTable)
     {
         CreateTable(m_schema_name, m_table_name, m_column_name, m_pcid);
     }
@@ -158,10 +151,9 @@ void PgWriter::write(const PointViewPtr view)
     writeTile(view);
 }
 
-
 void PgWriter::done(PointTableRef /*table*/)
 {
-    //CreateIndex(m_schema_name, m_table_name, m_column_name);
+    // CreateIndex(m_schema_name, m_table_name, m_column_name);
 
     if (m_post_sql.size())
     {
@@ -180,7 +172,6 @@ void PgWriter::done(PointTableRef /*table*/)
     return;
 }
 
-
 uint32_t PgWriter::SetupSchema(uint32_t srid)
 {
 
@@ -190,15 +181,15 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
     long schema_count;
     if (m_pcid)
     {
-        oss << "SELECT Count(pcid) FROM pointcloud_formats WHERE pcid = " <<
-            m_pcid;
+        oss << "SELECT Count(pcid) FROM pointcloud_formats WHERE pcid = "
+            << m_pcid;
         std::string count_str = pg_query_once(m_session, oss.str());
         if (count_str.empty())
             throwError("Unable to count pcid's in table `pointcloud_formats`");
         schema_count = atoi(count_str.c_str());
         if (schema_count == 0)
             throwError("Requested PCID '" + Utils::toString(m_pcid) +
-                "' does not exist in POINTCLOUD_FORMATS");
+                       "' does not exist in POINTCLOUD_FORMATS");
         return m_pcid;
     }
 
@@ -232,12 +223,13 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
     {
         oss.str("");
         oss.clear();
-        oss << "SELECT pcid, schema FROM pointcloud_formats WHERE srid = " << srid;
-        PGresult *result = pg_query_result(m_session, oss.str());
+        oss << "SELECT pcid, schema FROM pointcloud_formats WHERE srid = "
+            << srid;
+        PGresult* result = pg_query_result(m_session, oss.str());
         for (int i = 0; i < PQntuples(result); ++i)
         {
-            char *pcid_str = PQgetvalue(result, i, 0);
-            char *schema_str = PQgetvalue(result, i, 1);
+            char* pcid_str = PQgetvalue(result, i, 0);
+            char* schema_str = PQgetvalue(result, i, 1);
 
             if (xml == schema_str)
             {
@@ -256,17 +248,18 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
         // released. See https://github.com/PDAL/PDAL/issues/1101 for
         // SQL to create this sequence on the pointcloud_formats
         // table.
-        std::string have_seq = pg_query_once(m_session,
-                "select count(*) from pg_class where relname = 'pointcloud_formats_pcid_sq'");
+        std::string have_seq =
+            pg_query_once(m_session, "select count(*) from pg_class where "
+                                     "relname = 'pointcloud_formats_pcid_sq'");
         int seq_count = atoi(have_seq.c_str());
         if (seq_count)
         {
             // We have the sequence, use its nextval
-            std::string pcid_str = pg_query_once(m_session,
-                    "SELECT nextval('pointcloud_formats_pcid_sq')");
+            std::string pcid_str = pg_query_once(
+                m_session, "SELECT nextval('pointcloud_formats_pcid_sq')");
             if (pcid_str.empty())
                 throwError("Unable to select nextval from "
-                    "'pointcloud_formats_pcid_seq'.");
+                           "'pointcloud_formats_pcid_seq'.");
             pcid = atoi(pcid_str.c_str());
         }
         else
@@ -278,8 +271,8 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
     }
     else
     {
-        std::string pcid_str = pg_query_once(m_session,
-                "SELECT Max(pcid)+1 AS pcid FROM pointcloud_formats");
+        std::string pcid_str = pg_query_once(
+            m_session, "SELECT Max(pcid)+1 AS pcid FROM pointcloud_formats");
         if (pcid_str.empty())
             throw("Unable to get the max pcid from 'pointcloud_formats'.");
         pcid = atoi(pcid_str.c_str());
@@ -289,9 +282,10 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
     oss.str("");
     oss.clear();
     oss << "INSERT INTO pointcloud_formats (pcid, srid, schema) "
-        "VALUES (" << pcid << "," << srid << ",$1)";
-    PGresult *result = PQexecParams(m_session, oss.str().c_str(), 1,
-            NULL, &paramValues, NULL, NULL, 0);
+           "VALUES ("
+        << pcid << "," << srid << ",$1)";
+    PGresult* result = PQexecParams(m_session, oss.str().c_str(), 1, NULL,
+                                    &paramValues, NULL, NULL, 0);
     if (PQresultStatus(result) != PGRES_COMMAND_OK)
         throwError(PQresultErrorMessage(result));
     PQclear(result);
@@ -299,9 +293,8 @@ uint32_t PgWriter::SetupSchema(uint32_t srid)
     return m_pcid;
 }
 
-
 void PgWriter::DeleteTable(std::string const& schema_name,
-                         std::string const& table_name)
+                           std::string const& table_name)
 {
     std::ostringstream stmt;
     std::ostringstream name;
@@ -318,51 +311,48 @@ void PgWriter::DeleteTable(std::string const& schema_name,
     pg_execute(m_session, stmt.str());
 }
 
-
 bool PgWriter::CheckPointCloudExists()
 {
-    log()->get(LogLevel::Debug) << "checking for pointcloud existence ... " <<
-        std::endl;
+    log()->get(LogLevel::Debug)
+        << "checking for pointcloud existence ... " << std::endl;
 
     std::string q = "SELECT PC_Version()";
     try
     {
         pg_execute(m_session, q);
     }
-    catch (pdal_error const &)
+    catch (pdal_error const&)
     {
         return false;
     }
     return true;
 }
 
-
 bool PgWriter::CheckPostGISExists()
 {
-    log()->get(LogLevel::Debug) << "checking for PostGIS existence ... " <<
-        std::endl;
+    log()->get(LogLevel::Debug)
+        << "checking for PostGIS existence ... " << std::endl;
 
     std::string q = "SELECT PostGIS_Version()";
     try
     {
         pg_execute(m_session, q);
     }
-    catch (pdal_error const &)
+    catch (pdal_error const&)
     {
         return false;
     }
     return true;
 }
 
-
 bool PgWriter::CheckTableExists(std::string const& name)
 {
     std::ostringstream oss;
-    oss << "SELECT count(*) FROM pg_tables WHERE tablename ILIKE '" <<
-        name << "'";
+    oss << "SELECT count(*) FROM pg_tables WHERE tablename ILIKE '" << name
+        << "'";
 
-    log()->get(LogLevel::Debug) << "checking for table '" << name <<
-        "' existence ... " << std::endl;
+    log()->get(LogLevel::Debug)
+        << "checking for table '" << name << "' existence ... " << std::endl;
 
     std::string count_str = pg_query_once(m_session, oss.str());
     if (count_str.empty())
@@ -372,22 +362,22 @@ bool PgWriter::CheckTableExists(std::string const& name)
     if (count == 1)
         return true;
     else if (count > 1)
-        log()->get(LogLevel::Debug) << "found more than 1 table named '" <<
-            name << "'" << std::endl;
+        log()->get(LogLevel::Debug)
+            << "found more than 1 table named '" << name << "'" << std::endl;
     return false;
 }
 
 void PgWriter::CreateTable(std::string const& schema_name,
-    std::string const& table_name, std::string const& column_name,
-    uint32_t pcid)
+                           std::string const& table_name,
+                           std::string const& column_name, uint32_t pcid)
 {
     std::ostringstream oss;
     oss << "CREATE TABLE ";
     if (schema_name.size())
         oss << pg_quote_identifier(schema_name) << ".";
     oss << pg_quote_identifier(table_name);
-    oss << " (id SERIAL PRIMARY KEY, " <<
-        pg_quote_identifier(column_name) << " PcPatch";
+    oss << " (id SERIAL PRIMARY KEY, " << pg_quote_identifier(column_name)
+        << " PcPatch";
     if (pcid)
         oss << "(" << pcid << ")";
     oss << ")";
@@ -395,10 +385,10 @@ void PgWriter::CreateTable(std::string const& schema_name,
     pg_execute(m_session, oss.str());
 }
 
-
 // Make sure you test for the presence of PostGIS before calling this
 void PgWriter::CreateIndex(std::string const& schema_name,
-    std::string const& table_name, std::string const& column_name)
+                           std::string const& table_name,
+                           std::string const& column_name)
 {
     std::ostringstream oss;
 
@@ -410,7 +400,6 @@ void PgWriter::CreateIndex(std::string const& schema_name,
 
     pg_execute(m_session, oss.str());
 }
-
 
 void PgWriter::writeTile(const PointViewPtr view)
 {

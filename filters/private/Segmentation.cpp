@@ -103,7 +103,7 @@ void ignoreDimRange(DimRange dr, PointViewPtr input, PointViewPtr keep,
 }
 
 void ignoreDimRanges(std::vector<DimRange>& ranges, PointViewPtr input,
-    PointViewPtr keep, PointViewPtr ignore)
+                     PointViewPtr keep, PointViewPtr ignore)
 {
     std::sort(ranges.begin(), ranges.end());
     PointRef point(*input, 0);
@@ -117,8 +117,8 @@ void ignoreDimRanges(std::vector<DimRange>& ranges, PointViewPtr input,
     }
 }
 
-void ignoreClassBits(PointViewPtr input, PointViewPtr keep,
-                     PointViewPtr ignore, PointClasses classbits)
+void ignoreClassBits(PointViewPtr input, PointViewPtr keep, PointViewPtr ignore,
+                     PointClasses classbits)
 {
     using namespace Dimension;
 
@@ -155,8 +155,8 @@ void segmentLastReturns(PointViewPtr input, PointViewPtr last,
     }
 }
 
-void segmentReturns(PointViewPtr input, PointViewPtr first,
-                    PointViewPtr second, StringList returns)
+void segmentReturns(PointViewPtr input, PointViewPtr first, PointViewPtr second,
+                    StringList returns)
 {
     using namespace Dimension;
 

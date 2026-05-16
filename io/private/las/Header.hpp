@@ -40,11 +40,11 @@
 
 #pragma once
 
-// Don't complain about DLL interface. If you want to use this out of the MS DLL, make sure
-// everything is built consistently.
+// Don't complain about DLL interface. If you want to use this out of the MS
+// DLL, make sure everything is built consistently.
 #ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4251)
+#pragma warning(push)
+#pragma warning(disable : 4251)
 #endif
 
 namespace pdal
@@ -58,92 +58,118 @@ struct Header
 {
     struct xyz
     {
-        xyz() : x(0), y(0), z(0)
-        {}
+        xyz() : x(0), y(0), z(0) {}
 
-        xyz(double x, double y, double z) : x(x), y(y), z(z)
-        {}
+        xyz(double x, double y, double z) : x(x), y(y), z(z) {}
 
         double x;
         double y;
         double z;
     };
 
-    static const int LegacyReturnCount {5};
-    static const int ReturnCount {15};
-    static const int Size {375};
-    static const int Size12 {227};
-    static const int Size13 {235};
-    static const int Size14 {375};
-    static const int FormatMask {0xF}; // Make as small as possible to improve? optimization.
-    static const int CompressionMask {0x80};
-    static const int WktMask {0x10};
+    static const int LegacyReturnCount{5};
+    static const int ReturnCount{15};
+    static const int Size{375};
+    static const int Size12{227};
+    static const int Size13{235};
+    static const int Size14{375};
+    static const int FormatMask{
+        0xF}; // Make as small as possible to improve? optimization.
+    static const int CompressionMask{0x80};
+    static const int WktMask{0x10};
 
-    std::string magic { "LASF" };
-    uint16_t fileSourceId {};
-    uint16_t globalEncoding {};
+    std::string magic{"LASF"};
+    uint16_t fileSourceId{};
+    uint16_t globalEncoding{};
     Uuid projectGuid;
-    uint8_t versionMajor {1};
-    uint8_t versionMinor {2};
-    std::string systemId { "PDAL" };
+    uint8_t versionMajor{1};
+    uint8_t versionMinor{2};
+    std::string systemId{"PDAL"};
     std::string softwareId;
     uint16_t creationDoy;
     uint16_t creationYear;
-    uint16_t headerSize {};            // Same as VLR offset
-    uint16_t& vlrOffset {headerSize};  // Synonym
-    uint32_t pointOffset {};
-    uint32_t vlrCount {};
-    uint8_t pointFormatBits {};
-    uint16_t pointSize {};
-    uint32_t legacyPointCount {};
+    uint16_t headerSize{};           // Same as VLR offset
+    uint16_t& vlrOffset{headerSize}; // Synonym
+    uint32_t pointOffset{};
+    uint32_t vlrCount{};
+    uint8_t pointFormatBits{};
+    uint16_t pointSize{};
+    uint32_t legacyPointCount{};
     std::array<uint32_t, LegacyReturnCount> legacyPointsByReturn;
     xyz scale;
     xyz offset;
     BOX3D bounds;
-    uint64_t waveOffset {};
-    uint64_t evlrOffset {};
-    uint32_t evlrCount {};
-    uint64_t ePointCount {};
+    uint64_t waveOffset{};
+    uint64_t evlrOffset{};
+    uint32_t evlrCount{};
+    uint64_t ePointCount{};
     std::array<uint64_t, ReturnCount> ePointsByReturn;
 
-    void fill(const char *buf, size_t bufsize);
+    void fill(const char* buf, size_t bufsize);
     std::vector<char> data() const;
     StringList validate(uint64_t fileSize) const;
 
     int size() const
-        { return versionMinor >= 4 ? Size14 : versionMinor == 3 ? Size13 : Size12; }
+    {
+        return versionMinor >= 4 ? Size14 : versionMinor == 3 ? Size13 : Size12;
+    }
     int ebCount() const
     {
         int base = baseCount();
         return (base ? pointSize - base : 0);
     }
     int baseCount() const
-        { return las::baseCount(pointFormat()); }
+    {
+        return las::baseCount(pointFormat());
+    }
     int pointFormat() const
-        { return pointFormatBits & FormatMask; }
+    {
+        return pointFormatBits & FormatMask;
+    }
     void setPointFormat(int format)
-        { pointFormatBits = format | (pointFormatBits & CompressionMask); }
+    {
+        pointFormatBits = format | (pointFormatBits & CompressionMask);
+    }
     bool dataCompressed() const
-        { return pointFormatBits & CompressionMask; }
+    {
+        return pointFormatBits & CompressionMask;
+    }
     void setDataCompressed()
-        { pointFormatBits |= CompressionMask; }
+    {
+        pointFormatBits |= CompressionMask;
+    }
     void setPointCount(uint64_t pointCount);
     void setPointsByReturn(int returnNum, uint64_t pointCount);
     bool useWkt() const
-        { return globalEncoding & WktMask; }
-    // It's an error if the WKT flag isn't set and the point format > 5, but we roll with it.
+    {
+        return globalEncoding & WktMask;
+    }
+    // It's an error if the WKT flag isn't set and the point format > 5, but we
+    // roll with it.
     bool mustUseWkt() const
-        { return (useWkt() && versionMinor >= 4) || has14PointFormat(); }
+    {
+        return (useWkt() && versionMinor >= 4) || has14PointFormat();
+    }
     uint64_t pointCount() const
-        { return versionMinor >= 4 ? ePointCount : legacyPointCount; }
+    {
+        return versionMinor >= 4 ? ePointCount : legacyPointCount;
+    }
     int maxReturnCount() const
-        { return versionMinor >= 4 ? ReturnCount : LegacyReturnCount; }
+    {
+        return versionMinor >= 4 ? ReturnCount : LegacyReturnCount;
+    }
     bool versionAtLeast(int major, int minor) const
-        { return versionMinor >= minor; } // Major is always 1.
+    {
+        return versionMinor >= minor;
+    } // Major is always 1.
     bool has14PointFormat() const
-        { return pointFormat() > 5; }
+    {
+        return pointFormat() > 5;
+    }
     bool hasTime() const
-        { return pointFormat() == 1 || pointFormat() >= 3; }
+    {
+        return pointFormat() == 1 || pointFormat() >= 3;
+    }
     bool hasWave() const
     {
         int f = pointFormat();
@@ -155,13 +181,14 @@ struct Header
         return f == 2 || f == 3 || f == 5 || f == 7 || f == 8 || f == 10;
     }
     bool hasInfrared() const
-        { return pointFormat() == 8; }
+    {
+        return pointFormat() == 8;
+    }
 };
 
 #ifdef _MSC_VER
-#pragma warning (pop)
+#pragma warning(pop)
 #endif
 
 } // namespace las
 } // namespace pdal
-

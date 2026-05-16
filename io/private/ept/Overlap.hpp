@@ -45,11 +45,11 @@ namespace ept
 
 struct Overlap
 {
-    Overlap(const Key& key) : m_key(key), m_count(0), m_nodeId(0)
-    {}
-    Overlap(const Key& key, point_count_t count, uint64_t nodeId) :
-        m_key(key), m_count(count), m_nodeId(nodeId)
-    {}
+    Overlap(const Key& key) : m_key(key), m_count(0), m_nodeId(0) {}
+    Overlap(const Key& key, point_count_t count, uint64_t nodeId)
+        : m_key(key), m_count(count), m_nodeId(nodeId)
+    {
+    }
 
     Key m_key;
     point_count_t m_count;
@@ -67,13 +67,11 @@ inline bool operator==(const Overlap& a, const Overlap& b)
 
 namespace std
 {
-    template<>
-    struct hash<pdal::ept::Overlap>
+template <> struct hash<pdal::ept::Overlap>
+{
+    std::size_t operator()(const pdal::ept::Overlap& o) const noexcept
     {
-        std::size_t operator()(const pdal::ept::Overlap& o) const noexcept
-        {
-            return std::hash<pdal::ept::Key>{}(o.m_key);
-        }
-    };
-}
-
+        return std::hash<pdal::ept::Key>{}(o.m_key);
+    }
+};
+} // namespace std

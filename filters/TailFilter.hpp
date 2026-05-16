@@ -42,8 +42,7 @@ namespace pdal
 class PDAL_EXPORT TailFilter : public Filter
 {
 public:
-    TailFilter()
-    {}
+    TailFilter() {}
     TailFilter& operator=(const TailFilter&) = delete;
     TailFilter(const TailFilter&) = delete;
 
@@ -55,11 +54,14 @@ private:
 
     void addArgs(ProgramArgs& args)
     {
-        args.add("count", "Number of points to return from end. "
-            "If 'invert' is true, number of points to drop from the end.",
-            m_count, point_count_t(10));
-        args.add("invert", "If true, 'count' specifies the number of points "
-            "at the end to drop.", m_invert);
+        args.add("count",
+                 "Number of points to return from end. "
+                 "If 'invert' is true, number of points to drop from the end.",
+                 m_count, point_count_t(10));
+        args.add("invert",
+                 "If true, 'count' specifies the number of points "
+                 "at the end to drop.",
+                 m_invert);
     }
 
     PointViewSet run(PointViewPtr view)

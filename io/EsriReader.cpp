@@ -1,50 +1,50 @@
 /******************************************************************************
-* Copyright (c) 2018, Kyle Mann (kyle@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2018, Kyle Mann (kyle@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <arbiter/arbiter.hpp>
 #include "EsriReader.hpp"
+#include <arbiter/arbiter.hpp>
 
 #include <Eigen/Geometry>
 
-#include <pdal/util/Algorithm.hpp>
-#include <pdal/util/ThreadPool.hpp>
 #include <pdal/private/MathUtils.hpp>
 #include <pdal/private/SrsTransform.hpp>
+#include <pdal/util/Algorithm.hpp>
+#include <pdal/util/ThreadPool.hpp>
 
-#include "private/esri/Obb.hpp"
-#include "private/esri/Interface.hpp"
 #include "lepcc/src/include/lepcc_types.h"
+#include "private/esri/Interface.hpp"
+#include "private/esri/Obb.hpp"
 
 namespace pdal
 {
@@ -53,30 +53,26 @@ using namespace i3s;
 
 namespace
 {
-    const std::map<std::string, pdal::Dimension::Id> dimMapping
-    {
-        {"CLASS_CODE",  Dimension::Id::Classification},
-        {"FLAGS",       Dimension::Id::Flag},
-        {"USER_DATA",   Dimension::Id::UserData},
-        {"POINT_SRC_ID",Dimension::Id::PointSourceId},
-        {"GPS_TIME",    Dimension::Id::GpsTime},
-        {"SCAN_ANGLE",  Dimension::Id::ScanAngleRank}
-    };
+const std::map<std::string, pdal::Dimension::Id> dimMapping{
+    {"CLASS_CODE", Dimension::Id::Classification},
+    {"FLAGS", Dimension::Id::Flag},
+    {"USER_DATA", Dimension::Id::UserData},
+    {"POINT_SRC_ID", Dimension::Id::PointSourceId},
+    {"GPS_TIME", Dimension::Id::GpsTime},
+    {"SCAN_ANGLE", Dimension::Id::ScanAngleRank}};
 
-    const std::map<std::string, pdal::Dimension::Type> typeMapping
-    {
-        {"UInt8", Dimension::Type::Unsigned8},
-        {"UInt16", Dimension::Type::Unsigned16},
-        {"UInt32", Dimension::Type::Unsigned32},
-        {"UInt64", Dimension::Type::Unsigned64},
-        {"Int8", Dimension::Type::Signed8},
-        {"Int16", Dimension::Type::Signed16},
-        {"Int32", Dimension::Type::Signed32},
-        {"Int64", Dimension::Type::Signed64},
-        {"Float64", Dimension::Type::Double},
-        {"Float32", Dimension::Type::Float}
-    };
-}
+const std::map<std::string, pdal::Dimension::Type> typeMapping{
+    {"UInt8", Dimension::Type::Unsigned8},
+    {"UInt16", Dimension::Type::Unsigned16},
+    {"UInt32", Dimension::Type::Unsigned32},
+    {"UInt64", Dimension::Type::Unsigned64},
+    {"Int8", Dimension::Type::Signed8},
+    {"Int16", Dimension::Type::Signed16},
+    {"Int32", Dimension::Type::Signed32},
+    {"Int64", Dimension::Type::Signed64},
+    {"Float64", Dimension::Type::Double},
+    {"Float32", Dimension::Type::Float}};
+} // namespace
 
 struct EsriReader::Args
 {
@@ -89,9 +85,11 @@ struct EsriReader::Args
 
 struct EsriReader::DimData
 {
-    DimData() : key(0), type(Dimension::Type::None),
-        dstId(Dimension::Id::Unknown), pos(-1)
-    {}
+    DimData()
+        : key(0), type(Dimension::Type::None), dstId(Dimension::Id::Unknown),
+          pos(-1)
+    {
+    }
 
     int key;
     std::string dataType;
@@ -104,14 +102,16 @@ struct EsriReader::DimData
 class EsriReader::TileContents
 {
 public:
-    TileContents()
-    {}
-    TileContents(const std::string& url, size_t extraDimCount) :
-        m_url(url), m_data(extraDimCount)
-    {}
+    TileContents() {}
+    TileContents(const std::string& url, size_t extraDimCount)
+        : m_url(url), m_data(extraDimCount)
+    {
+    }
 
     size_t size() const
-    { return m_xyz.size(); }
+    {
+        return m_xyz.size();
+    }
 
     std::string m_url;
     std::vector<lepcc::Point3D> m_xyz;
@@ -121,29 +121,26 @@ public:
     std::string m_error;
 };
 
-EsriReader::EsriReader(std::unique_ptr<Interface> interface) :
-    m_interface(std::move(interface)), m_args(new Args)
-{}
+EsriReader::EsriReader(std::unique_ptr<Interface> interface)
+    : m_interface(std::move(interface)), m_args(new Args)
+{
+}
 
-
-EsriReader::~EsriReader()
-{}
-
+EsriReader::~EsriReader() {}
 
 void EsriReader::addArgs(ProgramArgs& args)
 {
     args.add("obb", "Oriented bounding box of clip region.", m_args->obb);
     args.add("threads", "Number of threads to be used.", m_args->threads, 4);
     args.add("dimensions", "Dimensions to be used in pulls",
-        m_args->dimensions);
+             m_args->dimensions);
     args.add("min_density", "Minimum point density", m_args->min_density, -1.0);
     args.add("max_density", "Maximum point density", m_args->max_density, -1.0);
 }
 
-
 void EsriReader::initialize(PointTableRef table)
 {
-    //create proper density if min was set but max wasn't
+    // create proper density if min was set but max wasn't
     if (m_args->min_density >= 0 && m_args->max_density < 0)
         m_args->max_density = (std::numeric_limits<double>::max)();
 
@@ -152,7 +149,7 @@ void EsriReader::initialize(PointTableRef table)
     for (std::string& s : m_args->dimensions)
         s = Utils::toupper(s);
 
-    //adjust filename string
+    // adjust filename string
     const std::string pre("i3s://");
     if (Utils::startsWith(m_filename, pre))
         m_filename = m_filename.substr(pre.size());
@@ -160,10 +157,10 @@ void EsriReader::initialize(PointTableRef table)
     if (m_filename.back() == '/')
         m_filename.pop_back();
 
-    log()->get(LogLevel::Debug) << "Fetching info from " << m_filename <<
-        std::endl;
+    log()->get(LogLevel::Debug)
+        << "Fetching info from " << m_filename << std::endl;
 
-    //personalize for slpk or i3s
+    // personalize for slpk or i3s
     try
     {
         m_interface->initInfo();
@@ -173,10 +170,10 @@ void EsriReader::initialize(PointTableRef table)
         throwError(std::string("Failed to fetch info: ") + e.what());
     }
 
-    //create const for looking into
+    // create const for looking into
     const NL::json jsonBody = m_interface->getInfo();
 
-    //find version
+    // find version
     if (jsonBody["store"].contains("version"))
     {
         std::string verName = jsonBody["store"]["version"].get<std::string>();
@@ -184,33 +181,36 @@ void EsriReader::initialize(PointTableRef table)
     }
 
     if (m_version > Version("2.0") || m_version < Version("1.6"))
-        log()->get(LogLevel::Warning) << "This version may not work with "
-            "the current implementation of i3s/slpk reader" << std::endl;
+        log()->get(LogLevel::Warning)
+            << "This version may not work with "
+               "the current implementation of i3s/slpk reader"
+            << std::endl;
 
-    //find number of nodes per nodepage
+    // find number of nodes per nodepage
     if (jsonBody["store"]["index"].contains("nodesPerPage"))
         m_nodeCap = jsonBody["store"]["index"]["nodesPerPage"].get<int>();
     else if (jsonBody["store"]["index"].contains("nodePerIndexBlock"))
         m_nodeCap = jsonBody["store"]["index"]["nodePerIndexBlock"].get<int>();
     else
     {
-        log()->get(LogLevel::Warning) <<
-            "Number of nodes per page not specified. Default is 64." <<
-                std::endl;
+        log()->get(LogLevel::Warning)
+            << "Number of nodes per page not specified. Default is 64."
+            << std::endl;
         m_nodeCap = 64;
     }
 
-    //find the type of encoding
+    // find the type of encoding
     if (jsonBody["store"]["defaultGeometrySchema"].contains("encoding"))
     {
-        std::string encoding = jsonBody["store"]
-            ["defaultGeometrySchema"]["encoding"].get<std::string>();
+        std::string encoding =
+            jsonBody["store"]["defaultGeometrySchema"]["encoding"]
+                .get<std::string>();
         if (encoding != "lepcc-xyz")
             throwError(std::string("Only lepcc encoding is supported "
-                "by this driver"));
+                                   "by this driver"));
     }
 
-    //create spatial reference objects
+    // create spatial reference objects
     NL::json wkid = jsonBody["spatialReference"]["wkid"];
     int system(0);
     if (wkid.is_string())
@@ -221,17 +221,19 @@ void EsriReader::initialize(PointTableRef table)
             system = std::stoi(sval);
         }
         catch (...)
-        {}
+        {
+        }
         if (system < 2000)
-            throwError("Invalid wkid string '" + sval + "' for spatial "
-                "reference.");
+            throwError("Invalid wkid string '" + sval +
+                       "' for spatial "
+                       "reference.");
     }
     else if (wkid.is_number())
     {
         system = (int)wkid.get<int64_t>();
         if (system < 2000)
             throwError("Invalid wkid value '" + std::to_string(system) +
-                "' for spatial reference.");
+                       "' for spatial reference.");
     }
 
     // If we're doing transform from 4326 to ECEF, go ahead and transform
@@ -244,7 +246,6 @@ void EsriReader::initialize(PointTableRef table)
     }
     setSpatialReference("EPSG:" + std::to_string(system));
 }
-
 
 void EsriReader::addDimensions(PointLayoutPtr layout)
 {
@@ -270,11 +271,10 @@ void EsriReader::addDimensions(PointLayoutPtr layout)
 
         if (!el.contains("attributeValues"))
         {
-            //Expect that Elevation will be bundled with xyz
+            // Expect that Elevation will be bundled with xyz
             if (dim.name != "ELEVATION")
-                log()->get(LogLevel::Warning) <<
-                    "Attribute does not have a type." <<
-                    std::endl;
+                log()->get(LogLevel::Warning)
+                    << "Attribute does not have a type." << std::endl;
             continue;
         }
 
@@ -318,24 +318,20 @@ void EsriReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
 void EsriReader::ready(PointTableRef table)
 {
-    //output arguments for debugging
-    log()->get(LogLevel::Debug) << "filename: " <<
-        m_filename << std::endl;
-    log()->get(LogLevel::Debug) << "threads: " <<
-        m_args->threads << std::endl;
-    log()->get(LogLevel::Debug) << "obb: " <<
-        m_args->obb << std::endl;
-    log()->get(LogLevel::Debug) << "min_density: " <<
-        m_args->min_density << std::endl;
-    log()->get(LogLevel::Debug) << "max_density: " <<
-        m_args->max_density << std::endl;
+    // output arguments for debugging
+    log()->get(LogLevel::Debug) << "filename: " << m_filename << std::endl;
+    log()->get(LogLevel::Debug) << "threads: " << m_args->threads << std::endl;
+    log()->get(LogLevel::Debug) << "obb: " << m_args->obb << std::endl;
+    log()->get(LogLevel::Debug)
+        << "min_density: " << m_args->min_density << std::endl;
+    log()->get(LogLevel::Debug)
+        << "max_density: " << m_args->max_density << std::endl;
     log()->get(LogLevel::Debug) << "dimensions: " << std::endl;
 
     for (std::string& dim : m_args->dimensions)
-        log()->get(LogLevel::Debug) << "    -" << dim <<std::endl;
+        log()->get(LogLevel::Debug) << "    -" << dim << std::endl;
 
     /*
     -3Dscenelayerinfo: <scene-server-url/layers/<layer-id>
@@ -346,12 +342,13 @@ void EsriReader::ready(PointTableRef table)
     -texture data: <node-url>/textures/<texture-data-bundle-id>
     */
 
-    // Before version 2, page indexes were the first item on the page, rather than the
-    // actual page number, so we use the page size (m_nodeCap) as a factor from the page
-    // index to get the proper filename for a page.
+    // Before version 2, page indexes were the first item on the page, rather
+    // than the actual page number, so we use the page size (m_nodeCap) as a
+    // factor from the page index to get the proper filename for a page.
     int indexFactor = m_version >= Version("2.0") ? 1 : m_nodeCap;
-    m_pageManager.reset(new PageManager(100, 4, indexFactor,
-        [this](std::string src) { return m_interface->fetchJson(src); }));
+    m_pageManager.reset(
+        new PageManager(100, 4, indexFactor, [this](std::string src)
+                        { return m_interface->fetchJson(src); }));
     PagePtr p = m_pageManager->getPage(0);
     traverseTree(p, 0);
     m_pool->await();
@@ -379,17 +376,15 @@ void EsriReader::ready(PointTableRef table)
     }
 }
 
-
 void EsriReader::checkTile(const TileContents& tile)
 {
     if (tile.m_error.size())
     {
         m_pool->stop();
-        throwError("Error reading tile '" + tile.m_url + "': " +
-            tile.m_error + ".");
+        throwError("Error reading tile '" + tile.m_url + "': " + tile.m_error +
+                   ".");
     }
 }
-
 
 point_count_t EsriReader::read(PointViewPtr view, point_count_t count)
 {
@@ -470,9 +465,8 @@ top:
     return true;
 }
 
-
 void EsriReader::process(PointViewPtr dstView, const TileContents& tile,
-    point_count_t count)
+                         point_count_t count)
 {
     m_pointId = 0;
     PointRef dst(*dstView);
@@ -484,7 +478,6 @@ void EsriReader::process(PointViewPtr dstView, const TileContents& tile,
         processPoint(dst, tile);
     }
 }
-
 
 bool EsriReader::processPoint(PointRef& dst, const TileContents& tile)
 {
@@ -502,8 +495,8 @@ bool EsriReader::processPoint(PointRef& dst, const TileContents& tile)
         return true;
     };
 
-    Eigen::Vector3d coord { tile.m_xyz[m_pointId].x, tile.m_xyz[m_pointId].y,
-        tile.m_xyz[m_pointId].z };
+    Eigen::Vector3d coord{tile.m_xyz[m_pointId].x, tile.m_xyz[m_pointId].y,
+                          tile.m_xyz[m_pointId].z};
 
     if (pointInObb(coord))
     {
@@ -531,7 +524,7 @@ bool EsriReader::processPoint(PointRef& dst, const TileContents& tile)
             {
                 const std::vector<char>& d = tile.m_data[dim.pos];
                 dst.setField(dim.dstId, dim.type,
-                        d.data() + m_pointId * Dimension::size(dim.type));
+                             d.data() + m_pointId * Dimension::size(dim.type));
             }
         }
     }
@@ -555,14 +548,13 @@ void EsriReader::traverseTree(PagePtr page, int node)
     int cCount = j["nodes"][index]["childCount"].get<int>();
 
     // find density information
-    double area = j["nodes"][index][
-        m_version >= Version("2.0") ?
-            "lodThreshold" :
-            "effectiveArea" ].get<double>();
-    int pCount = j["nodes"][index][
-        m_version >= Version("2.0") ?
-            "vertexCount" :
-            "pointCount" ].get<int>();
+    double area =
+        j["nodes"][index]
+         [m_version >= Version("2.0") ? "lodThreshold" : "effectiveArea"]
+             .get<double>();
+    int pCount = j["nodes"][index]
+                  [m_version >= Version("2.0") ? "vertexCount" : "pointCount"]
+                      .get<int>();
 
     double density = pCount / area;
 
@@ -612,23 +604,23 @@ void EsriReader::traverseTree(PagePtr page, int node)
         node = firstChild + i;
         if (i == 0 || node % m_nodeCap == 0)
             page = m_pageManager->getPage(node / m_nodeCap);
-        m_pool->add([this, page, node](){traverseTree(page, node);});
+        m_pool->add([this, page, node]() { traverseTree(page, node); });
     }
 }
-
 
 void EsriReader::load(int nodeId)
 {
     std::string filepath = "nodes/" + std::to_string(nodeId);
-    m_pool->add([this, filepath]()
+    m_pool->add(
+        [this, filepath]()
         {
             TileContents tile;
             try
             {
                 tile = loadPath(filepath);
             }
-            //ABELL - Need to make sure we trap all the errors
-            // from size check, fetchBinary, decompress...
+            // ABELL - Need to make sure we trap all the errors
+            //  from size check, fetchBinary, decompress...
             catch (const i3s::EsriError& e)
             {
                 tile.m_error = e.what();
@@ -640,10 +632,8 @@ void EsriReader::load(int nodeId)
                 m_contents.push(std::move(tile));
             }
             m_contentsCv.notify_one();
-        }
-    );
+        });
 }
-
 
 EsriReader::TileContents EsriReader::loadPath(const std::string& filepath)
 {
@@ -667,24 +657,25 @@ EsriReader::TileContents EsriReader::loadPath(const std::string& filepath)
     {
         if (dim.name == "RGB")
         {
-            auto data = m_interface->fetchBinary(attrUrl, std::to_string(dim.key),
-                ".bin.pccrgb");
+            auto data = m_interface->fetchBinary(
+                attrUrl, std::to_string(dim.key), ".bin.pccrgb");
             tile.m_rgb = i3s::decompressRGB(&data);
             tile.m_error = checkSize(dim, size, tile.m_rgb.size());
         }
         else if (dim.name == "INTENSITY")
         {
-            auto data = m_interface->fetchBinary(attrUrl, std::to_string(dim.key),
-                ".bin.pccint");
+            auto data = m_interface->fetchBinary(
+                attrUrl, std::to_string(dim.key), ".bin.pccint");
             tile.m_intensity = i3s::decompressIntensity(&data);
             tile.m_error = checkSize(dim, size, tile.m_intensity.size());
         }
         else
         {
             std::vector<char>& data = tile.m_data[dim.pos];
-            data = m_interface->fetchBinary(attrUrl, std::to_string(dim.key), ".bin.gz");
-            tile.m_error = checkSize(dim, size * Dimension::size(dim.type),
-                data.size());
+            data = m_interface->fetchBinary(attrUrl, std::to_string(dim.key),
+                                            ".bin.gz");
+            tile.m_error =
+                checkSize(dim, size * Dimension::size(dim.type), data.size());
         }
         if (tile.m_error.size())
             break;
@@ -692,5 +683,4 @@ EsriReader::TileContents EsriReader::loadPath(const std::string& filepath)
     return tile;
 }
 
-} //namespace pdal
-
+} // namespace pdal

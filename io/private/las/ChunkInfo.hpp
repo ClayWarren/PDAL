@@ -34,10 +34,10 @@
 
 #pragma once
 
-#include <istream>
-#include <pdal/util/IStream.hpp>
-#include <lazperf/vlr.hpp>
 #include "Header.hpp"
+#include <istream>
+#include <lazperf/vlr.hpp>
+#include <pdal/util/IStream.hpp>
 
 namespace pdal
 {
@@ -47,7 +47,8 @@ namespace las
 class ChunkInfo
 {
 public:
-    void load(std::istream& stream, uint64_t pointOffset, uint64_t numPoints, uint32_t chunkSize)
+    void load(std::istream& stream, uint64_t pointOffset, uint64_t numPoints,
+              uint32_t chunkSize)
     {
         m_chunks.clear();
         m_numPoints = numPoints;
@@ -65,11 +66,11 @@ public:
         in >> numChunks;
         if (version != 0)
             throw pdal_error("Invalid version " + std::to_string(version) +
-                " found in LAZ chunk table.");
+                             " found in LAZ chunk table.");
 
         if (numChunks)
-            m_chunks = lazperf::decompress_chunk_table(stream, numChunks,
-                lazperf::laz_vlr::variableChunks(chunkSize));
+            m_chunks = lazperf::decompress_chunk_table(
+                stream, numChunks, lazperf::laz_vlr::variableChunks(chunkSize));
 
         // If the chunk size is fixed, set the counts to the chunk size since
         // they aren't stored in the chunk table.
@@ -84,20 +85,22 @@ public:
             assert(remaining == 0);
         }
 
-        // Add a chunk at the beginning that has a count of 0 and an offset of the
-        // start of the first chunk.
+        // Add a chunk at the beginning that has a count of 0 and an offset of
+        // the start of the first chunk.
         m_chunks.insert(m_chunks.begin(), {0, pointOffset + sizeof(uint64_t)});
 
-        // Fix up the chunk table such that the offsets are absolute offsets to the
-        // chunk and the counts are cumulative counts of points before the chunk.
-        // When we're done, the chunk table looks like this, where N is the number of chunks:
+        // Fix up the chunk table such that the offsets are absolute offsets to
+        // the chunk and the counts are cumulative counts of points before the
+        // chunk. When we're done, the chunk table looks like this, where N is
+        // the number of chunks:
 
         // Chunk table entry 1: offset to chunk 1, count of 0
         // Chunk table entry 2: offset to chunk 2, count of chunk 1
         // Chunk table entry 3: offset to chunk 3, count of chunk 1 + 2
         // ...
         // Chunk table entry N: offset to chunk N, count of chunk 1 + ... + N
-        // Chunk table entry N + 1: offset to end of chunks (start of chunk table),
+        // Chunk table entry N + 1: offset to end of chunks (start of chunk
+        // table),
         //   count is the total number of points in all chunks.
 
         for (size_t i = 1; i < m_chunks.size(); ++i)
@@ -114,12 +117,14 @@ public:
             return -1;
 
         // Search for the chunk containing the requested point.
-        // The chunk count is used, but it contains the number of points in all the *previous*
-        // chunks, so...
+        // The chunk count is used, but it contains the number of points in all
+        // the *previous* chunks, so...
         auto ci = std::upper_bound(m_chunks.begin(), m_chunks.end(), point,
-            [](uint64_t point, const lazperf::chunk& c) {  return point < c.count; });
+                                   [](uint64_t point, const lazperf::chunk& c)
+                                   { return point < c.count; });
 
-        // ...we have to back up one to find the proper chunk containing the record.
+        // ...we have to back up one to find the proper chunk containing the
+        // record.
         if (ci == m_chunks.begin()) // Should never happen.
             return -1;
         ci--;
@@ -127,7 +132,8 @@ public:
         return static_cast<int32_t>(distance);
     }
 
-    // Find the offset of a point in a chunk. -1 if the offset isn't in the provided chunk.
+    // Find the offset of a point in a chunk. -1 if the offset isn't in the
+    // provided chunk.
     int32_t index(uint64_t point, int32_t chunk) const
     {
         if (point > m_chunks[chunk + 1].count || point < m_chunks[chunk].count)
@@ -172,4 +178,3 @@ private:
 
 } // namespace las
 } // namespace pdal
-

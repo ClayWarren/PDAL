@@ -36,12 +36,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.head",
-    "Return N points from beginning of the point cloud.",
-    "https://pdal.org/stages/filters.head.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.head", "Return N points from beginning of the point cloud.",
+    "https://pdal.org/stages/filters.head.html"};
 
 CREATE_STATIC_STAGE(HeadFilter, s_info)
 
@@ -52,11 +49,15 @@ std::string HeadFilter::getName() const
 
 void HeadFilter::addArgs(ProgramArgs& args)
 {
-    args.add("count", "Number of points to return from beginning.  "
+    args.add(
+        "count",
+        "Number of points to return from beginning.  "
         "If 'invert' is true, number of points to drop from the beginning.",
         m_count, point_count_t(10));
-    args.add("invert", "If true, 'count' specifies the number of points "
-        "to skip from the beginning.", m_invert, false);
+    args.add("invert",
+             "If true, 'count' specifies the number of points "
+             "to skip from the beginning.",
+             m_invert, false);
 }
 
 void HeadFilter::ready(PointTableRef table)
@@ -75,8 +76,6 @@ bool HeadFilter::processOne(PointRef& point)
     if (m_invert)
         keep = !keep;
     return keep;
-
-
 }
 
 PointViewSet HeadFilter::run(PointViewPtr inView)

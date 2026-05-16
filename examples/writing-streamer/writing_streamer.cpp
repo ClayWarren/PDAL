@@ -1,13 +1,14 @@
-#include <pdal/PointView.hpp>
-#include <pdal/PointTable.hpp>
 #include <pdal/Options.hpp>
+#include <pdal/PointTable.hpp>
+#include <pdal/PointView.hpp>
+#include <pdal/Reader.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/Streamable.hpp>
-#include <pdal/Reader.hpp>
 
 #include <vector>
 
-namespace pdal {
+namespace pdal
+{
 
 // A class to produce a point cloud point-by-point, rather than
 // having it all in memory at the same time. It will be streamed to
@@ -37,13 +38,9 @@ std::string StreamedPointCloud::getName() const
     return "streamed_point_cloud";
 }
 
-StreamedPointCloud::StreamedPointCloud()
-    : m_count(0), m_size(0)
-{}
+StreamedPointCloud::StreamedPointCloud() : m_count(0), m_size(0) {}
 
-StreamedPointCloud::~StreamedPointCloud()
-{
-}
+StreamedPointCloud::~StreamedPointCloud() {}
 
 // Set the size of the cloud. Will ask for a point till the counter
 // reaches this size.
@@ -60,9 +57,7 @@ void StreamedPointCloud::addDimensions(PointLayoutPtr layout)
     layout->registerDim(pdal::Dimension::Id::Z);
 }
 
-void StreamedPointCloud::addArgs(ProgramArgs& args)
-{
-}
+void StreamedPointCloud::addArgs(ProgramArgs& args) {}
 
 void StreamedPointCloud::ready(PointTableRef table)
 {
@@ -73,7 +68,8 @@ void StreamedPointCloud::ready(PointTableRef table)
 // Not applicable here.
 point_count_t StreamedPointCloud::read(PointViewPtr view, point_count_t numPts)
 {
-    throw pdal_error("The read() function must not be called in streaming mode.");
+    throw pdal_error(
+        "The read() function must not be called in streaming mode.");
     return -1;
 }
 
@@ -95,9 +91,7 @@ bool StreamedPointCloud::processOne(PointRef& point)
     return true;
 }
 
-void StreamedPointCloud::done(PointTableRef table)
-{
-}
+void StreamedPointCloud::done(PointTableRef table) {}
 
 } // end namespace pdal
 
@@ -122,7 +116,7 @@ int main(int argc, char* argv[])
     // StageFactory always "owns" stages it creates. They'll be destroyed with
     // the factory.
     StageFactory factory;
-    Stage *writer = factory.createStage("writers.las");
+    Stage* writer = factory.createStage("writers.las");
 
     // Stream the point cloud to disk
     writer->setInput(stream_cloud);

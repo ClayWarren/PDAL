@@ -1,39 +1,39 @@
 /******************************************************************************
-* Copyright (c) 2014, Connor Manning (connor@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Connor Manning (connor@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <limits>
 #include <cmath>
+#include <limits>
 #include <memory>
 
 #include <pdal/PointView.hpp>
@@ -42,69 +42,60 @@
 
 namespace
 {
-    using namespace pdal;
+using namespace pdal;
 
-    struct BBox
+struct BBox
+{
+    BBox(Point minimum, Point maximum)
+        : minimum(minimum), maximum(maximum),
+          center(minimum.x + (maximum.x - minimum.x) / 2,
+                 minimum.y + (maximum.y - minimum.y) / 2),
+          halfWidth(center.x - minimum.x), halfHeight(center.y - minimum.y)
     {
-        BBox(Point minimum, Point maximum)
-            : minimum(minimum)
-            , maximum(maximum)
-            , center(minimum.x + (maximum.x - minimum.x) / 2,
-                minimum.y + (maximum.y - minimum.y) / 2)
-            , halfWidth(center.x - minimum.x)
-            , halfHeight(center.y - minimum.y)
-        { }
+    }
 
-        BBox(const BBox& other)
-            : minimum(other.minimum)
-            , maximum(other.maximum)
-            , center(other.center)
-            , halfWidth(other.halfWidth)
-            , halfHeight(other.halfHeight)
-        { }
+    BBox(const BBox& other)
+        : minimum(other.minimum), maximum(other.maximum), center(other.center),
+          halfWidth(other.halfWidth), halfHeight(other.halfHeight)
+    {
+    }
 
-        // Returns true if this BBox shares any area in common with another.
-        bool overlaps(const BBox& other) const
-        {
-            return
-                std::abs(center.x - other.center.x) <
-                    halfWidth + other.halfWidth &&
-                std::abs(center.y - other.center.y) <
-                    halfHeight + other.halfHeight;
-        }
+    // Returns true if this BBox shares any area in common with another.
+    bool overlaps(const BBox& other) const
+    {
+        return std::abs(center.x - other.center.x) <
+                   halfWidth + other.halfWidth &&
+               std::abs(center.y - other.center.y) <
+                   halfHeight + other.halfHeight;
+    }
 
-        bool overlaps(
-            const double xBegin,
-            const double xEnd,
-            const double yBegin,
-            const double yEnd) const
-        {
-            const BBox other(
-                    Point(xBegin, yBegin),
-                    Point(xEnd, yEnd));
+    bool overlaps(const double xBegin, const double xEnd, const double yBegin,
+                  const double yEnd) const
+    {
+        const BBox other(Point(xBegin, yBegin), Point(xEnd, yEnd));
 
-            return overlaps(other);
-        }
+        return overlaps(other);
+    }
 
-        // Returns true if the requested point is contained within this BBox.
-        bool contains(const Point& p) const
-        {
-            return p.x >= minimum.x && p.y >= minimum.y &&
-                p.x < maximum.x && p.y < maximum.y;
-        }
+    // Returns true if the requested point is contained within this BBox.
+    bool contains(const Point& p) const
+    {
+        return p.x >= minimum.x && p.y >= minimum.y && p.x < maximum.x &&
+               p.y < maximum.y;
+    }
 
-        const Point minimum;
-        const Point maximum;
+    const Point minimum;
+    const Point maximum;
 
-        // Pre-calculate these properties, rather than exposing functions to
-        // calculate them on-demand, due to the large number of times that
-        // these will be needed when querying the quad tree.
-        const Point center;
-        const double halfWidth;
-        const double halfHeight;
+    // Pre-calculate these properties, rather than exposing functions to
+    // calculate them on-demand, due to the large number of times that
+    // these will be needed when querying the quad tree.
+    const Point center;
+    const double halfWidth;
+    const double halfHeight;
 
-        BBox& operator=(const BBox&); // not implemented
-    };
+    BBox& operator=(const BBox&); // not implemented
+};
 
 } // anonymous namespace
 
@@ -115,51 +106,29 @@ namespace pdal
 struct Tree
 {
     Tree(BBox bbox, const QuadPointRef* data = 0)
-        : bbox(bbox)
-        , data(data)
-        , nw()
-        , ne()
-        , se()
-        , sw()
-    { }
+        : bbox(bbox), data(data), nw(), ne(), se(), sw()
+    {
+    }
 
     void getFills(std::vector<std::size_t>& fills, std::size_t level = 0) const;
 
     // Returns depth resulting from the insertion of this point.
     std::size_t addPoint(const QuadPointRef* toAdd, std::size_t curDepth = 0);
 
-    void getPoints(
-            PointIdList& results,
-            std::size_t depthBegin,
-            std::size_t depthEnd,
-            std::size_t curDepth) const;
+    void getPoints(PointIdList& results, std::size_t depthBegin,
+                   std::size_t depthEnd, std::size_t curDepth) const;
 
-    void getPoints(
-            PointIdList& results,
-            std::size_t rasterize,
-            double xBegin,
-            double xEnd,
-            double xStep,
-            double yBegin,
-            double yEnd,
-            double yStep,
-            std::size_t curDepth) const;
+    void getPoints(PointIdList& results, std::size_t rasterize, double xBegin,
+                   double xEnd, double xStep, double yBegin, double yEnd,
+                   double yStep, std::size_t curDepth) const;
 
-    void getPoints(
-            PointIdList& results,
-            double xBegin,
-            double xEnd,
-            double xStep,
-            double yBegin,
-            double yEnd,
-            double yStep) const;
+    void getPoints(PointIdList& results, double xBegin, double xEnd,
+                   double xStep, double yBegin, double yEnd,
+                   double yStep) const;
 
-    void getPoints(
-            PointIdList& results,
-            const BBox& query,
-            std::size_t depthBegin,
-            std::size_t depthEnd,
-            std::size_t curDepth) const;
+    void getPoints(PointIdList& results, const BBox& query,
+                   std::size_t depthBegin, std::size_t depthEnd,
+                   std::size_t curDepth) const;
 
     const BBox bbox;
     const QuadPointRef* data;
@@ -170,7 +139,8 @@ struct Tree
     std::unique_ptr<Tree> sw;
 };
 
-std::size_t Tree::addPoint(const QuadPointRef* toAdd, const std::size_t curDepth)
+std::size_t Tree::addPoint(const QuadPointRef* toAdd,
+                           const std::size_t curDepth)
 {
     if (data)
     {
@@ -193,11 +163,10 @@ std::size_t Tree::addPoint(const QuadPointRef* toAdd, const std::size_t curDepth
                 }
                 else
                 {
-                    sw.reset(new Tree(
-                            BBox(
-                                Point(bbox.minimum.x, bbox.minimum.y),
-                                Point(center.x, center.y)),
-                            toAdd));
+                    sw.reset(
+                        new Tree(BBox(Point(bbox.minimum.x, bbox.minimum.y),
+                                      Point(center.x, center.y)),
+                                 toAdd));
 
                     return nextDepth;
                 }
@@ -210,11 +179,9 @@ std::size_t Tree::addPoint(const QuadPointRef* toAdd, const std::size_t curDepth
                 }
                 else
                 {
-                    nw.reset(new Tree(
-                            BBox(
-                                Point(bbox.minimum.x, center.y),
-                                Point(center.x, bbox.maximum.y)),
-                            toAdd));
+                    nw.reset(new Tree(BBox(Point(bbox.minimum.x, center.y),
+                                           Point(center.x, bbox.maximum.y)),
+                                      toAdd));
 
                     return nextDepth;
                 }
@@ -230,11 +197,9 @@ std::size_t Tree::addPoint(const QuadPointRef* toAdd, const std::size_t curDepth
                 }
                 else
                 {
-                    se.reset(new Tree(
-                            BBox(
-                                Point(center.x, bbox.minimum.y),
-                                Point(bbox.maximum.x, center.y)),
-                            toAdd));
+                    se.reset(new Tree(BBox(Point(center.x, bbox.minimum.y),
+                                           Point(bbox.maximum.x, center.y)),
+                                      toAdd));
 
                     return nextDepth;
                 }
@@ -247,11 +212,10 @@ std::size_t Tree::addPoint(const QuadPointRef* toAdd, const std::size_t curDepth
                 }
                 else
                 {
-                    ne.reset(new Tree(
-                            BBox(
-                                Point(center.x, center.y),
-                                Point(bbox.maximum.x, bbox.maximum.y)),
-                            toAdd));
+                    ne.reset(
+                        new Tree(BBox(Point(center.x, center.y),
+                                      Point(bbox.maximum.x, bbox.maximum.y)),
+                                 toAdd));
 
                     return nextDepth;
                 }
@@ -276,18 +240,18 @@ void Tree::getFills(std::vector<std::size_t>& fills, std::size_t level) const
     }
 
     ++level;
-    if (nw) nw->getFills(fills, level);
-    if (ne) ne->getFills(fills, level);
-    if (sw) sw->getFills(fills, level);
-    if (se) se->getFills(fills, level);
+    if (nw)
+        nw->getFills(fills, level);
+    if (ne)
+        ne->getFills(fills, level);
+    if (sw)
+        sw->getFills(fills, level);
+    if (se)
+        se->getFills(fills, level);
 }
 
-
-void Tree::getPoints(
-        PointIdList& results,
-        const std::size_t depthBegin,
-        const std::size_t depthEnd,
-        std::size_t curDepth) const
+void Tree::getPoints(PointIdList& results, const std::size_t depthBegin,
+                     const std::size_t depthEnd, std::size_t curDepth) const
 {
     if (data && curDepth >= depthBegin)
     {
@@ -296,23 +260,21 @@ void Tree::getPoints(
 
     if (++curDepth < depthEnd || depthEnd == 0)
     {
-        if (nw) nw->getPoints(results, depthBegin, depthEnd, curDepth);
-        if (ne) ne->getPoints(results, depthBegin, depthEnd, curDepth);
-        if (se) se->getPoints(results, depthBegin, depthEnd, curDepth);
-        if (sw) sw->getPoints(results, depthBegin, depthEnd, curDepth);
+        if (nw)
+            nw->getPoints(results, depthBegin, depthEnd, curDepth);
+        if (ne)
+            ne->getPoints(results, depthBegin, depthEnd, curDepth);
+        if (se)
+            se->getPoints(results, depthBegin, depthEnd, curDepth);
+        if (sw)
+            sw->getPoints(results, depthBegin, depthEnd, curDepth);
     }
 }
 
-void Tree::getPoints(
-        PointIdList& results,
-        const std::size_t rasterize,
-        const double xBegin,
-        const double xEnd,
-        const double xStep,
-        const double yBegin,
-        const double yEnd,
-        const double yStep,
-        std::size_t curDepth) const
+void Tree::getPoints(PointIdList& results, const std::size_t rasterize,
+                     const double xBegin, const double xEnd, const double xStep,
+                     const double yBegin, const double yEnd, const double yStep,
+                     std::size_t curDepth) const
 {
     if (curDepth == rasterize)
     {
@@ -321,126 +283,62 @@ void Tree::getPoints(
             double xOffset(Utils::sround((bbox.center.x - xBegin) / xStep));
             double yOffset(Utils::sround((bbox.center.y - yBegin) / yStep));
 
-            const std::size_t index(
-                static_cast<size_t>(
-                    Utils::sround(yOffset * (xEnd - xBegin) / xStep +
-                        xOffset)));
+            const std::size_t index(static_cast<size_t>(
+                Utils::sround(yOffset * (xEnd - xBegin) / xStep + xOffset)));
 
             results.at(index) = data->pbIndex;
         }
     }
     else if (++curDepth <= rasterize)
     {
-        if (nw) nw->getPoints(
-                results,
-                rasterize,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep,
-                curDepth);
+        if (nw)
+            nw->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                          yStep, curDepth);
 
-        if (ne) ne->getPoints(
-                results,
-                rasterize,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep,
-                curDepth);
+        if (ne)
+            ne->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                          yStep, curDepth);
 
-        if (se) se->getPoints(
-                results,
-                rasterize,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep,
-                curDepth);
+        if (se)
+            se->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                          yStep, curDepth);
 
-        if (sw) sw->getPoints(
-                results,
-                rasterize,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep,
-                curDepth);
+        if (sw)
+            sw->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                          yStep, curDepth);
     }
 }
 
-void Tree::getPoints(
-        PointIdList& results,
-        const double xBegin,
-        const double xEnd,
-        const double xStep,
-        const double yBegin,
-        const double yEnd,
-        const double yStep) const
+void Tree::getPoints(PointIdList& results, const double xBegin,
+                     const double xEnd, const double xStep, const double yBegin,
+                     const double yEnd, const double yStep) const
 {
     if (!bbox.overlaps(xBegin, xEnd, yBegin, yEnd))
     {
         return;
     }
 
-    if (nw) nw->getPoints(
-            results,
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    if (nw)
+        nw->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
 
-    if (ne) ne->getPoints(
-            results,
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    if (ne)
+        ne->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
 
-    if (se) se->getPoints(
-            results,
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    if (se)
+        se->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
 
-    if (sw) sw->getPoints(
-            results,
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    if (sw)
+        sw->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
 
     // Add data after calling child nodes so we prefer upper levels of the tree.
-    if (
-            data &&
-            data->point.x >= xBegin &&
-            data->point.y >= yBegin &&
-            data->point.x < xEnd - xStep &&
-            data->point.y < yEnd - yStep)
+    if (data && data->point.x >= xBegin && data->point.y >= yBegin &&
+        data->point.x < xEnd - xStep && data->point.y < yEnd - yStep)
     {
         double xOffset(Utils::sround((data->point.x - xBegin) / xStep));
         double yOffset(Utils::sround((data->point.y - yBegin) / yStep));
 
-        std::size_t index(
-            static_cast<size_t>(
-                Utils::sround(yOffset * (xEnd - xBegin) / xStep + xOffset)));
+        std::size_t index(static_cast<size_t>(
+            Utils::sround(yOffset * (xEnd - xBegin) / xStep + xOffset)));
 
         if (index < results.size())
         {
@@ -449,21 +347,16 @@ void Tree::getPoints(
     }
 }
 
-void Tree::getPoints(
-        PointIdList& results,
-        const BBox& query,
-        const std::size_t depthBegin,
-        const std::size_t depthEnd,
-        std::size_t curDepth) const
+void Tree::getPoints(PointIdList& results, const BBox& query,
+                     const std::size_t depthBegin, const std::size_t depthEnd,
+                     std::size_t curDepth) const
 {
     if (!query.overlaps(bbox))
     {
         return;
     }
 
-    if (data &&
-        query.contains(data->point) &&
-        curDepth >= depthBegin &&
+    if (data && query.contains(data->point) && curDepth >= depthBegin &&
         (curDepth < depthEnd || depthEnd == 0))
     {
         results.push_back(data->pbIndex);
@@ -471,83 +364,53 @@ void Tree::getPoints(
 
     if (++curDepth < depthEnd || depthEnd == 0)
     {
-        if (nw) nw->getPoints(results, query, depthBegin, depthEnd, curDepth);
-        if (ne) ne->getPoints(results, query, depthBegin, depthEnd, curDepth);
-        if (se) se->getPoints(results, query, depthBegin, depthEnd, curDepth);
-        if (sw) sw->getPoints(results, query, depthBegin, depthEnd, curDepth);
+        if (nw)
+            nw->getPoints(results, query, depthBegin, depthEnd, curDepth);
+        if (ne)
+            ne->getPoints(results, query, depthBegin, depthEnd, curDepth);
+        if (se)
+            se->getPoints(results, query, depthBegin, depthEnd, curDepth);
+        if (sw)
+            sw->getPoints(results, query, depthBegin, depthEnd, curDepth);
     }
 }
 
 struct QuadIndex::QImpl
 {
     QImpl(const PointView& view, std::size_t topLevel);
-    QImpl(
-            const PointView& view,
-            double xMin,
-            double yMin,
-            double xMax,
-            double yMax,
-            std::size_t topLevel);
-    QImpl(
-            const std::vector<std::shared_ptr<QuadPointRef> >& points,
-            double xMin,
-            double yMin,
-            double xMax,
-            double yMax,
-            std::size_t topLevel);
+    QImpl(const PointView& view, double xMin, double yMin, double xMax,
+          double yMax, std::size_t topLevel);
+    QImpl(const std::vector<std::shared_ptr<QuadPointRef>>& points, double xMin,
+          double yMin, double xMax, double yMax, std::size_t topLevel);
 
-    void getBounds(
-            double& xMin,
-            double& yMin,
-            double& xMax,
-            double& yMax) const;
+    void getBounds(double& xMin, double& yMin, double& xMax,
+                   double& yMax) const;
 
     std::size_t getDepth() const;
 
     std::vector<std::size_t> getFills();
 
-    PointIdList getPoints(
-            std::size_t depthBegin,
-            std::size_t depthEnd) const;
+    PointIdList getPoints(std::size_t depthBegin, std::size_t depthEnd) const;
 
-    PointIdList getPoints(
-            std::size_t rasterize,
-            double& xBegin,
-            double& xEnd,
-            double& xStep,
-            double& yBegin,
-            double& yEnd,
-            double& yStep) const;
+    PointIdList getPoints(std::size_t rasterize, double& xBegin, double& xEnd,
+                          double& xStep, double& yBegin, double& yEnd,
+                          double& yStep) const;
 
-    PointIdList getPoints(
-            double xBegin,
-            double xEnd,
-            double xStep,
-            double yBegin,
-            double yEnd,
-            double yStep) const;
+    PointIdList getPoints(double xBegin, double xEnd, double xStep,
+                          double yBegin, double yEnd, double yStep) const;
 
-    PointIdList getPoints(
-            double xMin,
-            double yMin,
-            double xMax,
-            double yMax,
-            std::size_t depthBegin,
-            std::size_t depthEnd) const;
+    PointIdList getPoints(double xMin, double yMin, double xMax, double yMax,
+                          std::size_t depthBegin, std::size_t depthEnd) const;
 
     std::size_t m_topLevel;
-    std::vector<std::shared_ptr<QuadPointRef> > m_pointRefVec;
+    std::vector<std::shared_ptr<QuadPointRef>> m_pointRefVec;
     std::unique_ptr<Tree> m_tree;
     std::size_t m_depth;
     std::vector<std::size_t> m_fills;
 };
 
 QuadIndex::QImpl::QImpl(const PointView& view, std::size_t topLevel)
-    : m_topLevel(topLevel)
-    , m_pointRefVec()
-    , m_tree()
-    , m_depth(0)
-    , m_fills()
+    : m_topLevel(topLevel), m_pointRefVec(), m_tree(), m_depth(0), m_fills()
 {
     m_pointRefVec.resize(view.size());
 
@@ -558,18 +421,20 @@ QuadIndex::QImpl::QImpl(const PointView& view, std::size_t topLevel)
 
     for (PointId i(0); i < view.size(); ++i)
     {
-        m_pointRefVec[i].reset(
-                new QuadPointRef(
-                    Point(
-                        view.getFieldAs<double>(Dimension::Id::X, i),
-                        view.getFieldAs<double>(Dimension::Id::Y, i)),
-                i));
+        m_pointRefVec[i].reset(new QuadPointRef(
+            Point(view.getFieldAs<double>(Dimension::Id::X, i),
+                  view.getFieldAs<double>(Dimension::Id::Y, i)),
+            i));
 
         const QuadPointRef* pointRef(m_pointRefVec[i].get());
-        if (pointRef->point.x < xMin) xMin = pointRef->point.x;
-        if (pointRef->point.x > xMax) xMax = pointRef->point.x;
-        if (pointRef->point.y < yMin) yMin = pointRef->point.y;
-        if (pointRef->point.y > yMax) yMax = pointRef->point.y;
+        if (pointRef->point.x < xMin)
+            xMin = pointRef->point.x;
+        if (pointRef->point.x > xMax)
+            xMax = pointRef->point.x;
+        if (pointRef->point.y < yMin)
+            yMin = pointRef->point.y;
+        if (pointRef->point.y > yMax)
+            yMax = pointRef->point.y;
     }
 
     m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
@@ -580,29 +445,18 @@ QuadIndex::QImpl::QImpl(const PointView& view, std::size_t topLevel)
     }
 }
 
-QuadIndex::QImpl::QImpl(
-        const PointView& view,
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t topLevel)
-    : m_topLevel(topLevel)
-    , m_pointRefVec()
-    , m_tree()
-    , m_depth(0)
-    , m_fills()
+QuadIndex::QImpl::QImpl(const PointView& view, double xMin, double yMin,
+                        double xMax, double yMax, std::size_t topLevel)
+    : m_topLevel(topLevel), m_pointRefVec(), m_tree(), m_depth(0), m_fills()
 {
     m_pointRefVec.resize(view.size());
 
     for (PointId i(0); i < view.size(); ++i)
     {
-        m_pointRefVec[i].reset(
-                new QuadPointRef(
-                    Point(
-                        view.getFieldAs<double>(Dimension::Id::X, i),
-                        view.getFieldAs<double>(Dimension::Id::Y, i)),
-                i));
+        m_pointRefVec[i].reset(new QuadPointRef(
+            Point(view.getFieldAs<double>(Dimension::Id::X, i),
+                  view.getFieldAs<double>(Dimension::Id::Y, i)),
+            i));
     }
 
     m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
@@ -614,17 +468,10 @@ QuadIndex::QImpl::QImpl(
 }
 
 QuadIndex::QImpl::QImpl(
-        const std::vector<std::shared_ptr<QuadPointRef> >& points,
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t topLevel)
-    : m_topLevel(topLevel)
-    , m_pointRefVec(points.size())
-    , m_tree()
-    , m_depth(0)
-    , m_fills()
+    const std::vector<std::shared_ptr<QuadPointRef>>& points, double xMin,
+    double yMin, double xMax, double yMax, std::size_t topLevel)
+    : m_topLevel(topLevel), m_pointRefVec(points.size()), m_tree(), m_depth(0),
+      m_fills()
 {
     m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
 
@@ -635,11 +482,8 @@ QuadIndex::QImpl::QImpl(
     }
 }
 
-void QuadIndex::QImpl::getBounds(
-        double& xMin,
-        double& yMin,
-        double& xMax,
-        double& yMax) const
+void QuadIndex::QImpl::getBounds(double& xMin, double& yMin, double& xMax,
+                                 double& yMax) const
 {
     if (m_tree)
     {
@@ -665,9 +509,8 @@ std::vector<std::size_t> QuadIndex::QImpl::getFills()
     return m_fills;
 }
 
-PointIdList QuadIndex::QImpl::getPoints(
-        const std::size_t minDepth,
-        const std::size_t maxDepth) const
+PointIdList QuadIndex::QImpl::getPoints(const std::size_t minDepth,
+                                        const std::size_t maxDepth) const
 {
     PointIdList results;
 
@@ -679,14 +522,10 @@ PointIdList QuadIndex::QImpl::getPoints(
     return results;
 }
 
-PointIdList QuadIndex::QImpl::getPoints(
-        const std::size_t rasterize,
-        double& xBegin,
-        double& xEnd,
-        double& xStep,
-        double& yBegin,
-        double& yEnd,
-        double& yStep) const
+PointIdList QuadIndex::QImpl::getPoints(const std::size_t rasterize,
+                                        double& xBegin, double& xEnd,
+                                        double& xStep, double& yBegin,
+                                        double& yEnd, double& yStep) const
 {
     PointIdList results;
 
@@ -698,36 +537,25 @@ PointIdList QuadIndex::QImpl::getPoints(
 
         xStep = xWidth / exp;
         yStep = yWidth / exp;
-        xBegin =    m_tree->bbox.minimum.x + (xStep / 2);
-        yBegin =    m_tree->bbox.minimum.y + (yStep / 2);
+        xBegin = m_tree->bbox.minimum.x + (xStep / 2);
+        yBegin = m_tree->bbox.minimum.y + (yStep / 2);
         // One tick past the end.
-        xEnd =      m_tree->bbox.maximum.x + (xStep / 2);
-        yEnd =      m_tree->bbox.maximum.y + (yStep / 2);
+        xEnd = m_tree->bbox.maximum.x + (xStep / 2);
+        yEnd = m_tree->bbox.maximum.y + (yStep / 2);
 
         results.resize(exp * exp, (std::numeric_limits<PointId>::max)());
 
-        m_tree->getPoints(
-                results,
-                rasterize,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep,
-                m_topLevel);
+        m_tree->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                          yStep, m_topLevel);
     }
 
     return results;
 }
 
-PointIdList QuadIndex::QImpl::getPoints(
-        const double xBegin,
-        const double xEnd,
-        const double xStep,
-        const double yBegin,
-        const double yEnd,
-        const double yStep) const
+PointIdList QuadIndex::QImpl::getPoints(const double xBegin, const double xEnd,
+                                        const double xStep, const double yBegin,
+                                        const double yEnd,
+                                        const double yStep) const
 {
     PointIdList results;
 
@@ -739,26 +567,15 @@ PointIdList QuadIndex::QImpl::getPoints(
             static_cast<size_t>(Utils::sround((yEnd - yBegin) / yStep)));
         results.resize(width * height, (std::numeric_limits<PointId>::max)());
 
-        m_tree->getPoints(
-                results,
-                xBegin,
-                xEnd,
-                xStep,
-                yBegin,
-                yEnd,
-                yStep);
+        m_tree->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
     }
 
     return results;
 }
 
-PointIdList QuadIndex::QImpl::getPoints(
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t minDepth,
-        std::size_t maxDepth) const
+PointIdList QuadIndex::QImpl::getPoints(double xMin, double yMin, double xMax,
+                                        double yMax, std::size_t minDepth,
+                                        std::size_t maxDepth) const
 {
     PointIdList results;
 
@@ -766,13 +583,10 @@ PointIdList QuadIndex::QImpl::getPoints(
     if (m_tree)
     {
         m_tree->getPoints(
-                results,
-                BBox(
-                    Point((std::min)(xMin, xMax), (std::min)(yMin, yMax)),
-                    Point((std::max)(xMin, xMax), (std::max)(yMin, yMax))),
-                minDepth,
-                maxDepth,
-                m_topLevel);
+            results,
+            BBox(Point((std::min)(xMin, xMax), (std::min)(yMin, yMax)),
+                 Point((std::max)(xMin, xMax), (std::max)(yMin, yMax))),
+            minDepth, maxDepth, m_topLevel);
     }
 
     return results;
@@ -780,36 +594,26 @@ PointIdList QuadIndex::QImpl::getPoints(
 
 QuadIndex::QuadIndex(const PointView& view, std::size_t topLevel)
     : m_qImpl(new QImpl(view, topLevel))
-{ }
+{
+}
 
-QuadIndex::QuadIndex(
-        const PointView& view,
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t topLevel)
+QuadIndex::QuadIndex(const PointView& view, double xMin, double yMin,
+                     double xMax, double yMax, std::size_t topLevel)
     : m_qImpl(new QImpl(view, xMin, yMin, xMax, yMax, topLevel))
-{ }
+{
+}
 
-QuadIndex::QuadIndex(
-        const std::vector<std::shared_ptr<QuadPointRef> >& points,
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t topLevel)
+QuadIndex::QuadIndex(const std::vector<std::shared_ptr<QuadPointRef>>& points,
+                     double xMin, double yMin, double xMax, double yMax,
+                     std::size_t topLevel)
     : m_qImpl(new QImpl(points, xMin, yMin, xMax, yMax, topLevel))
-{ }
+{
+}
 
-QuadIndex::~QuadIndex()
-{ }
+QuadIndex::~QuadIndex() {}
 
-void QuadIndex::getBounds(
-        double& xMin,
-        double& yMin,
-        double& xMax,
-        double& yMax) const
+void QuadIndex::getBounds(double& xMin, double& yMin, double& xMax,
+                          double& yMax) const
 {
     m_qImpl->getBounds(xMin, yMin, xMax, yMax);
 }
@@ -824,87 +628,43 @@ std::vector<std::size_t> QuadIndex::getFills() const
     return m_qImpl->getFills();
 }
 
-PointIdList QuadIndex::getPoints(
-        std::size_t depthEnd) const
+PointIdList QuadIndex::getPoints(std::size_t depthEnd) const
 {
     return m_qImpl->getPoints(0, depthEnd);
 }
 
-PointIdList QuadIndex::getPoints(
-        std::size_t depthBegin,
-        std::size_t depthEnd) const
+PointIdList QuadIndex::getPoints(std::size_t depthBegin,
+                                 std::size_t depthEnd) const
 {
     return m_qImpl->getPoints(depthBegin, depthEnd);
 }
 
-PointIdList QuadIndex::getPoints(
-        const std::size_t rasterize,
-        double& xBegin,
-        double& xEnd,
-        double& xStep,
-        double& yBegin,
-        double& yEnd,
-        double& yStep) const
+PointIdList QuadIndex::getPoints(const std::size_t rasterize, double& xBegin,
+                                 double& xEnd, double& xStep, double& yBegin,
+                                 double& yEnd, double& yStep) const
 {
-    return m_qImpl->getPoints(
-            rasterize,
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    return m_qImpl->getPoints(rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
+                              yStep);
 }
 
-PointIdList QuadIndex::getPoints(
-        const double xBegin,
-        const double xEnd,
-        const double xStep,
-        const double yBegin,
-        const double yEnd,
-        const double yStep) const
+PointIdList QuadIndex::getPoints(const double xBegin, const double xEnd,
+                                 const double xStep, const double yBegin,
+                                 const double yEnd, const double yStep) const
 {
-    return m_qImpl->getPoints(
-            xBegin,
-            xEnd,
-            xStep,
-            yBegin,
-            yEnd,
-            yStep);
+    return m_qImpl->getPoints(xBegin, xEnd, xStep, yBegin, yEnd, yStep);
 }
 
-PointIdList QuadIndex::getPoints(
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t depthEnd) const
+PointIdList QuadIndex::getPoints(double xMin, double yMin, double xMax,
+                                 double yMax, std::size_t depthEnd) const
 {
-    return m_qImpl->getPoints(
-            xMin,
-            yMin,
-            xMax,
-            yMax,
-            0,
-            depthEnd);
+    return m_qImpl->getPoints(xMin, yMin, xMax, yMax, 0, depthEnd);
 }
 
-PointIdList QuadIndex::getPoints(
-        double xMin,
-        double yMin,
-        double xMax,
-        double yMax,
-        std::size_t depthBegin,
-        std::size_t depthEnd) const
+PointIdList QuadIndex::getPoints(double xMin, double yMin, double xMax,
+                                 double yMax, std::size_t depthBegin,
+                                 std::size_t depthEnd) const
 {
-    return m_qImpl->getPoints(
-            xMin,
-            yMin,
-            xMax,
-            yMax,
-            depthBegin,
-            depthEnd);
+    return m_qImpl->getPoints(xMin, yMin, xMax, yMax, depthBegin, depthEnd);
 }
 
 } // namespace pdal
-

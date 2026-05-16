@@ -34,7 +34,8 @@ TEST(TrajectoryTest, t1)
     w.execute(table);
 
     EXPECT_EQ(Support::diff_files(Support::temppath("tran.txt"),
-        Support::datapath("text/C2_L2-traj.txt")), 0);
+                                  Support::datapath("text/C2_L2-traj.txt")),
+              0);
 }
 
 } // namespace pdal

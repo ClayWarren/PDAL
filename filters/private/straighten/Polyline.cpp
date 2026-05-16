@@ -184,8 +184,7 @@ void Polyline::interpolate(const PointRef& point, double& x, double& y,
 
     // well get the first point where W is higher than pk
     PointViewIter currentPointIter =
-        std::find_if(m_view->begin(), m_view->end(),
-                     [&](const PointRef pt)
+        std::find_if(m_view->begin(), m_view->end(), [&](const PointRef pt)
                      { return pk < pt.getFieldAs<double>(Dimension::Id::W); });
     // If even last point is not a candidate, then we just get last point
     if (currentPointIter == m_view->end())
@@ -284,8 +283,10 @@ double Polyline::closestSegment(const PointRef& point, double& x, double& y,
     double prevY = m_view->getFieldAs<double>(Dimension::Id::Y, list[0]);
     for (size_t i = 1; i < size; ++i)
     {
-        const double currentX = m_view->getFieldAs<double>(Dimension::Id::X, list[i]);
-        const double currentY = m_view->getFieldAs<double>(Dimension::Id::Y, list[i]);
+        const double currentX =
+            m_view->getFieldAs<double>(Dimension::Id::X, list[i]);
+        const double currentY =
+            m_view->getFieldAs<double>(Dimension::Id::Y, list[i]);
         testDist = Utils::sqrDistToLine(candX, candY, prevX, prevY, currentX,
                                         currentY, segmentPtX, segmentPtY);
         if (testDist < sqrDist)
@@ -331,8 +332,8 @@ double Polyline::closestSegment(const PointRef& point, double& x, double& y,
                 m_view->getFieldAs<double>(Dimension::Id::Roll, list[i]),
                 ratio);
         }
-	prevX = currentX;
-	prevY = currentY;
+        prevX = currentX;
+        prevY = currentY;
     }
     return sqrDist;
 }

@@ -62,7 +62,8 @@ void RelaxationDartThrowing::addArgs(ProgramArgs& args)
 {
     args.add("decay", "Decay rate", m_decay, 0.9);
     args.add("radius", "Minimum radius (initial)", m_startRadius, 1.0);
-    args.add("terminal_radius", "Minimum radius (terminal)", m_terminalRadius, 0.001);
+    args.add("terminal_radius", "Minimum radius (terminal)", m_terminalRadius,
+             0.001);
     args.add("count", "Target number of points after sampling", m_maxSize,
              (point_count_t)1000);
     args.add("shuffle", "Shuffle points prior to sampling?", m_shuffle, true);
@@ -101,11 +102,15 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
     if (m_shuffle)
     {
         if (!m_seedArg->set())
-            m_seed = (int)std::chrono::system_clock::now().time_since_epoch().count();
-        std::shuffle(shuffledIds.begin(), shuffledIds.end(), std::mt19937(m_seed));
+            m_seed = (int)std::chrono::system_clock::now()
+                         .time_since_epoch()
+                         .count();
+        std::shuffle(shuffledIds.begin(), shuffledIds.end(),
+                     std::mt19937(m_seed));
     }
 
-    using PointIdNeighborMap = std::unordered_map<PointId, KD3Index::RadiusResults>;
+    using PointIdNeighborMap =
+        std::unordered_map<PointId, KD3Index::RadiusResults>;
     PointIdNeighborMap neighborMap;
     while (finalIds.size() < m_maxSize)
     {
@@ -113,9 +118,8 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
         if (sqr_radius < sqrTerminalRadius)
         {
             log()->get(LogLevel::Debug)
-                << "Minimum radius of " << m_terminalRadius
-                << " reached at " << radius
-                << ". Terminating with " << finalIds.size()
+                << "Minimum radius of " << m_terminalRadius << " reached at "
+                << radius << ". Terminating with " << finalIds.size()
                 << " points." << std::endl;
             break;
         }
@@ -135,8 +139,9 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
 
             // Find the upper bound on the neighboring square distances, using
             // the current radius squared.
-            auto upper = std::upper_bound(res.begin(), res.end(), sqr_radius, 
-                [](double val, const auto& p) { return val < p.second; });
+            auto upper = std::upper_bound(res.begin(), res.end(), sqr_radius,
+                                          [](double val, const auto& p)
+                                          { return val < p.second; });
 
             // All neighbors below the upper bound are masked.
             for (auto it = res.begin(); it != upper; ++it)
@@ -159,7 +164,7 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
             // We now proceed to mask all neighbors within radius of the
             // kept point.
 
-            // If there is no entry in the neighborMap, we populate it with all 
+            // If there is no entry in the neighborMap, we populate it with all
             // neighbor PointIds and square distances up to the current radius.
             if (neighborMap.find(i) == neighborMap.end())
                 index.radius(i, radius, neighborMap[i]);
@@ -169,8 +174,9 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
 
             // Find the upper bound on the neighboring square distances, using
             // the current radius squared.
-            auto upper = std::upper_bound(res.begin(), res.end(), sqr_radius, 
-                [](double val, const auto& p) { return val < p.second; });
+            auto upper = std::upper_bound(res.begin(), res.end(), sqr_radius,
+                                          [](double val, const auto& p)
+                                          { return val < p.second; });
 
             // All neighbors below the upper bound are masked.
             for (auto it = res.begin(); it != upper; ++it)

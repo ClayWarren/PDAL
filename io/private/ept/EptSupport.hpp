@@ -48,8 +48,7 @@ inline BOX3D toBox3d(const NL::json& b)
     }
 
     return BOX3D(b[0].get<double>(), b[1].get<double>(), b[2].get<double>(),
-            b[3].get<double>(), b[4].get<double>(), b[5].get<double>());
+                 b[3].get<double>(), b[4].get<double>(), b[5].get<double>());
 }
 
 } // namespace pdal
-

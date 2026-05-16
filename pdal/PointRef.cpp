@@ -4,9 +4,11 @@
 namespace pdal
 {
 
-PointRef::PointRef(PointView& v, PointId idx) : m_table(&v.table()),
-    m_idx(v.tableId(idx)), m_view(&v), m_viewIdx(idx), m_orig(true)
-{}
+PointRef::PointRef(PointView& v, PointId idx)
+    : m_table(&v.table()), m_idx(v.tableId(idx)), m_view(&v), m_viewIdx(idx),
+      m_orig(true)
+{
+}
 
 PointRef& PointRef::operator=(const PointRef& r)
 {
@@ -20,7 +22,7 @@ PointRef& PointRef::operator=(const PointRef& r)
     return *this;
 }
 
-void PointRef::setFieldInternal(Dimension::Id dim, void *val)
+void PointRef::setFieldInternal(Dimension::Id dim, void* val)
 {
     if (m_view && m_viewIdx == m_view->size())
         m_idx = m_view->addPoint();

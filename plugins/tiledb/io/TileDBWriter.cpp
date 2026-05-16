@@ -138,24 +138,24 @@ void TileDBWriter::addArgs(ProgramArgs& args)
                      m_args->m_time_domain_st, 0.0);
     args.add<double>("time_domain_end", "TileDB end of domain in GpsTime",
                      m_args->m_time_domain_end, 0.0);
-    args.add<double>("scale_x",
-                     "Scale factor to use for default x float-scale filter",
-                     m_args->m_scale[0], std::numeric_limits<double>::quiet_NaN());
-    args.add<double>("scale_y",
-                     "Scale factor to use for default y float-scale fitler",
-                     m_args->m_scale[1], std::numeric_limits<double>::quiet_NaN());
-    args.add<double>("scale_z",
-                     "Scale factor to use for default z float-scale filter",
-                     m_args->m_scale[2], std::numeric_limits<double>::quiet_NaN());
-    args.add<double>("offset_x",
-                     "Add offset to use for default x float-scale filter",
-                     m_args->m_offset[0], std::numeric_limits<double>::quiet_NaN());
-    args.add<double>("offset_y",
-                     "Add offset to use for default y float-scale filter",
-                     m_args->m_offset[1], std::numeric_limits<double>::quiet_NaN());
-    args.add<double>("offset_z",
-                     "Add offset to use fo default x float-scale filter",
-                     m_args->m_offset[2], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "scale_x", "Scale factor to use for default x float-scale filter",
+        m_args->m_scale[0], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "scale_y", "Scale factor to use for default y float-scale fitler",
+        m_args->m_scale[1], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "scale_z", "Scale factor to use for default z float-scale filter",
+        m_args->m_scale[2], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "offset_x", "Add offset to use for default x float-scale filter",
+        m_args->m_offset[0], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "offset_y", "Add offset to use for default y float-scale filter",
+        m_args->m_offset[1], std::numeric_limits<double>::quiet_NaN());
+    args.add<double>(
+        "offset_z", "Add offset to use fo default x float-scale filter",
+        m_args->m_offset[2], std::numeric_limits<double>::quiet_NaN());
     args.add("chunk_size", "Point cache size for chunked writes",
              m_args->m_cache_size, size_t(1000000));
     args.add("stats", "Dump TileDB query stats to stdout", m_args->m_stats,
@@ -182,9 +182,8 @@ void TileDBWriter::addArgs(ProgramArgs& args)
     args.add("combine_bit_fields",
              "Combine all bit fields into a single 2 byte attribute",
              m_args->m_combine_bit_fields, true);
-    args.add("allow_dups", "Allow duplicate points (default is True)", m_args->m_allow_dups,
-             true);
-
+    args.add("allow_dups", "Allow duplicate points (default is True)",
+             m_args->m_allow_dups, true);
 }
 
 void TileDBWriter::initialize()
@@ -341,24 +340,23 @@ void TileDBWriter::ready(pdal::BasePointTable& table)
             throwError("Invalid cell order option '" + m_args->m_cell_order +
                        "'.");
 
-        MetadataNode meta = table.metadata().findChild("filters.stats:bbox:native:bbox");
+        MetadataNode meta =
+            table.metadata().findChild("filters.stats:bbox:native:bbox");
         if (!meta.valid())
         {
             meta = table.metadata().findChild("readers.las");
         }
 
         auto updateWithMeta = [&](const std::string& key, double& val)
-        {
-            val = meta.findChild(key).value<double>();
-        };
+        { val = meta.findChild(key).value<double>(); };
 
         if (std::isnan(m_args->m_offset[0]))
         {
             if (meta.valid() && meta.findChild("offset_x").valid())
             {
-                    updateWithMeta("offset_x", m_args->m_offset[0]);
-                    updateWithMeta("offset_y", m_args->m_offset[1]);
-                    updateWithMeta("offset_z", m_args->m_offset[2]);
+                updateWithMeta("offset_x", m_args->m_offset[0]);
+                updateWithMeta("offset_y", m_args->m_offset[1]);
+                updateWithMeta("offset_z", m_args->m_offset[2]);
             }
             else
             {
@@ -410,14 +408,15 @@ void TileDBWriter::ready(pdal::BasePointTable& table)
         if (bbox[0][1] <= bbox[0][0] || bbox[1][1] <= bbox[1][0] ||
             bbox[2][1] <= bbox[2][0])
         {
-            // Check if we can update with stats filter, fallback to quickinfo if not
+            // Check if we can update with stats filter, fallback to quickinfo
+            // if not
             auto updateMinMaxWithMeta = [&](const std::string& minStr,
-                                        const std::string& maxStr,
-                                        std::array<double, 2>& range)
+                                            const std::string& maxStr,
+                                            std::array<double, 2>& range)
             {
                 if (range[1] <= range[0])
                     range = {meta.findChild(minStr).value<double>() - 1.0,
-                                meta.findChild(maxStr).value<double>() + 1.0};
+                             meta.findChild(maxStr).value<double>() + 1.0};
             };
 
             if (meta.valid())
@@ -446,7 +445,8 @@ void TileDBWriter::ready(pdal::BasePointTable& table)
                     auto dim_details = dim_summary.children();
                     bool is_gps_time =
                         std::any_of(dim_details.cbegin(), dim_details.cend(),
-                                    [](const auto& detail) {
+                                    [](const auto& detail)
+                                    {
                                         return detail.name() == "name" &&
                                                detail.value() == "GpsTime";
                                     });

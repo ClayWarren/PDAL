@@ -16,9 +16,10 @@ namespace expr
 namespace
 {
 struct EofException
-{};
+{
+};
 
-}
+} // namespace
 
 char Lexer::getChar()
 {
@@ -109,21 +110,69 @@ Token Lexer::top(char c)
     case ')':
         tok = Token(TokenType::Rparen, m_tokPos, m_pos, ")");
         break;
-    case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
         tok = number();
         break;
-    case 'a': case 'b': case 'c': case 'd': case 'e':
-    case 'f': case 'g': case 'h': case 'i': case 'j':
-    case 'k': case 'l': case 'm': case 'n': case 'o':
-    case 'p': case 'q': case 'r': case 's': case 't':
-    case 'u': case 'v': case 'w': case 'x': case 'y':
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'g':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+    case 'q':
+    case 'r':
+    case 's':
+    case 't':
+    case 'u':
+    case 'v':
+    case 'w':
+    case 'x':
+    case 'y':
     case 'z':
-    case 'A': case 'B': case 'C': case 'D': case 'E':
-    case 'F': case 'G': case 'H': case 'I': case 'J':
-    case 'K': case 'L': case 'M': case 'N': case 'O':
-    case 'P': case 'Q': case 'R': case 'S': case 'T':
-    case 'U': case 'V': case 'W': case 'X': case 'Y':
+    case 'A':
+    case 'B':
+    case 'C':
+    case 'D':
+    case 'E':
+    case 'F':
+    case 'G':
+    case 'H':
+    case 'I':
+    case 'J':
+    case 'K':
+    case 'L':
+    case 'M':
+    case 'N':
+    case 'O':
+    case 'P':
+    case 'Q':
+    case 'R':
+    case 'S':
+    case 'T':
+    case 'U':
+    case 'V':
+    case 'W':
+    case 'X':
+    case 'Y':
     case 'Z':
         tok = letter();
         break;
@@ -140,8 +189,9 @@ Token Lexer::ampersand()
     if (c == '&')
         return Token(TokenType::And, m_tokPos, m_pos, "&&");
     putChar();
-    return Token(TokenType::Error, m_tokPos, m_pos, "'&' invalid in this "
-        "context.");
+    return Token(TokenType::Error, m_tokPos, m_pos,
+                 "'&' invalid in this "
+                 "context.");
 }
 
 Token Lexer::bar()
@@ -150,8 +200,9 @@ Token Lexer::bar()
     if (c == '|')
         return Token(TokenType::Or, m_tokPos, m_pos, "||");
     putChar();
-    return Token(TokenType::Error, m_tokPos, m_pos, "'!' invalid in this "
-        "context.");
+    return Token(TokenType::Error, m_tokPos, m_pos,
+                 "'!' invalid in this "
+                 "context.");
 }
 
 Token Lexer::exclamation()
@@ -170,7 +221,7 @@ Token Lexer::dash()
     if (c != '-')
         return Token(TokenType::Dash, m_tokPos, m_pos, "-");
     return Token(TokenType::Error, m_tokPos, m_pos,
-        "Found disallowed consecutive dashes: '--'");
+                 "Found disallowed consecutive dashes: '--'");
 }
 
 Token Lexer::equal()
@@ -211,7 +262,8 @@ Token Lexer::number()
     if (!iss.eof())
         len = (int)(iss.tellg() - start);
     m_pos = m_tokPos + len;
-    return Token(TokenType::Number, m_tokPos, m_pos, m_buf.substr(m_tokPos, len), v);
+    return Token(TokenType::Number, m_tokPos, m_pos,
+                 m_buf.substr(m_tokPos, len), v);
 }
 
 Token Lexer::letter()
@@ -223,7 +275,7 @@ Token Lexer::letter()
         {
             putChar();
             return Token(TokenType::Identifier, m_tokPos, m_pos,
-                m_buf.substr(m_tokPos, m_pos - m_tokPos));
+                         m_buf.substr(m_tokPos, m_pos - m_tokPos));
         }
     }
 }

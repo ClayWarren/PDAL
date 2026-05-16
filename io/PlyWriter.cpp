@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "PlyWriter.hpp"
 
@@ -43,22 +43,19 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-        "writers.ply",
-        "ply writer",
-        "https://pdal.org/stages/writers.ply.html",
-        { "ply" }
-};
+static StaticPluginInfo const s_info{"writers.ply",
+                                     "ply writer",
+                                     "https://pdal.org/stages/writers.ply.html",
+                                     {"ply"}};
 
 CREATE_STATIC_STAGE(PlyWriter, s_info)
 
-std::string PlyWriter::getName() const { return s_info.name; }
+std::string PlyWriter::getName() const
+{
+    return s_info.name;
+}
 
-
-PlyWriter::PlyWriter()
-{}
-
+PlyWriter::PlyWriter() {}
 
 void PlyWriter::addArgs(ProgramArgs& args)
 {
@@ -66,11 +63,10 @@ void PlyWriter::addArgs(ProgramArgs& args)
     args.add("dims", "Dimension names", m_dimNames);
     args.add("faces", "Write faces", m_faces);
     args.add("sized_types",
-        "Write types as size-explicit strings (e.g. 'uint32')",
-        m_sizedTypes, true);
+             "Write types as size-explicit strings (e.g. 'uint32')",
+             m_sizedTypes, true);
     m_precisionArg = &args.add("precision", "Output precision", m_precision, 3);
 }
-
 
 void PlyWriter::prepared(PointTableRef table)
 {
@@ -80,7 +76,7 @@ void PlyWriter::prepared(PointTableRef table)
 
     if (m_precisionArg->set() && m_format != Format::Ascii)
         throwError("Option 'precision' can only be set of the 'storage_mode' "
-            "is ascii.");
+                   "is ascii.");
 
     m_dims.clear();
     if (m_dimNames.size())
@@ -94,8 +90,9 @@ void PlyWriter::prepared(PointTableRef table)
             dimspec = Utils::tolower(name);
             auto id = layout->findDim(name);
             if (id == Dimension::Id::Unknown)
-                throwError("Unknown dimension '" + name + "' in provided "
-                    "dimension list.");
+                throwError("Unknown dimension '" + name +
+                           "' in provided "
+                           "dimension list.");
             if (parts.size() == 1)
                 type = layout->dimType(id);
             else if (parts.size() == 2)
@@ -105,7 +102,10 @@ void PlyWriter::prepared(PointTableRef table)
             }
             else
                 throwError("Invalid format for dimension specification for "
-                    "dimension '" + name + "'. " "Must be 'name[=type]'.");
+                           "dimension '" +
+                           name +
+                           "'. "
+                           "Must be 'name[=type]'.");
             m_dims.emplace_back(id, type);
         }
     }
@@ -117,31 +117,26 @@ void PlyWriter::prepared(PointTableRef table)
     }
 }
 
-
 std::string PlyWriter::getType(Dimension::Type type) const
 {
-    static std::map<Dimension::Type, std::string> sizedTypes =
-    {
-        { Dimension::Type::Signed8, "int8" },
-        { Dimension::Type::Unsigned8, "uint8" },
-        { Dimension::Type::Signed16, "int16" },
-        { Dimension::Type::Unsigned16, "uint16" },
-        { Dimension::Type::Signed32, "int32" },
-        { Dimension::Type::Unsigned32, "uint32" },
-        { Dimension::Type::Float, "float32" },
-        { Dimension::Type::Double, "float64" }
-    };
-    static std::map<Dimension::Type, std::string> types =
-    {
-        { Dimension::Type::Signed8, "char" },
-        { Dimension::Type::Unsigned8, "uchar" },
-        { Dimension::Type::Signed16, "short" },
-        { Dimension::Type::Unsigned16, "ushort" },
-        { Dimension::Type::Signed32, "int" },
-        { Dimension::Type::Unsigned32, "uint" },
-        { Dimension::Type::Float, "float" },
-        { Dimension::Type::Double, "double" }
-    };
+    static std::map<Dimension::Type, std::string> sizedTypes = {
+        {Dimension::Type::Signed8, "int8"},
+        {Dimension::Type::Unsigned8, "uint8"},
+        {Dimension::Type::Signed16, "int16"},
+        {Dimension::Type::Unsigned16, "uint16"},
+        {Dimension::Type::Signed32, "int32"},
+        {Dimension::Type::Unsigned32, "uint32"},
+        {Dimension::Type::Float, "float32"},
+        {Dimension::Type::Double, "float64"}};
+    static std::map<Dimension::Type, std::string> types = {
+        {Dimension::Type::Signed8, "char"},
+        {Dimension::Type::Unsigned8, "uchar"},
+        {Dimension::Type::Signed16, "short"},
+        {Dimension::Type::Unsigned16, "ushort"},
+        {Dimension::Type::Signed32, "int"},
+        {Dimension::Type::Unsigned32, "uint"},
+        {Dimension::Type::Float, "float"},
+        {Dimension::Type::Double, "double"}};
 
     try
     {
@@ -150,13 +145,13 @@ std::string PlyWriter::getType(Dimension::Type type) const
     catch (std::out_of_range&)
     {
         throwError("Can't write dimension of type '" +
-                Dimension::interpretationName(type) + "'.");
+                   Dimension::interpretationName(type) + "'.");
     }
     return "";
 }
 
-
-void PlyWriter::writeHeader(PointLayoutPtr layout, point_count_t pointCount, point_count_t faceCount) const
+void PlyWriter::writeHeader(PointLayoutPtr layout, point_count_t pointCount,
+                            point_count_t faceCount) const
 {
     *m_stream << "ply" << std::endl;
     *m_stream << "format " << m_format << " 1.0" << std::endl;
@@ -183,7 +178,6 @@ void PlyWriter::writeHeader(PointLayoutPtr layout, point_count_t pointCount, poi
     *m_stream << "end_header" << std::endl;
 }
 
-
 void PlyWriter::readyTable(PointTableRef table)
 {
     m_layout = table.layout();
@@ -194,7 +188,8 @@ void PlyWriter::doneTable(PointTableRef table)
     m_layout = nullptr;
 }
 
-void PlyWriter::readyFile(const std::string& filename, const SpatialReference& srs)
+void PlyWriter::readyFile(const std::string& filename,
+                          const SpatialReference& srs)
 {
     m_curFilename = filename;
     Utils::writeProgress(m_progressFd, "READYFILE", filename);
@@ -205,8 +200,7 @@ void PlyWriter::writeView(const PointViewPtr data)
     m_views.push_back(data);
 }
 
-
-template<typename T>
+template <typename T>
 void writeTextVal(std::ostream& out, PointRef& point, Dimension::Id dim)
 {
     T t = point.getFieldAs<T>(dim);
@@ -215,24 +209,23 @@ void writeTextVal(std::ostream& out, PointRef& point, Dimension::Id dim)
 
 // Writing int/uint can write "char" type instead of numeric values.
 // Two specializations is easier than the SFINAE mess.
-template<>
+template <>
 void writeTextVal<int8_t>(std::ostream& out, PointRef& point, Dimension::Id dim)
 {
     int i = point.getFieldAs<int8_t>(dim);
     out << i;
 }
 
-template<>
+template <>
 void writeTextVal<uint8_t>(std::ostream& out, PointRef& point,
-    Dimension::Id dim)
+                           Dimension::Id dim)
 {
     uint32_t i = point.getFieldAs<uint8_t>(dim);
     out << i;
 }
 
-
 void PlyWriter::writeValue(PointRef& point, Dimension::Id dim,
-    Dimension::Type type)
+                           Dimension::Type type)
 {
     if (m_format == Format::Ascii)
     {
@@ -282,7 +275,7 @@ void PlyWriter::writeValue(PointRef& point, Dimension::Id dim,
                 break;
             default:
                 throwError("Internal error: invalid type found writing "
-                    "output.");
+                           "output.");
             }
         }
     }
@@ -290,18 +283,17 @@ void PlyWriter::writeValue(PointRef& point, Dimension::Id dim,
     {
         OLeStream out(m_stream);
         Everything e;
-        point.getField((char *)&e, dim, type);
+        point.getField((char*)&e, dim, type);
         Utils::insertDim(out, type, e);
     }
     else if (m_format == Format::BinaryBe)
     {
         OBeStream out(m_stream);
         Everything e;
-        point.getField((char *)&e, dim, type);
+        point.getField((char*)&e, dim, type);
         Utils::insertDim(out, type, e);
     }
 }
-
 
 void PlyWriter::writePoint(PointRef& point, PointLayoutPtr layout)
 {
@@ -316,13 +308,12 @@ void PlyWriter::writePoint(PointRef& point, PointLayoutPtr layout)
         *m_stream << std::endl;
 }
 
-
 void PlyWriter::writeTriangle(const Triangle& t, size_t offset)
 {
     if (m_format == Format::Ascii)
     {
-        *m_stream << "3 " << (t.m_a + offset) << " " <<
-            (t.m_b + offset) << " " << (t.m_c + offset) << std::endl;
+        *m_stream << "3 " << (t.m_a + offset) << " " << (t.m_b + offset) << " "
+                  << (t.m_c + offset) << std::endl;
     }
     else if (m_format == Format::BinaryLe)
     {
@@ -343,7 +334,6 @@ void PlyWriter::writeTriangle(const Triangle& t, size_t offset)
         out << count << a << b << c;
     }
 }
-
 
 // Deferring write until this time allows both points and faces from multiple
 // point views to be written.
@@ -361,8 +351,8 @@ void PlyWriter::doneFile()
 
     if (pointCount > (std::numeric_limits<uint32_t>::max)())
         throwError("Can't write PLY file.  Only " +
-            std::to_string((std::numeric_limits<uint32_t>::max)()) +
-            " points supported.");
+                   std::to_string((std::numeric_limits<uint32_t>::max)()) +
+                   " points supported.");
 
     m_stream = Utils::createFile(m_curFilename, true);
     if (!m_stream)
@@ -383,7 +373,7 @@ void PlyWriter::doneFile()
         PointId offset = 0;
         for (auto& v : m_views)
         {
-            TriangularMesh *mesh = v->mesh();
+            TriangularMesh* mesh = v->mesh();
             if (mesh)
             {
                 for (size_t id = 0; id < mesh->size(); ++id)

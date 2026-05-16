@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2025, Norman Barker (norman.barker@gmail.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2025, Norman Barker (norman.barker@gmail.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <memory>
 #include <sstream>
@@ -38,10 +38,9 @@
 
 #include <cpl_vsi.h>
 #include <cpl_vsi_virtual.h>
+#include <pdal/pdal_types.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/VSIIO.hpp>
-#include <pdal/pdal_types.hpp>
-
 
 namespace pdal
 {
@@ -73,7 +72,6 @@ typedef std::streambuf::pos_type pos_type;
 typedef std::streambuf::off_type off_type;
 typedef std::streambuf::traits_type traits_type;
 
-
 class VSIStreamBuffer : public std::streambuf
 {
 public:
@@ -87,12 +85,13 @@ public:
     virtual int_type underflow();
     virtual int_type overflow(int_type c = traits_type::eof());
     virtual int sync();
-    virtual pos_type seekoff(off_type off, std::ios_base::seekdir way,
-                             std::ios_base::openmode which = std::ios_base::in |
-                                                             std::ios_base::out);
-    virtual pos_type seekpos(pos_type sp,
-                             std::ios_base::openmode which = std::ios_base::in |
-                                                             std::ios_base::out);
+    virtual pos_type seekoff(
+        off_type off, std::ios_base::seekdir way,
+        std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
+    virtual pos_type
+    seekpos(pos_type sp, std::ios_base::openmode which = std::ios_base::in |
+                                                         std::ios_base::out);
+
 private:
     PDALVirtualHandleUniquePtr fp{};
     std::string fname;
@@ -101,12 +100,12 @@ private:
     std::vector<char> buffer;
 };
 
-
-VSIStreamBuffer::VSIStreamBuffer(std::string filename, std::ios_base::openmode mode,
-    std::size_t bufferSize)
+VSIStreamBuffer::VSIStreamBuffer(std::string filename,
+                                 std::ios_base::openmode mode,
+                                 std::size_t bufferSize)
     : fname(filename),
-        nBufferSize(bufferSize != 0 ? bufferSize : defaultBufferSize),
-        nBufferStart(0)
+      nBufferSize(bufferSize != 0 ? bufferSize : defaultBufferSize),
+      nBufferStart(0)
 {
     std::string fm;
     buffer.resize(nBufferSize);
@@ -135,18 +134,19 @@ VSIStreamBuffer::VSIStreamBuffer(std::string filename, std::ios_base::openmode m
     if (mode & std::ios::binary)
         fm += "b";
 
-    if (Utils::startsWith(Utils::toupper(filename), "/VSI") || (mode & std::ios_base::out))
+    if (Utils::startsWith(Utils::toupper(filename), "/VSI") ||
+        (mode & std::ios_base::out))
         fp.reset(reinterpret_cast<VSIVirtualHandle*>(
             VSIFOpenL(filename.c_str(), fm.c_str())));
     else
-        fp.reset(reinterpret_cast<VSIVirtualHandle*>(
-            VSICreateBufferedReaderHandle(VSIFOpenL(filename.c_str(), fm.c_str()))));
+        fp.reset(
+            reinterpret_cast<VSIVirtualHandle*>(VSICreateBufferedReaderHandle(
+                VSIFOpenL(filename.c_str(), fm.c_str()))));
 
     // can either set a bad bit in underflow/overflow or throw a PDAL error here
     if (fp == nullptr)
         throw pdal_error("Can't open file '" + filename + "'.");
 }
-
 
 VSIStreamBuffer::~VSIStreamBuffer()
 {
@@ -155,14 +155,12 @@ VSIStreamBuffer::~VSIStreamBuffer()
         sync();
 }
 
-
 std::streamsize VSIStreamBuffer::showmanyc()
 {
     if (underflow() == traits_type::eof())
         return -1;
     return egptr() - gptr();
 }
-
 
 int_type VSIStreamBuffer::underflow()
 {
@@ -175,7 +173,6 @@ int_type VSIStreamBuffer::underflow()
     setg(buffer.data(), buffer.data(), buffer.data() + nRead);
     return traits_type::not_eof(buffer.data()[0]);
 }
-
 
 int_type VSIStreamBuffer::overflow(int_type c)
 {
@@ -194,7 +191,6 @@ int_type VSIStreamBuffer::overflow(int_type c)
     }
     return traits_type::eof();
 }
-
 
 int VSIStreamBuffer::sync()
 {
@@ -222,10 +218,8 @@ int VSIStreamBuffer::sync()
     return 0;
 }
 
-
-pos_type VSIStreamBuffer::seekoff(off_type off,
-    std::ios_base::seekdir way,
-    std::ios_base::openmode which)
+pos_type VSIStreamBuffer::seekoff(off_type off, std::ios_base::seekdir way,
+                                  std::ios_base::openmode which)
 {
     if (way == std::ios_base::cur)
     {
@@ -289,9 +283,11 @@ pos_type VSIStreamBuffer::seekoff(off_type off,
             if (nOffsetInBuffer > (egptr() - eback()))
                 return -1;
             else
-                gbump((int)(nOffsetInBuffer - std::streampos(gptr() - eback())));
+                gbump(
+                    (int)(nOffsetInBuffer - std::streampos(gptr() - eback())));
 
-            return static_cast<off_type>(nBufferStart + std::streampos(gptr() - eback()));
+            return static_cast<off_type>(nBufferStart +
+                                         std::streampos(gptr() - eback()));
         }
     }
     else
@@ -308,35 +304,30 @@ pos_type VSIStreamBuffer::seekoff(off_type off,
     }
 }
 
-
-pos_type VSIStreamBuffer::seekpos(pos_type sp,
-    std::ios_base::openmode which)
+pos_type VSIStreamBuffer::seekpos(pos_type sp, std::ios_base::openmode which)
 {
     return VSIStreamBuffer::seekoff(sp, std::ios_base::beg, which);
 }
 
-
-VSIOStream::VSIOStream(const std::string& filename, std::ios::openmode mode, std::size_t bufferSize) :
-    std::ofstream()
+VSIOStream::VSIOStream(const std::string& filename, std::ios::openmode mode,
+                       std::size_t bufferSize)
+    : std::ofstream()
 {
     pVsiBuf.reset(new VSIStreamBuffer(filename, mode, bufferSize));
     basic_ios<char>::rdbuf(pVsiBuf.get());
 }
 
+VSIOStream::~VSIOStream() {}
 
-VSIOStream::~VSIOStream(){}
-
-
-VSIIStream::VSIIStream(const std::string& filename, std::ios::openmode mode, std::size_t bufferSize) :
-    std::ifstream()
+VSIIStream::VSIIStream(const std::string& filename, std::ios::openmode mode,
+                       std::size_t bufferSize)
+    : std::ifstream()
 {
     pVsiBuf.reset(new VSIStreamBuffer(filename, mode, bufferSize));
     basic_ios<char>::rdbuf(pVsiBuf.get());
 }
 
-
-VSIIStream::~VSIIStream(){}
-
+VSIIStream::~VSIIStream() {}
 
 } // namespace VSI
 

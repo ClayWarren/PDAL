@@ -3,8 +3,8 @@
 
 #include <filters/M3C2Filter.hpp>
 
-#include <io/LasReader.hpp>
 #include <io/BufferReader.hpp>
+#include <io/LasReader.hpp>
 #include <io/TextReader.hpp>
 
 #include "Support.hpp"
@@ -78,7 +78,6 @@ TEST(M3C2FilterTest, test1)
     EXPECT_NEAR(viewOut->getFieldAs<float>(stdDev2, 0), 1.582, 0.01);
     EXPECT_EQ(viewOut->getFieldAs<int>(c1, 0), 118);
     EXPECT_EQ(viewOut->getFieldAs<int>(c2, 0), 166);
-
 }
 
 // Comparing to a set of pre-processed points
@@ -94,7 +93,8 @@ TEST(M3C2FilterTest, verifyPoints)
 
     ro1.add("filename", Support::datapath("autzen/autzen-bmx-2010.las"));
     ro2.add("filename", Support::datapath("autzen/autzen-bmx-2023.las"));
-    ro3.add("filename", Support::datapath("autzen/autzen-bmx-largersample.txt"));
+    ro3.add("filename",
+            Support::datapath("autzen/autzen-bmx-largersample.txt"));
     r1.setOptions(ro1);
     r2.setOptions(ro2);
     r3.setOptions(ro3);
@@ -131,17 +131,17 @@ TEST(M3C2FilterTest, verifyPoints)
     for (size_t i = 0; i < viewOut->size(); ++i)
     {
         EXPECT_EQ(viewOut->getFieldAs<float>(Dimension::Id::X, i),
-            comp_viewOut->getFieldAs<float>(Dimension::Id::X, i));
+                  comp_viewOut->getFieldAs<float>(Dimension::Id::X, i));
         EXPECT_EQ(viewOut->getFieldAs<float>(Dimension::Id::Y, i),
-            comp_viewOut->getFieldAs<float>(Dimension::Id::Y, i));
+                  comp_viewOut->getFieldAs<float>(Dimension::Id::Y, i));
         EXPECT_EQ(viewOut->getFieldAs<float>(Dimension::Id::Z, i),
-            comp_viewOut->getFieldAs<float>(Dimension::Id::Z, i));
+                  comp_viewOut->getFieldAs<float>(Dimension::Id::Z, i));
     }
 
     Dimension::Id distance = viewOut->layout()->findDim("m3c2_distance");
     for (size_t i = 0; i < viewOut->size(); ++i)
-        EXPECT_NEAR(viewOut->getFieldAs<float>(distance, i), 
-            comp_viewOut->getFieldAs<float>(distance, i), 0.01);
+        EXPECT_NEAR(viewOut->getFieldAs<float>(distance, i),
+                    comp_viewOut->getFieldAs<float>(distance, i), 0.01);
 }
 
 } // namespace pdal

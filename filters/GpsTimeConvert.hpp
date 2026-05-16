@@ -43,8 +43,7 @@ namespace pdal
 class PDAL_EXPORT GpsTimeConvert : public Filter, public Streamable
 {
 public:
-    GpsTimeConvert() : Filter()
-    {}
+    GpsTimeConvert() : Filter() {}
     std::string getName() const;
 
 private:
@@ -60,7 +59,7 @@ private:
     double m_wrappedTolerance;
     int m_numSeconds;
 
-        void weekSeconds2GpsTime(PointRef& point);
+    void weekSeconds2GpsTime(PointRef& point);
     void daySeconds2GpsTime(PointRef& point);
 
     void gpsTime2WeekSeconds(PointRef& point);
@@ -75,7 +74,7 @@ private:
 
     void unwrapWeekSeconds(PointRef& point);
     void wrapWeekSeconds(PointRef& point);
-    
+
     void unwrapDaySeconds(PointRef& point);
     void wrapDaySeconds(PointRef& point);
 
@@ -88,7 +87,7 @@ private:
     virtual void filter(PointView& view);
 
     GpsTimeConvert& operator=(const GpsTimeConvert&); // not implemented
-    GpsTimeConvert(const GpsTimeConvert&); // not implemented
+    GpsTimeConvert(const GpsTimeConvert&);            // not implemented
 };
 
 } // namespace pdal

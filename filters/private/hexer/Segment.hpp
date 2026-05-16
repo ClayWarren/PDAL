@@ -42,11 +42,12 @@ namespace hexer
 
 struct Segment
 {
-    Segment(HexId hex, int edge) : hex(hex), edge(edge)
-    {}
+    Segment(HexId hex, int edge) : hex(hex), edge(edge) {}
 
     bool horizontal() const
-    { return edge == 0 || edge == 3; }
+    {
+        return edge == 0 || edge == 3;
+    }
 
     /// Hexagon who's side is the segment.
     HexId hex;
@@ -54,17 +55,17 @@ struct Segment
     int edge;
 };
 
-inline bool operator == (const Segment& s1, const Segment& s2)
+inline bool operator==(const Segment& s1, const Segment& s2)
 {
     return s1.hex == s2.hex && s1.edge == s2.edge;
 }
 
-inline bool operator != (const Segment& s1, const Segment& s2)
+inline bool operator!=(const Segment& s1, const Segment& s2)
 {
     return !(s1 == s2);
 }
 
-inline std::ostream& operator << (std::ostream& out, const Segment& s)
+inline std::ostream& operator<<(std::ostream& out, const Segment& s)
 {
     out << "(" << s.hex.i << "," << s.hex.j << " - " << s.edge << ")";
     return out;

@@ -1,35 +1,35 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. <info@hobu.co>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the names of its contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. <info@hobu.co>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of its contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "GDALWriter.hpp"
 
@@ -44,13 +44,11 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "writers.gdal",
     "Write a point cloud as a GDAL raster.",
     "https://pdal.org/stages/writers.gdal.html",
-    { "tif", "tiff", "vrt" }
-};
+    {"tif", "tiff", "vrt"}};
 
 CREATE_STATIC_STAGE(GDALWriter, s_info)
 
@@ -59,53 +57,64 @@ std::string GDALWriter::getName() const
     return s_info.name;
 }
 
-
 void GDALWriter::addArgs(ProgramArgs& args)
 {
-    args.add("resolution", "Cell edge size, in units of X/Y",
-        m_edgeLength).setPositional();
-    m_radiusArg = &args.add("radius", "Radius from cell center to use to locate"
-        " influencing points", m_radius);
+    args.add("resolution", "Cell edge size, in units of X/Y", m_edgeLength)
+        .setPositional();
+    m_radiusArg = &args.add("radius",
+                            "Radius from cell center to use to locate"
+                            " influencing points",
+                            m_radius);
     args.add("power", "Power parameter for weighting points when using IDW",
-        m_power, 1.0);
+             m_power, 1.0);
     args.add("gdaldriver", "GDAL writer driver name", m_drivername, "GTiff");
     args.add("gdalopts", "GDAL driver options (name=value,name=value...)",
-        m_options);
-    args.add("output_type", "Statistics produced ('min', 'max', 'mean', "
-        "'idw', 'count', 'stdev', 'p<percentile>' or 'all')", m_outputTypeString, {"all"} );
-    args.add("data_type", "Data type for output grid ('int8', 'uint64', "
-        "'float', etc.)", m_dataType, Dimension::Type::Double);
+             m_options);
+    args.add("output_type",
+             "Statistics produced ('min', 'max', 'mean', "
+             "'idw', 'count', 'stdev', 'p<percentile>' or 'all')",
+             m_outputTypeString, {"all"});
+    args.add("data_type",
+             "Data type for output grid ('int8', 'uint64', "
+             "'float', etc.)",
+             m_dataType, Dimension::Type::Double);
     args.add("window_size", "Cell distance for fallback interpolation",
-        m_windowSize);
+             m_windowSize);
     // Nan is a sentinal value to say that no value was set for nodata.
     args.add("nodata", "No data value", m_noData,
-        std::numeric_limits<double>::quiet_NaN());
+             std::numeric_limits<double>::quiet_NaN());
     args.add("dimension", "Dimension to use", m_interpDimString, "Z");
     args.add("bounds", "Bounds of data. [deprecated]", m_bounds);
     m_xOriginArg = &args.add("origin_x", "X origin for grid.", m_xOrigin);
     m_yOriginArg = &args.add("origin_y", "Y origin for grid.", m_yOrigin);
-    m_widthArg = &args.add("width", "Number of cells in the X direction.",
-        m_width);
-    m_heightArg = &args.add("height", "Number of cells in the Y direction.",
-        m_height);
+    m_widthArg =
+        &args.add("width", "Number of cells in the X direction.", m_width);
+    m_heightArg =
+        &args.add("height", "Number of cells in the Y direction.", m_height);
 
     args.add("override_srs", "Spatial reference to apply to data",
-        m_overrideSrs);
+             m_overrideSrs);
     args.addSynonym("override_srs", "spatialreference");
 
-    args.add("default_srs", "Spatial reference to apply to data if one cannot be inferred",
-        m_defaultSrs);
-    args.add("metadata", "GDAL metadata to set on the raster, in the form 'NAME=VALUE,NAME2=VALUE2,NAME3=VALUE3'",
-        m_GDAL_metadata);
-    args.add("pdal_metadata", "Write PDAL metadata as to GDAL PAM XML Metadata?",
-        m_writePDALMetadata, decltype(m_writePDALMetadata)(false));
-    args.add("binmode", "Use binning mode for computing statistics and ignore distance and neighborhood",
-        m_binMode, false);
-    args.add("allow_empty", "Allow writing GDAL output that do not have any pixel values (no points)",
-        m_allowEmpty, false);
+    args.add("default_srs",
+             "Spatial reference to apply to data if one cannot be inferred",
+             m_defaultSrs);
+    args.add("metadata",
+             "GDAL metadata to set on the raster, in the form "
+             "'NAME=VALUE,NAME2=VALUE2,NAME3=VALUE3'",
+             m_GDAL_metadata);
+    args.add("pdal_metadata",
+             "Write PDAL metadata as to GDAL PAM XML Metadata?",
+             m_writePDALMetadata, decltype(m_writePDALMetadata)(false));
+    args.add("binmode",
+             "Use binning mode for computing statistics and ignore distance "
+             "and neighborhood",
+             m_binMode, false);
+    args.add("allow_empty",
+             "Allow writing GDAL output that do not have any pixel values (no "
+             "points)",
+             m_allowEmpty, false);
 }
-
-
 
 void GDALWriter::initialize()
 {
@@ -135,7 +144,8 @@ void GDALWriter::initialize()
             if (!Utils::fromString(ts.substr(1), p))
                 throwError("Invalid percentile value: '" + ts + "'.");
             if (p < 0 || p > 100)
-                throwError("Percentile values must be integers between 1 and 100.");
+                throwError(
+                    "Percentile values must be integers between 1 and 100.");
             m_percentiles.push_back(p);
         }
         else
@@ -144,7 +154,7 @@ void GDALWriter::initialize()
 
     if (m_overrideSrs.valid() && m_defaultSrs.valid())
         throwError("Can't set both 'override_srs' and 'default_srs'.");
-    
+
     if (!m_percentiles.empty() && !m_binMode)
         throwError("Can't output percentiles without 'binmode=true'.");
 
@@ -162,19 +172,19 @@ void GDALWriter::initialize()
         args |= 8;
     if (args != 0 && args != 15)
         throwError("Must specify all or none of 'origin_x', 'origin_y', "
-            "'width' and 'height'.");
+                   "'width' and 'height'.");
     if (args == 15)
     {
         if (m_bounds.to2d().valid())
             throwError("Specify either 'bounds' or 'origin_x'/'origin_y'/"
-                "'width'/'height' options -- not both");
+                       "'width'/'height' options -- not both");
 
         // Subtracting .5 gets to the middle of the last cell.  This
         // should get us back to the same place when figuring the
         // cell count.
         m_bounds = Bounds({m_xOrigin, m_yOrigin,
-            m_xOrigin + (m_edgeLength * (m_width - .5)),
-            m_yOrigin + (m_edgeLength * (m_height - .5))});
+                           m_xOrigin + (m_edgeLength * (m_width - .5)),
+                           m_yOrigin + (m_edgeLength * (m_height - .5))});
     }
 
     m_fixedGrid = m_bounds.to2d().valid();
@@ -182,24 +192,22 @@ void GDALWriter::initialize()
     // don't expand by point if we're running in standard mode.  That's
     // set later in writeView.
     m_expandByPoint = !m_fixedGrid;
-
 }
-
 
 void GDALWriter::prepared(PointTableRef table)
 {
     m_interpDim = table.layout()->findDim(m_interpDimString);
     if (m_interpDim == Dimension::Id::Unknown)
         throwError("Specified dimension '" + m_interpDimString +
-            "' does not exist.");
+                   "' does not exist.");
 
     if (!table.supportsView() && m_percentiles.size())
-            throwError("Percentile band calculations are not supported with "
-                "streaming point tables.");
+        throwError("Percentile band calculations are not supported with "
+                   "streaming point tables.");
 }
 
-
-void GDALWriter::readyFile(const std::string& filename, const SpatialReference& srs)
+void GDALWriter::readyFile(const std::string& filename,
+                           const SpatialReference& srs)
 {
     m_outputFilename = filename;
     m_srs = srs;
@@ -212,24 +220,22 @@ void GDALWriter::readyFile(const std::string& filename, const SpatialReference& 
         createGrid(m_bounds.to2d());
 }
 
-
 int GDALWriter::width() const
 {
     return m_grid->width();
 }
-
 
 int GDALWriter::height() const
 {
     return m_grid->height();
 }
 
-
 void GDALWriter::createGrid(BOX2D bounds)
 {
     // Validating before casting avoids float-cast-overflow undefined behavior.
     double d_width = std::floor((bounds.maxx - bounds.minx) / m_edgeLength) + 1;
-    double d_height = std::floor((bounds.maxy - bounds.miny) / m_edgeLength) + 1;
+    double d_height =
+        std::floor((bounds.maxy - bounds.miny) / m_edgeLength) + 1;
     if (d_width < 0.0 || d_width > (std::numeric_limits<int>::max)())
         throwError("Grid width out of range.");
     if (d_height < 0.0 || d_height > (std::numeric_limits<int>::max)())
@@ -238,15 +244,15 @@ void GDALWriter::createGrid(BOX2D bounds)
     int height = static_cast<int>(d_height);
     try
     {
-        m_grid.reset(new GDALGrid(bounds.minx, bounds.miny, width, height, m_edgeLength,
-            m_radius, m_outputTypes, m_windowSize, m_power, m_binMode, m_percentiles));
+        m_grid.reset(new GDALGrid(
+            bounds.minx, bounds.miny, width, height, m_edgeLength, m_radius,
+            m_outputTypes, m_windowSize, m_power, m_binMode, m_percentiles));
     }
     catch (GDALGrid::error& err)
     {
         throwError(err.what());
     }
 }
-
 
 void GDALWriter::writeView(const PointViewPtr view)
 {
@@ -279,7 +285,6 @@ void GDALWriter::writeView(const PointViewPtr view)
     }
 }
 
-
 bool GDALWriter::processOne(PointRef& point)
 {
     double x = point.getFieldAs<double>(Dimension::Id::X);
@@ -298,12 +303,11 @@ bool GDALWriter::processOne(PointRef& point)
     return true;
 }
 
-
 void GDALWriter::doneFile()
 {
     if (!m_grid && !m_allowEmpty)
         throw pdal_error("Unable to write GDAL data with no points "
-            "for output.");
+                         "for output.");
     else if (!m_grid)
         return;
 
@@ -319,15 +323,16 @@ void GDALWriter::doneFile()
 
     m_grid->finalize();
 
-    gdal::GDALError err = raster.open(m_grid->width(), m_grid->height(),
-        m_grid->numBands(), m_dataType, m_noData, m_options);
+    gdal::GDALError err =
+        raster.open(m_grid->width(), m_grid->height(), m_grid->numBands(),
+                    m_dataType, m_noData, m_options);
 
     if (err != gdal::GDALError::None)
         throwError(raster.errorMsg());
     int bandNum = 1;
 
     // Perhaps the grid should return an iterator, which would work as well.
-    double *src;
+    double* src;
     src = m_grid->data("min");
     double srcNoData = std::numeric_limits<double>::quiet_NaN();
     if (src && err == gdal::GDALError::None)
@@ -351,7 +356,8 @@ void GDALWriter::doneFile()
     {
         src = m_grid->pctlData(pct);
         if (src && err == gdal::GDALError::None)
-            err = raster.writeBand(src, srcNoData, bandNum++, "p" + std::to_string(pct));
+            err = raster.writeBand(src, srcNoData, bandNum++,
+                                   "p" + std::to_string(pct));
     }
     if (err != gdal::GDALError::None)
         throwError(raster.errorMsg());
@@ -359,13 +365,14 @@ void GDALWriter::doneFile()
     getMetadata().addList("filename", filename());
 
     std::vector<std::string> gdalitems = Utils::split(m_GDAL_metadata, ',');
-    for (auto& v: gdalitems)
+    for (auto& v : gdalitems)
     {
         const std::size_t pos = v.find_first_of("=");
         if (pos != std::string::npos)
         {
             const std::string name = v.substr(0, pos);
-            const std::string value = pos != std::string::npos ? v.substr(pos + 1) : "";
+            const std::string value =
+                pos != std::string::npos ? v.substr(pos + 1) : "";
             raster.addMetadata(name, value);
         }
     }
@@ -376,12 +383,13 @@ void GDALWriter::doneFile()
 void GDALWriter::readyTable(PointTableRef table)
 {
     // Add these as GDAL metadata
-    if(m_writePDALMetadata)
+    if (m_writePDALMetadata)
     {
         MetadataNode m = table.metadata();
         std::string json = Utils::toJSON(m);
         std::vector<uint8_t> metadata(json.begin(), json.end());
-        std::string b64 = Utils::base64_encode(metadata.data(), metadata.size());
+        std::string b64 =
+            Utils::base64_encode(metadata.data(), metadata.size());
         if (m_GDAL_metadata.size())
             m_GDAL_metadata += ",";
 
@@ -394,8 +402,6 @@ void GDALWriter::readyTable(PointTableRef table)
         b64 = Utils::base64_encode(pipeline.data(), pipeline.size());
         m_GDAL_metadata += ",pdal_pipeline=" + b64;
     }
-
 }
-
 
 } // namespace pdal

@@ -38,17 +38,17 @@
 
 #include <pdal/pdal_test_main.hpp>
 
+#include <filters/CropFilter.hpp>
+#include <filters/MergeFilter.hpp>
+#include <filters/ReprojectionFilter.hpp>
+#include <filters/SortFilter.hpp>
 #include <io/CopcReader.hpp>
 #include <io/LasReader.hpp>
 #include <io/NullWriter.hpp>
-#include <filters/CropFilter.hpp>
-#include <filters/ReprojectionFilter.hpp>
-#include <filters/SortFilter.hpp>
-#include <filters/MergeFilter.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include "Support.hpp"
 
@@ -57,21 +57,34 @@ namespace pdal
 
 namespace
 {
-    const std::string copcPath(Support::datapath("copc/lone-star.copc.laz"));
-    const std::string copcAutzenPath(Support::datapath("copc/1.2-with-color.copc.laz"));
-    const BOX3D pointBounds(515368.60225, 4918340.364, 2322.89625,
-        515401.043, 4918381.12375, 2338.5755);
-    const point_count_t numPoints(518862);
-}
+const std::string copcPath(Support::datapath("copc/lone-star.copc.laz"));
+const std::string
+    copcAutzenPath(Support::datapath("copc/1.2-with-color.copc.laz"));
+const BOX3D pointBounds(515368.60225, 4918340.364, 2322.89625, 515401.043,
+                        4918381.12375, 2338.5755);
+const point_count_t numPoints(518862);
+} // namespace
 
 TEST(CopcReaderTest, inspect)
 {
-    const std::vector<std::string> dimNames = {
-         "Classification", "EdgeOfFlightLine", "GpsTime", "Intensity", "KeyPoint",
-         "NumberOfReturns", "Overlap", "PointSourceId", "ReturnNumber", "ScanAngleRank",
-         "ScanChannel", "ScanDirectionFlag", "Synthetic", "UserData", "Withheld",
-         "X", "Y", "Z"
-    };
+    const std::vector<std::string> dimNames = {"Classification",
+                                               "EdgeOfFlightLine",
+                                               "GpsTime",
+                                               "Intensity",
+                                               "KeyPoint",
+                                               "NumberOfReturns",
+                                               "Overlap",
+                                               "PointSourceId",
+                                               "ReturnNumber",
+                                               "ScanAngleRank",
+                                               "ScanChannel",
+                                               "ScanDirectionFlag",
+                                               "Synthetic",
+                                               "UserData",
+                                               "Withheld",
+                                               "X",
+                                               "Y",
+                                               "Z"};
 
     Options options;
     options.add("filename", copcPath);
@@ -98,7 +111,8 @@ TEST(CopcReaderTest, inspect)
         srs.replace(pos, 5, "meter");
     }
 
-    const std::string wkt = R"(GEOCCS["unnamed",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["meter",1],AXIS["Geocentric X",OTHER],AXIS["Geocentric Y",OTHER],AXIS["Geocentric Z",NORTH]])";
+    const std::string wkt =
+        R"(GEOCCS["unnamed",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["meter",1],AXIS["Geocentric X",OTHER],AXIS["Geocentric Y",OTHER],AXIS["Geocentric Z",NORTH]])";
     EXPECT_EQ(wkt, srs);
 }
 
@@ -145,8 +159,8 @@ TEST(CopcReaderTest, resolutionLimit)
     //      Depth 1: 0.15923
     //      Depth 2: 0.079615
     //
-    // Any resolution option between 0.31846 and 0.15923 will select depths 0 and 1,
-    // so we'll test a corresponding query.
+    // Any resolution option between 0.31846 and 0.15923 will select depths 0
+    // and 1, so we'll test a corresponding query.
     options.add("resolution", 0.2);
 
     // This expected value corresponds to the sum of the point counts of all
@@ -182,7 +196,6 @@ TEST(CopcReaderTest, resolutionLimit)
     EXPECT_EQ(np, expectedCount);
 }
 
-
 TEST(CopcReaderTest, boundedRead2d)
 {
     BOX2D bounds(515380, 4918350, 515400, 4918370);
@@ -211,8 +224,8 @@ TEST(CopcReaderTest, boundedRead2d)
             y = view->getFieldAs<double>(Dimension::Id::Y, i);
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
-            ASSERT_TRUE(bounds.contains(x, y)) << bounds << ": " <<
-                x << ", " << y << ", " << z << std::endl;
+            ASSERT_TRUE(bounds.contains(x, y))
+                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
             ASSERT_TRUE(o < 4);
         }
     }
@@ -270,8 +283,8 @@ TEST(CopcReaderTest, boundedRead3d)
             y = view->getFieldAs<double>(Dimension::Id::Y, i);
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
-            ASSERT_TRUE(bounds.contains(x, y, z)) << bounds << ": " <<
-                x << ", " << y << ", " << z << std::endl;
+            ASSERT_TRUE(bounds.contains(x, y, z))
+                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
             ASSERT_TRUE(o < 4);
         }
     }
@@ -311,9 +324,10 @@ TEST(CopcReaderTest, boundedRead3d)
     EXPECT_EQ(np, 45930u);
 }
 
-// The following test causes a strange failure in the test process (not the below test itself)
-// for the Windows CI run. We haven't been able to recreate otherwise. We have run santizers
-// with no error. It's very strange.  Commenting out at this point until we understand.
+// The following test causes a strange failure in the test process (not the
+// below test itself) for the Windows CI run. We haven't been able to recreate
+// otherwise. We have run santizers with no error. It's very strange. Commenting
+// out at this point until we understand.
 #ifndef _MSC_VER
 TEST(CopcReaderTest, stream)
 {
@@ -336,9 +350,9 @@ TEST(CopcReaderTest, stream)
     {
     public:
         TestPointTable(PointView& view)
-            : StreamPointTable(*view.table().layout(), 1024)
-            , m_view(view)
-        { }
+            : StreamPointTable(*view.table().layout(), 1024), m_view(view)
+        {
+        }
 
     protected:
         virtual void reset() override
@@ -370,9 +384,8 @@ TEST(CopcReaderTest, stream)
     // we'll need to sort them since the EPT reader loads data asynchronously
     // so we can't rely on their order being the same.
     ASSERT_EQ(streamView.size(), normalView.size());
-    ASSERT_EQ(
-        streamTable.layout()->pointSize(),
-        normalTable.layout()->pointSize());
+    ASSERT_EQ(streamTable.layout()->pointSize(),
+              normalTable.layout()->pointSize());
 
     const std::size_t numPoints(normalView.size());
     const std::size_t pointSize(normalTable.layout()->pointSize());
@@ -385,9 +398,11 @@ TEST(CopcReaderTest, stream)
         {
             double nval = normalView.getFieldAs<double>(dim, i);
             double sval = streamView.getFieldAs<double>(dim, i);
-            ASSERT_EQ(nval, sval) <<
-                "Point ID: " << i << " dim: " << normalView.layout()->dimName(dim) <<
-                " don't match. Values normal/stream = " << nval << "/" << sval << ".";
+            ASSERT_EQ(nval, sval)
+                << "Point ID: " << i
+                << " dim: " << normalView.layout()->dimName(dim)
+                << " don't match. Values normal/stream = " << nval << "/"
+                << sval << ".";
         }
 }
 #endif // _MSC_VER
@@ -438,7 +453,6 @@ TEST(CopcReaderTest, boundedCrop)
     EXPECT_EQ(v2->size(), 47u);
 }
 
-
 TEST(CopcReaderTest, boundedCropGeoJSON)
 {
     std::string wkt = FileUtils::readFileIntoString(
@@ -484,8 +498,6 @@ TEST(CopcReaderTest, boundedCropGeoJSON)
     EXPECT_EQ(v->size(), 47u);
     EXPECT_EQ(v2->size(), 47u);
 }
-
-
 
 TEST(CopcReaderTest, polygonAndBoundsCrop)
 {
@@ -555,7 +567,6 @@ TEST(CopcReaderTest, polygonAndBoundsCrop)
     EXPECT_EQ(v->size(), 38u);
 }
 
-
 TEST(CopcReaderTest, boundedCropReprojection)
 {
     std::string selection = FileUtils::readFileIntoString(
@@ -617,10 +628,10 @@ TEST(CopcReaderTest, boundedCropReprojection)
     EXPECT_LE(v->size(), 50u);
 }
 
-
 TEST(CopcReaderTest, ogrCrop)
 {
-    const std::string srs = R"(PROJCS["NAD_1983_HARN_Lambert_Conformal_Conic",GEOGCS["GCS_North_American_1983_HARN",DATUM["NAD83_High_Accuracy_Reference_Network",SPHEROID["GRS 1980",6378137,298.2572221010002,AUTHORITY["EPSG","7019"]],AUTHORITY["EPSG","6152"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic_2SP"],PARAMETER["standard_parallel_1",43],PARAMETER["standard_parallel_2",45.5],PARAMETER["latitude_of_origin",41.75],PARAMETER["central_meridian",-120.5],PARAMETER["false_easting",1312335.958005249],PARAMETER["false_northing",0],UNIT["foot",0.3048,AUTHORITY["EPSG","9002"]]])";
+    const std::string srs =
+        R"(PROJCS["NAD_1983_HARN_Lambert_Conformal_Conic",GEOGCS["GCS_North_American_1983_HARN",DATUM["NAD83_High_Accuracy_Reference_Network",SPHEROID["GRS 1980",6378137,298.2572221010002,AUTHORITY["EPSG","7019"]],AUTHORITY["EPSG","6152"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic_2SP"],PARAMETER["standard_parallel_1",43],PARAMETER["standard_parallel_2",45.5],PARAMETER["latitude_of_origin",41.75],PARAMETER["central_meridian",-120.5],PARAMETER["false_easting",1312335.958005249],PARAMETER["false_northing",0],UNIT["foot",0.3048,AUTHORITY["EPSG","9002"]]])";
 
     NL::json json;
     json["type"] = "ogr";
@@ -680,10 +691,8 @@ TEST(CopcReaderTest, ogrCrop)
     EXPECT_LE(v->size(), 90u);
 }
 
-
 TEST(CopcReaderTest, boundedpreview)
 {
-
 
     BOX2D bounds(515380, 4918350, 515400, 4918370);
 

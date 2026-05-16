@@ -42,17 +42,17 @@ namespace pdal
 class PDAL_EXPORT SplitterFilter : public pdal::Filter
 {
 private:
-    //This used to be a lambda, but the VS compiler exploded, I guess.
+    // This used to be a lambda, but the VS compiler exploded, I guess.
     typedef std::pair<int, int> Coord;
     class CoordCompare
     {
     public:
-        bool operator () (const Coord& c1, const Coord& c2) const
+        bool operator()(const Coord& c1, const Coord& c2) const
         {
-            return c1.first < c2.first ? true :
-                c1.first > c2.first ? false :
-                c1.second < c2.second ? true :
-                false;
+            return c1.first < c2.first     ? true
+                   : c1.first > c2.first   ? false
+                   : c1.second < c2.second ? true
+                                           : false;
         };
     };
 
@@ -86,7 +86,7 @@ private:
     bool squareContains(int xpos, int ypos, double x, double y) const;
 
     SplitterFilter& operator=(const SplitterFilter&); // not implemented
-    SplitterFilter(const SplitterFilter&); // not implemented
+    SplitterFilter(const SplitterFilter&);            // not implemented
 };
 
 } // namespace pdal

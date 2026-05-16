@@ -37,7 +37,7 @@
 #include "Dumper.hpp"
 #include "Lasdump.hpp"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     std::deque<std::string> args;
 
@@ -58,8 +58,7 @@ void usage(const std::string& err = "")
     std::cerr << "Usage: lasdump [-o <output filename>] <las/las file>\n";
 }
 
-}
-
+} // namespace
 
 namespace pdal
 {
@@ -76,7 +75,8 @@ void Dumper::dump()
         return;
     }
 
-    try {
+    try
+    {
         in >> m_header;
     }
     catch (Exception& ex)
@@ -124,7 +124,6 @@ void Dumper::dump()
     return;
 }
 
-
 void Dumper::readPoints()
 {
     lazperf::reader::named_file f(m_filename);
@@ -168,7 +167,5 @@ int Dumper::processArgs(std::deque<std::string> args)
     return 0;
 }
 
-
 } // namespace lasdump
 } // namespace pdal
-

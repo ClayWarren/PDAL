@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include <functional>  // for hash
+#include <functional> // for hash
 
 #include <pdal/pdal_types.hpp>
 
@@ -48,10 +48,10 @@ namespace copc
 
 class PDAL_EXPORT Key
 {
-    // A depth/X/Y/Z key representing a data node, as well as the bounds of the contained data.
+    // A depth/X/Y/Z key representing a data node, as well as the bounds of the
+    // contained data.
 public:
-    Key()
-    {}
+    Key() {}
 
     Key(const std::string& s)
     {
@@ -99,15 +99,13 @@ public:
     operator std::string() const
     {
         return std::to_string(d) + '-' + std::to_string(x) + '-' +
-            std::to_string(y) + '-' + std::to_string(z);
+               std::to_string(y) + '-' + std::to_string(z);
     }
 
     Key child(int32_t dir) const
     {
-        return Key(d + 1,
-            (x << 1) | (dir & 0x1),
-            (y << 1) | ((dir >> 1) & 0x1),
-            (z << 1) | ((dir >> 2) & 0x1));
+        return Key(d + 1, (x << 1) | (dir & 0x1), (y << 1) | ((dir >> 1) & 0x1),
+                   (z << 1) | ((dir >> 2) & 0x1));
     }
 
     BOX3D bounds(const BOX3D& root) const
@@ -116,14 +114,17 @@ public:
 
         int width = pow(2, d);
         double cellWidth = (root.maxx - root.minx) / width;
-        // The test in each of these is to avoid unnecessary rounding errors when
-        // we know the actual value.
+        // The test in each of these is to avoid unnecessary rounding errors
+        // when we know the actual value.
         cellBounds.minx = (x == 0 ? root.minx : root.minx + (cellWidth * x));
-        cellBounds.maxx = (x == (width - 1) ? root.maxx : root.minx + (cellWidth * (x + 1)));
+        cellBounds.maxx =
+            (x == (width - 1) ? root.maxx : root.minx + (cellWidth * (x + 1)));
         cellBounds.miny = (y == 0 ? root.miny : root.miny + (cellWidth * y));
-        cellBounds.maxy = (y == (width - 1) ? root.maxy : root.miny + (cellWidth * (y + 1)));
+        cellBounds.maxy =
+            (y == (width - 1) ? root.maxy : root.miny + (cellWidth * (y + 1)));
         cellBounds.minz = (z == 0 ? root.minz : root.minz + (cellWidth * z));
-        cellBounds.maxz = (z == (width - 1) ? root.maxz : root.minz + (cellWidth * (z + 1)));
+        cellBounds.maxz =
+            (z == (width - 1) ? root.maxz : root.minz + (cellWidth * (z + 1)));
         return cellBounds;
     }
 
@@ -135,8 +136,7 @@ public:
     }
 
 private:
-    Key(int d, int x, int y, int z) : d(d), x(x), y(y), z(z)
-    {}
+    Key(int d, int x, int y, int z) : d(d), x(x), y(y), z(z) {}
 };
 
 inline LeExtractor& operator>>(LeExtractor& in, Key& k)
@@ -157,16 +157,23 @@ inline bool operator!=(const Key& a, const Key& b)
 
 inline bool operator<(const Key& a, const Key& b)
 {
-    if (a.d < b.d) return true;
-    if (a.d > b.d) return false;
+    if (a.d < b.d)
+        return true;
+    if (a.d > b.d)
+        return false;
 
-    if (a.x < b.x) return true;
-    if (a.x > b.x) return false;
+    if (a.x < b.x)
+        return true;
+    if (a.x > b.x)
+        return false;
 
-    if (a.y < b.y) return true;
-    if (a.y > b.y) return false;
+    if (a.y < b.y)
+        return true;
+    if (a.y > b.y)
+        return false;
 
-    if (a.z < b.z) return true;
+    if (a.z < b.z)
+        return true;
     return false;
 }
 
@@ -181,17 +188,15 @@ inline std::ostream& operator<<(std::ostream& out, const Key& k)
 
 namespace std
 {
-    template<>
-    struct hash<pdal::copc::Key>
+template <> struct hash<pdal::copc::Key>
+{
+    std::size_t operator()(pdal::copc::Key const& k) const noexcept
     {
-        std::size_t operator()(pdal::copc::Key const& k) const noexcept
-        {
-            std::hash<uint64_t> h;
+        std::hash<uint64_t> h;
 
-            uint64_t k1 = ((uint64_t)k.d << 32) | k.x;
-            uint64_t k2 = ((uint64_t)k.y << 32) | k.z;
-            return h(k1) ^ (h(k2) << 1);
-        }
-    };
-}
-
+        uint64_t k1 = ((uint64_t)k.d << 32) | k.x;
+        uint64_t k2 = ((uint64_t)k.y << 32) | k.z;
+        return h(k1) ^ (h(k2) << 1);
+    }
+};
+} // namespace std

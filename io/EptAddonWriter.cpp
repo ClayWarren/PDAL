@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2019, Connor Manning (connor@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2019, Connor Manning (connor@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "EptAddonWriter.hpp"
 
@@ -41,22 +41,19 @@
 #include <pdal/ArtifactManager.hpp>
 #include <pdal/util/ThreadPool.hpp>
 
+#include "private/connector/Connector.hpp"
 #include "private/ept/Addon.hpp"
 #include "private/ept/Artifact.hpp"
-#include "private/connector/Connector.hpp"
 
 namespace pdal
 {
 
 namespace
 {
-    const StaticPluginInfo s_info
-    {
-        "writers.ept_addon",
-        "EPT Writer",
-        "https://pdal.org/stages/writers.ept.html",
-        { "ept_addon", "ept-addon" }
-    };
+const StaticPluginInfo s_info{"writers.ept_addon",
+                              "EPT Writer",
+                              "https://pdal.org/stages/writers.ept.html",
+                              {"ept_addon", "ept-addon"}};
 
 } // unnamed namespace
 
@@ -64,11 +61,13 @@ struct EptAddonWriter::HierarchyWriter
 {
 public:
     HierarchyWriter(const ept::Hierarchy& hierarchy, uint64_t step,
-        ThreadPool& pool, connector::Connector& conn) :
-        m_hierarchy(hierarchy), m_step(step), m_pool(pool), m_connector(conn)
-    {}
+                    ThreadPool& pool, connector::Connector& conn)
+        : m_hierarchy(hierarchy), m_step(step), m_pool(pool), m_connector(conn)
+    {
+    }
 
-    void write(const std::string& hierarchyDir, NL::json& curr, const ept::Key& key) const;
+    void write(const std::string& hierarchyDir, NL::json& curr,
+               const ept::Key& key) const;
 
 private:
     const ept::Hierarchy& m_hierarchy;
@@ -77,8 +76,9 @@ private:
     connector::Connector& m_connector;
 };
 
-void EptAddonWriter::HierarchyWriter::write(const std::string& hierarchyDir, NL::json& curr,
-    const ept::Key& key) const
+void EptAddonWriter::HierarchyWriter::write(const std::string& hierarchyDir,
+                                            NL::json& curr,
+                                            const ept::Key& key) const
 {
     auto it = m_hierarchy.find(key);
     if (it == m_hierarchy.end())
@@ -94,7 +94,7 @@ void EptAddonWriter::HierarchyWriter::write(const std::string& hierarchyDir, NL:
         curr[keyName] = -1;
 
         // Create a new hierarchy subtree.
-        NL::json next {{ keyName, overlap.m_count }};
+        NL::json next{{keyName, overlap.m_count}};
 
         for (uint64_t dir(0); dir < 8; ++dir)
             write(hierarchyDir, next, key.bisect(dir));
@@ -102,9 +102,7 @@ void EptAddonWriter::HierarchyWriter::write(const std::string& hierarchyDir, NL:
         std::string filename = hierarchyDir + keyName + ".json";
         std::string data = next.dump();
         m_pool.add([this, filename, data]()
-        {
-            m_connector.put(filename, data);
-        });
+                   { m_connector.put(filename, data); });
     }
     else
     {
@@ -122,27 +120,29 @@ struct EptAddonWriter::Args
     std::size_t m_numThreads;
 };
 
-EptAddonWriter::EptAddonWriter() : m_args(new Args)
-{}
+EptAddonWriter::EptAddonWriter() : m_args(new Args) {}
 
-EptAddonWriter::~EptAddonWriter()
-{}
+EptAddonWriter::~EptAddonWriter() {}
 
-std::string EptAddonWriter::getName() const { return s_info.name; }
+std::string EptAddonWriter::getName() const
+{
+    return s_info.name;
+}
 
 void EptAddonWriter::addArgs(ProgramArgs& args)
 {
     args.add("addons", "Mapping of output locations to their dimension names",
-            m_args->m_addons).setPositional();
+             m_args->m_addons)
+        .setPositional();
     args.add("threads", "Number of worker threads", m_args->m_numThreads);
 }
 
 void EptAddonWriter::addDimensions(PointLayoutPtr layout)
 {
-    m_nodeIdDim = layout->registerOrAssignDim("EptNodeId",
-            Dimension::Type::Unsigned32);
-    m_pointIdDim = layout->registerOrAssignDim("EptPointId",
-            Dimension::Type::Unsigned32);
+    m_nodeIdDim =
+        layout->registerOrAssignDim("EptNodeId", Dimension::Type::Unsigned32);
+    m_pointIdDim =
+        layout->registerOrAssignDim("EptPointId", Dimension::Type::Unsigned32);
 }
 
 void EptAddonWriter::prepared(PointTableRef table)
@@ -150,8 +150,9 @@ void EptAddonWriter::prepared(PointTableRef table)
     const std::size_t threads(std::max<std::size_t>(m_args->m_numThreads, 4));
     if (threads > 100)
     {
-        log()->get(LogLevel::Warning) << "Using a large thread count: " <<
-            threads << " threads" << std::endl;
+        log()->get(LogLevel::Warning)
+            << "Using a large thread count: " << threads << " threads"
+            << std::endl;
     }
     m_pool.reset(new ThreadPool(threads));
 
@@ -159,7 +160,8 @@ void EptAddonWriter::prepared(PointTableRef table)
     // the connector that was used in the EptReader that uses any
     // headers/query that was set.
     m_connector.reset(new connector::Connector());
-    m_addons = ept::Addon::store(*m_connector, m_args->m_addons, *(table.layout()));
+    m_addons =
+        ept::Addon::store(*m_connector, m_args->m_addons, *(table.layout()));
 }
 
 void EptAddonWriter::ready(PointTableRef table)
@@ -167,9 +169,8 @@ void EptAddonWriter::ready(PointTableRef table)
     ept::ArtifactPtr eap = table.artifactManager().get<ept::Artifact>("ept");
     if (!eap)
     {
-        throwError(
-                "Cannot use writers.ept_addon without reading using "
-                "readers.ept");
+        throwError("Cannot use writers.ept_addon without reading using "
+                   "readers.ept");
     }
 
     m_hierarchyStep = eap->m_hierarchyStep;
@@ -182,10 +183,12 @@ void EptAddonWriter::write(const PointViewPtr view)
 {
     for (const auto& addon : m_addons)
     {
-        log()->get(LogLevel::Debug) << "Writing addon dimension " <<
-            addon.name() << " to " << addon.filename() << std::endl;
+        log()->get(LogLevel::Debug)
+            << "Writing addon dimension " << addon.name() << " to "
+            << addon.filename() << std::endl;
 
-        HierarchyWriter writer(*m_hierarchy, m_hierarchyStep, *m_pool, *m_connector);
+        HierarchyWriter writer(*m_hierarchy, m_hierarchyStep, *m_pool,
+                               *m_connector);
         writeOne(view, addon, writer);
 
         log()->get(LogLevel::Debug) << "\tWritten" << std::endl;
@@ -193,7 +196,7 @@ void EptAddonWriter::write(const PointViewPtr view)
 }
 
 void EptAddonWriter::writeOne(const PointViewPtr view, const ept::Addon& addon,
-    HierarchyWriter& writer) const
+                              HierarchyWriter& writer) const
 {
     std::vector<std::vector<char>> buffers(m_hierarchy->size());
 
@@ -238,9 +241,7 @@ void EptAddonWriter::writeOne(const PointViewPtr view, const ept::Addon& addon,
         std::vector<char>& buffer = buffers.at(overlap.m_nodeId - 1);
         std::string filename = dataDir + overlap.m_key.toString() + ".bin";
         m_pool->add([this, filename, &buffer]()
-        {
-            m_connector->put(filename, buffer);
-        });
+                    { m_connector->put(filename, buffer); });
     }
 
     m_pool->await();
@@ -270,5 +271,4 @@ void EptAddonWriter::writeOne(const PointViewPtr view, const ept::Addon& addon,
     m_connector->put("ept-addon.json", meta.dump());
 }
 
-}
-
+} // namespace pdal

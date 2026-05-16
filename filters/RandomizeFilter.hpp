@@ -45,9 +45,7 @@ namespace pdal
 class PDAL_EXPORT RandomizeFilter : public Filter
 {
 public:
-    RandomizeFilter()
-    {
-    }
+    RandomizeFilter() {}
 
     std::string getName() const;
 

@@ -60,4 +60,3 @@ TEST(ObbTest, obb)
 
 } // namespace i3s
 } // namespace pdal
-

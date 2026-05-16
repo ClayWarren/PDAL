@@ -7,24 +7,24 @@ namespace expr
 
 Utils::StatusWithReason ConditionalExpression::prepare(PointLayoutPtr layout)
 {
-    Node *top = topNode();
+    Node* top = topNode();
     if (top)
     {
         auto status = top->prepare(layout);
         if (status)
         {
             if (top->isValue())
-                status =
-                    { -1, "Expression evaluates to a value, not a boolean." };
+                status = {-1,
+                          "Expression evaluates to a value, not a boolean."};
             else
             {
-                ConstLogicalNode *n = dynamic_cast<ConstLogicalNode *>(top);
+                ConstLogicalNode* n = dynamic_cast<ConstLogicalNode*>(top);
                 if (n)
                 {
                     if (n->value())
-                        status = { -1, "Expression is always true." };
+                        status = {-1, "Expression is always true."};
                     else
-                        status = { -1, "Expression is always false." };
+                        status = {-1, "Expression is always false."};
                 }
             }
         }
@@ -35,10 +35,9 @@ Utils::StatusWithReason ConditionalExpression::prepare(PointLayoutPtr layout)
 
 bool ConditionalExpression::eval(PointRef& p) const
 {
-    const Node *n = topNode();
+    const Node* n = topNode();
     return n ? n->eval(p).m_bval : true;
 }
 
 } // namespace expr
 } // namespace pdal
-

@@ -70,7 +70,9 @@ private:
     bool flushCache();
 
     std::string arrayName() const
-    { return filename(); }
+    {
+        return filename();
+    }
 
     struct Args;
     std::unique_ptr<TileDBWriter::Args> m_args;

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
@@ -47,8 +47,7 @@ TEST(BpfTestBase, test_point_major)
 
 TEST(BpfTestBase, test_dim_major)
 {
-    test_file_type(
-        Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
+    test_file_type(Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
 }
 
 TEST(BpfTestBase, test_byte_major)
@@ -179,19 +178,18 @@ TEST(BpfTestBase, bundled)
     MetadataNode n = reader2.getMetadata();
     std::vector<uint8_t> outbuf;
     auto findbundle = [](MetadataNode& m)
-        { return m.name() == "bundled_file"; };
+    { return m.name() == "bundled_file"; };
     MetadataNodeList nodes = n.findChildren(findbundle);
     EXPECT_EQ(nodes.size(), 2u);
     auto findbundle1 = [](const MetadataNode& m)
-        { return m.name() == "bundle1"; };
+    { return m.name() == "bundle1"; };
     outbuf = Utils::base64_decode(n.find(findbundle1).value());
-    EXPECT_EQ(memcmp(outbuf.data(), "This is a test",
-        outbuf.size() - 1), 0);
+    EXPECT_EQ(memcmp(outbuf.data(), "This is a test", outbuf.size() - 1), 0);
     auto findbundle2 = [](const MetadataNode& m)
-        { return m.name() == "bundle2"; };
+    { return m.name() == "bundle2"; };
     outbuf = Utils::base64_decode(n.find(findbundle2).value());
-    EXPECT_EQ(memcmp(outbuf.data(), "This is another test",
-        outbuf.size() - 1), 0);
+    EXPECT_EQ(memcmp(outbuf.data(), "This is another test", outbuf.size() - 1),
+              0);
 }
 
 TEST(BpfTestBase, inspect)
@@ -204,35 +202,43 @@ TEST(BpfTestBase, inspect)
 
     QuickInfo qi = reader.preview();
 
-    std::string testWkt = "PROJCS[\"WGS 84 / UTM zone 1N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-177],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32601\"]]";
+    std::string testWkt =
+        "PROJCS[\"WGS 84 / UTM zone 1N\",GEOGCS[\"WGS "
+        "84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
+        "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
+        "\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\","
+        "\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\","
+        "\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_"
+        "Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_"
+        "meridian\",-177],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_"
+        "easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,"
+        "AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS["
+        "\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32601\"]]";
     EXPECT_EQ(qi.m_srs.getWKT(), testWkt);
 
     EXPECT_EQ(qi.m_pointCount, 1065u);
 
-    BOX3D bounds(
-        -13676090.610841721296, 4894836.9556098170578, 123.93000030517578125,
-        -13674705.011110275984, 4896224.6888861842453, 178.7299957275390625);
+    BOX3D bounds(-13676090.610841721296, 4894836.9556098170578,
+                 123.93000030517578125, -13674705.011110275984,
+                 4896224.6888861842453, 178.7299957275390625);
     EXPECT_EQ(qi.m_bounds, bounds);
 
-    const char *dims[] =
-    {
-        "Blue",
-        "Classification",
-        "GPSTime",
-        "Green",
-        "Intensity",
-        "Number of Returns",
-        "Red",
-        "Return Information",
-        "Return Number",
-        "X",
-        "Y",
-        "Z"
-    };
+    const char* dims[] = {"Blue",
+                          "Classification",
+                          "GPSTime",
+                          "Green",
+                          "Intensity",
+                          "Number of Returns",
+                          "Red",
+                          "Return Information",
+                          "Return Number",
+                          "X",
+                          "Y",
+                          "Z"};
 
     std::sort(qi.m_dimNames.begin(), qi.m_dimNames.end());
     EXPECT_TRUE(CheckEqualCollections(qi.m_dimNames.begin(),
-        qi.m_dimNames.end(), std::begin(dims)));
+                                      qi.m_dimNames.end(), std::begin(dims)));
 }
 
 TEST(BpfTestBase, mueller)
@@ -279,15 +285,14 @@ TEST(BpfTestBase, mueller)
     EXPECT_DOUBLE_EQ(zp, -3.0);
 }
 
-
 TEST(BpfTestBase, flex)
 {
-    std::array<std::string, 3> outname =
-        {{ "test_1.bpf", "test_2.bpf", "test_3.bpf" }};
+    std::array<std::string, 3> outname = {
+        {"test_1.bpf", "test_2.bpf", "test_3.bpf"}};
 
     Options readerOps;
     readerOps.add("filename",
-        Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
+                  Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
 
     PointTable table;
 
@@ -346,7 +351,7 @@ TEST(BpfTestBase, flex2)
 {
     Options readerOps;
     readerOps.add("filename",
-        Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
+                  Support::datapath("bpf/autzen-utm-chipped-25-v3.bpf"));
 
     PointTable table;
 
@@ -435,18 +440,11 @@ TEST(BpfTestBase, outputdims)
     for (auto di : dimList)
         dimNames.push_back(t2.layout()->dimName(di));
 
-    const char *dims[] =
-    {
-        "Green",
-        "Red",
-        "X",
-        "Y",
-        "Z"
-    };
+    const char* dims[] = {"Green", "Red", "X", "Y", "Z"};
 
     std::sort(dimNames.begin(), dimNames.end());
-    EXPECT_TRUE(CheckEqualCollections(dimNames.begin(),
-        dimNames.end(), std::begin(dims)));
+    EXPECT_TRUE(CheckEqualCollections(dimNames.begin(), dimNames.end(),
+                                      std::begin(dims)));
 
     Options o3;
     o3.add("filename", testfile);
@@ -458,7 +456,6 @@ TEST(BpfTestBase, outputdims)
     // Missing X dimension.
     PointTable t3;
     EXPECT_THROW(w3.prepare(t3), pdal_error);
-
 }
 
 TEST(BpfTestBase, autoutm)
@@ -488,7 +485,7 @@ TEST(BpfTestBase, autoutm)
     EXPECT_THROW(writer.prepare(table), pdal_error);
 
     Options readerOps;
-    readerOps.add("filename",sourcefile);
+    readerOps.add("filename", sourcefile);
 
     BpfReader reader;
     reader.setOptions(readerOps);
@@ -505,7 +502,7 @@ TEST(BpfTestBase, autoutm)
     writer.execute(table);
 
     Options readerOps2;
-    readerOps2.replace("filename",outfile);
+    readerOps2.replace("filename", outfile);
     BpfReader reader2;
     reader2.setOptions(readerOps2);
 
@@ -526,7 +523,7 @@ TEST(BpfTestBase, setauto)
     PointTable table;
 
     Options readerOps;
-    readerOps.add("filename",sourcefile);
+    readerOps.add("filename", sourcefile);
 
     BpfReader reader;
     reader.setOptions(readerOps);
@@ -544,7 +541,7 @@ TEST(BpfTestBase, setauto)
     writer.execute(table);
 
     Options readerOps2;
-    readerOps2.replace("filename",outfile);
+    readerOps2.replace("filename", outfile);
     BpfReader reader2;
     reader2.setOptions(readerOps2);
 
@@ -553,5 +550,4 @@ TEST(BpfTestBase, setauto)
     PointViewSet views = reader2.execute(table2);
     SpatialReference srs = reader2.getSpatialReference();
     EXPECT_EQ(srs.getUTMZone(), 10);
-
 }

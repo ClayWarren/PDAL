@@ -2,15 +2,12 @@
 
 #include "Path.hpp"
 
-namespace hexer 
+namespace hexer
 {
 
 void Path::writeRing(std::ostream& out) const
 {
-    auto outputPoint = [&out](const Point& p)
-    {
-        out << p.m_x << " " << p.m_y;
-    };
+    auto outputPoint = [&out](const Point& p) { out << p.m_x << " " << p.m_y; };
 
     const std::vector<Point>& pts = points();
     assert(pts.size() > 2);
@@ -28,18 +25,18 @@ void Path::writeRing(std::ostream& out) const
 // polygons and holes.  Islands within the holes need to be described as
 // separate polygons.  To that end, we gather the islands from all holes
 // and return them to be processed as separate polygons.
-std::vector<Path *> Path::writePolygon(std::ostream& out) const
+std::vector<Path*> Path::writePolygon(std::ostream& out) const
 {
-    std::vector<Path *> islands;
+    std::vector<Path*> islands;
 
     out << "(";
     writeRing(out);
-    const std::vector<Path *>& paths = subPaths();
+    const std::vector<Path*>& paths = subPaths();
     for (auto& p : paths)
     {
         out << ", ";
         p->writeRing(out);
-        const std::vector<Path *>& subs(p->subPaths());
+        const std::vector<Path*>& subs(p->subPaths());
         islands.insert(islands.end(), subs.begin(), subs.end());
     }
     out << ")";
@@ -49,17 +46,17 @@ std::vector<Path *> Path::writePolygon(std::ostream& out) const
 
 void Path::toWKT(std::ostream& output) const
 {
-    std::vector<Path *> islands = writePolygon(output);
+    std::vector<Path*> islands = writePolygon(output);
 
     // See the note on writePolygon()
     while (islands.size())
     {
-        std::vector<Path *> paths;
+        std::vector<Path*> paths;
         paths.swap(islands);
-        for (Path *p : paths)
+        for (Path* p : paths)
         {
             output << ", ";
-            std::vector<Path *> subIslands = p->writePolygon(output);
+            std::vector<Path*> subIslands = p->writePolygon(output);
             islands.insert(islands.end(), subIslands.begin(), subIslands.end());
         }
     }

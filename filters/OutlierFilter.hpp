@@ -54,9 +54,7 @@ struct Indices
 class PDAL_EXPORT OutlierFilter : public pdal::Filter
 {
 public:
-    OutlierFilter() : Filter()
-    {
-    }
+    OutlierFilter() : Filter() {}
 
     std::string getName() const;
 

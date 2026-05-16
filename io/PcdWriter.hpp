@@ -45,9 +45,7 @@ class PDAL_EXPORT PcdWriter : public Writer
 {
     struct DimSpec
     {
-        DimSpec() : m_field(PcdField()), m_precision(3)
-        {
-        }
+        DimSpec() : m_field(PcdField()), m_precision(3) {}
 
         DimSpec(PcdField field, uint32_t precision)
         {
@@ -87,4 +85,4 @@ private:
     DimSpec m_zDim;
 };
 
-} // namespaces
+} // namespace pdal

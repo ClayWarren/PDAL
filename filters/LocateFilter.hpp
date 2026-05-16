@@ -48,8 +48,7 @@ class ProgramArgs;
 class PDAL_EXPORT LocateFilter : public Filter
 {
 public:
-    LocateFilter() : Filter()
-    {}
+    LocateFilter() : Filter() {}
 
     std::string getName() const;
 
@@ -63,7 +62,7 @@ private:
     virtual PointViewSet run(PointViewPtr view);
 
     LocateFilter& operator=(const LocateFilter&); // not implemented
-    LocateFilter(const LocateFilter&); // not implemented
+    LocateFilter(const LocateFilter&);            // not implemented
 };
 
 } // namespace pdal

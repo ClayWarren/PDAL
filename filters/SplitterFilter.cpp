@@ -43,20 +43,18 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.splitter",
-    "Split data based on a X/Y box length.",
-    "https://pdal.org/stages/filters.splitter.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.splitter", "Split data based on a X/Y box length.",
+    "https://pdal.org/stages/filters.splitter.html"};
 
 CREATE_STATIC_STAGE(SplitterFilter, s_info)
 
-SplitterFilter::SplitterFilter() : m_viewMap(CoordCompare())
-{}
+SplitterFilter::SplitterFilter() : m_viewMap(CoordCompare()) {}
 
-std::string SplitterFilter::getName() const { return s_info.name; }
-
+std::string SplitterFilter::getName() const
+{
+    return s_info.name;
+}
 
 PointViewPtr SplitterFilter::view(const Coord& coord)
 {
@@ -65,7 +63,6 @@ PointViewPtr SplitterFilter::view(const Coord& coord)
         return nullptr;
     return vi->second;
 }
-
 
 BOX2D SplitterFilter::bounds(const Coord& coord) const
 {
@@ -80,7 +77,6 @@ BOX2D SplitterFilter::bounds(const Coord& coord) const
     return BOX2D(minx, miny, maxx, maxy);
 }
 
-
 BOX2D SplitterFilter::bufferedBounds(const Coord& coord) const
 {
     const int& xpos = coord.first;
@@ -94,7 +90,6 @@ BOX2D SplitterFilter::bufferedBounds(const Coord& coord) const
     return BOX2D(minx, miny, maxx, maxy);
 }
 
-
 BOX2D SplitterFilter::extent() const
 {
     BOX2D box;
@@ -107,30 +102,27 @@ BOX2D SplitterFilter::extent() const
     return box;
 }
 
-
 void SplitterFilter::addArgs(ProgramArgs& args)
 {
     args.add("length", "Edge length of cell", m_length, 1000.0);
     args.add("origin_x", "X origin for a cell", m_xOrigin,
-        std::numeric_limits<double>::quiet_NaN());
+             std::numeric_limits<double>::quiet_NaN());
     args.add("origin_y", "Y origin for a cell", m_yOrigin,
-        std::numeric_limits<double>::quiet_NaN());
+             std::numeric_limits<double>::quiet_NaN());
     args.add("buffer", "Size of buffer (overlap) to include around each tile.",
-        m_buffer, 0.0);
+             m_buffer, 0.0);
 }
-
 
 void SplitterFilter::initialize()
 {
     if (m_buffer >= m_length / 2)
     {
         std::stringstream oss;
-        oss << "Buffer (" << m_buffer <<
-            ") must be less than half of length (" << m_length << ")";
+        oss << "Buffer (" << m_buffer << ") must be less than half of length ("
+            << m_length << ")";
         throwError(oss.str());
     }
 }
-
 
 void SplitterFilter::setOrigin(double xOrigin, double yOrigin)
 {
@@ -138,11 +130,11 @@ void SplitterFilter::setOrigin(double xOrigin, double yOrigin)
     m_yOrigin = yOrigin;
 }
 
-
 PointViewSet SplitterFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-    auto addPoint = [this, &inView](PointRef& point, int xpos, int ypos) {
+    auto addPoint = [this, &inView](PointRef& point, int xpos, int ypos)
+    {
         Coord loc(xpos, ypos);
         PointViewPtr& outView = m_viewMap[loc];
         if (!outView)
@@ -173,7 +165,6 @@ PointViewSet SplitterFilter::run(PointViewPtr inView)
     return viewSet;
 }
 
-
 void SplitterFilter::processPoint(PointRef& point, PointAdder adder)
 {
     double x = point.getFieldAs<double>(Dimension::Id::X);
@@ -192,7 +183,8 @@ void SplitterFilter::processPoint(PointRef& point, PointAdder adder)
 
     // We check in initialize() to make sure that the buffer value isn't more
     // than have the cell edge length.
-    if (m_buffer > 0.0) {
+    if (m_buffer > 0.0)
+    {
         if (squareContains(xpos - 1, ypos, x, y))
             adder(point, xpos - 1, ypos);
         else if (squareContains(xpos + 1, ypos, x, y))
@@ -214,9 +206,8 @@ void SplitterFilter::processPoint(PointRef& point, PointAdder adder)
     }
 }
 
-
-bool SplitterFilter::squareContains(int xpos, int ypos,
-    double x, double y) const
+bool SplitterFilter::squareContains(int xpos, int ypos, double x,
+                                    double y) const
 {
     double minx = m_xOrigin + xpos * m_length - m_buffer;
     double maxx = minx + m_length + 2 * m_buffer;
@@ -226,4 +217,4 @@ bool SplitterFilter::squareContains(int xpos, int ypos,
     return minx < x && x < maxx && miny < y && y < maxy;
 }
 
-} // pdal
+} // namespace pdal

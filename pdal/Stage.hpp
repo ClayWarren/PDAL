@@ -1,50 +1,50 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
 #include <list>
 
-#include <pdal/Dimension.hpp>
 #include <pdal/DimType.hpp>
+#include <pdal/Dimension.hpp>
 #include <pdal/Log.hpp>
 #include <pdal/Metadata.hpp>
 #include <pdal/Options.hpp>
 #include <pdal/PipelineWriter.hpp>
 #include <pdal/PluginHelper.hpp>
-#include <pdal/PointTable.hpp>
 #include <pdal/PointRef.hpp>
+#include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/QuickInfo.hpp>
 #include <pdal/SpatialReference.hpp>
@@ -60,7 +60,7 @@ class Streamable;
 
 namespace expr
 {
-    class ConditionalExpression;
+class ConditionalExpression;
 }
 
 /**
@@ -98,7 +98,9 @@ public:
       \param input  Stage to use as input.
     */
     void setInput(Stage& input)
-        { m_inputs.push_back(&input); }
+    {
+        m_inputs.push_back(&input);
+    }
 
     /**
       Set a file descriptor to which progress information should be written.
@@ -106,7 +108,9 @@ public:
       \param fd  Progress file descriptor.
     */
     void setProgressFd(int fd)
-        { m_progressFd = fd; }
+    {
+        m_progressFd = fd;
+    }
 
     /**
       Retrieve some basic point information without reading all data when
@@ -138,7 +142,7 @@ public:
     virtual void execute(StreamPointTable& table)
     {
         throw pdal_error("Attempting to use stream mode with a non-streamable "
-            "stage.");
+                         "stage.");
     }
 
     /**
@@ -147,7 +151,9 @@ public:
       \return Whether the pipeline is streamable.
     */
     virtual bool pipelineStreamable() const
-    { return false; }
+    {
+        return false;
+    }
 
     /**
       Return a pointer to a pipeline's first non-streamable stage,
@@ -156,8 +162,10 @@ public:
       \return  nullptr if the stage is streamable, a pointer to this stage
         otherwise.
     */
-    virtual const Stage *findNonstreamable() const
-    { return this; }
+    virtual const Stage* findNonstreamable() const
+    {
+        return this;
+    }
 
     /**
       Set the spatial reference of a stage.
@@ -195,7 +203,9 @@ public:
       \param options  Options to set.
     */
     void setOptions(Options options)
-        { m_options = options; }
+    {
+        m_options = options;
+    }
 
     /**
       Add options if an option with the same name doesn't already exist on
@@ -240,7 +250,9 @@ public:
       \param log  Log pointer.
     */
     void setLog(const LogPtr& log)
-        { m_log = log; }
+    {
+        m_log = log;
+    }
 
     /**
       Return the stage's log pointer.
@@ -248,7 +260,9 @@ public:
       \return  Log pointer.
     */
     virtual LogPtr log() const
-        { return m_log; }
+    {
+        return m_log;
+    }
 
     /**
       Push the stage's leader into the log.
@@ -266,7 +280,9 @@ public:
       \return  The stage's debug state.
     */
     bool isDebug() const
-        { return m_log && m_log->getLevel() > LogLevel::Debug; }
+    {
+        return m_log && m_log->getLevel() > LogLevel::Debug;
+    }
 
     /**
       Return the name of a stage.
@@ -279,7 +295,9 @@ public:
         Set a specific tag name.
     */
     void setTag(const std::string& tag)
-        { m_tag = tag; }
+    {
+        m_tag = tag;
+    }
 
     /**
       Return the tag name of a stage.
@@ -287,7 +305,9 @@ public:
       \return  The tag name.
     */
     virtual std::string tag() const
-        { return m_tag; }
+    {
+        return m_tag;
+    }
 
     /**
       Return a list of the stage's inputs.
@@ -295,7 +315,9 @@ public:
       \return  A vector pointers to input stages.
     **/
     std::vector<Stage*>& getInputs()
-        { return m_inputs; }
+    {
+        return m_inputs;
+    }
 
     /**
       Get the stage's metadata node.
@@ -303,7 +325,9 @@ public:
       \return  Stage's metadata.
     */
     MetadataNode getMetadata() const
-        { return m_metadata; }
+    {
+        return m_metadata;
+    }
 
     /**
       Serialize a stage by inserting appropriate data into the provided
@@ -337,9 +361,9 @@ public:
     static bool parseTagName(std::string o, std::string::size_type& pos);
 
 protected:
-    Options m_options;          ///< Stage's options.
-    MetadataNode m_metadata;    ///< Stage's metadata.
-    int m_progressFd;           ///< Descriptor for progress info.
+    Options m_options;       ///< Stage's options.
+    MetadataNode m_metadata; ///< Stage's metadata.
+    int m_progressFd;        ///< Descriptor for progress info.
 
     virtual void setSpatialReference(MetadataNode& m, SpatialReference const&);
     void throwError(const std::string& s) const;
@@ -350,7 +374,9 @@ protected:
       \return  Total number of points in all point views being executed.
     */
     point_count_t pointCount() const
-        { return m_pointCount; }
+    {
+        return m_pointCount;
+    }
     /**
       Return the count of faces in all primary meshes for all point views.
       Only valid during execute().
@@ -358,12 +384,14 @@ protected:
       \return  Total number of faces in all point views being executed.
     */
     point_count_t faceCount() const
-        { return m_faceCount; }
+    {
+        return m_faceCount;
+    }
 
 private:
     uint32_t m_verbose;
     std::string m_logname;
-    std::vector<Stage *> m_inputs;
+    std::vector<Stage*> m_inputs;
     LogPtr m_log;
     std::string m_logLeader;
     SpatialReference m_spatialReference;
@@ -382,7 +410,7 @@ private:
     Stage& operator=(const Stage&) = delete;
     Stage(const Stage&) = delete;
 
-    virtual const expr::ConditionalExpression *whereExpr() const = 0;
+    virtual const expr::ConditionalExpression* whereExpr() const = 0;
     virtual WhereMergeMode mergeMode() const = 0;
     void setupLog();
     void handleOptions();
@@ -395,13 +423,15 @@ private:
     virtual void l_prepared(PointTableRef table);
 
     /**
-      Potentially split a point view into keeps and skips based on a where clause.
+      Potentially split a point view into keeps and skips based on a where
+      clause.
 
       \param view  Point view to split.
       \param keep  PointView to hold the kept points.
       \param skip  PointView to hold the skipped points.
     */
-    void splitView(const PointViewPtr& view, PointViewPtr& keep, PointViewPtr& skip);
+    void splitView(const PointViewPtr& view, PointViewPtr& keep,
+                   PointViewPtr& skip);
 
     /**
       Get basic metadata (avoids reading points).  Implement in subclass.
@@ -409,23 +439,23 @@ private:
       \return  QuickInfo data.
     */
     virtual QuickInfo inspect()
-        { return QuickInfo(); }
+    {
+        return QuickInfo();
+    }
 
     /**
       Add arguments(options) handled by this stage.  Implement in subclass.
 
       \param args  ProgramArgs object to which arguments should be added.
     */
-    virtual void addArgs(ProgramArgs& /*args*/)
-    {}
+    virtual void addArgs(ProgramArgs& /*args*/) {}
 
     /**
       Process options.  Implement in subclass.
 
       \param options  Options to process.
     */
-    virtual void processOptions(const Options& /*options*/)
-        {}
+    virtual void processOptions(const Options& /*options*/) {}
 
     /**
       Initialize stage after options have been processed.  Implement in
@@ -436,22 +466,22 @@ private:
       \param table  PointTable associated with pipeline.
     */
     virtual void initialize(PointTableRef /*table*/)
-        { initialize(); }
+    {
+        initialize();
+    }
 
     /**
       Initialize stage after options have been processed.  Implement in
       subclass.
     */
-    virtual void initialize()
-        {}
+    virtual void initialize() {}
 
     /**
       Add dimensions to a layout.
 
       \param layout  Point layout.
     */
-    virtual void addDimensions(PointLayoutPtr /*layout*/)
-        {}
+    virtual void addDimensions(PointLayoutPtr /*layout*/) {}
 
     /**
       Execute a single stage.
@@ -468,8 +498,7 @@ private:
 
       \param table  PointTable associated with pipeline.
     */
-    virtual void prepared(PointTableRef /*table*/)
-        {}
+    virtual void prepared(PointTableRef /*table*/) {}
 
     /**
       First part of the execute step.  Called after all stages have been
@@ -477,8 +506,7 @@ private:
 
       \param table  PointTable associated with the pipeline.
     */
-    virtual void ready(PointTableRef /*table*/)
-        {}
+    virtual void ready(PointTableRef /*table*/) {}
 
     /**
       Pass all the point views at once to the stage for cases where we need
@@ -486,8 +514,7 @@ private:
 
       \param pvSet  PointViewSet being processed for the stage.
     */
-    virtual void prerun(const PointViewSet& /*pvSet*/)
-        {}
+    virtual void prerun(const PointViewSet& /*pvSet*/) {}
 
     /**
       Process all points in a view.  Implement in subclass.
@@ -505,17 +532,20 @@ private:
 
       \param table  PointTable associated with pipeline.
     */
-    virtual void done(PointTableRef /*table*/)
-        {}
+    virtual void done(PointTableRef /*table*/) {}
 
     /*
       Test hook.
     */
     const Options& getOptions() const
-        { return m_options; }
+    {
+        return m_options;
+    }
 
-    friend PDAL_EXPORT std::istream& operator>>(std::istream& in, WhereMergeMode& mode);
-    friend PDAL_EXPORT std::ostream& operator<<(std::ostream& out, const WhereMergeMode& mode);
+    friend PDAL_EXPORT std::istream& operator>>(std::istream& in,
+                                                WhereMergeMode& mode);
+    friend PDAL_EXPORT std::ostream& operator<<(std::ostream& out,
+                                                const WhereMergeMode& mode);
 };
 
 } // namespace pdal

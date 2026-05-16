@@ -48,7 +48,7 @@ using BasePointTablePtr = std::unique_ptr<BasePointTable>;
 
 namespace connector
 {
-    class Connector;
+class Connector;
 }
 
 namespace ept
@@ -60,23 +60,36 @@ class TileContents
 {
 public:
     TileContents(const Overlap& overlap, const EptInfo& info,
-            const connector::Connector& connector, const AddonList& addons) :
-        m_overlap(overlap), m_info(info), m_connector(connector),
-        m_addons(addons)
-    {}
+                 const connector::Connector& connector, const AddonList& addons)
+        : m_overlap(overlap), m_info(info), m_connector(connector),
+          m_addons(addons)
+    {
+    }
 
     BasePointTable& table() const
-        { return *m_table; }
+    {
+        return *m_table;
+    }
     const Key& key() const
-        { return m_overlap.m_key; }
+    {
+        return m_overlap.m_key;
+    }
     point_count_t nodeId() const
-        { return m_overlap.m_nodeId; }
+    {
+        return m_overlap.m_nodeId;
+    }
     point_count_t size() const
-        { return m_overlap.m_count; }
+    {
+        return m_overlap.m_count;
+    }
     const std::string& error() const
-        { return m_error; }
-    BasePointTable *addonTable(Dimension::Id id) const
-        { return const_cast<TileContents *>(this)->m_addonTables[id].get(); }
+    {
+        return m_error;
+    }
+    BasePointTable* addonTable(Dimension::Id id) const
+    {
+        return const_cast<TileContents*>(this)->m_addonTables[id].get();
+    }
     void read();
 
 private:
@@ -99,4 +112,3 @@ private:
 
 } // namespace ept
 } // namespace pdal
-

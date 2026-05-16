@@ -41,10 +41,7 @@ namespace hexer
 class hexer_error : public std::runtime_error
 {
 public:
-    hexer_error(std::string const& msg)
-        : std::runtime_error(msg)
-    {}
+    hexer_error(std::string const& msg) : std::runtime_error(msg) {}
 };
 
 } // namespace hexer
-

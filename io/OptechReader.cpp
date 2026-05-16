@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "OptechReader.hpp"
 
@@ -45,13 +45,11 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.optech",
     "Optech reader support.",
     "https://pdal.org/stages/readers.optech.html",
-    { "csd" }
-};
+    {"csd"}};
 
 CREATE_STATIC_STAGE(OptechReader, s_info)
 
@@ -67,20 +65,17 @@ const size_t OptechReader::NumBytesInRecord;
 #endif
 
 OptechReader::OptechReader()
-    : Reader()
-    , m_header()
-    , m_boresightMatrix(georeference::createIdentityMatrix())
-    , m_istream()
-    , m_buffer()
-    , m_extractor(m_buffer.data(), 0)
-    , m_recordIndex(0)
-    , m_returnIndex(0)
-    , m_pulse()
-{}
+    : Reader(), m_header(),
+      m_boresightMatrix(georeference::createIdentityMatrix()), m_istream(),
+      m_buffer(), m_extractor(m_buffer.data(), 0), m_recordIndex(0),
+      m_returnIndex(0), m_pulse()
+{
+}
 
-
-const CsdHeader& OptechReader::getHeader() const { return m_header; }
-
+const CsdHeader& OptechReader::getHeader() const
+{
+    return m_header;
+}
 
 void OptechReader::initialize()
 {
@@ -94,7 +89,7 @@ void OptechReader::initialize()
         stream.get(m_header.signature, 4);
         if (strcmp(m_header.signature, "CSD") != 0)
             throwError("Invalid header signature when reading CSD file: '" +
-                std::string(m_header.signature) + "'");
+                       std::string(m_header.signature) + "'");
 
         stream.get(m_header.vendorId, 64);
         stream.get(m_header.softwareVersion, 32);
@@ -111,7 +106,7 @@ void OptechReader::initialize()
             m_header.imuOffsets[2] >> m_header.temperature >> m_header.pressure;
         stream.get(m_header.freeSpace, 830);
     }
-    catch( ... )
+    catch (...)
     {
         Utils::closeFile(rawStream);
         throw;
@@ -128,16 +123,14 @@ void OptechReader::initialize()
     setSpatialReference("EPSG:4326");
 }
 
-
 void OptechReader::addDimensions(PointLayoutPtr layout)
 {
     using namespace Dimension;
 
-    layout->registerDims( { Id::X, Id::Y, Id::Z, Id::GpsTime, Id::ReturnNumber,
-        Id::NumberOfReturns, Id::EchoRange, Id::Intensity,
-        Id::ScanAngleRank } );
+    layout->registerDims({Id::X, Id::Y, Id::Z, Id::GpsTime, Id::ReturnNumber,
+                          Id::NumberOfReturns, Id::EchoRange, Id::Intensity,
+                          Id::ScanAngleRank});
 }
-
 
 void OptechReader::ready(PointTableRef)
 {
@@ -150,7 +143,6 @@ void OptechReader::ready(PointTableRef)
     m_returnIndex = 0;
     m_pulse = CsdPulse();
 }
-
 
 point_count_t OptechReader::read(PointViewPtr data,
                                  point_count_t countRequested)
@@ -203,8 +195,8 @@ point_count_t OptechReader::read(PointViewPtr data,
             createOptechRotationMatrix(m_pulse.roll, m_pulse.pitch,
                                        m_pulse.heading);
         georeference::Xyz point = pdal::georeference::georeferenceWgs84(
-            m_pulse.range[m_returnIndex], m_pulse.scanAngle,
-            m_boresightMatrix, rotationMatrix, gpsPoint);
+            m_pulse.range[m_returnIndex], m_pulse.scanAngle, m_boresightMatrix,
+            rotationMatrix, gpsPoint);
 
         data->setField(Dimension::Id::X, dataIndex, point.X * 180 / M_PI);
         data->setField(Dimension::Id::Y, dataIndex, point.Y * 180 / M_PI);
@@ -213,21 +205,21 @@ point_count_t OptechReader::read(PointViewPtr data,
         if (m_returnIndex == MaximumNumberOfReturns - 1)
         {
             data->setField(Dimension::Id::ReturnNumber, dataIndex,
-                          m_pulse.returnCount);
+                           m_pulse.returnCount);
         }
         else
         {
             data->setField(Dimension::Id::ReturnNumber, dataIndex,
-                          m_returnIndex + 1);
+                           m_returnIndex + 1);
         }
         data->setField(Dimension::Id::NumberOfReturns, dataIndex,
-                      m_pulse.returnCount);
+                       m_pulse.returnCount);
         data->setField(Dimension::Id::EchoRange, dataIndex,
-                      m_pulse.range[m_returnIndex]);
+                       m_pulse.range[m_returnIndex]);
         data->setField(Dimension::Id::Intensity, dataIndex,
-                      m_pulse.intensity[m_returnIndex]);
+                       m_pulse.intensity[m_returnIndex]);
         data->setField(Dimension::Id::ScanAngleRank, dataIndex,
-                      m_pulse.scanAngle * 180 / M_PI);
+                       m_pulse.scanAngle * 180 / M_PI);
 
         if (m_cb)
             m_cb(*data, dataIndex);
@@ -245,11 +237,10 @@ point_count_t OptechReader::read(PointViewPtr data,
     return numRead;
 }
 
-
 size_t OptechReader::fillBuffer()
 {
-    size_t numRecords = (std::min)(m_header.numRecords - m_recordIndex,
-        MaxNumRecordsInBuffer);
+    size_t numRecords =
+        (std::min)(m_header.numRecords - m_recordIndex, MaxNumRecordsInBuffer);
 
     buffer_size_t bufferSize = NumBytesInRecord * numRecords;
     m_buffer.resize(bufferSize);
@@ -258,11 +249,9 @@ size_t OptechReader::fillBuffer()
     return numRecords;
 }
 
-
 void OptechReader::done(PointTableRef)
 {
     m_istream.reset();
 }
 
 } // namespace pdal
-

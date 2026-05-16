@@ -36,8 +36,8 @@
 #include <deque>
 
 #include <arbiter/arbiter.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <pdal/pdal_types.hpp>
+#include <pdal/util/FileUtils.hpp>
 #include <pdal/util/private/JsonSupport.hpp>
 
 namespace pdal
@@ -45,68 +45,69 @@ namespace pdal
 
 namespace stac
 {
-    class Item;
-    class Catalog;
-    class Collection;
-    class ItemCollection;
+class Item;
+class Catalog;
+class Collection;
+class ItemCollection;
 
-    typedef std::pair<std::string, std::string> StacError;
-    typedef std::deque<StacError> ErrorList;
-    typedef std::vector<Item> ItemList;
-    typedef std::vector<std::unique_ptr<Catalog>> SubList;
-    typedef std::deque<std::pair<std::time_t, std::time_t>> DatePairs;
+typedef std::pair<std::string, std::string> StacError;
+typedef std::deque<StacError> ErrorList;
+typedef std::vector<Item> ItemList;
+typedef std::vector<std::unique_ptr<Catalog>> SubList;
+typedef std::deque<std::pair<std::time_t, std::time_t>> DatePairs;
 
-    enum GroupType
-    {
-        catalog,
-        collection
-    };
+enum GroupType
+{
+    catalog,
+    collection
+};
 
-    pdal_error stac_error(std::string id, std::string stacType, std::string const& msg);
-    pdal_error stac_error(std::string const& msg);
-
+pdal_error stac_error(std::string id, std::string stacType,
+                      std::string const& msg);
+pdal_error stac_error(std::string const& msg);
 
 namespace StacUtils
 {
 
-    std::string handleRelativePath(std::string srcPath, std::string linkPath);
-    std::time_t getStacTime(std::string in);
-    std::string stacId(const NL::json& stac);
-    std::string stacType(const NL::json& stac);
-    std::string icSelfPath(const NL::json& json);
+std::string handleRelativePath(std::string srcPath, std::string linkPath);
+std::time_t getStacTime(std::string in);
+std::string stacId(const NL::json& stac);
+std::string stacType(const NL::json& stac);
+std::string icSelfPath(const NL::json& json);
 
-    template <class U = NL::json>
-    inline U stacValue(const NL::json& stac, std::string key = "",
-        const NL::json& rootJson = {})
+template <class U = NL::json>
+inline U stacValue(const NL::json& stac, std::string key = "",
+                   const NL::json& rootJson = {})
+{
+
+    try
     {
-
+        if (key.empty())
+            return stac.get<U>();
+        return stac.at(key).get<U>();
+    }
+    catch (NL::detail::exception& e)
+    {
         try
         {
-            if (key.empty())
-                return stac.get<U>();
-            return stac.at(key).get<U>();
+            NL::json stacCheck = stac;
+            if (!rootJson.empty())
+                stacCheck = rootJson;
+            std::string type = stacType(stacCheck);
+            std::string id;
+            if (type == "FeatureCollection")
+                id = icSelfPath(stacCheck);
+            else
+                id = stacId(stacCheck);
+            throw stac_error(id, type, e.what());
         }
-        catch (NL::detail::exception& e)
+        catch (std::exception&)
         {
-            try {
-                NL::json stacCheck = stac;
-                if (!rootJson.empty())
-                    stacCheck = rootJson;
-                std::string type = stacType(stacCheck);
-                std::string id;
-                if (type == "FeatureCollection")
-                    id = icSelfPath(stacCheck);
-                else
-                    id = stacId(stacCheck);
-                throw stac_error(id, type, e.what());
-            }
-            catch (std::exception& )
-            {
-                throw stac_error(e.what());
-            }
+            throw stac_error(e.what());
         }
     }
+}
 
-}// StacUtils
-}// stac
-}// pdal
+} // namespace StacUtils
+} // namespace stac
+} // namespace pdal

@@ -48,7 +48,7 @@ namespace pdal
 class PDAL_EXPORT XYZTimeFauxReader : public Reader, public Streamable
 {
 public:
-    XYZTimeFauxReader(){};
+    XYZTimeFauxReader() {};
 
     std::string getName() const;
 

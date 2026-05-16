@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2014, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/PDALUtils.hpp>
 
 #include <arbiter/arbiter.hpp>
 
 #include <pdal/KDIndex.hpp>
+#include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/Options.hpp>
 #include <pdal/util/FileUtils.hpp>
 
 #include <utf8.h>
@@ -55,7 +55,8 @@ using namespace std;
 namespace pdal
 {
 
-namespace {
+namespace
+{
 
 void toJSON(const MetadataNode& m, std::ostream& o, int level);
 void arrayToJSON(const MetadataNodeList& children, std::ostream& o, int level);
@@ -163,7 +164,8 @@ std::string toJSON(const MetadataNode& m)
     toJSON(m, o);
     std::string input(o.str());
     std::string output;
-    utf8::replace_invalid(input.begin(), input.end(), std::back_inserter(output));
+    utf8::replace_invalid(input.begin(), input.end(),
+                          std::back_inserter(output));
     return output;
 }
 
@@ -185,8 +187,8 @@ void toJSON(const MetadataNode& m, std::ostream& o)
 
 bool isJSON(const std::string& value)
 {
-    static constexpr std::array<std::pair<char, char>, 3> delims
-    { { { '{', '}' }, { '[', ']' }, { '"', '"' } } };
+    static constexpr std::array<std::pair<char, char>, 3> delims{
+        {{'{', '}'}, {'[', ']'}, {'"', '"'}}};
 
     std::string t = value;
     Utils::trim(t);
@@ -211,14 +213,17 @@ std::string tempFilename(const std::string& path)
 class TempFile
 {
 public:
-    TempFile(const std::string path) : m_filename(path)
-    {}
+    TempFile(const std::string path) : m_filename(path) {}
 
     virtual ~TempFile()
-        { FileUtils::deleteFile(m_filename); }
+    {
+        FileUtils::deleteFile(m_filename);
+    }
 
     const std::string& filename()
-        { return m_filename; }
+    {
+        return m_filename;
+    }
 
 private:
     std::string m_filename;
@@ -228,11 +233,11 @@ class ArbiterOutStream : public std::ofstream
 {
 public:
     ArbiterOutStream(const std::string& localPath,
-            const std::string& remotePath, std::ios::openmode mode) :
-        std::ofstream(localPath, mode),
-        m_remotePath(remotePath),
-        m_localFile(localPath)
-    {}
+                     const std::string& remotePath, std::ios::openmode mode)
+        : std::ofstream(localPath, mode), m_remotePath(remotePath),
+          m_localFile(localPath)
+    {
+    }
 
     virtual ~ArbiterOutStream()
     {
@@ -249,8 +254,8 @@ class ArbiterInStream : public std::ifstream
 {
 public:
     ArbiterInStream(const std::string& localPath, const std::string& remotePath,
-            std::ios::openmode mode) :
-        m_localFile(localPath)
+                    std::ios::openmode mode)
+        : m_localFile(localPath)
     {
         arbiter::Arbiter a;
         a.put(localPath, a.getBinary(remotePath));
@@ -260,13 +265,13 @@ public:
     TempFile m_localFile;
 };
 
-
 uintmax_t fileSize(const std::string& path)
 {
     uintmax_t size = 0;
     if (isRemote(path))
     {
-        std::unique_ptr<std::size_t> pSize = arbiter::Arbiter().tryGetSize(path);
+        std::unique_ptr<std::size_t> pSize =
+            arbiter::Arbiter().tryGetSize(path);
         if (pSize)
             size = *pSize;
     }
@@ -282,9 +287,9 @@ uintmax_t fileSize(const std::string& path)
   \param asBinary  Whether the file should be written in binary mode.
   \return  Pointer to the created stream, or NULL.
 */
-std::ostream *createFile(const std::string& path, bool asBinary)
+std::ostream* createFile(const std::string& path, bool asBinary)
 {
-    ostream *ofs(nullptr);
+    ostream* ofs(nullptr);
 
     if (isRemote(path))
     {
@@ -294,10 +299,12 @@ std::ostream *createFile(const std::string& path, bool asBinary)
         try
         {
             ofs = new ArbiterOutStream(tempFilename(path), path,
-                asBinary ? ios::out | ios::binary : ios::out);
+                                       asBinary ? ios::out | ios::binary
+                                                : ios::out);
         }
         catch (arbiter::ArbiterError&)
-        {}
+        {
+        }
         if (ofs && !ofs->good())
         {
             delete ofs;
@@ -308,7 +315,6 @@ std::ostream *createFile(const std::string& path, bool asBinary)
         ofs = FileUtils::createFile(path, asBinary);
     return ofs;
 }
-
 
 /**
   Open a file (potentially on a remote filesystem).
@@ -327,7 +333,6 @@ bool isRemote(const std::string& path)
         return path.find("://") != std::string::npos;
 }
 
-
 std::string fetchRemote(const std::string& path)
 {
     std::string temp = tempFilename(path);
@@ -336,7 +341,7 @@ std::string fetchRemote(const std::string& path)
     return temp;
 }
 
-std::istream *openFile(const std::string& path, bool asBinary)
+std::istream* openFile(const std::string& path, bool asBinary)
 {
     if (isRemote(path))
     {
@@ -346,7 +351,8 @@ std::istream *openFile(const std::string& path, bool asBinary)
         try
         {
             return new ArbiterInStream(tempFilename(path), path,
-                asBinary ? ios::in | ios::binary : ios::in);
+                                       asBinary ? ios::in | ios::binary
+                                                : ios::in);
         }
         catch (arbiter::ArbiterError& e)
         {
@@ -361,22 +367,20 @@ std::istream *openFile(const std::string& path, bool asBinary)
 
   \param out  Stream to close.
 */
-void closeFile(std::ostream *out)
+void closeFile(std::ostream* out)
 {
     FileUtils::closeFile(out);
 }
-
 
 /**
   Close an input stream.
 
   \param out  Stream to close.
 */
-void closeFile(std::istream *in)
+void closeFile(std::istream* in)
 {
     FileUtils::closeFile(in);
 }
-
 
 /**
   Check to see if a file exists.
@@ -400,8 +404,8 @@ double computeHausdorff(PointViewPtr srcView, PointViewPtr candView)
 {
     using namespace Dimension;
 
-    KD3Index &srcIndex = srcView->build3dIndex();
-    KD3Index &candIndex = candView->build3dIndex();
+    KD3Index& srcIndex = srcView->build3dIndex();
+    KD3Index& candIndex = candView->build3dIndex();
 
     double maxDistSrcToCand = std::numeric_limits<double>::lowest();
     double maxDistCandToSrc = std::numeric_limits<double>::lowest();
@@ -437,7 +441,8 @@ std::pair<double, double> computeHausdorffPair(PointViewPtr viewA,
 {
     // Computes both the max and mean of all nearest neighbor distances from
     // each point in the PointView to those in the KD3Index.
-    auto compute = [](PointViewPtr view, KD3Index& index) {
+    auto compute = [](PointViewPtr view, KD3Index& index)
+    {
         double max_distance = std::numeric_limits<double>::lowest();
         double M1(0.0);
         for (PointRef p : *view)
@@ -484,10 +489,9 @@ std::string dllDir()
 #ifdef _WIN32
     HMODULE hm = NULL;
 
-    if (GetModuleHandleEx(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        (LPCSTR)&dllDir, &hm))
+    if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                              GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          (LPCSTR)&dllDir, &hm))
     {
 #ifdef PDAL_WIN32_STL
         wchar_t path[MAX_PATH];
@@ -501,19 +505,18 @@ std::string dllDir()
     }
 #else
     Dl_info info;
-    if (dladdr((const void *)dllDir, &info))
+    if (dladdr((const void*)dllDir, &info))
         s = info.dli_fname;
 #endif
     return FileUtils::getDirectory(s);
 }
 
-
 double computeChamfer(PointViewPtr srcView, PointViewPtr candView)
 {
     using namespace Dimension;
 
-    KD3Index &srcIndex = srcView->build3dIndex();
-    KD3Index &candIndex = candView->build3dIndex();
+    KD3Index& srcIndex = srcView->build3dIndex();
+    KD3Index& candIndex = candView->build3dIndex();
 
     double sum1(0.0);
     for (PointRef p : *srcView)
@@ -535,7 +538,6 @@ double computeChamfer(PointViewPtr srcView, PointViewPtr candView)
 
     return sum1 + sum2;
 }
-
 
 std::vector<std::string> remoteGlob(const std::string& path)
 {
@@ -564,14 +566,14 @@ std::vector<std::string> remoteGlob(const std::string& path)
         return a.resolve(path);
 }
 
-
 // Glob remote or local filepaths. Remote paths only support '*' or '**'
 // wildcard characters.
 std::vector<std::string> glob(const std::string& path)
 {
-    // need to make sure '/' doesn't appear before '://' so PipelineReader can accept
-    // filenames starting with GDAL vsi prefixes. Maybe move this somewhere else.
-    // The isRemote check isn't necessary but only keeping the second part would look weird
+    // need to make sure '/' doesn't appear before '://' so PipelineReader can
+    // accept filenames starting with GDAL vsi prefixes. Maybe move this
+    // somewhere else. The isRemote check isn't necessary but only keeping the
+    // second part would look weird
     if (isRemote(path) && (path.find("://") < path.find('/')))
         return remoteGlob(path);
     else

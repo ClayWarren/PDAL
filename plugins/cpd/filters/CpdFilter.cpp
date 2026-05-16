@@ -60,14 +60,10 @@ void addMetadata(CpdFilter* filter, const cpd::Result& result)
     root.add("runtime", double(result.runtime.count()) / 1e6);
     root.add("iterations", result.iterations);
 }
-}
+} // namespace
 
-static PluginInfo const s_info
-{
-    "filters.cpd",
-    "CPD filter",
-    "https://pdal.org/stages/filters.cpd.html"
-};
+static PluginInfo const s_info{"filters.cpd", "CPD filter",
+                               "https://pdal.org/stages/filters.cpd.html"};
 
 CREATE_SHARED_STAGE(CpdFilter, s_info)
 
@@ -192,4 +188,4 @@ void CpdFilter::cpd_nonrigid(PointViewPtr fixed, PointViewPtr moving)
     cpd::NonrigidResult result = cpd::nonrigid(fixedMatrix, movingMatrix);
     movePoints(moving, result.points);
 }
-}
+} // namespace pdal

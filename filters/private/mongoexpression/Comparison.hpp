@@ -58,35 +58,53 @@ enum class ComparisonType
 inline bool isComparisonType(const std::string& s)
 {
     return s == "$eq" || s == "$gt" || s == "$gte" || s == "$lt" ||
-        s == "$lte" || s == "$ne" || s == "$in" || s == "$nin";
+           s == "$lte" || s == "$ne" || s == "$in" || s == "$nin";
 }
 
 inline ComparisonType toComparisonType(const std::string& s)
 {
-    if (s == "$eq")         return ComparisonType::eq;
-    else if (s == "$gt")    return ComparisonType::gt;
-    else if (s == "$gte")   return ComparisonType::gte;
-    else if (s == "$lt")    return ComparisonType::lt;
-    else if (s == "$lte")   return ComparisonType::lte;
-    else if (s == "$ne")    return ComparisonType::ne;
-    else if (s == "$in")    return ComparisonType::in;
-    else if (s == "$nin")   return ComparisonType::nin;
-    else throw pdal_error("Invalid comparison type: " + s);
+    if (s == "$eq")
+        return ComparisonType::eq;
+    else if (s == "$gt")
+        return ComparisonType::gt;
+    else if (s == "$gte")
+        return ComparisonType::gte;
+    else if (s == "$lt")
+        return ComparisonType::lt;
+    else if (s == "$lte")
+        return ComparisonType::lte;
+    else if (s == "$ne")
+        return ComparisonType::ne;
+    else if (s == "$in")
+        return ComparisonType::in;
+    else if (s == "$nin")
+        return ComparisonType::nin;
+    else
+        throw pdal_error("Invalid comparison type: " + s);
 }
 
 inline std::string typeToString(ComparisonType c)
 {
     switch (c)
     {
-        case ComparisonType::eq: return "$eq";
-        case ComparisonType::gt: return "$gt";
-        case ComparisonType::gte: return "$gte";
-        case ComparisonType::lt: return "$lt";
-        case ComparisonType::lte: return "$lte";
-        case ComparisonType::ne: return "$ne";
-        case ComparisonType::in: return "$in";
-        case ComparisonType::nin: return "$nin";
-        default: throw pdal_error("Invalid comparison type enum");
+    case ComparisonType::eq:
+        return "$eq";
+    case ComparisonType::gt:
+        return "$gt";
+    case ComparisonType::gte:
+        return "$gte";
+    case ComparisonType::lt:
+        return "$lt";
+    case ComparisonType::lte:
+        return "$lte";
+    case ComparisonType::ne:
+        return "$ne";
+    case ComparisonType::in:
+        return "$in";
+    case ComparisonType::nin:
+        return "$nin";
+    default:
+        throw pdal_error("Invalid comparison type enum");
     }
 }
 
@@ -113,7 +131,7 @@ public:
             if (m_id == Dimension::Id::Unknown)
             {
                 throw pdal_error("Invalid dimension: " +
-                    json.get<std::string>());
+                                 json.get<std::string>());
             }
         }
         else if (json.is_number())
@@ -152,10 +170,11 @@ using Operands = std::vector<Operand>;
 class Comparison : public Filterable
 {
 public:
-    Comparison(Dimension::Id dimId) : m_dimId(dimId) { }
+    Comparison(Dimension::Id dimId) : m_dimId(dimId) {}
 
     static std::unique_ptr<Comparison> create(const PointLayout& layout,
-            std::string dimName, const NL::json& json);
+                                              std::string dimName,
+                                              const NL::json& json);
 
 protected:
     virtual ComparisonType type() const = 0;
@@ -167,9 +186,9 @@ class ComparisonSingle : public Comparison
 {
 public:
     ComparisonSingle(Dimension::Id id, Operand op)
-        : Comparison(id)
-        , m_operand(op)
-    { }
+        : Comparison(id), m_operand(op)
+    {
+    }
 
     virtual bool operator()(const pdal::PointRef& pr) const override
     {
@@ -180,8 +199,8 @@ public:
     {
         std::ostringstream ss;
         ss << pre << Dimension::name(m_dimId) << " ";
-        ss << pre << typeToString(type()) << " " << m_operand.toString() <<
-            std::endl;
+        ss << pre << typeToString(type()) << " " << m_operand.toString()
+           << std::endl;
         return ss.str();
     }
 
@@ -195,25 +214,35 @@ private:
 class ComparisonEqual : public ComparisonSingle
 {
 public:
-    ComparisonEqual(Dimension::Id id, Operand op)
-        : ComparisonSingle(id, op)
-    { }
+    ComparisonEqual(Dimension::Id id, Operand op) : ComparisonSingle(id, op) {}
 
 protected:
-    virtual bool compare(double a, double b) const override { return a == b; }
-    virtual ComparisonType type() const override { return ComparisonType::eq; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a == b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::eq;
+    }
 };
 
 class ComparisonGreater : public ComparisonSingle
 {
 public:
-    ComparisonGreater(Dimension::Id id, Operand op)
-        : ComparisonSingle(id, op)
-    { }
+    ComparisonGreater(Dimension::Id id, Operand op) : ComparisonSingle(id, op)
+    {
+    }
 
 protected:
-    virtual bool compare(double a, double b) const override { return a > b; }
-    virtual ComparisonType type() const override { return ComparisonType::gt; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a > b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::gt;
+    }
 };
 
 class ComparisonGreaterEqual : public ComparisonSingle
@@ -221,63 +250,87 @@ class ComparisonGreaterEqual : public ComparisonSingle
 public:
     ComparisonGreaterEqual(Dimension::Id id, Operand op)
         : ComparisonSingle(id, op)
-    { }
+    {
+    }
 
 protected:
-    virtual bool compare(double a, double b) const override { return a >= b; }
-    virtual ComparisonType type() const override { return ComparisonType::gte; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a >= b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::gte;
+    }
 };
 
 class ComparisonLess : public ComparisonSingle
 {
 public:
-    ComparisonLess(Dimension::Id id, Operand op)
-        : ComparisonSingle(id, op)
-    { }
+    ComparisonLess(Dimension::Id id, Operand op) : ComparisonSingle(id, op) {}
 
 protected:
-    virtual bool compare(double a, double b) const override { return a < b; }
-    virtual ComparisonType type() const override { return ComparisonType::lt; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a < b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::lt;
+    }
 };
 
 class ComparisonLessEqual : public ComparisonSingle
 {
 public:
-    ComparisonLessEqual(Dimension::Id id, Operand op)
-        : ComparisonSingle(id, op)
-    { }
+    ComparisonLessEqual(Dimension::Id id, Operand op) : ComparisonSingle(id, op)
+    {
+    }
 
 protected:
-    virtual bool compare(double a, double b) const override { return a <= b; }
-    virtual ComparisonType type() const override { return ComparisonType::lte; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a <= b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::lte;
+    }
 };
 
 class ComparisonNotEqual : public ComparisonSingle
 {
 public:
-    ComparisonNotEqual(Dimension::Id id, Operand op)
-        : ComparisonSingle(id, op)
-    { }
+    ComparisonNotEqual(Dimension::Id id, Operand op) : ComparisonSingle(id, op)
+    {
+    }
 
 protected:
-    virtual bool compare(double a, double b) const override { return a != b; }
-    virtual ComparisonType type() const override { return ComparisonType::ne; }
+    virtual bool compare(double a, double b) const override
+    {
+        return a != b;
+    }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::ne;
+    }
 };
 
 class ComparisonMulti : public Comparison
 {
 public:
     ComparisonMulti(Dimension::Id id, Operands ops)
-        : Comparison(id)
-        , m_operands(ops)
-    { }
+        : Comparison(id), m_operands(ops)
+    {
+    }
 
     virtual std::string toString(std::string pre) const override
     {
         std::ostringstream ss;
         ss << pre << Dimension::name(m_dimId) << " ";
         ss << pre << typeToString(type()) << " ";
-        for (const auto& op : m_operands) ss << op.toString() << " ";
+        for (const auto& op : m_operands)
+            ss << op.toString() << " ";
         ss << std::endl;
         return ss.str();
     }
@@ -289,42 +342,41 @@ protected:
 class ComparisonAny : public ComparisonMulti
 {
 public:
-    ComparisonAny(Dimension::Id id, Operands ops)
-        : ComparisonMulti(id, ops)
-    { }
+    ComparisonAny(Dimension::Id id, Operands ops) : ComparisonMulti(id, ops) {}
 
 protected:
-    virtual ComparisonType type() const override { return ComparisonType::in; }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::in;
+    }
 
     virtual bool operator()(const pdal::PointRef& pr) const override
     {
         const double val(pr.getFieldAs<double>(m_dimId));
-        return std::any_of(
-                m_operands.begin(),
-                m_operands.end(),
-                [&pr, val](const Operand& op) { return val == op.get(pr); });
+        return std::any_of(m_operands.begin(), m_operands.end(),
+                           [&pr, val](const Operand& op)
+                           { return val == op.get(pr); });
     }
 };
 
 class ComparisonNone : public ComparisonMulti
 {
 public:
-    ComparisonNone(Dimension::Id id, Operands ops)
-        : ComparisonMulti(id, ops)
-    { }
+    ComparisonNone(Dimension::Id id, Operands ops) : ComparisonMulti(id, ops) {}
 
 protected:
-    virtual ComparisonType type() const override { return ComparisonType::nin; }
+    virtual ComparisonType type() const override
+    {
+        return ComparisonType::nin;
+    }
 
     virtual bool operator()(const pdal::PointRef& pr) const override
     {
         const double val(pr.getFieldAs<double>(m_dimId));
-        return std::none_of(
-                m_operands.begin(),
-                m_operands.end(),
-                [&pr, val](const Operand& op) { return val == op.get(pr); });
+        return std::none_of(m_operands.begin(), m_operands.end(),
+                            [&pr, val](const Operand& op)
+                            { return val == op.get(pr); });
     }
 };
 
 } // namespace pdal
-

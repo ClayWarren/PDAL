@@ -33,13 +33,13 @@
  ****************************************************************************/
 
 #include <assert.h>
-#include <sstream>
+#include <chrono>
 #include <cmath>
 #include <map>
-#include <chrono>
+#include <sstream>
 
-#include "Processor.hpp"
 #include "Point.hpp"
+#include "Processor.hpp"
 
 namespace hexer
 {
@@ -59,4 +59,4 @@ void process(BaseGrid& grid, PointReader reader, int count)
     grid.findParentPaths();
 }
 
-} //namespace hexer
+} // namespace hexer

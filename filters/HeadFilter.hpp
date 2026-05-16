@@ -43,8 +43,7 @@ namespace pdal
 class PDAL_EXPORT HeadFilter : public Filter, public Streamable
 {
 public:
-    HeadFilter()
-    {}
+    HeadFilter() {}
     HeadFilter& operator=(const HeadFilter&) = delete;
     HeadFilter(const HeadFilter&) = delete;
 
@@ -59,7 +58,6 @@ private:
     virtual bool processOne(PointRef& point);
     virtual PointViewSet run(PointViewPtr view);
     virtual void ready(PointTableRef table);
-
 };
 
 } // namespace pdal

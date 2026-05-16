@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2012, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Consulting LLC nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2012, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Consulting LLC nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
 #include <array>
 
+#include <io/BufferReader.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <io/BufferReader.hpp>
 
 #include "Support.hpp"
 
@@ -93,8 +93,7 @@ void compare_contents(const std::string& las_file, const std::string& ntf_file)
     n = root.findChild("FH.OPHONE");
     EXPECT_EQ(n.value(), "5155554628");
     n = root.findChild([](MetadataNode& m)
-        { return m.name() == "IM:0.IDATIM"; }
-    );
+                       { return m.name() == "IM:0.IDATIM"; });
     EXPECT_EQ(n.value(), "20110516183337");
 
     //
@@ -105,11 +104,11 @@ void compare_contents(const std::string& las_file, const std::string& ntf_file)
     for (PointId i = 0; i < ntfView->size(); ++i)
     {
         EXPECT_DOUBLE_EQ(ntfView->getFieldAs<double>(Dimension::Id::X, i),
-            lasView->getFieldAs<double>(Dimension::Id::X, i));
+                         lasView->getFieldAs<double>(Dimension::Id::X, i));
         EXPECT_DOUBLE_EQ(ntfView->getFieldAs<double>(Dimension::Id::Y, i),
-            lasView->getFieldAs<double>(Dimension::Id::Y, i));
+                         lasView->getFieldAs<double>(Dimension::Id::Y, i));
         EXPECT_DOUBLE_EQ(ntfView->getFieldAs<double>(Dimension::Id::Z, i),
-            lasView->getFieldAs<double>(Dimension::Id::Z, i));
+                         lasView->getFieldAs<double>(Dimension::Id::Z, i));
     }
 }
 
@@ -190,8 +189,8 @@ TEST(NitfWriterTest, flex)
 {
     StageFactory f;
 
-    std::array<std::string, 3> outname =
-        {{ "test_1.ntf", "test_2.ntf", "test_3.ntf" }};
+    std::array<std::string, 3> outname = {
+        {"test_1.ntf", "test_2.ntf", "test_3.ntf"}};
 
     Options readerOps;
     readerOps.add("filename", Support::datapath("nitf/autzen-utm10.ntf"));
@@ -248,7 +247,6 @@ TEST(NitfWriterTest, flex)
         EXPECT_EQ(r->preview().m_pointCount, vs[i]->size());
     }
 }
-
 
 // Test that data from three input views gets written to a single output file.
 TEST(NitfWriterTest, flex2)
@@ -311,17 +309,18 @@ TEST(NitfWriterTest, longFtitle)
 {
     StageFactory f;
 
-    Stage *r = f.createStage("readers.las");
+    Stage* r = f.createStage("readers.las");
 
     Options ro;
     ro.add("filename", Support::datapath("nitf/autzen-utm10.las"));
 
     r->setOptions(ro);
 
-    Stage *w = f.createStage("writers.nitf");
+    Stage* w = f.createStage("writers.nitf");
 
     Options wo;
-    wo.add("filename", "aaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbccccccccccccccccccccccddddddddddddddeeeeeeeeeeee");
+    wo.add("filename", "aaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbcccccccccccccccc"
+                       "ccccccddddddddddddddeeeeeeeeeeee");
 
     w->setOptions(wo);
     w->setInput(*r);

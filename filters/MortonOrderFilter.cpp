@@ -10,8 +10,8 @@
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in *       the documentation and/or other materials provided
- *       with the distribution.
+ *       notice, this list of conditions and the following disclaimer in * the
+ *documentation and/or other materials provided with the distribution.
  *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
  *       names of its contributors may be used to endorse or promote
  *       products derived from this software without specific prior
@@ -41,24 +41,25 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.mortonorder",
     "Morton or z-order sorting of points. See "
-        "http://en.wikipedia.org/wiki/Z-order_curve for more detail.",
-    "https://pdal.org/stages/filters.mortonorder.html"
-};
+    "http://en.wikipedia.org/wiki/Z-order_curve for more detail.",
+    "https://pdal.org/stages/filters.mortonorder.html"};
 
 CREATE_STATIC_STAGE(MortonOrderFilter, s_info)
 
-std::string MortonOrderFilter::getName() const { return s_info.name; }
+std::string MortonOrderFilter::getName() const
+{
+    return s_info.name;
+}
 
 void MortonOrderFilter::addArgs(ProgramArgs& args)
 {
     args.add("reverse", "Reverse Morton", m_reverse, false);
 }
 
-//This used to be a lambda, but the VS compiler exploded, I guess.
+// This used to be a lambda, but the VS compiler exploded, I guess.
 typedef std::pair<double, double> Coord;
 namespace
 {
@@ -90,7 +91,7 @@ public:
         return (a[j] - b[j]) < 0;
     };
 };
-}
+} // namespace
 
 class ReverseZOrder
 {
@@ -114,10 +115,10 @@ private:
     static uint32_t part1_by1(uint32_t x)
     {
         x &= 0x0000ffff;
-        x = (x ^ (x <<  8)) & 0x00ff00ff;
-        x = (x ^ (x <<  4)) & 0x0f0f0f0f;
-        x = (x ^ (x <<  2)) & 0x33333333;
-        x = (x ^ (x <<  1)) & 0x55555555;
+        x = (x ^ (x << 8)) & 0x00ff00ff;
+        x = (x ^ (x << 4)) & 0x0f0f0f0f;
+        x = (x ^ (x << 2)) & 0x33333333;
+        x = (x ^ (x << 1)) & 0x55555555;
         return x;
     }
 
@@ -125,9 +126,9 @@ private:
     {
         x &= 0x000003ff;
         x = (x ^ (x << 16)) & 0xff0000ff;
-        x = (x ^ (x <<  8)) & 0x0300f00f;
-        x = (x ^ (x <<  4)) & 0x030c30c3;
-        x = (x ^ (x <<  2)) & 0x09249249;
+        x = (x ^ (x << 8)) & 0x0300f00f;
+        x = (x ^ (x << 4)) & 0x030c30c3;
+        x = (x ^ (x << 2)) & 0x09249249;
         return x;
     }
 };
@@ -150,19 +151,17 @@ PointViewSet MortonOrderFilter::reverseMorton(PointViewPtr inView)
     for (PointId idx = 0; idx < inView->size(); idx++)
     {
         const double x = inView->getFieldAs<double>(Dimension::Id::X, idx);
-        const int32_t xpos =
-            static_cast<int32_t>(std::floor((x - buffer_bounds.minx) /
-                cell_width));
+        const int32_t xpos = static_cast<int32_t>(
+            std::floor((x - buffer_bounds.minx) / cell_width));
 
         const double y = inView->getFieldAs<double>(Dimension::Id::Y, idx);
-        const int32_t ypos =
-            static_cast<int32_t>(std::floor((y - buffer_bounds.miny) /
-                cell_height));
+        const int32_t ypos = static_cast<int32_t>(
+            std::floor((y - buffer_bounds.miny) / cell_height));
 
         const uint32_t code = ReverseZOrder::encode_morton(xpos, ypos);
-        const uint32_t reverse = ReverseZOrder::reverse_morton( code );
+        const uint32_t reverse = ReverseZOrder::reverse_morton(code);
 
-        codes.insert( std::pair<uint32_t, PointId>(reverse, idx) );
+        codes.insert(std::pair<uint32_t, PointId>(reverse, idx));
     }
 
     // a map is yet order by key so its naturally ordered by lod
@@ -196,9 +195,11 @@ PointViewSet MortonOrderFilter::morton(PointViewPtr inView)
     for (PointId idx = 0; idx < inView->size(); idx++)
     {
         double xpos = (inView->getFieldAs<double>(Dimension::Id::X, idx) -
-            buffer_bounds.minx) / xrange;
+                       buffer_bounds.minx) /
+                      xrange;
         double ypos = (inView->getFieldAs<double>(Dimension::Id::Y, idx) -
-            buffer_bounds.miny) / yrange;
+                       buffer_bounds.miny) /
+                      yrange;
         Coord loc(xpos, ypos);
         sorted.insert(std::make_pair(loc, idx));
     }
@@ -216,14 +217,14 @@ PointViewSet MortonOrderFilter::morton(PointViewPtr inView)
 
 PointViewSet MortonOrderFilter::run(PointViewPtr inView)
 {
-    if ( m_reverse )
+    if (m_reverse)
     {
-        return reverseMorton( inView );
+        return reverseMorton(inView);
     }
     else
     {
-        return morton( inView );
+        return morton(inView);
     }
 }
 
-} // pdal
+} // namespace pdal

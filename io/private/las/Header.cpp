@@ -14,7 +14,8 @@ namespace las
 
 int baseCount(int format)
 {
-    // LAZ screws with the high bits of the format, so we mask down to the low four bits.
+    // LAZ screws with the high bits of the format, so we mask down to the low
+    // four bits.
     switch (format & Header::FormatMask)
     {
     case 0:
@@ -36,7 +37,7 @@ int baseCount(int format)
     }
 }
 
-void Header::fill(const char *buf, size_t bufsize)
+void Header::fill(const char* buf, size_t bufsize)
 {
     LeExtractor s(buf, bufsize);
 
@@ -59,7 +60,8 @@ void Header::fill(const char *buf, size_t bufsize)
 
     s >> scale.x >> scale.y >> scale.z;
     s >> offset.x >> offset.y >> offset.z;
-    s >> bounds.maxx >> bounds.minx >> bounds.maxy >> bounds.miny >> bounds.maxz >> bounds.minz;
+    s >> bounds.maxx >> bounds.minx >> bounds.maxy >> bounds.miny >>
+        bounds.maxz >> bounds.minz;
     if (versionMinor >= 3)
     {
         s >> waveOffset;
@@ -102,7 +104,8 @@ std::vector<char> Header::data() const
 
     s << scale.x << scale.y << scale.z;
     s << offset.x << offset.y << offset.z;
-    s << bounds.maxx << bounds.minx << bounds.maxy << bounds.miny << bounds.maxz << bounds.minz;
+    s << bounds.maxx << bounds.minx << bounds.maxy << bounds.miny << bounds.maxz
+      << bounds.minz;
     if (versionMinor >= 3)
     {
         s << waveOffset;
@@ -121,25 +124,29 @@ StringList Header::validate(uint64_t fileSize) const
     StringList errors;
 
     if (magic != "LASF")
-        errors.push_back("Invalid file signature. Was expecting 'LASF', Check the first four "
-            " bytes of the file.");
+        errors.push_back("Invalid file signature. Was expecting 'LASF', Check "
+                         "the first four "
+                         " bytes of the file.");
     if (!dataCompressed() && (pointOffset > fileSize))
         errors.push_back("Invalid point offset - exceeds file size.");
-    if (!dataCompressed() && (pointOffset + pointCount() * pointSize > fileSize))
-        errors.push_back("Invalid point count: " + std::to_string(pointCount()) +
+    if (!dataCompressed() &&
+        (pointOffset + pointCount() * pointSize > fileSize))
+        errors.push_back(
+            "Invalid point count: " + std::to_string(pointCount()) +
             ". Number of points too large for file size.");
     if (vlrOffset > fileSize)
         errors.push_back("Invalid VLR offset - exceeds file size.");
     if (!pointFormatSupported(pointFormat()))
         errors.push_back("Unsupported LAS input point format: " +
-            Utils::toString((int)pointFormat()) + ".");
+                         Utils::toString((int)pointFormat()) + ".");
     if (pointSize < baseCount())
         errors.push_back("Invalid point size of " + std::to_string(pointSize) +
-            ". Less than minimum required for point format " +
-            std::to_string((int)pointFormat()) + ".");
+                         ". Less than minimum required for point format " +
+                         std::to_string((int)pointFormat()) + ".");
     if (versionMajor != 1 || versionMinor > 4)
-        errors.push_back("Unsupported LAS version '" + std::to_string(versionMajor) + "." +
-            std::to_string(versionMinor) + "'.");
+        errors.push_back("Unsupported LAS version '" +
+                         std::to_string(versionMajor) + "." +
+                         std::to_string(versionMinor) + "'.");
     return errors;
 }
 
@@ -147,9 +154,8 @@ void Header::setPointCount(uint64_t pointCount)
 {
     ePointCount = pointCount;
     bool condition = (ePointCount <= (std::numeric_limits<uint32_t>::max)()) &&
-        !((versionMinor >= 4) && (pointFormat() >= 6) );
-    legacyPointCount =
-        condition ? (uint32_t)ePointCount : 0;
+                     !((versionMinor >= 4) && (pointFormat() >= 6));
+    legacyPointCount = condition ? (uint32_t)ePointCount : 0;
 }
 
 void Header::setPointsByReturn(int returnNum, uint64_t pointCount)
@@ -157,8 +163,9 @@ void Header::setPointsByReturn(int returnNum, uint64_t pointCount)
     ePointsByReturn[returnNum] = pointCount;
     if (returnNum < LegacyReturnCount)
     {
-        bool condition = (pointCount <= (std::numeric_limits<uint32_t>::max)()) &&
-            !((versionMinor >= 4) && (pointFormat() >= 6) );
+        bool condition =
+            (pointCount <= (std::numeric_limits<uint32_t>::max)()) &&
+            !((versionMinor >= 4) && (pointFormat() >= 6));
 
         legacyPointsByReturn[returnNum] = condition ? (uint32_t)pointCount : 0;
     }
@@ -166,4 +173,3 @@ void Header::setPointsByReturn(int returnNum, uint64_t pointCount)
 
 } // namespace las
 } // namespace pdal
-

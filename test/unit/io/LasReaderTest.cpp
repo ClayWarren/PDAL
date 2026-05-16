@@ -34,17 +34,17 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/pdal_features.hpp>
+#include "Support.hpp"
+#include <io/HeaderVal.hpp>
+#include <io/LasHeader.hpp>
+#include <io/LasReader.hpp>
 #include <pdal/Filter.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/Streamable.hpp>
+#include <pdal/pdal_features.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
-#include <io/HeaderVal.hpp>
-#include <io/LasHeader.hpp>
-#include <io/LasReader.hpp>
-#include "Support.hpp"
 
 using namespace pdal;
 
@@ -93,7 +93,8 @@ TEST(LasReaderTest, create)
 
 TEST(LasReaderTest, header)
 {
-    auto testLasHeader = [](const std::string& filePath, bool compressed){
+    auto testLasHeader = [](const std::string& filePath, bool compressed)
+    {
         PointTable table;
         Options ops;
         ops.add("filename", Support::datapath(filePath));
@@ -195,11 +196,10 @@ TEST(LasReaderTest, test_sequential)
     Support::check_p100_p101_p102(*view2);
 }
 
-
 static void test_a_format(const std::string& file, uint8_t majorVersion,
-    uint8_t minorVersion, int pointFormat,
-    double xref, double yref, double zref, double tref,
-    uint16_t rref,  uint16_t gref,  uint16_t bref)
+                          uint8_t minorVersion, int pointFormat, double xref,
+                          double yref, double zref, double tref, uint16_t rref,
+                          uint16_t gref, uint16_t bref)
 {
     PointTable table;
 
@@ -225,16 +225,23 @@ static void test_a_format(const std::string& file, uint8_t majorVersion,
 
 TEST(LasReaderTest, test_different_formats)
 {
-    test_a_format("las/permutations/1.0_0.las", 1, 0, 0, 470692.440000, 4602888.900000, 16.000000, 0, 0, 0, 0);
-    test_a_format("las/permutations/1.0_1.las", 1, 0, 1, 470692.440000, 4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
-    test_a_format("las/permutations/1.1_0.las", 1, 1, 0, 470692.440000, 4602888.900000, 16.000000, 0, 0, 0, 0);
-    test_a_format("las/permutations/1.1_1.las", 1, 1, 1, 470692.440000, 4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
-    test_a_format("las/permutations/1.2_0.las", 1, 2, 0, 470692.440000, 4602888.900000, 16.000000, 0, 0, 0, 0);
-    test_a_format("las/permutations/1.2_1.las", 1, 2, 1, 470692.440000, 4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
-    test_a_format("las/permutations/1.2_2.las", 1, 2, 2, 470692.440000, 4602888.900000, 16.000000, 0, 255, 12, 234);
-    test_a_format("las/permutations/1.2_3.las", 1, 2, 3, 470692.440000, 4602888.900000, 16.000000, 1205902800.000000, 255, 12, 234);
+    test_a_format("las/permutations/1.0_0.las", 1, 0, 0, 470692.440000,
+                  4602888.900000, 16.000000, 0, 0, 0, 0);
+    test_a_format("las/permutations/1.0_1.las", 1, 0, 1, 470692.440000,
+                  4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
+    test_a_format("las/permutations/1.1_0.las", 1, 1, 0, 470692.440000,
+                  4602888.900000, 16.000000, 0, 0, 0, 0);
+    test_a_format("las/permutations/1.1_1.las", 1, 1, 1, 470692.440000,
+                  4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
+    test_a_format("las/permutations/1.2_0.las", 1, 2, 0, 470692.440000,
+                  4602888.900000, 16.000000, 0, 0, 0, 0);
+    test_a_format("las/permutations/1.2_1.las", 1, 2, 1, 470692.440000,
+                  4602888.900000, 16.000000, 1205902800.000000, 0, 0, 0);
+    test_a_format("las/permutations/1.2_2.las", 1, 2, 2, 470692.440000,
+                  4602888.900000, 16.000000, 0, 255, 12, 234);
+    test_a_format("las/permutations/1.2_3.las", 1, 2, 3, 470692.440000,
+                  4602888.900000, 16.000000, 1205902800.000000, 255, 12, 234);
 }
-
 
 TEST(LasReaderTest, inspect)
 {
@@ -248,9 +255,7 @@ TEST(LasReaderTest, inspect)
 
     // This string is common for WKT1 and WKT2.  When we move to WKT2
     // completely, this can be fixed.
-    std::string testWkt {
-         R"(GEOGCS)"
-    };
+    std::string testWkt{R"(GEOGCS)"};
 
     std::cout << "qi.m_srs.getWKT(): " << qi.m_srs.getWKT() << std::endl;
     std::cout << "testWkt: " << testWkt << std::endl;
@@ -258,28 +263,25 @@ TEST(LasReaderTest, inspect)
     EXPECT_EQ(qi.m_pointCount, 5380u);
 
     BOX3D bounds(-94.683465399999989, 31.0367341, 39.081000199999998,
-        -94.660631099999989, 31.047329099999999, 78.119000200000002);
+                 -94.660631099999989, 31.047329099999999, 78.119000200000002);
     EXPECT_EQ(qi.m_bounds, bounds);
 
-    const std::set<std::string> exp =
-    {
-        "Classification",
-        "EdgeOfFlightLine",
-        "Intensity",
-        "NumberOfReturns",
-        "Overlap",
-        "KeyPoint",
-        "PointSourceId",
-        "ReturnNumber",
-        "ScanAngleRank",
-        "ScanDirectionFlag",
-        "Synthetic",
-        "UserData",
-        "Withheld",
-        "X",
-        "Y",
-        "Z"
-    };
+    const std::set<std::string> exp = {"Classification",
+                                       "EdgeOfFlightLine",
+                                       "Intensity",
+                                       "NumberOfReturns",
+                                       "Overlap",
+                                       "KeyPoint",
+                                       "PointSourceId",
+                                       "ReturnNumber",
+                                       "ScanAngleRank",
+                                       "ScanDirectionFlag",
+                                       "Synthetic",
+                                       "UserData",
+                                       "Withheld",
+                                       "X",
+                                       "Y",
+                                       "Z"};
 
     const std::set<std::string> got(qi.m_dimNames.begin(), qi.m_dimNames.end());
 
@@ -313,7 +315,6 @@ TEST(LasReaderTest, test_vlr)
         EXPECT_TRUE(!m.empty()) << "No value for node " << i;
     }
 }
-
 
 TEST(LasReaderTest, testInvalidFileSignature)
 {
@@ -374,20 +375,20 @@ TEST(LasReaderTest, extraBytes)
     for (PointId idx = 0; idx < view->size(); ++idx)
     {
         ASSERT_EQ(view->getFieldAs<uint16_t>(red, idx),
-            view->getFieldAs<uint16_t>(color0, idx));
+                  view->getFieldAs<uint16_t>(color0, idx));
         ASSERT_EQ(view->getFieldAs<uint16_t>(green, idx),
-            view->getFieldAs<uint16_t>(color1, idx));
+                  view->getFieldAs<uint16_t>(color1, idx));
         ASSERT_EQ(view->getFieldAs<uint16_t>(blue, idx),
-            view->getFieldAs<uint16_t>(color2, idx));
+                  view->getFieldAs<uint16_t>(color2, idx));
 
         ASSERT_EQ(view->getFieldAs<uint16_t>(flag0, idx),
-            view->getFieldAs<uint16_t>(returnNum, idx));
+                  view->getFieldAs<uint16_t>(returnNum, idx));
         ASSERT_EQ(view->getFieldAs<uint16_t>(flag1, idx),
-            view->getFieldAs<uint16_t>(numReturns, idx));
+                  view->getFieldAs<uint16_t>(numReturns, idx));
 
         // Time was written truncated rather than rounded.
         ASSERT_NEAR(view->getFieldAs<double>(time, idx),
-            view->getFieldAs<double>(time2, idx), 1.0);
+                    view->getFieldAs<double>(time2, idx), 1.0);
     }
 }
 
@@ -413,9 +414,7 @@ TEST(LasReaderTest, callback)
     ops.add("filename", Support::datapath("las/simple.las"));
 
     Reader::PointReadFunc cb = [&count](PointView& view, PointId id)
-    {
-        count++;
-    };
+    { count++; };
     LasReader reader;
     reader.setOptions(ops);
     reader.setReadCb(cb);
@@ -464,9 +463,9 @@ TEST(LasReaderTest, lazperf)
     std::vector<char> buf2(pointSize);
     for (PointId i = 0; i < 110000; i += 100)
     {
-       view1->getPackedPoint(dims, i, buf1.data());
-       view2->getPackedPoint(dims, i, buf2.data());
-       EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
+        view1->getPackedPoint(dims, i, buf1.data());
+        view2->getPackedPoint(dims, i, buf2.data());
+        EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
     }
 }
 
@@ -488,11 +487,15 @@ void streamTest(const std::string src)
     {
     public:
         std::string getName() const
-            { return "checker"; }
-        Checker(PointViewPtr v) : m_cnt(0), m_view(v),
-            m_bulkBuf(v->pointSize()), m_buf(v->pointSize()),
-            m_dims(v->dimTypes())
-            {}
+        {
+            return "checker";
+        }
+        Checker(PointViewPtr v)
+            : m_cnt(0), m_view(v), m_bulkBuf(v->pointSize()),
+              m_buf(v->pointSize()), m_dims(v->dimTypes())
+        {
+        }
+
     private:
         point_count_t m_cnt;
         PointViewPtr m_view;
@@ -506,8 +509,8 @@ void streamTest(const std::string src)
 
             bulkPoint.getPackedData(m_dims, m_bulkBuf.data());
             point.getPackedData(m_dims, m_buf.data());
-            EXPECT_EQ(memcmp(m_buf.data(), m_bulkBuf.data(),
-                m_view->pointSize()), 0);
+            EXPECT_EQ(
+                memcmp(m_buf.data(), m_bulkBuf.data(), m_view->pointSize()), 0);
             m_cnt++;
             return true;
         }
@@ -539,7 +542,6 @@ TEST(LasReaderTest, stream)
     streamTest(Support::datapath("laz/autzen_trim.laz"));
 }
 
-
 // The header of 1.2-with-color-clipped says that it has 1065 points,
 // but it really only has 1064.
 TEST(LasReaderTest, LasHeaderIncorrectPointcount)
@@ -547,7 +549,8 @@ TEST(LasReaderTest, LasHeaderIncorrectPointcount)
     PointTable table;
 
     Options readOps;
-    readOps.add("filename", Support::datapath("las/1.2-with-color-clipped.las"));
+    readOps.add("filename",
+                Support::datapath("las/1.2-with-color-clipped.las"));
     LasReader reader;
     reader.setOptions(readOps);
 
@@ -559,7 +562,8 @@ TEST(LasReaderTest, EmptyGeotiffVlr)
     PointTable table;
 
     Options readOps;
-    readOps.add("filename", Support::datapath("las/1.2-empty-geotiff-vlrs.las"));
+    readOps.add("filename",
+                Support::datapath("las/1.2-empty-geotiff-vlrs.las"));
     LasReader reader;
     reader.setOptions(readOps);
 
@@ -568,7 +572,6 @@ TEST(LasReaderTest, EmptyGeotiffVlr)
     PointViewPtr view = *viewSet.begin();
 
     EXPECT_EQ(43u, view->size());
-
 }
 
 TEST(LasReaderTest, IgnoreVLRs)
@@ -625,7 +628,6 @@ TEST(LasReaderTest, IgnoreBadVLRs)
     }
 }
 
-
 TEST(LasReaderTest, SyntheticPoints)
 {
     using namespace Dimension;
@@ -642,7 +644,7 @@ TEST(LasReaderTest, SyntheticPoints)
     PointViewPtr outView = *viewSet.begin();
 
     EXPECT_EQ(ClassLabel::CreatedNeverClassified,
-        outView->getFieldAs<uint8_t>(Id::Classification, 0));
+              outView->getFieldAs<uint8_t>(Id::Classification, 0));
 
     EXPECT_TRUE(outView->getFieldAs<bool>(Id::Synthetic, 0));
 }
@@ -653,14 +655,14 @@ TEST(LasReaderTest, Start)
     std::string source = Support::temppath("increment.laz");
     StageFactory f;
     {
-        Stage *faux = f.createStage("readers.faux");
+        Stage* faux = f.createStage("readers.faux");
         Options opts;
         opts.add("mode", "ramp");
         opts.add("bounds", "([0, 69999],[100,70099],[500,70499])");
         opts.add("count", 70000);
         faux->setOptions(opts);
 
-        Stage *las = f.createStage("writers.las");
+        Stage* las = f.createStage("writers.las");
         Options opts2;
         opts2.add("filename", source);
         las->setOptions(opts2);
@@ -673,7 +675,7 @@ TEST(LasReaderTest, Start)
 
     auto test1 = [source, &f](int start)
     {
-        Stage *las = f.createStage("readers.las");
+        Stage* las = f.createStage("readers.las");
         Options opts;
         opts.add("filename", source);
         opts.add("start", start);
@@ -690,7 +692,7 @@ TEST(LasReaderTest, Start)
     // Can't start at 70'000 when there are only 70'000 points.
     auto test2 = [source, &f]()
     {
-        Stage *las = f.createStage("readers.las");
+        Stage* las = f.createStage("readers.las");
         Options opts;
         opts.add("filename", source);
         opts.add("start", 70000);
@@ -701,7 +703,7 @@ TEST(LasReaderTest, Start)
     };
     auto test3 = [&f](int start, float xval, float yval, float zval)
     {
-        Stage *las = f.createStage("readers.las");
+        Stage* las = f.createStage("readers.las");
         Options opts;
         opts.add("filename", Support::datapath("copc/lone-star.copc.laz"));
         opts.add("start", start);
@@ -716,7 +718,7 @@ TEST(LasReaderTest, Start)
         EXPECT_EQ(v->getFieldAs<float>(Dimension::Id::Z, 0), zval);
     };
 
-    std::vector<int> starts {0, 49999, 50000, 62520, 2525, 69999};
+    std::vector<int> starts{0, 49999, 50000, 62520, 2525, 69999};
     for (auto i : starts)
         test1(i);
     test2();
@@ -756,11 +758,11 @@ TEST(LasReaderTest, Copc)
     }
 }
 
-
 TEST(LasReaderTest, Laz_with_extra_byte)
 {
     Options ops1;
-    ops1.add("filename", Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
+    ops1.add("filename",
+             Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
     ops1.add("extra_dims", "Deviation=uint16_t, confidence=uint8_t");
 
     LasReader lazReader;
@@ -772,14 +774,15 @@ TEST(LasReaderTest, Laz_with_extra_byte)
     PointLayoutPtr layout(table.layout());
     PointViewPtr view = *viewSet.begin();
 
-    ASSERT_TRUE(view->hasDim( layout->findDim("Deviation") ));
-    ASSERT_TRUE(view->hasDim( layout->findDim("confidence") ));
+    ASSERT_TRUE(view->hasDim(layout->findDim("Deviation")));
+    ASSERT_TRUE(view->hasDim(layout->findDim("confidence")));
 }
 
 TEST(LasReaderTest, multi_eb)
 {
     Options ops1;
-    ops1.add("filename", Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
+    ops1.add("filename",
+             Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
 
     LasReader lazReader;
     lazReader.setOptions(ops1);
@@ -795,7 +798,8 @@ TEST(LasReaderTest, multi_eb)
 TEST(LasReaderTest, Laz_with_severals_extra_byte_with_wrong_options_name)
 {
     Options ops1;
-    ops1.add("filename", Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
+    ops1.add("filename",
+             Support::datapath("laz/las_with_several_extra_byte_bloc.laz"));
     ops1.add("extra_dims", "Bad_Name=uint16_t, confidence=uint8_t");
 
     LasReader lazReader;
@@ -808,9 +812,9 @@ TEST(LasReaderTest, Laz_with_severals_extra_byte_with_wrong_options_name)
     PointLayoutPtr layout(table.layout());
     PointViewPtr view = *viewSet.begin();
 
-    ASSERT_FALSE(view->hasDim( layout->findDim("Deviation") ));
-    ASSERT_TRUE(view->hasDim( layout->findDim("confidence") ));
-    ASSERT_TRUE(view->hasDim( layout->findDim("Bad_Name") ));
+    ASSERT_FALSE(view->hasDim(layout->findDim("Deviation")));
+    ASSERT_TRUE(view->hasDim(layout->findDim("confidence")));
+    ASSERT_TRUE(view->hasDim(layout->findDim("Bad_Name")));
 }
 
 TEST(LasReaderTest, remote_vsi)
@@ -824,16 +828,18 @@ TEST(LasReaderTest, remote_vsi)
     PointTable table;
 
     // check we get past looking up the arbiter driver
-    EXPECT_THROW({
-        try
+    EXPECT_THROW(
         {
-            reader.prepare(table);
-        }
-        catch(const pdal_error& e)
-        {
-            EXPECT_TRUE(Utils::startsWith(e.what(),
-                "Unable to open stream for"));
-            throw;
-        }
-    }, pdal_error);
+            try
+            {
+                reader.prepare(table);
+            }
+            catch (const pdal_error& e)
+            {
+                EXPECT_TRUE(
+                    Utils::startsWith(e.what(), "Unable to open stream for"));
+                throw;
+            }
+        },
+        pdal_error);
 }

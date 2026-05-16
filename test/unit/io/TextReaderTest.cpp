@@ -43,8 +43,8 @@
 
 using namespace pdal;
 
-void compareTextLas(const std::string& textFilename,
-    Options& textOptions, const std::string& lasFilename)
+void compareTextLas(const std::string& textFilename, Options& textOptions,
+                    const std::string& lasFilename)
 {
     TextReader t;
     textOptions.add("filename", textFilename);
@@ -72,27 +72,25 @@ void compareTextLas(const std::string& textFilename,
     // Validate some point data.
     for (PointId i = 0; i < lv->size(); ++i)
     {
-       EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::X, i),
-           lv->getFieldAs<double>(Dimension::Id::X, i));
-       EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::Y, i),
-           lv->getFieldAs<double>(Dimension::Id::Y, i));
-       EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::Z, i),
-           lv->getFieldAs<double>(Dimension::Id::Z, i));
+        EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::X, i),
+                         lv->getFieldAs<double>(Dimension::Id::X, i));
+        EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::Y, i),
+                         lv->getFieldAs<double>(Dimension::Id::Y, i));
+        EXPECT_DOUBLE_EQ(tv->getFieldAs<double>(Dimension::Id::Z, i),
+                         lv->getFieldAs<double>(Dimension::Id::Z, i));
     }
 }
 
-
 void compareTextLas(const std::string& textFilename,
-    const std::string& lasFilename)
+                    const std::string& lasFilename)
 {
     Options textOptions;
 
     compareTextLas(textFilename, textOptions, lasFilename);
 }
 
-
 void compareTextLasStreaming(const std::string& textFilename,
-    const std::string& lasFilename)
+                             const std::string& lasFilename)
 {
     std::string tempname(Support::temppath("testlas.las"));
 
@@ -140,19 +138,19 @@ void compareTextLasStreaming(const std::string& textFilename,
     // Validate some point data.
     for (PointId i = 0; i < v1->size(); ++i)
     {
-       EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::X, i),
-           v2->getFieldAs<double>(Dimension::Id::X, i));
-       EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::Y, i),
-           v2->getFieldAs<double>(Dimension::Id::Y, i));
-       EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::Z, i),
-           v2->getFieldAs<double>(Dimension::Id::Z, i));
+        EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::X, i),
+                         v2->getFieldAs<double>(Dimension::Id::X, i));
+        EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::Y, i),
+                         v2->getFieldAs<double>(Dimension::Id::Y, i));
+        EXPECT_DOUBLE_EQ(v1->getFieldAs<double>(Dimension::Id::Z, i),
+                         v2->getFieldAs<double>(Dimension::Id::Z, i));
     }
 }
 
 TEST(TextReaderTest, t1)
 {
     compareTextLas(Support::datapath("text/utm17_1.txt"),
-        Support::datapath("las/utm17.las"));
+                   Support::datapath("las/utm17.las"));
 }
 
 TEST(TextReaderTest, t1a)
@@ -161,20 +159,20 @@ TEST(TextReaderTest, t1a)
 
     textOptions.add("separator", ',');
 
-    compareTextLas(Support::datapath("text/utm17_1.txt"),
-        textOptions, Support::datapath("las/utm17.las"));
+    compareTextLas(Support::datapath("text/utm17_1.txt"), textOptions,
+                   Support::datapath("las/utm17.las"));
 }
 
 TEST(TextReaderTest, t2)
 {
     compareTextLas(Support::datapath("text/utm17_2.txt"),
-        Support::datapath("las/utm17.las"));
+                   Support::datapath("las/utm17.las"));
 }
 
 TEST(TextReaderTest, t3)
 {
     compareTextLas(Support::datapath("text/utm17_3.txt"),
-        Support::datapath("las/utm17.las"));
+                   Support::datapath("las/utm17.las"));
 }
 
 TEST(TextReaderTest, badheader)
@@ -206,7 +204,8 @@ TEST(TextReaderTest, strip_whitespace_from_dimension_names)
     PointViewSet pointViewSet = reader.execute(table);
     PointViewPtr pointViewPtr = *pointViewSet.begin();
 
-    for (PointId i = 0; i < pointViewPtr->size(); ++i) {
+    for (PointId i = 0; i < pointViewPtr->size(); ++i)
+    {
         EXPECT_EQ(
             i, pointViewPtr->getFieldAs<uint16_t>(Dimension::Id::Intensity, i));
     }
@@ -239,7 +238,8 @@ TEST(TextReaderTest, issue1939)
     PointViewPtr pointViewPtr = *pointViewSet.begin();
 
     EXPECT_EQ(pointViewPtr->size(), 10U);
-    for (PointId i = 0; i < pointViewPtr->size(); ++i) {
+    for (PointId i = 0; i < pointViewPtr->size(); ++i)
+    {
         EXPECT_EQ(
             i, pointViewPtr->getFieldAs<uint16_t>(Dimension::Id::Intensity, i));
     }
@@ -255,7 +255,7 @@ TEST(TextReaderTest, warnMissingHeader)
 
     Utils::run_shell_command(Support::binpath(cmd), output);
     EXPECT_NE(output.find("doesn't appear to contain a header"),
-        std::string::npos);
+              std::string::npos);
 }
 
 // Skip the file's header and use another in it's place.
@@ -304,8 +304,8 @@ TEST(TextReaderTest, insertHeader)
 
 TEST(TextReaderTest, quotedHeader)
 {
-    auto testme = [](Options& options,
-        const std::string& filename = "text/quoted.txt")
+    auto testme =
+        [](Options& options, const std::string& filename = "text/quoted.txt")
     {
         TextReader reader;
         options.add("filename", Support::datapath(filename));

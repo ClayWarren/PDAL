@@ -1,43 +1,43 @@
 /******************************************************************************
-* Copyright (c) 2020, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2020, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
 #include <pdal/Filter.hpp>
-#include <pdal/Writer.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/Streamable.hpp>
+#include <pdal/Writer.hpp>
 #include <pdal/util/Bounds.hpp>
 
 namespace pdal
@@ -45,15 +45,15 @@ namespace pdal
 
 namespace
 {
-    size_t g_count;
+size_t g_count;
 }
 
 void exec1(const std::string& where, size_t expKeep, size_t expViews,
-    Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
+           Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -63,7 +63,9 @@ void exec1(const std::string& where, size_t expKeep, size_t expViews,
     class TestFilter : public Filter
     {
         std::string getName() const
-        { return "filters.test"; }
+        {
+            return "filters.test";
+        }
 
         void filter(PointView& v)
         {
@@ -90,11 +92,11 @@ void exec1(const std::string& where, size_t expKeep, size_t expViews,
 }
 
 void exec2(const std::string& where, size_t expKeep, size_t expViews,
-    Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
+           Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -111,7 +113,9 @@ void exec2(const std::string& where, size_t expKeep, size_t expViews,
 
     private:
         std::string getName() const
-        { return "filters.test"; }
+        {
+            return "filters.test";
+        }
 
         void filter(PointView& v)
         {
@@ -139,11 +143,11 @@ void exec2(const std::string& where, size_t expKeep, size_t expViews,
 }
 
 void exec3(const std::string& where, size_t expKeep, size_t expViews,
-    Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
+           Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -153,7 +157,9 @@ void exec3(const std::string& where, size_t expKeep, size_t expViews,
     class TestFilter : public Filter
     {
         std::string getName() const
-        { return "filters.test"; }
+        {
+            return "filters.test";
+        }
 
         PointViewSet run(PointViewPtr v)
         {
@@ -184,11 +190,11 @@ void exec3(const std::string& where, size_t expKeep, size_t expViews,
 }
 
 void exec4(const std::string& where, size_t expKeep, size_t expViews,
-    Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
+           Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -198,7 +204,9 @@ void exec4(const std::string& where, size_t expKeep, size_t expViews,
     class TestWriter : public NoFilenameWriter
     {
         std::string getName() const
-        { return "writers.test"; }
+        {
+            return "writers.test";
+        }
 
         PointViewSet run(PointViewPtr v)
         {
@@ -232,7 +240,7 @@ void exec5(const std::string& where, size_t expKeep)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -242,7 +250,9 @@ void exec5(const std::string& where, size_t expKeep)
     class TestWriter : public NoFilenameWriter, public Streamable
     {
         std::string getName() const
-        { return "writers.test"; }
+        {
+            return "writers.test";
+        }
 
         bool processOne(PointRef& p)
         {
@@ -266,11 +276,11 @@ void exec5(const std::string& where, size_t expKeep)
 
 // Support for filter that returns no point views.
 void exec6(const std::string& where, size_t expKeep, size_t expViews,
-    Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
+           Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
 {
     StageFactory factory;
 
-    Stage *r = factory.createStage("readers.faux");
+    Stage* r = factory.createStage("readers.faux");
     Options ro;
     ro.add("count", 100);
     ro.add("bounds", BOX3D(0, 0, 100, 99, 9.9, 199));
@@ -280,14 +290,16 @@ void exec6(const std::string& where, size_t expKeep, size_t expViews,
     class TestFilter : public Filter
     {
     public:
-    TestFilter()
-    {
-        g_count = 0;
-    }
+        TestFilter()
+        {
+            g_count = 0;
+        }
 
     private:
         std::string getName() const
-        { return "filters.test"; }
+        {
+            return "filters.test";
+        }
 
         PointViewSet run(PointViewPtr v)
         {
@@ -318,7 +330,6 @@ void exec6(const std::string& where, size_t expKeep, size_t expViews,
     EXPECT_EQ(total, 100);
     EXPECT_EQ(g_count, expKeep);
 }
-
 
 TEST(WhereTest, filter)
 {

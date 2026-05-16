@@ -12,8 +12,7 @@ class AssignStatement;
 class AssignParser : public BaseParser
 {
 public:
-    AssignParser(Lexer& lexer) : BaseParser(lexer)
-    {}
+    AssignParser(Lexer& lexer) : BaseParser(lexer) {}
 
     bool statement(AssignStatement& expr);
 

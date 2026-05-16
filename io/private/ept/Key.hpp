@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include <functional>  // for hash
+#include <functional> // for hash
 
 namespace pdal
 {
@@ -46,8 +46,7 @@ class PDAL_EXPORT Key
     // An EPT key representation (see https://git.io/fAiBh).  A depth/X/Y/Z key
     // representing a data node, as well as the bounds of the contained data.
 public:
-    Key()
-    {}
+    Key() {}
 
     Key(const std::string& s)
     {
@@ -70,20 +69,27 @@ public:
     std::string toString() const
     {
         return std::to_string(d) + '-' + std::to_string(x) + '-' +
-            std::to_string(y) + '-' + std::to_string(z);
+               std::to_string(y) + '-' + std::to_string(z);
     }
 
     double& operator[](uint64_t i)
     {
         switch (i)
         {
-            case 0: return b.minx;
-            case 1: return b.miny;
-            case 2: return b.minz;
-            case 3: return b.maxx;
-            case 4: return b.maxy;
-            case 5: return b.maxz;
-            default: throw pdal_error("Invalid Key[] index");
+        case 0:
+            return b.minx;
+        case 1:
+            return b.miny;
+        case 2:
+            return b.minz;
+        case 3:
+            return b.maxx;
+        case 4:
+            return b.maxy;
+        case 5:
+            return b.maxz;
+        default:
+            throw pdal_error("Invalid Key[] index");
         }
     }
 
@@ -91,10 +97,14 @@ public:
     {
         switch (i)
         {
-            case 0: return x;
-            case 1: return y;
-            case 2: return z;
-            default: throw pdal_error("Invalid Key::idAt index");
+        case 0:
+            return x;
+        case 1:
+            return y;
+        case 2:
+            return z;
+        default:
+            throw pdal_error("Invalid Key::idAt index");
         }
     }
 
@@ -103,22 +113,23 @@ public:
         Key key(*this);
         ++key.d;
 
-        auto step([&key, direction](uint8_t i)
-        {
-            key.idAt(i) *= 2;
+        auto step(
+            [&key, direction](uint8_t i)
+            {
+                key.idAt(i) *= 2;
 
-            const double mid(key[i] + (key[i + 3] - key[i]) / 2.0);
-            const bool positive(direction & (((uint64_t)1) << i));
-            if (positive)
-            {
-                key[i] = mid;
-                ++key.idAt(i);
-            }
-            else
-            {
-                key[i + 3] = mid;
-            }
-        });
+                const double mid(key[i] + (key[i + 3] - key[i]) / 2.0);
+                const bool positive(direction & (((uint64_t)1) << i));
+                if (positive)
+                {
+                    key[i] = mid;
+                    ++key.idAt(i);
+                }
+                else
+                {
+                    key[i + 3] = mid;
+                }
+            });
 
         for (uint8_t i(0); i < 3; ++i)
             step(i);
@@ -134,16 +145,23 @@ inline bool operator==(const Key& a, const Key& b)
 
 inline bool operator<(const Key& a, const Key& b)
 {
-    if (a.d < b.d) return true;
-    if (a.d > b.d) return false;
+    if (a.d < b.d)
+        return true;
+    if (a.d > b.d)
+        return false;
 
-    if (a.x < b.x) return true;
-    if (a.x > b.x) return false;
+    if (a.x < b.x)
+        return true;
+    if (a.x > b.x)
+        return false;
 
-    if (a.y < b.y) return true;
-    if (a.y > b.y) return false;
+    if (a.y < b.y)
+        return true;
+    if (a.y > b.y)
+        return false;
 
-    if (a.z < b.z) return true;
+    if (a.z < b.z)
+        return true;
     return false;
 }
 
@@ -152,17 +170,15 @@ inline bool operator<(const Key& a, const Key& b)
 
 namespace std
 {
-    template<>
-    struct hash<pdal::ept::Key>
+template <> struct hash<pdal::ept::Key>
+{
+    std::size_t operator()(pdal::ept::Key const& k) const noexcept
     {
-        std::size_t operator()(pdal::ept::Key const& k) const noexcept
-        {
-            std::hash<uint64_t> h;
+        std::hash<uint64_t> h;
 
-            uint64_t k1 = ((uint64_t)k.d << 32) | k.x;
-            uint64_t k2 = ((uint64_t)k.y << 32) | k.z;
-            return h(k1) ^ (h(k2) << 1);
-        }
-    };
-}
-
+        uint64_t k1 = ((uint64_t)k.d << 32) | k.x;
+        uint64_t k2 = ((uint64_t)k.y << 32) | k.z;
+        return h(k1) ^ (h(k2) << 1);
+    }
+};
+} // namespace std

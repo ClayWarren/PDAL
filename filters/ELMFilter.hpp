@@ -48,9 +48,7 @@ class PointView;
 class PDAL_EXPORT ELMFilter : public Filter
 {
 public:
-    ELMFilter() : Filter()
-    {
-    }
+    ELMFilter() : Filter() {}
 
     std::string getName() const;
 

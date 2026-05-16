@@ -1,50 +1,53 @@
 /******************************************************************************
-* Copyright (c) 2020, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2020, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <nlohmann/json.hpp>
 
-#include "PageManager.hpp"
 #include "EsriUtil.hpp"
+#include "PageManager.hpp"
 
 namespace pdal
 {
 namespace i3s
 {
 
-PageManager::PageManager(int cacheSize, int threads, int indexFactor, i3s::FetchFunction fetch) :
-    m_pool(threads, -1), m_cacheSize(cacheSize), m_indexFactor(indexFactor), m_fetch(fetch)
-{}
+PageManager::PageManager(int cacheSize, int threads, int indexFactor,
+                         i3s::FetchFunction fetch)
+    : m_pool(threads, -1), m_cacheSize(cacheSize), m_indexFactor(indexFactor),
+      m_fetch(fetch)
+{
+}
 
 void PageManager::fetchPage(int index)
 {
@@ -63,33 +66,35 @@ void PageManager::fetchPage(int index)
     if (size >= m_cacheSize)
         evict();
 
-    // Before version 2, page indices were the actual first node value, rather than the
-    // page index itself. In these cases m_indexFactor is the number of items in a page.
+    // Before version 2, page indices were the actual first node value, rather
+    // than the page index itself. In these cases m_indexFactor is the number of
+    // items in a page.
     std::string filename = "nodepages/" + std::to_string(index * m_indexFactor);
-    m_pool.add([this, filename, index]()
-    {
-        std::string s = m_fetch(filename);
-        PagePtr p(new Page(i3s::parse(s, "Invalid JSON in file '" + filename + "'.")));
+    m_pool.add(
+        [this, filename, index]()
         {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            for (PageEntry& pe : m_cache)
-                if (index == pe.index)
-                {
-                    pe.page = p;
-                    break;
-                }
-        }
-        m_cv.notify_all();
-    });
+            std::string s = m_fetch(filename);
+            PagePtr p(new Page(
+                i3s::parse(s, "Invalid JSON in file '" + filename + "'.")));
+            {
+                std::unique_lock<std::mutex> lock(m_mutex);
+                for (PageEntry& pe : m_cache)
+                    if (index == pe.index)
+                    {
+                        pe.page = p;
+                        break;
+                    }
+            }
+            m_cv.notify_all();
+        });
 }
-
 
 PagePtr PageManager::getPage(int index)
 {
-    // In case someone forgot to call fetchPage() before calling this function or in the
-    // case a cached page were to get evicted since the time fetchPage() was called,
-    // we loop and try to fetch again if we couldn't get the page that we expected to
-    // be around.
+    // In case someone forgot to call fetchPage() before calling this function
+    // or in the case a cached page were to get evicted since the time
+    // fetchPage() was called, we loop and try to fetch again if we couldn't get
+    // the page that we expected to be around.
     while (true)
     {
         PagePtr p = getPageLocked(index);
@@ -98,7 +103,6 @@ PagePtr PageManager::getPage(int index)
         fetchPage(index);
     }
 }
-
 
 PagePtr PageManager::getPageLocked(int index)
 {
@@ -120,7 +124,8 @@ PagePtr PageManager::getPageLocked(int index)
         if (it->page)
             return it->page;
 
-        // Wait until a page comes in and see if it's the one we're interested in.
+        // Wait until a page comes in and see if it's the one we're interested
+        // in.
         m_cv.wait(lock);
     }
 

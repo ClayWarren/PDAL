@@ -1,48 +1,48 @@
 /******************************************************************************
-* Copyright (c) 2014, Howard Butler (howard@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Howard Butler (howard@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4251)
+#pragma warning(push)
+#pragma warning(disable : 4251)
 #endif
 
-#include <lazperf/lazperf.hpp>
 #include <lazperf/filestream.hpp>
+#include <lazperf/lazperf.hpp>
 #include <lazperf/vlr.hpp>
 
 #ifdef _MSC_VER
-#pragma warning (pop)
+#pragma warning(pop)
 #endif
 
 // This only exist in version 1.3+, so is an acceptable version test for now.
@@ -50,10 +50,10 @@
 #error "LAZperf version 2+ (supporting LAS version 1.4) not found"
 #endif
 
+#include <io/private/las/Header.hpp>
+#include <pdal/pdal_types.hpp>
 #include <pdal/util/IStream.hpp>
 #include <pdal/util/OStream.hpp>
-#include <pdal/pdal_types.hpp>
-#include <io/private/las/Header.hpp>
 
 #include "LazPerfVlrCompression.hpp"
 
@@ -73,10 +73,12 @@ namespace pdal
 class LazPerfVlrCompressorImpl
 {
 public:
-    LazPerfVlrCompressorImpl(std::ostream& stream, int format, int ebCount) :
-        m_stream(stream), m_outputStream(stream), m_format(format), m_ebCount(ebCount),
-        m_chunksize(50000), m_chunkPointsWritten(0), m_chunkInfoPos(0), m_chunkOffset(0)
-    {}
+    LazPerfVlrCompressorImpl(std::ostream& stream, int format, int ebCount)
+        : m_stream(stream), m_outputStream(stream), m_format(format),
+          m_ebCount(ebCount), m_chunksize(50000), m_chunkPointsWritten(0),
+          m_chunkInfoPos(0), m_chunkOffset(0)
+    {
+    }
 
     std::vector<char> vlrData() const
     {
@@ -84,7 +86,7 @@ public:
         return vlr.data();
     }
 
-    void compress(const char *inbuf)
+    void compress(const char* inbuf)
     {
         // First time through.
         if (!m_compressor)
@@ -114,10 +116,10 @@ public:
             newChunk();
         }
 
-        // If we didn't write any points, chunk info pos will be 0 and we need to
-        // set the chunk info pos. Could do this as an "else" case of the
-        // above, but this seems safer in case some other compressor creation logic
-        // comes about.
+        // If we didn't write any points, chunk info pos will be 0 and we need
+        // to set the chunk info pos. Could do this as an "else" case of the
+        // above, but this seems safer in case some other compressor creation
+        // logic comes about.
         if (m_chunkInfoPos == 0)
         {
             m_chunkInfoPos = m_stream.tellp();
@@ -135,7 +137,7 @@ public:
         m_stream.seekp(chunkTablePos);
 
         // Write the chunk table header.
-        out << (uint32_t)0;  // Version (?)
+        out << (uint32_t)0; // Version (?)
         out << (uint32_t)m_chunkTable.size();
 
         lazperf::OutFileStream stream(m_stream);
@@ -147,7 +149,8 @@ private:
     {
         if (m_compressor)
             m_compressor->done();
-        m_compressor = lazperf::build_las_compressor(m_outputStream.cb(), m_format, m_ebCount);
+        m_compressor = lazperf::build_las_compressor(m_outputStream.cb(),
+                                                     m_format, m_ebCount);
     }
 
     void newChunk()
@@ -170,33 +173,28 @@ private:
     std::vector<uint32_t> m_chunkTable;
 };
 
+LazPerfVlrCompressor::LazPerfVlrCompressor(std::ostream& stream, int format,
+                                           int ebCount)
+    : m_impl(new LazPerfVlrCompressorImpl(stream, format, ebCount))
+{
+}
 
-LazPerfVlrCompressor::LazPerfVlrCompressor(std::ostream& stream, int format, int ebCount) :
-    m_impl(new LazPerfVlrCompressorImpl(stream, format, ebCount))
-{}
-
-
-LazPerfVlrCompressor::~LazPerfVlrCompressor()
-{}
-
+LazPerfVlrCompressor::~LazPerfVlrCompressor() {}
 
 std::vector<char> LazPerfVlrCompressor::vlrData() const
 {
     return m_impl->vlrData();
 }
 
-
-void LazPerfVlrCompressor::compress(const char *inbuf)
+void LazPerfVlrCompressor::compress(const char* inbuf)
 {
     m_impl->compress(inbuf);
 }
-
 
 void LazPerfVlrCompressor::done()
 {
     m_impl->done();
 }
-
 
 class LazPerfVlrDecompressorImpl
 {
@@ -205,11 +203,12 @@ class LazPerfVlrDecompressorImpl
 
 public:
     LazPerfVlrDecompressorImpl(std::istream& stream, const las::Header& header,
-            const char *vlrdata) :
-        m_stream(stream), m_fileStream(stream), m_format(header.pointFormat()),
-        m_pointLen(header.pointSize), m_ebCount(header.ebCount()),
-        m_pointCount(header.pointCount()), m_vlr(vlrdata), m_chunkPointsTotal(0),
-        m_chunkPointsRead(0), m_curChunk(m_chunks.end())
+                               const char* vlrdata)
+        : m_stream(stream), m_fileStream(stream),
+          m_format(header.pointFormat()), m_pointLen(header.pointSize),
+          m_ebCount(header.ebCount()), m_pointCount(header.pointCount()),
+          m_vlr(vlrdata), m_chunkPointsTotal(0), m_chunkPointsRead(0),
+          m_curChunk(m_chunks.end())
     {
         m_stream.seekg(header.pointOffset);
         ILeStream in(&stream);
@@ -225,11 +224,11 @@ public:
 
         if (version != 0)
             throw pdal_error("Invalid version " + std::to_string(version) +
-                " found in LAZ chunk table.");
+                             " found in LAZ chunk table.");
 
         if (numChunks)
-            m_chunks = lazperf::decompress_chunk_table(m_fileStream.cb(), numChunks,
-                m_vlr.variableChunks());
+            m_chunks = lazperf::decompress_chunk_table(
+                m_fileStream.cb(), numChunks, m_vlr.variableChunks());
 
         // If the chunk size is fixed, set the counts to the chunk size since
         // they aren't stored in the chunk table..
@@ -244,20 +243,23 @@ public:
             assert(remaining == 0);
         }
 
-        // Add a chunk at the beginning that has a count of 0 and an offset of the
-        // start of the first chunk.
-        m_chunks.insert(m_chunks.begin(), {0, header.pointOffset + sizeof(uint64_t)});
+        // Add a chunk at the beginning that has a count of 0 and an offset of
+        // the start of the first chunk.
+        m_chunks.insert(m_chunks.begin(),
+                        {0, header.pointOffset + sizeof(uint64_t)});
 
-        // Fix up the chunk table such that the offsets are absolute offsets to the
-        // chunk and the counts are cumulative counts of points before the chunk.
-        // When we're done, the chunk table looks like this, where N is the number of chunks:
+        // Fix up the chunk table such that the offsets are absolute offsets to
+        // the chunk and the counts are cumulative counts of points before the
+        // chunk. When we're done, the chunk table looks like this, where N is
+        // the number of chunks:
 
         // Chunk table entry 1: offset to chunk 1, count of 0
         // Chunk table entry 2: offset to chunk 2, count of chunk 1
         // Chunk table entry 3: offset to chunk 3, count of chunk 1 + 2
         // ...
         // Chunk table entry N: offset to chunk N, count of chunk 1 + ... + N
-        // Chunk table entry N + 1: offset to end of chunks (start of chunk table),
+        // Chunk table entry N + 1: offset to end of chunks (start of chunk
+        // table),
         //   count is the total number of points in all chunks.
 
         for (size_t i = 1; i < m_chunks.size(); ++i)
@@ -274,7 +276,6 @@ public:
         m_fileStream.reset();
     }
 
-
     bool seek(uint64_t record)
     {
         if (record >= m_pointCount || m_chunks.empty())
@@ -282,7 +283,8 @@ public:
 
         // Search for the chunk containing the requested record.
         auto ci = std::upper_bound(m_chunks.begin(), m_chunks.end(), record,
-            [](uint64_t record, const lazperf::chunk& c) {  return record < c.count; });
+                                   [](uint64_t record, const lazperf::chunk& c)
+                                   { return record < c.count; });
 
         if (ci == m_chunks.begin()) // Should never happen.
             return false;
@@ -301,7 +303,7 @@ public:
         return true;
     }
 
-    bool decompress(char *outbuf)
+    bool decompress(char* outbuf)
     {
         if (chunkDone())
         {
@@ -317,7 +319,8 @@ public:
 private:
     void resetDecompressor()
     {
-        m_decompressor = lazperf::build_las_decompressor(m_fileStream.cb(), m_format, m_ebCount);
+        m_decompressor = lazperf::build_las_decompressor(m_fileStream.cb(),
+                                                         m_format, m_ebCount);
     }
 
     bool nextChunk()
@@ -334,10 +337,11 @@ private:
     {
         m_curChunk = chunk;
         auto nextChunk = chunk + 1;
-        // The chunk table entries are written at the *end* of a creating a chunk. When we
-        // read the chunk table, we stick an entry at the front indicating the start of
-        // the first chunk. The last chunk table entry points to the end of the chunks
-        // and has a count value equal to the total number of points.
+        // The chunk table entries are written at the *end* of a creating a
+        // chunk. When we read the chunk table, we stick an entry at the front
+        // indicating the start of the first chunk. The last chunk table entry
+        // points to the end of the chunks and has a count value equal to the
+        // total number of points.
         if (chunk == m_chunks.end() || nextChunk == m_chunks.end())
             return false;
 
@@ -346,7 +350,9 @@ private:
     }
 
     bool chunkDone() const
-        { return m_chunkPointsRead == m_chunkPointsTotal; }
+    {
+        return m_chunkPointsRead == m_chunkPointsTotal;
+    }
 
     std::istream& m_stream;
     lazperf::InFileStream m_fileStream;
@@ -364,16 +370,15 @@ private:
 };
 
 LazPerfVlrDecompressor::LazPerfVlrDecompressor(std::istream& stream,
-        const las::Header& header, const char *vlrdata) :
-    m_impl(new LazPerfVlrDecompressorImpl(stream, header, vlrdata))
-{}
+                                               const las::Header& header,
+                                               const char* vlrdata)
+    : m_impl(new LazPerfVlrDecompressorImpl(stream, header, vlrdata))
+{
+}
 
+LazPerfVlrDecompressor::~LazPerfVlrDecompressor() {}
 
-LazPerfVlrDecompressor::~LazPerfVlrDecompressor()
-{}
-
-
-bool LazPerfVlrDecompressor::decompress(char *outbuf)
+bool LazPerfVlrDecompressor::decompress(char* outbuf)
 {
     return m_impl->decompress(outbuf);
 }
@@ -384,4 +389,3 @@ bool LazPerfVlrDecompressor::seek(uint64_t record)
 }
 
 } // namespace pdal
-

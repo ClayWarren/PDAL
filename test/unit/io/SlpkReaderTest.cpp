@@ -2,25 +2,25 @@
 
 #include "Support.hpp"
 
-#include <pdal/PipelineManager.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <filters/StreamCallbackFilter.hpp>
+#include <pdal/PipelineManager.hpp>
+#include <pdal/PointView.hpp>
+#include <pdal/StageFactory.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <io/LasReader.hpp>
 #include <io/LasWriter.hpp>
 
 using namespace pdal;
 
-//test small autzen slpk data provided by esri
+// test small autzen slpk data provided by esri
 TEST(SlpkReaderTest, read_local)
 {
     StageFactory f;
-    //create args
+    // create args
     Options slpk_options;
     slpk_options.add("filename",
-        Support::datapath("i3s/SMALL_AUTZEN_LAS_All.slpk"));
+                     Support::datapath("i3s/SMALL_AUTZEN_LAS_All.slpk"));
     slpk_options.add("threads", 2);
     slpk_options.add("dimensions", "intensity, returns");
 
@@ -39,15 +39,14 @@ TEST(SlpkReaderTest, read_local)
     ASSERT_FALSE(table.layout()->hasDim(Dimension::Id::GpsTime));
 }
 
-
-//test small autzen slpk data provided by esri
+// test small autzen slpk data provided by esri
 TEST(SlpkReaderTest, read_stream_local)
 {
     StageFactory f;
-    //create args
+    // create args
     Options slpk_options;
     slpk_options.add("filename",
-        Support::datapath("i3s/SMALL_AUTZEN_LAS_All.slpk"));
+                     Support::datapath("i3s/SMALL_AUTZEN_LAS_All.slpk"));
     slpk_options.add("threads", 2);
     slpk_options.add("dimensions", "intensity, returns");
 
@@ -74,8 +73,7 @@ TEST(SlpkReaderTest, read_stream_local)
     ASSERT_FALSE(table.layout()->hasDim(Dimension::Id::GpsTime));
 }
 
-
-//ABELL - Waiting for test from ESRI
+// ABELL - Waiting for test from ESRI
 /**
 TEST(SlpkReaderTest, bounded)
 {

@@ -36,20 +36,20 @@
 
 #include <nlohmann/json.hpp>
 
-#include <pdal/util/FileUtils.hpp>
+#include "Support.hpp"
 #include <filters/AssignFilter.hpp>
 #include <filters/FerryFilter.hpp>
-#include <io/EptReader.hpp>
 #include <io/EptAddonWriter.hpp>
+#include <io/EptReader.hpp>
 #include <io/LasReader.hpp>
-#include "Support.hpp"
+#include <pdal/util/FileUtils.hpp>
 
 using namespace pdal;
 
 namespace
 {
-    const std::string eptLaszipPath(
-        Support::datapath("ept/lone-star-laszip/ept.json"));
+const std::string
+    eptLaszipPath(Support::datapath("ept/lone-star-laszip/ept.json"));
 }
 
 TEST(EptAddonWriterTest, fullLoop)
@@ -361,4 +361,3 @@ TEST(EptAddonWriterTest, mustDescendFromEptReader)
 
     EXPECT_THROW(writer.execute(table), pdal_error);
 }
-

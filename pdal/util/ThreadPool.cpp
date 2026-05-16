@@ -56,10 +56,8 @@ void ThreadPool::work()
     while (true)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_consumeCv.wait(lock, [this]()
-        {
-            return m_tasks.size() || !m_running;
-        });
+        m_consumeCv.wait(lock,
+                         [this]() { return m_tasks.size() || !m_running; });
 
         if (m_tasks.size())
         {
@@ -91,4 +89,3 @@ void ThreadPool::work()
 }
 
 } // namespace pdal
-

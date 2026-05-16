@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include <vector>
-#include <utility>
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 #include <Eigen/Dense>
 
@@ -18,10 +18,8 @@ class SplineFitScalar
 {
 public:
     template <typename T>
-    static T EndPointCubic(const T& rm, const T& vm,
-                           const T& rp, const T& vp,
-                           const T& t,
-                           T* v = nullptr, T* a = nullptr)
+    static T EndPointCubic(const T& rm, const T& vm, const T& rp, const T& vp,
+                           const T& t, T* v = nullptr, T* a = nullptr)
     {
         T rs = rp + rm;
         T rd = rp - rm;
@@ -29,7 +27,7 @@ public:
         T vd = vp - vm;
         T a0 = (4.0 * rs - vd) / 8.0;
         T a1 = (6.0 * rd - vs) / 4.0;
-        T a2 =        vd       / 2.0;
+        T a2 = vd / 2.0;
         T a3 = (-2.0 * rd) + vs;
         if (v)
             *v = t * (t * 3.0 * a3 + 2.0 * a2) + a1;
@@ -39,8 +37,7 @@ public:
     }
 };
 
-template<int N>
-class SplineFit
+template <int N> class SplineFit
 {
 public:
     typedef Eigen::Matrix<double, N, 1> datum;
@@ -51,9 +48,11 @@ public:
     std::vector<bool> missing;
 
     // Set vals to num+1 to get both endpoints
-    SplineFit(int _num = -1, double _tblock = 1, double _tstart = 0) :
-        num(_num), tblock(_tblock), tstart(_tstart), r(num+1) ,v(num+1), missing(num+1)
-    {}
+    SplineFit(int _num = -1, double _tblock = 1, double _tstart = 0)
+        : num(_num), tblock(_tblock), tstart(_tstart), r(num + 1), v(num + 1),
+          missing(num + 1)
+    {
+    }
 
     datum position(double t) const;
     datum position(double t, datum& velocity) const;
@@ -62,7 +61,9 @@ public:
     // convert time to index + fractional time
     std::pair<int, double> tconvert(double t) const
     {
-        int i = (std::min)(num-1, (std::max)(0, int(std::floor((t - tstart) / tblock))));
+        int i =
+            (std::min)(num - 1,
+                       (std::max)(0, int(std::floor((t - tstart) / tblock))));
         double tf = (t - tstart) / tblock - (i + 0.5);
         return std::make_pair(i, tf);
     }
@@ -75,14 +76,13 @@ public:
 typedef SplineFit<3> SplineFit3;
 typedef SplineFit<2> SplineFit2;
 
-template <int N>
-class AccelJumpConstraint
+template <int N> class AccelJumpConstraint
 {
 private:
     const double _scale;
+
 public:
-    AccelJumpConstraint(double tblock = 1) : _scale(2 / (tblock * tblock))
-    {}
+    AccelJumpConstraint(double tblock = 1) : _scale(2 / (tblock * tblock)) {}
 
     template <typename T>
     bool operator()(const T* const ra, // N vec for pos at beg
@@ -99,13 +99,13 @@ public:
         //   scale * (3*(rc-ra) - (vc+va) - 4*vb) = 0
         const T scale = T(_scale);
         for (int i = 0; i < N; ++i)
-            residual[i] = scale * (3.0 * (rc[i] - ra[i]) - (vc[i] + va[i]) - 4.0 * vb[i]) ;
+            residual[i] =
+                scale * (3.0 * (rc[i] - ra[i]) - (vc[i] + va[i]) - 4.0 * vb[i]);
         return true;
     }
 };
 
-template <int N>
-class ClampConstraint
+template <int N> class ClampConstraint
 {
 private:
     typedef Eigen::Matrix<double, N, 1> datum;
@@ -113,10 +113,10 @@ private:
     const datum _mult;
 
 public:
-    ClampConstraint(double tblock = 1, datum mult = datum::Ones()) :
-        _scale(1 / (tblock * tblock * tblock)),
-        _mult(mult)
-    {}
+    ClampConstraint(double tblock = 1, datum mult = datum::Ones())
+        : _scale(1 / (tblock * tblock * tblock)), _mult(mult)
+    {
+    }
 
     template <typename T>
     bool operator()(const T* const ra, // N vec for pos at beg
@@ -131,7 +131,8 @@ public:
         //  (4*rb - 2*(rc + ra) + (vc - va)) / tblock^3
         const T scale = T(_scale);
         for (int i = 0; i < N; ++i)
-            residual[i] = scale * T(_mult[i]) *
+            residual[i] =
+                scale * T(_mult[i]) *
                 (4.0 * rb[i] - 2.0 * (rc[i] + ra[i]) + (vc[i] - va[i]));
         return true;
     }

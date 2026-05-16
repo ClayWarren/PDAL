@@ -57,11 +57,11 @@ class SpatialReference;
 
 namespace las
 {
-    struct Header;
-    class Srs;
-    struct Vlr;
-    using VlrList = std::vector<Vlr>;
-}
+struct Header;
+class Srs;
+struct Vlr;
+using VlrList = std::vector<Vlr>;
+} // namespace las
 
 [[deprecated]] PDAL_EXPORT ILeStream& operator>>(ILeStream&, LasHeader& h);
 [[deprecated]] OLeStream& operator<<(OLeStream&, const LasHeader& h);
@@ -70,8 +70,8 @@ namespace las
 class PDAL_EXPORT LasHeader
 {
 public:
-    static const size_t LEGACY_RETURN_COUNT {5};
-    static const size_t RETURN_COUNT {15};
+    static const size_t LEGACY_RETURN_COUNT{5};
+    static const size_t RETURN_COUNT{15};
     static const std::string FILE_SIGNATURE;
 
     std::string getSystemIdentifier() const;
@@ -183,7 +183,7 @@ public:
     /// considered to be fixed in size, and the point format is used
     /// to determine the fixed portion of the dimensions in the point.
     uint16_t pointLen() const;
-	[[deprecated]] void setPointLen(uint16_t v);
+    [[deprecated]] void setPointLen(uint16_t v);
 
     uint16_t basePointLen();
     uint16_t basePointLen(uint8_t format);
@@ -277,7 +277,7 @@ public:
     [[deprecated]] void setSummary(const LasSummaryData& summary);
     [[deprecated]] bool valid() const;
     Dimension::IdList usedDims() const;
-    const LasVLR *findVlr(const std::string& userId, uint16_t recordId) const;
+    const LasVLR* findVlr(const std::string& userId, uint16_t recordId) const;
     [[deprecated]] void removeVLR(const std::string& userId, uint16_t recordId);
     [[deprecated]] void removeVLR(const std::string& userId);
     [[deprecated]] void initialize(LogPtr log, uintmax_t fileSize, bool nosrs);

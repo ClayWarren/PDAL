@@ -35,36 +35,34 @@
 #include <pdal/Filter.hpp>
 #include <pdal/pdal_test_main.hpp>
 
+#include "Support.hpp"
 #include <io/SbetSmrmsgReader.hpp>
 #include <pdal/pdal_types.hpp>
-#include "Support.hpp"
 
 namespace pdal
 {
 
-
-void checkPoint(const PointView& data, PointId index,
-        double gpsTime, double npRMS, double epRMS, double dpRMS,
-        double nvRMS, double evRMS, double dvRMS, double rollRMS,
-        double pitchRMS, double headingRMS)
+void checkPoint(const PointView& data, PointId index, double gpsTime,
+                double npRMS, double epRMS, double dpRMS, double nvRMS,
+                double evRMS, double dvRMS, double rollRMS, double pitchRMS,
+                double headingRMS)
 {
-    auto checkDimension = [&data,index](Dimension::Id dim,
-        double expected)
+    auto checkDimension = [&data, index](Dimension::Id dim, double expected)
     {
         double actual = data.getFieldAs<double>(dim, index);
         EXPECT_NEAR(expected, actual, .0001);
     };
 
     checkDimension(Dimension::Id::GpsTime, gpsTime);
-    //Postion RMS
+    // Postion RMS
     checkDimension(Dimension::Id::NorthPositionRMS, npRMS);
     checkDimension(Dimension::Id::EastPositionRMS, epRMS);
     checkDimension(Dimension::Id::DownPositionRMS, dpRMS);
-    //Velocity RMS
+    // Velocity RMS
     checkDimension(Dimension::Id::NorthVelocityRMS, nvRMS);
     checkDimension(Dimension::Id::EastVelocityRMS, evRMS);
     checkDimension(Dimension::Id::DownVelocityRMS, dvRMS);
-    //Angles RMS
+    // Angles RMS
     checkDimension(Dimension::Id::RollRMS, rollRMS);
     checkDimension(Dimension::Id::PitchRMS, pitchRMS);
     checkDimension(Dimension::Id::HeadingRMS, headingRMS);
@@ -84,9 +82,12 @@ TEST(SmrmsgReader, ReadSmrmsg)
     PointViewPtr view = *viewSet.begin();
     EXPECT_EQ(view->size(), 21902u);
 
-    checkPoint(*view.get(), 0, 536258, 0.056279, 0.057791, 0.070774, 0.006642, 0.008034, 0.008131, 0.236985, 0.239420,3.010802);
-    checkPoint(*view.get(), 1, 536259, 0.054151, 0.055892, 0.068654, 0.006113, 0.007200, 0.007629, 0.235971, 0.238542,3.010596);
-    checkPoint(*view.get(), 2, 536260, 0.052268, 0.054339, 0.066672, 0.006119, 0.006675, 0.007411, 0.235108, 0.237804,3.010406);
+    checkPoint(*view.get(), 0, 536258, 0.056279, 0.057791, 0.070774, 0.006642,
+               0.008034, 0.008131, 0.236985, 0.239420, 3.010802);
+    checkPoint(*view.get(), 1, 536259, 0.054151, 0.055892, 0.068654, 0.006113,
+               0.007200, 0.007629, 0.235971, 0.238542, 3.010596);
+    checkPoint(*view.get(), 2, 536260, 0.052268, 0.054339, 0.066672, 0.006119,
+               0.006675, 0.007411, 0.235108, 0.237804, 3.010406);
 }
 
 } // namespace pdal

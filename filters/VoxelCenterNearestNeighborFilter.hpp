@@ -48,9 +48,7 @@ class PointView;
 class PDAL_EXPORT VoxelCenterNearestNeighborFilter : public Filter
 {
 public:
-    VoxelCenterNearestNeighborFilter() : Filter()
-    {
-    }
+    VoxelCenterNearestNeighborFilter() : Filter() {}
 
     std::string getName() const;
 

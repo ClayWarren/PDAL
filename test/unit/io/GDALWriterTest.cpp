@@ -1,40 +1,38 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <pdal/pdal_test_main.hpp>
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/private/gdal/Raster.hpp>
+#include "Support.hpp"
 #include <filters/RangeFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
@@ -42,7 +40,9 @@
 #include <io/LasReader.hpp>
 #include <io/TextReader.hpp>
 #include <io/private/GDALGrid.hpp>
-#include "Support.hpp"
+#include <pdal/pdal_test_main.hpp>
+#include <pdal/private/gdal/Raster.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -54,8 +54,8 @@ namespace
 {
 
 void runGdalWriter(const Options& wo, const std::string& infile,
-    const std::string& outfile, const std::string& values, bool noStream=false,
-    int bandNum=1)
+                   const std::string& outfile, const std::string& values,
+                   bool noStream = false, int bandNum = 1)
 {
     auto run = [=](bool streamMode)
     {
@@ -110,8 +110,8 @@ void runGdalWriter(const Options& wo, const std::string& infile,
 
         for (size_t i = 0; i < arr.size(); ++i)
         {
-            EXPECT_NEAR(arr[i], data[i], .001) << "Error row/col = " <<
-                row << "/" << col << std::endl;
+            EXPECT_NEAR(arr[i], data[i], .001)
+                << "Error row/col = " << row << "/" << col << std::endl;
             if (++col == raster.width())
             {
                 col = 0;
@@ -126,7 +126,7 @@ void runGdalWriter(const Options& wo, const std::string& infile,
 }
 
 void runGdalWriter2(const Options& wo, const std::string& outfile,
-    const std::string& values, bool stream)
+                    const std::string& values, bool stream)
 {
     FileUtils::deleteFile(outfile);
 
@@ -187,7 +187,7 @@ void runGdalWriter2(const Options& wo, const std::string& outfile,
         EXPECT_NEAR(arr[i], data[i], .001);
 }
 
-}
+} // namespace
 
 TEST(GDALWriterTest, min)
 {
@@ -201,12 +201,11 @@ TEST(GDALWriterTest, min)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     8.900 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.400     6.400 "
-        "2.000     3.000     4.000     4.400     5.400 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     8.900 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.400     6.400 "
+                               "2.000     3.000     4.000     4.400     5.400 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -223,7 +222,7 @@ TEST(GDALWriterTest, min2)
     wo.add("filename", outfile);
 
     Options wo2 = wo;
-//    wo2.add("bounds", "([-2, 4.7],[-2, 6.5])");
+    //    wo2.add("bounds", "([-2, 4.7],[-2, 6.5])");
     wo2.add("origin_x", -2);
     wo2.add("origin_y", -2);
     wo2.add("width", 7);
@@ -258,12 +257,11 @@ TEST(GDALWriterTest, minWindow)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "5.000     5.457     7.000     8.000     8.900 "
-        "4.000     4.848     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.400     6.400 "
-        "2.000     3.000     4.000     4.400     5.400 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string output = "5.000     5.457     7.000     8.000     8.900 "
+                               "4.000     4.848     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.400     6.400 "
+                               "2.000     3.000     4.000     4.400     5.400 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -280,12 +278,11 @@ TEST(GDALWriterTest, max)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     9.100 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     6.000     7.000 "
-        "2.000     3.000     4.400     5.400     6.400 "
-        "1.000     2.000     3.000     4.400     5.400 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     9.100 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     6.000     7.000 "
+                               "2.000     3.000     4.400     5.400     6.400 "
+                               "1.000     2.000     3.000     4.400     5.400 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -303,12 +300,11 @@ TEST(GDALWriterTest, maxWindow)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "5.000     5.500     7.000     8.000     9.100 "
-        "4.000     4.942     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     6.000     7.000 "
-        "2.000     3.000     4.400     5.400     6.400 "
-        "1.000     2.000     3.000     4.400     5.400 ";
+    const std::string output = "5.000     5.500     7.000     8.000     9.100 "
+                               "4.000     4.942     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     6.000     7.000 "
+                               "2.000     3.000     4.400     5.400     6.400 "
+                               "1.000     2.000     3.000     4.400     5.400 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -325,12 +321,11 @@ TEST(GDALWriterTest, mean)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     8.967 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.700     6.700 "
-        "2.000     3.000     4.200     4.920     5.800 "
-        "1.000     2.000     3.000     4.200     5.200 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     8.967 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.700     6.700 "
+                               "2.000     3.000     4.200     4.920     5.800 "
+                               "1.000     2.000     3.000     4.200     5.200 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -348,12 +343,11 @@ TEST(GDALWriterTest, meanWindow)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "5.000     5.478     7.000     8.000     8.967 "
-        "4.000     4.896     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.700     6.700 "
-        "2.000     3.000     4.200     4.920     5.800 "
-        "1.000     2.000     3.000     4.200     5.200 ";
+    const std::string output = "5.000     5.478     7.000     8.000     8.967 "
+                               "4.000     4.896     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.700     6.700 "
+                               "2.000     3.000     4.200     4.920     5.800 "
+                               "1.000     2.000     3.000     4.200     5.200 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -370,12 +364,11 @@ TEST(GDALWriterTest, idw)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     9.000 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     6.000     7.000 "
-        "2.000     3.000     4.000     5.000     6.000 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     9.000 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     6.000     7.000 "
+                               "2.000     3.000     4.000     5.000     6.000 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -393,12 +386,11 @@ TEST(GDALWriterTest, idwWindow)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "5.000     5.500     7.000     8.000     9.000 "
-        "4.000     4.905     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     6.000     7.000 "
-        "2.000     3.000     4.000     5.000     6.000 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string output = "5.000     5.500     7.000     8.000     9.000 "
+                               "4.000     4.905     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     6.000     7.000 "
+                               "2.000     3.000     4.000     5.000     6.000 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -415,12 +407,11 @@ TEST(GDALWriterTest, count)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "1.000     0.000     1.000     1.000     3.000 "
-        "1.000     0.000     1.000     1.000     1.000 "
-        "1.000     1.000     1.000     2.000     2.000 "
-        "1.000     1.000     2.000     5.000     4.000 "
-        "1.000     1.000     1.000     2.000     2.000 ";
+    const std::string output = "1.000     0.000     1.000     1.000     3.000 "
+                               "1.000     0.000     1.000     1.000     1.000 "
+                               "1.000     1.000     1.000     2.000     2.000 "
+                               "1.000     1.000     2.000     5.000     4.000 "
+                               "1.000     1.000     1.000     2.000     2.000 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -438,11 +429,11 @@ TEST(GDALWriterTest, percentile)
     wo.add("filename", outfile);
 
     const std::string output =
-    "5.000     -9999.000     7.000     8.000     8.900 "
-    "4.000     -9999.000     6.000     7.000     8.000 "
-    "3.000     4.000     5.000     5.700     6.700 "
-    "2.000     3.000     4.000     4.400     5.400 "
-    "0.500     2.000     3.000     4.000     5.000 ";
+        "5.000     -9999.000     7.000     8.000     8.900 "
+        "4.000     -9999.000     6.000     7.000     8.000 "
+        "3.000     4.000     5.000     5.700     6.700 "
+        "2.000     3.000     4.000     4.400     5.400 "
+        "0.500     2.000     3.000     4.000     5.000 ";
 
     runGdalWriter(wo, infile, outfile, output, true);
 
@@ -464,12 +455,11 @@ TEST(GDALWriterTest, stdev)
     wo.add("radius", .7071);
     wo.add("filename", outfile);
 
-    const std::string output =
-        "0.000 -9999.000     0.000     0.000     0.094 "
-        "0.000 -9999.000     0.000     0.000     0.000 "
-        "0.000     0.000     0.000     0.300     0.300 "
-        "0.000     0.000     0.200     0.449     0.424 "
-        "0.000     0.000     0.000     0.200     0.200 ";
+    const std::string output = "0.000 -9999.000     0.000     0.000     0.094 "
+                               "0.000 -9999.000     0.000     0.000     0.000 "
+                               "0.000     0.000     0.000     0.300     0.300 "
+                               "0.000     0.000     0.200     0.449     0.424 "
+                               "0.000     0.000     0.000     0.200     0.200 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -487,12 +477,11 @@ TEST(GDALWriterTest, stdevWindow)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "0.000     0.021     0.000     0.000     0.094 "
-        "0.000     0.045     0.000     0.000     0.000 "
-        "0.000     0.000     0.000     0.300     0.300 "
-        "0.000     0.000     0.200     0.449     0.424 "
-        "0.000     0.000     0.000     0.200     0.200 ";
+    const std::string output = "0.000     0.021     0.000     0.000     0.094 "
+                               "0.000     0.045     0.000     0.000     0.000 "
+                               "0.000     0.000     0.000     0.300     0.300 "
+                               "0.000     0.000     0.200     0.449     0.424 "
+                               "0.000     0.000     0.000     0.200     0.200 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -550,12 +539,11 @@ TEST(GDALWriterTest, btbad)
     wo.add("data_type", "double");
     wo.add("filename", outfile);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     8.900 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.000     6.000 "
-        "2.000     3.000     4.000     4.000     5.000 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     8.900 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.000     6.000 "
+                               "2.000     3.000     4.000     4.000     5.000 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
 
     EXPECT_THROW(runGdalWriter(wo, infile, outfile, output), pdal_error);
 }
@@ -589,12 +577,11 @@ TEST(GDALWriterTest, btint)
 
     using namespace gdal;
 
-    const std::string values =
-        "5.000 -9999.000     7.000     8.000     9.000 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.000     6.000 "
-        "2.000     3.000     4.000     4.000     5.000 "
-        "1.000     2.000     3.000     4.000     5.000 ";
+    const std::string values = "5.000 -9999.000     7.000     8.000     9.000 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.000     6.000 "
+                               "2.000     3.000     4.000     4.000     5.000 "
+                               "1.000     2.000     3.000     4.000     5.000 ";
     Utils::IStringStreamClassicLocale iss(values);
 
     std::vector<double> arr;
@@ -659,18 +646,17 @@ TEST(GDALWriterTest, bounds)
     wo.add("resolution", 1);
     wo.add("radius", .7071);
     wo.add("filename", outfile);
-//    wo.add("bounds", "([0, 4.5],[0, 4.5])");
+    //    wo.add("bounds", "([0, 4.5],[0, 4.5])");
     wo.add("origin_x", 0);
     wo.add("origin_y", 0);
     wo.add("height", 5);
     wo.add("width", 5);
 
-    const std::string output =
-        "5.000 -9999.000     7.000     8.000     8.967 "
-        "4.000 -9999.000     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     5.700     6.700 "
-        "2.000     3.000     4.200     4.920     5.800 "
-        "1.000     2.000     3.000     4.200     5.200 ";
+    const std::string output = "5.000 -9999.000     7.000     8.000     8.967 "
+                               "4.000 -9999.000     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     5.700     6.700 "
+                               "2.000     3.000     4.200     4.920     5.800 "
+                               "1.000     2.000     3.000     4.200     5.200 ";
 
     runGdalWriter(wo, infile, outfile, output);
 }
@@ -783,7 +769,7 @@ TEST(GDALWriterTest, issue_2545)
     wOpts.add("origin_y", .5);
     wOpts.add("width", 7);
     wOpts.add("height", 7);
-//    wOpts.add("bounds", BOX2D(.5, .5, 6.5, 6.5));
+    //    wOpts.add("bounds", BOX2D(.5, .5, 6.5, 6.5));
     wOpts.add("filename", outfile);
 
     w.setOptions(wOpts);
@@ -800,10 +786,7 @@ TEST(GDALWriterTest, issue_2545)
     EXPECT_EQ(raster.width(), 7);
     EXPECT_EQ(raster.height(), 7);
 
-    auto index = [](size_t row, size_t col)
-    {
-        return (row * 7) + col;
-    };
+    auto index = [](size_t row, size_t col) { return (row * 7) + col; };
 
     std::vector<double> data;
     raster.readBand(data, 1);
@@ -882,7 +865,7 @@ TEST(GDALWriterTest, alternate_grid)
 TEST(GDALWriterTest, srs)
 {
     auto test = [](const std::string& sourceSrs, const std::string& defaultSrs,
-        const std::string& overrideSrs, const std::string& testSrs)
+                   const std::string& overrideSrs, const std::string& testSrs)
     {
         std::string outfile(Support::temppath("out.tif"));
 
@@ -922,9 +905,9 @@ TEST(GDALWriterTest, srs)
     test("", "", "EPSG:4326", "EPSG:4326");
     test("EPSG:4326", "EPSG:2030", "", "EPSG:4326");
     test("EPSG:4326", "", "EPSG:2030", "EPSG:2030");
-    EXPECT_THROW(test("EPSG:4326", "EPSG:4326", "EPSG:2030", "EPSG:2030"), pdal_error);
+    EXPECT_THROW(test("EPSG:4326", "EPSG:4326", "EPSG:2030", "EPSG:2030"),
+                 pdal_error);
 }
-
 
 TEST(GDALWriterTest, testMetadata)
 {
@@ -940,15 +923,13 @@ TEST(GDALWriterTest, testMetadata)
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
-    const std::string output =
-        "5.000     5.500     7.000     8.000     9.100 "
-        "4.000     4.942     6.000     7.000     8.000 "
-        "3.000     4.000     5.000     6.000     7.000 "
-        "2.000     3.000     4.400     5.400     6.400 "
-        "1.000     2.000     3.000     4.400     5.400 ";
+    const std::string output = "5.000     5.500     7.000     8.000     9.100 "
+                               "4.000     4.942     6.000     7.000     8.000 "
+                               "3.000     4.000     5.000     6.000     7.000 "
+                               "2.000     3.000     4.400     5.400     6.400 "
+                               "1.000     2.000     3.000     4.400     5.400 ";
 
     runGdalWriter(wo, infile, outfile, output);
-
 
     gdal::Raster raster(outfile);
     raster.open();
@@ -965,8 +946,6 @@ TEST(GDALWriterTest, testMetadata)
         FAIL() << "Couldn't find raster metadata equals";
 
     EXPECT_EQ(l.value(), "some_more_equals===");
-
-
 }
 
 } // namespace pdal

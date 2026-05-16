@@ -58,9 +58,7 @@ std::string DBSCANFilter::getName() const
     return s_info.name;
 }
 
-DBSCANFilter::DBSCANFilter() : Filter()
-{
-}
+DBSCANFilter::DBSCANFilter() : Filter() {}
 
 void DBSCANFilter::addArgs(ProgramArgs& args)
 {

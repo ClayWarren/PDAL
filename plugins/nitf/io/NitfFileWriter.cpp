@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "NitfFileWriter.hpp"
 
@@ -53,7 +53,6 @@ void NitfFileWriter::initialize()
     }
 }
 
-
 void NitfFileWriter::addArgs(ProgramArgs& args)
 {
     args.add("clevel", "Complexity level", m_cLevel, "03");
@@ -64,9 +63,9 @@ void NitfFileWriter::addArgs(ProgramArgs& args)
     args.add("oname", "Originator's name", m_origName);
     args.add("ophone", "Originator's phone number", m_origPhone);
     args.add("fsctlh", "File control and handling",
-        m_securityControlAndHandling);
+             m_securityControlAndHandling);
     args.add("fsclsy", "File security classification system",
-        m_securityClassificationSystem);
+             m_securityClassificationSystem);
     args.add("isclas", "File security classification", m_imgSecurityClass, "U");
     args.add("idatim", "Image date and time", m_imgDate);
     args.add("iid2", "Image identifier 2", m_imgIdentifier2);
@@ -75,8 +74,7 @@ void NitfFileWriter::addArgs(ProgramArgs& args)
     args.add("acftb", "Aircraft information", m_acftb);
 }
 
-
-//NOTE: Throws except::Throwable.
+// NOTE: Throws except::Throwable.
 //
 void NitfFileWriter::write()
 {
@@ -90,7 +88,8 @@ void NitfFileWriter::write()
     // because this is a flex writer and we don't know the filename
     // until the execute() step.
     if (m_fileTitle.size() > header.getFileTitle().getLength())
-        throw error("Can't write file.  FTITLE field (usually filename) "
+        throw error(
+            "Can't write file.  FTITLE field (usually filename) "
             "can't be longer than " +
             Utils::toString(header.getFileTitle().getLength()) +
             ".  Use 'ftitle' option to set appropriately sized FTITLE.");
@@ -110,7 +109,7 @@ void NitfFileWriter::write()
     header.getSecurityGroup().getClassificationSystem().set(
         m_securityClassificationSystem);
     header.getSecurityGroup().getControlAndHandling().set(
-       m_securityControlAndHandling);
+        m_securityControlAndHandling);
     header.getSecurityGroup().getClassificationText().set(m_sic);
 
     ::nitf::DESegment des = record.newDataExtensionSegment();
@@ -150,42 +149,40 @@ void NitfFileWriter::write()
         subheader.getImageDateAndTime().set(m_imgDate);
 
     ::nitf::BandInfo info;
-    ::nitf::LookupTable lt(0,0);
-    info.init(" ",    /* The band representation, Nth band */
-              " ",      /* The band subcategory */
-              "N",      /* The band filter condition */
-              "   ",    /* The band standard image filter code */
-              0,        /* The number of look-up tables */
-              0,        /* The number of entries/LUT */
-              lt);     /* The look-up tables */
+    ::nitf::LookupTable lt(0, 0);
+    info.init(" ",   /* The band representation, Nth band */
+              " ",   /* The band subcategory */
+              "N",   /* The band filter condition */
+              "   ", /* The band standard image filter code */
+              0,     /* The number of look-up tables */
+              0,     /* The number of entries/LUT */
+              lt);   /* The look-up tables */
 
     std::vector<::nitf::BandInfo> bands;
     bands.push_back(info);
-    subheader.setPixelInformation(
-        "INT",      /* Pixel value type */
-        8,         /* Number of bits/pixel */
-        8,         /* Actual number of bits/pixel */
-        "R",       /* Pixel justification */
-        "NODISPLY",     /* Image representation */
-        "VIS",     /* Image category */
-        1,         /* Number of bands */
-        bands);
+    subheader.setPixelInformation("INT",      /* Pixel value type */
+                                  8,          /* Number of bits/pixel */
+                                  8,          /* Actual number of bits/pixel */
+                                  "R",        /* Pixel justification */
+                                  "NODISPLY", /* Image representation */
+                                  "VIS",      /* Image category */
+                                  1,          /* Number of bands */
+                                  bands);
 
-    subheader.setBlocking(
-        8,   /*!< The number of rows */
-        8,   /*!< The number of columns */
-        8,   /*!< The number of rows/block */
-        8,   /*!< The number of columns/block */
-        "B");                /*!< Image mode */
+    subheader.setBlocking(8,    /*!< The number of rows */
+                          8,    /*!< The number of columns */
+                          8,    /*!< The number of rows/block */
+                          8,    /*!< The number of columns/block */
+                          "B"); /*!< Image mode */
 
-    //Image Header fields to set
+    // Image Header fields to set
     subheader.getImageId().set("None");
     subheader.getImageTitle().set(m_imgIdentifier2);
 
-    //AIMIDB
+    // AIMIDB
     ::nitf::TRE aimidbTre("AIMIDB");
 
-    //LIDAR defaults
+    // LIDAR defaults
     if (m_imgDate.size())
         aimidbTre.setField("ACQUISITION_DATE", m_imgDate);
     aimidbTre.setField("MISSION_NO", "UNKN");
@@ -203,14 +200,14 @@ void NitfFileWriter::write()
         StringList v = Utils::split2(s, ':');
         if (v.size() != 2)
             throw error("Invalid name/value for AIMIDB '" + s +
-                "'.  Format: <name>:<value>.");
+                        "'.  Format: <name>:<value>.");
         Utils::trim(v[0]);
         Utils::trim(v[1]);
         aimidbTre.setField(v[0], v[1]);
     }
     subheader.getExtendedSection().appendTRE(aimidbTre);
 
-    //if IDATIM is empty set it equal to AIMIDB.ACQUISITION_DATE
+    // if IDATIM is empty set it equal to AIMIDB.ACQUISITION_DATE
     if (!m_imgDate.size())
     {
         m_imgDate = aimidbTre.getField("ACQUISITION_DATE").toString();
@@ -218,14 +215,14 @@ void NitfFileWriter::write()
             subheader.getImageDateAndTime().set(m_imgDate);
     }
 
-    //ACFTB
+    // ACFTB
     ::nitf::TRE acftbTre("ACFTB");
 
-    //LIDAR defaults
+    // LIDAR defaults
     acftbTre.setField("AC_MSN_ID", "NOT AVAILABLE");
     acftbTre.setField("SCENE_SOURCE", " ");
-    if (m_imgDate.size()>7)
-        acftbTre.setField("PDATE", m_imgDate.substr(0,8));
+    if (m_imgDate.size() > 7)
+        acftbTre.setField("PDATE", m_imgDate.substr(0, 8));
     acftbTre.setField("MPLAN", "999");
     acftbTre.setField("LOC_ACCY", "000.00");
     acftbTre.setField("ROW_SPACING", "0000000");
@@ -239,7 +236,7 @@ void NitfFileWriter::write()
         StringList v = Utils::split2(s, ':');
         if (v.size() != 2)
             throw error("Invalid name/value for ACFTB '" + s +
-                "'.  Format: <name>:<value>.");
+                        "'.  Format: <name>:<value>.");
         Utils::trim(v[0]);
         Utils::trim(v[1]);
         acftbTre.setField(v[0], v[1]);
@@ -247,8 +244,7 @@ void NitfFileWriter::write()
     subheader.getExtendedSection().appendTRE(acftbTre);
 
     ::nitf::Writer writer;
-    ::nitf::IOHandle output_io(m_filename, NITF_ACCESS_WRITEONLY,
-        NITF_CREATE);
+    ::nitf::IOHandle output_io(m_filename, NITF_ACCESS_WRITEONLY, NITF_CREATE);
     writer.prepare(output_io, record);
 
     ::nitf::SegmentWriter sWriter = writer.newDEWriter(0);
@@ -258,11 +254,8 @@ void NitfFileWriter::write()
     std::string zeros(64, '0');
 
     ::nitf::MemorySource band(
-        const_cast<char*>(zeros.c_str()),
-        zeros.size() /* memory size */,
-        0 /* starting offset */,
-        1 /* bytes per pixel */,
-        0 /*skip*/);
+        const_cast<char*>(zeros.c_str()), zeros.size() /* memory size */,
+        0 /* starting offset */, 1 /* bytes per pixel */, 0 /*skip*/);
     ::nitf::ImageSource iSource;
     iSource.addBand(band);
 
@@ -273,28 +266,25 @@ void NitfFileWriter::write()
     output_io.close();
 }
 
-
 void NitfFileWriter::setBounds(const BOX3D& bounds)
 {
     m_bounds = bounds;
 
-    //NITF decimal degree values for corner coordinates only has a
-    // precision of 3 after the decimal. This may cause an invalid
-    // polygon due to rounding errors with a small tile. Therefore
-    // instead of rounding min values will use the floor value and
-    // max values will use the ceiling values.
+    // NITF decimal degree values for corner coordinates only has a
+    //  precision of 3 after the decimal. This may cause an invalid
+    //  polygon due to rounding errors with a small tile. Therefore
+    //  instead of rounding min values will use the floor value and
+    //  max values will use the ceiling values.
     m_bounds.minx = (floor(m_bounds.minx * 1000)) / 1000.0;
     m_bounds.miny = (floor(m_bounds.miny * 1000)) / 1000.0;
     m_bounds.maxx = (ceil(m_bounds.maxx * 1000)) / 1000.0;
     m_bounds.maxy = (ceil(m_bounds.maxy * 1000)) / 1000.0;
 }
 
-
-void NitfFileWriter::wrapData(const char *buf, size_t size)
+void NitfFileWriter::wrapData(const char* buf, size_t size)
 {
     m_source.reset(new ::nitf::SegmentMemorySource(buf, size, 0, 0, false));
 }
-
 
 void NitfFileWriter::wrapData(const std::string& filename)
 {
@@ -303,4 +293,3 @@ void NitfFileWriter::wrapData(const std::string& filename)
 }
 
 } // namespace pdal
-

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2015, Howard Butler <howard@hobu.co>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Howard Butler <howard@hobu.co>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "GDALReader.hpp"
 
@@ -43,33 +43,26 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "readers.gdal",
-    "Read GDAL rasters as point clouds.",
-    "https://pdal.org/stages/reader.gdal.html",
-    { "tif", "tiff", "jpeg", "jpg", "png" }
+static StaticPluginInfo const s_info{"readers.gdal",
+                                     "Read GDAL rasters as point clouds.",
+                                     "https://pdal.org/stages/reader.gdal.html",
+                                     {"tif", "tiff", "jpeg", "jpg", "png"}
 
 };
 
 CREATE_STATIC_STAGE(GDALReader, s_info)
-
 
 std::string GDALReader::getName() const
 {
     return s_info.name;
 }
 
-
-GDALReader::GDALReader()
-    : m_blockReader(*this)
-{}
+GDALReader::GDALReader() : m_blockReader(*this) {}
 
 GDALReader::~GDALReader()
 {
     m_raster.reset();
 }
-
 
 void GDALReader::initialize()
 {
@@ -92,7 +85,7 @@ void GDALReader::initialize()
         m_dimNames = Utils::split(m_header, ',');
         if (m_dimNames.size() != m_bandTypes.size())
             throwError("Dimension names are not the same count as "
-                "raster bands.");
+                       "raster bands.");
     }
     else
     {
@@ -130,7 +123,6 @@ QuickInfo GDALReader::inspect()
     return qi;
 }
 
-
 void GDALReader::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDim(pdal::Dimension::Id::X);
@@ -144,17 +136,20 @@ void GDALReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
 void GDALReader::addArgs(ProgramArgs& args)
 {
-    args.add("header", "A comma-separated list of dimension IDs to map "
-        "raster bands to dimension id", m_header);
-    args.add("memorycopy", "Load the given raster file "
-        "entirely to memory", m_useMemoryCopy, false).setHidden();
+    args.add("header",
+             "A comma-separated list of dimension IDs to map "
+             "raster bands to dimension id",
+             m_header);
+    args.add("memorycopy",
+             "Load the given raster file "
+             "entirely to memory",
+             m_useMemoryCopy, false)
+        .setHidden();
     args.add("gdalopts", "GDAL driver options (name=value,name=value...)",
-        m_options);
+             m_options);
 }
-
 
 void GDALReader::ready(PointTableRef table)
 {
@@ -164,12 +159,12 @@ void GDALReader::ready(PointTableRef table)
 
     if (m_useMemoryCopy)
     {
-        gdal::Raster *r = m_raster->memoryCopy();
+        gdal::Raster* r = m_raster->memoryCopy();
         if (r)
             m_raster.reset(r);
         else
             log()->get(LogLevel::Warning) << "Couldn't create raster memory "
-                "copy.  Using standard interface.";
+                                             "copy.  Using standard interface.";
     }
 
     m_blockReader.initialize();
@@ -193,13 +188,12 @@ bool GDALReader::processOne(PointRef& point)
     return m_blockReader.processOne(point);
 }
 
-
 void GDALReader::done(PointTableRef table)
 {
     m_raster->close();
 }
 
-GDALReader::BlockReader::BlockReader(GDALReader& reader): m_reader(reader) {}
+GDALReader::BlockReader::BlockReader(GDALReader& reader) : m_reader(reader) {}
 
 void GDALReader::BlockReader::initialize()
 {
@@ -336,4 +330,3 @@ bool GDALReader::BlockReader::processOne(PointRef& point)
 }
 
 } // namespace pdal
-

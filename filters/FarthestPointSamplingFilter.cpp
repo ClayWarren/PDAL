@@ -58,9 +58,7 @@ std::string FarthestPointSamplingFilter::getName() const
     return s_info.name;
 }
 
-FarthestPointSamplingFilter::FarthestPointSamplingFilter()
-{
-}
+FarthestPointSamplingFilter::FarthestPointSamplingFilter() {}
 
 void FarthestPointSamplingFilter::addArgs(ProgramArgs& args)
 {

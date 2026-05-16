@@ -46,12 +46,10 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.voxelcentroidnearestneighbor",
     "Voxel Centroid Nearest Neighbor Filter",
-    "https://pdal.org/stages/filters.voxelcentroidnearestneighbor.html"
-};
+    "https://pdal.org/stages/filters.voxelcentroidnearestneighbor.html"};
 
 CREATE_STATIC_STAGE(VoxelCentroidNearestNeighborFilter, s_info)
 
@@ -111,13 +109,15 @@ PointViewSet VoxelCentroidNearestNeighborFilter::run(PointViewPtr view)
             double x1 = view->getFieldAs<double>(Dimension::Id::X, t.second[0]);
             double y1 = view->getFieldAs<double>(Dimension::Id::Y, t.second[0]);
             double z1 = view->getFieldAs<double>(Dimension::Id::Z, t.second[0]);
-            double d1 = pow(x_center - x1, 2) + pow(y_center - y1, 2) + pow(z_center - z1, 2);
+            double d1 = pow(x_center - x1, 2) + pow(y_center - y1, 2) +
+                        pow(z_center - z1, 2);
 
             // Compute distance from second point to voxel center.
             double x2 = view->getFieldAs<double>(Dimension::Id::X, t.second[1]);
             double y2 = view->getFieldAs<double>(Dimension::Id::Y, t.second[1]);
             double z2 = view->getFieldAs<double>(Dimension::Id::Z, t.second[1]);
-            double d2 = pow(x_center - x2, 2) + pow(y_center - y2, 2) + pow(z_center - z2, 2);
+            double d2 = pow(x_center - x2, 2) + pow(y_center - y2, 2) +
+                        pow(z_center - z2, 2);
 
             // Append the closer of the two.
             if (d1 < d2)

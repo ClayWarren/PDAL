@@ -39,16 +39,12 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.separatescanline",
-    "Split data by scan line.",
-    "https://pdal.org/stages/filters.separatescanline.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.separatescanline", "Split data by scan line.",
+    "https://pdal.org/stages/filters.separatescanline.html"};
 CREATE_STATIC_STAGE(SeparateScanLineFilter, s_info)
 
-SeparateScanLineFilter::SeparateScanLineFilter()
-{}
+SeparateScanLineFilter::SeparateScanLineFilter() {}
 
 std::string SeparateScanLineFilter::getName() const
 {
@@ -57,7 +53,8 @@ std::string SeparateScanLineFilter::getName() const
 
 void SeparateScanLineFilter::addArgs(ProgramArgs& args)
 {
-    args.add("groupby", "Number of lines to be grouped by", m_groupBy, (uint64_t) 1u);
+    args.add("groupby", "Number of lines to be grouped by", m_groupBy,
+             (uint64_t)1u);
 }
 
 void SeparateScanLineFilter::prepared(PointTableRef table)
@@ -72,9 +69,9 @@ PointViewSet SeparateScanLineFilter::run(PointViewPtr inView)
     PointViewSet result;
     PointViewPtr v(inView->makeNew());
     result.insert(v);
-    
+
     uint64_t lineNum = 1;
-    for (PointId i = 0; i < inView->size();++i)
+    for (PointId i = 0; i < inView->size(); ++i)
     {
         v->appendPoint(*inView, i);
         if (inView->getFieldAs<uint8_t>(Dimension::Id::EdgeOfFlightLine, i))
@@ -87,11 +84,11 @@ PointViewSet SeparateScanLineFilter::run(PointViewPtr inView)
             }
         }
     }
-    //if last point was an edge of flight line
+    // if last point was an edge of flight line
     if (v->empty())
         result.erase(v);
-    
+
     return result;
 }
 
-} // pdal
+} // namespace pdal

@@ -45,21 +45,29 @@ namespace copc
 
 struct Entry
 {
-    Entry() :
-        m_key(Key::invalid()), m_offset(0), m_byteSize(-1), m_pointCount(-1)
-    {}
-    Entry(const Key& key) :
-        m_key(key), m_offset(0), m_byteSize(-1), m_pointCount(-1)
-    {}
-    Entry(const Key& key, uint64_t offset, int32_t byteSize, int32_t pointCount) :
-        m_key(key), m_offset(offset), m_byteSize(byteSize), m_pointCount(pointCount)
-    {}
+    Entry()
+        : m_key(Key::invalid()), m_offset(0), m_byteSize(-1), m_pointCount(-1)
+    {
+    }
+    Entry(const Key& key)
+        : m_key(key), m_offset(0), m_byteSize(-1), m_pointCount(-1)
+    {
+    }
+    Entry(const Key& key, uint64_t offset, int32_t byteSize, int32_t pointCount)
+        : m_key(key), m_offset(offset), m_byteSize(byteSize),
+          m_pointCount(pointCount)
+    {
+    }
 
     bool valid() const
-        { return m_key.valid(); }
+    {
+        return m_key.valid();
+    }
 
     bool isDataEntry() const
-        { return m_key.valid() && m_pointCount != -1; }
+    {
+        return m_key.valid() && m_pointCount != -1;
+    }
 
     Key m_key;
     uint64_t m_offset;
@@ -69,7 +77,8 @@ struct Entry
 
 inline std::ostream& operator<<(std::ostream& out, const Entry& e)
 {
-    out << e.m_key << " - " << e.m_offset << "/" << e.m_byteSize << "/" << e.m_pointCount;
+    out << e.m_key << " - " << e.m_offset << "/" << e.m_byteSize << "/"
+        << e.m_pointCount;
     return out;
 }
 
@@ -78,15 +87,14 @@ inline std::ostream& operator<<(std::ostream& out, const Entry& e)
 
 namespace std
 {
-    template<>
-    struct hash<pdal::copc::Entry>
+template <> struct hash<pdal::copc::Entry>
+{
+    std::size_t operator()(const pdal::copc::Entry& entry) const noexcept
     {
-        std::size_t operator()(const pdal::copc::Entry& entry) const noexcept
-        {
-            return std::hash<pdal::copc::Key>{}(entry.m_key);
-        }
-    };
-}
+        return std::hash<pdal::copc::Key>{}(entry.m_key);
+    }
+};
+} // namespace std
 
 namespace pdal
 {
@@ -115,15 +123,25 @@ public:
     using iterator = std::unordered_set<Entry>::iterator;
     using const_iterator = std::unordered_set<Entry>::const_iterator;
     iterator begin()
-        { return m_entries.begin(); }
+    {
+        return m_entries.begin();
+    }
     iterator end()
-        { return m_entries.end(); }
+    {
+        return m_entries.end();
+    }
     const_iterator begin() const
-        { return m_entries.begin(); }
+    {
+        return m_entries.begin();
+    }
     const_iterator end() const
-        { return m_entries.end(); }
+    {
+        return m_entries.end();
+    }
     size_t size() const
-        { return m_entries.size(); }
+    {
+        return m_entries.size();
+    }
     point_count_t pointCount() const;
 
 private:

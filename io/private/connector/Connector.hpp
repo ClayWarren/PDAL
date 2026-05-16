@@ -54,7 +54,8 @@ class Connector
 
 public:
     Connector();
-    Connector(const std::string& filename, const StringMap& headers, const StringMap& query);
+    Connector(const std::string& filename, const StringMap& headers,
+              const StringMap& query);
     Connector(const StringMap& headers, const StringMap& query);
     Connector(const FileSpec& spec);
 
@@ -70,6 +71,5 @@ public:
     std::vector<char> getBinary(uint64_t offset, int32_t size) const;
 };
 
-} // namespace ept
+} // namespace connector
 } // namespace pdal
-

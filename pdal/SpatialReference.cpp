@@ -41,10 +41,10 @@
 #include <pdal/util/FileUtils.hpp>
 
 // gdal
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wfloat-equal"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 #include <ogr_spatialref.h>
-#  pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
 
 #include <cpl_conv.h>
 
@@ -53,16 +53,15 @@
 namespace
 {
 
-using OGRScopedSpatialReference =
-    std::unique_ptr<OGRSpatialReference>;
+using OGRScopedSpatialReference = std::unique_ptr<OGRSpatialReference>;
 
-OGRScopedSpatialReference ogrCreateSrs(std::string s = "", double epoch=0.0)
+OGRScopedSpatialReference ogrCreateSrs(std::string s = "", double epoch = 0.0)
 {
     OGRScopedSpatialReference r(
         new OGRSpatialReference(s.size() ? s.c_str() : nullptr));
     if (!pdal::Utils::compare_approx(epoch, 0.0f, 0.00001f))
     {
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,4,0)
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
         r->SetCoordinateEpoch(epoch);
 #endif
     }
@@ -70,18 +69,19 @@ OGRScopedSpatialReference ogrCreateSrs(std::string s = "", double epoch=0.0)
     return r;
 }
 
-std::string exportToWkt(OGRSpatialReference* srs, const std::vector<std::string>& options = {})
+std::string exportToWkt(OGRSpatialReference* srs,
+                        const std::vector<std::string>& options = {})
 {
     std::string wkt;
     if (!srs)
         return wkt;
 
     // Make one more pointer than option to terminate the list with a nullptr.
-    std::vector<const char *> copts(options.size() + 1, nullptr);
+    std::vector<const char*> copts(options.size() + 1, nullptr);
     for (size_t i = 0; i < options.size(); ++i)
         copts[i] = options[i].c_str();
 
-    char *buf = nullptr;
+    char* buf = nullptr;
     srs->exportToWkt(&buf, copts.data());
     if (buf)
     {
@@ -91,7 +91,7 @@ std::string exportToWkt(OGRSpatialReference* srs, const std::vector<std::string>
     return wkt;
 }
 
-}
+} // namespace
 
 namespace pdal
 {
@@ -101,20 +101,17 @@ SpatialReference::SpatialReference(const std::string& s)
     set(s);
 }
 
-
-//NOTE that this ctor allows a string constant to be used in places
-// where a SpatialReference is extpected.
-SpatialReference::SpatialReference(const char *s)
+// NOTE that this ctor allows a string constant to be used in places
+//  where a SpatialReference is extpected.
+SpatialReference::SpatialReference(const char* s)
 {
     set(s);
 }
-
 
 bool SpatialReference::empty() const
 {
     return m_wkt.empty();
 }
-
 
 bool SpatialReference::valid() const
 {
@@ -122,7 +119,6 @@ bool SpatialReference::valid() const
 
     return current.Validate() == OGRERR_NONE;
 }
-
 
 std::string SpatialReference::identifyHorizontalEPSG() const
 {
@@ -137,7 +133,6 @@ std::string SpatialReference::identifyHorizontalEPSG() const
     return "";
 }
 
-
 std::string SpatialReference::identifyVerticalEPSG() const
 {
     OGRScopedSpatialReference srs(ogrCreateSrs(getVertical(), m_epoch));
@@ -148,23 +143,20 @@ std::string SpatialReference::identifyVerticalEPSG() const
     return "";
 }
 
-
 std::string SpatialReference::getWKT() const
 {
     return m_wkt;
 }
-
 
 double SpatialReference::getEpoch() const
 {
     return m_epoch;
 }
 
-void SpatialReference::setEpoch( const double& epoch )
+void SpatialReference::setEpoch(const double& epoch)
 {
     m_epoch = epoch;
 }
-
 
 std::string SpatialReference::getPROJJSON() const
 {
@@ -173,26 +165,24 @@ std::string SpatialReference::getPROJJSON() const
     if (!poSRS)
         return json;
 
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,1,0)
-    char *poJSON (nullptr);
-    char **papszOptions = NULL;
-    papszOptions = CSLSetNameValue( papszOptions, "INDENTATION_WIDTH", "2" );
-    papszOptions = CSLSetNameValue( papszOptions, "SCHEMA", "" );
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 1, 0)
+    char* poJSON(nullptr);
+    char** papszOptions = NULL;
+    papszOptions = CSLSetNameValue(papszOptions, "INDENTATION_WIDTH", "2");
+    papszOptions = CSLSetNameValue(papszOptions, "SCHEMA", "");
     poSRS->exportToPROJJSON(&poJSON, papszOptions);
     if (poJSON)
         json = std::string(poJSON);
     CPLFree(poJSON);
-    CSLDestroy( papszOptions );
+    CSLDestroy(papszOptions);
 #endif
     return json;
 }
-
 
 void SpatialReference::parse(const std::string& s, std::string::size_type& pos)
 {
     set(s.substr(pos));
 }
-
 
 void SpatialReference::set(std::string v)
 {
@@ -223,15 +213,15 @@ void SpatialReference::set(std::string v)
 
     CPLErrorReset();
     const char* input = v.c_str();
-    OGRErr err = srs.SetFromUserInput(const_cast<char *>(input));
+    OGRErr err = srs.SetFromUserInput(const_cast<char*>(input));
     if (err != OGRERR_NONE)
     {
         std::ostringstream oss;
         std::string msg = CPLGetLastErrorMsg();
         if (msg.empty())
             msg = "(unknown reason)";
-        oss << "Could not import coordinate system '" << input << "': " <<
-            msg << ".";
+        oss << "Could not import coordinate system '" << input << "': " << msg
+            << ".";
         throw pdal_error(oss.str());
     }
 
@@ -242,7 +232,6 @@ void SpatialReference::set(std::string v)
     m_wkt2 = exportToWkt(&srs, {"FORMAT=WKT2_2018"});
 }
 
-
 std::string SpatialReference::getProj4() const
 {
     std::string tmp;
@@ -250,7 +239,7 @@ std::string SpatialReference::getProj4() const
     const char* poWKT = m_wkt.c_str();
 
     OGRSpatialReference srs(NULL);
-    if (OGRERR_NONE == srs.importFromWkt(const_cast<char **>(&poWKT)))
+    if (OGRERR_NONE == srs.importFromWkt(const_cast<char**>(&poWKT)))
     {
         char* proj4 = nullptr;
         srs.exportToProj4(&proj4);
@@ -262,7 +251,6 @@ std::string SpatialReference::getProj4() const
     return tmp;
 }
 
-
 std::string SpatialReference::getVertical() const
 {
     std::string tmp;
@@ -273,7 +261,7 @@ std::string SpatialReference::getVertical() const
     if (!poSRS)
         return tmp;
 
-    char *pszWKT = NULL;
+    char* pszWKT = NULL;
 
     OGR_SRSNode* node = poSRS->GetAttrNode("VERT_CS");
     if (node && poSRS)
@@ -285,7 +273,6 @@ std::string SpatialReference::getVertical() const
 
     return tmp;
 }
-
 
 std::string SpatialReference::getVerticalUnits() const
 {
@@ -311,7 +298,6 @@ std::string SpatialReference::getVerticalUnits() const
     return tmp;
 }
 
-
 std::string SpatialReference::getHorizontal() const
 {
     if (m_horizontalWkt.empty())
@@ -326,7 +312,6 @@ std::string SpatialReference::getHorizontal() const
     }
     return m_horizontalWkt;
 }
-
 
 std::string SpatialReference::getHorizontalUnits() const
 {
@@ -346,7 +331,6 @@ std::string SpatialReference::getHorizontalUnits() const
     return tmp;
 }
 
-
 bool SpatialReference::equals(const SpatialReference& input) const
 {
     if (getWKT() == input.getWKT())
@@ -363,25 +347,21 @@ bool SpatialReference::equals(const SpatialReference& input) const
     return (output == 1);
 }
 
-
 bool SpatialReference::operator==(const SpatialReference& input) const
 {
     return this->equals(input);
 }
-
 
 bool SpatialReference::operator!=(const SpatialReference& input) const
 {
     return !(this->equals(input));
 }
 
-
 const std::string& SpatialReference::getName() const
 {
     static std::string name("pdal.spatialreference");
     return name;
 }
-
 
 bool SpatialReference::isGeographic() const
 {
@@ -393,7 +373,6 @@ bool SpatialReference::isGeographic() const
     return output;
 }
 
-
 bool SpatialReference::isGeocentric() const
 {
     OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
@@ -403,7 +382,6 @@ bool SpatialReference::isGeocentric() const
     bool output = current->IsGeocentric();
     return output;
 }
-
 
 bool SpatialReference::isProjected() const
 {
@@ -424,39 +402,36 @@ std::vector<int> SpatialReference::getAxisOrdering() const
     return output;
 }
 
-
-
 int SpatialReference::calculateZone(double lon, double lat)
 {
     int zone = 0;
     lon = Utils::normalizeLongitude(lon);
 
     // Special Norway processing.
-    if (lat >= 56.0 && lat < 64.0 && lon >= 3.0 && lon < 12.0 )
+    if (lat >= 56.0 && lat < 64.0 && lon >= 3.0 && lon < 12.0)
         zone = 32;
     // Special Svalbard processing.
     else if (lat >= 72.0 && lat < 84.0)
     {
-        if (lon >= 0.0  && lon < 9.0)
+        if (lon >= 0.0 && lon < 9.0)
             zone = 31;
-        else if (lon >= 9.0  && lon < 21.0)
+        else if (lon >= 9.0 && lon < 21.0)
             zone = 33;
-        else if (lon >= 21.0  && lon < 33.0)
+        else if (lon >= 21.0 && lon < 33.0)
             zone = 35;
-        else if (lon >= 33.0  && lon < 42.0)
+        else if (lon >= 33.0 && lon < 42.0)
             zone = 37;
     }
     // Everywhere else.
     else
     {
-        zone = (int) floor((lon + 180.0) / 6) + 1;
+        zone = (int)floor((lon + 180.0) / 6) + 1;
         if (lat < 0)
             zone = -zone;
     }
 
     return zone;
 }
-
 
 /**
   Create a spatial reference that represents a specific UTM zone.
@@ -482,37 +457,26 @@ SpatialReference SpatialReference::wgs84FromZone(int zone)
     return SpatialReference(code);
 }
 
-
 bool SpatialReference::isWKT2(const std::string& wkt)
 {
-    StringList leaders {
-        "GEODCRS", "GEODETICCRS",
-        "GEOGCRS", "GEOGRAPHICCRS",
-        "PROJCRS", "PROJECTEDCRS",
-        "VERTCRS", "VERTICALCRS",
-        "ENGCRS", "ENGINEERINGCRS",
-        "BOUNDCRS",
-        "IMAGECRS",
-        "PARAMETRICCRS",
-        "TIMECRS",
-        "COMPOUNDCRS",
-        "DERIVEDPROJCRS"
-    };
+    StringList leaders{
+        "GEODCRS",       "GEODETICCRS",    "GEOGCRS",     "GEOGRAPHICCRS",
+        "PROJCRS",       "PROJECTEDCRS",   "VERTCRS",     "VERTICALCRS",
+        "ENGCRS",        "ENGINEERINGCRS", "BOUNDCRS",    "IMAGECRS",
+        "PARAMETRICCRS", "TIMECRS",        "COMPOUNDCRS", "DERIVEDPROJCRS"};
 
     for (const std::string& s : leaders)
         if (wkt.compare(0, s.size(), s) == 0)
             return true;
     return false;
 }
-
 
 bool SpatialReference::isWKT1(const std::string& wkt)
 {
     // List comes from GDAL.  WKT includes FITTED_CS, but this isn't
     // included in GDAL list.  Not sure why.
-    StringList leaders { "PROJCS", "GEOGCS", "COMPD_CS", "GEOCCS",
-        "VERT_CS", "LOCAL_CS"
-    };
+    StringList leaders{"PROJCS", "GEOGCS",  "COMPD_CS",
+                       "GEOCCS", "VERT_CS", "LOCAL_CS"};
 
     for (const std::string& s : leaders)
         if (wkt.compare(0, s.size(), s) == 0)
@@ -520,12 +484,10 @@ bool SpatialReference::isWKT1(const std::string& wkt)
     return false;
 }
 
-
 bool SpatialReference::isWKT(const std::string& wkt)
 {
     return isWKT1(wkt) || isWKT2(wkt);
 }
-
 
 std::string SpatialReference::prettyWkt(const std::string& wkt)
 {
@@ -535,7 +497,8 @@ std::string SpatialReference::prettyWkt(const std::string& wkt)
     if (!srs)
         return outWkt;
 
-    outWkt = exportToWkt(srs.get(), {"MULTILINE=YES"}); // equivalent to exportToPrettyWkt
+    outWkt = exportToWkt(srs.get(),
+                         {"MULTILINE=YES"}); // equivalent to exportToPrettyWkt
     return outWkt;
 }
 
@@ -546,9 +509,12 @@ std::string SpatialReference::getWKT1() const
         return wkt;
 
     OGRScopedSpatialReference srs = ogrCreateSrs(wkt, m_epoch);
-    std::string wkt1 = exportToWkt(srs.get(), {"FORMAT=WKT1_GDAL", "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS=YES"});
+    std::string wkt1 = exportToWkt(
+        srs.get(),
+        {"FORMAT=WKT1_GDAL", "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS=YES"});
     if (wkt1.empty())
-       throw pdal_error("Couldn't convert spatial reference to WKT version 1.");
+        throw pdal_error(
+            "Couldn't convert spatial reference to WKT version 1.");
     return wkt1;
 }
 
@@ -568,7 +534,6 @@ int SpatialReference::getUTMZone() const
     return (north ? 1 : -1) * zone;
 }
 
-
 int SpatialReference::computeUTMZone(const BOX3D& cbox) const
 {
     SrsTransform transform(*this, SpatialReference("EPSG:4326"));
@@ -586,12 +551,12 @@ int SpatialReference::computeUTMZone(const BOX3D& cbox) const
     {
         std::ostringstream msg;
         msg << "computeUTMZone failed due to zone crossing. Zones "
-            "are " << minZone << " and " << maxZone << ".";
+               "are "
+            << minZone << " and " << maxZone << ".";
         throw pdal_error(msg.str());
     }
     return minZone;
 }
-
 
 MetadataNode SpatialReference::toMetadata() const
 {
@@ -614,19 +579,16 @@ MetadataNode SpatialReference::toMetadata() const
     return root;
 }
 
-
 void SpatialReference::dump() const
 {
     std::cout << *this;
 }
-
 
 std::ostream& operator<<(std::ostream& ostr, const SpatialReference& srs)
 {
     ostr << SpatialReference::prettyWkt(srs.m_wkt);
     return ostr;
 }
-
 
 std::istream& operator>>(std::istream& istr, SpatialReference& srs)
 {

@@ -34,7 +34,6 @@
 
 #include "DisjointSet.hpp"
 
-
 namespace pdal
 {
 

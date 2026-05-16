@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2025, Isaac Bell (isaac@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2025, Isaac Bell (isaac@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "SpzWriter.hpp"
 #include "SpzUtil.hpp"
@@ -42,20 +42,19 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-        "writers.spz",
-        "SPZ writer",
-        "https://pdal.org/stages/writers.spz.html",
-        { "spz" }
-};
+static StaticPluginInfo const s_info{"writers.spz",
+                                     "SPZ writer",
+                                     "https://pdal.org/stages/writers.spz.html",
+                                     {"spz"}};
 
 CREATE_SHARED_STAGE(SpzWriter, s_info)
 
-SpzWriter::SpzWriter() : m_cloud(new spz::GaussianCloud)
-{}
+SpzWriter::SpzWriter() : m_cloud(new spz::GaussianCloud) {}
 
-std::string SpzWriter::getName() const { return s_info.name; }
+std::string SpzWriter::getName() const
+{
+    return s_info.name;
+}
 
 void SpzWriter::addArgs(ProgramArgs& args)
 {
@@ -73,11 +72,13 @@ void SpzWriter::initialize()
     }
 }
 
-Dimension::Id SpzWriter::tryFindDim(PointLayoutPtr layout, const std::string& dimName)
+Dimension::Id SpzWriter::tryFindDim(PointLayoutPtr layout,
+                                    const std::string& dimName)
 {
     Dimension::Id id = layout->findDim(dimName);
     if (id == Dimension::Id::Unknown)
-        log()->get(LogLevel::Warning) << "Dimension " << dimName << " not found." << std::endl;
+        log()->get(LogLevel::Warning)
+            << "Dimension " << dimName << " not found." << std::endl;
     return id;
 }
 
@@ -89,7 +90,8 @@ void SpzWriter::checkDimensions(PointLayoutPtr layout)
     for (int i = 0; i < 3; ++i)
     {
         m_scaleDims.push_back(tryFindDim(layout, "scale_" + std::to_string(i)));
-        m_plyColorDims.push_back(tryFindDim(layout, "f_dc_" + std::to_string(i)));
+        m_plyColorDims.push_back(
+            tryFindDim(layout, "f_dc_" + std::to_string(i)));
         m_rotDims.push_back(tryFindDim(layout, "rot_" + std::to_string(i + 1)));
     }
     // rotation W component (rot_0) is added as the last item
@@ -109,24 +111,25 @@ void SpzWriter::checkDimensions(PointLayoutPtr layout)
     // check spherical harmonics dimensions
     switch (m_shDims.size())
     {
-        case 0:
-            m_shDegree = 0;
-            break;
-        case 9:
-            m_shDegree = 1;
-            break;
-        case 24:
-            m_shDegree = 2;
-            break;
-        case 45:
-            m_shDegree = 3;
-            break;
-        default:
-            log()->get(LogLevel::Warning) << "Invalid spherical harmonics dimensions " <<
-                "for '" << filename() << "': expected 0, 9, 24 or 45 dimensions " <<
-                "labeled 'f_rest_*': found " << m_shDims.size() << std::endl;
-            m_shDims.clear();
-            m_shDegree = 0;
+    case 0:
+        m_shDegree = 0;
+        break;
+    case 9:
+        m_shDegree = 1;
+        break;
+    case 24:
+        m_shDegree = 2;
+        break;
+    case 45:
+        m_shDegree = 3;
+        break;
+    default:
+        log()->get(LogLevel::Warning)
+            << "Invalid spherical harmonics dimensions " << "for '"
+            << filename() << "': expected 0, 9, 24 or 45 dimensions "
+            << "labeled 'f_rest_*': found " << m_shDims.size() << std::endl;
+        m_shDims.clear();
+        m_shDegree = 0;
     }
     // check float RGB
     if (m_plyColorDims.size() != 3)
@@ -137,10 +140,10 @@ void SpzWriter::prepared(PointTableRef table)
 {
     checkDimensions(table.layout());
 
-    // See if we have an SPZ-supported coordinate system specified for our point table.
-    // readers.spz sets this as RUB, or can be set by user.
+    // See if we have an SPZ-supported coordinate system specified for our point
+    // table. readers.spz sets this as RUB, or can be set by user.
     MetadataNode m = table.metadata();
-    m_coordinateOrientation = 
+    m_coordinateOrientation =
         spz::getCoordinateSystem(m.findChild("coordinate_orientation").value());
 }
 
@@ -180,20 +183,23 @@ void SpzWriter::write(const PointViewPtr data)
         }
 
         for (int i = 0; i < 3; ++i)
-            m_cloud->colors.push_back(point.getFieldAs<float>(m_plyColorDims[i]));
+            m_cloud->colors.push_back(
+                point.getFieldAs<float>(m_plyColorDims[i]));
 
         m_cloud->alphas.push_back(point.getFieldAs<float>(m_plyAlphaDim));
 
         if (m_shDegree)
         {
-            for (int i = 0; i < numSh; i++) 
+            for (int i = 0; i < numSh; i++)
             {
                 // R sh component
                 m_cloud->sh.push_back(point.getFieldAs<float>(m_shDims[i]));
                 // G sh component
-                m_cloud->sh.push_back(point.getFieldAs<float>(m_shDims[i + numSh]));
+                m_cloud->sh.push_back(
+                    point.getFieldAs<float>(m_shDims[i + numSh]));
                 // B sh component
-                m_cloud->sh.push_back(point.getFieldAs<float>(m_shDims[i + 2 * numSh]));
+                m_cloud->sh.push_back(
+                    point.getFieldAs<float>(m_shDims[i + 2 * numSh]));
             }
         }
     }

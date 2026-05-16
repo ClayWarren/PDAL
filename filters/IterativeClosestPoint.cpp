@@ -48,12 +48,9 @@ namespace pdal
 using namespace Dimension;
 using namespace Eigen;
 
-static StaticPluginInfo const s_info
-{
-    "filters.icp",
-    "Iterative Closest Point (ICP) registration.",
-    "https://pdal.org/stages/filters.icp.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.icp", "Iterative Closest Point (ICP) registration.",
+    "https://pdal.org/stages/filters.icp.html"};
 
 CREATE_STATIC_STAGE(IterativeClosestPoint, s_info)
 
@@ -91,7 +88,7 @@ void IterativeClosestPoint::prepared(PointTableRef table)
             m_vec.push_back(val);
         if (m_vec.size() != 16)
             throwError("Expecting exactly 16 values in 'init' got " +
-                std::to_string(m_vec.size()));
+                       std::to_string(m_vec.size()));
     }
 }
 

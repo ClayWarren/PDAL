@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <pdal/PipelineManager.hpp>
-#include <pdal/Stage.hpp>
-#include <pdal/SpatialReference.hpp>
+#include "../filters/private/expr/ConditionalExpression.hpp"
 #include <pdal/PDALUtils.hpp>
+#include <pdal/PipelineManager.hpp>
+#include <pdal/SpatialReference.hpp>
+#include <pdal/Stage.hpp>
+#include <pdal/private/gdal/ErrorHandler.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal/private/gdal/ErrorHandler.hpp>
-#include "../filters/private/expr/ConditionalExpression.hpp"
 
 #include "private/StageRunner.hpp"
 
@@ -49,25 +49,23 @@
 namespace pdal
 {
 
-Stage::Stage() : m_progressFd(-1), m_verbose(0), m_pointCount(0),
-    m_faceCount(0)
-{}
-
-
-Stage::~Stage()
-{}
-
-
-void Stage::splitView(const PointViewPtr& view, PointViewPtr& keep, PointViewPtr& skip)
+Stage::Stage() : m_progressFd(-1), m_verbose(0), m_pointCount(0), m_faceCount(0)
 {
-    const expr::ConditionalExpression *where = whereExpr();
+}
+
+Stage::~Stage() {}
+
+void Stage::splitView(const PointViewPtr& view, PointViewPtr& keep,
+                      PointViewPtr& skip)
+{
+    const expr::ConditionalExpression* where = whereExpr();
     if (where)
     {
-        PointView *k = keep.get();
-        PointView *s = skip.get();
+        PointView* k = keep.get();
+        PointView* s = skip.get();
         for (PointRef p : *view)
         {
-            PointView *active = where->eval(p) ? k : s;
+            PointView* active = where->eval(p) ? k : s;
             active->appendPoint(*view, p.pointId());
         }
     }
@@ -75,20 +73,18 @@ void Stage::splitView(const PointViewPtr& view, PointViewPtr& keep, PointViewPtr
         keep = view;
 }
 
-
 void Stage::addConditionalOptions(const Options& opts)
 {
     for (const auto& o : opts.getOptions())
         m_options.addConditional(o);
 }
 
-
 void Stage::serialize(MetadataNode root, PipelineWriter::TagMap& tags) const
 {
-    for (Stage *s : m_inputs)
+    for (Stage* s : m_inputs)
         s->serialize(root, tags);
 
-    auto tagname = [tags](const Stage *s)
+    auto tagname = [tags](const Stage* s)
     {
         const auto ti = tags.find(s);
         return ti->second;
@@ -98,7 +94,7 @@ void Stage::serialize(MetadataNode root, PipelineWriter::TagMap& tags) const
     anon.add("type", getName());
     anon.add("tag", tagname(this));
     m_options.toMetadata(anon);
-    for (Stage *s : m_inputs)
+    for (Stage* s : m_inputs)
         anon.addList("inputs", tagname(s));
     root.addList(anon);
 }
@@ -115,7 +111,6 @@ void Stage::addAllArgs(ProgramArgs& args)
         throw pdal_error(getName() + ": " + error.what());
     }
 }
-
 
 void Stage::handleOptions()
 {
@@ -146,10 +141,7 @@ void Stage::handleOptions()
     setupLog();
 }
 
-
-void Stage::assignParsedOptions()
-{}
-
+void Stage::assignParsedOptions() {}
 
 QuickInfo Stage::preview()
 {
@@ -161,27 +153,26 @@ QuickInfo Stage::preview()
     return qi;
 }
 
-
 void Stage::prepare(PointTableRef table)
 {
     // Linearize
-    std::stack<Stage *> pending;
-    std::vector<Stage *> stages;
+    std::stack<Stage*> pending;
+    std::vector<Stage*> stages;
 
     pending.push(this);
     while (pending.size())
     {
-        Stage *s = pending.top();
+        Stage* s = pending.top();
         pending.pop();
         stages.push_back(s);
-        for (Stage *in : s->m_inputs)
+        for (Stage* in : s->m_inputs)
             pending.push(in);
     }
 
     // Initialize each stage.
     for (auto it = stages.rbegin(); it != stages.rend(); it++)
     {
-        Stage *s = *it;
+        Stage* s = *it;
         s->m_args.reset(new ProgramArgs);
         s->handleOptions();
         s->startLogging();
@@ -194,14 +185,13 @@ void Stage::prepare(PointTableRef table)
     // Call prepared() now that all stages are initialized.
     for (auto it = stages.rbegin(); it != stages.rend(); it++)
     {
-        Stage *s = *it;
+        Stage* s = *it;
         s->startLogging();
         s->l_prepared(table);
         s->prepared(table);
         s->stopLogging();
     }
 }
-
 
 PointViewSet Stage::execute(PointTableRef table)
 {
@@ -211,9 +201,9 @@ PointViewSet Stage::execute(PointTableRef table)
         {
             if (Dimension::isDeprecated(id))
             {
-                log()->get(LogLevel::Warning) <<
-                    "Dimension " << Dimension::name(id) << " is deprecated" <<
-                    std::endl;
+                log()->get(LogLevel::Warning)
+                    << "Dimension " << Dimension::name(id) << " is deprecated"
+                    << std::endl;
             }
         }
     }
@@ -227,24 +217,24 @@ PointViewSet Stage::execute(PointTableRef table)
     int stageInstanceId = 1;
     struct StageInstance
     {
-        Stage *m_stage;
+        Stage* m_stage;
         int m_id;
 
-        StageInstance(Stage *s, int id) : m_stage(s), m_id(id)
-        {}
-        StageInstance() : m_stage(nullptr), m_id(0)
-        {}
+        StageInstance(Stage* s, int id) : m_stage(s), m_id(id) {}
+        StageInstance() : m_stage(nullptr), m_id(0) {}
 
         bool operator<(const StageInstance& other) const
-        { return m_id < other.m_id; }
+        {
+            return m_id < other.m_id;
+        }
     };
 
     std::stack<StageInstance> stages;
     std::stack<StageInstance> pending;
     std::map<StageInstance, StageInstance> children;
 
-    m_log->get(LogLevel::Debug) << "Executing pipeline in standard mode." <<
-        std::endl;
+    m_log->get(LogLevel::Debug)
+        << "Executing pipeline in standard mode." << std::endl;
 
     pending.push(StageInstance(this, stageInstanceId++));
 
@@ -254,7 +244,7 @@ PointViewSet Stage::execute(PointTableRef table)
         StageInstance si = pending.top();
         pending.pop();
         stages.push(si);
-        for (Stage *in : si.m_stage->m_inputs)
+        for (Stage* in : si.m_stage->m_inputs)
         {
             StageInstance parent(in, stageInstanceId++);
             pending.push(parent);
@@ -319,8 +309,8 @@ PointViewSet Stage::execute(PointTableRef table, PointViewSet& views)
         runners.push_back(runner);
     }
 
-    // The stage runner separates the point view into keeps and skips. We put all the
-    // kept points together to pass to prerun().
+    // The stage runner separates the point view into keeps and skips. We put
+    // all the kept points together to pass to prerun().
     PointViewSet keeps;
     for (StageRunnerPtr r : runners)
         keeps.insert(r->keeps());
@@ -390,7 +380,6 @@ void Stage::setupLog()
     gdal::ErrorHandler::getGlobalErrorHandler().set(m_log, isDebug());
 }
 
-
 void Stage::l_addArgs(ProgramArgs& args)
 {
     args.add("user_data", "User JSON", m_userDataJSON);
@@ -400,34 +389,28 @@ void Stage::l_addArgs(ProgramArgs& args)
     // before parsing the command line.  This entry allows a line in the
     // help and options list.
     args.add("option_file", "File from which to read additional options",
-        m_optionFile);
+             m_optionFile);
 }
-
 
 void Stage::l_initialize(PointTableRef table)
 {
     m_metadata = table.metadata().add(getName());
 }
 
-
-void Stage::l_prepared(PointTableRef table)
-{}
-
+void Stage::l_prepared(PointTableRef table) {}
 
 const SpatialReference& Stage::getSpatialReference() const
 {
     return m_spatialReference;
 }
 
-
 void Stage::setSpatialReference(const SpatialReference& spatialRef)
 {
     setSpatialReference(m_metadata, spatialRef);
 }
 
-
 void Stage::setSpatialReference(MetadataNode& m,
-    const SpatialReference& spatialRef)
+                                const SpatialReference& spatialRef)
 {
     m_spatialReference = spatialRef;
 
@@ -435,14 +418,13 @@ void Stage::setSpatialReference(MetadataNode& m,
     m.addOrUpdate(spatialRef.toMetadata());
     m.addOrUpdate("spatialreference", spatialRef.getWKT(), "SRS of this stage");
     m.addOrUpdate("comp_spatialreference", spatialRef.getWKT(),
-        "SRS of this stage");
+                  "SRS of this stage");
 }
-
 
 bool Stage::parseName(std::string o, std::string::size_type& pos)
 {
     auto isStageChar = [](char c)
-        { return std::isalpha(c) || std::isdigit(c) || c == '_'; };
+    { return std::isalpha(c) || std::isdigit(c) || c == '_'; };
 
     if (o.empty() || !std::isalpha(o[pos]))
         return false;
@@ -451,11 +433,9 @@ bool Stage::parseName(std::string o, std::string::size_type& pos)
     return true;
 }
 
-
 bool Stage::parseTagName(std::string o, std::string::size_type& pos)
 {
-    auto isTagChar = [](char c)
-        { return std::isalnum(c) || c == '_'; };
+    auto isTagChar = [](char c) { return std::isalnum(c) || c == '_'; };
 
     if (!std::isalpha(o[pos]))
         return false;
@@ -464,19 +444,16 @@ bool Stage::parseTagName(std::string o, std::string::size_type& pos)
     return true;
 }
 
-
 void Stage::throwError(const std::string& s) const
 {
     throw pdal_error(getName() + ": " + s);
 }
-
 
 void Stage::startLogging() const
 {
     m_log->pushLeader(m_logLeader);
     gdal::ErrorHandler::getGlobalErrorHandler().set(m_log, isDebug());
 }
-
 
 void Stage::stopLogging() const
 {
@@ -520,4 +497,3 @@ std::ostream& operator<<(std::ostream& out, const Stage::WhereMergeMode& mode)
 }
 
 } // namespace pdal
-

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2015, Hobu Inc., hobu@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Hobu Inc., hobu@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "BpfWriter.hpp"
 
@@ -41,26 +41,26 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include "BpfCompressor.hpp"
-#include <pdal/util/Utils.hpp>
 #include <arbiter/arbiter.hpp>
-
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "writers.bpf",
-    "\"Binary Point Format\" (BPF) writer support. BPF is a simple \n" \
-        "DoD and research format that is used by some sensor and \n" \
-        "processing chains.",
+    "\"Binary Point Format\" (BPF) writer support. BPF is a simple \n"
+    "DoD and research format that is used by some sensor and \n"
+    "processing chains.",
     "https://pdal.org/stages/writers.bpf.html",
-    { "bpf" }
-};
+    {"bpf"}};
 
 CREATE_STATIC_STAGE(BpfWriter, s_info)
 
-std::string BpfWriter::getName() const { return s_info.name; }
+std::string BpfWriter::getName() const
+{
+    return s_info.name;
+}
 
 std::istream& operator>>(std::istream& in, BpfWriter::CoordId& id)
 {
@@ -87,14 +87,13 @@ void BpfWriter::addArgs(ProgramArgs& args)
     args.add("compression", "Output compression", m_compression);
     args.add("header_data", "Base64-encoded header data", m_extraDataSpec);
     args.add("format", "Output format", m_header.m_pointFormat,
-        BpfFormat::DimMajor);
+             BpfFormat::DimMajor);
     args.add("coord_id", "UTM coordinate ID", m_coordId, {true, 0});
     args.add("bundledfile", "List of files to bundle in output",
-        m_bundledFilesSpec);
+             m_bundledFilesSpec);
     args.add("output_dims", "Output dimensions", m_outputDims);
     m_scaling.addArgs(args);
 }
-
 
 void BpfWriter::initialize()
 {
@@ -108,15 +107,15 @@ void BpfWriter::initialize()
     }
 
     m_header.m_coordId = m_coordId.m_val;
-    m_header.m_coordType = Utils::toNative(m_header.m_coordId ?
-        BpfCoordType::UTM : BpfCoordType::Cartesian);
+    m_header.m_coordType = Utils::toNative(
+        m_header.m_coordId ? BpfCoordType::UTM : BpfCoordType::Cartesian);
 #ifndef PDAL_HAVE_ZLIB
     if (m_compression)
         throwError("Can't write compressed BPF. PDAL wasn't built with "
-            "Zlib support.");
+                   "Zlib support.");
 #endif
     m_header.m_compression = Utils::toNative(
-            m_compression ? BpfCompression::Zlib : BpfCompression::None);
+        m_compression ? BpfCompression::Zlib : BpfCompression::None);
     m_extraData = Utils::base64_decode(m_extraDataSpec);
 
     for (auto file : m_bundledFilesSpec)
@@ -128,12 +127,14 @@ void BpfWriter::initialize()
         if (size > (std::numeric_limits<uint32_t>::max)())
             throwError("Bundled file '" + file + "' too large.");
         if (size == 0)
-            throwError("Bundled file '" + file + "' empty or otherwise invalid.");
+            throwError("Bundled file '" + file +
+                       "' empty or otherwise invalid.");
 
         BpfUlemFile ulemFile(size, FileUtils::getFilename(file), file);
         if (ulemFile.m_filename.length() > 32)
-            throwError("Bundled file '" + file + "' name exceeds "
-                "maximum length of 32.");
+            throwError("Bundled file '" + file +
+                       "' name exceeds "
+                       "maximum length of 32.");
         m_bundledFiles.push_back(ulemFile);
     }
 
@@ -150,15 +151,13 @@ void BpfWriter::initialize()
         m_scaling.m_zXform.m_offset.m_auto = true;
 }
 
-
 void BpfWriter::prepared(PointTableRef table)
 {
     loadBpfDimensions(table.layout());
 }
 
-
 void BpfWriter::readyFile(const std::string& filename,
-    const SpatialReference& srs)
+                          const SpatialReference& srs)
 {
     m_curFilename = filename;
     m_stream.open(filename);
@@ -191,7 +190,7 @@ void BpfWriter::readyFile(const std::string& filename,
     m_header.writeDimensions(m_stream, m_dims);
     for (auto& file : m_bundledFiles)
         file.write(m_stream);
-    m_stream.put((const char *)m_extraData.data(), m_extraData.size());
+    m_stream.put((const char*)m_extraData.data(), m_extraData.size());
 
     if (m_stream.position() > (std::numeric_limits<int32_t>::max)())
         throwError("Data too large.  BPF only supports 2^32 - 1 bytes.");
@@ -202,21 +201,21 @@ void BpfWriter::readyFile(const std::string& filename,
     m_header.m_xform.m_vals[10] = m_scaling.m_zXform.m_scale.m_val;
 }
 
-
 void BpfWriter::loadBpfDimensions(PointLayoutPtr layout)
 {
     Dimension::IdList dims;
 
     if (m_outputDims.size())
     {
-       for (std::string& s : m_outputDims)
-       {
-           Dimension::Id id = layout->findDim(s);
-           if (id == Dimension::Id::Unknown)
-               throwError("Invalid dimension '" + s + "' specified for "
-                   "'output_dims' option.");
-           dims.push_back(id);
-       }
+        for (std::string& s : m_outputDims)
+        {
+            Dimension::Id id = layout->findDim(s);
+            if (id == Dimension::Id::Unknown)
+                throwError("Invalid dimension '" + s +
+                           "' specified for "
+                           "'output_dims' option.");
+            dims.push_back(id);
+        }
     }
     else
         dims = layout->dims();
@@ -239,12 +238,10 @@ void BpfWriter::loadBpfDimensions(PointLayoutPtr layout)
     }
 }
 
-
 void BpfWriter::prerunFile(const PointViewSet& pvSet)
 {
     m_scaling.setAutoXForm(pvSet);
 }
-
 
 void BpfWriter::writeView(const PointViewPtr dataShared)
 {
@@ -260,15 +257,15 @@ void BpfWriter::writeView(const PointViewPtr dataShared)
     {
         switch (m_header.m_pointFormat)
         {
-            case BpfFormat::PointMajor:
-                writePointMajor(data);
-                break;
-            case BpfFormat::DimMajor:
-                writeDimMajor(data);
-                break;
-            case BpfFormat::ByteMajor:
-                writeByteMajor(data);
-                break;
+        case BpfFormat::PointMajor:
+            writePointMajor(data);
+            break;
+        case BpfFormat::DimMajor:
+            writeDimMajor(data);
+            break;
+        case BpfFormat::ByteMajor:
+            writeByteMajor(data);
+            break;
         }
     }
     catch (const BpfCompressor::error& err)
@@ -282,7 +279,6 @@ void BpfWriter::writeView(const PointViewPtr dataShared)
     m_header.m_numPts = static_cast<int32_t>(count);
 }
 
-
 void BpfWriter::writePointMajor(const PointView* data)
 {
     // Blocks of 10,000 points will ensure that we're under 16MB, even
@@ -292,7 +288,7 @@ void BpfWriter::writePointMajor(const PointView* data)
     // For compression we're going to write to a buffer so that it can be
     // compressed before it's written to the file stream.
     BpfCompressor compressor(m_stream,
-        blockpoints * sizeof(float) * m_dims.size());
+                             blockpoints * sizeof(float) * m_dims.size());
     PointId idx = 0;
     while (idx < data->size())
     {
@@ -300,9 +296,9 @@ void BpfWriter::writePointMajor(const PointView* data)
             compressor.startBlock();
         size_t blockId;
         for (blockId = 0; idx < data->size() && blockId < blockpoints;
-            ++idx, ++blockId)
+             ++idx, ++blockId)
         {
-            for (auto & bpfDim : m_dims)
+            for (auto& bpfDim : m_dims)
             {
                 double d = getAdjustedValue(data, bpfDim, idx);
                 m_stream << (float)d;
@@ -316,13 +312,12 @@ void BpfWriter::writePointMajor(const PointView* data)
     }
 }
 
-
 void BpfWriter::writeDimMajor(const PointView* data)
 {
     // We're going to pretend for now that we only ever have one point buffer.
     BpfCompressor compressor(m_stream, data->size() * sizeof(float));
 
-    for (auto & bpfDim : m_dims)
+    for (auto& bpfDim : m_dims)
     {
         if (m_header.m_compression)
             compressor.startBlock();
@@ -339,7 +334,6 @@ void BpfWriter::writeDimMajor(const PointView* data)
     }
 }
 
-
 void BpfWriter::writeByteMajor(const PointView* data)
 {
     union
@@ -350,11 +344,11 @@ void BpfWriter::writeByteMajor(const PointView* data)
 
     // We're going to pretend for now that we only ever have one point buffer.
     BpfCompressor compressor(m_stream,
-        data->size() * sizeof(float) * m_dims.size());
+                             data->size() * sizeof(float) * m_dims.size());
 
     if (m_header.m_compression)
         compressor.startBlock();
-    for (auto & bpfDim : m_dims)
+    for (auto& bpfDim : m_dims)
     {
         for (size_t b = 0; b < sizeof(float); b++)
         {
@@ -373,9 +367,8 @@ void BpfWriter::writeByteMajor(const PointView* data)
     }
 }
 
-
-double BpfWriter::getAdjustedValue(const PointView* data,
-    BpfDimension& bpfDim, PointId idx)
+double BpfWriter::getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
+                                   PointId idx)
 {
     double d = data->getFieldAs<double>(bpfDim.m_id, idx);
     bpfDim.m_min = (std::min)(bpfDim.m_min, d);
@@ -389,7 +382,6 @@ double BpfWriter::getAdjustedValue(const PointView* data,
         d /= m_scaling.m_zXform.m_scale.m_val;
     return (d - bpfDim.m_offset);
 }
-
 
 void BpfWriter::doneFile()
 {
@@ -422,4 +414,4 @@ void BpfWriter::doneFile()
     }
 }
 
-} //namespace pdal
+} // namespace pdal

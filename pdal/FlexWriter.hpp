@@ -1,35 +1,35 @@
 /******************************************************************************
-* Copyright (c) 2015, Hobu Inc. (hobu@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the names of its contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Hobu Inc. (hobu@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of its contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -41,24 +41,26 @@
 namespace pdal
 {
 
-// Subclasses can create an output file for each point view when in standard mode.
-// A '#' in the output filename is replaced with an incrementing integer as each file is
-// written. If no '#' is seen, all point views are written to a single output file.
+// Subclasses can create an output file for each point view when in standard
+// mode. A '#' in the output filename is replaced with an incrementing integer
+// as each file is written. If no '#' is seen, all point views are written to a
+// single output file.
 class PDAL_EXPORT FlexWriter : public Writer
 {
 protected:
-    FlexWriter() : m_filenum(1)
-    {}
+    FlexWriter() : m_filenum(1) {}
 
     Scaling m_scaling;
 
     void validateFilename(PointTableRef table)
     {
-        if (!table.supportsView() && (filename().find('#') != std::string::npos))
+        if (!table.supportsView() &&
+            (filename().find('#') != std::string::npos))
         {
             std::ostringstream oss;
-            oss << getName() << ": Can't write with template-based "
-                "filename using streaming point table.";
+            oss << getName()
+                << ": Can't write with template-based "
+                   "filename using streaming point table.";
             throw pdal_error(oss.str());
         }
     }
@@ -69,7 +71,8 @@ private:
     virtual void l_initialize(PointTableRef table) final
     {
         Writer::l_initialize(table);
-        try {
+        try
+        {
             m_hashPos = handleFilenameTemplate(filename());
         }
         catch (const pdal_error& err)
@@ -90,7 +93,9 @@ private:
     }
 
     virtual bool srsOverridden() const
-    { return false; }
+    {
+        return false;
+    }
 
     virtual void ready(PointTableRef table) final
     {
@@ -100,9 +105,9 @@ private:
         if (m_hashPos == std::string::npos)
         {
             if (!table.spatialReferenceUnique() && !srsOverridden())
-                log()->get(LogLevel::Error) << getName() <<
-                    ": Attempting to write '" << filename() <<
-                    "' with multiple point spatial references." << std::endl;
+                log()->get(LogLevel::Error)
+                    << getName() << ": Attempting to write '" << filename()
+                    << "' with multiple point spatial references." << std::endl;
             readyFile(generateFilename(), table.spatialReference());
         }
     }
@@ -144,25 +149,20 @@ private:
 
 #undef final
 
-    virtual void readyTable(PointTableRef table)
-    {}
+    virtual void readyTable(PointTableRef table) {}
 
-    virtual void doneTable(PointTableRef table)
-    {}
+    virtual void doneTable(PointTableRef table) {}
 
     virtual void readyFile(const std::string& filename,
-        const SpatialReference& srs) = 0;
-    virtual void prerunFile(const PointViewSet& pvSet)
-    {}
+                           const SpatialReference& srs) = 0;
+    virtual void prerunFile(const PointViewSet& pvSet) {}
     virtual void writeView(const PointViewPtr view) = 0;
-    virtual void doneFile()
-    {}
+    virtual void doneFile() {}
 
     size_t m_filenum;
 
     FlexWriter& operator=(const FlexWriter&); // not implemented
-    FlexWriter(const FlexWriter&); // not implemented
+    FlexWriter(const FlexWriter&);            // not implemented
 };
 
 } // namespace pdal
-

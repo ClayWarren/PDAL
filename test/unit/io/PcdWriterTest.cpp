@@ -321,11 +321,11 @@ TEST(PcdWriterTest, binaryPdalTypes)
     EXPECT_EQ(1, v->getFieldAs<int>(Dimension::Id::Intensity, 0));
 
     EXPECT_NEAR(2.2222222222, v->getFieldAs<float>(Dimension::Id::X, 1),
-        0.0001);
+                0.0001);
     EXPECT_NEAR(2.2222222222, v->getFieldAs<float>(Dimension::Id::Y, 1),
-        0.0001);
+                0.0001);
     EXPECT_NEAR(2.2222222222, v->getFieldAs<float>(Dimension::Id::Z, 1),
-        0.0001);
+                0.0001);
     EXPECT_EQ(2, v->getFieldAs<int>(Dimension::Id::Intensity, 1));
 
     EXPECT_NEAR(3.33, v->getFieldAs<float>(Dimension::Id::X, 2), 0.0001);

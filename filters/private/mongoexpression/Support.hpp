@@ -45,7 +45,7 @@ namespace pdal
 class Loggable
 {
 public:
-    virtual ~Loggable() { }
+    virtual ~Loggable() {}
 
     virtual std::string toString(std::string prefix) const = 0;
 };
@@ -63,4 +63,3 @@ public:
 };
 
 } // namespace pdal
-

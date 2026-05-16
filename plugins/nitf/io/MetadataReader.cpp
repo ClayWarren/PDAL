@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2014, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Consulting LLC nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Consulting LLC nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "MetadataReader.hpp"
 
@@ -42,15 +42,11 @@
 namespace pdal
 {
 
-MetadataReader::MetadataReader(::nitf::Record& record,
-                               MetadataNode& node,
-                               bool showEmptyFields) :
-    m_record(record),
-    m_node(node),
-    m_showEmptyFields(showEmptyFields)
+MetadataReader::MetadataReader(::nitf::Record& record, MetadataNode& node,
+                               bool showEmptyFields)
+    : m_record(record), m_node(node), m_showEmptyFields(showEmptyFields)
 {
 }
-
 
 void MetadataReader::read()
 {
@@ -75,7 +71,7 @@ void MetadataReader::read()
     //
     iter = m_record.getImages().begin();
     num = m_record.getNumImages();
-    for (i=0; i<num; i++)
+    for (i = 0; i < num; i++)
     {
         const std::string key = "IM:" + std::to_string(i);
 
@@ -96,7 +92,7 @@ void MetadataReader::read()
     //
     iter = m_record.getDataExtensions().begin();
     num = m_record.getNumDataExtensions();
-    for (i=0; i<num; i++)
+    for (i = 0; i < num; i++)
     {
         const std::string key = "DE:" + std::to_string(i);
 
@@ -111,10 +107,8 @@ void MetadataReader::read()
     }
 }
 
-
 void MetadataReader::writeField(const std::string& parentkey,
-                                const std::string& key,
-                                ::nitf::Field field)
+                                const std::string& key, ::nitf::Field field)
 {
     std::string v;
 
@@ -128,8 +122,8 @@ void MetadataReader::writeField(const std::string& parentkey,
     }
     else if (field.getType() == (::nitf::Field::FieldType)NITF_BINARY)
     {
-	if (key == "FBKGC")
-	{
+        if (key == "FBKGC")
+        {
             // special case: field is three distinct bytes
             std::string t = field.toString();
             v = std::to_string((unsigned int)t[0]) + ", " +
@@ -156,14 +150,11 @@ void MetadataReader::writeField(const std::string& parentkey,
     return;
 }
 
-
 void MetadataReader::writeInt(const std::string& parentkey,
-                              const std::string& key,
-                              int thevalue)
+                              const std::string& key, int thevalue)
 {
     m_node.add<std::string>(parentkey + "." + key, std::to_string(thevalue));
 }
-
 
 void MetadataReader::writeString(const std::string& parentkey,
                                  const std::string& key,
@@ -171,7 +162,6 @@ void MetadataReader::writeString(const std::string& parentkey,
 {
     m_node.add<std::string>(parentkey + "." + key, thevalue);
 }
-
 
 void MetadataReader::doFileHeader(const std::string& parentkey,
                                   ::nitf::FileHeader& header)
@@ -194,12 +184,12 @@ void MetadataReader::doFileHeader(const std::string& parentkey,
     writeField("FH", "HL", header.getHeaderLength());
     writeField("FH", "NUMI", header.getNumImages());
     writeField("FH", "NUMS", header.getNumGraphics());
-    //writeField("FH", "???", header.getNumLabels()); //unsupported in 2500c spec
+    // writeField("FH", "???", header.getNumLabels()); //unsupported in 2500c
+    // spec
     writeField("FH", "NUMT", header.getNumTexts());
     writeField("FH", "NUMDES", header.getNumDataExtensions());
     writeField("FH", "NUMRES", header.getNumReservedExtensions());
 }
-
 
 void MetadataReader::doSecurity(const std::string& parentkey,
                                 const std::string& prefix,
@@ -211,23 +201,26 @@ void MetadataReader::doSecurity(const std::string& parentkey,
     writeField(parentkey, prefix + "SREL", security.getReleasingInstructions());
     writeField(parentkey, prefix + "SDCTP", security.getDeclassificationType());
     writeField(parentkey, prefix + "SDCDT", security.getDeclassificationDate());
-    writeField(parentkey, prefix + "SDCXM", security.getDeclassificationExemption());
+    writeField(parentkey, prefix + "SDCXM",
+               security.getDeclassificationExemption());
     writeField(parentkey, prefix + "SDG", security.getDowngrade());
     writeField(parentkey, prefix + "SDGDT", security.getDowngradeDateTime());
     writeField(parentkey, prefix + "SCLTX", security.getClassificationText());
-    writeField(parentkey, prefix + "SCATP", security.getClassificationAuthorityType());
-    writeField(parentkey, prefix + "SCAUT", security.getClassificationAuthority());
+    writeField(parentkey, prefix + "SCATP",
+               security.getClassificationAuthorityType());
+    writeField(parentkey, prefix + "SCAUT",
+               security.getClassificationAuthority());
     writeField(parentkey, prefix + "SCRSN", security.getClassificationReason());
     writeField(parentkey, prefix + "SSRDT", security.getSecuritySourceDate());
-    writeField(parentkey, prefix + "SCTLN", security.getSecurityControlNumber());
+    writeField(parentkey, prefix + "SCTLN",
+               security.getSecurityControlNumber());
 }
-
 
 void MetadataReader::doBands(const std::string& key,
                              ::nitf::ImageSubheader& header)
 {
     const int nbands = (int)header.getNumImageBands();
-    for (int i=0; i<nbands; i++)
+    for (int i = 0; i < nbands; i++)
     {
         ::nitf::BandInfo bandinfo = header.getBandInfo(i);
         std::string subkey = key + ".BAND:" + std::to_string(i);
@@ -235,9 +228,7 @@ void MetadataReader::doBands(const std::string& key,
     }
 }
 
-
-void MetadataReader::doBand(const std::string& key,
-                            ::nitf::BandInfo& band)
+void MetadataReader::doBand(const std::string& key, ::nitf::BandInfo& band)
 {
     writeField(key, "IREPBAND", band.getRepresentation());
     writeField(key, "ISUBCAT", band.getSubcategory());
@@ -250,7 +241,6 @@ void MetadataReader::doBand(const std::string& key,
     writeInt(key, "num_lookup_tables", lut.getTables());
     writeInt(key, "num_lookup_entries", lut.getEntries());
 }
-
 
 void MetadataReader::doImageSubheader(const std::string& key,
                                       ::nitf::ImageSubheader& subheader)
@@ -300,7 +290,6 @@ void MetadataReader::doImageSubheader(const std::string& key,
     writeField(key, "IMAG", subheader.getImageMagnification());
 }
 
-
 void MetadataReader::doDESubheader(const std::string& key,
                                    ::nitf::DESubheader& subheader)
 {
@@ -312,12 +301,10 @@ void MetadataReader::doDESubheader(const std::string& key,
     doSecurity(key, "DE", security);
 
     // this is not an internal field, not interesting to users
-    //writeField(key, "DESSHL", subheader.getDataLength());
+    // writeField(key, "DESSHL", subheader.getDataLength());
 }
 
-
-void MetadataReader::doTRE(const std::string& key,
-                           ::nitf::TRE& tre)
+void MetadataReader::doTRE(const std::string& key, ::nitf::TRE& tre)
 {
     const std::string& tag = key + "." + tre.getTag();
 
@@ -359,7 +346,6 @@ void MetadataReader::doTRE(const std::string& key,
     }
 }
 
-
 void MetadataReader::doExtensions(const std::string& key,
                                   ::nitf::Extensions& ext)
 {
@@ -374,9 +360,7 @@ void MetadataReader::doExtensions(const std::string& key,
     }
 }
 
-
-void MetadataReader::doComments(const std::string& key,
-                                ::nitf::List& list)
+void MetadataReader::doComments(const std::string& key, ::nitf::List& list)
 {
     int i = 0;
     ::nitf::ListIterator iter = list.begin();
@@ -395,5 +379,4 @@ void MetadataReader::doComments(const std::string& key,
     return;
 }
 
-
-} // namespaces
+} // namespace pdal

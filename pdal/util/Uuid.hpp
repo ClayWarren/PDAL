@@ -1,23 +1,23 @@
 /******************************************************************************
-* Copyright (c) 2014, Hobu Inc., hobu@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
+ * Copyright (c) 2014, Hobu Inc., hobu@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
  * Copyright (C) 1996, 1997 Theodore Ts'o.
  *
  * %Begin-Header%
@@ -47,7 +47,7 @@
  * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  * %End-Header%
-****************************************************************************/
+ ****************************************************************************/
 
 // This is a C++ification of the libuuid code, less the code that actually
 // creates UUIDs, which is most of it and we don't need at this time.
@@ -56,15 +56,15 @@
 
 #include <cstdint>
 #include <cstring>
-#include <sstream>
-#include <string>
 #include <iomanip>
 #include <random>
+#include <sstream>
+#include <string>
 
 #include "pdal_util_export.hpp"
 
-#include "Inserter.hpp"
 #include "Extractor.hpp"
+#include "Inserter.hpp"
 #include "Utils.hpp"
 
 namespace pdal
@@ -75,7 +75,9 @@ namespace pdal
 struct PDAL_EXPORT uuid
 {
     uuid()
-    { clear(); }
+    {
+        clear();
+    }
 
     uint32_t time_low;
     uint16_t time_mid;
@@ -84,7 +86,9 @@ struct PDAL_EXPORT uuid
     uint8_t node[6];
 
     void clear()
-    { memset(this, 0, sizeof(struct uuid)); }
+    {
+        memset(this, 0, sizeof(struct uuid));
+    }
 
     void randomize()
     {
@@ -93,14 +97,17 @@ struct PDAL_EXPORT uuid
         static std::uniform_int_distribution<uint64_t> dist;
 
         uint64_t r = dist(gen);
-        const char *c = reinterpret_cast<const char *>(&r);
-        memcpy(&time_low, c, sizeof(time_low)); c += sizeof(time_low);
-        memcpy(&time_mid, c, sizeof(time_mid)); c += sizeof(time_mid);
+        const char* c = reinterpret_cast<const char*>(&r);
+        memcpy(&time_low, c, sizeof(time_low));
+        c += sizeof(time_low);
+        memcpy(&time_mid, c, sizeof(time_mid));
+        c += sizeof(time_mid);
         memcpy(&time_hi_and_version, c, sizeof(time_hi_and_version));
 
         r = dist(gen);
-        c = reinterpret_cast<const char *>(&r);
-        std::memcpy(&clock_seq, c, sizeof(clock_seq)); c += sizeof(clock_seq);
+        c = reinterpret_cast<const char*>(&r);
+        std::memcpy(&clock_seq, c, sizeof(clock_seq));
+        c += sizeof(clock_seq);
         std::memcpy(node, c, sizeof(node));
 
         // Set the high nibble to 4 (version 4).
@@ -112,7 +119,7 @@ struct PDAL_EXPORT uuid
 };
 #pragma pack(pop)
 
-PDAL_EXPORT inline bool operator < (const uuid& u1, const uuid& u2)
+PDAL_EXPORT inline bool operator<(const uuid& u1, const uuid& u2)
 {
     if (u1.time_low != u2.time_low)
         return u1.time_low < u2.time_low;
@@ -128,33 +135,39 @@ PDAL_EXPORT inline bool operator < (const uuid& u1, const uuid& u2)
 
 class PDAL_EXPORT Uuid
 {
-    PDAL_EXPORT friend inline bool operator < (const Uuid& u1, const Uuid& u2);
+    PDAL_EXPORT friend inline bool operator<(const Uuid& u1, const Uuid& u2);
+
 public:
-    Uuid()
-        {}
-    Uuid(const char *c)
-        { unpack(c); }
+    Uuid() {}
+    Uuid(const char* c)
+    {
+        unpack(c);
+    }
     Uuid(const std::string& s)
-        { parse(s); }
+    {
+        parse(s);
+    }
 
     void clear()
-        { m_data.clear(); }
-    void unpack(const char *c)
+    {
+        m_data.clear();
+    }
+    void unpack(const char* c)
     {
         BeExtractor e(c, 10);
 
-        e >> m_data.time_low >> m_data.time_mid >>
-            m_data.time_hi_and_version >> m_data.clock_seq;
+        e >> m_data.time_low >> m_data.time_mid >> m_data.time_hi_and_version >>
+            m_data.clock_seq;
         c += 10;
         std::copy(c, c + 6, m_data.node);
     }
 
-    void pack(char *c) const
+    void pack(char* c) const
     {
         BeInserter i(c, 10);
 
-        i << m_data.time_low << m_data.time_mid <<
-            m_data.time_hi_and_version << m_data.clock_seq;
+        i << m_data.time_low << m_data.time_mid << m_data.time_hi_and_version
+          << m_data.clock_seq;
         c += 10;
         std::copy(m_data.node, m_data.node + 6, c);
     }
@@ -165,8 +178,9 @@ public:
             return false;
 
         // Format validation.
-        const char *cp = s.data();
-        for (size_t i = 0; i < 36; i++) {
+        const char* cp = s.data();
+        for (size_t i = 0; i < 36; i++)
+        {
             if ((i == 8) || (i == 13) || (i == 18) || (i == 23))
             {
                 if (*cp != '-')
@@ -187,7 +201,8 @@ public:
         cp = s.data() + 24;
         char buf[3];
         buf[2] = 0;
-        for (size_t i = 0; i < 6; i++) {
+        for (size_t i = 0; i < 6; i++)
+        {
             buf[0] = *cp++;
             buf[1] = *cp++;
             m_data.node[i] = (uint8_t)strtoul(buf, NULL, 16);
@@ -211,14 +226,18 @@ public:
     }
 
     std::string toString() const
-        { return unparse(); }
+    {
+        return unparse();
+    }
 
     bool empty() const
-    { return isNull(); }
+    {
+        return isNull();
+    }
 
     bool isNull() const
     {
-        const char *c = (const char *)&m_data;
+        const char* c = (const char*)&m_data;
         for (size_t i = 0; i < sizeof(m_data); ++i)
             if (*c++ != 0)
                 return false;
@@ -226,7 +245,9 @@ public:
     }
 
     static constexpr size_t size()
-        { return sizeof(m_data); }
+    {
+        return sizeof(m_data);
+    }
 
 protected:
     uuid m_data;
@@ -241,23 +262,23 @@ public:
     }
 };
 
-PDAL_EXPORT inline bool operator == (const Uuid& u1, const Uuid& u2)
+PDAL_EXPORT inline bool operator==(const Uuid& u1, const Uuid& u2)
 {
     return !(u1 < u2) && !(u2 < u1);
 }
 
-PDAL_EXPORT inline bool operator < (const Uuid& u1, const Uuid& u2)
+PDAL_EXPORT inline bool operator<(const Uuid& u1, const Uuid& u2)
 {
     return u1.m_data < u2.m_data;
 }
 
-PDAL_EXPORT inline std::ostream& operator << (std::ostream& out, const Uuid& u)
+PDAL_EXPORT inline std::ostream& operator<<(std::ostream& out, const Uuid& u)
 {
     out << u.toString();
     return out;
 }
 
-PDAL_EXPORT inline std::istream& operator >> (std::istream& in, Uuid& u)
+PDAL_EXPORT inline std::istream& operator>>(std::istream& in, Uuid& u)
 {
     std::string s;
     in >> s;
@@ -267,4 +288,3 @@ PDAL_EXPORT inline std::istream& operator >> (std::istream& in, Uuid& u)
 }
 
 } // namespace pdal
-

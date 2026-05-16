@@ -147,13 +147,13 @@ inline Type type(std::string s)
     s = Utils::tolower(s);
 
     if (s == "int8_t" || s == "int8" || s == "char")
-       return Type::Signed8;
+        return Type::Signed8;
     if (s == "int16_t" || s == "int16" || s == "short")
-       return Type::Signed16;
+        return Type::Signed16;
     if (s == "int32_t" || s == "int32" || s == "int")
-       return Type::Signed32;
+        return Type::Signed32;
     if (s == "int64_t" || s == "int64" || s == "long")
-       return Type::Signed64;
+        return Type::Signed64;
     if (s == "uint8_t" || s == "uint8" || s == "uchar")
         return Type::Unsigned8;
     if (s == "uint16_t" || s == "uint16" || s == "ushort")
@@ -182,65 +182,54 @@ inline Type type(const std::string& baseType, size_t size)
     return static_cast<Type>((size_t)(base) | size);
 }
 
-template<typename T>
-Type type();
+template <typename T> Type type();
 
-template<>
-inline Type type<int8_t>()
+template <> inline Type type<int8_t>()
 {
     return Type::Signed8;
 }
 
-template<>
-inline Type type<int16_t>()
+template <> inline Type type<int16_t>()
 {
     return Type::Signed16;
 }
 
-template<>
-inline Type type<int32_t>()
+template <> inline Type type<int32_t>()
 {
     return Type::Signed32;
 }
 
-template<>
-inline Type type<int64_t>()
+template <> inline Type type<int64_t>()
 {
     return Type::Signed64;
 }
 
-template<>
-inline Type type<uint8_t>()
+template <> inline Type type<uint8_t>()
 {
     return Type::Unsigned8;
 }
 
-template<>
-inline Type type<uint16_t>()
+template <> inline Type type<uint16_t>()
 {
     return Type::Unsigned16;
 }
 
-template<>
-inline Type type<uint32_t>()
+template <> inline Type type<uint32_t>()
 {
     return Type::Unsigned32;
 }
 
-template<>
-inline Type type<uint64_t>()
+template <> inline Type type<uint64_t>()
 {
     return Type::Unsigned64;
 }
 
-template<>
-inline Type type<float>()
+template <> inline Type type<float>()
 {
     return Type::Float;
 }
 
-template<>
-inline Type type<double>()
+template <> inline Type type<double>()
 {
     return Type::Double;
 }
@@ -255,9 +244,7 @@ inline std::size_t extractName(const std::string& s, std::string::size_type p)
     if (!std::isalpha(s[p++]))
         return 0;
     auto isvalid = [](int c)
-    {
-        return std::isalpha(c) || std::isdigit(c) || c == '_' || c == ' ';
-    };
+    { return std::isalpha(c) || std::isdigit(c) || c == '_' || c == ' '; };
     return Utils::extract(s, p, isvalid) + 1;
 }
 
@@ -268,7 +255,8 @@ inline std::string fixName(std::string name)
 
     auto isvalid = [replaceChar](int c)
     {
-        return std::isalpha(c) || std::isdigit(c) || c == replaceChar || c == ' ';
+        return std::isalpha(c) || std::isdigit(c) || c == replaceChar ||
+               c == ' ';
     };
 
     // if first character isn't an alpha, we
@@ -278,7 +266,8 @@ inline std::string fixName(std::string name)
 
     for (std::size_t i = 0; i < name.size(); ++i)
     {
-        if (!isvalid(name[i])) name[i] = replaceChar;
+        if (!isvalid(name[i]))
+            name[i] = replaceChar;
     }
     return name;
 }
@@ -313,4 +302,3 @@ inline std::ostream& operator<<(std::ostream& out, const Dimension::Type& type)
 } // namespace Dimension
 
 } // namespace pdal
-

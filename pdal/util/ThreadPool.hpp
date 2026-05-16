@@ -53,16 +53,18 @@ public:
     // to Pool::add will block until an enqueued task has been popped from the
     // queue.
     PDAL_EXPORT ThreadPool(std::size_t numThreads, int64_t queueSize = -1,
-            bool verbose = true) :
-        m_queueSize(queueSize),
-        m_numThreads(std::max<std::size_t>(numThreads, 1))
+                           bool verbose = true)
+        : m_queueSize(queueSize),
+          m_numThreads(std::max<std::size_t>(numThreads, 1))
     {
         assert(m_queueSize != 0);
         go();
     }
 
     PDAL_EXPORT ~ThreadPool()
-    { join(); }
+    {
+        join();
+    }
 
     ThreadPool(const ThreadPool& other) = delete;
     ThreadPool& operator=(const ThreadPool& other) = delete;
@@ -75,7 +77,8 @@ public:
     PDAL_EXPORT void join()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (!m_running) return;
+        if (!m_running)
+            return;
         m_running = false;
         lock.unlock();
 
@@ -107,14 +110,15 @@ public:
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_produceCv.wait(lock, [this]()
-        {
-            return !m_outstanding && m_tasks.empty();
-        });
+                         { return !m_outstanding && m_tasks.empty(); });
     }
 
     // Join and restart.
     PDAL_EXPORT void cycle()
-    { join(); go(); }
+    {
+        join();
+        go();
+    }
 
     // Change the number of threads.  Current threads will be joined.
     PDAL_EXPORT void resize(const std::size_t numThreads)
@@ -134,10 +138,12 @@ public:
             throw pdal_error("Attempted to add a task to a stopped ThreadPool");
         }
 
-        m_produceCv.wait(lock, [this]()
-        {
-            return m_queueSize < 0 || m_tasks.size() < (size_t)m_queueSize;
-        });
+        m_produceCv.wait(lock,
+                         [this]()
+                         {
+                             return m_queueSize < 0 ||
+                                    m_tasks.size() < (size_t)m_queueSize;
+                         });
 
         m_tasks.emplace(task);
 
@@ -147,10 +153,14 @@ public:
     }
 
     PDAL_EXPORT std::size_t size() const
-    { return m_numThreads; }
+    {
+        return m_numThreads;
+    }
 
     PDAL_EXPORT std::size_t numThreads() const
-    { return m_numThreads; }
+    {
+        return m_numThreads;
+    }
 
 private:
     // Worker thread function.  Wait for a task and run it.
@@ -170,4 +180,3 @@ private:
 };
 
 } // namespace pdal
-

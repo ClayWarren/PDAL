@@ -35,12 +35,9 @@
 namespace pdal
 {
 
-static PluginInfo const ptstatInfo
-{
-    "filters.zsmooth",
-    "Zsmooth Filter",
-    "https://pdal.org/stages/filters.zsmooth.html"
-};
+static PluginInfo const ptstatInfo{
+    "filters.zsmooth", "Zsmooth Filter",
+    "https://pdal.org/stages/filters.zsmooth.html"};
 
 struct ZsmoothFilter::Private
 {
@@ -57,30 +54,31 @@ std::string ZsmoothFilter::getName() const
     return ptstatInfo.name;
 }
 
-ZsmoothFilter::ZsmoothFilter() : m_p(new Private)
-{}
+ZsmoothFilter::ZsmoothFilter() : m_p(new Private) {}
 
-
-ZsmoothFilter::~ZsmoothFilter()
-{}
-
+ZsmoothFilter::~ZsmoothFilter() {}
 
 void ZsmoothFilter::addArgs(ProgramArgs& args)
 {
-    args.add("radius", "Radius in X/Y plane in which to find neighboring points", m_p->radius, 1.0);
-    args.add("medianpercent", "Location (percent) in neighbor list at which to find "
-        "neighbor Z value (min == 0, max == 100, median == 50, etc.)", m_p->pos, 50.0);
-    args.add("dim", "Name of dimension in which to store statistic", m_p->dimName).setPositional();
+    args.add("radius",
+             "Radius in X/Y plane in which to find neighboring points",
+             m_p->radius, 1.0);
+    args.add("medianpercent",
+             "Location (percent) in neighbor list at which to find "
+             "neighbor Z value (min == 0, max == 100, median == 50, etc.)",
+             m_p->pos, 50.0);
+    args.add("dim", "Name of dimension in which to store statistic",
+             m_p->dimName)
+        .setPositional();
 }
-
 
 void ZsmoothFilter::addDimensions(PointLayoutPtr layout)
 {
-    m_p->statDim = layout->registerOrAssignDim(m_p->dimName, Dimension::Type::Double);
+    m_p->statDim =
+        layout->registerOrAssignDim(m_p->dimName, Dimension::Type::Double);
     if (m_p->statDim == Dimension::Id::Z)
         throwError("Can't use 'Z' as output dimension.");
 }
-
 
 void ZsmoothFilter::prepared(PointTableRef)
 {
@@ -88,7 +86,6 @@ void ZsmoothFilter::prepared(PointTableRef)
         throwError("'medicanpercent' value must be in the range [0, 100]");
     m_p->pos /= 100.0;
 }
-
 
 void ZsmoothFilter::filter(PointView& view)
 {
@@ -124,7 +121,6 @@ void ZsmoothFilter::filter(PointView& view)
             double highfrac = pos - low;
             double lowfrac = 1 - highfrac;
             val = valList[low] * lowfrac + valList[high] * highfrac;
-
         }
         view.setField(m_p->statDim, idx, val);
     }

@@ -43,12 +43,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.cluster",
-    "Extract and label clusters using Euclidean distance.",
-    "https://pdal.org/stages/filters.cluster.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.cluster", "Extract and label clusters using Euclidean distance.",
+    "https://pdal.org/stages/filters.cluster.html"};
 
 CREATE_STATIC_STAGE(ClusterFilter, s_info)
 
@@ -60,9 +57,9 @@ std::string ClusterFilter::getName() const
 void ClusterFilter::addArgs(ProgramArgs& args)
 {
     args.add("min_points", "Min points per cluster", m_minPoints,
-        static_cast<uint64_t>(1));
+             static_cast<uint64_t>(1));
     args.add("max_points", "Max points per cluster", m_maxPoints,
-        (std::numeric_limits<uint64_t>::max)());
+             (std::numeric_limits<uint64_t>::max)());
     args.add("tolerance", "Radius", m_tolerance, 1.0);
     args.add("is3d", "Perform cluster extraction in 3D?", m_is3d, true);
 }
@@ -76,11 +73,11 @@ void ClusterFilter::filter(PointView& view)
 {
     std::deque<PointIdList> clusters;
     if (m_is3d)
-        clusters = Segmentation::extractClusters<KD3Index>(view, m_minPoints,
-            m_maxPoints, m_tolerance);
+        clusters = Segmentation::extractClusters<KD3Index>(
+            view, m_minPoints, m_maxPoints, m_tolerance);
     else
-        clusters = Segmentation::extractClusters<KD2Index>(view, m_minPoints,
-            m_maxPoints, m_tolerance);
+        clusters = Segmentation::extractClusters<KD2Index>(
+            view, m_minPoints, m_maxPoints, m_tolerance);
 
     uint64_t id = 1;
     for (auto const& c : clusters)

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "gtest/gtest.h"
 
@@ -41,13 +41,13 @@
 
 #include <stdio.h>
 
+#include "TestConfig.hpp"
 #include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Random.hpp>
-#include "TestConfig.hpp"
 
 namespace pdal
 {
@@ -109,9 +109,9 @@ std::string exename(const std::string& name)
 #endif
 }
 
-
 // do a comparison by line of two (text) files, ignoring CRLF differences
-uint32_t diff_text_files(const std::string& file1, const std::string& file2, int32_t ignoreLine1)
+uint32_t diff_text_files(const std::string& file1, const std::string& file2,
+                         int32_t ignoreLine1)
 {
     if (!Utils::fileExists(file1) || !Utils::fileExists(file2))
         return (std::numeric_limits<uint32_t>::max)();
@@ -126,7 +126,8 @@ uint32_t diff_text_files(const std::string& file1, const std::string& file2, int
     return diffs;
 }
 
-uint32_t diff_text_files(std::istream& str1, std::istream& str2, int32_t ignoreLine1)
+uint32_t diff_text_files(std::istream& str1, std::istream& str2,
+                         int32_t ignoreLine1)
 {
     uint32_t numdiffs = 0;
     int32_t currLine = 1;
@@ -145,10 +146,10 @@ uint32_t diff_text_files(std::istream& str1, std::istream& str2, int32_t ignoreL
         }
 
         // remove line endings from test comparisons
-        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\r' ), buf1.end());
-        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\n' ), buf1.end());
-        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\r' ), buf2.end());
-        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\n' ), buf2.end());
+        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\r'), buf1.end());
+        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\n'), buf1.end());
+        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\r'), buf2.end());
+        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\n'), buf2.end());
 
         if (str1.eof() && str2.eof())
         {
@@ -188,19 +189,18 @@ uint32_t diff_text_files(std::istream& str1, std::istream& str2, int32_t ignoreL
     return numdiffs;
 }
 
-
-uint32_t diff_files(const std::string& file1, const std::string& file2, uint32_t ignorable_start,
-    uint32_t ignorable_length)
+uint32_t diff_files(const std::string& file1, const std::string& file2,
+                    uint32_t ignorable_start, uint32_t ignorable_length)
 {
-    uint32_t start[] = { ignorable_start };
-    uint32_t len[] = { ignorable_length };
+    uint32_t start[] = {ignorable_start};
+    uint32_t len[] = {ignorable_length};
     return diff_files(file1, file2, start, len, 1);
 }
 
-
 // do a byte-wise comparison of two (binary) files
-uint32_t diff_files(const std::string& file1, const std::string& file2, uint32_t* ignorable_start,
-    uint32_t* ignorable_length, uint32_t num_ignorables)
+uint32_t diff_files(const std::string& file1, const std::string& file2,
+                    uint32_t* ignorable_start, uint32_t* ignorable_length,
+                    uint32_t num_ignorables)
 {
     if (!Utils::fileExists(file1) || !Utils::fileExists(file2))
         return (std::numeric_limits<uint32_t>::max)();
@@ -208,21 +208,22 @@ uint32_t diff_files(const std::string& file1, const std::string& file2, uint32_t
     std::istream* str1 = Utils::openFile(file1);
     std::istream* str2 = Utils::openFile(file2);
 
-    uint32_t ret = diff_files(*str1, *str2, ignorable_start, ignorable_length, num_ignorables);
+    uint32_t ret = diff_files(*str1, *str2, ignorable_start, ignorable_length,
+                              num_ignorables);
 
     Utils::closeFile(str1);
     Utils::closeFile(str2);
     return ret;
 }
 
-
-uint32_t diff_files(std::istream& str1, std::istream& str2, uint32_t* ignorable_start,
-    uint32_t* ignorable_length, uint32_t num_ignorables)
+uint32_t diff_files(std::istream& str1, std::istream& str2,
+                    uint32_t* ignorable_start, uint32_t* ignorable_length,
+                    uint32_t num_ignorables)
 {
     uint32_t numdiffs = 0;
     char p, q;
 
-    for (uint32_t i = 0; ; ++i)
+    for (uint32_t i = 0;; ++i)
     {
         str1.get(p);
         str2.get(q);
@@ -260,7 +261,6 @@ uint32_t diff_files(std::istream& str1, std::istream& str2, uint32_t* ignorable_
     return numdiffs;
 }
 
-
 uint32_t diff_files(const std::string& file1, const std::string& file2)
 {
     return diff_files(file1, file2, NULL, NULL, 0);
@@ -296,11 +296,11 @@ void checkXYZ(const std::string& file1, const std::string& file2)
     const std::string driver2 = f.inferReaderDriver(file2);
     EXPECT_NE(driver2, "") << "Can't find driver";
 
-    Stage *reader1 = f.createStage(driver1);
-    EXPECT_NE(reader1, (Stage *)NULL) << "Couldn't create stage";
+    Stage* reader1 = f.createStage(driver1);
+    EXPECT_NE(reader1, (Stage*)NULL) << "Couldn't create stage";
 
-    Stage *reader2 = f.createStage(driver2);
-    EXPECT_NE(reader1, (Stage *)NULL) << "Couldn't create stage";
+    Stage* reader2 = f.createStage(driver2);
+    EXPECT_NE(reader1, (Stage*)NULL) << "Couldn't create stage";
 
     Options o1;
     o1.add("filename", file1);
@@ -320,22 +320,25 @@ void checkXYZ(const std::string& file1, const std::string& file2)
     EXPECT_EQ(s2.size(), 1u);
     PointViewPtr v2 = *s2.begin();
 
-    EXPECT_EQ(v1->size(), v2->size()) << "Files " << file1 << " and " <<
-        file2 << " have different point counts.";
+    EXPECT_EQ(v1->size(), v2->size()) << "Files " << file1 << " and " << file2
+                                      << " have different point counts.";
     for (PointId idx = 0; idx < v1->size(); ++idx)
     {
         using namespace Dimension;
         ASSERT_DOUBLE_EQ(v1->getFieldAs<double>(Id::X, idx),
-            v2->getFieldAs<double>(Id::X, idx)) << "Index = " << idx;
+                         v2->getFieldAs<double>(Id::X, idx))
+            << "Index = " << idx;
         ASSERT_DOUBLE_EQ(v1->getFieldAs<double>(Id::Y, idx),
-            v2->getFieldAs<double>(Id::Y, idx)) << "Index = " << idx;
+                         v2->getFieldAs<double>(Id::Y, idx))
+            << "Index = " << idx;
         ASSERT_DOUBLE_EQ(v1->getFieldAs<double>(Id::Z, idx),
-            v2->getFieldAs<double>(Id::Z, idx)) << "Index = " << idx;
+                         v2->getFieldAs<double>(Id::Z, idx))
+            << "Index = " << idx;
     }
 }
 
-
-void check_pN(const PointView& data, PointId index, double xref, double yref, double zref)
+void check_pN(const PointView& data, PointId index, double xref, double yref,
+              double zref)
 {
     float x0 = data.getFieldAs<float>(Dimension::Id::X, index);
     float y0 = data.getFieldAs<float>(Dimension::Id::Y, index);
@@ -346,9 +349,9 @@ void check_pN(const PointView& data, PointId index, double xref, double yref, do
     EXPECT_FLOAT_EQ(z0, static_cast<float>(zref));
 }
 
-
-void check_pN(const PointView& data, PointId index, double xref, double yref, double zref,
-    double tref, uint16_t rref, uint16_t gref, uint16_t bref)
+void check_pN(const PointView& data, PointId index, double xref, double yref,
+              double zref, double tref, uint16_t rref, uint16_t gref,
+              uint16_t bref)
 {
     check_pN(data, index, xref, yref, zref);
 
@@ -369,14 +372,12 @@ void check_pN(const PointView& data, PointId index, double xref, double yref, do
     }
 }
 
-
 void check_p0_p1_p2(const PointView& data)
 {
     check_pN(data, 0, 637012.240000, 849028.310000, 431.660000);
     check_pN(data, 1, 636896.330000, 849087.700000, 446.390000);
     check_pN(data, 2, 636784.740000, 849106.660000, 426.710000);
 }
-
 
 void check_p100_p101_p102(const PointView& data)
 {
@@ -395,7 +396,8 @@ void compareBounds(const BOX3D& p, const BOX3D& q)
     EXPECT_DOUBLE_EQ(p.maxz, q.maxz);
 }
 
-// This provides no guarantees but is highly likely to work, and it's just for test purposes.
+// This provides no guarantees but is highly likely to work, and it's just for
+// test purposes.
 Tempfile::Tempfile(bool ascii)
 {
     Utils::Random r;
@@ -403,7 +405,8 @@ Tempfile::Tempfile(bool ascii)
     auto asciiChar = [&r]() -> std::string
     {
         // 10 numbers + 26 lowercase + 26 uppercase = 62 values.
-        uint8_t v = (uint8_t)std::uniform_int_distribution<>(0, 61)(r.generator());
+        uint8_t v =
+            (uint8_t)std::uniform_int_distribution<>(0, 61)(r.generator());
         if (v < 10)
             return std::string(1, '0' + v);
         else if (v < 36)
@@ -418,7 +421,8 @@ Tempfile::Tempfile(bool ascii)
 
         // The second byte of UTF-8 latin in in the range 0x80 - 0xBF;
         const int range = 0xBF - 0x80;
-        uint8_t v = (uint8_t)std::uniform_int_distribution<>(0, range)(r.generator());
+        uint8_t v =
+            (uint8_t)std::uniform_int_distribution<>(0, range)(r.generator());
         s += (char)(0x80 + v);
         return s;
     };

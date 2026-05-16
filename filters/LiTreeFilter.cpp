@@ -154,7 +154,8 @@ void LiTreeFilter::classifyPoint(PointId ui, PointView& view, PointIdList& Ni,
                                  PointIdList& Pi)
 {
     // compute dmin1 and dmin2 (nearest neighbor in each set)
-    auto mindist = [&ui, &view](PointIdList idx) {
+    auto mindist = [&ui, &view](PointIdList idx)
+    {
         double ux = view.getFieldAs<double>(Id::X, ui);
         double uy = view.getFieldAs<double>(Id::Y, ui);
 
@@ -182,7 +183,9 @@ void LiTreeFilter::classifyPoint(PointId ui, PointView& view, PointIdList& Ni,
     else
     {
         // determine appropriate threshold based on HAG of current point
-        double dt = view.getFieldAs<double>(Id::HeightAboveGround, ui) <= 15 ? 1.5 : 2.0;
+        double dt = view.getFieldAs<double>(Id::HeightAboveGround, ui) <= 15
+                        ? 1.5
+                        : 2.0;
         if (dmin1 > dt)
         {
             Ni.push_back(ui);
@@ -242,9 +245,11 @@ void LiTreeFilter::segmentTree(PointView& view, PointIdList& Ui,
 
         double ux = view.getFieldAs<double>(Id::X, ui);
         double uy = view.getFieldAs<double>(Id::Y, ui);
-        //ABELL - This is strange. We've already done a radius search to locate a dummy point
-        //  and the distance used is 100, so we already have the points that are within that
-        //  distance, so there's really no need to do it again, is there?
+        // ABELL - This is strange. We've already done a radius search to locate
+        // a dummy point
+        //   and the distance used is 100, so we already have the points that
+        //   are within that distance, so there's really no need to do it again,
+        //   is there?
         double d = (ux - tx) * (ux - tx) + (uy - ty) * (uy - ty);
         if (d < 100.0)
             classifyPoint(ui, view, Ni, Pi);
@@ -283,8 +288,8 @@ void LiTreeFilter::filter(PointView& view)
     int64_t tree_id(1);
     while (Ui.size() > m_minSize)
     {
-        // "We find the highest point t0 (global maximum) in Ui, which is assumed
-        // to be the top of the tallest tree i in Ui."
+        // "We find the highest point t0 (global maximum) in Ui, which is
+        // assumed to be the top of the tallest tree i in Ui."
         PointId t0 = locateHighestPoint(view, Ui);
         if (view.getFieldAs<double>(Id::HeightAboveGround, t0) < m_minHag)
         {

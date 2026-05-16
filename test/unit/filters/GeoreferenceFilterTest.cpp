@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2025, Guilhem Villemin <guilhem.villemin@altametris.com>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2025, Guilhem Villemin <guilhem.villemin@altametris.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <filters/GeoreferenceFilter.hpp>
 #include <filters/TransformationFilter.hpp>
@@ -56,10 +56,8 @@ using TransformArray = Transform::ArrayType;
 
 Transform identityTransform()
 {
-    TransformArray arr{1.0, 0.0, 0.0, 0.0,
-                       0.0, 1.0, 0.0, 0.0,
-                       0.0, 0.0, 1.0, 0.0,
-                       0.0, 0.0, 0.0, 1.0};
+    TransformArray arr{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                       0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
     return Transform(arr);
 }
 
@@ -81,8 +79,8 @@ std::string writeTrajectoryFile()
     // WGS84 trajectory (EPSG:4979)
     // X = longitude in radians, Y = latitude in radians, Z = altitude in meters
     // Approximate position: Paris, France (2.3522° E, 48.8566° N, 50m alt)
-    const double lon_rad = 0.041015;  // ~2.35° in radians
-    const double lat_rad = 0.852478;  // ~48.85° in radians
+    const double lon_rad = 0.041015; // ~2.35° in radians
+    const double lat_rad = 0.852478; // ~48.85° in radians
     const double alt_m = 50.0;
 
     PointViewPtr view(new PointView(table));
@@ -184,7 +182,7 @@ TEST(GeoreferenceFilterTest, TransformsPointAndBeamDirection)
     const double beamOriginX = 0.2;
     const double beamOriginY = 0.3;
     const double beamOriginZ = 0.1;
-    
+
     PointViewPtr view(new PointView(table));
     view->setField(DimId::X, 0, scanX);
     view->setField(DimId::Y, 0, scanY);
@@ -201,7 +199,9 @@ TEST(GeoreferenceFilterTest, TransformsPointAndBeamDirection)
     double dx_scanner = scanX - beamOriginX;
     double dy_scanner = scanY - beamOriginY;
     double dz_scanner = scanZ - beamOriginZ;
-    double dist_scanner = std::sqrt(dx_scanner*dx_scanner + dy_scanner*dy_scanner + dz_scanner*dz_scanner);
+    double dist_scanner =
+        std::sqrt(dx_scanner * dx_scanner + dy_scanner * dy_scanner +
+                  dz_scanner * dz_scanner);
 
     BufferReader reader;
     reader.addView(view);
@@ -225,24 +225,24 @@ TEST(GeoreferenceFilterTest, TransformsPointAndBeamDirection)
     double lon = point.getFieldAs<double>(DimId::X);
     double lat = point.getFieldAs<double>(DimId::Y);
     double alt = point.getFieldAs<double>(DimId::Z);
-    
+
     EXPECT_TRUE(std::isfinite(lon));
     EXPECT_TRUE(std::isfinite(lat));
     EXPECT_TRUE(std::isfinite(alt));
-    
+
     double beamOriginLon = point.getFieldAs<double>(DimId::BeamOriginX);
     double beamOriginLat = point.getFieldAs<double>(DimId::BeamOriginY);
     double beamOriginAlt = point.getFieldAs<double>(DimId::BeamOriginZ);
-    
+
     EXPECT_TRUE(std::isfinite(beamOriginLon));
     EXPECT_TRUE(std::isfinite(beamOriginLat));
     EXPECT_TRUE(std::isfinite(beamOriginAlt));
-    
+
     // BeamDirection must remain a unit vector
     double dirX = point.getFieldAs<double>(DimId::BeamDirectionX);
     double dirY = point.getFieldAs<double>(DimId::BeamDirectionY);
     double dirZ = point.getFieldAs<double>(DimId::BeamDirectionZ);
-    double norm = std::sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+    double norm = std::sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
     EXPECT_NEAR(norm, 1.0, 1e-6);
 
     FileUtils::deleteFile(trajFile);
@@ -265,21 +265,21 @@ TEST(GeoreferenceFilterTest, PreservesDistancesBetweenPoints)
     const double point1X = 1.5;
     const double point1Y = 2.0;
     const double point1Z = -0.5;
-    
+
     const double point2X = 3.2;
     const double point2Y = 1.8;
     const double point2Z = 0.3;
-    
+
     const double gpsTime = 5.0;
 
     PointViewPtr view(new PointView(table));
-    
+
     // First point
     view->setField(DimId::X, 0, point1X);
     view->setField(DimId::Y, 0, point1Y);
     view->setField(DimId::Z, 0, point1Z);
     view->setField(DimId::GpsTime, 0, gpsTime);
-    
+
     // Second point
     view->setField(DimId::X, 1, point2X);
     view->setField(DimId::Y, 1, point2Y);
@@ -290,7 +290,9 @@ TEST(GeoreferenceFilterTest, PreservesDistancesBetweenPoints)
     double dx_scanner = point2X - point1X;
     double dy_scanner = point2Y - point1Y;
     double dz_scanner = point2Z - point1Z;
-    double dist_scanner = std::sqrt(dx_scanner*dx_scanner + dy_scanner*dy_scanner + dz_scanner*dz_scanner);
+    double dist_scanner =
+        std::sqrt(dx_scanner * dx_scanner + dy_scanner * dy_scanner +
+                  dz_scanner * dz_scanner);
 
     BufferReader reader;
     reader.addView(view);
@@ -313,20 +315,21 @@ TEST(GeoreferenceFilterTest, PreservesDistancesBetweenPoints)
     double ecef1X = p1.getFieldAs<double>(DimId::X);
     double ecef1Y = p1.getFieldAs<double>(DimId::Y);
     double ecef1Z = p1.getFieldAs<double>(DimId::Z);
-    
+
     PointRef p2(*result, 1);
     double ecef2X = p2.getFieldAs<double>(DimId::X);
     double ecef2Y = p2.getFieldAs<double>(DimId::Y);
     double ecef2Z = p2.getFieldAs<double>(DimId::Z);
-    
+
     // Calculate distance between the two points in ECEF
     double dx_ecef = ecef2X - ecef1X;
     double dy_ecef = ecef2Y - ecef1Y;
     double dz_ecef = ecef2Z - ecef1Z;
-    double dist_ecef = std::sqrt(dx_ecef*dx_ecef + dy_ecef*dy_ecef + dz_ecef*dz_ecef);
-    
+    double dist_ecef =
+        std::sqrt(dx_ecef * dx_ecef + dy_ecef * dy_ecef + dz_ecef * dz_ecef);
+
     // Distance between the two points must be preserved
-    EXPECT_NEAR(dist_ecef, dist_scanner, 1e-3);  // Tolerance: 1mm
+    EXPECT_NEAR(dist_ecef, dist_scanner, 1e-3); // Tolerance: 1mm
 
     FileUtils::deleteFile(trajFile);
 }
@@ -566,12 +569,9 @@ TEST(GeoreferenceFilterTest, WithCustomScan2ImuTransform)
     reader.addView(view);
 
     // 90-degree rotation around Z axis
-    TransformArray rotationTransform = {
-        0.0, -1.0, 0.0, 0.0,
-        1.0,  0.0, 0.0, 0.0,
-        0.0,  0.0, 1.0, 0.0,
-        0.0,  0.0, 0.0, 1.0
-    };
+    TransformArray rotationTransform = {0.0, -1.0, 0.0, 0.0, 1.0, 0.0,
+                                        0.0, 0.0,  0.0, 0.0, 1.0, 0.0,
+                                        0.0, 0.0,  0.0, 1.0};
 
     GeoreferenceFilter filter;
     Options opts;

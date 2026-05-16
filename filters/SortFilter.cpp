@@ -37,29 +37,30 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.sort",
-    "Sort data based on a given dimension.",
-    "https://pdal.org/stages/filters.sort.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.sort", "Sort data based on a given dimension.",
+    "https://pdal.org/stages/filters.sort.html"};
 
 CREATE_STATIC_STAGE(SortFilter, s_info)
 
-std::string SortFilter::getName() const { return s_info.name; }
+std::string SortFilter::getName() const
+{
+    return s_info.name;
+}
 
 void SortFilter::addArgs(ProgramArgs& args)
 {
-    args.add("dimensions", "Dimensions and ordering on which to sort", m_dimNames).
-        setPositional();
+    args.add("dimensions", "Dimensions and ordering on which to sort",
+             m_dimNames)
+        .setPositional();
 
     args.addSynonym("dimensions", "dimension");
 
     args.add("order", "Sort order ASC(ending) or DESC(ending)", m_order,
-        SortOrder::ASC);
+             SortOrder::ASC);
 
     args.add("algorithm", "NORMAL (default) or STABLE", m_algorithm,
-        SortAlgorithm::Normal);
+             SortAlgorithm::Normal);
 }
 
 void SortFilter::prepared(PointTableRef table)
@@ -69,7 +70,8 @@ void SortFilter::prepared(PointTableRef table)
     {
         Dimension::Id dimId = layout->findDim(s);
         if (layout->findDim(s) == Dimension::Id::Unknown)
-            throwError("Cannot sort because dimension '" + s + "' was not found.");
+            throwError("Cannot sort because dimension '" + s +
+                       "' was not found.");
         m_dims.push_back(dimId);
     }
 
@@ -79,18 +81,14 @@ void SortFilter::prepared(PointTableRef table)
 
 void SortFilter::filter(PointView& view)
 {
-    for (Dimension::IdList::size_type i=0; i < m_dims.size(); ++i)
+    for (Dimension::IdList::size_type i = 0; i < m_dims.size(); ++i)
     {
         PointView::Compare cmp;
-        cmp = [&view, dim=m_dims[i]](PointId id1, PointId id2)
-        {
-            return view.compare(dim, id1, id2);
-        };
+        cmp = [&view, dim = m_dims[i]](PointId id1, PointId id2)
+        { return view.compare(dim, id1, id2); };
         if (m_order == SortOrder::DESC)
-            cmp = [&view, dim=m_dims[i]](PointId id1, PointId id2)
-            {
-                return view.compare(dim, id2, id1);
-            };
+            cmp = [&view, dim = m_dims[i]](PointId id1, PointId id2)
+            { return view.compare(dim, id2, id1); };
 
         if (m_dims.size() > 1)
         {
@@ -111,7 +109,7 @@ void SortFilter::filter(PointView& view)
     }
 }
 
-std::istream& operator >> (std::istream& in, SortOrder& order)
+std::istream& operator>>(std::istream& in, SortOrder& order)
 {
     std::string s;
 
@@ -138,7 +136,7 @@ std::ostream& operator<<(std::ostream& out, const SortOrder& order)
     return out;
 }
 
-std::istream& operator >> (std::istream& in, SortAlgorithm& order)
+std::istream& operator>>(std::istream& in, SortAlgorithm& order)
 {
     std::string s;
 
@@ -166,4 +164,3 @@ std::ostream& operator<<(std::ostream& out, const SortAlgorithm& order)
 }
 
 } // namespace pdal
-

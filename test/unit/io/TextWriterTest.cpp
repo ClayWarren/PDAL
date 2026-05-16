@@ -36,10 +36,10 @@
 
 #include "Support.hpp"
 
-#include <pdal/util/FileUtils.hpp>
 #include <io/BufferReader.hpp>
 #include <io/TextReader.hpp>
 #include <io/TextWriter.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 using namespace pdal;
 
@@ -143,7 +143,7 @@ TEST(TextWriterTest, precision)
     using namespace Dimension;
 
     PointTable table;
-    table.layout()->registerDims( { Id::X, Id::Y, Id::Z, Id::Intensity } );
+    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Intensity});
 
     PointViewPtr view(new PointView(table));
     view->setField(Id::X, 0, 1);

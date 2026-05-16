@@ -1,7 +1,7 @@
 #include <io/LasReader.hpp>
-#include <pdal/Writer.hpp>
-#include <pdal/Streamable.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/Streamable.hpp>
+#include <pdal/Writer.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
 #include <iostream>
@@ -14,7 +14,7 @@ namespace pdal
 // but this can be replaced with any other processing. See the LasWriter
 // class for a more detailed example.
 
-class StreamProcessor: public NoFilenameWriter, public Streamable
+class StreamProcessor : public NoFilenameWriter, public Streamable
 {
 
 public:
@@ -23,7 +23,6 @@ public:
     ~StreamProcessor();
 
 private:
-
     virtual void addArgs(ProgramArgs& args);
     virtual void initialize();
     virtual void writeView(const PointViewPtr view);
@@ -34,37 +33,35 @@ private:
     StreamProcessor(const StreamProcessor&&) = delete;
 };
 
-std::string StreamProcessor::getName() const { return "sample streamer"; }
+std::string StreamProcessor::getName() const
+{
+    return "sample streamer";
+}
 
 StreamProcessor::StreamProcessor() {}
 
 StreamProcessor::~StreamProcessor() {}
 
-void StreamProcessor::addArgs(ProgramArgs& args)
-{
-}
+void StreamProcessor::addArgs(ProgramArgs& args) {}
 
-void StreamProcessor::initialize()
-{
-}
+void StreamProcessor::initialize() {}
 
 // This will be called for each point in the cloud.
 bool StreamProcessor::processOne(PointRef& point)
 {
-   // Print the point coordinates
-   std::cout << "Process point: "
-             << point.getFieldAs<double>(Dimension::Id::X) <<  ", "
-             << point.getFieldAs<double>(Dimension::Id::Y) << ", "
-             << point.getFieldAs<double>(Dimension::Id::Z) << std::endl;
+    // Print the point coordinates
+    std::cout << "Process point: " << point.getFieldAs<double>(Dimension::Id::X)
+              << ", " << point.getFieldAs<double>(Dimension::Id::Y) << ", "
+              << point.getFieldAs<double>(Dimension::Id::Z) << std::endl;
     return true;
 }
 
-void StreamProcessor::done(PointTableRef table) {
-}
+void StreamProcessor::done(PointTableRef table) {}
 
 void StreamProcessor::writeView(const PointViewPtr view)
 {
-    throw pdal_error("The writeView() function must not be called in streaming mode.");
+    throw pdal_error(
+        "The writeView() function must not be called in streaming mode.");
 }
 
 } // namespace pdal

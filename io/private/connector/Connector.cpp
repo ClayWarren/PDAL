@@ -34,9 +34,9 @@
 
 #include "Connector.hpp"
 
-#include <pdal/pdal_types.hpp>
-#include <pdal/pdal_config.hpp>
 #include <curl/curl.h>
+#include <pdal/pdal_config.hpp>
+#include <pdal/pdal_types.hpp>
 #include <pdal/util/FileUtils.hpp>
 
 namespace pdal
@@ -48,61 +48,53 @@ std::string getUserAgent()
 {
     std::stringstream output;
 
-    output  << "pdal ("
-            << pdal::Config::versionMajor() << "."
-            << pdal::Config::versionMinor() << "."
-            << pdal::Config::versionPatch() << ") "
-            << " / curl (" << std::string (curl_version()) << ")";
+    output << "pdal (" << pdal::Config::versionMajor() << "."
+           << pdal::Config::versionMinor() << "."
+           << pdal::Config::versionPatch() << ") "
+           << " / curl (" << std::string(curl_version()) << ")";
     return output.str();
 }
 
 Connector::Connector()
     : m_arbiter(new arbiter::Arbiter()),
-      m_httpDriver(new arbiter::drivers::Http( m_arbiter->httpPool()))
+      m_httpDriver(new arbiter::drivers::Http(m_arbiter->httpPool()))
 {
     if (m_headers.find("User-Agent") == m_headers.end())
     {
-        m_headers.insert( std::make_pair("User-Agent", getUserAgent()));
+        m_headers.insert(std::make_pair("User-Agent", getUserAgent()));
     }
 }
 
-Connector::Connector(const StringMap& headers, const StringMap& query) :
-    m_arbiter(new arbiter::Arbiter),
-    m_headers(headers),
-    m_query(query),
-    m_httpDriver(new arbiter::drivers::Http( m_arbiter->httpPool()))
+Connector::Connector(const StringMap& headers, const StringMap& query)
+    : m_arbiter(new arbiter::Arbiter), m_headers(headers), m_query(query),
+      m_httpDriver(new arbiter::drivers::Http(m_arbiter->httpPool()))
 {
     if (m_headers.find("User-Agent") == m_headers.end())
     {
-        m_headers.insert( std::make_pair("User-Agent", getUserAgent()));
+        m_headers.insert(std::make_pair("User-Agent", getUserAgent()));
     }
 }
 
 Connector::Connector(const std::string& filename, const StringMap& headers,
-        const StringMap& query) :
-    m_arbiter(new arbiter::Arbiter),
-    m_headers(headers),
-    m_query(query),
-    m_filename(filename)
+                     const StringMap& query)
+    : m_arbiter(new arbiter::Arbiter), m_headers(headers), m_query(query),
+      m_filename(filename)
 {
     if (m_headers.find("User-Agent") == m_headers.end())
     {
-        m_headers.insert( std::make_pair("User-Agent", getUserAgent()));
+        m_headers.insert(std::make_pair("User-Agent", getUserAgent()));
     }
 }
 
-Connector::Connector(const FileSpec& spec) :
-    m_arbiter(new arbiter::Arbiter),
-    m_headers(spec.headers()),
-    m_query(spec.query()),
-    m_filename(spec.u8string())
+Connector::Connector(const FileSpec& spec)
+    : m_arbiter(new arbiter::Arbiter), m_headers(spec.headers()),
+      m_query(spec.query()), m_filename(spec.u8string())
 {
     if (m_headers.find("User-Agent") == m_headers.end())
     {
-        m_headers.insert( std::make_pair("User-Agent", getUserAgent()));
+        m_headers.insert(std::make_pair("User-Agent", getUserAgent()));
     }
 }
-
 
 std::string Connector::get(const std::string& path) const
 {
@@ -120,8 +112,8 @@ NL::json Connector::getJson(const std::string& path) const
     }
     catch (NL::json::parse_error& err)
     {
-        throw pdal_error("File '" + path + "' contained invalid JSON: " +
-            err.what());
+        throw pdal_error("File '" + path +
+                         "' contained invalid JSON: " + err.what());
     }
 }
 
@@ -132,7 +124,6 @@ std::vector<char> Connector::getBinary(const std::string& path) const
     else
         return m_arbiter->getBinary(path, m_headers, m_query);
 }
-
 
 arbiter::LocalHandle Connector::getLocalHandle(const std::string& path) const
 {
@@ -168,7 +159,6 @@ void Connector::makeDir(const std::string& path) const
         arbiter::mkdirp(path);
 }
 
-
 StringMap Connector::headRequest(const std::string& path) const
 {
     arbiter::http::Response r = m_httpDriver->internalHead(path);
@@ -180,7 +170,8 @@ std::vector<char> Connector::getBinary(uint64_t offset, int32_t size) const
     if (size <= 0)
         return std::vector<char>();
 
-    if (Utils::startsWith(Utils::toupper(m_filename), "/VSI") || m_arbiter->isLocal(m_filename))
+    if (Utils::startsWith(Utils::toupper(m_filename), "/VSI") ||
+        m_arbiter->isLocal(m_filename))
     {
         std::vector<char> buf(size);
         std::istream* in = FileUtils::openFile(m_filename);
@@ -200,7 +191,7 @@ std::vector<char> Connector::getBinary(uint64_t offset, int32_t size) const
     {
         StringMap headers(m_headers);
         headers["Range"] = "bytes=" + std::to_string(offset) + "-" +
-            std::to_string(offset + size - 1);
+                           std::to_string(offset + size - 1);
         return m_arbiter->getBinary(m_filename, headers, m_query);
     }
 }

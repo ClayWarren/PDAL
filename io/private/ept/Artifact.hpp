@@ -36,10 +36,10 @@
 
 #include <memory>
 
-#include <pdal/Artifact.hpp>
 #include "../connector/Connector.hpp"
 #include "EptInfo.hpp"
 #include "Overlap.hpp"
+#include <pdal/Artifact.hpp>
 
 namespace pdal
 {
@@ -50,11 +50,13 @@ class Artifact : public pdal::Artifact
 {
 public:
     Artifact(std::unique_ptr<EptInfo> info,
-            std::unique_ptr<Hierarchy> hierarchy,
-            std::unique_ptr<connector::Connector> connector, size_t hierarchyStep) :
-        m_info(std::move(info)), m_hierarchy(std::move(hierarchy)),
-        m_connector(std::move(connector)), m_hierarchyStep(hierarchyStep)
-    {}
+             std::unique_ptr<Hierarchy> hierarchy,
+             std::unique_ptr<connector::Connector> connector,
+             size_t hierarchyStep)
+        : m_info(std::move(info)), m_hierarchy(std::move(hierarchy)),
+          m_connector(std::move(connector)), m_hierarchyStep(hierarchyStep)
+    {
+    }
 
     std::unique_ptr<EptInfo> m_info;
     std::unique_ptr<Hierarchy> m_hierarchy;
@@ -65,4 +67,3 @@ using ArtifactPtr = std::shared_ptr<Artifact>;
 
 } // namespace ept
 } // namespace pdal
-

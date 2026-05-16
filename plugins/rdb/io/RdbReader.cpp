@@ -1,86 +1,71 @@
 /******************************************************************************
-* Copyright (c) 2018, RIEGL Laser Measurement Systems GmbH (support@riegl.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc., Flaxen Geo Consulting or RIEGL
-*       Laser Measurement Systems GmbH nor the names of its contributors
-*       may be used to endorse or promote products derived from this
-*       software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
+ * Copyright (c) 2018, RIEGL Laser Measurement Systems GmbH (support@riegl.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc., Flaxen Geo Consulting or RIEGL
+ *       Laser Measurement Systems GmbH nor the names of its contributors
+ *       may be used to endorse or promote products derived from this
+ *       software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <array>
-#include <sstream>
-#include <nlohmann/json.hpp>
-#include <pdal/util/ProgramArgs.hpp>
-#include <pdal/PDALUtils.hpp>
 #include "RdbReader.hpp"
+#include <array>
+#include <nlohmann/json.hpp>
+#include <pdal/PDALUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
+#include <sstream>
 
 namespace pdal
 {
 
 //---< PDAL PLUGIN REGISTRATION >-----------------------------------------------
 
-
-static PluginInfo const s_info
-{
-    "readers.rdb",
-    "RIEGL RDB Reader",
-    "https://pdal.org/stages/readers.rdb.html"
-};
+static PluginInfo const s_info{"readers.rdb", "RIEGL RDB Reader",
+                               "https://pdal.org/stages/readers.rdb.html"};
 
 CREATE_SHARED_STAGE(RdbReader, s_info)
 
-
 //---< RdbReader::PUBLIC >------------------------------------------------------
 
-
-RdbReader::RdbReader():
-    pdal::Reader(),
-    pdal::Streamable(),
-    m_pointcloud(),
-    m_filter(),
-    m_extras(false)
+RdbReader::RdbReader()
+    : pdal::Reader(), pdal::Streamable(), m_pointcloud(), m_filter(),
+      m_extras(false)
 {
 }
 
-
-RdbReader::~RdbReader()
-{
-}
-
+RdbReader::~RdbReader() {}
 
 std::string RdbReader::getName() const
 {
     return s_info.name;
 }
 
-
-//---< RdbReader::PRIVATE >------------------------------------------------------
-
+//---< RdbReader::PRIVATE
+//>------------------------------------------------------
 
 QuickInfo RdbReader::inspect()
 {
@@ -105,7 +90,7 @@ QuickInfo RdbReader::inspect()
         PointLayout layout;
         reader.addDimensions(&layout);
         const auto dimensions = layout.dims();
-        for (const auto& dimension: dimensions)
+        for (const auto& dimension : dimensions)
         {
             result.m_dimNames.push_back(layout.dimName(dimension));
         }
@@ -114,10 +99,8 @@ QuickInfo RdbReader::inspect()
         Eigen::Vector4d minimum, maximum;
         if (reader.getBoundingBox(minimum, maximum))
         {
-            result.m_bounds = BOX3D(
-                minimum[0], minimum[1], minimum[2],
-                maximum[0], maximum[1], maximum[2]
-            );
+            result.m_bounds = BOX3D(minimum[0], minimum[1], minimum[2],
+                                    maximum[0], maximum[1], maximum[2]);
         }
 
         // finalize result
@@ -126,25 +109,17 @@ QuickInfo RdbReader::inspect()
     }
 }
 
-
 void RdbReader::addArgs(ProgramArgs& args)
 {
-    args.add(
-        "filter",
-        "Optional point filter expression string "
-        "(see RDB SDK documentation for details)",
-        m_filter,
-        ""
-    );
-    args.add(
-        "extras",
-        "Read all available dimensions (true) "
-        "or known PDAL dimensions only (false)",
-        m_extras,
-        false
-    );
+    args.add("filter",
+             "Optional point filter expression string "
+             "(see RDB SDK documentation for details)",
+             m_filter, "");
+    args.add("extras",
+             "Read all available dimensions (true) "
+             "or known PDAL dimensions only (false)",
+             m_extras, false);
 }
-
 
 void RdbReader::initialize()
 {
@@ -158,40 +133,32 @@ void RdbReader::initialize()
     readMetadata(*m_pointcloud, getMetadata());
 }
 
-
 void RdbReader::addDimensions(PointLayoutPtr layout)
 {
     m_pointcloud->addDimensions(layout);
 }
-
 
 bool RdbReader::processOne(PointRef& point)
 {
     return m_pointcloud->read(point);
 }
 
-
 point_count_t RdbReader::read(PointViewPtr view, point_count_t count)
 {
     return m_pointcloud->read(view, count);
 }
-
 
 void RdbReader::done(PointTableRef /*table*/)
 {
     m_pointcloud.reset();
 }
 
-
-void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
+void RdbReader::readMetadata(RdbPointcloud& reader, MetadataNode root)
 {
     struct Converter // simple JSON to MetadataNode converter
     {
-        static void add(
-            MetadataNode&      parent,
-            const std::string& name,
-            const std::string& value
-        )
+        static void add(MetadataNode& parent, const std::string& name,
+                        const std::string& value)
         {
             try
             {
@@ -204,11 +171,8 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
             }
         }
 
-        static void add(
-            MetadataNode&      parent,
-            const std::string& name,
-            const NL::json& node
-        )
+        static void add(MetadataNode& parent, const std::string& name,
+                        const NL::json& node)
         {
             if (node.is_null())
                 parent.add(name, "");
@@ -247,7 +211,7 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
 
         // database ID and number of points
         MetadataNode node = root.add("database");
-        node.add("uuid",   rdb.getUUID());
+        node.add("uuid", rdb.getUUID());
         node.add("points", tree.pointCountTotal);
 
         // XYZ bounds (if available)
@@ -257,26 +221,29 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
             MetadataNode bounds = node.add("bounds");
             MetadataNode min = bounds.add("minimum");
             MetadataNode max = bounds.add("maximum");
-            min.add("X", minimum[0]);    max.add("X", maximum[0]);
-            min.add("Y", minimum[1]);    max.add("Y", maximum[1]);
-            min.add("Z", minimum[2]);    max.add("Z", maximum[2]);
+            min.add("X", minimum[0]);
+            max.add("X", maximum[0]);
+            min.add("Y", minimum[1]);
+            max.add("Y", maximum[1]);
+            min.add("Z", minimum[2]);
+            max.add("Z", maximum[2]);
         }
     }
 
     // database transactions
     {
         const auto list = rdb.transaction().list();
-        for (const auto& item: list)
+        for (const auto& item : list)
         {
             const auto details = rdb.transaction().details(item);
             MetadataNode node = root.add("transactions");
-            node.add("id",       details.id);
-            node.add("rdb",      details.rdb);
-            node.add("title",    details.title);
-            node.add("agent",    details.agent);
+            node.add("id", details.id);
+            node.add("rdb", details.rdb);
+            node.add("title", details.title);
+            node.add("agent", details.agent);
             node.add("comments", details.comments);
-            node.add("start",    details.start);
-            node.add("stop",     details.stop);
+            node.add("start", details.start);
+            node.add("stop", details.stop);
             Converter::add(node, "settings", details.settings);
         }
     }
@@ -284,7 +251,7 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
     // point attributes
     {
         const auto list = rdb.pointAttribute().list();
-        for (const auto& item: list)
+        for (const auto& item : list)
         {
             const auto details = rdb.pointAttribute().get(item);
             Converter::add(root, "dimensions", details.save());
@@ -295,7 +262,7 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
     {
         MetadataNode node = root.add("metadata");
         const auto list = rdb.metaData().list();
-        for (const auto& item: list)
+        for (const auto& item : list)
         {
             const auto details = rdb.metaData().get(item);
             Converter::add(node, item, details);
@@ -303,8 +270,7 @@ void RdbReader::readMetadata(RdbPointcloud &reader, MetadataNode root)
     }
 }
 
-
-std::string RdbReader::getSpatialReferenceSystem(const RdbPointcloud &reader)
+std::string RdbReader::getSpatialReferenceSystem(const RdbPointcloud& reader)
 {
     std::stringstream srs;
     if (reader.crsEPSG() != 0)

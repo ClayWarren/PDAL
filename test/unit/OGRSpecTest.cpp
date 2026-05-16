@@ -13,7 +13,7 @@ TEST(OGRSpecTest, createFromFile)
     json["type"] = "ogr";
     json["datasource"] = Support::datapath("autzen/attributes.json");
     json["drivers"] = {"GeoJSON"};
-    json["openoptions"] = {"FLATTEN_NESTED_ATTRIBUTES=YES","NATIVE_DATA=YES"};
+    json["openoptions"] = {"FLATTEN_NESTED_ATTRIBUTES=YES", "NATIVE_DATA=YES"};
     json["sql"] = "select \"_ogr_geometry_\" from attributes";
     NL::json subJson;
     subJson["dialect"] = "OGRSQL";
@@ -30,13 +30,19 @@ TEST(OGRSpecTest, createFromFile)
 
     // sql selection
     NL::json updateJson = json;
-    updateJson["sql"] = "select \"_ogr_geometry_\" from attributes WHERE id = 1";
+    updateJson["sql"] =
+        "select \"_ogr_geometry_\" from attributes WHERE id = 1";
     ogr.update(updateJson);
     EXPECT_EQ(ogr.size(), 1);
 
     // geometry filter
     updateJson = json;
-    subJson["geometry"] = "{\"type\":\"Polygon\",\"coordinates\":[[[-123.071871740947586, 44.058426242457685],[-123.070376025800414, 44.058117017731242],[-123.07060216253906, 44.057465769662898],[-123.072144836409578, 44.057837746292243],[-123.071871740947586, 44.058426242457685]]]}";
+    subJson["geometry"] =
+        "{\"type\":\"Polygon\",\"coordinates\":[[[-123.071871740947586, "
+        "44.058426242457685],[-123.070376025800414, "
+        "44.058117017731242],[-123.07060216253906, "
+        "44.057465769662898],[-123.072144836409578, "
+        "44.057837746292243],[-123.071871740947586, 44.058426242457685]]]}";
     updateJson["options"] = subJson;
     OGRSpec ogrGeom(updateJson);
     EXPECT_EQ(ogrGeom.size(), 1);
@@ -47,7 +53,7 @@ TEST(OGRSpecTest, parseErrors)
     NL::json json;
     json["type"] = "ogr";
     json["datasource"] = "no_path";
-    json["sql"] ="select \"_ogr_geometry_\" from attributes"; 
+    json["sql"] = "select \"_ogr_geometry_\" from attributes";
 
     // removing datasource field
     NL::json updateJson = json;
@@ -56,10 +62,10 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(updateJson);
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
         EXPECT_EQ("'ogr' option must contain a 'datasource' field!",
-            std::string(e.what()));
+                  std::string(e.what()));
     }
 
     // invalid type field
@@ -69,10 +75,10 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(updateJson);
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
         EXPECT_EQ("'ogr' option must have 'type':'ogr' specified!",
-            std::string(e.what()));
+                  std::string(e.what()));
     }
 
     // invalid field
@@ -82,9 +88,9 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(updateJson);
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
-        EXPECT_EQ("unexpected field 'foo' in OGR JSON!", std::string(e.what())); 
+        EXPECT_EQ("unexpected field 'foo' in OGR JSON!", std::string(e.what()));
     }
 
     // invalid value
@@ -94,9 +100,10 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(updateJson);
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
-        EXPECT_EQ("invalid value for field 'sql' in OGR JSON!", std::string(e.what()));
+        EXPECT_EQ("invalid value for field 'sql' in OGR JSON!",
+                  std::string(e.what()));
     }
 
     // input json array
@@ -106,9 +113,10 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(dump.str());
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
-        EXPECT_EQ("'ogr' option must be a JSON object with 'type':'ogr' specified!",
+        EXPECT_EQ(
+            "'ogr' option must be a JSON object with 'type':'ogr' specified!",
             std::string(e.what()));
     }
 
@@ -117,11 +125,11 @@ TEST(OGRSpecTest, parseErrors)
     {
         OGRSpec ogr(std::string("invalid json string"));
     }
-    catch(OGRSpec::error const& e)
+    catch (OGRSpec::error const& e)
     {
         EXPECT_EQ("Failed to parse OGR JSON with error:  parse error "
-            "at line 1, column 1: syntax error while parsing value - "
-            "invalid literal; last read: 'i'", std::string(e.what()));
+                  "at line 1, column 1: syntax error while parsing value - "
+                  "invalid literal; last read: 'i'",
+                  std::string(e.what()));
     }
 }
-

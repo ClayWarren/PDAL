@@ -37,6 +37,6 @@
 #include <pdal/util/pdal_util_export.hpp>
 
 #ifdef _MSC_VER
-#pragma warning(disable:4251)// [templated class] needs to have dll-interface...
+#pragma warning(                                                               \
+    disable : 4251) // [templated class] needs to have dll-interface...
 #endif
-

@@ -46,7 +46,8 @@ TEST(SuperVoxelFilterTest, BasicTest)
     using namespace Dimension;
 
     PointTable table;
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::NormalX, Id::NormalY, Id::NormalZ});
+    table.layout()->registerDims(
+        {Id::X, Id::Y, Id::Z, Id::NormalX, Id::NormalY, Id::NormalZ});
 
     BufferReader br;
     SupervoxelFilter filt;
@@ -120,7 +121,7 @@ TEST(SuperVoxelFilterTest, BasicTest)
     PointViewPtr outView = *viewSet.begin();
 
     std::set<uint64_t> clusters;
-    for (PointRef p: *outView)
+    for (PointRef p : *outView)
     {
         double cid = p.getFieldAs<uint64_t>(Id::ClusterID);
         clusters.insert(cid);
@@ -130,7 +131,7 @@ TEST(SuperVoxelFilterTest, BasicTest)
     for (PointId idx = 0; idx < outView->size(); idx += 2)
     {
         uint64_t cid1 = outView->getFieldAs<uint64_t>(Id::ClusterID, idx);
-        uint64_t cid2 = outView->getFieldAs<uint64_t>(Id::ClusterID, idx+1);
+        uint64_t cid2 = outView->getFieldAs<uint64_t>(Id::ClusterID, idx + 1);
         EXPECT_EQ(cid1, cid2);
     }
 }

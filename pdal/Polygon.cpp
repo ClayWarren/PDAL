@@ -1,39 +1,39 @@
 /******************************************************************************
-* Copyright (c) 2016, Howard Butler (howard@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Howard Butler (howard@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma warning(push)
-#pragma warning(disable: 4251)
+#pragma warning(disable : 4251)
 #include <ogr_api.h>
 #include <ogr_geometry.h>
 #pragma warning(pop)
@@ -56,21 +56,19 @@ Polygon::Polygon()
     init();
 }
 
-
-void Polygon::construct(void *geom)
+void Polygon::construct(void* geom)
 {
     Geometry::construct(geom);
     init();
 }
 
-
-void Polygon::construct(void *geom, const SpatialReference& srs)
+void Polygon::construct(void* geom, const SpatialReference& srs)
 {
     Geometry::construct(geom, srs);
     init();
 }
 
-void Polygon::PrivateDataDeleter::operator()(PrivateData *pd)
+void Polygon::PrivateDataDeleter::operator()(PrivateData* pd)
 {
     delete pd;
 }
@@ -88,12 +86,11 @@ void Polygon::init()
 
     OGRwkbGeometryType t = m_geom->getGeometryType();
 
-    if (!(t == wkbPolygon ||
-        t == wkbMultiPolygon ||
-        t == wkbPolygon25D ||
-        t == wkbMultiPolygon25D))
+    if (!(t == wkbPolygon || t == wkbMultiPolygon || t == wkbPolygon25D ||
+          t == wkbMultiPolygon25D))
     {
-        throw pdal::pdal_error("pdal::Polygon() cannot construct geometry "
+        throw pdal::pdal_error(
+            "pdal::Polygon() cannot construct geometry "
             "because OGR geometry is not Polygon or MultiPolygon.");
     }
 }
@@ -104,17 +101,16 @@ void Polygon::initGrids() const
         m_pd->m_grids.emplace_back(p.exteriorRing(), p.interiorRings());
 }
 
-
-Polygon::Polygon(const std::string& wkt_or_json, SpatialReference ref) :
-    Geometry(wkt_or_json, ref), m_pd(new PrivateData)
-{}
-
+Polygon::Polygon(const std::string& wkt_or_json, SpatialReference ref)
+    : Geometry(wkt_or_json, ref), m_pd(new PrivateData)
+{
+}
 
 Polygon::Polygon(const BOX2D& box) : m_pd(new PrivateData)
 {
-    OGRPolygon *poly = new OGRPolygon();
+    OGRPolygon* poly = new OGRPolygon();
     m_geom.reset(poly);
-    OGRLinearRing *lr = new OGRLinearRing();
+    OGRLinearRing* lr = new OGRLinearRing();
     lr->addPoint(box.minx, box.miny);
     lr->addPoint(box.maxx, box.miny);
     lr->addPoint(box.maxx, box.maxy);
@@ -123,12 +119,11 @@ Polygon::Polygon(const BOX2D& box) : m_pd(new PrivateData)
     poly->addRingDirectly(lr);
 }
 
-
 Polygon::Polygon(const BOX3D& box) : m_pd(new PrivateData)
 {
-    OGRPolygon *poly = new OGRPolygon();
+    OGRPolygon* poly = new OGRPolygon();
     m_geom.reset(poly);
-    OGRLinearRing *lr = new OGRLinearRing();
+    OGRLinearRing* lr = new OGRLinearRing();
     lr->addPoint(box.minx, box.miny, box.minz);
     lr->addPoint(box.minx, box.maxy, box.minz);
     lr->addPoint(box.maxx, box.maxy, box.maxz);
@@ -137,26 +132,22 @@ Polygon::Polygon(const BOX3D& box) : m_pd(new PrivateData)
     poly->addRingDirectly(lr);
 }
 
-
 Polygon::Polygon(const Polygon& poly) : Geometry(poly)
 {
     init();
 }
 
-
 Polygon& Polygon::operator=(const Polygon& src)
 {
-    ((Geometry *)this)->operator=((const Geometry&)src);
+    ((Geometry*)this)->operator=((const Geometry&)src);
     m_pd.reset(new PrivateData);
     return *this;
 }
-
 
 void Polygon::modified()
 {
     m_pd->m_grids.clear();
 }
-
 
 void Polygon::clear()
 {
@@ -165,9 +156,8 @@ void Polygon::clear()
     modified();
 }
 
-
 void Polygon::simplify(double distance_tolerance, double area_tolerance,
-    bool preserve_topology)
+                       bool preserve_topology)
 {
     throwNoGeos();
 
@@ -181,7 +171,6 @@ void Polygon::simplify(double distance_tolerance, double area_tolerance,
     modified();
 }
 
-
 void Polygon::removeSmallRings(double tolerance)
 {
     OGRwkbGeometryType t = m_geom->getGeometryType();
@@ -192,25 +181,24 @@ void Polygon::removeSmallRings(double tolerance)
     }
     else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
     {
-        OGRMultiPolygon *mPoly = static_cast<OGRMultiPolygon *>(m_geom.get());
+        OGRMultiPolygon* mPoly = static_cast<OGRMultiPolygon*>(m_geom.get());
         for (int i = mPoly->getNumGeometries() - 1; i >= 0; --i)
         {
-            OGRPolygon *poly =
-                static_cast<OGRPolygon *>(mPoly->getGeometryRef(i));
+            OGRPolygon* poly =
+                static_cast<OGRPolygon*>(mPoly->getGeometryRef(i));
             if (poly->get_Area() < tolerance)
                 mPoly->removeGeometry(i, true);
         }
     }
 }
 
-
 void Polygon::removeSmallHoles(double tolerance)
 {
-    auto remove = [tolerance](OGRPolygon *poly)
+    auto remove = [tolerance](OGRPolygon* poly)
     {
         for (int i = poly->getNumInteriorRings() - 1; i >= 0; --i)
         {
-            OGRLinearRing *lr = poly->getInteriorRing(i);
+            OGRLinearRing* lr = poly->getInteriorRing(i);
             if (lr->get_Area() < tolerance)
                 OGR_G_RemoveGeometry(gdal::toHandle(poly), i + 1, true);
         }
@@ -218,15 +206,14 @@ void Polygon::removeSmallHoles(double tolerance)
 
     OGRwkbGeometryType t = m_geom->getGeometryType();
     if (t == wkbPolygon || t == wkbPolygon25D)
-        remove(static_cast<OGRPolygon *>(m_geom.get()));
+        remove(static_cast<OGRPolygon*>(m_geom.get()));
     else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
     {
-        OGRMultiPolygon *mPoly = static_cast<OGRMultiPolygon *>(m_geom.get());
+        OGRMultiPolygon* mPoly = static_cast<OGRMultiPolygon*>(m_geom.get());
         for (int i = mPoly->getNumGeometries() - 1; i >= 0; --i)
-            remove(static_cast<OGRPolygon *>(mPoly->getGeometryRef(i)));
+            remove(static_cast<OGRPolygon*>(mPoly->getGeometryRef(i)));
     }
 }
-
 
 double Polygon::area() const
 {
@@ -236,26 +223,25 @@ double Polygon::area() const
     throwNoGeos();
 
     OGRwkbGeometryType t = m_geom->getGeometryType();
-// Not until GDAL 2.3
-/**
-    if (t == wkbPolygon || t == wkbPolygon25D)
-        return m_geom->toPolygon()->get_Area();
-    else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
-        return m_geom->toMultiPolygon()->get_Area();
-**/
+    // Not until GDAL 2.3
+    /**
+        if (t == wkbPolygon || t == wkbPolygon25D)
+            return m_geom->toPolygon()->get_Area();
+        else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
+            return m_geom->toMultiPolygon()->get_Area();
+    **/
     if (t == wkbPolygon || t == wkbPolygon25D)
     {
-        OGRPolygon *p = static_cast<OGRPolygon *>(m_geom.get());
+        OGRPolygon* p = static_cast<OGRPolygon*>(m_geom.get());
         return p->get_Area();
     }
     else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
     {
-        OGRMultiPolygon *p = static_cast<OGRMultiPolygon *>(m_geom.get());
+        OGRMultiPolygon* p = static_cast<OGRMultiPolygon*>(m_geom.get());
         return p->get_Area();
     }
     return 0;
 }
-
 
 bool Polygon::covers(const PointRef& ref) const
 {
@@ -268,7 +254,6 @@ bool Polygon::covers(const PointRef& ref) const
     OGRPoint p(x, y, z);
     return m_geom->Contains(&p) || m_geom->Touches(&p);
 }
-
 
 bool Polygon::overlaps(const Polygon& p) const
 {
@@ -312,7 +297,6 @@ bool Polygon::contains(double x, double y) const
     return false;
 }
 
-
 bool Polygon::touches(const Polygon& p) const
 {
     throwNoGeos();
@@ -354,7 +338,7 @@ std::vector<Polygon> Polygon::polygons() const
             polys.push_back(p);
         }
         **/
-        OGRMultiPolygon *mPoly = static_cast<OGRMultiPolygon *>(m_geom.get());
+        OGRMultiPolygon* mPoly = static_cast<OGRMultiPolygon*>(m_geom.get());
         for (int i = 0; i < mPoly->getNumGeometries(); ++i)
         {
             Polygon p;
@@ -364,7 +348,6 @@ std::vector<Polygon> Polygon::polygons() const
     }
     return polys;
 }
-
 
 Polygon::Ring Polygon::exteriorRing() const
 {
@@ -382,14 +365,13 @@ Polygon::Ring Polygon::exteriorRing() const
     for (auto it = er->begin(); it != er->end(); ++it)
         r.push_back({(*it).getX(), (*it).getY()});
     **/
-    OGRLinearRing *er =
-        static_cast<OGRPolygon *>(m_geom.get())->getExteriorRing();
+    OGRLinearRing* er =
+        static_cast<OGRPolygon*>(m_geom.get())->getExteriorRing();
     for (int i = 0; i < er->getNumPoints(); ++i)
         r.push_back({er->getX(i), er->getY(i)});
 
     return r;
 }
-
 
 std::vector<Polygon::Ring> Polygon::interiorRings() const
 {
@@ -399,11 +381,11 @@ std::vector<Polygon::Ring> Polygon::interiorRings() const
     if (t != wkbPolygon && t != wkbPolygon25D)
         throw pdal_error("Request for exterior ring on non-polygon.");
 
-//    OGRPolygon *poly = m_geom->toPolygon();
-     OGRPolygon *poly = static_cast<OGRPolygon *>(m_geom.get());
+    //    OGRPolygon *poly = m_geom->toPolygon();
+    OGRPolygon* poly = static_cast<OGRPolygon*>(m_geom.get());
     for (int i = 0; i < poly->getNumInteriorRings(); ++i)
     {
-        OGRLinearRing *er = poly->getInteriorRing(i);
+        OGRLinearRing* er = poly->getInteriorRing(i);
 
         Ring r;
         for (int j = 0; j < er->getNumPoints(); ++j)

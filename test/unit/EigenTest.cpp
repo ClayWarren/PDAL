@@ -69,11 +69,8 @@ PointViewPtr makeTestView(PointTableRef table, point_count_t cnt = 17)
     return view;
 }
 
-
-static void check_bounds(const BOX3D& box,
-                         double minx, double maxx,
-                         double miny, double maxy,
-                         double minz, double maxz)
+static void check_bounds(const BOX3D& box, double minx, double maxx,
+                         double miny, double maxy, double minz, double maxz)
 {
     EXPECT_DOUBLE_EQ(box.minx, minx);
     EXPECT_DOUBLE_EQ(box.maxx, maxx);
@@ -177,8 +174,8 @@ TEST(EigenTest, RoundtripString)
 
 TEST(EigenTest, calcBounds)
 {
-    auto set_points = [](PointViewPtr view, PointId i, double x, double y,
-        double z)
+    auto set_points =
+        [](PointViewPtr view, PointId i, double x, double y, double z)
     {
         view->setField(Dimension::Id::X, i, x);
         view->setField(Dimension::Id::Y, i, y);

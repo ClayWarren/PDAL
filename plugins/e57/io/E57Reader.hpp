@@ -34,10 +34,10 @@
 
 #pragma once
 
-#include <pdal/Reader.hpp>
-#include <pdal/Streamable.hpp>
 #include "Scan.hpp"
 #include "Utils.hpp"
+#include <pdal/Reader.hpp>
+#include <pdal/Streamable.hpp>
 
 namespace pdal
 {

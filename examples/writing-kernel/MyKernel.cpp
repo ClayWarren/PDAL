@@ -10,30 +10,28 @@
 #include <memory>
 #include <string>
 
+namespace pdal
+{
 
-namespace pdal {
+static PluginInfo const s_info{"kernels.mykernel", "MyKernel",
+                               "http://link/to/documentation"};
 
-  static PluginInfo const s_info
-  {
-    "kernels.mykernel",
-    "MyKernel",
-    "http://link/to/documentation"
-  };
+CREATE_SHARED_KERNEL(MyKernel, s_info);
+std::string MyKernel::getName() const
+{
+    return s_info.name;
+}
 
-  CREATE_SHARED_KERNEL(MyKernel, s_info);
-  std::string MyKernel::getName() const { return s_info.name; }
+MyKernel::MyKernel() : Kernel() {}
 
-  MyKernel::MyKernel() : Kernel()
-  {}
+void MyKernel::addSwitches(ProgramArgs& args)
+{
+    args.add("input,i", "Input filename", m_input_file).setPositional();
+    args.add("output,o", "Output filename", m_output_file).setPositional();
+}
 
-  void MyKernel::addSwitches(ProgramArgs& args)
-  {
-      args.add("input,i", "Input filename", m_input_file).setPositional();
-      args.add("output,o", "Output filename", m_output_file).setPositional();
-  }
-
-  int MyKernel::execute()
-  {
+int MyKernel::execute()
+{
     PointTable table;
 
     Stage& reader = makeReader(m_input_file, "readers.las");
@@ -50,6 +48,6 @@ namespace pdal {
     writer.execute(table);
 
     return 0;
-  }
+}
 
 } // namespace pdal

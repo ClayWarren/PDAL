@@ -40,9 +40,9 @@
 #include "SMRFilter.hpp"
 
 #include <pdal/KDIndex.hpp>
+#include <pdal/private/MathUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal/private/MathUtils.hpp>
 
 #include "private/DimRange.hpp"
 #include "private/Segmentation.hpp"
@@ -91,7 +91,7 @@ struct SMRArgs
     std::vector<DimRange> m_ignored;
     StringList m_returns;
     Segmentation::PointClasses m_classbits;
-    Arg *m_windowArg;
+    Arg* m_windowArg;
 };
 
 SMRFilter::SMRFilter() : m_args(new SMRArgs) {}
@@ -114,17 +114,24 @@ void SMRFilter::addArgs(ProgramArgs& args)
     args.add("ignore", "Ignore values", m_args->m_ignored);
     args.add("returns", "Include last returns?", m_args->m_returns,
              {"last", "only"});
-    args.add("classbits", "Ignore synthetic|keypoint|withheld "
-        "classification bits?", m_args->m_classbits);
-    m_args->m_windowArg = &args.add("window", "Max window size?",
-        m_args->m_window);
-    args.add("ground_class", "Classification value of ground points."
-        " [Default: 2]", m_groundClass, ClassLabel::Ground);
-    args.add("other_class", "Classification value of non-ground points."
-        " [Default: 1]", m_otherClass, ClassLabel::Unclassified);
-    args.add("only_ground", "Set to true to only modify the CLassification"
-        " value of detected ground points. [Default: false]",
-        m_onlyGround, false);
+    args.add("classbits",
+             "Ignore synthetic|keypoint|withheld "
+             "classification bits?",
+             m_args->m_classbits);
+    m_args->m_windowArg =
+        &args.add("window", "Max window size?", m_args->m_window);
+    args.add("ground_class",
+             "Classification value of ground points."
+             " [Default: 2]",
+             m_groundClass, ClassLabel::Ground);
+    args.add("other_class",
+             "Classification value of non-ground points."
+             " [Default: 1]",
+             m_otherClass, ClassLabel::Unclassified);
+    args.add("only_ground",
+             "Set to true to only modify the CLassification"
+             " value of detected ground points. [Default: false]",
+             m_onlyGround, false);
 }
 
 void SMRFilter::addDimensions(PointLayoutPtr layout)
@@ -139,7 +146,7 @@ void SMRFilter::prepared(PointTableRef table)
     if ((m_groundClass == m_otherClass) && !m_onlyGround)
     {
         throwError("Ground and non-ground class cannot be"
-            "equal when only_ground is false.");
+                   "equal when only_ground is false.");
     }
 
     for (auto& r : m_args->m_ignored)
@@ -260,8 +267,10 @@ PointViewSet SMRFilter::run(PointViewPtr view)
         ((m_bounds.maxy - m_bounds.miny) / m_args->m_cell) + 1);
     if (m_cols * m_rows < 10000)
         log()->get(LogLevel::Warning) << "SMRF running with a small number "
-            "of cells (" << (m_cols * m_rows) << ").  Consider changing "
-            "cell size.\n";
+                                         "of cells ("
+                                      << (m_cols * m_rows)
+                                      << ").  Consider changing "
+                                         "cell size.\n";
 
     // Create raster of minimum Z values per element.
     std::vector<double> ZImin = createZImin(inlierView);
@@ -316,8 +325,8 @@ void SMRFilter::classifyGround(PointViewPtr view, std::vector<double>& ZIpro)
         std::vector<double> gsurfsV(gsurfs.data(),
                                     gsurfs.data() + gsurfs.size());
 
-        //ABELL - We can eliminate this copy if we're OK with not writing
-        //  both the filled and non-filled array to output.
+        // ABELL - We can eliminate this copy if we're OK with not writing
+        //   both the filled and non-filled array to output.
         std::vector<double> gsurfs_fillV = gsurfsV;
         knnfill(view, gsurfs_fillV);
         gsurfs = Map<MatrixXd>(gsurfs_fillV.data(), m_rows, m_cols);
@@ -328,21 +337,26 @@ void SMRFilter::classifyGround(PointViewPtr view, std::vector<double>& ZIpro)
         {
             std::string fname =
                 FileUtils::toAbsolutePath("gx.tif", m_args->m_dir);
-            math::writeMatrix(gx, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+            math::writeMatrix(gx, fname, "GTiff", m_args->m_cell, m_bounds,
+                              m_srs);
 
             fname = FileUtils::toAbsolutePath("gy.tif", m_args->m_dir);
-            math::writeMatrix(gy, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+            math::writeMatrix(gy, fname, "GTiff", m_args->m_cell, m_bounds,
+                              m_srs);
 
             fname = FileUtils::toAbsolutePath("gsurfs.tif", m_args->m_dir);
-            math::writeMatrix(gsurfs, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+            math::writeMatrix(gsurfs, fname, "GTiff", m_args->m_cell, m_bounds,
+                              m_srs);
 
             fname = FileUtils::toAbsolutePath("gsurfs_fill.tif", m_args->m_dir);
             MatrixXd gsurfs_fill =
                 Map<MatrixXd>(gsurfs_fillV.data(), m_rows, m_cols);
-            math::writeMatrix(gsurfs_fill, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+            math::writeMatrix(gsurfs_fill, fname, "GTiff", m_args->m_cell,
+                              m_bounds, m_srs);
 
             fname = FileUtils::toAbsolutePath("thresh.tif", m_args->m_dir);
-            math::writeMatrix(thresh, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+            math::writeMatrix(thresh, fname, "GTiff", m_args->m_cell, m_bounds,
+                              m_srs);
         }
     }
 
@@ -415,7 +429,8 @@ std::vector<int> SMRFilter::createLowMask(std::vector<double> const& ZImin)
         std::string fname =
             FileUtils::toAbsolutePath("zilow.tif", m_args->m_dir);
         MatrixXi Low = Map<MatrixXi>(LowV.data(), m_rows, m_cols);
-        math::writeMatrix(Low.cast<double>(), fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(Low.cast<double>(), fname, "GTiff", m_args->m_cell,
+                          m_bounds, m_srs);
     }
 
     return LowV;
@@ -467,7 +482,8 @@ std::vector<int> SMRFilter::createObjMask(std::vector<double> const& ZImin)
         std::string fname =
             FileUtils::toAbsolutePath("ziobj.tif", m_args->m_dir);
         MatrixXi Obj = Map<MatrixXi>(ObjV.data(), m_rows, m_cols);
-        math::writeMatrix(Obj.cast<double>(), fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(Obj.cast<double>(), fname, "GTiff", m_args->m_cell,
+                          m_bounds, m_srs);
     }
 
     return ObjV;
@@ -500,8 +516,8 @@ std::vector<double> SMRFilter::createZImin(PointViewPtr view)
     // inpainting involves the replacement of the empty cells in an image (or
     // matrix) with values calculated from other nearby values."
 
-    //ABELL - We can eliminate this copy if we're OK with not writing
-    //  both the filled and non-filled array to output.
+    // ABELL - We can eliminate this copy if we're OK with not writing
+    //   both the filled and non-filled array to output.
     std::vector<double> ZImin_fillV = ZIminV;
     knnfill(view, ZImin_fillV);
 
@@ -510,11 +526,13 @@ std::vector<double> SMRFilter::createZImin(PointViewPtr view)
         std::string fname =
             FileUtils::toAbsolutePath("zimin.tif", m_args->m_dir);
         MatrixXd ZImin = Map<MatrixXd>(ZIminV.data(), m_rows, m_cols);
-        math::writeMatrix(ZImin, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(ZImin, fname, "GTiff", m_args->m_cell, m_bounds,
+                          m_srs);
 
         fname = FileUtils::toAbsolutePath("zimin_fill.tif", m_args->m_dir);
         MatrixXd ZImin_fill = Map<MatrixXd>(ZImin_fillV.data(), m_rows, m_cols);
-        math::writeMatrix(ZImin_fill, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(ZImin_fill, fname, "GTiff", m_args->m_cell, m_bounds,
+                          m_srs);
     }
 
     return ZImin_fillV;
@@ -554,7 +572,8 @@ std::vector<double> SMRFilter::createZInet(std::vector<double> const& ZImin,
         std::string fname =
             FileUtils::toAbsolutePath("zinet.tif", m_args->m_dir);
         MatrixXd ZInet = Map<MatrixXd>(ZInetV.data(), m_rows, m_cols);
-        math::writeMatrix(ZInet, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(ZInet, fname, "GTiff", m_args->m_cell, m_bounds,
+                          m_srs);
     }
 
     return ZInetV;
@@ -579,7 +598,7 @@ std::vector<double> SMRFilter::createZIpro(PointViewPtr view,
 
     // "These cells are then inpainted according to the same process described
     // previously, producing a provisional DEM (ZIpro)."
-    //ABELL - We can eliminate this copy if we're OK with not writing
+    // ABELL - We can eliminate this copy if we're OK with not writing
     //  both the filled and non-filled array to output.
     std::vector<double> ZIpro_fillV = ZIproV;
     knnfill(view, ZIpro_fillV);
@@ -589,11 +608,13 @@ std::vector<double> SMRFilter::createZIpro(PointViewPtr view,
         std::string fname =
             FileUtils::toAbsolutePath("zipro.tif", m_args->m_dir);
         MatrixXd ZIpro = Map<MatrixXd>(ZIproV.data(), m_rows, m_cols);
-        math::writeMatrix(ZIpro, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(ZIpro, fname, "GTiff", m_args->m_cell, m_bounds,
+                          m_srs);
 
         fname = FileUtils::toAbsolutePath("zipro_fill.tif", m_args->m_dir);
         MatrixXd ZIpro_fill = Map<MatrixXd>(ZIpro_fillV.data(), m_rows, m_cols);
-        math::writeMatrix(ZIpro_fill, fname, "GTiff", m_args->m_cell, m_bounds, m_srs);
+        math::writeMatrix(ZIpro_fill, fname, "GTiff", m_args->m_cell, m_bounds,
+                          m_srs);
     }
 
     return ZIpro_fillV;
@@ -602,11 +623,11 @@ std::vector<double> SMRFilter::createZIpro(PointViewPtr view,
 // Fill voids with the average of eight nearest neighbors.
 void SMRFilter::knnfill(PointViewPtr view, std::vector<double>& cz)
 {
-    //ABELL - This potentially means moving a lot of data from the raster
-    //  to the temporary view.  This can be improved by either
-    //  1) using some method other than a KD tree to find neighbors
-    //  2) build a KDtree from the raster data directly, rather than moving it
-    //     to a view.
+    // ABELL - This potentially means moving a lot of data from the raster
+    //   to the temporary view.  This can be improved by either
+    //   1) using some method other than a KD tree to find neighbors
+    //   2) build a KDtree from the raster data directly, rather than moving it
+    //      to a view.
 
     // Create a temporary PointView that encodes our raster values so that we
     // can construct a 2D KDIndex and perform nearest neighbor searches.
@@ -708,9 +729,8 @@ std::vector<int> SMRFilter::progressiveFilter(std::vector<double> const& ZImin,
         // cell."
         std::vector<int> foo;
         std::transform(diff.begin(), diff.end(), std::back_inserter(foo),
-                       [threshold](double x) {
-                           return (x > threshold) ? int(1) : int(0);
-                       });
+                       [threshold](double x)
+                       { return (x > threshold) ? int(1) : int(0); });
         std::transform(Obj.begin(), Obj.end(), foo.begin(), Obj.begin(),
                        [](int a, int b) { return (std::max)(a, b); });
 
@@ -723,10 +743,11 @@ std::vector<int> SMRFilter::progressiveFilter(std::vector<double> const& ZImin,
         size_t g(Obj.size() - ng);
         double p(100.0 * double(ng) / double(Obj.size()));
         log()->floatPrecision(2);
-        log()->get(LogLevel::Debug) << "progressiveFilter: radius = " << radius
-                                    << "\t" << g << " ground cells"
-                                    << "\t" << ng << " non-ground cells"
-                                    << "\t(" << p << "% of cells contain ground)\n";
+        log()->get(LogLevel::Debug)
+            << "progressiveFilter: radius = " << radius << "\t" << g
+            << " ground cells"
+            << "\t" << ng << " non-ground cells"
+            << "\t(" << p << "% of cells contain ground)\n";
     }
 
     return Obj;

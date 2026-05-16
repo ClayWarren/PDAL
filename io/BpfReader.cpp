@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2014, Andrew Bell
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Andrew Bell
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "BpfReader.hpp"
 
 #include <climits>
 
+#include <arbiter/arbiter.hpp>
 #include <pdal/Options.hpp>
 #include <pdal/pdal_features.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <arbiter/arbiter.hpp>
 
 #ifdef PDAL_HAVE_ZLIB
 #include <zlib.h>
@@ -48,15 +48,13 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.bpf",
-    "\"Binary Point Format\" (BPF) reader support. BPF is a simple \n" \
-        "DoD and research format that is used by some sensor and \n" \
-        "processing chains.",
+    "\"Binary Point Format\" (BPF) reader support. BPF is a simple \n"
+    "DoD and research format that is used by some sensor and \n"
+    "processing chains.",
     "https://pdal.org/stages/readers.bpf.html",
-    { "bpf" }
-};
+    {"bpf"}};
 
 CREATE_STATIC_STAGE(BpfReader, s_info)
 
@@ -65,18 +63,19 @@ struct BpfReader::Args
     bool m_fixNames;
 };
 
-std::string BpfReader::getName() const { return s_info.name; }
+std::string BpfReader::getName() const
+{
+    return s_info.name;
+}
 
-BpfReader::BpfReader() : m_args(new BpfReader::Args)
-{}
-
+BpfReader::BpfReader() : m_args(new BpfReader::Args) {}
 
 BpfReader::~BpfReader()
 {
 #ifdef PDAL_HAVE_ZLIB
     if (m_header.m_compression)
     {
-        for( auto& stream: m_streams )
+        for (auto& stream : m_streams)
         {
             delete stream->popStream();
         }
@@ -84,23 +83,23 @@ BpfReader::~BpfReader()
 #endif
 }
 
-
 void BpfReader::addArgs(ProgramArgs& args)
 {
-    args.add("fix_dims", "Make invalid dimension names valid by changing "
-        "invalid characters to '_'", m_args->m_fixNames, true);
+    args.add("fix_dims",
+             "Make invalid dimension names valid by changing "
+             "invalid characters to '_'",
+             m_args->m_fixNames, true);
 }
-
 
 void BpfReader::addDimensions(PointLayoutPtr layout)
 {
     for (size_t i = 0; i < m_dims.size(); ++i)
     {
         BpfDimension& dim = m_dims[i];
-        dim.m_id = layout->registerOrAssignDim(dim.m_label, Dimension::Type::Float);
+        dim.m_id =
+            layout->registerOrAssignDim(dim.m_label, Dimension::Type::Float);
     }
 }
-
 
 QuickInfo BpfReader::inspect()
 {
@@ -132,7 +131,6 @@ QuickInfo BpfReader::inspect()
     }
     return qi;
 }
-
 
 // When the stage is intialized, the schema needs to be populated with the
 // dimensions in order to allow subsequent stages to be aware of or append to
@@ -177,20 +175,20 @@ void BpfReader::initialize()
 #ifndef PDAL_HAVE_ZLIB
     if (m_header.m_compression)
         throwError("Can't read compressed BPF. PDAL wasn't built with "
-            "Zlib support.");
+                   "Zlib support.");
 #endif
 
     SpatialReference srs;
     if (m_header.m_coordType == static_cast<int>(BpfCoordType::Cartesian))
     {
-       srs.set("EPSG:4326");
+        srs.set("EPSG:4326");
     }
     else if (m_header.m_coordType == static_cast<int>(BpfCoordType::UTM))
     {
-       srs = SpatialReference::wgs84FromZone(m_header.m_coordId);
-       if (!srs.valid())
-          throwError("BPF file contains an invalid UTM zone " +
-            Utils::toString(m_header.m_coordId));
+        srs = SpatialReference::wgs84FromZone(m_header.m_coordId);
+        if (!srs.valid())
+            throwError("BPF file contains an invalid UTM zone " +
+                       Utils::toString(m_header.m_coordId));
     }
     else if (m_header.m_coordType == static_cast<int>(BpfCoordType::TCR))
     {
@@ -203,20 +201,20 @@ void BpfReader::initialize()
         {
             std::ostringstream oss;
             oss << "BPF has ECEF/TCR coordinate type defined, but the ID of '"
-                <<  m_header.m_coordId << "' is invalid";
+                << m_header.m_coordId << "' is invalid";
             throwError(oss.str());
         }
     }
     else
     {
-       // BPF also supports something East North Up (BpfCoordType::ENU)
-       // which we can figure out when we run into a file with these
-       // coordinate systems.
+        // BPF also supports something East North Up (BpfCoordType::ENU)
+        // which we can figure out when we run into a file with these
+        // coordinate systems.
         std::ostringstream oss;
         oss << "BPF file contains unsupported coordinate system with "
             << "coordinate type: '" << m_header.m_coordType
             << "' and coordinate id: '" << m_header.m_coordId << "'";
-       throwError(oss.str());
+        throwError(oss.str());
     }
 
     setSpatialReference(srs);
@@ -246,7 +244,6 @@ void BpfReader::initialize()
     Utils::closeFile(m_istreamPtr);
 }
 
-
 bool BpfReader::readUlemData()
 {
     if (!m_ulemHeader.read(m_stream))
@@ -262,19 +259,17 @@ bool BpfReader::readUlemData()
     return (bool)m_stream;
 }
 
-
 bool BpfReader::readUlemFiles()
 {
     BpfUlemFile file;
     while (file.read(m_stream))
     {
         MetadataNode m = m_metadata.add("bundled_file");
-        m.addEncoded(file.m_filename,
-            (const unsigned char *)file.m_buf.data(), file.m_len);
+        m.addEncoded(file.m_filename, (const unsigned char*)file.m_buf.data(),
+                     file.m_len);
     }
     return (bool)m_stream;
 }
-
 
 /// Encode all data that follows the headers as metadata->
 /// \return  Whether the stream is still valid.
@@ -290,7 +285,6 @@ bool BpfReader::readHeaderExtraData()
     return (bool)m_stream;
 }
 
-
 bool BpfReader::readPolarData()
 {
     if (!m_polarHeader.read(m_stream))
@@ -304,7 +298,6 @@ bool BpfReader::readPolarData()
     }
     return (bool)m_stream;
 }
-
 
 void BpfReader::ready(PointTableRef)
 {
@@ -330,7 +323,6 @@ void BpfReader::ready(PointTableRef)
 #endif // PDAL_HAVE_ZLIB
 }
 
-
 void BpfReader::done(PointTableRef)
 {
     if (auto s = m_stream.popStream())
@@ -344,7 +336,6 @@ void BpfReader::done(PointTableRef)
         FileUtils::deleteFile(m_filename);
     }
 }
-
 
 bool BpfReader::processOne(PointRef& point)
 {
@@ -366,7 +357,6 @@ bool BpfReader::processOne(PointRef& point)
     return true;
 }
 
-
 point_count_t BpfReader::read(PointViewPtr data, point_count_t count)
 {
     switch (m_header.m_pointFormat)
@@ -381,12 +371,10 @@ point_count_t BpfReader::read(PointViewPtr data, point_count_t count)
     return 0;
 }
 
-
 bool BpfReader::eof()
 {
     return m_index >= numPoints();
 }
-
 
 void BpfReader::readPointMajor(PointRef& point)
 {
@@ -415,7 +403,6 @@ void BpfReader::readPointMajor(PointRef& point)
     point.setField(Dimension::Id::Z, z);
     m_index++;
 }
-
 
 point_count_t BpfReader::readPointMajor(PointViewPtr view, point_count_t count)
 {
@@ -452,7 +439,6 @@ point_count_t BpfReader::readPointMajor(PointViewPtr view, point_count_t count)
     return numRead;
 }
 
-
 void BpfReader::readDimMajor(PointRef& point)
 {
     if (m_streams.empty())
@@ -468,11 +454,11 @@ void BpfReader::readDimMajor(PointRef& point)
             if (m_header.m_compression)
             {
                 m_charbufs.emplace_back(new Charbuf());
-                m_charbufs.back()->initialize(
-                        m_deflateBuf.data(), m_deflateBuf.size(), m_start);
+                m_charbufs.back()->initialize(m_deflateBuf.data(),
+                                              m_deflateBuf.size(), m_start);
 
                 m_streams.back()->pushStream(
-                        new std::istream(m_charbufs.back().get()));
+                    new std::istream(m_charbufs.back().get()));
             }
 #endif // PDAL_HAVE_ZLIB
 
@@ -505,7 +491,6 @@ void BpfReader::readDimMajor(PointRef& point)
     point.setField(Dimension::Id::Z, z);
     m_index++;
 }
-
 
 point_count_t BpfReader::readDimMajor(PointViewPtr data, point_count_t count)
 {
@@ -546,7 +531,6 @@ point_count_t BpfReader::readDimMajor(PointViewPtr data, point_count_t count)
     return numRead;
 }
 
-
 void BpfReader::readByteMajor(PointRef& point)
 {
     // We need a temp buffer for the point data
@@ -586,7 +570,6 @@ void BpfReader::readByteMajor(PointRef& point)
     m_index++;
 }
 
-
 point_count_t BpfReader::readByteMajor(PointViewPtr data, point_count_t count)
 {
     PointId idx(0);
@@ -611,8 +594,8 @@ point_count_t BpfReader::readByteMajor(PointViewPtr data, point_count_t count)
             PointId nextId = startId;
             seekByteMajor(d, b, idx);
 
-            for (;numRead < count && idx < numPoints();
-                idx++, numRead++, nextId++)
+            for (; numRead < count && idx < numPoints();
+                 idx++, numRead++, nextId++)
             {
                 union uu& u = *(uArr.get() + numRead);
 
@@ -649,31 +632,25 @@ point_count_t BpfReader::readByteMajor(PointViewPtr data, point_count_t count)
     return numRead;
 }
 
-
 void BpfReader::seekPointMajor(PointId ptIdx)
 {
     std::streamoff offset = ptIdx * sizeof(float) * m_dims.size();
     m_stream.seek(m_start + offset);
 }
 
-
 void BpfReader::seekDimMajor(size_t dimIdx, PointId ptIdx)
 {
-    std::streamoff offset = ((sizeof(float) * dimIdx * numPoints()) +
-        (sizeof(float) * ptIdx));
+    std::streamoff offset =
+        ((sizeof(float) * dimIdx * numPoints()) + (sizeof(float) * ptIdx));
     m_stream.seek(m_start + offset);
 }
-
 
 void BpfReader::seekByteMajor(size_t dimIdx, size_t byteIdx, PointId ptIdx)
 {
-    std::streamoff offset =
-        (dimIdx * numPoints() * sizeof(float)) +
-        (byteIdx * numPoints()) +
-        ptIdx;
+    std::streamoff offset = (dimIdx * numPoints() * sizeof(float)) +
+                            (byteIdx * numPoints()) + ptIdx;
     m_stream.seek(m_start + offset);
 }
-
 
 #ifdef PDAL_HAVE_ZLIB
 size_t BpfReader::readBlock(std::vector<char>& outBuf, size_t index)
@@ -688,16 +665,15 @@ size_t BpfReader::readBlock(std::vector<char>& outBuf, size_t index)
 
     // Fill the input bytes from the stream.
     m_stream.get(in);
-    int ret = inflate(in.data(), compressBytes,
-        outBuf.data() + index, finalBytes);
+    int ret =
+        inflate(in.data(), compressBytes, outBuf.data() + index, finalBytes);
     return (ret ? 0 : finalBytes);
 }
 
-
-int BpfReader::inflate(char *buf, uint32_t insize,
-    char *outbuf, uint32_t outsize)
+int BpfReader::inflate(char* buf, uint32_t insize, char* outbuf,
+                       uint32_t outsize)
 {
-   if (insize == 0)
+    if (insize == 0)
         return 0;
 
     int ret;
@@ -713,9 +689,9 @@ int BpfReader::inflate(char *buf, uint32_t insize,
         return -2;
 
     strm.avail_in = insize;
-    strm.next_in = (unsigned char *)buf;
+    strm.next_in = (unsigned char*)buf;
     strm.avail_out = outsize;
-    strm.next_out = (unsigned char *)outbuf;
+    strm.next_out = (unsigned char*)outbuf;
 
     ret = ::inflate(&strm, Z_NO_FLUSH);
     (void)inflateEnd(&strm);
@@ -723,4 +699,4 @@ int BpfReader::inflate(char *buf, uint32_t insize,
 }
 #endif // PDAL_HAVE_ZLIB
 
-} //namespace pdal
+} // namespace pdal

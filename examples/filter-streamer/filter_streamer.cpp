@@ -1,13 +1,14 @@
-#include <pdal/Filter.hpp>
-#include <pdal/Streamable.hpp>
+#include <io/LasHeader.hpp>
 #include <io/LasReader.hpp>
 #include <io/LasWriter.hpp>
-#include <io/LasHeader.hpp>
+#include <pdal/Filter.hpp>
 #include <pdal/Options.hpp>
+#include <pdal/Streamable.hpp>
 
 #include <vector>
 
-namespace pdal {
+namespace pdal
+{
 
 // A filter to multiply each point's coordinates by a factor. Each point
 // is processed in streaming mode, without loading the entire point cloud into
@@ -31,13 +32,9 @@ std::string FilterStreamer::getName() const
     return "filter_streamer";
 }
 
-FilterStreamer::FilterStreamer(double factor): m_factor(factor)
-{
-}
+FilterStreamer::FilterStreamer(double factor) : m_factor(factor) {}
 
-FilterStreamer::~FilterStreamer()
-{
-}
+FilterStreamer::~FilterStreamer() {}
 
 // Apply a transform to each point
 bool FilterStreamer::processOne(PointRef& point)
@@ -76,7 +73,7 @@ int main(int argc, char* argv[])
 
     // Get the scale and offset from the input cloud header
     // Must be run after the table is prepared
-    const LasHeader & header = reader.header();
+    const LasHeader& header = reader.header();
     double offset[3] = {header.offsetX(), header.offsetY(), header.offsetZ()};
     double scale[3] = {header.scaleX(), header.scaleY(), header.scaleZ()};
 
@@ -99,9 +96,9 @@ int main(int argc, char* argv[])
     write_options.add("offset_x", factor * offset[0]);
     write_options.add("offset_y", factor * offset[1]);
     write_options.add("offset_z", factor * offset[2]);
-    write_options.add("scale_x",  factor * scale[0]);
-    write_options.add("scale_y",  factor * scale[1]);
-    write_options.add("scale_z",  factor * scale[2]);
+    write_options.add("scale_x", factor * scale[0]);
+    write_options.add("scale_y", factor * scale[1]);
+    write_options.add("scale_z", factor * scale[2]);
 
     // Write the output file
     LasWriter writer;

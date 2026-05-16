@@ -6,13 +6,11 @@
 namespace pdal
 {
 
-OGRSpec::OGRSpec()
-{}
-
+OGRSpec::OGRSpec() {}
 
 OGRSpec::OGRSpec(const std::string& ogrJsonStr)
 {
-    validateInput(ogrJsonStr); 
+    validateInput(ogrJsonStr);
     initialize();
 }
 
@@ -42,7 +40,7 @@ void OGRSpec::validateInput(const std::string& ogrJsonStr)
     {
         m_json = NL::json::parse(ogrJsonStr);
     }
-    catch(NL::json::parse_error& e)
+    catch (NL::json::parse_error& e)
     {
         std::string s(e.what());
         auto pos = s.find("]");
@@ -66,7 +64,8 @@ void OGRSpec::parse()
 {
     // "type" field name is case sensitive, value is not
     if (!(m_json.is_object() && m_json.contains("type")))
-        throw error("'ogr' option must be a JSON object with 'type':'ogr' specified!");
+        throw error(
+            "'ogr' option must be a JSON object with 'type':'ogr' specified!");
     else if (!(Utils::tolower(m_json.at("type").get<std::string>()) == "ogr"))
         throw error("'ogr' option must have 'type':'ogr' specified!");
 
@@ -101,13 +100,14 @@ void OGRSpec::parse()
                 else if (optKey == "geometry")
                     assignJSON(optItem.value(), m_opts.geometry);
                 else
-                    throw error("invalid value for 'options' field in OGR JSON!");
+                    throw error(
+                        "invalid value for 'options' field in OGR JSON!");
             }
         }
         else if (key == "type")
             continue;
         else
-        {           
+        {
             std::stringstream out;
             out << "unexpected field '" << key << "' in OGR JSON!";
             throw error(out.str());
@@ -123,7 +123,7 @@ void OGRSpec::initialize()
     m_geom = gdal::getPolygons(m_opts);
 }
 
-std::ostream& operator << (std::ostream& out, const OGRSpec& ogr)
+std::ostream& operator<<(std::ostream& out, const OGRSpec& ogr)
 {
     out << ogr.m_json;
     return out;

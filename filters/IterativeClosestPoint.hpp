@@ -42,8 +42,7 @@ namespace pdal
 class PDAL_EXPORT IterativeClosestPoint : public Filter
 {
 public:
-    IterativeClosestPoint() : Filter(), m_fixed(nullptr), m_complete(false)
-    {}
+    IterativeClosestPoint() : Filter(), m_fixed(nullptr), m_complete(false) {}
 
     std::string getName() const;
 
@@ -53,9 +52,9 @@ private:
     double m_rotation_threshold;
     double m_translation_threshold;
     double m_mse_abs;
-    Arg *m_maxdistArg;
+    Arg* m_maxdistArg;
     double m_maxdist;
-    Arg *m_matrixArg;
+    Arg* m_matrixArg;
     std::string m_matrixStr;
     std::vector<double> m_vec;
 

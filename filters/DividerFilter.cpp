@@ -45,32 +45,27 @@ struct DividerFilter::Args
     SizeMode m_sizeMode = SizeMode::Count;
     point_count_t m_size = 1;
 
-    Arg *m_cntArg = nullptr;
-    Arg *m_capArg = nullptr;
-    Arg *m_splitExpressionArg = nullptr;
+    Arg* m_cntArg = nullptr;
+    Arg* m_capArg = nullptr;
+    Arg* m_splitExpressionArg = nullptr;
 };
 
-
-static PluginInfo const s_info
-{
+static PluginInfo const s_info{
     "filters.divider",
     "Divide points into approximately equal sized groups based on a simple "
-      "scheme",
-    "https://pdal.org/stages/filters.divider.html"
-};
+    "scheme",
+    "https://pdal.org/stages/filters.divider.html"};
 
 CREATE_STATIC_STAGE(DividerFilter, s_info)
 
+DividerFilter::DividerFilter() : m_args(new Args) {}
 
-DividerFilter::DividerFilter() : m_args(new Args)
-{}
+DividerFilter::~DividerFilter() {}
 
-
-DividerFilter::~DividerFilter()
-{}
-
-
-std::string DividerFilter::getName() const { return s_info.name; }
+std::string DividerFilter::getName() const
+{
+    return s_info.name;
+}
 
 std::istream& operator>>(std::istream& in, DividerFilter::Mode& mode)
 {
@@ -85,11 +80,11 @@ std::istream& operator>>(std::istream& in, DividerFilter::Mode& mode)
     else if (s == "expression")
         mode = DividerFilter::Mode::Expression;
     else
-        throw pdal_error("filters.divider: Invalid 'mode' option '" + s + "'. "
-            "Valid options are 'partition' and 'round_robin'");
+        throw pdal_error("filters.divider: Invalid 'mode' option '" + s +
+                         "'. "
+                         "Valid options are 'partition' and 'round_robin'");
     return in;
 }
-
 
 std::ostream& operator<<(std::ostream& out, const DividerFilter::Mode& mode)
 {
@@ -108,22 +103,26 @@ std::ostream& operator<<(std::ostream& out, const DividerFilter::Mode& mode)
     return out;
 }
 
-
 void DividerFilter::addArgs(ProgramArgs& args)
 {
-    args.add("mode", "A mode of 'partition' will write sequential points "
-        "to an output view until the view meets its predetermined size. "
-        "'round_robin' mode will iterate through the output views as it "
-        "writes sequential points. A mode of 'split' will output new "
-        "views every time a 'capacity' number of points with the given 'expression'"
-        "are visited", m_args->m_mode, DividerFilter::Mode::Partition);
-    m_args->m_cntArg = &args.add("count", "Number of output views", m_args->m_size);
-    m_args->m_capArg = &args.add("capacity", "Maximum number of points in each "
-        "output view", m_args->m_size);
-    m_args->m_splitExpressionArg = &args.add("expression", "Expression to cause split",
-        m_args->m_splitExpression);
+    args.add("mode",
+             "A mode of 'partition' will write sequential points "
+             "to an output view until the view meets its predetermined size. "
+             "'round_robin' mode will iterate through the output views as it "
+             "writes sequential points. A mode of 'split' will output new "
+             "views every time a 'capacity' number of points with the given "
+             "'expression'"
+             "are visited",
+             m_args->m_mode, DividerFilter::Mode::Partition);
+    m_args->m_cntArg =
+        &args.add("count", "Number of output views", m_args->m_size);
+    m_args->m_capArg = &args.add("capacity",
+                                 "Maximum number of points in each "
+                                 "output view",
+                                 m_args->m_size);
+    m_args->m_splitExpressionArg = &args.add(
+        "expression", "Expression to cause split", m_args->m_splitExpression);
 }
-
 
 void DividerFilter::prepared(PointTableRef table)
 {
@@ -132,7 +131,7 @@ void DividerFilter::prepared(PointTableRef table)
         if (!m_args->m_splitExpression.valid())
         {
             std::stringstream oss;
-            oss << "The expression '" <<  m_args->m_splitExpression
+            oss << "The expression '" << m_args->m_splitExpression
                 << "' is invalid";
             throwError(oss.str());
         }
@@ -143,7 +142,6 @@ void DividerFilter::prepared(PointTableRef table)
     }
 }
 
-
 void DividerFilter::initialize()
 {
     if (m_args->m_splitExpressionArg->set())
@@ -151,16 +149,19 @@ void DividerFilter::initialize()
         m_args->m_mode = DividerFilter::Mode::Expression;
 
         if (!m_args->m_cntArg->set())
-            m_args->m_size = 1; // Default to 1 if the user didn't specify a break count
+            m_args->m_size =
+                1; // Default to 1 if the user didn't specify a break count
     }
 
     else if (m_args->m_mode == Mode::Partition ||
              m_args->m_mode == Mode::RoundRobin)
     {
         if (m_args->m_cntArg->set() && m_args->m_capArg->set())
-            throwError("Can't specify both option 'count' and option 'capacity.");
+            throwError(
+                "Can't specify both option 'count' and option 'capacity.");
         if (!m_args->m_cntArg->set() && !m_args->m_capArg->set())
-            throwError("Must specify either option 'count' or option 'capacity'.");
+            throwError(
+                "Must specify either option 'count' or option 'capacity'.");
 
         if (m_args->m_cntArg->set())
         {
@@ -172,7 +173,6 @@ void DividerFilter::initialize()
             m_args->m_sizeMode = SizeMode::Capacity;
     }
 }
-
 
 PointViewSet DividerFilter::run(PointViewPtr inView)
 {
@@ -187,8 +187,7 @@ PointViewSet DividerFilter::run(PointViewPtr inView)
     // make views of m_args->m_size. If we are Expression mode,
     // we will make new views once the expression passes the 'count'
     // number of times
-    if (m_args->m_mode == Mode::Partition ||
-        m_args->m_mode == Mode::RoundRobin)
+    if (m_args->m_mode == Mode::Partition || m_args->m_mode == Mode::RoundRobin)
     {
         for (point_count_t i = 0; i < m_args->m_size; ++i)
         {
@@ -229,7 +228,7 @@ PointViewSet DividerFilter::run(PointViewPtr inView)
         views.push_back(firstView);
         result.insert(firstView);
 
-        unsigned viewNum (0);
+        unsigned viewNum(0);
 
         for (PointRef point : *inView)
         {
@@ -253,4 +252,4 @@ PointViewSet DividerFilter::run(PointViewPtr inView)
     return result;
 }
 
-} // pdal
+} // namespace pdal

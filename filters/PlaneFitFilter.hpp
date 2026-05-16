@@ -48,8 +48,7 @@ using namespace Eigen;
 class PDAL_EXPORT PlaneFitFilter : public Filter
 {
 public:
-    PlaneFitFilter() : Filter()
-    {}
+    PlaneFitFilter() : Filter() {}
     PlaneFitFilter& operator=(const PlaneFitFilter&) = delete;
     PlaneFitFilter(const PlaneFitFilter&) = delete;
 
@@ -64,8 +63,8 @@ private:
     virtual void filter(PointView& view);
 
     void setPlaneFit(PointView& view, const PointId& i);
-    double absDistance(PointView& view, const PointId& i,
-                       Vector3d& centroid, Vector3d& normal);
+    double absDistance(PointView& view, const PointId& i, Vector3d& centroid,
+                       Vector3d& normal);
 };
 
 } // namespace pdal

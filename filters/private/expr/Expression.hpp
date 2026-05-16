@@ -1,9 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <stack>
 #include <string>
-#include <memory>
-#include <functional>
 
 #include <pdal/Dimension.hpp>
 #include <pdal/PointLayout.hpp>
@@ -40,10 +40,16 @@ enum class NodeType
 struct Result
 {
     Result(double d)
-    { m_dval = d; m_bval = false; }
+    {
+        m_dval = d;
+        m_bval = false;
+    }
 
     Result(bool b)
-    { m_bval = b; m_dval = 0; }
+    {
+        m_bval = b;
+        m_dval = 0;
+    }
 
     enum class Type
     {
@@ -56,12 +62,12 @@ struct Result
     Type m_type;
 };
 
-// Currently all we deal with is a function that takes a single double argument and returns
-// a double.
+// Currently all we deal with is a function that takes a single double argument
+// and returns a double.
 struct Func1
 {
-    using Ptr = double(*)(double);
-//    using Ptr = std::function<double(double)>;
+    using Ptr = double (*)(double);
+    //    using Ptr = std::function<double(double)>;
 
     std::string name;
     Ptr function;
@@ -69,7 +75,7 @@ struct Func1
 
 struct BoolFunc1
 {
-    using Ptr = bool(*)(double);
+    using Ptr = bool (*)(double);
 
     std::string name;
     Ptr function;
@@ -89,7 +95,9 @@ public:
     virtual Result eval(PointRef& p) const = 0;
     virtual bool isBool() const = 0;
     virtual bool isValue() const
-    { return !isBool(); }
+    {
+        return !isBool();
+    }
 
 private:
     NodeType m_type;
@@ -103,21 +111,23 @@ using NodePtr = std::unique_ptr<Node>;
 class LogicalNode : public Node
 {
 public:
-    LogicalNode(NodeType type) : Node(type)
-    {}
+    LogicalNode(NodeType type) : Node(type) {}
 
     virtual bool isBool() const
-    { return true; }
+    {
+        return true;
+    }
 };
 
 class ValueNode : public Node
 {
 public:
-    ValueNode(NodeType type) : Node(type)
-    {}
+    ValueNode(NodeType type) : Node(type) {}
 
     virtual bool isBool() const
-    { return false; }
+    {
+        return false;
+    }
 };
 
 class BinMathNode : public ValueNode
@@ -255,7 +265,10 @@ public:
     virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
     virtual Result eval(PointRef& p) const;
     Dimension::Id eval() const;
-    inline std::string const& name() const { return m_name; }
+    inline std::string const& name() const
+    {
+        return m_name;
+    }
 
 private:
     std::string m_name;
@@ -277,8 +290,8 @@ public:
     std::string error() const;
     NodePtr popNode();
     void pushNode(NodePtr node);
-    Node *topNode();
-    const Node *topNode() const;
+    Node* topNode();
+    const Node* topNode() const;
     virtual std::string print() const;
     virtual Utils::StatusWithReason prepare(PointLayoutPtr layout) = 0;
 

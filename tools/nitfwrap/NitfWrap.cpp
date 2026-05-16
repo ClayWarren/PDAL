@@ -1,46 +1,46 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <string>
 #include <vector>
 
+#include <io/BpfHeader.hpp>
+#include <io/LasHeader.hpp>
 #include <pdal/Dimension.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/IStream.hpp>
-#include <io/BpfHeader.hpp>
-#include <io/LasHeader.hpp>
 #include <plugins/nitf/io/NitfFileReader.hpp>
 
 #include "NitfWrap.hpp"
@@ -72,14 +72,13 @@ namespace
 
 void outputHelp(ProgramArgs& args)
 {
-    std::cout << "usage: nitfwrap [options] " << args.commandLine() <<
-        std::endl;
+    std::cout << "usage: nitfwrap [options] " << args.commandLine()
+              << std::endl;
     std::cout << "options:" << std::endl;
     args.dump(std::cout, 2, Utils::screenWidth());
 }
 
 } // unnamed namespace
-
 
 NitfWrap::NitfWrap(std::vector<std::string>& args)
 {
@@ -101,7 +100,6 @@ NitfWrap::NitfWrap(std::vector<std::string>& args)
     }
 }
 
-
 void NitfWrap::unwrap()
 {
     // Use the NITF reader to get the offset and length
@@ -112,7 +110,7 @@ void NitfWrap::unwrap()
     reader.close();
 
     // Open file file and seek to the beginning of the location.
-    std::istream *in = FileUtils::openFile(m_inputFile);
+    std::istream* in = FileUtils::openFile(m_inputFile);
     if (!in)
     {
         std::ostringstream oss;
@@ -152,7 +150,7 @@ void NitfWrap::unwrap()
 
     uint64_t bufsize = 16;
     std::vector<char> buf(bufsize);
-    std::ostream *out = FileUtils::createFile(m_outputFile);
+    std::ostream* out = FileUtils::createFile(m_outputFile);
     in->seekg(offset, std::istream::beg);
     while (length)
     {
@@ -164,14 +162,13 @@ void NitfWrap::unwrap()
     FileUtils::closeFile(out);
 }
 
-
 bool NitfWrap::parseArgs(std::vector<std::string>& argList)
 {
     ProgramArgs args;
 
     args.add("input,i", "Input filename", m_inputFile).setPositional();
-    args.add("output,o", "Output filename",
-        m_outputFile).setOptionalPositional();
+    args.add("output,o", "Output filename", m_outputFile)
+        .setOptionalPositional();
     args.add("unwrap,u", "Unwrap NITF file", m_unwrap);
     try
     {
@@ -206,10 +203,9 @@ bool NitfWrap::parseArgs(std::vector<std::string>& argList)
     return true;
 }
 
-
 void NitfWrap::verify(BOX3D& bounds)
 {
-    std::istream *stream = FileUtils::openFile(m_inputFile);
+    std::istream* stream = FileUtils::openFile(m_inputFile);
 
     if (!stream)
     {
@@ -230,7 +226,6 @@ void NitfWrap::verify(BOX3D& bounds)
     }
 }
 
-
 bool NitfWrap::verifyLas(ILeStream& in, BOX3D& bounds, bool& compressed)
 {
     LasHeader h;
@@ -248,7 +243,6 @@ bool NitfWrap::verifyLas(ILeStream& in, BOX3D& bounds, bool& compressed)
     gdal::reprojectBounds(bounds, h.srs(), "EPSG:4326");
     return true;
 }
-
 
 bool NitfWrap::verifyBpf(ILeStream& in, BOX3D& bounds)
 {
@@ -285,6 +279,5 @@ bool NitfWrap::verifyBpf(ILeStream& in, BOX3D& bounds)
     return true;
 }
 
-} //namespace nitfwrap
-} //namespace pdal
-
+} // namespace nitfwrap
+} // namespace pdal

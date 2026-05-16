@@ -1,8 +1,8 @@
 #pragma once
 
+#include "ConditionalParser.hpp"
 #include "Expression.hpp"
 #include "Lexer.hpp"
-#include "ConditionalParser.hpp"
 
 namespace pdal
 {
@@ -21,21 +21,22 @@ public:
 namespace Utils
 {
 
-template<>
+template <>
 inline StatusWithReason fromString(const std::string& from,
-    pdal::expr::ConditionalExpression& expr)
+                                   pdal::expr::ConditionalExpression& expr)
 {
     std::string error;
 
     expr::Lexer lexer(from);
     expr::ConditionalParser parser(lexer);
     if (!parser.expression(expr))
-        return { -1, parser.error() };
+        return {-1, parser.error()};
     if (!parser.checkEnd())
-        return { -1, "Found '" + from.substr(lexer.pos()) + "' following valid expression." };
+        return {-1, "Found '" + from.substr(lexer.pos()) +
+                        "' following valid expression."};
     return {};
 }
 
-} // namespace Util
+} // namespace Utils
 
 } // namespace pdal

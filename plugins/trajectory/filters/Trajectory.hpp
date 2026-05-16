@@ -12,7 +12,7 @@ namespace pdal
 
 namespace trajectory
 {
-    struct Args;
+struct Args;
 }
 
 class PDAL_EXPORT Trajectory : public Filter
@@ -35,4 +35,3 @@ private:
 };
 
 } // namespace pdal
-

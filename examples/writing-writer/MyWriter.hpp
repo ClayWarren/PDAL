@@ -6,19 +6,19 @@
 
 #include <string>
 
-namespace pdal{
+namespace pdal
+{
 
-  typedef std::shared_ptr<std::ostream> FileStreamPtr;
+typedef std::shared_ptr<std::ostream> FileStreamPtr;
 
-  class MyWriter : public Writer
-  {
-  public:
-    MyWriter()
-    {}
+class MyWriter : public Writer
+{
+public:
+    MyWriter() {}
 
     std::string getName() const;
 
-  private:
+private:
     virtual void addArgs(ProgramArgs& args);
     virtual void initialize();
     virtual void ready(PointTableRef table);
@@ -32,6 +32,6 @@ namespace pdal{
 
     FileStreamPtr m_stream;
     Dimension::Id m_dataDim;
-  };
+};
 
 } // namespace pdal

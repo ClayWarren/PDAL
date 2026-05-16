@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2025, Isaac Bell (isaac@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2025, Isaac Bell (isaac@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "SpzReader.hpp"
 
@@ -42,26 +42,25 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "readers.spz",
-    "SPZ Reader",
-    "https://pdal.org/stages/readers.spz.html",
-    { "spz" }
-};
+static StaticPluginInfo const s_info{"readers.spz",
+                                     "SPZ Reader",
+                                     "https://pdal.org/stages/readers.spz.html",
+                                     {"spz"}};
 
 CREATE_SHARED_STAGE(SpzReader, s_info)
-std::string SpzReader::getName() const { return s_info.name; }
+std::string SpzReader::getName() const
+{
+    return s_info.name;
+}
 
-void SpzReader::addArgs(ProgramArgs& args)
-{}
+void SpzReader::addArgs(ProgramArgs& args) {}
 
 void SpzReader::extractHeaderData()
 {
     m_numPoints = m_data->numPoints;
 
     // total number of harmonics / 3
-    constexpr std::array<int, 4> numHarmonics { 0, 3, 8, 15 };
+    constexpr std::array<int, 4> numHarmonics{0, 3, 8, 15};
     m_numSh = numHarmonics[m_data->shDegree];
 }
 
@@ -85,7 +84,7 @@ void SpzReader::initialize()
     stream.seek(0, std::ios::end);
     std::vector<uint8_t> data(stream.position());
     stream.seek(0, std::ios::beg);
-    stream.get(reinterpret_cast<char *>(data.data()), data.size());
+    stream.get(reinterpret_cast<char*>(data.data()), data.size());
     stream.close();
 
     m_data.reset(new spz::PackedGaussians(spz::loadSpzPacked(data)));
@@ -101,23 +100,24 @@ void SpzReader::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::Y);
     layout->registerDim(Id::Z);
 
-    // RGB, alpha, scale, rotation, SH dimensions set with PLY naming conventions
+    // RGB, alpha, scale, rotation, SH dimensions set with PLY naming
+    // conventions
     m_alphaDim = layout->assignDim("opacity", Type::Float);
     for (int i = 0; i < 3; ++i)
     {
-        m_colorDims.push_back(layout->assignDim("f_dc_" + std::to_string(i),
-            Type::Float));
-        m_scaleDims.push_back(layout->assignDim("scale_" + std::to_string(i),
-            Type::Float));
+        m_colorDims.push_back(
+            layout->assignDim("f_dc_" + std::to_string(i), Type::Float));
+        m_scaleDims.push_back(
+            layout->assignDim("scale_" + std::to_string(i), Type::Float));
     }
 
     for (int i = 0; i < 4; ++i)
-        m_rotDims.push_back(layout->assignDim("rot_" + std::to_string(i),
-            Type::Float));
+        m_rotDims.push_back(
+            layout->assignDim("rot_" + std::to_string(i), Type::Float));
 
     for (int i = 0; i < (m_numSh * 3); ++i)
-        m_shDims.push_back(layout->assignDim("f_rest_" + std::to_string(i),
-            Type::Float));
+        m_shDims.push_back(
+            layout->assignDim("f_rest_" + std::to_string(i), Type::Float));
 }
 
 void SpzReader::ready(PointTableRef table)
@@ -158,7 +158,7 @@ point_count_t SpzReader::read(PointViewPtr view, point_count_t count)
         }
 
         // Spherical harmonics -- assign from UnpackedGaussian so first 1/3 = R,
-        //second 1/3 = G, etc
+        // second 1/3 = G, etc
         for (int i = 0; i < m_numSh; ++i)
         {
             view->setField(m_shDims[i], idx, unpacked.shR[i]);

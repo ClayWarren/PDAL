@@ -1,81 +1,74 @@
 /******************************************************************************
-* Copyright (c) 2018, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2018, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "TileKernel.hpp"
 
+#include <pdal/PDALUtils.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/StageWrapper.hpp>
 #include <pdal/Writer.hpp>
-#include <pdal/PDALUtils.hpp>
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "kernels.tile",
-    "Tile Kernel",
-    "https://pdal.org/apps/tile.html"
-};
+static StaticPluginInfo const s_info{"kernels.tile", "Tile Kernel",
+                                     "https://pdal.org/apps/tile.html"};
 
 CREATE_STATIC_KERNEL(TileKernel, s_info)
 
-TileKernel::TileKernel() : m_table(10000), m_repro(nullptr)
-{}
-
+TileKernel::TileKernel() : m_table(10000), m_repro(nullptr) {}
 
 std::string TileKernel::getName() const
 {
     return s_info.name;
 }
 
-
 void TileKernel::addSwitches(ProgramArgs& args)
 {
     args.add("input,i", "Input file/path name", m_inputFile).setPositional();
-    args.add("output,o", "Output filename template", m_outputFile).setPositional();
+    args.add("output,o", "Output filename template", m_outputFile)
+        .setPositional();
     args.add("length", "Edge length for cells", m_length, 1000.0);
     args.add("origin_x", "Origin in X axis for cells", m_xOrigin,
-        std::numeric_limits<double>::quiet_NaN());
+             std::numeric_limits<double>::quiet_NaN());
     args.add("origin_y", "Origin in Y axis for cells", m_yOrigin,
-        std::numeric_limits<double>::quiet_NaN());
+             std::numeric_limits<double>::quiet_NaN());
     args.add("buffer", "Size of buffer (overlap) to include around each tile",
-        m_buffer);
+             m_buffer);
     args.add("out_srs", "Output SRS to which points will be reprojected",
-        m_outSrs);
+             m_outSrs);
 }
-
 
 void TileKernel::validateSwitches(ProgramArgs& args)
 {
@@ -83,16 +76,15 @@ void TileKernel::validateSwitches(ProgramArgs& args)
     m_hashPos = Writer::handleFilenameTemplate(m_outputFile);
     if (m_hashPos == std::string::npos)
         throw pdal_error("Output filename must contain a single '#' "
-            "template placeholder.");
+                         "template placeholder.");
 }
-
 
 int TileKernel::execute()
 {
     const StringList& files = Utils::glob(m_inputFile);
     if (files.empty())
-        throw pdal_error("No input files found for path '" +
-            m_inputFile + "'.");
+        throw pdal_error("No input files found for path '" + m_inputFile +
+                         "'.");
 
     Readers readers;
     for (auto&& file : files)
@@ -114,7 +106,6 @@ int TileKernel::execute()
     return 0;
 }
 
-
 void TileKernel::checkReaders(const Readers& readers)
 {
     SpatialReference tempSrs;
@@ -124,7 +115,7 @@ void TileKernel::checkReaders(const Readers& readers)
     for (auto& rp : readers)
     {
         const std::string& filename = rp.first;
-        Streamable *r = rp.second;
+        Streamable* r = rp.second;
 
         tempSrs = r->getSpatialReference();
 
@@ -133,7 +124,7 @@ void TileKernel::checkReaders(const Readers& readers)
         {
             if (!m_outSrs.empty())
                 throw pdal_error("Can't reproject file '" + filename +
-                    "' with no SRS.");
+                                 "' with no SRS.");
             continue;
         }
 
@@ -148,9 +139,11 @@ void TileKernel::checkReaders(const Readers& readers)
                 static bool warned(false);
                 if (!warned)
                 {
-                    m_log->get(LogLevel::Warning) << "No 'out_srs' specified "
-                        "and input files have multiple SRSs.  Using SRS of "
-                        "first input file as output SRS." << std::endl;
+                    m_log->get(LogLevel::Warning)
+                        << "No 'out_srs' specified "
+                           "and input files have multiple SRSs.  Using SRS of "
+                           "first input file as output SRS."
+                        << std::endl;
                     warned = true;
                     m_outSrs = srs;
                 }
@@ -168,29 +161,27 @@ void TileKernel::checkReaders(const Readers& readers)
         Options opts;
         opts.add("out_srs", m_outSrs);
 
-        m_repro = dynamic_cast<Streamable *>(
+        m_repro = dynamic_cast<Streamable*>(
             &m_manager.makeFilter("filters.reprojection", opts));
     }
 }
 
-
-Streamable *TileKernel::prepareReader(const std::string& filename)
+Streamable* TileKernel::prepareReader(const std::string& filename)
 {
     Stage* r = &(m_manager.makeReader(filename, ""));
 
     if (!r)
-        throw pdal_error("Couldn't create reader for input file '" +
-            filename + "'.");
+        throw pdal_error("Couldn't create reader for input file '" + filename +
+                         "'.");
 
-    Streamable *sr = dynamic_cast<Streamable *>(r);
+    Streamable* sr = dynamic_cast<Streamable*>(r);
     if (!sr)
         throw pdal_error("Driver '" + r->getName() + "' for input file '" +
-            filename + "' is not streamable.");
+                         filename + "' is not streamable.");
 
     sr->prepare(m_table);
     return sr;
 }
-
 
 // We calculate the origin specially in order to avoid a "first point"
 // check for every point iteration, seeing as we might have BILLIONS
@@ -215,7 +206,7 @@ void TileKernel::process(const Readers& readers)
         StreamableWrapper::ready(r, m_table);
         if (m_repro)
             StreamableWrapper::spatialReferenceChanged(*m_repro,
-                r.getSpatialReference());
+                                                       r.getSpatialReference());
 
         // Read first point.
         bool finished(false);
@@ -283,13 +274,12 @@ void TileKernel::process(const Readers& readers)
     }
 }
 
-
 void TileKernel::adder(PointRef& point, int xpos, int ypos)
 {
     Coord loc(xpos, ypos);
 
-    Stage *w;
-    Streamable *sw;
+    Stage* w;
+    Streamable* sw;
 
     auto wi = m_writers.find(loc);
     if (wi == m_writers.end())
@@ -302,11 +292,11 @@ void TileKernel::adder(PointRef& point, int xpos, int ypos)
         w = &m_manager.makeWriter(filename, "");
         if (!w)
             throw pdal_error("Couldn't create writer for output file '" +
-                m_outputFile + "'.");
-        sw = dynamic_cast<Streamable *>(w);
+                             m_outputFile + "'.");
+        sw = dynamic_cast<Streamable*>(w);
         if (!sw)
             throw pdal_error("Driver '" + w->getName() + "' for output file '" +
-                m_outputFile + "' is not streamable.");
+                             m_outputFile + "' is not streamable.");
         m_writers[loc] = sw;
 
         sw->prepare(m_table);

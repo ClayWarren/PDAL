@@ -10,8 +10,7 @@ namespace nitfwrap
 class error : public std::runtime_error
 {
 public:
-    error(const std::string& msg) : std::runtime_error(msg)
-        {}
+    error(const std::string& msg) : std::runtime_error(msg) {}
 };
 
 class NitfWrap
@@ -34,4 +33,3 @@ private:
 
 } // namespace nitfwrap
 } // namespace pdal
-

@@ -41,7 +41,7 @@ namespace stac
 {
 
 pdal_error stac_error(std::string id, std::string stacType,
-    std::string const& msg)
+                      std::string const& msg)
 {
     return pdal_error("STACError (" + stacType + ": " + id + "): " + msg);
 }
@@ -56,31 +56,32 @@ namespace StacUtils
 
 std::string handleRelativePath(std::string srcPath, std::string linkPath)
 {
-    //Make absolute path of current item's directory, then create relative path from that
+    // Make absolute path of current item's directory, then create relative path
+    // from that
 
-    //If the filepath is already absolute we don't need to bother.
+    // If the filepath is already absolute we don't need to bother.
     if (FileUtils::isAbsolutePath(linkPath))
         return linkPath;
 
-    //If src item isn't an absolute path, we need to convert it to one for getDirectory to work
+    // If src item isn't an absolute path, we need to convert it to one for
+    // getDirectory to work
     if (!FileUtils::isAbsolutePath(srcPath))
         srcPath = FileUtils::toAbsolutePath(srcPath);
-    //Get driectory of src item
+    // Get driectory of src item
     const std::string baseDir = FileUtils::getDirectory(srcPath);
-    //Create absolute path from src item filepath, if it's not already
-    // and join relative path to src item's dir path
+    // Create absolute path from src item filepath, if it's not already
+    //  and join relative path to src item's dir path
     return FileUtils::toAbsolutePath(linkPath, baseDir);
-
 }
 
 std::time_t getStacTime(std::string in)
 {
     std::istringstream dateStr(in);
-    std::tm date {};
+    std::tm date{};
     dateStr >> std::get_time(&date, "%Y-%m-%dT%H:%M:%S");
     if (dateStr.fail())
         throw stac_error("Specified date (" + dateStr.str() +
-            ") cannot be parsed. Dates must fit RFC 3339 specs.");
+                         ") cannot be parsed. Dates must fit RFC 3339 specs.");
     return std::mktime(&date);
 }
 
@@ -128,14 +129,14 @@ std::string icSelfPath(const NL::json& json)
     try
     {
         NL::json links = Utils::jsonValue(json, "links");
-        for (const NL::json& link: links)
+        for (const NL::json& link : links)
         {
             std::string target = Utils::jsonValue<std::string>(link, "rel");
             if (target == "self")
                 return Utils::jsonValue<std::string>(link, "href");
         }
     }
-    catch(std::runtime_error& )
+    catch (std::runtime_error&)
     {
         return "";
     }
@@ -143,7 +144,6 @@ std::string icSelfPath(const NL::json& json)
     return "";
 }
 
-
-}//StacUtils
-}//stac
-}//pdal
+} // namespace StacUtils
+} // namespace stac
+} // namespace pdal

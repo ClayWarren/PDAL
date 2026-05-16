@@ -60,8 +60,7 @@ public:
     /**
       Constructor.  Create an empty SRS.
     */
-    SpatialReference()
-    {}
+    SpatialReference() {}
 
     /**
       Construct a spatial reference from well-known text.
@@ -75,8 +74,7 @@ public:
 
       \param wkt  Well-known text from which to construct SRS.
     */
-    SpatialReference(const char *wkt);
-
+    SpatialReference(const char* wkt);
 
     /**
       Determine if this spatial reference is the same as another.
@@ -107,7 +105,9 @@ public:
        \return  \c true if this SRS is lexographically less.
     */
     bool operator<(const SpatialReference& other) const
-        { return m_wkt < other.m_wkt; }
+    {
+        return m_wkt < other.m_wkt;
+    }
 
     /**
       Returns true iff the object doesn't contain a valid srs.
@@ -115,7 +115,6 @@ public:
       \return  Whether the SRS is empty.
     */
     bool empty() const;
-
 
     // Returns true of OSR can validate the SRS
     bool valid() const;
@@ -145,7 +144,6 @@ public:
     /// that.  Note that GDAL's operations are much more mature and
     /// support more coordinate systems and descriptions.
     std::string getProj4() const;
-
 
     /// Return PROJJSON
     std::string getPROJJSON() const;
@@ -186,16 +184,15 @@ private:
     double m_epoch = 0.0f;
     mutable std::string m_horizontalWkt;
     friend PDAL_EXPORT std::ostream& operator<<(std::ostream& ostr,
-        const SpatialReference& srs);
+                                                const SpatialReference& srs);
     friend PDAL_EXPORT std::istream& operator>>(std::istream& istr,
-        SpatialReference& srs);
+                                                SpatialReference& srs);
     static bool isWKT1(const std::string& wkt);
     static bool isWKT2(const std::string& wkt);
 };
 
 PDAL_EXPORT std::ostream& operator<<(std::ostream& ostr,
-    const SpatialReference& srs);
+                                     const SpatialReference& srs);
 PDAL_EXPORT std::istream& operator>>(std::istream& istr, SpatialReference& srs);
 
 } // namespace pdal
-

@@ -36,12 +36,12 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/util/FileUtils.hpp>
+#include <filters/FerryFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <io/CopcReader.hpp>
 #include <io/CopcWriter.hpp>
 #include <io/LasReader.hpp>
-#include <filters/FerryFilter.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <pdal/PDALUtils.hpp>
 
@@ -54,52 +54,52 @@ namespace pdal
 
 namespace
 {
-    std::string wkt2DerivedProjected =
-        "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\",\n"
-        "    BASEPROJCRS[\"NAD83(2011) / Mississippi East (ftUS)\",\n"
-        "        BASEGEOGCRS[\"NAD83(2011)\",\n"
-        "            DATUM[\"NAD83 (National Spatial Reference System "
-        "2011)\",\n"
-        "                ELLIPSOID[\"GRS 1980\",6378137,298.257222101,\n"
-        "                    LENGTHUNIT[\"metre\",1]]],\n"
-        "            PRIMEM[\"Greenwich\",0,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433]]],\n"
-        "        CONVERSION[\"SPCS83 Mississippi East zone (US Survey "
-        "feet)\",\n"
-        "            METHOD[\"Transverse Mercator\",\n"
-        "                ID[\"EPSG\",9807]],\n"
-        "            PARAMETER[\"Latitude of natural origin\",29.5,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
-        "                ID[\"EPSG\",8801]],\n"
-        "            PARAMETER[\"Longitude of natural "
-        "origin\",-88.8333333333333,\n"
-        "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
-        "                ID[\"EPSG\",8802]],\n"
-        "            PARAMETER[\"Scale factor at natural origin\",0.99995,\n"
-        "                SCALEUNIT[\"unity\",1],\n"
-        "                ID[\"EPSG\",8805]],\n"
-        "            PARAMETER[\"False easting\",984250,\n"
-        "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
-        "                ID[\"EPSG\",8806]],\n"
-        "            PARAMETER[\"False northing\",0,\n"
-        "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
-        "                ID[\"EPSG\",8807]]]],\n"
-        "    DERIVINGCONVERSION[\"Affine transformation as PROJ-based\",\n"
-        "        METHOD[\"PROJ-based operation method: "
-        "+proj=pipeline +step +proj=unitconvert +xy_in=m +xy_out=us-ft "
-        "+step +proj=affine +xoff=20 "
-        "+step +proj=unitconvert +xy_in=us-ft +xy_out=m\"]],\n"
-        "    CS[Cartesian,2],\n"
-        "        AXIS[\"northing (Y)\",north,\n"
-        "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
-        "        AXIS[\"easting (X)\",east,\n"
-        "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
-        "    REMARK[\"EPSG:6507 with 20 feet offset and axis inversion\"]]";
+std::string wkt2DerivedProjected =
+    "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\",\n"
+    "    BASEPROJCRS[\"NAD83(2011) / Mississippi East (ftUS)\",\n"
+    "        BASEGEOGCRS[\"NAD83(2011)\",\n"
+    "            DATUM[\"NAD83 (National Spatial Reference System "
+    "2011)\",\n"
+    "                ELLIPSOID[\"GRS 1980\",6378137,298.257222101,\n"
+    "                    LENGTHUNIT[\"metre\",1]]],\n"
+    "            PRIMEM[\"Greenwich\",0,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433]]],\n"
+    "        CONVERSION[\"SPCS83 Mississippi East zone (US Survey "
+    "feet)\",\n"
+    "            METHOD[\"Transverse Mercator\",\n"
+    "                ID[\"EPSG\",9807]],\n"
+    "            PARAMETER[\"Latitude of natural origin\",29.5,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
+    "                ID[\"EPSG\",8801]],\n"
+    "            PARAMETER[\"Longitude of natural "
+    "origin\",-88.8333333333333,\n"
+    "                ANGLEUNIT[\"degree\",0.0174532925199433],\n"
+    "                ID[\"EPSG\",8802]],\n"
+    "            PARAMETER[\"Scale factor at natural origin\",0.99995,\n"
+    "                SCALEUNIT[\"unity\",1],\n"
+    "                ID[\"EPSG\",8805]],\n"
+    "            PARAMETER[\"False easting\",984250,\n"
+    "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
+    "                ID[\"EPSG\",8806]],\n"
+    "            PARAMETER[\"False northing\",0,\n"
+    "                LENGTHUNIT[\"US survey foot\",0.304800609601219],\n"
+    "                ID[\"EPSG\",8807]]]],\n"
+    "    DERIVINGCONVERSION[\"Affine transformation as PROJ-based\",\n"
+    "        METHOD[\"PROJ-based operation method: "
+    "+proj=pipeline +step +proj=unitconvert +xy_in=m +xy_out=us-ft "
+    "+step +proj=affine +xoff=20 "
+    "+step +proj=unitconvert +xy_in=us-ft +xy_out=m\"]],\n"
+    "    CS[Cartesian,2],\n"
+    "        AXIS[\"northing (Y)\",north,\n"
+    "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
+    "        AXIS[\"easting (X)\",east,\n"
+    "            LENGTHUNIT[\"US survey foot\",0.304800609601219]],\n"
+    "    REMARK[\"EPSG:6507 with 20 feet offset and axis inversion\"]]";
 }
 
 TEST(CopcWriterTest, srsWkt2)
 {
-#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3,6,0)
+#if GDAL_VERSION_NUM <= GDAL_COMPUTE_VERSION(3, 6, 0)
     // not working with PROJ >= 9.2.0 https://github.com/OSGeo/gdal/pull/6800
     std::cerr << "Test disabled with GDAL <= 3.6.0" << std::endl;
     return;
@@ -135,7 +135,8 @@ TEST(CopcWriterTest, srsWkt2)
         const QuickInfo qi(creader.preview());
         std::string srs = qi.m_srs.getWKT();
 
-        EXPECT_TRUE(Utils::startsWith(srs, "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\""));
+        EXPECT_TRUE(Utils::startsWith(
+            srs, "DERIVEDPROJCRS[\"Custom Site Calibrated CRS\""));
     }
 
     {
@@ -149,7 +150,8 @@ TEST(CopcWriterTest, srsWkt2)
         const QuickInfo qi(creader.preview());
         std::string srs = qi.m_srs.getPROJJSON();
 
-        EXPECT_TRUE(Utils::startsWith(srs, "{\n  \"type\": \"DerivedProjectedCRS\","));
+        EXPECT_TRUE(
+            Utils::startsWith(srs, "{\n  \"type\": \"DerivedProjectedCRS\","));
     }
 }
 
@@ -187,9 +189,10 @@ TEST(CopcWriterTest, srsUTM)
 
     const QuickInfo qi(r.preview());
     std::string srs = qi.m_srs.getWKT();
-    EXPECT_TRUE(Utils::startsWith(srs, "PROJCRS[\"NAD83 / UTM zone 15N\",BASEGEOGCRS"));
+    EXPECT_TRUE(
+        Utils::startsWith(srs, "PROJCRS[\"NAD83 / UTM zone 15N\",BASEGEOGCRS"));
 
-    const char *data = nullptr;
+    const char* data = nullptr;
 
     EXPECT_TRUE(r.vlrData("LASF_Projection", 4224, data) > 0);
     EXPECT_TRUE(Utils::startsWith(data, "PROJCRS[\"NAD83 / UTM zone 15N\""));
@@ -202,8 +205,8 @@ TEST(CopcWriterTest, srsUTM)
     // This vlr data must not be null terminated and segfaults when startsWith
     // tries to read it
     EXPECT_TRUE(r.vlrData("LASF_Projection", 2112, data) > 0);
-    std::string info (data, 50);
-    bool test = Utils::startsWith(info, "PROJCS[\"NAD83 / UTM zone 15N\"" );
+    std::string info(data, 50);
+    bool test = Utils::startsWith(info, "PROJCS[\"NAD83 / UTM zone 15N\"");
     EXPECT_TRUE(test);
 }
 
@@ -268,7 +271,6 @@ TEST(CopcWriterTest, extradim)
 
     auto createFile = [&](const std::string& extraDims)
     {
-
         LasReader r;
 
         Options ro;
@@ -315,17 +317,16 @@ TEST(CopcWriterTest, extradim)
                 (s == (layout->findDim("S") != Dimension::Id::Unknown)));
     };
 
-
-    createFile("Q=int32");                                // Q, but no R, S
+    createFile("Q=int32"); // Q, but no R, S
     EXPECT_TRUE(verifyFile(true, false, false));
-    createFile("all");                                    // Q, R, and S
+    createFile("all"); // Q, R, and S
     EXPECT_TRUE(verifyFile(true, true, true));
-    createFile("Q=int32, S=double");                      // Q, and S, no R
+    createFile("Q=int32, S=double"); // Q, and S, no R
     EXPECT_TRUE(verifyFile(true, false, true));
 
-    EXPECT_THROW(createFile("Q=int32, S"), pdal_error);   // No type for S
-    EXPECT_THROW(createFile("X=int32"), pdal_error);      // Existing dimension.
-    EXPECT_THROW(createFile("Z=int32"), pdal_error);      // Unknown dimension.
+    EXPECT_THROW(createFile("Q=int32, S"), pdal_error); // No type for S
+    EXPECT_THROW(createFile("X=int32"), pdal_error);    // Existing dimension.
+    EXPECT_THROW(createFile("Z=int32"), pdal_error);    // Unknown dimension.
 }
 
 } // namespace pdal

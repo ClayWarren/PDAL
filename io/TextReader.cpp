@@ -1,57 +1,58 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc., info@hobu.co
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc., info@hobu.co
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/PDALUtils.hpp>
 #include <pdal/util/Algorithm.hpp>
 
-#include "TextReader.hpp"
 #include "../filters/StatsFilter.hpp"
+#include "TextReader.hpp"
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.text",
     "Text Reader",
     "https://pdal.org/stages/readers.text.html",
-    { "txt", "csv" }
-};
+    {"txt", "csv"}};
 
 CREATE_STATIC_STAGE(TextReader, s_info)
 
-std::string TextReader::getName() const { return s_info.name; }
+std::string TextReader::getName() const
+{
+    return s_info.name;
+}
 
 // NOTE: - Forces reading of the entire file.
 QuickInfo TextReader::inspect()
@@ -83,23 +84,22 @@ QuickInfo TextReader::inspect()
         qi.m_valid = true;
     }
     catch (pdal_error&)
-    {}
+    {
+    }
     return qi;
 }
-
 
 // Make sure we have a header line.
 void TextReader::checkHeader(const std::string& header)
 {
     auto it = std::find_if(header.begin(), header.end(),
-        [](char c){ return std::isalpha(c); });
+                           [](char c) { return std::isalpha(c); });
 
     if (it == header.end())
-        log()->get(LogLevel::Warning) << getName() <<
-            ": file '" << m_filename <<
-            "' doesn't appear to contain a header line." << std::endl;
+        log()->get(LogLevel::Warning)
+            << getName() << ": file '" << m_filename
+            << "' doesn't appear to contain a header line." << std::endl;
 }
-
 
 void TextReader::parseHeader(const std::string& header)
 {
@@ -112,7 +112,6 @@ void TextReader::parseHeader(const std::string& header)
         parseUnquotedHeader(header);
 }
 
-
 void TextReader::parseQuotedHeader(const std::string& header)
 {
     // We know there's a double quote at position 0.
@@ -124,11 +123,11 @@ void TextReader::parseQuotedHeader(const std::string& header)
         pos += count;
         if (header[pos] != '"')
             throwError("Invalid character '" + std::string(1, header[pos]) +
-                "' found while parsing quoted header line.");
+                       "' found while parsing quoted header line.");
         pos++; // Skip ending quote.
 
         // Skip everything other than a double quote.
-        count = Utils::extract(header, pos, [](char c){ return c != '"'; });
+        count = Utils::extract(header, pos, [](char c) { return c != '"'; });
 
         // Find a separator.
         if (!m_separatorArg->set())
@@ -149,8 +148,7 @@ void TextReader::parseQuotedHeader(const std::string& header)
 
 void TextReader::parseUnquotedHeader(const std::string& header)
 {
-    auto isspecial = [](char c)
-        { return (!std::isalnum(c)); };
+    auto isspecial = [](char c) { return (!std::isalnum(c)); };
 
     // If the separator wasn't provided on the command line extract it
     // from the header line.
@@ -177,10 +175,9 @@ void TextReader::parseUnquotedHeader(const std::string& header)
         size_t cnt = Dimension::extractName(s, 0);
         if (cnt != s.size())
             throwError("Invalid character '" + std::string(1, s[cnt]) +
-                "' in dimension name.");
+                       "' in dimension name.");
     }
 }
-
 
 void TextReader::initialize(PointTableRef table)
 {
@@ -211,7 +208,7 @@ void TextReader::initialize(PointTableRef table)
     {
         parseHeader(header);
     }
-    catch( const pdal_error& )
+    catch (const pdal_error&)
     {
         Utils::closeFile(m_istream);
         throw;
@@ -219,16 +216,19 @@ void TextReader::initialize(PointTableRef table)
     Utils::closeFile(m_istream);
 }
 
-
 void TextReader::addArgs(ProgramArgs& args)
 {
-    m_separatorArg = &(args.add("separator", "Separator character that "
-        "overrides special character found in header line", m_separator, ' '));
+    m_separatorArg =
+        &(args.add("separator",
+                   "Separator character that "
+                   "overrides special character found in header line",
+                   m_separator, ' '));
     args.add("header", "Use this string as the header line.", m_header);
-    args.add("skip", "Skip this number of lines before attempting to "
-        "read the header.", m_skip);
+    args.add("skip",
+             "Skip this number of lines before attempting to "
+             "read the header.",
+             m_skip);
 }
-
 
 void TextReader::addDimensions(PointLayoutPtr layout)
 {
@@ -236,15 +236,14 @@ void TextReader::addDimensions(PointLayoutPtr layout)
     for (auto name : m_dimNames)
     {
         Utils::trim(name);
-        Dimension::Id id = layout->registerOrAssignDim(name,
-            Dimension::Type::Double);
+        Dimension::Id id =
+            layout->registerOrAssignDim(name, Dimension::Type::Double);
         if (Utils::contains(m_dims, id) && id != pdal::Dimension::Id::Unknown)
             throwError("Duplicate dimension '" + name +
-                "' detected in input file '" + m_filename + "'.");
+                       "' detected in input file '" + m_filename + "'.");
         m_dims.push_back(id);
     }
 }
-
 
 void TextReader::ready(PointTableRef table)
 {
@@ -254,9 +253,8 @@ void TextReader::ready(PointTableRef table)
 
     std::string dummy;
     for (size_t i = 0; i < m_line; ++i)
-	std::getline(*m_istream, dummy);
+        std::getline(*m_istream, dummy);
 }
-
 
 point_count_t TextReader::read(PointViewPtr view, point_count_t numPts)
 {
@@ -274,7 +272,6 @@ point_count_t TextReader::read(PointViewPtr view, point_count_t numPts)
     return cnt;
 }
 
-
 bool TextReader::processOne(PointRef& point)
 {
     if (!fillFields())
@@ -285,17 +282,17 @@ bool TextReader::processOne(PointRef& point)
     {
         if (!Utils::fromString(m_fields[i], d))
         {
-            log()->get(LogLevel::Error) << "Can't convert "
-                "field '" << m_fields[i] << "' to numeric value on line " <<
-                m_line << " in '" << m_filename << "'.  Setting to 0." <<
-                std::endl;
+            log()->get(LogLevel::Error)
+                << "Can't convert "
+                   "field '"
+                << m_fields[i] << "' to numeric value on line " << m_line
+                << " in '" << m_filename << "'.  Setting to 0." << std::endl;
             d = 0;
         }
         point.setField(m_dims[i], d);
     }
     return true;
 }
-
 
 bool TextReader::fillFields()
 {
@@ -319,22 +316,21 @@ bool TextReader::fillFields()
             m_fields = Utils::split2(buf, m_separator);
         if (m_fields.size() != m_dims.size())
         {
-            log()->get(LogLevel::Error) << "Line " << m_line <<
-                " in '" << m_filename << "' contains " << m_fields.size() <<
-                " fields when " << m_dims.size() << " were expected.  "
-                "Ignoring." << std::endl;
+            log()->get(LogLevel::Error)
+                << "Line " << m_line << " in '" << m_filename << "' contains "
+                << m_fields.size() << " fields when " << m_dims.size()
+                << " were expected.  "
+                   "Ignoring."
+                << std::endl;
             continue;
         }
         return true;
     }
 }
 
-
 void TextReader::done(PointTableRef table)
 {
     Utils::closeFile(m_istream);
 }
 
-
 } // namespace pdal
-

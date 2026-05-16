@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2018, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2018, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <sstream>
 
@@ -48,43 +48,37 @@ namespace
 
 using Extensions = std::map<std::string, StringList>;
 
-static const Extensions readerExtensions =
-{
-  { "readers.arrow", { "feather", "parquet"} },
-  { "readers.draco", { "drc" } },
-  { "readers.icebridge", { "icebridge", "h5" } },
-  { "readers.matlab", { "mat" } },
-  { "readers.nitf", { "nitf", "nsf", "ntf" } },
-  { "readers.pcd", { "pcd" } },
-  { "readers.rdb", { "rdbx" } },
-  { "readers.mrsid", { "sid" } },
-  { "readers.rxp", { "rxp" } },
-  { "readers.fbi", { "fbi" } },
-  { "readers.fbx", { "fbx" } },
-  { "readers.slpk", { "slpk" } },
-  { "readers.i3s", { "i3s" } },
-  { "readers.obj", { "obj" } },
-  { "readers.stac", { "vpc" } },
-  { "readers.e57", { "e57" } }
-};
+static const Extensions readerExtensions = {
+    {"readers.arrow", {"feather", "parquet"}},
+    {"readers.draco", {"drc"}},
+    {"readers.icebridge", {"icebridge", "h5"}},
+    {"readers.matlab", {"mat"}},
+    {"readers.nitf", {"nitf", "nsf", "ntf"}},
+    {"readers.pcd", {"pcd"}},
+    {"readers.rdb", {"rdbx"}},
+    {"readers.mrsid", {"sid"}},
+    {"readers.rxp", {"rxp"}},
+    {"readers.fbi", {"fbi"}},
+    {"readers.fbx", {"fbx"}},
+    {"readers.slpk", {"slpk"}},
+    {"readers.i3s", {"i3s"}},
+    {"readers.obj", {"obj"}},
+    {"readers.stac", {"vpc"}},
+    {"readers.e57", {"e57"}}};
 
-static const Extensions writerExtensions =
-{
-  { "writers.arrow", { "feather", "parquet"} },
-  { "writers.draco", { "drc" } },
-  { "writers.fbi", { "fbi" } },
-  { "writers.matlab", { "mat" } },
-  { "writers.nitf", { "nitf", "nsf", "ntf" } },
-  { "writers.pcd", { "pcd" } },
-  { "writers.e57", { "e57" } },
-  { "writers.fbx", { "fbx" } }
-};
+static const Extensions writerExtensions = {
+    {"writers.arrow", {"feather", "parquet"}},
+    {"writers.draco", {"drc"}},
+    {"writers.fbi", {"fbi"}},
+    {"writers.matlab", {"mat"}},
+    {"writers.nitf", {"nitf", "nsf", "ntf"}},
+    {"writers.pcd", {"pcd"}},
+    {"writers.e57", {"e57"}},
+    {"writers.fbx", {"fbx"}}};
 
 } // unnamed namespace
 
-StageExtensions::StageExtensions(LogPtr log) : m_log(log)
-{}
-
+StageExtensions::StageExtensions(LogPtr log) : m_log(log) {}
 
 void StageExtensions::load()
 {
@@ -110,7 +104,7 @@ void StageExtensions::load()
 }
 
 PDAL_EXPORT void StageExtensions::set(const std::string& stage,
-    const StringList& exts)
+                                      const StringList& exts)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (Utils::startsWith(stage, "readers."))
@@ -130,7 +124,6 @@ std::string StageExtensions::defaultReader(const std::string& extension)
     return (m_readers[extension]);
 }
 
-
 // Get the default writer associated with an extension.  Extensions
 // are specified without the leading '.'
 std::string StageExtensions::defaultWriter(const std::string& extension)
@@ -139,7 +132,6 @@ std::string StageExtensions::defaultWriter(const std::string& extension)
     std::lock_guard<std::mutex> lock(m_mutex);
     return (m_writers[extension]);
 }
-
 
 StringList StageExtensions::extensions(const std::string& stage)
 {

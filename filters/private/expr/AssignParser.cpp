@@ -28,11 +28,8 @@ bool AssignParser::assignment(AssignStatement& expr)
         return false;
     }
 
-    static const std::vector<Token> endTokens
-    {
-        Token(TokenType::Eof),
-        Token(TokenType::Identifier, "WHERE")
-    };
+    static const std::vector<Token> endTokens{
+        Token(TokenType::Eof), Token(TokenType::Identifier, "WHERE")};
 
     MathParser parser(lexer(), endTokens);
     if (!parser.expression(expr.valueExpr()))
@@ -42,7 +39,8 @@ bool AssignParser::assignment(AssignStatement& expr)
     }
     if (!parser.checkEnd())
     {
-        setError("Invalid token '" + peekToken().sval() + "' following valid math expression");
+        setError("Invalid token '" + peekToken().sval() +
+                 "' following valid math expression");
         return false;
     }
 
@@ -67,7 +65,8 @@ bool AssignParser::where(AssignStatement& expr)
         }
     }
 
-    setError("Expected keyword 'WHERE' to precede condition assignment. Found '" +
+    setError(
+        "Expected keyword 'WHERE' to precede condition assignment. Found '" +
         peekToken().sval() + "' instead.");
     return false;
 }

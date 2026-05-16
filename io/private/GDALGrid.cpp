@@ -1,69 +1,72 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "GDALGrid.hpp"
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <iostream>
+#include <limits>
 #include <pdal/pdal_types.hpp>
 
 namespace pdal
 {
 
-//ABELL - In the beginning this data needed to be contiguous, as it was passed
-//  directly to GDAL to write.  Since we started supporting various data types
-//  in GDAL output, we end up copying/casting data to a block for output,
-//  so there's no reason that we must have contiguous data -- we just need
-//  an iterator that allows traversal of the data in row-major order.  So,
-//  this should probably be re-implemented in some way that doesn't require
-//  moving data around every time the grid is resized.
+// ABELL - In the beginning this data needed to be contiguous, as it was passed
+//   directly to GDAL to write.  Since we started supporting various data types
+//   in GDAL output, we end up copying/casting data to a block for output,
+//   so there's no reason that we must have contiguous data -- we just need
+//   an iterator that allows traversal of the data in row-major order.  So,
+//   this should probably be re-implemented in some way that doesn't require
+//   moving data around every time the grid is resized.
 
-GDALGrid::GDALGrid(double xOrigin, double yOrigin, size_t width, size_t height, double edgeLength,
-        double radius, int outputTypes, size_t windowSize, double power, bool binMode, 
-        std::vector<int> percentileValues) :
-    m_windowSize(windowSize), m_edgeLength(edgeLength), m_radius(radius), m_power(power),
-    m_outputTypes(outputTypes), m_binMode(binMode)
+GDALGrid::GDALGrid(double xOrigin, double yOrigin, size_t width, size_t height,
+                   double edgeLength, double radius, int outputTypes,
+                   size_t windowSize, double power, bool binMode,
+                   std::vector<int> percentileValues)
+    : m_windowSize(windowSize), m_edgeLength(edgeLength), m_radius(radius),
+      m_power(power), m_outputTypes(outputTypes), m_binMode(binMode)
 {
     if (width > (size_t)(std::numeric_limits<int>::max)() ||
         height > (size_t)(std::numeric_limits<int>::max)())
     {
         std::ostringstream oss;
         oss << "Grid width or height is too large. Width and height are "
-            "limited to " << (std::numeric_limits<int>::max)() << " cells."
-            "Try setting bounds or increasing resolution.";
+               "limited to "
+            << (std::numeric_limits<int>::max)()
+            << " cells."
+               "Try setting bounds or increasing resolution.";
         throw error(oss.str());
     }
     RasterLimits limits(xOrigin, yOrigin, width, height, edgeLength);
@@ -90,8 +93,8 @@ GDALGrid::GDALGrid(double xOrigin, double yOrigin, size_t width, size_t height, 
         else
         {
             std::ostringstream oss;
-            oss << "Invalid percentile value: " << p << ". Percentiles are limited to " << 
-                "0-100 integer values.";
+            oss << "Invalid percentile value: " << p
+                << ". Percentiles are limited to " << "0-100 integer values.";
             throw error(oss.str());
         }
     }
@@ -155,7 +158,6 @@ void GDALGrid::expandToInclude(double x, double y)
         m_stdDev->expandToInclude(x, y);
 }
 
-
 int GDALGrid::numBands() const
 {
     int num = 0;
@@ -177,8 +179,7 @@ int GDALGrid::numBands() const
     return num;
 }
 
-
-double *GDALGrid::data(const std::string& name)
+double* GDALGrid::data(const std::string& name)
 {
     if (name == "count" && (m_outputTypes & statCount))
         return m_count->data();
@@ -189,23 +190,22 @@ double *GDALGrid::data(const std::string& name)
     if (name == "mean" && (m_outputTypes & statMean))
         return m_mean->data();
     if (name == "idw" && (m_outputTypes & statIdw))
-         return m_idw->data();
+        return m_idw->data();
     if (name == "stdev" && (m_outputTypes & statStdDev))
         return m_stdDev->data();
     return nullptr;
 }
 
-
-//!! could maybe run something equivalent to fillPercentiles to calculate on the fly, but that would
-//!! entail looping thru m_valBins multiple times. Not sure which is better
-double *GDALGrid::pctlData(int pct) const
+//!! could maybe run something equivalent to fillPercentiles to calculate on the
+//! fly, but that would ! entail looping thru m_valBins multiple times. Not sure
+//! which is better
+double* GDALGrid::pctlData(int pct) const
 {
     auto it = m_pctls.find(pct);
     if ((it != m_pctls.end()) && m_valBins.size())
         return it->second->data();
     return nullptr;
 }
-
 
 GDALGrid::Cell GDALGrid::pointToCell(const Point& p)
 {
@@ -267,12 +267,10 @@ void GDALGrid::addPoint(double x, double y, double z)
 
     // In non bin mode, this case is where a point lies in a cell.
     // In bin mode, this is the only case and distance is zero.
-    if ((m_binMode || d < m_radius) &&
-        origin.i >= 0 && origin.j >= 0 &&
+    if ((m_binMode || d < m_radius) && origin.i >= 0 && origin.j >= 0 &&
         origin.i < width() && origin.j < height())
         update(origin.i, origin.j, z, d);
 }
-
 
 void GDALGrid::updateFirstQuadrant(double x, double y, double z)
 {
@@ -307,7 +305,6 @@ void GDALGrid::updateFirstQuadrant(double x, double y, double z)
     }
 }
 
-
 void GDALGrid::updateSecondQuadrant(double x, double y, double z)
 {
     int i, j;
@@ -340,7 +337,6 @@ void GDALGrid::updateSecondQuadrant(double x, double y, double z)
         i--;
     }
 }
-
 
 void GDALGrid::updateThirdQuadrant(double x, double y, double z)
 {
@@ -375,7 +371,6 @@ void GDALGrid::updateThirdQuadrant(double x, double y, double z)
     }
 }
 
-
 void GDALGrid::updateFourthQuadrant(double x, double y, double z)
 {
     int i, j;
@@ -408,7 +403,6 @@ void GDALGrid::updateFourthQuadrant(double x, double y, double z)
         i++;
     }
 }
-
 
 void GDALGrid::update(size_t i, size_t j, double val, double dist)
 {
@@ -476,7 +470,6 @@ void GDALGrid::update(size_t i, size_t j, double val, double dist)
     }
 }
 
-
 void GDALGrid::fillPercentiles(const size_t& idx, std::vector<double>& values)
 {
     std::sort(values.begin(), values.end());
@@ -484,8 +477,9 @@ void GDALGrid::fillPercentiles(const size_t& idx, std::vector<double>& values)
     if (values.size() != static_cast<size_t>(m_count->at(idx)))
     {
         throw error("Mismatch in size of accumulated values and count raster; "
-            "expected " + std::to_string(m_count->at(idx)) + " values, got " +
-            std::to_string(values.size()));
+                    "expected " +
+                    std::to_string(m_count->at(idx)) + " values, got " +
+                    std::to_string(values.size()));
         return;
     }
     //!! Could use nth_element?
@@ -497,11 +491,11 @@ void GDALGrid::fillPercentiles(const size_t& idx, std::vector<double>& values)
         if (!fraction)
             (*raster)[idx] = values[pctIdxFloor];
         else
-            (*raster)[idx] = values[pctIdxFloor] + fraction *
-                (values[pctIdxFloor + 1] - values[pctIdxFloor]);
+            (*raster)[idx] =
+                values[pctIdxFloor] +
+                fraction * (values[pctIdxFloor + 1] - values[pctIdxFloor]);
     }
 }
-
 
 void GDALGrid::finalize()
 {
@@ -541,7 +535,6 @@ void GDALGrid::finalize()
     }
 }
 
-
 void GDALGrid::fillNodata(int i, int j)
 {
     if (m_min)
@@ -558,7 +551,6 @@ void GDALGrid::fillNodata(int i, int j)
         for (auto& it : m_pctls)
             it.second->at(i, j) = std::numeric_limits<double>::quiet_NaN();
 }
-
 
 void GDALGrid::windowFill(int dstI, int dstJ)
 {
@@ -583,8 +575,9 @@ void GDALGrid::windowFill(int dstI, int dstJ)
                 continue;
             // The ternaries just avoid underflow UB.  We're just trying to
             // find the distance from j to dstJ or i to dstI.
-            double distance = (double)(std::max)(j > dstJ ? j - dstJ : dstJ - j,
-                i > dstI ? i - dstI : dstI - i);
+            double distance =
+                (double)(std::max)(j > dstJ ? j - dstJ : dstJ - j,
+                                   i > dstI ? i - dstI : dstI - i);
             windowFillCell(i, j, dstI, dstJ, distance);
             distSum += (1 / distance);
         }
@@ -607,8 +600,8 @@ void GDALGrid::windowFill(int dstI, int dstJ)
         fillNodata(dstI, dstJ);
 }
 
-
-void GDALGrid::windowFillCell(int srcI, int srcJ, int dstI, int dstJ, double distance)
+void GDALGrid::windowFillCell(int srcI, int srcJ, int dstI, int dstJ,
+                              double distance)
 {
     if (m_min)
         m_min->at(dstI, dstJ) += m_min->at(srcI, srcJ) / distance;
@@ -622,4 +615,4 @@ void GDALGrid::windowFillCell(int srcI, int srcJ, int dstI, int dstJ, double dis
         m_stdDev->at(dstI, dstJ) += m_stdDev->at(srcI, srcJ) / distance;
 }
 
-} //namespace pdal
+} // namespace pdal

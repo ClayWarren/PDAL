@@ -47,8 +47,7 @@ class PointView;
 class PDAL_EXPORT ReciprocityFilter : public Filter
 {
 public:
-    ReciprocityFilter() : Filter()
-    {}
+    ReciprocityFilter() : Filter() {}
     ReciprocityFilter& operator=(const ReciprocityFilter&) = delete;
     ReciprocityFilter(const ReciprocityFilter&) = delete;
 

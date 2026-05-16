@@ -1,51 +1,51 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/private/OGRSpec.hpp>
+#include "Support.hpp"
+#include <filters/CropFilter.hpp>
+#include <filters/ReprojectionFilter.hpp>
+#include <filters/StatsFilter.hpp>
+#include <filters/StreamCallbackFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
 #include <io/LasReader.hpp>
-#include <filters/ReprojectionFilter.hpp>
-#include <filters/CropFilter.hpp>
-#include <filters/StatsFilter.hpp>
-#include <filters/StreamCallbackFilter.hpp>
-#include "Support.hpp"
+#include <pdal/PointView.hpp>
+#include <pdal/StageFactory.hpp>
+#include <pdal/private/OGRSpec.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -222,7 +222,8 @@ TEST(CropFilterTest, test_crop_polygon_reprojection)
     Options readOptions;
 
     readOptions.add("filename", Support::datapath("las/1.2-with-color.las"));
-    readOptions.add("spatialreference", Support::datapath("autzen/autzen-srs.wkt"));
+    readOptions.add("spatialreference",
+                    Support::datapath("autzen/autzen-srs.wkt"));
 
     LasReader reader;
     reader.setOptions(readOptions);
@@ -253,15 +254,16 @@ TEST(CropFilterTest, test_crop_polygon_reprojection)
     PointViewSet viewSet = crop.execute(table);
     EXPECT_EQ(viewSet.size(), 1u);
     view = *viewSet.begin();
-//ABELL - I'd like to do the following, but we don't necessarily have proj.h
-/**
-#if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
-    EXPECT_EQ(view->size(), 45u);
-#else
-    EXPECT_EQ(view->size(), 47u);
-#endif
-**/
-// So instead...
+    // ABELL - I'd like to do the following, but we don't necessarily have
+    // proj.h
+    /**
+    #if defined(PROJ_VERSION_NUMBER) && PROJ_VERSION_NUMBER > 80101
+        EXPECT_EQ(view->size(), 45u);
+    #else
+        EXPECT_EQ(view->size(), 47u);
+    #endif
+    **/
+    // So instead...
     EXPECT_GE(view->size(), 45u);
     EXPECT_LE(view->size(), 47u);
 
@@ -364,7 +366,6 @@ TEST(CropFilterTest, multibounds)
     EXPECT_EQ(total_cnt, 7);
 }
 
-
 TEST(CropFilterTest, stream)
 {
     using namespace Dimension;
@@ -378,7 +379,9 @@ TEST(CropFilterTest, stream)
     {
     public:
         std::string getName() const
-            { return "readers.stream"; }
+        {
+            return "readers.stream";
+        }
         bool processOne(PointRef& point)
         {
             static int i = 0;
@@ -428,7 +431,7 @@ TEST(CropFilterTest, stream)
     o.add("bounds", "([5, 7], [1, 3])");
     o.add("polygon", "POLYGON ((9 1, 11 1, 11 3, 9 3, 9 1))");
     o.add("polygon", "MULTIPOLYGON (((9 1, 11 1, 11 3, 9 3, 9 1)),"
-        "((100 100, 110 100, 110 110, 100 110, 100 100 )))");
+                     "((100 100, 110 100, 110 110, 100 110, 100 100 )))");
     crop.setInput(r);
     crop.setOptions(o);
 
@@ -436,7 +439,9 @@ TEST(CropFilterTest, stream)
     {
     public:
         std::string getName() const
-            { return "filters.testfilter"; }
+        {
+            return "filters.testfilter";
+        }
         point_count_t m_count;
 
     private:
@@ -480,7 +485,6 @@ TEST(CropFilterTest, stream)
     EXPECT_EQ(f.m_count, (point_count_t)4);
 }
 
-
 TEST(CropFilterTest, circle)
 {
     Options opts;
@@ -510,13 +514,10 @@ TEST(CropFilterTest, circle)
         double y;
     };
 
-    std::vector<Point> found {
-                {4, 3}, {5, 3}, {6, 3},
-        {3, 4}, {4, 4}, {5, 4}, {6, 4}, {7, 4},
-        {3, 5}, {4, 5}, {5, 5}, {6, 5}, {7, 5},
-        {3, 6}, {4, 6}, {5, 6}, {6, 6}, {7, 6},
-                {4, 7}, {5, 7}, {6, 7}
-    };
+    std::vector<Point> found{{4, 3}, {5, 3}, {6, 3}, {3, 4}, {4, 4}, {5, 4},
+                             {6, 4}, {7, 4}, {3, 5}, {4, 5}, {5, 5}, {6, 5},
+                             {7, 5}, {3, 6}, {4, 6}, {5, 6}, {6, 6}, {7, 6},
+                             {4, 7}, {5, 7}, {6, 7}};
 
     for (PointId idx = 0; idx < buf->size(); ++idx)
     {
@@ -524,7 +525,6 @@ TEST(CropFilterTest, circle)
         EXPECT_EQ(found[idx].y, buf->getFieldAs<double>(Dimension::Id::Y, idx));
     }
 }
-
 
 TEST(CropFilterTest, sphere)
 {
@@ -556,33 +556,27 @@ TEST(CropFilterTest, sphere)
         double z;
     };
 
-    std::vector<Point> found {
-                   {4, 4, 3}, {5, 4, 3}, {6, 4, 3},
-                   {4, 5, 3}, {5, 5, 3}, {6, 5, 3},
-                   {4, 6, 3}, {5, 6, 3}, {6, 6, 3},
+    std::vector<Point> found{
+        {4, 4, 3}, {5, 4, 3}, {6, 4, 3}, {4, 5, 3}, {5, 5, 3}, {6, 5, 3},
+        {4, 6, 3}, {5, 6, 3}, {6, 6, 3},
 
-                   {4, 3, 4}, {5, 3, 4}, {6, 3, 4},
-        {3, 4, 4}, {4, 4, 4}, {5, 4, 4}, {6, 4, 4}, {7, 4, 4},
-        {3, 5, 4}, {4, 5, 4}, {5, 5, 4}, {6, 5, 4}, {7, 5, 4},
-        {3, 6, 4}, {4, 6, 4}, {5, 6, 4}, {6, 6, 4}, {7, 6, 4},
-                   {4, 7, 4}, {5, 7, 4}, {6, 7, 4},
+        {4, 3, 4}, {5, 3, 4}, {6, 3, 4}, {3, 4, 4}, {4, 4, 4}, {5, 4, 4},
+        {6, 4, 4}, {7, 4, 4}, {3, 5, 4}, {4, 5, 4}, {5, 5, 4}, {6, 5, 4},
+        {7, 5, 4}, {3, 6, 4}, {4, 6, 4}, {5, 6, 4}, {6, 6, 4}, {7, 6, 4},
+        {4, 7, 4}, {5, 7, 4}, {6, 7, 4},
 
-                   {4, 3, 5}, {5, 3, 5}, {6, 3, 5},
-        {3, 4, 5}, {4, 4, 5}, {5, 4, 5}, {6, 4, 5}, {7, 4, 5},
-        {3, 5, 5}, {4, 5, 5}, {5, 5, 5}, {6, 5, 5}, {7, 5, 5},
-        {3, 6, 5}, {4, 6, 5}, {5, 6, 5}, {6, 6, 5}, {7, 6, 5},
-                   {4, 7, 5}, {5, 7, 5}, {6, 7, 5},
+        {4, 3, 5}, {5, 3, 5}, {6, 3, 5}, {3, 4, 5}, {4, 4, 5}, {5, 4, 5},
+        {6, 4, 5}, {7, 4, 5}, {3, 5, 5}, {4, 5, 5}, {5, 5, 5}, {6, 5, 5},
+        {7, 5, 5}, {3, 6, 5}, {4, 6, 5}, {5, 6, 5}, {6, 6, 5}, {7, 6, 5},
+        {4, 7, 5}, {5, 7, 5}, {6, 7, 5},
 
-                   {4, 3, 6}, {5, 3, 6}, {6, 3, 6},
-        {3, 4, 6}, {4, 4, 6}, {5, 4, 6}, {6, 4, 6}, {7, 4, 6},
-        {3, 5, 6}, {4, 5, 6}, {5, 5, 6}, {6, 5, 6}, {7, 5, 6},
-        {3, 6, 6}, {4, 6, 6}, {5, 6, 6}, {6, 6, 6}, {7, 6, 6},
-                   {4, 7, 6}, {5, 7, 6}, {6, 7, 6},
+        {4, 3, 6}, {5, 3, 6}, {6, 3, 6}, {3, 4, 6}, {4, 4, 6}, {5, 4, 6},
+        {6, 4, 6}, {7, 4, 6}, {3, 5, 6}, {4, 5, 6}, {5, 5, 6}, {6, 5, 6},
+        {7, 5, 6}, {3, 6, 6}, {4, 6, 6}, {5, 6, 6}, {6, 6, 6}, {7, 6, 6},
+        {4, 7, 6}, {5, 7, 6}, {6, 7, 6},
 
-                   {4, 4, 7}, {5, 4, 7}, {6, 4, 7},
-                   {4, 5, 7}, {5, 5, 7}, {6, 5, 7},
-                   {4, 6, 7}, {5, 6, 7}, {6, 6, 7}
-    };
+        {4, 4, 7}, {5, 4, 7}, {6, 4, 7}, {4, 5, 7}, {5, 5, 7}, {6, 5, 7},
+        {4, 6, 7}, {5, 6, 7}, {6, 6, 7}};
 
     for (PointId idx = 0; idx < buf->size(); ++idx)
     {
@@ -714,12 +708,12 @@ TEST(CropFilterTest, issue_3114)
     tst("([-122.530, -122.347], [37.695, 37.816], [0,500])", 1);
 }
 
-
 TEST(CropFilterTest, test_crop_on_edge)
 {
     Options readOptions;
 
-    readOptions.add("filename", Support::datapath("filters/crop-on-edge/crop.las"));
+    readOptions.add("filename",
+                    Support::datapath("filters/crop-on-edge/crop.las"));
 
     LasReader reader;
     reader.setOptions(readOptions);
@@ -749,7 +743,4 @@ TEST(CropFilterTest, test_crop_on_edge)
     EXPECT_EQ(viewSet.size(), 1u);
     view = *viewSet.begin();
     EXPECT_EQ(view->size(), 132u);
-
 }
-
-

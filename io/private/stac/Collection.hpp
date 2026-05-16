@@ -34,10 +34,10 @@
 
 #pragma once
 
+#include "Catalog.hpp"
 #include <pdal/PointView.hpp>
 #include <pdal/Stage.hpp>
 #include <pdal/util/ThreadPool.hpp>
-#include "Catalog.hpp"
 
 namespace pdal
 {
@@ -45,17 +45,16 @@ namespace pdal
 namespace stac
 {
 
-class Collection: public Catalog {
+class Collection : public Catalog
+{
 
 public:
-
     using Catalog::Catalog;
     ~Collection();
 
     virtual void validate();
-
 };
 
-}//stac
+} // namespace stac
 
-}//pdal
+} // namespace pdal

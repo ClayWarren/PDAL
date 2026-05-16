@@ -32,10 +32,10 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
+#include "Utils.hpp"
 #include "Header.hpp"
 #include "Srs.hpp"
 #include "Summary.hpp"
-#include "Utils.hpp"
 #include "Vlr.hpp"
 
 #include <pdal/PointRef.hpp>
@@ -50,13 +50,12 @@ namespace pdal
 
 namespace
 {
-    using DT = Dimension::Type;
-    const Dimension::Type lastypes[] = {
-        DT::None, DT::Unsigned8, DT::Signed8, DT::Unsigned16, DT::Signed16,
-        DT::Unsigned32, DT::Signed32, DT::Unsigned64, DT::Signed64,
-        DT::Float, DT::Double
-    };
-}
+using DT = Dimension::Type;
+const Dimension::Type lastypes[] = {
+    DT::None,     DT::Unsigned8,  DT::Signed8,  DT::Unsigned16,
+    DT::Signed16, DT::Unsigned32, DT::Signed32, DT::Unsigned64,
+    DT::Signed64, DT::Float,      DT::Double};
+} // namespace
 
 namespace las
 {
@@ -79,18 +78,19 @@ void setSummary(las::Header& header, const Summary& summary)
         header.bounds = summary.getBounds();
 }
 
-
-void extractHeaderMetadata(const Header& h, MetadataNode& forward, MetadataNode& m)
+void extractHeaderMetadata(const Header& h, MetadataNode& forward,
+                           MetadataNode& m)
 {
     addForwardMetadata(forward, m, "major_version", h.versionMajor,
-        "The major LAS version for the file, always 1 for now");
+                       "The major LAS version for the file, always 1 for now");
     addForwardMetadata(forward, m, "minor_version", h.versionMinor,
-        "The minor LAS version for the file");
+                       "The minor LAS version for the file");
     addForwardMetadata(forward, m, "dataformat_id", h.pointFormat(),
-        "LAS Point Data Format");
+                       "LAS Point Data Format");
     addForwardMetadata(forward, m, "filesource_id", h.fileSourceId,
-        "File Source ID (Flight Line Number if this file was derived from an original "
-            "flight line).");
+                       "File Source ID (Flight Line Number if this file was "
+                       "derived from an original "
+                       "flight line).");
     if (h.versionAtLeast(1, 2))
     {
         // For some reason we've written global encoding as a base 64
@@ -98,63 +98,84 @@ void extractHeaderMetadata(const Header& h, MetadataNode& forward, MetadataNode&
         // I'm writing this as a special value, and will also write
         // global_encoding like we write all other header metadata.
         uint16_t globalEncoding = h.globalEncoding;
-        m.addEncoded("global_encoding_base64", (uint8_t *)&globalEncoding, sizeof(globalEncoding),
-            "Global Encoding: general property bit field.");
+        m.addEncoded("global_encoding_base64", (uint8_t*)&globalEncoding,
+                     sizeof(globalEncoding),
+                     "Global Encoding: general property bit field.");
         addForwardMetadata(forward, m, "global_encoding", h.globalEncoding,
-            "Global Encoding: general property bit field.");
+                           "Global Encoding: general property bit field.");
     }
 
     addForwardMetadata(forward, m, "project_id", h.projectGuid, "Project ID.");
-    addForwardMetadata(forward, m, "system_id", h.systemId, "Generating system ID.");
-    addForwardMetadata(forward, m, "software_id", h.softwareId, "Generating software description.");
-    addForwardMetadata(forward, m, "creation_doy", h.creationDoy,
+    addForwardMetadata(forward, m, "system_id", h.systemId,
+                       "Generating system ID.");
+    addForwardMetadata(forward, m, "software_id", h.softwareId,
+                       "Generating software description.");
+    addForwardMetadata(
+        forward, m, "creation_doy", h.creationDoy,
         "Day, expressed as an unsigned short, on which this file was created. "
         "Day is computed as the Greenwich Mean Time (GMT) day. January 1 is "
         "considered day 1.");
     addForwardMetadata(forward, m, "creation_year", h.creationYear,
-        "The year, expressed as a four digit number, in which the file was created.");
-    addForwardMetadata(forward, m, "scale_x", h.scale.x, "The scale factor for X values.", 15);
-    addForwardMetadata(forward, m, "scale_y", h.scale.y, "The scale factor for Y values.", 15);
-    addForwardMetadata(forward, m, "scale_z", h.scale.z, "The scale factor for Z values.", 15);
-    addForwardMetadata(forward, m, "offset_x", h.offset.x, "The offset for X values.", 15);
-    addForwardMetadata(forward, m, "offset_y", h.offset.y, "The offset for Y values.", 15);
-    addForwardMetadata(forward, m, "offset_z", h.offset.z, "The offset for Z values.", 15);
+                       "The year, expressed as a four digit number, in which "
+                       "the file was created.");
+    addForwardMetadata(forward, m, "scale_x", h.scale.x,
+                       "The scale factor for X values.", 15);
+    addForwardMetadata(forward, m, "scale_y", h.scale.y,
+                       "The scale factor for Y values.", 15);
+    addForwardMetadata(forward, m, "scale_z", h.scale.z,
+                       "The scale factor for Z values.", 15);
+    addForwardMetadata(forward, m, "offset_x", h.offset.x,
+                       "The offset for X values.", 15);
+    addForwardMetadata(forward, m, "offset_y", h.offset.y,
+                       "The offset for Y values.", 15);
+    addForwardMetadata(forward, m, "offset_z", h.offset.z,
+                       "The offset for Z values.", 15);
 
-    m.add<bool>("compressed", h.dataCompressed(), "true if this LAS file is compressed");
-    m.add("point_length", h.pointSize, "The size, in bytes, of each point records.");
+    m.add<bool>("compressed", h.dataCompressed(),
+                "true if this LAS file is compressed");
+    m.add("point_length", h.pointSize,
+          "The size, in bytes, of each point records.");
     m.add("header_size", h.vlrOffset,
-        "The size, in bytes, of the header block, including any extension by specific software.");
+          "The size, in bytes, of the header block, including any extension by "
+          "specific software.");
     m.add("dataoffset", h.pointOffset,
-        "The actual number of bytes from the beginning of the file to the "
-        "first field of the first point record data field. This data offset "
-        "must be updated if any software adds data from the Public Header "
-        "Block or adds/removes data to/from the Variable Length Records.");
-    m.add<double>("minx", h.bounds.minx,
+          "The actual number of bytes from the beginning of the file to the "
+          "first field of the first point record data field. This data offset "
+          "must be updated if any software adds data from the Public Header "
+          "Block or adds/removes data to/from the Variable Length Records.");
+    m.add<double>(
+        "minx", h.bounds.minx,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
-    m.add<double>("miny", h.bounds.miny,
+    m.add<double>(
+        "miny", h.bounds.miny,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
-    m.add<double>("minz", h.bounds.minz,
+    m.add<double>(
+        "minz", h.bounds.minz,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
-    m.add<double>("maxx", h.bounds.maxx,
+    m.add<double>(
+        "maxx", h.bounds.maxx,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
-    m.add<double>("maxy", h.bounds.maxy,
+    m.add<double>(
+        "maxy", h.bounds.maxy,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
-    m.add<double>("maxz", h.bounds.maxz,
+    m.add<double>(
+        "maxz", h.bounds.maxz,
         "The max and min data fields are the actual unscaled extents of the "
         "LAS point file data, specified in the coordinate system of the LAS "
         "data.");
     m.add<point_count_t>("count", h.pointCount(),
-        "This field contains the total number of point records within the file.");
+                         "This field contains the total number of point "
+                         "records within the file.");
 }
 
 void extractSrsMetadata(const Srs& srs, MetadataNode& m)
@@ -164,7 +185,8 @@ void extractSrsMetadata(const Srs& srs, MetadataNode& m)
         m.add("gtiff", s, "GTifPrint output of GEOTIFF keys");
 }
 
-void addVlrMetadata(const Vlr& vlr, std::string name, MetadataNode& forward, MetadataNode& m)
+void addVlrMetadata(const Vlr& vlr, std::string name, MetadataNode& forward,
+                    MetadataNode& m)
 {
     const size_t DataLenMax = 1000000;
 
@@ -188,15 +210,16 @@ void addVlrMetadata(const Vlr& vlr, std::string name, MetadataNode& forward, Met
         return;
     }
     MetadataNode vlrNode(name);
-    vlrNode.addEncoded("data", (const unsigned char *)vlr.data(), vlr.dataSize(), vlr.description);
-    vlrNode.add("user_id", vlr.userId, "User ID of the record or pre-defined value "
-        "from the specification.");
+    vlrNode.addEncoded("data", (const unsigned char*)vlr.data(), vlr.dataSize(),
+                       vlr.description);
+    vlrNode.add("user_id", vlr.userId,
+                "User ID of the record or pre-defined value "
+                "from the specification.");
     vlrNode.add("record_id", vlr.recordId, "Record ID specified by the user.");
     vlrNode.add("description", vlr.description);
     m.add(vlrNode);
 
-    if (vlr.userId == las::TransformUserId ||
-        vlr.userId == las::LaszipUserId ||
+    if (vlr.userId == las::TransformUserId || vlr.userId == las::LaszipUserId ||
         vlr.userId == las::LiblasUserId)
         return;
     if (vlr.userId == las::SpecUserId &&
@@ -225,7 +248,6 @@ uint8_t lasType(Dimension::Type type, int fieldCnt)
     return 10 * (fieldCnt - 1) + lastype;
 }
 
-
 void ExtraBytesIf::setType(uint8_t lastype)
 {
     m_fieldCnt = 1;
@@ -240,7 +262,6 @@ void ExtraBytesIf::setType(uint8_t lastype)
         m_fieldCnt = 0;
 }
 
-
 void ExtraBytesIf::appendTo(std::vector<char>& ebBytes)
 {
     size_t offset = ebBytes.size();
@@ -252,9 +273,9 @@ void ExtraBytesIf::appendTo(std::vector<char>& ebBytes)
 
     inserter << (uint16_t)0 << lastype << options;
     inserter.put(m_name, 32);
-    inserter << (uint32_t)0;  // Reserved.
+    inserter << (uint32_t)0; // Reserved.
     for (size_t i = 0; i < 3; ++i)
-        inserter << (uint64_t)0;  // No data field.
+        inserter << (uint64_t)0; // No data field.
     for (size_t i = 0; i < 3; ++i)
         inserter << (double)0.0; // Min.
     for (size_t i = 0; i < 3; ++i)
@@ -266,8 +287,7 @@ void ExtraBytesIf::appendTo(std::vector<char>& ebBytes)
     inserter.put(m_description, 32);
 }
 
-
-void ExtraBytesIf::readFrom(const char *buf)
+void ExtraBytesIf::readFrom(const char* buf)
 {
     LeExtractor extractor(buf, ExtraBytesSpecSize);
     uint16_t dummy16;
@@ -284,11 +304,11 @@ void ExtraBytesIf::readFrom(const char *buf)
     extractor.get(m_name, 32);
     extractor >> dummy32;
     for (size_t i = 0; i < 3; ++i)
-        extractor >> dummy64;  // No data field.
+        extractor >> dummy64; // No data field.
     for (size_t i = 0; i < 3; ++i)
-        extractor >> dummyd;  // Min.
+        extractor >> dummyd; // Min.
     for (size_t i = 0; i < 3; ++i)
-        extractor >> dummyd;  // Max.
+        extractor >> dummyd; // Max.
     for (size_t i = 0; i < 3; ++i)
         extractor >> m_scale[i];
     for (size_t i = 0; i < 3; ++i)
@@ -306,9 +326,10 @@ void ExtraBytesIf::readFrom(const char *buf)
             m_offset[i] = 0.0;
 }
 
-
-// NOTE: You must make sure that bufsize is a multiple of ExtraBytesSpecSize before calling.
-std::vector<ExtraDim> ExtraBytesIf::toExtraDims(const char *buf, size_t bufsize, int baseSize)
+// NOTE: You must make sure that bufsize is a multiple of ExtraBytesSpecSize
+// before calling.
+std::vector<ExtraDim> ExtraBytesIf::toExtraDims(const char* buf, size_t bufsize,
+                                                int baseSize)
 {
     std::vector<ExtraDim> eds;
 
@@ -326,7 +347,8 @@ std::vector<ExtraDim> ExtraBytesIf::toExtraDims(const char *buf, size_t bufsize,
         }
         else if (spec.m_fieldCnt == 1)
         {
-            ExtraDim ed(spec.m_name, spec.m_type, byteOffset, spec.m_scale[0], spec.m_offset[0]);
+            ExtraDim ed(spec.m_name, spec.m_type, byteOffset, spec.m_scale[0],
+                        spec.m_offset[0]);
             eds.push_back(ed);
             byteOffset += ed.m_size;
         }
@@ -334,8 +356,8 @@ std::vector<ExtraDim> ExtraBytesIf::toExtraDims(const char *buf, size_t bufsize,
         {
             for (size_t i = 0; i < spec.m_fieldCnt; ++i)
             {
-                ExtraDim ed(spec.m_name + std::to_string(i), spec.m_type, byteOffset,
-                    spec.m_scale[i], spec.m_offset[i]);
+                ExtraDim ed(spec.m_name + std::to_string(i), spec.m_type,
+                            byteOffset, spec.m_scale[i], spec.m_offset[i]);
                 eds.push_back(ed);
                 byteOffset += ed.m_size;
             }
@@ -346,50 +368,103 @@ std::vector<ExtraDim> ExtraBytesIf::toExtraDims(const char *buf, size_t bufsize,
     return eds;
 }
 
-
 const Dimension::IdList& pdrfDims(int pdrf)
 {
     if (pdrf < 0 || pdrf > 10)
         pdrf = 10;
 
     using D = Dimension::Id;
-    static const Dimension::IdList dims[11]
-    {
+    static const Dimension::IdList dims[11]{
         // 0
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId },
+        {D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns,
+         D::ScanDirectionFlag, D::EdgeOfFlightLine, D::Classification,
+         D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap, D::ScanAngleRank,
+         D::UserData, D::PointSourceId},
         // 1
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::GpsTime },
+        {D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns,
+         D::ScanDirectionFlag, D::EdgeOfFlightLine, D::Classification,
+         D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap, D::ScanAngleRank,
+         D::UserData, D::PointSourceId, D::GpsTime},
         // 2
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::Red, D::Green, D::Blue },
+        {D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns,
+         D::ScanDirectionFlag, D::EdgeOfFlightLine, D::Classification,
+         D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap, D::ScanAngleRank,
+         D::UserData, D::PointSourceId, D::Red, D::Green, D::Blue},
         // 3
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::GpsTime, D::Red, D::Green, D::Blue },
+        {D::X,
+         D::Y,
+         D::Z,
+         D::Intensity,
+         D::ReturnNumber,
+         D::NumberOfReturns,
+         D::ScanDirectionFlag,
+         D::EdgeOfFlightLine,
+         D::Classification,
+         D::Synthetic,
+         D::KeyPoint,
+         D::Withheld,
+         D::Overlap,
+         D::ScanAngleRank,
+         D::UserData,
+         D::PointSourceId,
+         D::GpsTime,
+         D::Red,
+         D::Green,
+         D::Blue},
         {},
         {},
         // 6
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::GpsTime, D::ScanChannel },
+        {D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns,
+         D::ScanDirectionFlag, D::EdgeOfFlightLine, D::Classification,
+         D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap, D::ScanAngleRank,
+         D::UserData, D::PointSourceId, D::GpsTime, D::ScanChannel},
         // 7
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::GpsTime, D::ScanChannel,
-          D::Red, D::Green, D::Blue },
+        {D::X,
+         D::Y,
+         D::Z,
+         D::Intensity,
+         D::ReturnNumber,
+         D::NumberOfReturns,
+         D::ScanDirectionFlag,
+         D::EdgeOfFlightLine,
+         D::Classification,
+         D::Synthetic,
+         D::KeyPoint,
+         D::Withheld,
+         D::Overlap,
+         D::ScanAngleRank,
+         D::UserData,
+         D::PointSourceId,
+         D::GpsTime,
+         D::ScanChannel,
+         D::Red,
+         D::Green,
+         D::Blue},
         // 8
-        { D::X, D::Y, D::Z, D::Intensity, D::ReturnNumber, D::NumberOfReturns, D::ScanDirectionFlag,
-          D::EdgeOfFlightLine, D::Classification, D::Synthetic, D::KeyPoint, D::Withheld, D::Overlap,
-          D::ScanAngleRank, D::UserData, D::PointSourceId, D::GpsTime, D::ScanChannel,
-          D::Red, D::Green, D::Blue, D::Infrared },
+        {D::X,
+         D::Y,
+         D::Z,
+         D::Intensity,
+         D::ReturnNumber,
+         D::NumberOfReturns,
+         D::ScanDirectionFlag,
+         D::EdgeOfFlightLine,
+         D::Classification,
+         D::Synthetic,
+         D::KeyPoint,
+         D::Withheld,
+         D::Overlap,
+         D::ScanAngleRank,
+         D::UserData,
+         D::PointSourceId,
+         D::GpsTime,
+         D::ScanChannel,
+         D::Red,
+         D::Green,
+         D::Blue,
+         D::Infrared},
         {},
-        {}
-    };
+        {}};
     return dims[pdrf];
 }
 
@@ -399,7 +474,7 @@ std::string generateSoftwareId()
     std::stringstream oss;
     std::ostringstream revs;
     revs << Config::sha1();
-    oss << "PDAL " << ver << " (" << revs.str().substr(0, 6) <<")";
+    oss << "PDAL " << ver << " (" << revs.str().substr(0, 6) << ")";
     return oss.str();
 }
 
@@ -418,8 +493,8 @@ std::vector<ExtraDim> parse(const StringList& dimString, bool allOk)
             // We only accept all for LasWriter.
             if (!allOk)
                 throw error("Invalid extra dimension specified: '" + dim +
-                    "'.  Need <dimension>=<type>.  See documentation "
-                    " for details.");
+                            "'.  Need <dimension>=<type>.  See documentation "
+                            " for details.");
             all = true;
             continue;
         }
@@ -427,15 +502,15 @@ std::vector<ExtraDim> parse(const StringList& dimString, bool allOk)
         StringList s = Utils::split2(dim, '=');
         if (s.size() != 2)
             throw error("Invalid extra dimension specified: '" + dim +
-                "'.  Need <dimension>=<type>.  See documentation "
-                " for details.");
+                        "'.  Need <dimension>=<type>.  See documentation "
+                        " for details.");
         Utils::trim(s[0]);
         Utils::trim(s[1]);
         Dimension::Type type = Dimension::type(s[1]);
         if (type == Dimension::Type::None)
             throw error("Invalid extra dimension type specified: '" + dim +
-                "'.  Need <dimension>=<type>.  See documentation "
-                " for details.");
+                        "'.  Need <dimension>=<type>.  See documentation "
+                        " for details.");
         ExtraDim ed(s[0], type, byteOffset);
         extraDims.push_back(ed);
         byteOffset += ed.m_size;
@@ -445,7 +520,7 @@ std::vector<ExtraDim> parse(const StringList& dimString, bool allOk)
     {
         if (extraDims.size())
             throw error("Can't specify specific extra dimensions with "
-                "special 'all' keyword.");
+                        "special 'all' keyword.");
         extraDims.push_back(ExtraDim("all", Dimension::Type::None, 0));
     }
 
@@ -454,7 +529,8 @@ std::vector<ExtraDim> parse(const StringList& dimString, bool allOk)
 
 // LAS loader driver
 
-LoaderDriver::LoaderDriver(int pdrf, const Scaling& scaling, const ExtraDims& dims)
+LoaderDriver::LoaderDriver(int pdrf, const Scaling& scaling,
+                           const ExtraDims& dims)
 {
     init(pdrf, scaling, dims);
 }
@@ -500,24 +576,23 @@ void LoaderDriver::init(int pdrf, const Scaling& scaling, const ExtraDims& dims)
         m_loaders.push_back(PointLoaderPtr(new ExtraDimLoader(dims)));
 }
 
-bool LoaderDriver::load(PointRef& point, const char *buf, int bufsize)
+bool LoaderDriver::load(PointRef& point, const char* buf, int bufsize)
 {
     for (PointLoaderPtr& l : m_loaders)
         l->load(point, buf, bufsize);
     return true;
 }
 
-bool LoaderDriver::pack(const PointRef& point, char *buf, int bufsize)
+bool LoaderDriver::pack(const PointRef& point, char* buf, int bufsize)
 {
     for (PointLoaderPtr& l : m_loaders)
         l->pack(point, buf, bufsize);
     return true;
 }
 
-V10BaseLoader::V10BaseLoader(const Scaling& scaling) : m_scaling(scaling)
-{}
+V10BaseLoader::V10BaseLoader(const Scaling& scaling) : m_scaling(scaling) {}
 
-void V10BaseLoader::load(PointRef& point, const char *buf, int bufsize)
+void V10BaseLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     LeExtractor istream(buf, bufsize);
 
@@ -535,7 +610,8 @@ void V10BaseLoader::load(PointRef& point, const char *buf, int bufsize)
     uint8_t user;
     uint16_t pointSourceId;
 
-    istream >> intensity >> flags >> classificationWithFlags >> scanAngleRank >> user >> pointSourceId;
+    istream >> intensity >> flags >> classificationWithFlags >> scanAngleRank >>
+        user >> pointSourceId;
 
     uint8_t returnNum = flags & 0x07;
     uint8_t numReturns = (flags >> 3) & 0x07;
@@ -574,10 +650,9 @@ void V10BaseLoader::load(PointRef& point, const char *buf, int bufsize)
     point.setField(Dimension::Id::PointSourceId, pointSourceId);
 }
 
-void V10BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
+void V10BaseLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     LeInserter ostream(buf, bufsize);
-
 
     auto converter = [](double val, Dimension::Id dim) -> int32_t
     {
@@ -585,8 +660,10 @@ void V10BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
 
         if (!Utils::numericCast(val, i))
             throw std::runtime_error("Unable to convert scaled value (" +
-                Utils::toString(val) + ") to "
-                "int32 for dimension '" + Dimension::name(dim) );
+                                     Utils::toString(val) +
+                                     ") to "
+                                     "int32 for dimension '" +
+                                     Dimension::name(dim));
         return i;
     };
 
@@ -607,8 +684,10 @@ void V10BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
     int scanDir = point.getFieldAs<int>(Dimension::Id::ScanDirectionFlag);
     int eofFlag = point.getFieldAs<int>(Dimension::Id::EdgeOfFlightLine);
 
-    uint8_t flags = returnNum | (numReturns << 3) | (scanDir << 6) | (eofFlag << 7);
-    uint8_t classification = point.getFieldAs<uint8_t>(Dimension::Id::Classification);
+    uint8_t flags =
+        returnNum | (numReturns << 3) | (scanDir << 6) | (eofFlag << 7);
+    uint8_t classification =
+        point.getFieldAs<uint8_t>(Dimension::Id::Classification);
     // Follow the LasWriter's example and replace Classification>31 with 1.
     if (classification > 31)
         classification = 1;
@@ -618,19 +697,20 @@ void V10BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
     uint8_t withheld = point.getFieldAs<uint8_t>(Dimension::Id::Withheld);
     uint8_t overlap = point.getFieldAs<uint8_t>(Dimension::Id::Overlap);
     uint8_t classificationWithFlags =
-        (classification & 0x1F) |
-        ((synthetic & 0x01) << 5) |
-        ((keypoint & 0x01) << 6) |
-        ((withheld & 0x01) << 7);
+        (classification & 0x1F) | ((synthetic & 0x01) << 5) |
+        ((keypoint & 0x01) << 6) | ((withheld & 0x01) << 7);
 
-    int8_t scanAngleRank = point.getFieldAs<int8_t>(Dimension::Id::ScanAngleRank);
+    int8_t scanAngleRank =
+        point.getFieldAs<int8_t>(Dimension::Id::ScanAngleRank);
     uint8_t user = point.getFieldAs<uint8_t>(Dimension::Id::UserData);
-    uint16_t pointSourceId = point.getFieldAs<uint16_t>(Dimension::Id::PointSourceId);
+    uint16_t pointSourceId =
+        point.getFieldAs<uint16_t>(Dimension::Id::PointSourceId);
 
-    ostream << flags << classificationWithFlags << scanAngleRank << user << pointSourceId;
+    ostream << flags << classificationWithFlags << scanAngleRank << user
+            << pointSourceId;
 }
 
-void GpstimeLoader::load(PointRef& point, const char *buf, int bufsize)
+void GpstimeLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -642,7 +722,7 @@ void GpstimeLoader::load(PointRef& point, const char *buf, int bufsize)
     point.setField(Dimension::Id::GpsTime, time);
 }
 
-void GpstimeLoader::pack(const PointRef& point, char *buf, int bufsize)
+void GpstimeLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -651,7 +731,7 @@ void GpstimeLoader::pack(const PointRef& point, char *buf, int bufsize)
     ostream << point.getFieldAs<double>(Dimension::Id::GpsTime);
 }
 
-void ColorLoader::load(PointRef& point, const char *buf, int bufsize)
+void ColorLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -665,7 +745,7 @@ void ColorLoader::load(PointRef& point, const char *buf, int bufsize)
     point.setField(Dimension::Id::Blue, blue);
 }
 
-void ColorLoader::pack(const PointRef& point, char *buf, int bufsize)
+void ColorLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -676,10 +756,9 @@ void ColorLoader::pack(const PointRef& point, char *buf, int bufsize)
     ostream << point.getFieldAs<uint16_t>(Dimension::Id::Blue);
 }
 
-V14BaseLoader::V14BaseLoader(const Scaling& scaling) : m_scaling(scaling)
-{}
+V14BaseLoader::V14BaseLoader(const Scaling& scaling) : m_scaling(scaling) {}
 
-void V14BaseLoader::load(PointRef& point, const char *buf, int bufsize)
+void V14BaseLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     LeExtractor istream(buf, bufsize);
 
@@ -732,7 +811,7 @@ void V14BaseLoader::load(PointRef& point, const char *buf, int bufsize)
     point.setField(Dimension::Id::GpsTime, gpsTime);
 }
 
-void V14BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
+void V14BaseLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     LeInserter ostream(buf, bufsize);
 
@@ -742,8 +821,10 @@ void V14BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
 
         if (!Utils::numericCast(val, i))
             throw std::runtime_error("Unable to convert scaled value (" +
-                Utils::toString(val) + ") to "
-                "int32 for dimension '" + Dimension::name(dim) );
+                                     Utils::toString(val) +
+                                     ") to "
+                                     "int32 for dimension '" +
+                                     Dimension::name(dim));
         return i;
     };
 
@@ -768,29 +849,30 @@ void V14BaseLoader::pack(const PointRef& point, char *buf, int bufsize)
     uint8_t overlap = point.getFieldAs<uint8_t>(Dimension::Id::Overlap);
 
     uint8_t scanChannel = point.getFieldAs<uint8_t>(Dimension::Id::ScanChannel);
-    uint8_t scanDirFlag = point.getFieldAs<uint8_t>(Dimension::Id::ScanDirectionFlag);
+    uint8_t scanDirFlag =
+        point.getFieldAs<uint8_t>(Dimension::Id::ScanDirectionFlag);
     uint8_t flight = point.getFieldAs<uint8_t>(Dimension::Id::EdgeOfFlightLine);
-    uint8_t classification = point.getFieldAs<uint8_t>(Dimension::Id::Classification);
+    uint8_t classification =
+        point.getFieldAs<uint8_t>(Dimension::Id::Classification);
 
     uint8_t classFlags =
         synthetic | (keypoint << 1) | (withheld << 2) | (overlap << 3);
 
-    uint8_t flags = (classFlags & 0x0F) |
-            ((scanChannel & 0x03) << 4) |
-            ((scanDirFlag & 0x01) << 6) |
-            ((flight & 0x01) << 7);
+    uint8_t flags = (classFlags & 0x0F) | ((scanChannel & 0x03) << 4) |
+                    ((scanDirFlag & 0x01) << 6) | ((flight & 0x01) << 7);
 
     uint8_t user = point.getFieldAs<uint8_t>(Dimension::Id::UserData);
     int16_t scanAngle = static_cast<int16_t>(std::round(
         point.getFieldAs<float>(Dimension::Id::ScanAngleRank) / .006f));
-    uint16_t pointSourceId = point.getFieldAs<uint16_t>(Dimension::Id::PointSourceId);
+    uint16_t pointSourceId =
+        point.getFieldAs<uint16_t>(Dimension::Id::PointSourceId);
     double gpsTime = point.getFieldAs<double>(Dimension::Id::GpsTime);
 
-    ostream << intensity << returnInfo << flags << classification << user <<
-        scanAngle << pointSourceId << gpsTime;
+    ostream << intensity << returnInfo << flags << classification << user
+            << scanAngle << pointSourceId << gpsTime;
 }
 
-void NirLoader::load(PointRef& point, const char *buf, int bufsize)
+void NirLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -803,7 +885,7 @@ void NirLoader::load(PointRef& point, const char *buf, int bufsize)
     point.setField(Dimension::Id::Infrared, nearInfraRed);
 }
 
-void NirLoader::pack(const PointRef& point, char *buf, int bufsize)
+void NirLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     buf += m_offset;
     bufsize -= m_offset;
@@ -813,7 +895,7 @@ void NirLoader::pack(const PointRef& point, char *buf, int bufsize)
     ostream << point.getFieldAs<uint16_t>(Dimension::Id::Infrared);
 }
 
-void ExtraDimLoader::load(PointRef& point, const char *buf, int bufsize)
+void ExtraDimLoader::load(PointRef& point, const char* buf, int bufsize)
 {
     for (const ExtraDim& d : m_extraDims)
     {
@@ -821,13 +903,14 @@ void ExtraDimLoader::load(PointRef& point, const char *buf, int bufsize)
         LeExtractor istream(buf + d.m_byteOffset, bufsize - d.m_byteOffset);
         Everything e = Utils::extractDim(istream, dt.m_type);
         if (dt.m_xform.nonstandard())
-            point.setField(dt.m_id, dt.m_xform.fromScaled(Utils::toDouble(e, dt.m_type)));
+            point.setField(
+                dt.m_id, dt.m_xform.fromScaled(Utils::toDouble(e, dt.m_type)));
         else
             point.setField(dt.m_id, dt.m_type, &e);
     }
 }
 
-void ExtraDimLoader::pack(const PointRef& point, char *buf, int bufsize)
+void ExtraDimLoader::pack(const PointRef& point, char* buf, int bufsize)
 {
     Everything e;
     for (const ExtraDim& d : m_extraDims)
@@ -835,9 +918,10 @@ void ExtraDimLoader::pack(const PointRef& point, char *buf, int bufsize)
         const DimType& dt = d.m_dimType;
         LeInserter ostream(buf + d.m_byteOffset, bufsize - d.m_byteOffset);
 
-        point.getField((char *)&e, d.m_dimType.m_id, d.m_dimType.m_type);
+        point.getField((char*)&e, d.m_dimType.m_id, d.m_dimType.m_type);
         if (d.m_dimType.m_xform.nonstandard())
-            ostream << d.m_dimType.m_xform.toScaled(Utils::toDouble(e, d.m_dimType.m_type));
+            ostream << d.m_dimType.m_xform.toScaled(
+                Utils::toDouble(e, d.m_dimType.m_type));
         else
             Utils::insertDim(ostream, d.m_dimType.m_type, e);
     }

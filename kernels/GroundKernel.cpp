@@ -70,12 +70,9 @@ struct GroundKernel::Args
     std::vector<DimRange> ignored;
 };
 
-static StaticPluginInfo const s_info
-{
-    "kernels.ground",
-    "Ground Kernel [DEPRECATED]",
-    "https://pdal.org/apps/ground.html"
-};
+static StaticPluginInfo const s_info{"kernels.ground",
+                                     "Ground Kernel [DEPRECATED]",
+                                     "https://pdal.org/apps/ground.html"};
 
 CREATE_STATIC_KERNEL(GroundKernel, s_info)
 
@@ -84,8 +81,7 @@ std::string GroundKernel::getName() const
     return s_info.name;
 }
 
-GroundKernel::GroundKernel() : m_args(new GroundKernel::Args)
-{}
+GroundKernel::GroundKernel() : m_args(new GroundKernel::Args) {}
 
 void GroundKernel::addSwitches(ProgramArgs& args)
 {
@@ -94,16 +90,22 @@ void GroundKernel::addSwitches(ProgramArgs& args)
     args.add("max_window_size", "Max window size", m_args->maxWindowSize, 18.0);
     args.add("slope", "Slope", m_args->slope, 0.15);
     args.add("max_distance", "Max distance", m_args->maxDistance, 2.5);
-    args.add("initial_distance", "Initial distance", m_args->initialDistance, .15);
+    args.add("initial_distance", "Initial distance", m_args->initialDistance,
+             .15);
     args.add("cell_size", "Cell size", m_args->cellSize, 1.0);
     args.add("extract", "Extract ground returns?", m_args->extract);
-    args.add("reset", "Reset classifications prior to segmenting?", m_args->reset);
-    args.add("denoise", "Apply statistical outlier removal prior to segmenting?", m_args->denoise);
-    args.add("returns", "Include last returns?", m_args->returns, {"last", "only"});
+    args.add("reset", "Reset classifications prior to segmenting?",
+             m_args->reset);
+    args.add("denoise",
+             "Apply statistical outlier removal prior to segmenting?",
+             m_args->denoise);
+    args.add("returns", "Include last returns?", m_args->returns,
+             {"last", "only"});
     args.add("scalar", "Elevation scalar?", m_args->scalar, 1.25);
     args.add("threshold", "Elevation threshold?", m_args->threshold, 0.5);
     args.add("cut", "Cut net size?", m_args->cut, 0.0);
-    args.add("ignore", "A range query to ignore when processing", m_args->ignored);
+    args.add("ignore", "A range query to ignore when processing",
+             m_args->ignored);
 }
 
 int GroundKernel::execute()
@@ -122,9 +124,9 @@ int GroundKernel::execute()
     groundOptions.add("cell", m_args->cellSize);
     groundOptions.add("cut", m_args->cut);
     groundOptions.add("scalar", m_args->scalar);
-    for (auto& s: m_args->returns)
+    for (auto& s : m_args->returns)
         groundOptions.add("returns", s);
-    for(DimRange& r: m_args->ignored)
+    for (DimRange& r : m_args->ignored)
         groundOptions.add("ignore", r);
 
     Options rangeOptions;
@@ -138,10 +140,11 @@ int GroundKernel::execute()
 
     Stage* outlierStage = assignStage;
     if (m_args->denoise)
-        outlierStage = &makeFilter("filters.outlier", *assignStage, outlierOptions);
+        outlierStage =
+            &makeFilter("filters.outlier", *assignStage, outlierOptions);
 
-    Stage& groundStage = makeFilter("filters.smrf", *outlierStage, groundOptions);
-
+    Stage& groundStage =
+        makeFilter("filters.smrf", *outlierStage, groundOptions);
 
     Stage* rangeStage = &groundStage;
     if (m_args->extract)

@@ -40,8 +40,8 @@
 #include "PMFFilter.hpp"
 
 #include <pdal/KDIndex.hpp>
-#include <pdal/util/ProgramArgs.hpp>
 #include <pdal/private/MathUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
 
 #include "private/DimRange.hpp"
 #include "private/Segmentation.hpp"
@@ -51,9 +51,9 @@ namespace pdal
 
 using namespace Dimension;
 
-static StaticPluginInfo const s_info{"filters.pmf",
-                                     "Progressive morphological filter",
-                                     "https://pdal.org/stages/filters.pmf.html"};
+static StaticPluginInfo const s_info{
+    "filters.pmf", "Progressive morphological filter",
+    "https://pdal.org/stages/filters.pmf.html"};
 
 struct PMFArgs
 {
@@ -92,13 +92,18 @@ void PMFFilter::addArgs(ProgramArgs& args)
     args.add("max_window_size", "Maximum window size", m_args->m_maxWindowSize,
              33.0);
     args.add("slope", "Slope", m_args->m_slope, 1.0);
-    args.add("ground_class", "Classification value of ground points."
-        " [Default: 2]", m_groundClass, ClassLabel::Ground);
-    args.add("other_class", "Classification value of non-ground points."
-        " [Default: 1]", m_otherClass, ClassLabel::Unclassified);
-    args.add("only_ground", "Set to true to only modify the CLassification"
-        " value of detected ground points. [Default: false]",
-        m_onlyGround, false);
+    args.add("ground_class",
+             "Classification value of ground points."
+             " [Default: 2]",
+             m_groundClass, ClassLabel::Ground);
+    args.add("other_class",
+             "Classification value of non-ground points."
+             " [Default: 1]",
+             m_otherClass, ClassLabel::Unclassified);
+    args.add("only_ground",
+             "Set to true to only modify the CLassification"
+             " value of detected ground points. [Default: false]",
+             m_onlyGround, false);
 }
 
 void PMFFilter::addDimensions(PointLayoutPtr layout)
@@ -113,7 +118,7 @@ void PMFFilter::prepared(PointTableRef table)
     if ((m_groundClass == m_otherClass) && !m_onlyGround)
     {
         throwError("Ground and non-ground class cannot be"
-            "equal when only_ground is false.");
+                   "equal when only_ground is false.");
     }
 
     for (auto& r : m_args->m_ignored)

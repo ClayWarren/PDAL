@@ -10,8 +10,7 @@ namespace expr
 class ConditionalParser : public MathParser
 {
 public:
-    ConditionalParser(Lexer& lexer) : MathParser(lexer)
-    {}
+    ConditionalParser(Lexer& lexer) : MathParser(lexer) {}
     bool expression(Expression& expr) override;
 
 protected:

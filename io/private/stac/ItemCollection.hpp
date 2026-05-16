@@ -46,10 +46,8 @@ class ItemCollection
 {
 
 public:
-    ItemCollection(const NL::json& json,
-        const std::string& icPath,
-        const connector::Connector& connector,
-        bool validate);
+    ItemCollection(const NL::json& json, const std::string& icPath,
+                   const connector::Connector& connector, bool validate);
     ~ItemCollection();
 
     struct Filters
@@ -57,7 +55,8 @@ public:
         Item::Filters* itemFilters;
     };
 
-    bool init(const Filters& filters, NL::json rawReaderArgs, SchemaUrls schemaUrls);
+    bool init(const Filters& filters, NL::json rawReaderArgs,
+              SchemaUrls schemaUrls);
     ItemList items();
 
 private:
@@ -69,6 +68,6 @@ private:
     ItemList m_itemList;
 };
 
-}//stac
+} // namespace stac
 
-}//pdal
+} // namespace pdal

@@ -38,7 +38,8 @@ namespace pdal
 {
 
 std::unique_ptr<Comparison> Comparison::create(const PointLayout& layout,
-        const std::string dimName, const NL::json& json)
+                                               const std::string dimName,
+                                               const NL::json& json)
 {
     if (!json.is_object())
     {
@@ -51,12 +52,12 @@ std::unique_ptr<Comparison> Comparison::create(const PointLayout& layout,
     if (json.size() != 1)
     {
         throw pdal_error("Invalid comparison object: " +
-            json.get<std::string>());
+                         json.get<std::string>());
     }
 
     auto it = json.begin();
 
-    //const auto key(json.getMemberNames().at(0));
+    // const auto key(json.getMemberNames().at(0));
     const ComparisonType co(toComparisonType(it.key()));
     const NL::json& val(it.value());
 
@@ -110,4 +111,3 @@ std::unique_ptr<Comparison> Comparison::create(const PointLayout& layout,
 }
 
 } // namespace pdal
-

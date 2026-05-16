@@ -1,48 +1,48 @@
 /******************************************************************************
-* Copyright (c) 2016, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2016, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <pdal/pdal_test_main.hpp>
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/private/gdal/ErrorHandler.hpp>
+#include "Support.hpp"
 #include <filters/HeadFilter.hpp>
 #include <filters/RangeFilter.hpp>
 #include <filters/SortFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
-#include <io/OGRWriter.hpp>
 #include <io/LasReader.hpp>
-#include "Support.hpp"
+#include <io/OGRWriter.hpp>
+#include <pdal/pdal_test_main.hpp>
+#include <pdal/private/gdal/ErrorHandler.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -54,17 +54,25 @@ namespace
 {
 
 void runOgrWriterInfo(const Options& wo, const std::string& infile,
-    const std::string& infofile, const std::string suffix, int featureCount = 10,
-    uint32_t(*compare)(const std::string&, const std::string&, int32_t) = &Support::diff_text_files
-)
+                      const std::string& infofile, const std::string suffix,
+                      int featureCount = 10,
+                      uint32_t (*compare)(const std::string&,
+                                          const std::string&,
+                                          int32_t) = &Support::diff_text_files)
 {
     FileUtils::createDirectory(Support::temppath("ogr"));
-    std::string outfile(Support::temppath(std::string("ogr/") + FileUtils::stem(FileUtils::stem(FileUtils::getFilename(infofile))) + suffix));
+    std::string outfile(Support::temppath(
+        std::string("ogr/") +
+        FileUtils::stem(FileUtils::stem(FileUtils::getFilename(infofile))) +
+        suffix));
     std::string outinfofile(outfile + ".ogrinfo");
 
-    if(FileUtils::isDirectory(outfile)) {
+    if (FileUtils::isDirectory(outfile))
+    {
         FileUtils::deleteDirectory(outfile);
-    } else {
+    }
+    else
+    {
         FileUtils::deleteFile(outfile);
     }
     FileUtils::deleteFile(outinfofile);
@@ -89,13 +97,16 @@ void runOgrWriterInfo(const Options& wo, const std::string& infile,
     writer.addOptions(writerOpts);
 
     HeadFilter headFilter;
-    if (featureCount > 0) {
+    if (featureCount > 0)
+    {
         Options headOpts;
         headOpts.add("count", featureCount);
         headFilter.setOptions(headOpts);
         headFilter.setInput(sortFilter);
         writer.setInput(headFilter);
-    } else {
+    }
+    else
+    {
         writer.setInput(sortFilter);
     }
 
@@ -104,13 +115,16 @@ void runOgrWriterInfo(const Options& wo, const std::string& infile,
     writer.execute(t);
 
     std::string cmd = "ogrinfo -nomd -al " + outfile;
-    if (featureCount == 0) {
+    if (featureCount == 0)
+    {
         cmd += " -so";
     }
     cmd += " 2>&1";
     std::string info;
-    if (Utils::run_shell_command(cmd, info)) {
-        std::cerr << "WARNING: error running ogrinfo, skipping test" << std::endl;
+    if (Utils::run_shell_command(cmd, info))
+    {
+        std::cerr << "WARNING: error running ogrinfo, skipping test"
+                  << std::endl;
         return;
     }
 
@@ -118,22 +132,24 @@ void runOgrWriterInfo(const Options& wo, const std::string& infile,
     *handle << info;
     FileUtils::closeFile(handle);
 
-    EXPECT_EQ(compare(infofile, outinfofile, 1), 0) \
+    EXPECT_EQ(compare(infofile, outinfofile, 1), 0)
         << "  (" << infofile << " <-> " << outinfofile << ")";
 }
 
-uint32_t diff_geojson(const std::string& file1, const std::string& file2, int32_t ignoreLine1=-1)
+uint32_t diff_geojson(const std::string& file1, const std::string& file2,
+                      int32_t ignoreLine1 = -1)
 {
-    // GeoJSON files depend on PROJ version, later versions write a much different
-    // SRS format. Crudely ignore lines between ^GEOGCRS[ and ^OGRFeature
+    // GeoJSON files depend on PROJ version, later versions write a much
+    // different SRS format. Crudely ignore lines between ^GEOGCRS[ and
+    // ^OGRFeature
 
     if (!Utils::fileExists(file1) || !Utils::fileExists(file2))
         return (std::numeric_limits<uint32_t>::max)();
     if (!Utils::fileExists(file1) || !Utils::fileExists(file2))
         return (std::numeric_limits<uint32_t>::max)();
 
-    std::istream *istr1 = Utils::openFile(file1, false);
-    std::istream *istr2 = Utils::openFile(file2, false);
+    std::istream* istr1 = Utils::openFile(file1, false);
+    std::istream* istr2 = Utils::openFile(file2, false);
     std::istream& str1 = *istr1;
     std::istream& str2 = *istr2;
 
@@ -202,10 +218,10 @@ uint32_t diff_geojson(const std::string& file1, const std::string& file2, int32_
             buf2ignore = true;
 
         // remove line endings from test comparisons
-        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\r' ), buf1.end());
-        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\n' ), buf1.end());
-        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\r' ), buf2.end());
-        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\n' ), buf2.end());
+        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\r'), buf1.end());
+        buf1.erase(std::remove(buf1.begin(), buf1.end(), '\n'), buf1.end());
+        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\r'), buf2.end());
+        buf2.erase(std::remove(buf2.begin(), buf2.end(), '\n'), buf2.end());
 
         if (!buf1ignore && !buf2ignore && buf1 != buf2)
             ++numdiffs;
@@ -222,7 +238,7 @@ uint32_t diff_geojson(const std::string& file1, const std::string& file2, int32_
     return numdiffs;
 }
 
-}
+} // namespace
 
 TEST(OGRWriterTest, shapefile)
 {
@@ -260,24 +276,27 @@ TEST(OGRWriterTest, geopackage)
 TEST(OGRWriterTest, creation_options)
 {
     std::string infile = Support::datapath("las/simple.las");
-    #if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,9,0)
-        std::string infofile = Support::datapath("ogr/creation_options_gdal_gt_390.geojson.ogrinfo");
-    #else
-        std::string infofile = Support::datapath("ogr/creation_options.geojson.ogrinfo");
-    #endif
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 9, 0)
+    std::string infofile =
+        Support::datapath("ogr/creation_options_gdal_gt_390.geojson.ogrinfo");
+#else
+    std::string infofile =
+        Support::datapath("ogr/creation_options.geojson.ogrinfo");
+#endif
 
-        Options wo;
-        wo.add("ogrdriver", "GeoJSON");
-        wo.add("ogr_options", "WRITE_BBOX=YES");
-        wo.add("ogr_options", "COORDINATE_PRECISION=1");
+    Options wo;
+    wo.add("ogrdriver", "GeoJSON");
+    wo.add("ogr_options", "WRITE_BBOX=YES");
+    wo.add("ogr_options", "COORDINATE_PRECISION=1");
 
-        runOgrWriterInfo(wo, infile, infofile, ".geojson", 10, &diff_geojson);
+    runOgrWriterInfo(wo, infile, infofile, ".geojson", 10, &diff_geojson);
 }
 
 TEST(OGRWriterTest, shapefile_measure)
 {
     std::string infile = Support::datapath("las/simple.las");
-    std::string infofile = Support::datapath("ogr/shapefile_measure.shp.ogrinfo");
+    std::string infofile =
+        Support::datapath("ogr/shapefile_measure.shp.ogrinfo");
 
     Options wo;
     wo.add("ogrdriver", "ESRI Shapefile");
@@ -302,12 +321,13 @@ TEST(OGRWriterTest, geopackage_attrs_all)
 {
     std::string infile = Support::datapath("las/simple.las");
 
-    #if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3,9,0)
-        std::string infofile = Support::datapath("ogr/geopackage_attrs_all_gdal_gt_390.gpkg.ogrinfo");
-    #else
-        std::string infofile = Support::datapath("ogr/geopackage_attrs_all.gpkg.ogrinfo");
-    #endif
-
+#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 9, 0)
+    std::string infofile =
+        Support::datapath("ogr/geopackage_attrs_all_gdal_gt_390.gpkg.ogrinfo");
+#else
+    std::string infofile =
+        Support::datapath("ogr/geopackage_attrs_all.gpkg.ogrinfo");
+#endif
 
     Options wo;
     wo.add("ogrdriver", "GPKG");
@@ -394,10 +414,10 @@ TEST(OGRWriterTest, error_multicount_attrs)
         runOgrWriterInfo(wo, infile, infofile, ".geojson");
         FAIL() << "Expected an exception for an invalid arg combination";
     }
-    catch (pdal_error const & err)
+    catch (pdal_error const& err)
     {
         EXPECT_EQ("writers.ogr: multicount > 1 incompatible with attr_dims",
-            std::string(err.what()));
+                  std::string(err.what()));
     }
 }
 
@@ -415,10 +435,10 @@ TEST(OGRWriterTest, error_unknown_attr)
         runOgrWriterInfo(wo, infile, infofile, ".geojson");
         FAIL() << "Expected an exception for an invalid arg combination";
     }
-    catch (pdal_error const & err)
+    catch (pdal_error const& err)
     {
         EXPECT_EQ("writers.ogr: Dimension 'bananas' (attr_dims) not found.",
-            std::string(err.what()));
+                  std::string(err.what()));
     }
 }
 
@@ -442,9 +462,11 @@ TEST(OGRWriterTest, error_ogr)
         }
         FAIL() << "Expected an exception from OGR";
     }
-    catch (pdal_error const & err)
+    catch (pdal_error const& err)
     {
-        EXPECT_EQ("writers.ogr: Can't create OGR layer: Failed to create coordinate transformation between the input coordinate system and WGS84.",
+        EXPECT_EQ(
+            "writers.ogr: Can't create OGR layer: Failed to create coordinate "
+            "transformation between the input coordinate system and WGS84.",
             std::string(err.what()));
     }
 }

@@ -1,40 +1,40 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
-#include <pdal/pdal_test_main.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/SrsBounds.hpp>
+#include <pdal/pdal_test_main.hpp>
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -52,18 +52,18 @@ TEST(BoundsTest, test_ctor)
 
 TEST(BoundsTest, test_equals)
 {
-    BOX2D b1(1,2,3,4);
-    BOX2D b2(1,2,3,4);
-    BOX2D b3(1,2,3,6);
+    BOX2D b1(1, 2, 3, 4);
+    BOX2D b2(1, 2, 3, 4);
+    BOX2D b3(1, 2, 3, 6);
 
     EXPECT_TRUE(b1 == b1);
     EXPECT_TRUE(b1 == b2);
     EXPECT_TRUE(b1 != b3);
     EXPECT_TRUE(b2 != b3);
 
-    BOX3D b4(1,2,3,4,5,6);
-    BOX3D b5(1,2,3,4,5,6);
-    BOX3D b6(1,2,3,4,4,6);
+    BOX3D b4(1, 2, 3, 4, 5, 6);
+    BOX3D b5(1, 2, 3, 4, 5, 6);
+    BOX3D b6(1, 2, 3, 4, 4, 6);
 
     EXPECT_TRUE(b4 == b4);
     EXPECT_TRUE(b4 == b5);
@@ -74,50 +74,50 @@ TEST(BoundsTest, test_equals)
 
 TEST(BoundsTest, test_copy)
 {
-    BOX2D b1(1,2,3,4);
+    BOX2D b1(1, 2, 3, 4);
     BOX2D b2(b1);
-    EXPECT_TRUE(b1==b2);
+    EXPECT_TRUE(b1 == b2);
 
-    BOX3D b3(1,2,3,4,5,6);
+    BOX3D b3(1, 2, 3, 4, 5, 6);
     BOX3D b4(b3);
-    EXPECT_TRUE(b1==b2);
+    EXPECT_TRUE(b1 == b2);
 }
 
 TEST(BoundsTest, test_accessor)
 {
-    BOX2D b1(1,2,3,4);
-	EXPECT_DOUBLE_EQ(b1.minx, 1.0);
+    BOX2D b1(1, 2, 3, 4);
+    EXPECT_DOUBLE_EQ(b1.minx, 1.0);
     EXPECT_DOUBLE_EQ(b1.miny, 2.0);
-	EXPECT_DOUBLE_EQ(b1.maxx, 3.0);
-	EXPECT_DOUBLE_EQ(b1.maxy, 4.0);
+    EXPECT_DOUBLE_EQ(b1.maxx, 3.0);
+    EXPECT_DOUBLE_EQ(b1.maxy, 4.0);
 
-    BOX3D b2(1,2,3,4,5,6);
-	EXPECT_DOUBLE_EQ(b2.minx, 1.0);
-	EXPECT_DOUBLE_EQ(b2.miny, 2.0);
-	EXPECT_DOUBLE_EQ(b2.minz, 3.0);
-	EXPECT_DOUBLE_EQ(b2.maxx, 4.0);
-	EXPECT_DOUBLE_EQ(b2.maxy, 5.0);
-	EXPECT_DOUBLE_EQ(b2.maxz, 6.0);
+    BOX3D b2(1, 2, 3, 4, 5, 6);
+    EXPECT_DOUBLE_EQ(b2.minx, 1.0);
+    EXPECT_DOUBLE_EQ(b2.miny, 2.0);
+    EXPECT_DOUBLE_EQ(b2.minz, 3.0);
+    EXPECT_DOUBLE_EQ(b2.maxx, 4.0);
+    EXPECT_DOUBLE_EQ(b2.maxy, 5.0);
+    EXPECT_DOUBLE_EQ(b2.maxz, 6.0);
 }
 
 TEST(BoundsTest, test_clip)
 {
-    BOX2D r1(0,0,10,10);
-    BOX2D r2(1,1,11,11);
+    BOX2D r1(0, 0, 10, 10);
+    BOX2D r2(1, 1, 11, 11);
     r1.clip(r2);
 
-    BOX2D r3(1,1,10,10);
-    EXPECT_TRUE(r1==r3);
+    BOX2D r3(1, 1, 10, 10);
+    EXPECT_TRUE(r1 == r3);
 
-    BOX2D r4(2,4,6,8);
+    BOX2D r4(2, 4, 6, 8);
     r1.clip(r4);
-    EXPECT_TRUE(r1==r4);
+    EXPECT_TRUE(r1 == r4);
 
-	BOX3D r8(0, 0, 0, 10, 10, 10);
-	BOX3D r9(1, 1, 1, 11, 11, 11);
-	r8.clip(r9);
+    BOX3D r8(0, 0, 0, 10, 10, 10);
+    BOX3D r9(1, 1, 1, 11, 11, 11);
+    r8.clip(r9);
 
-	BOX3D r10(1, 1, 1, 10, 10, 10);
+    BOX3D r10(1, 1, 1, 10, 10, 10);
     EXPECT_TRUE(r8 == r10);
 
     BOX3D r11(2, 3, 4, 7, 8, 9);
@@ -128,10 +128,10 @@ TEST(BoundsTest, test_clip)
 
 TEST(BoundsTest, test_intersect)
 {
-    BOX2D r1(0,0,10,10);
-    BOX2D r2(1,1,11,11);
-    BOX2D r3(100,100,101,101);
-    BOX2D r4(2,4,6,8);
+    BOX2D r1(0, 0, 10, 10);
+    BOX2D r2(1, 1, 11, 11);
+    BOX2D r3(100, 100, 101, 101);
+    BOX2D r4(2, 4, 6, 8);
 
     EXPECT_TRUE(r1.overlaps(r1));
 
@@ -145,17 +145,17 @@ TEST(BoundsTest, test_intersect)
     EXPECT_TRUE(!r1.contains(r2));
     EXPECT_TRUE(r1.contains(r4));
 
-//ABELL - Need BOX3D example.
+    // ABELL - Need BOX3D example.
 }
 
 TEST(BoundsTest, test_grow)
 {
-    BOX2D r1(50,51,100,101);
-    BOX2D r2(0,1,10,201);
+    BOX2D r1(50, 51, 100, 101);
+    BOX2D r2(0, 1, 10, 201);
 
     r1.grow(r2);
 
-    BOX2D r3(0,1,100,201);
+    BOX2D r3(0, 1, 100, 201);
     EXPECT_TRUE(r1 == r3);
 
     BOX3D r4(50, 51, 52, 100, 101, 102);
@@ -227,8 +227,8 @@ TEST(BoundsTest, test_invalid)
 
 TEST(BoundsTest, test_output)
 {
-    const BOX2D b2(1,2,101,102);
-    const BOX3D b3(1.1,2.2,3.3,101.1,102.2,103.3);
+    const BOX2D b2(1, 2, 101, 102);
+    const BOX3D b3(1.1, 2.2, 3.3, 101.1, 102.2, 103.3);
 
     std::stringstream ss2(std::stringstream::in | std::stringstream::out);
     std::stringstream ss3(std::stringstream::in | std::stringstream::out);
@@ -243,15 +243,14 @@ TEST(BoundsTest, test_output)
     EXPECT_EQ(out3, "([1.1, 101.1], [2.2, 102.2], [3.3, 103.3])");
 }
 
-
 TEST(BoundsTest, test_input)
 {
     std::stringstream ss("([1.1, 101.1], [2.2, 102.2], [3.3, 103.3])",
-        std::stringstream::in | std::stringstream::out);
+                         std::stringstream::in | std::stringstream::out);
 
     BOX3D rr;
     ss >> rr;
-    BOX3D r(1.1,2.2,3.3,101.1,102.2,103.3);
+    BOX3D r(1.1, 2.2, 3.3, 101.1, 102.2, 103.3);
     EXPECT_TRUE(r == rr);
 }
 
@@ -276,9 +275,7 @@ TEST(BoundsTest, test_parse2)
     BOX3D b1;
 
     iss1 >> b1;
-
 }
-
 
 TEST(BoundsTest, test_parse_geojson)
 {
@@ -308,7 +305,8 @@ TEST(BoundsTest, test_parse_geojson)
 TEST(BoundsTest, test_parse_object)
 {
     std::istringstream iss1("([1,101],[2,102],[3,103])");
-    std::istringstream iss2("{\"minx\": 1,\"miny\": 2,\"minz\": 3,\"maxx\": 101,\"maxy\": 102,\"maxz\": 103}");
+    std::istringstream iss2("{\"minx\": 1,\"miny\": 2,\"minz\": 3,\"maxx\": "
+                            "101,\"maxy\": 102,\"maxz\": 103}");
 
     BOX3D b1;
     BOX3D b2;
@@ -319,7 +317,8 @@ TEST(BoundsTest, test_parse_object)
     EXPECT_EQ(b1, b2);
 
     std::istringstream iss3("([1,101],[2,102])");
-    std::istringstream iss4("{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}");
+    std::istringstream iss4(
+        "{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}");
 
     BOX2D b3;
     BOX2D b4;
@@ -330,7 +329,8 @@ TEST(BoundsTest, test_parse_object)
     EXPECT_EQ(b3, b4);
 
     SrsBounds sb;
-    std::string t("{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102, \"crs\":\"EPSG:2596\"}");
+    std::string t("{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102, "
+                  "\"crs\":\"EPSG:2596\"}");
     Utils::fromString(t, sb);
 
     EXPECT_FALSE(sb.is3d());
@@ -343,42 +343,48 @@ TEST(BoundsTest, test_parse_object)
     EXPECT_EQ(box.maxy, 102.0);
 
     EXPECT_NE(std::string::npos,
-        sb.spatialReference().getWKT().find("Krassowsky 1940"));
-
-
+              sb.spatialReference().getWKT().find("Krassowsky 1940"));
 }
-
-
 
 TEST(BoundsTest, test_wkt)
 {
-    BOX2D b(1.1,2.2,101.1,102.2);
-    std::string out = "POLYGON ((1.1 2.2, 1.1 102.2, 101.1 102.2, 101.1 2.2, 1.1 2.2))";
+    BOX2D b(1.1, 2.2, 101.1, 102.2);
+    std::string out =
+        "POLYGON ((1.1 2.2, 1.1 102.2, 101.1 102.2, 101.1 2.2, 1.1 2.2))";
     EXPECT_EQ(b.toWKT(1), out);
 
-    BOX3D b2(1.1,2.2,3.3,101.1,102.2,103.3);
-    std::string out2 = "POLYHEDRON Z ( ((1.1 2.2 3.3, 101.1 2.2 3.3, 101.1 102.2 3.3, 1.1 102.2 3.3, 1.1 2.2 3.3, )), ((1.1 2.2 3.3, 101.1 2.2 3.3, 101.1 2.2 103.3, 1.1 2.2 103.3, 1.1 2.2 3.3, )), ((101.1 2.2 3.3, 101.1 102.2 3.3, 101.1 102.2 103.3, 101.1 2.2 103.3, 101.1 2.2 3.3, )), ((101.1 102.2 3.3, 1.1 102.2 3.3, 1.1 102.2 103.3, 101.1 102.2 103.3, 101.1 102.2 3.3, )), ((1.1 102.2 3.3, 1.1 2.2 3.3, 1.1 2.2 103.3, 1.1 102.2 103.3, 1.1 102.2 3.3, )), ((1.1 2.2 103.3, 101.1 2.2 103.3, 101.1 102.2 103.3, 1.1 102.2 103.3, 1.1 2.2 103.3, )) )";
+    BOX3D b2(1.1, 2.2, 3.3, 101.1, 102.2, 103.3);
+    std::string out2 =
+        "POLYHEDRON Z ( ((1.1 2.2 3.3, 101.1 2.2 3.3, 101.1 102.2 3.3, 1.1 "
+        "102.2 3.3, 1.1 2.2 3.3, )), ((1.1 2.2 3.3, 101.1 2.2 3.3, 101.1 2.2 "
+        "103.3, 1.1 2.2 103.3, 1.1 2.2 3.3, )), ((101.1 2.2 3.3, 101.1 102.2 "
+        "3.3, 101.1 102.2 103.3, 101.1 2.2 103.3, 101.1 2.2 3.3, )), ((101.1 "
+        "102.2 3.3, 1.1 102.2 3.3, 1.1 102.2 103.3, 101.1 102.2 103.3, 101.1 "
+        "102.2 3.3, )), ((1.1 102.2 3.3, 1.1 2.2 3.3, 1.1 2.2 103.3, 1.1 102.2 "
+        "103.3, 1.1 102.2 3.3, )), ((1.1 2.2 103.3, 101.1 2.2 103.3, 101.1 "
+        "102.2 103.3, 1.1 102.2 103.3, 1.1 2.2 103.3, )) )";
     EXPECT_EQ(b2.toWKT(1), out2);
 }
 TEST(BoundsTest, test_json)
 {
-    BOX2D b(1.1,2.2,101.1,102.2);
+    BOX2D b(1.1, 2.2, 101.1, 102.2);
     std::string out = "{\"bbox\":[1.1, 2.2, 101.1,102.2]}";
     EXPECT_EQ(b.toGeoJSON(1), out);
 }
 
 TEST(BoundsTest, test_2d_input)
 {
-    std::stringstream ss("([1.1, 101.1], [2.2, 102.2])", std::stringstream::in | std::stringstream::out);
+    std::stringstream ss("([1.1, 101.1], [2.2, 102.2])",
+                         std::stringstream::in | std::stringstream::out);
     BOX2D rr;
     ss >> rr;
-    BOX2D r(1.1,2.2,101.1,102.2);
+    BOX2D r(1.1, 2.2, 101.1, 102.2);
     EXPECT_EQ(r, rr);
 }
 
 TEST(BoundsTest, test_precisionloss)
 {
-    const BOX2D b1(0.123456789,0.0,0,0);
+    const BOX2D b1(0.123456789, 0.0, 0, 0);
     EXPECT_DOUBLE_EQ(b1.minx, 0.123456789);
 
     // convert it to a string, which is what happens
@@ -397,7 +403,7 @@ TEST(BoundsTest, test_precisionloss)
 
 namespace
 {
-    std::string fancySrs =
+std::string fancySrs =
     R"SRS(
         COMPD_CS["OSGB36 / British National Grid + ODN",
          PROJCS["OSGB 1936 / British National Grid",
@@ -454,7 +460,8 @@ TEST(BoundsTest, b1)
 
     EXPECT_FALSE(sb.is3d());
     EXPECT_TRUE(sb.to3d().empty());
-    EXPECT_TRUE(sb.spatialReference().getWKT().find("Pulkovo") != std::string::npos);
+    EXPECT_TRUE(sb.spatialReference().getWKT().find("Pulkovo") !=
+                std::string::npos);
 
     box = sb.to2d();
     EXPECT_EQ(box.minx, 0.0);
@@ -463,7 +470,7 @@ TEST(BoundsTest, b1)
     EXPECT_EQ(box.maxy, 1.0);
 
     EXPECT_NE(std::string::npos,
-        sb.spatialReference().getWKT().find("Krassowsky 1940"));
+              sb.spatialReference().getWKT().find("Krassowsky 1940"));
 
     Utils::fromString("([0, -1.00000],[0,-1e0] ) / " + fancySrs, sb);
 
@@ -477,7 +484,7 @@ TEST(BoundsTest, b1)
     EXPECT_EQ(box.maxy, -1.0);
     EXPECT_TRUE(sb.spatialReference().valid());
     EXPECT_NE(std::string::npos,
-        sb.spatialReference().getWKT().find("Ordnance Datum Newlyn"));
+              sb.spatialReference().getWKT().find("Ordnance Datum Newlyn"));
 }
 
 TEST(BoundsTest, fromstring)
@@ -525,7 +532,7 @@ TEST(BoundsTest, b2)
     EXPECT_EQ(box3.maxz, 2.0);
 
     EXPECT_NE(std::string::npos,
-        sb.spatialReference().getWKT().find("Krassowsky 1940"));
+              sb.spatialReference().getWKT().find("Krassowsky 1940"));
 
     Utils::fromString("([0,1],[0,1], [0,2]) / " + fancySrs, sb);
     EXPECT_TRUE(sb.is3d());
@@ -539,7 +546,7 @@ TEST(BoundsTest, b2)
     EXPECT_EQ(box3.maxz, 2.0);
     EXPECT_TRUE(sb.spatialReference().valid());
     EXPECT_NE(std::string::npos,
-        sb.spatialReference().getWKT().find("Ordnance Datum Newlyn"));
+              sb.spatialReference().getWKT().find("Ordnance Datum Newlyn"));
 }
 
 TEST(BoundsTest, bounds_insertion)

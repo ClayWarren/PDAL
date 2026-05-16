@@ -67,23 +67,24 @@ blocks.
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.chipper",
-    "Organize points into spatially contiguous, squarish, and non-overlapping chips.",
-    "https://pdal.org/stages/filters.chipper.html"
-};
+    "Organize points into spatially contiguous, squarish, and non-overlapping "
+    "chips.",
+    "https://pdal.org/stages/filters.chipper.html"};
 
 CREATE_STATIC_STAGE(ChipperFilter, s_info)
 
-std::string ChipperFilter::getName() const { return s_info.name; }
+std::string ChipperFilter::getName() const
+{
+    return s_info.name;
+}
 
 void ChipperFilter::addArgs(ProgramArgs& args)
 {
     args.add("capacity", "Maximum number of points per cell", m_threshold,
-        (PointId) 5000u);
+             (PointId)5000u);
 }
-
 
 PointViewSet ChipperFilter::run(PointViewPtr view)
 {
@@ -104,9 +105,8 @@ PointViewSet ChipperFilter::run(PointViewPtr view)
     return m_outViews;
 }
 
-
 void ChipperFilter::load(PointView& view, ChipRefList& xvec, ChipRefList& yvec,
-    ChipRefList& spare)
+                         ChipRefList& spare)
 {
     for (PointId i = 0; i < view.size(); ++i)
     {
@@ -139,20 +139,18 @@ void ChipperFilter::load(PointView& view, ChipRefList& xvec, ChipRefList& yvec,
         xvec[yvec[i].m_oindex].m_oindex = i;
 }
 
-
 #ifdef _WIN32
 inline long lround(double d)
 {
-	long l;
+    long l;
 
-	if (d < 0)
-		l = (long)ceil(d - .5);
-	else
-		l = (long)floor(d + .5);
-	return l;
+    if (d < 0)
+        l = (long)ceil(d - .5);
+    else
+        l = (long)floor(d + .5);
+    return l;
 }
 #endif
-
 
 // Build a list of partitions.  The partition is the size of each block in
 // the x and y directions in number of points.
@@ -178,9 +176,9 @@ void ChipperFilter::partition(point_count_t size)
     }
 }
 
-
 void ChipperFilter::decideSplit(ChipRefList& v1, ChipRefList& v2,
-    ChipRefList& spare, PointId pleft, PointId pright)
+                                ChipRefList& spare, PointId pleft,
+                                PointId pright)
 {
     double v1range;
     double v2range;
@@ -198,7 +196,7 @@ void ChipperFilter::decideSplit(ChipRefList& v1, ChipRefList& v2,
 }
 
 void ChipperFilter::split(ChipRefList& wide, ChipRefList& narrow,
-    ChipRefList& spare, PointId pleft, PointId pright)
+                          ChipRefList& spare, PointId pleft, PointId pright)
 {
     PointId lstart;
     PointId rstart;
@@ -216,15 +214,14 @@ void ChipperFilter::split(ChipRefList& wide, ChipRefList& narrow,
 
     if (pright - pleft == 1)
         emit(wide, left, right);
-    else if (pright - pleft == 2) {
+    else if (pright - pleft == 2)
+    {
         center = m_partitions[pright - 1];
-        emit(wide,
-             left,
-             center - 1);
-        emit(wide,
-             center,
-             right);
-    } else {
+        emit(wide, left, center - 1);
+        emit(wide, center, right);
+    }
+    else
+    {
         pcenter = (pleft + pright) / 2;
         center = m_partitions[pcenter];
 
@@ -265,4 +262,3 @@ void ChipperFilter::emit(ChipRefList& wide, PointId widemin, PointId widemax)
 }
 
 } // namespace pdal
-

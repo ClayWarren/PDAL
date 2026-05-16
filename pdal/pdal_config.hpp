@@ -67,4 +67,3 @@ PDAL_EXPORT std::string pluginInstallPath();
 
 } // namespace Config
 } // namespace pdal
-

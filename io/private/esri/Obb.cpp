@@ -1,44 +1,44 @@
 /******************************************************************************
-* Copyright (c) 2020, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2020, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <array>
 
 #include <nlohmann/json.hpp>
 
-#include <pdal/util/Bounds.hpp>
 #include <pdal/private/MathUtils.hpp>
 #include <pdal/private/SrsTransform.hpp>
+#include <pdal/util/Bounds.hpp>
 
 #include "Obb.hpp"
 
@@ -47,38 +47,32 @@ namespace pdal
 namespace i3s
 {
 
-Obb::Obb() : m_valid(false)
-{}
+Obb::Obb() : m_valid(false) {}
 
 Obb::Obb(const NL::json& spec)
 {
     parse(spec);
 }
 
-
 bool Obb::valid() const
 {
     return m_valid;
 }
-
 
 Eigen::Vector3d Obb::center() const
 {
     return m_p;
 }
 
-
 Eigen::Quaterniond Obb::quat() const
 {
     return m_quat;
 }
 
-
 BOX3D Obb::bounds() const
 {
-    return { -m_hx, -m_hy, -m_hz, m_hx, m_hy, m_hz };
+    return {-m_hx, -m_hy, -m_hz, m_hx, m_hy, m_hz};
 }
-
 
 void Obb::verifyArray(const NL::json& spec, const std::string& name, size_t cnt)
 {
@@ -89,14 +83,16 @@ void Obb::verifyArray(const NL::json& spec, const std::string& name, size_t cnt)
     if (!arr.is_array())
         throw EsriError("Invalid OBB - '" + name + "' is not an array.");
     if (arr.size() != cnt)
-        throw EsriError("Invalid OBB - '" + name + "' does not specify "
-                "three values.");
+        throw EsriError("Invalid OBB - '" + name +
+                        "' does not specify "
+                        "three values.");
     for (size_t i = 0; i < cnt; ++i)
     {
         NL::json o = arr[i];
         if (!o.is_number())
-            throw EsriError("Invalid OBB - '" + name +
-                "[" + std::to_string(i) + "]' " "is not numeric.");
+            throw EsriError("Invalid OBB - '" + name + "[" + std::to_string(i) +
+                            "]' "
+                            "is not numeric.");
     }
 }
 
@@ -109,7 +105,7 @@ void Obb::parse(NL::json spec)
     double x = spec["center"][0].get<double>();
     double y = spec["center"][1].get<double>();
     double z = spec["center"][2].get<double>();
-    m_p = { x, y, z };
+    m_p = {x, y, z};
 
     m_hx = spec["halfSize"][0].get<double>();
     m_hy = spec["halfSize"][1].get<double>();
@@ -129,7 +125,7 @@ void Obb::parse(NL::json spec)
     if (spec.size())
     {
         throw EsriError("Invalid OBB: found invalid key '" +
-            spec.begin().key() + "'.");
+                        spec.begin().key() + "'.");
     }
     m_valid = true;
 }
@@ -144,8 +140,7 @@ void Obb::transform(const SrsTransform& xform)
 Eigen::Vector3d Obb::corner(size_t pos)
 {
     assert(pos < 8);
-    Eigen::Vector3d v((pos & 1) ? -m_hx : m_hx,
-                      (pos & 2) ? -m_hy : m_hy,
+    Eigen::Vector3d v((pos & 1) ? -m_hx : m_hx, (pos & 2) ? -m_hy : m_hy,
                       (pos & 4) ? -m_hz : m_hz);
     v = math::rotate(v, m_quat);
     v += m_p;
@@ -160,13 +155,19 @@ Segment Obb::segment(size_t pos)
     // Top row is the segments that make up the "top" rectangle.  Second
     // row makes up the "bottom" rectangle.  Third row makes up the edges
     // connecting the top corners to the bottom corners.
-    std::array<std::pair<std::size_t, std::size_t>, 12> segs
-    {{
-        {0, 2}, {2, 6}, {6, 4}, {4, 0},
-        {1, 3}, {3, 7}, {7, 5}, {5, 1},
-        {0, 1}, {2, 3}, {4, 5}, {6, 7}
-    }};
-    return { corner(segs[pos].first), corner(segs[pos].second) };
+    std::array<std::pair<std::size_t, std::size_t>, 12> segs{{{0, 2},
+                                                              {2, 6},
+                                                              {6, 4},
+                                                              {4, 0},
+                                                              {1, 3},
+                                                              {3, 7},
+                                                              {7, 5},
+                                                              {5, 1},
+                                                              {0, 1},
+                                                              {2, 3},
+                                                              {4, 5},
+                                                              {6, 7}}};
+    return {corner(segs[pos].first), corner(segs[pos].second)};
 }
 
 // For this to work both this and the clip box must be in the same cartesian
@@ -192,11 +193,11 @@ bool Obb::halfIntersect(const Obb& a, Obb b)
     // If any of the clip box corners are in this box, we're done.
     // While we're at it, store the min/max of corner points.
     Eigen::Vector3d pmin((std::numeric_limits<double>::max)(),
-        (std::numeric_limits<double>::max)(),
-        (std::numeric_limits<double>::max)());
+                         (std::numeric_limits<double>::max)(),
+                         (std::numeric_limits<double>::max)());
     Eigen::Vector3d pmax((std::numeric_limits<double>::lowest)(),
-        (std::numeric_limits<double>::lowest)(),
-        (std::numeric_limits<double>::lowest)());
+                         (std::numeric_limits<double>::lowest)(),
+                         (std::numeric_limits<double>::lowest)());
     for (size_t i = 0; i < 8; ++i)
     {
         Eigen::Vector3d corner = b.corner(i);
@@ -212,9 +213,8 @@ bool Obb::halfIntersect(const Obb& a, Obb b)
     }
 
     // If the clip box surrounds this box, we're done.
-    if (pmax.x() >= a.m_hx && pmin.x() <= -a.m_hx &&
-        pmax.y() >= a.m_hy && pmin.y() <= -a.m_hy &&
-        pmax.z() >= a.m_hz && pmin.z() <= -a.m_hz)
+    if (pmax.x() >= a.m_hx && pmin.x() <= -a.m_hx && pmax.y() >= a.m_hy &&
+        pmin.y() <= -a.m_hy && pmax.z() >= a.m_hz && pmin.z() <= -a.m_hz)
         return true;
 
     // If any of the segments that make up the clip region intersect
@@ -241,23 +241,17 @@ bool Obb::intersectNormalized(const Segment& seg) const
     // These represent both points on the faces of this box and
     // outward-facing normal vectors to those faces.
     const size_t numFaces = 6;
-    std::array<Eigen::Vector3d, numFaces> faces
-    {{
-        {m_hx, 0, 0},
-        {-m_hx, 0, 0},
-        {0, m_hy, 0},
-        {0, -m_hy, 0},
-        {0, 0, m_hz},
-        {0, 0, -m_hz}
-    }};
+    std::array<Eigen::Vector3d, numFaces> faces{{{m_hx, 0, 0},
+                                                 {-m_hx, 0, 0},
+                                                 {0, m_hy, 0},
+                                                 {0, -m_hy, 0},
+                                                 {0, 0, m_hz},
+                                                 {0, 0, -m_hz}}};
 
     // Faces of the base box represented as 2D areas.
-    std::array<BOX2D, 3> boxes
-    {{
-        {-m_hy, -m_hz, m_hy, m_hz},
-        {-m_hx, -m_hz, m_hx, m_hz},
-        {-m_hx, -m_hy, m_hx, m_hy}
-    }};
+    std::array<BOX2D, 3> boxes{{{-m_hy, -m_hz, m_hy, m_hz},
+                                {-m_hx, -m_hz, m_hx, m_hz},
+                                {-m_hx, -m_hy, m_hx, m_hy}}};
 
     // Find the 3D intersection point of the segment and each of the faces.
     // Convert to a 2D point WRT the face and see if the point is in the 2D
@@ -292,7 +286,7 @@ bool Obb::intersectNormalized(const Segment& seg) const
         // face in 2d, ignoring the dimension in the direction of the normal.
         double coord[2];
         size_t pos = 0;
-        BOX2D *box(0);
+        BOX2D* box(0);
         for (size_t i = 0; i < 3; ++i)
         {
             if (face[i])
@@ -313,14 +307,13 @@ void Obb::setCenter(const Eigen::Vector3d& center)
     m_p = center;
 }
 
-
 std::ostream& operator<<(std::ostream& out, const Obb& obb)
 {
     NL::json j;
-    j["center"] = { obb.m_p.x(), obb.m_p.y(), obb.m_p.z() };
-    j["halfSize"] = { obb.m_hx, obb.m_hy, obb.m_hz };
+    j["center"] = {obb.m_p.x(), obb.m_p.y(), obb.m_p.z()};
+    j["halfSize"] = {obb.m_hx, obb.m_hy, obb.m_hz};
     const Eigen::Vector3d& v = obb.m_quat.vec();
-    j["quaternion"] = { v.x(), v.y(), v.z(), obb.m_quat.w() };
+    j["quaternion"] = {v.x(), v.y(), v.z(), obb.m_quat.w()};
 
     out << j;
     return out;

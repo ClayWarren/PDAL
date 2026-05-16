@@ -1,9 +1,9 @@
 #pragma once
 
-#include <functional>
-#include <vector>
-#include <utility>
 #include <cmath>
+#include <functional>
+#include <utility>
+#include <vector>
 
 #include "../Comparison.hpp"
 
@@ -12,7 +12,7 @@ class VoxelRayTrace
 {
 public:
     using CellList = std::vector<std::pair<int, int>>;
-    using CellCb = std::function<bool (int, int)>;
+    using CellCb = std::function<bool(int, int)>;
 
     // Think parametric equations:
     //  x = xstart + (xend - xstart) * t
@@ -20,21 +20,21 @@ public:
     // OR
     //  x = xstart + xvec * t
     //  y = ystart + tvec * t
-    VoxelRayTrace(double cellWidth, double cellHeight,
-        double xstart, double ystart, double xend, double yend) :
-        m_cellWidth(cellWidth), m_cellHeight(cellHeight),
-        m_xCellOrigin(0), m_yCellOrigin(0),
-        m_xstart(xstart), m_ystart(ystart), m_xend(xend), m_yend(yend)
+    VoxelRayTrace(double cellWidth, double cellHeight, double xstart,
+                  double ystart, double xend, double yend)
+        : m_cellWidth(cellWidth), m_cellHeight(cellHeight), m_xCellOrigin(0),
+          m_yCellOrigin(0), m_xstart(xstart), m_ystart(ystart), m_xend(xend),
+          m_yend(yend)
     {
         initialize();
     }
 
-    VoxelRayTrace(double cellWidth, double cellHeight,
-        double xCellOrigin, double yCellOrigin,
-        double xstart, double ystart, double xend, double yend) :
-        m_cellWidth(cellWidth), m_cellHeight(cellHeight),
-        m_xCellOrigin(xCellOrigin), m_yCellOrigin(yCellOrigin),
-        m_xstart(xstart), m_ystart(ystart), m_xend(xend), m_yend(yend)
+    VoxelRayTrace(double cellWidth, double cellHeight, double xCellOrigin,
+                  double yCellOrigin, double xstart, double ystart, double xend,
+                  double yend)
+        : m_cellWidth(cellWidth), m_cellHeight(cellHeight),
+          m_xCellOrigin(xCellOrigin), m_yCellOrigin(yCellOrigin),
+          m_xstart(xstart), m_ystart(ystart), m_xend(xend), m_yend(yend)
     {
         initialize();
     }
@@ -61,28 +61,24 @@ public:
 
         // The x/y coordinates of the X and Y grid lines we'll cross next
         // as we move from the start point to the end point.
-        double xNextCell = m_xCellOrigin + ((gridNextX) * m_cellWidth);
-        double yNextCell = m_yCellOrigin + ((gridNextY) * m_cellHeight);
+        double xNextCell = m_xCellOrigin + ((gridNextX)*m_cellWidth);
+        double yNextCell = m_yCellOrigin + ((gridNextY)*m_cellHeight);
 
         // These come straight from the equations shown above.
         // X/Y component of the vector from start to the intersection of
         // the "next" cell. Set the value to max if we're not moving in that
         // direction to force the emit loop to only consider movement in one
         // direction.
-        m_tMaxX = m_xvec ?
-            ((xNextCell - m_xstart) / m_xvec) :
-            (std::numeric_limits<double>::max)();
-        m_tMaxY = m_yvec ?
-            ((yNextCell - m_ystart) / m_yvec) :
-            (std::numeric_limits<double>::max)();
+        m_tMaxX = m_xvec ? ((xNextCell - m_xstart) / m_xvec)
+                         : (std::numeric_limits<double>::max)();
+        m_tMaxY = m_yvec ? ((yNextCell - m_ystart) / m_yvec)
+                         : (std::numeric_limits<double>::max)();
 
         // Amount t changes to move across a cell.
-        m_tDeltaX = m_xvec ?
-            std::abs(m_cellWidth / m_xvec) :
-            (std::numeric_limits<double>::max)();
-        m_tDeltaY = m_yvec ?
-            std::abs(m_cellHeight / m_yvec) :
-            (std::numeric_limits<double>::max)();
+        m_tDeltaX = m_xvec ? std::abs(m_cellWidth / m_xvec)
+                           : (std::numeric_limits<double>::max)();
+        m_tDeltaY = m_yvec ? std::abs(m_cellHeight / m_yvec)
+                           : (std::numeric_limits<double>::max)();
     }
 
     // Return the list of cells crossed when moving from the start point
@@ -97,11 +93,11 @@ public:
         int xlast = xcell(m_xend);
         int ylast = ycell(m_yend);
 
-        cells.push_back( {gridX, gridY} );
+        cells.push_back({gridX, gridY});
 
-        // Stop when we hit either the X or Y end position. This allows us to properly
-        // exit the loop when m_tMaxX == t_MaxY at the end, which can happen if an
-        // endpoint is exactly on a grid vertex.
+        // Stop when we hit either the X or Y end position. This allows us to
+        // properly exit the loop when m_tMaxX == t_MaxY at the end, which can
+        // happen if an endpoint is exactly on a grid vertex.
         while (gridX != xlast && gridY != ylast)
         {
             if (m_tMaxX < m_tMaxY)
@@ -114,20 +110,20 @@ public:
                 m_tMaxY += m_tDeltaY;
                 gridY += m_stepY;
             }
-            cells.push_back( { gridX, gridY } );
+            cells.push_back({gridX, gridY});
         }
 
-        // Once we have hit the endpoint in one direction, add cells in the other
-        // direction until we're done.
+        // Once we have hit the endpoint in one direction, add cells in the
+        // other direction until we're done.
         while (gridX != xlast)
         {
             gridX += m_stepX;
-            cells.push_back( { gridX, gridY } );
+            cells.push_back({gridX, gridY});
         }
         while (gridY != ylast)
         {
             gridY += m_stepY;
-            cells.push_back( { gridX, gridY } );
+            cells.push_back({gridX, gridY});
         }
         return cells;
     }

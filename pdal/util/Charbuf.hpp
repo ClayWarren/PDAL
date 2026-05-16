@@ -1,41 +1,41 @@
 /******************************************************************************
-* Copyright (c) 2014, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2014, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
-#include <streambuf>
 #include <iostream>
+#include <streambuf>
 #include <vector>
 
 #include "pdal_util_export.hpp"
@@ -47,8 +47,8 @@ namespace pdal
   Allow a data buffer to be used at a std::streambuf.
 */
 #ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4251)
+#pragma warning(push)
+#pragma warning(disable : 4251)
 #endif
 class PDAL_EXPORT Charbuf : public std::streambuf
 {
@@ -56,8 +56,7 @@ public:
     /**
       Construct an empty Charbuf.
     */
-    Charbuf() : m_bufOffset(0)
-        {}
+    Charbuf() : m_bufOffset(0) {}
 
     /**
       Construct a Charbuf that wraps a byte vector.
@@ -66,7 +65,9 @@ public:
       \param bufOffset  Offset in vector (ignore bytes before offset).
     */
     Charbuf(std::vector<char>& v, pos_type bufOffset = 0)
-        { initialize(v.data(), v.size(), bufOffset); }
+    {
+        initialize(v.data(), v.size(), bufOffset);
+    }
 
     /**
       Construct a Charbuf that wraps a byte buffer.
@@ -75,8 +76,10 @@ public:
       \param count  Size of buffer.
       \param bufOffset  Offset in vector (ignore bytes before offset).
     */
-    Charbuf(char *buf, size_t count, pos_type bufOffset = 0)
-        { initialize(buf, count, bufOffset); }
+    Charbuf(char* buf, size_t count, pos_type bufOffset = 0)
+    {
+        initialize(buf, count, bufOffset);
+    }
 
     /**
       Set a buffer to back a Charbuf.
@@ -85,7 +88,7 @@ public:
       \param count  Size of buffer.
       \param bufOffset  Offset in vector (ignore bytes before offset).
     */
-    void initialize(char *buf, size_t count, pos_type bufOffset = 0);
+    void initialize(char* buf, size_t count, pos_type bufOffset = 0);
 
 protected:
     /**
@@ -95,7 +98,8 @@ protected:
       \param which  I/O mode [default: rw]
       \return  Current position adjusted for buffer offset.
     */
-    std::ios::pos_type seekpos(std::ios::pos_type pos,
+    std::ios::pos_type seekpos(
+        std::ios::pos_type pos,
         std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
 
     /**
@@ -106,8 +110,8 @@ protected:
       \param which  I/O mode [default: rw]
       \return  Current position adjusted for buffer offset.
     */
-    std::ios::pos_type seekoff(std::ios::off_type off,
-        std::ios_base::seekdir dir,
+    std::ios::pos_type seekoff(
+        std::ios::off_type off, std::ios_base::seekdir dir,
         std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
 
 private:
@@ -121,10 +125,10 @@ private:
       For the put pointer, it seems we need the beginning of the buffer
       in order to deal with offsets.
     */
-    char *m_buf;
+    char* m_buf;
 };
 #ifdef _MSC_VER
-#pragma warning (pop)
+#pragma warning(pop)
 #endif
 
-} //namespace pdal
+} // namespace pdal

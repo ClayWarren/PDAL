@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2020, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2020, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -44,9 +44,11 @@ class KD2Impl
 public:
     using RadiusResults = std::vector<std::pair<size_t, double>>;
 
-    KD2Impl(const PointView& buf) : m_buf(buf),
-        m_index(2, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
-    {}
+    KD2Impl(const PointView& buf)
+        : m_buf(buf),
+          m_index(2, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
+    {
+    }
 
     std::size_t kdtree_get_point_count() const
     {
@@ -56,12 +58,12 @@ public:
     double kdtree_get_pt(const PointId idx, int dim) const
     {
         using namespace Dimension;
-        std::array<Id, 2> ids { Id::X, Id::Y };
+        std::array<Id, 2> ids{Id::X, Id::Y};
         return m_buf.getFieldAs<double>(ids[dim], idx);
     }
 
-    double kdtree_distance(const double *p1, const PointId p2_idx,
-        size_t /*numDims*/) const
+    double kdtree_distance(const double* p1, const PointId p2_idx,
+                           size_t /*numDims*/) const
     {
         double d0 = p1[0] - m_buf.getFieldAs<double>(Dimension::Id::X, p2_idx);
         double d1 = p1[1] - m_buf.getFieldAs<double>(Dimension::Id::Y, p2_idx);
@@ -69,8 +71,7 @@ public:
         return (d0 * d0 + d1 * d1);
     }
 
-    template <class BBOX>
-    bool kdtree_get_bbox(BBOX& bb) const
+    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
     {
         if (m_buf.empty())
             bb = {};
@@ -79,7 +80,7 @@ public:
             BOX2D bounds;
             m_buf.calculateBounds(bounds);
 
-            bb = { {bounds.minx, bounds.maxx}, {bounds.miny, bounds.maxy} };
+            bb = {{bounds.minx, bounds.maxx}, {bounds.miny, bounds.maxy}};
         }
         return true;
     }
@@ -98,20 +99,20 @@ public:
 
         resultSet.init(&output[0], &out_dist_sqr[0]);
 
-        std::array<double, 2> pt { x, y };
+        std::array<double, 2> pt{x, y};
         m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams(10));
         return output;
     }
 
-    void knnSearch(double x, double y, point_count_t k,
-        PointIdList *indices, std::vector<double> *sqr_dists) const
+    void knnSearch(double x, double y, point_count_t k, PointIdList* indices,
+                   std::vector<double>* sqr_dists) const
     {
         k = (std::min)(m_buf.size(), k);
         nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k);
 
         resultSet.init(&indices->front(), &sqr_dists->front());
 
-        std::array<double, 2> pt { x, y };
+        std::array<double, 2> pt{x, y};
         m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams(10));
     }
 
@@ -122,7 +123,7 @@ public:
         nanoflann::SearchParams params;
         params.sorted = true;
 
-        std::array<double, 2> pt { x, y };
+        std::array<double, 2> pt{x, y};
 
         // Our distance metric is square distance, so we use the square of
         // the radius.
@@ -138,7 +139,7 @@ public:
     {
         nanoflann::SearchParams params;
 
-        std::array<double, 2> pt { x, y };
+        std::array<double, 2> pt{x, y};
 
         // Our distance metric is square distance, so we use the square of
         // the radius.
@@ -148,8 +149,10 @@ public:
 private:
     const PointView& m_buf;
 
-    typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<
-        double, KD2Impl, double>, KD2Impl, -1, std::size_t> KDTree;
+    typedef nanoflann::KDTreeSingleIndexAdaptor<
+        nanoflann::L2_Simple_Adaptor<double, KD2Impl, double>, KD2Impl, -1,
+        std::size_t>
+        KDTree;
 
     KDTree m_index;
 };
@@ -159,9 +162,11 @@ class KD3Impl
 public:
     using RadiusResults = std::vector<std::pair<size_t, double>>;
 
-    KD3Impl(const PointView& buf) : m_buf(buf),
-        m_index(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
-    {}
+    KD3Impl(const PointView& buf)
+        : m_buf(buf),
+          m_index(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
+    {
+    }
 
     std::size_t kdtree_get_point_count() const
     {
@@ -174,16 +179,16 @@ public:
             return 0.0;
 
         using namespace Dimension;
-        std::array<Id, 3> ids { Id::X, Id::Y, Id::Z };
+        std::array<Id, 3> ids{Id::X, Id::Y, Id::Z};
         if ((size_t)dim >= ids.size())
             throw pdal_error("kdtree_get_pt: Request for invalid dimension "
-                "from nanoflann");
+                             "from nanoflann");
 
         return m_buf.getFieldAs<double>(ids[dim], idx);
     }
 
-    double kdtree_distance(const double *p1, const PointId p2_idx,
-        size_t /*numDims*/) const
+    double kdtree_distance(const double* p1, const PointId p2_idx,
+                           size_t /*numDims*/) const
     {
         double d0 = p1[0] - m_buf.getFieldAs<double>(Dimension::Id::X, p2_idx);
         double d1 = p1[1] - m_buf.getFieldAs<double>(Dimension::Id::Y, p2_idx);
@@ -192,8 +197,7 @@ public:
         return (d0 * d0 + d1 * d1 + d2 * d2);
     }
 
-    template <class BBOX>
-    bool kdtree_get_bbox(BBOX& bb) const
+    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
     {
         if (m_buf.empty())
             bb = {};
@@ -201,8 +205,9 @@ public:
         {
             BOX3D bounds;
             m_buf.calculateBounds(bounds);
-            bb = { {bounds.minx, bounds.maxx}, {bounds.miny, bounds.maxy},
-                {bounds.minz, bounds.maxz} };
+            bb = {{bounds.minx, bounds.maxx},
+                  {bounds.miny, bounds.maxy},
+                  {bounds.minz, bounds.maxz}};
         }
         return true;
     }
@@ -213,7 +218,7 @@ public:
     }
 
     PointIdList neighbors(double x, double y, double z, point_count_t k,
-        size_t stride) const
+                          size_t stride) const
     {
         // Account for input buffer size smaller than requested number of
         // neighbors, then determine the number of neighbors to extract based
@@ -226,7 +231,7 @@ public:
         std::vector<double> out_dist_sqr(k2);
 
         // Set the query point.
-        std::vector<double> pt { x, y, z };
+        std::vector<double> pt{x, y, z};
 
         // Extract k*stride neighbors, then return only k, selecting every nth
         // neighbor at the given stride.
@@ -245,7 +250,7 @@ public:
     }
 
     void knnSearch(double x, double y, double z, point_count_t k,
-        PointIdList *indices, std::vector<double> *sqr_dists) const
+                   PointIdList* indices, std::vector<double>* sqr_dists) const
     {
         k = (std::min)(m_buf.size(), k);
         nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k);
@@ -266,7 +271,7 @@ public:
         nanoflann::SearchParams params;
         params.sorted = true;
 
-        std::vector<double> pt { x, y, z };
+        std::vector<double> pt{x, y, z};
 
         // Our distance metric is square distance, so we use the square of
         // the radius.
@@ -278,11 +283,12 @@ public:
         return output;
     }
 
-    void radius(double x, double y, double z, double r, RadiusResults& ret_matches) const
+    void radius(double x, double y, double z, double r,
+                RadiusResults& ret_matches) const
     {
         nanoflann::SearchParams params;
 
-        std::vector<double> pt { x, y, z };
+        std::vector<double> pt{x, y, z};
 
         // Our distance metric is square distance, so we use the square of
         // the radius.
@@ -292,8 +298,10 @@ public:
 private:
     const PointView& m_buf;
 
-    typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<
-        double, KD3Impl, double>, KD3Impl, -1, std::size_t> KDTree;
+    typedef nanoflann::KDTreeSingleIndexAdaptor<
+        nanoflann::L2_Simple_Adaptor<double, KD3Impl, double>, KD3Impl, -1,
+        std::size_t>
+        KDTree;
 
     KDTree m_index;
 };
@@ -301,11 +309,12 @@ private:
 class KDFlexImpl
 {
 public:
-    KDFlexImpl(const PointView& buf, const Dimension::IdList& dims) :
-        m_buf(buf), m_dims(dims),
-        m_index(m_dims.size(), *this,
-            nanoflann::KDTreeSingleIndexAdaptorParams(100))
-    {}
+    KDFlexImpl(const PointView& buf, const Dimension::IdList& dims)
+        : m_buf(buf), m_dims(dims),
+          m_index(m_dims.size(), *this,
+                  nanoflann::KDTreeSingleIndexAdaptorParams(100))
+    {
+    }
 
     std::size_t kdtree_get_point_count() const
     {
@@ -317,7 +326,7 @@ public:
         m_index.buildIndex();
     }
 
-    PointIdList neighbors(PointRef &point, point_count_t k, size_t stride) const
+    PointIdList neighbors(PointRef& point, point_count_t k, size_t stride) const
     {
         // Account for input buffer size smaller than requested number of
         // neighbors, then determine the number of neighbors to extract based
@@ -398,8 +407,7 @@ public:
         return result;
     }
 
-    template <class BBOX>
-    bool kdtree_get_bbox(BBOX& bb) const
+    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
     {
         if (m_buf.empty())
             bb = {};
@@ -431,8 +439,10 @@ private:
     const PointView& m_buf;
     const Dimension::IdList& m_dims;
 
-    typedef nanoflann::KDTreeSingleIndexAdaptor< nanoflann::L2_Simple_Adaptor<
-        double, KDFlexImpl, double>, KDFlexImpl, -1, std::size_t> KDTree;
+    typedef nanoflann::KDTreeSingleIndexAdaptor<
+        nanoflann::L2_Simple_Adaptor<double, KDFlexImpl, double>, KDFlexImpl,
+        -1, std::size_t>
+        KDTree;
 
     KDTree m_index;
 };

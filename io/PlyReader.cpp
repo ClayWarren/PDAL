@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2015, Peter J. Gadomski <pete.gadomski@gmail.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "PlyReader.hpp"
 
@@ -43,20 +43,14 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-        "readers.ply",
-        "Read ply files.",
-        "https://pdal.org/stages/reader.ply.html",
-        { "ply" }
-};
+static StaticPluginInfo const s_info{"readers.ply",
+                                     "Read ply files.",
+                                     "https://pdal.org/stages/reader.ply.html",
+                                     {"ply"}};
 
 CREATE_STATIC_STAGE(PlyReader, s_info)
 
-
-PlyReader::PlyReader() : m_vertexElt(nullptr)
-{}
-
+PlyReader::PlyReader() : m_vertexElt(nullptr) {}
 
 std::string PlyReader::readLine()
 {
@@ -74,17 +68,15 @@ std::string PlyReader::readLine()
         } while (m_line.empty() && m_stream->good());
     }
     Utils::trimTrailing(m_line);
-    m_linePos = Utils::extract(m_line, 0,
-        [](char c){ return !std::isspace(c); });
+    m_linePos =
+        Utils::extract(m_line, 0, [](char c) { return !std::isspace(c); });
     return std::string(m_line, 0, m_linePos);
 }
-
 
 void PlyReader::pushLine()
 {
     m_lines.push(m_line);
 }
-
 
 std::string PlyReader::nextWord()
 {
@@ -95,12 +87,11 @@ std::string PlyReader::nextWord()
         return s;
 
     cnt = Utils::extract(m_line, m_linePos,
-        [](char c){ return !std::isspace(c); });
+                         [](char c) { return !std::isspace(c); });
     s = std::string(m_line, m_linePos, cnt);
     m_linePos += cnt;
     return s;
 }
-
 
 void PlyReader::extractMagic()
 {
@@ -111,17 +102,15 @@ void PlyReader::extractMagic()
         throwError("Text found following 'ply' keyword.");
 }
 
-
 void PlyReader::extractEnd()
 {
     std::string first = readLine();
     if (first != "end_header")
         throwError("'end_header' expected but found line beginning with '" +
-            first + "' instead.");
+                   first + "' instead.");
     if (m_linePos != m_line.size())
         throwError("Text found following 'end_header' keyword.");
 }
-
 
 void PlyReader::extractFormat()
 {
@@ -144,39 +133,36 @@ void PlyReader::extractFormat()
         throwError("Unsupported PLY version: '" + word + "'.");
 }
 
-
 Dimension::Type PlyReader::getType(const std::string& name)
 {
-    static std::map<std::string, Dimension::Type> types =
-    {
-        { "int8", Dimension::Type::Signed8 },
-        { "uint8", Dimension::Type::Unsigned8 },
-        { "int16", Dimension::Type::Signed16 },
-        { "uint16", Dimension::Type::Unsigned16 },
-        { "int32", Dimension::Type::Signed32 },
-        { "uint32", Dimension::Type::Unsigned32 },
-        { "float32", Dimension::Type::Float },
-        { "float64", Dimension::Type::Double },
+    static std::map<std::string, Dimension::Type> types = {
+        {"int8", Dimension::Type::Signed8},
+        {"uint8", Dimension::Type::Unsigned8},
+        {"int16", Dimension::Type::Signed16},
+        {"uint16", Dimension::Type::Unsigned16},
+        {"int32", Dimension::Type::Signed32},
+        {"uint32", Dimension::Type::Unsigned32},
+        {"float32", Dimension::Type::Float},
+        {"float64", Dimension::Type::Double},
 
-        { "char", Dimension::Type::Signed8 },
-        { "uchar", Dimension::Type::Unsigned8 },
-        { "short", Dimension::Type::Signed16 },
-        { "ushort", Dimension::Type::Unsigned16 },
-        { "int", Dimension::Type::Signed32 },
-        { "uint", Dimension::Type::Unsigned32 },
-        { "float", Dimension::Type::Float },
-        { "double", Dimension::Type::Double }
-    };
+        {"char", Dimension::Type::Signed8},
+        {"uchar", Dimension::Type::Unsigned8},
+        {"short", Dimension::Type::Signed16},
+        {"ushort", Dimension::Type::Unsigned16},
+        {"int", Dimension::Type::Signed32},
+        {"uint", Dimension::Type::Unsigned32},
+        {"float", Dimension::Type::Float},
+        {"double", Dimension::Type::Double}};
 
     try
     {
         return types.at(name);
     }
     catch (std::out_of_range&)
-    {}
+    {
+    }
     return Dimension::Type::None;
 }
-
 
 void PlyReader::extractProperty(Element& element)
 {
@@ -187,8 +173,8 @@ void PlyReader::extractProperty(Element& element)
     {
         std::string name = nextWord();
         if (name.empty())
-            throwError("No name for property of element '" +
-                element.m_name + "'.");
+            throwError("No name for property of element '" + element.m_name +
+                       "'.");
         element.m_properties.push_back(
             std::unique_ptr<Property>(new SimpleProperty(name, type)));
     }
@@ -196,30 +182,28 @@ void PlyReader::extractProperty(Element& element)
     {
         if (element.m_name == "vertex")
             throwError("List properties are not supported for the 'vertex' "
-                "element.");
+                       "element.");
 
         word = nextWord();
         Dimension::Type countType = getType(word);
         if (countType == Dimension::Type::None)
             throwError("No valid count type for list property of element '" +
-                element.m_name + "'.");
+                       element.m_name + "'.");
         word = nextWord();
         Dimension::Type listType = getType(word);
         if (listType == Dimension::Type::None)
             throwError("No valid list type for list property of element '" +
-                element.m_name + "'.");
+                       element.m_name + "'.");
         std::string name = nextWord();
         if (name.empty())
-            throwError("No name for property of element '" +
-                element.m_name + "'.");
-        element.m_properties.push_back(
-            std::unique_ptr<Property>(new ListProperty(name, countType,
-                listType)));
+            throwError("No name for property of element '" + element.m_name +
+                       "'.");
+        element.m_properties.push_back(std::unique_ptr<Property>(
+            new ListProperty(name, countType, listType)));
     }
     else
         throwError("Invalid property type '" + word + "'.");
 }
-
 
 void PlyReader::extractProperties(Element& element)
 {
@@ -237,7 +221,6 @@ void PlyReader::extractProperties(Element& element)
         }
     }
 }
-
 
 bool PlyReader::extractElement()
 {
@@ -262,9 +245,8 @@ bool PlyReader::extractElement()
         return true;
     }
     throwError("Invalid keyword '" + word + "' when expecting an element.");
-    return false;  // quiet compiler
+    return false; // quiet compiler
 }
-
 
 void PlyReader::extractHeader()
 {
@@ -283,7 +265,6 @@ void PlyReader::extractHeader()
         throwError("Can't read PLY file without a 'vertex' element.");
 }
 
-
 std::string PlyReader::getName() const
 {
     return s_info.name;
@@ -300,9 +281,10 @@ QuickInfo PlyReader::inspect()
 
     if (m_vertexElt)
     {
-        // Get quick info information from the vertex element (if initialised). We ignore the bounds
-        // since calculating that would require reading the entire file. We also ignore the spatial
-        // reference since we don't have that.
+        // Get quick info information from the vertex element (if initialised).
+        // We ignore the bounds since calculating that would require reading the
+        // entire file. We also ignore the spatial reference since we don't have
+        // that.
 
         qi.m_valid = true;
         qi.m_pointCount = static_cast<point_count_t>(m_vertexElt->m_count);
@@ -335,7 +317,7 @@ void PlyReader::initialize()
     {
         extractHeader();
     }
-    catch( ... )
+    catch (...)
     {
         Utils::closeFile(m_stream);
         m_stream = nullptr;
@@ -344,7 +326,6 @@ void PlyReader::initialize()
     Utils::closeFile(m_stream);
     m_stream = nullptr;
 }
-
 
 void PlyReader::addDimensions(PointLayoutPtr layout)
 {
@@ -359,7 +340,7 @@ void PlyReader::addDimensions(PointLayoutPtr layout)
         {
             for (auto& prop : elt.m_properties)
             {
-                auto vprop = static_cast<SimpleProperty *>(prop.get());
+                auto vprop = static_cast<SimpleProperty*>(prop.get());
                 layout->registerOrAssignDim(vprop->m_name, vprop->m_type);
                 vprop->setDim(
                     layout->registerOrAssignDim(vprop->m_name, vprop->m_type));
@@ -370,8 +351,7 @@ void PlyReader::addDimensions(PointLayoutPtr layout)
     throwError("No 'vertex' element in header.");
 }
 
-
-bool PlyReader::readProperty(Property *prop, PointRef& point)
+bool PlyReader::readProperty(Property* prop, PointRef& point)
 {
     if (!m_stream->good())
         return false;
@@ -379,9 +359,8 @@ bool PlyReader::readProperty(Property *prop, PointRef& point)
     return true;
 }
 
-
-void PlyReader::SimpleProperty::read(std::istream *stream,
-    PlyReader::Format format, PointRef& point)
+void PlyReader::SimpleProperty::read(std::istream* stream,
+                                     PlyReader::Format format, PointRef& point)
 {
     if (format == Format::Ascii)
     {
@@ -403,11 +382,10 @@ void PlyReader::SimpleProperty::read(std::istream *stream,
     }
 }
 
-
 // Right now we don't support list properties for point data.  We just
 // read the data and throw it away.
-void PlyReader::ListProperty::read(std::istream *stream,
-    PlyReader::Format format, PointRef& point)
+void PlyReader::ListProperty::read(std::istream* stream,
+                                   PlyReader::Format format, PointRef& point)
 {
     if (format == Format::Ascii)
     {
@@ -436,15 +414,13 @@ void PlyReader::ListProperty::read(std::istream *stream,
     }
 }
 
-
 void PlyReader::readElement(Element& elt, PointRef& point)
 {
     for (auto& prop : elt.m_properties)
         if (!readProperty(prop.get(), point))
             throwError("Error reading data for point/element " +
-                std::to_string(point.pointId()) + ".");
+                       std::to_string(point.pointId()) + ".");
 }
-
 
 void PlyReader::ready(PointTableRef table)
 {
@@ -470,7 +446,6 @@ void PlyReader::ready(PointTableRef table)
     m_index = 0;
 }
 
-
 bool PlyReader::processOne(PointRef& point)
 {
     if (m_index < m_vertexElt->m_count)
@@ -481,7 +456,6 @@ bool PlyReader::processOne(PointRef& point)
     }
     return false;
 }
-
 
 // We're just reading the vertex element here.
 point_count_t PlyReader::read(PointViewPtr view, point_count_t num)
@@ -497,7 +471,6 @@ point_count_t PlyReader::read(PointViewPtr view, point_count_t num)
     }
     return cnt;
 }
-
 
 void PlyReader::done(PointTableRef table)
 {

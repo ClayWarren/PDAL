@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "FauxReader.hpp"
 
@@ -43,16 +43,15 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "readers.faux",
-    "Faux Reader",
-    "https://pdal.org/stages/readers.faux.html"
-};
+static StaticPluginInfo const s_info{
+    "readers.faux", "Faux Reader", "https://pdal.org/stages/readers.faux.html"};
 
 CREATE_STATIC_STAGE(FauxReader, s_info)
 
-std::string FauxReader::getName() const { return s_info.name; }
+std::string FauxReader::getName() const
+{
+    return s_info.name;
+}
 
 void FauxReader::addArgs(ProgramArgs& args)
 {
@@ -67,7 +66,6 @@ void FauxReader::addArgs(ProgramArgs& args)
     args.add("number_of_returns", "Max number of returns", m_numReturns);
     m_seedArg = &args.add("seed", "Random generator seed", m_seed);
 }
-
 
 void FauxReader::prepared(PointTableRef table)
 {
@@ -86,7 +84,6 @@ void FauxReader::prepared(PointTableRef table)
         }
     }
 }
-
 
 void FauxReader::initialize()
 {
@@ -134,7 +131,7 @@ void FauxReader::initialize()
     }
     else if (m_mode == Mode::Normal)
     {
-        //using nd = std::normal_distribution<double>;
+        // using nd = std::normal_distribution<double>;
 
         m_normalX.reset(new nd(m_mean_x, m_stdev_x));
         m_normalY.reset(new nd(m_mean_y, m_stdev_y));
@@ -142,7 +139,7 @@ void FauxReader::initialize()
     }
     else if (m_mode == Mode::Uniform)
     {
-        //using urd = std::uniform_real_distribution<double>;
+        // using urd = std::uniform_real_distribution<double>;
 
         m_uniformX.reset(new urd(m_bounds.minx, m_bounds.maxx));
         m_uniformY.reset(new urd(m_bounds.miny, m_bounds.maxy));
@@ -150,7 +147,7 @@ void FauxReader::initialize()
     }
     else if (m_mode == Mode::Invalid)
     {
-        //using urd = std::uniform_real_distribution<double>;
+        // using urd = std::uniform_real_distribution<double>;
 
         m_uniformX.reset(new urd(m_bounds.minx, m_bounds.maxx));
         m_uniformY.reset(new urd(m_bounds.miny, m_bounds.maxy));
@@ -173,11 +170,10 @@ void FauxReader::initialize()
     }
 }
 
-
 void FauxReader::addDimensions(PointLayoutPtr layout)
 {
-    Dimension::IdList ids = { Dimension::Id::X, Dimension::Id::Y,
-        Dimension::Id::Z, Dimension::Id::OffsetTime };
+    Dimension::IdList ids = {Dimension::Id::X, Dimension::Id::Y,
+                             Dimension::Id::Z, Dimension::Id::OffsetTime};
 
     layout->registerDims(ids);
     if (m_numReturns > 0)
@@ -187,7 +183,6 @@ void FauxReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
 void FauxReader::ready(PointTableRef /*table*/)
 {
     m_returnNum = 1;
@@ -196,9 +191,8 @@ void FauxReader::ready(PointTableRef /*table*/)
     m_index = 0;
 }
 
-
-#pragma warning (push)
-#pragma warning (disable: 4244)
+#pragma warning(push)
+#pragma warning(disable : 4244)
 bool FauxReader::processOne(PointRef& point)
 {
     double x(0);
@@ -266,7 +260,8 @@ bool FauxReader::processOne(PointRef& point)
     point.setField(Dimension::Id::Z, z);
 
     if (m_mode == Mode::Invalid)
-        point.setField(Dimension::Id::OffsetTime, std::numeric_limits<double>::quiet_NaN());
+        point.setField(Dimension::Id::OffsetTime,
+                       std::numeric_limits<double>::quiet_NaN());
     else
         point.setField(Dimension::Id::OffsetTime, m_time++);
     if (m_numReturns > 0)
@@ -278,8 +273,7 @@ bool FauxReader::processOne(PointRef& point)
     m_index++;
     return true;
 }
-#pragma warning (pop)
-
+#pragma warning(pop)
 
 point_count_t FauxReader::read(PointViewPtr view, point_count_t count)
 {

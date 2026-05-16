@@ -38,10 +38,10 @@
 #include <climits>
 #include <functional>
 #include <iostream>
+#include <pdal/pdal_export.hpp>
 #include <random>
 #include <sstream>
 #include <string>
-#include <pdal/pdal_export.hpp>
 
 namespace pdal
 {

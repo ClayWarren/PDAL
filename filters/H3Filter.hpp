@@ -37,18 +37,16 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace pdal
 {
 
-
 class SrsTransform;
 
-
-class PDAL_EXPORT H3Filter : public Filter,  public Streamable
+class PDAL_EXPORT H3Filter : public Filter, public Streamable
 {
 public:
     H3Filter();
@@ -69,7 +67,6 @@ private:
 
     void createTransform(const SpatialReference& srs);
     std::unique_ptr<SrsTransform> m_transform;
-
 
     H3Filter& operator=(const H3Filter&) = delete;
     H3Filter(const H3Filter&) = delete;

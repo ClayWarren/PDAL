@@ -1,45 +1,45 @@
 /******************************************************************************
-* Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
-#include <cassert>
-#include <memory> // shared_ptr
-#include <stack>
-#include <chrono>
 #include <atomic>
+#include <cassert>
+#include <chrono>
+#include <memory> // shared_ptr
 #include <mutex>
+#include <stack>
 
 #include <pdal/pdal_internal.hpp>
 #include <pdal/util/NullOStream.hpp>
@@ -74,19 +74,19 @@ private:
 
 public:
     static LogPtr makeLog(std::string const& leaderString,
-        std::string const& outputName, bool timing = false);
+                          std::string const& outputName, bool timing = false);
 
-    static LogPtr makeLog(std::string const& leaderString,
-        std::ostream* v, bool timing = false);
+    static LogPtr makeLog(std::string const& leaderString, std::ostream* v,
+                          bool timing = false);
 
     /** @name Destructor
-    */
+     */
     /// The destructor will clean up its own internal log stream, but it will
     /// not touch one that is given via the constructor
     ~Log();
 
     /** @name Logging level
-    */
+     */
     /// @return the logging level of the pdal::Log instance
     LogLevel getLevel()
     {
@@ -104,17 +104,23 @@ public:
     /// Set the leader string (deprecated).
     /// \param[in]  leader  Leader string.
     void setLeader(const std::string& leader)
-        { pushLeader(leader); }
+    {
+        pushLeader(leader);
+    }
 
     /// Push the leader string onto the stack.
     /// \param  leader  Leader string
     void pushLeader(const std::string& leader)
-        { m_leaders.push(leader); }
+    {
+        m_leaders.push(leader);
+    }
 
     /// Get the leader string.
     /// \return  The current leader string.
     std::string leader() const
-        { return m_leaders.empty() ? std::string() : m_leaders.top(); }
+    {
+        return m_leaders.empty() ? std::string() : m_leaders.top();
+    }
 
     /// Pop the current leader string.
     void popLeader()
@@ -127,7 +133,7 @@ public:
     std::string getLevelString(LogLevel v) const;
 
     /** @name Log stream operations
-    */
+     */
     /// @return the stream object that is currently being used to for log
     /// operations regardless of logging level of the instance.
     std::ostream* getLogStream()
@@ -148,11 +154,11 @@ public:
     void clearFloat();
 
 protected:
-    std::ostream *m_log;
+    std::ostream* m_log;
 
 private:
     Log(const Log&) = delete;
-    Log& operator =(const Log&) = delete;
+    Log& operator=(const Log&) = delete;
     std::string now() const;
 
     LogLevel m_level;
@@ -165,4 +171,3 @@ private:
 };
 
 } // namespace pdal
-

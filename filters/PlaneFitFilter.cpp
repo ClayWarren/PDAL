@@ -40,8 +40,8 @@
 #include "PlaneFitFilter.hpp"
 
 #include <pdal/KDIndex.hpp>
-#include <pdal/util/ProgramArgs.hpp>
 #include <pdal/private/MathUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
 
 #include <Eigen/Dense>
 
@@ -55,12 +55,9 @@ namespace pdal
 using namespace Dimension;
 using namespace Eigen;
 
-static StaticPluginInfo const s_info
-{
-    "filters.planefit",
-    "Plane Fit (Kutz et al., 2003)",
-    "https://pdal.org/stages/filters.planefit.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.planefit", "Plane Fit (Kutz et al., 2003)",
+    "https://pdal.org/stages/filters.planefit.html"};
 
 CREATE_STATIC_STAGE(PlaneFitFilter, s_info)
 
@@ -85,19 +82,20 @@ void PlaneFitFilter::filter(PointView& view)
 {
     point_count_t npoints = view.size();
     point_count_t chunk_size = npoints / m_threads;
-    if (npoints % m_threads) chunk_size++;
+    if (npoints % m_threads)
+        chunk_size++;
     std::vector<std::thread> threadList(m_threads);
 
     for (int t = 0; t < m_threads; t++)
     {
         threadList[t] = std::thread(
-            [&](const PointId start, const PointId end) {
+            [&](const PointId start, const PointId end)
+            {
                 for (PointId i = start; i < end; i++)
                     setPlaneFit(view, i);
             },
             t * chunk_size,
-            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size
-        );
+            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size);
     }
 
     for (auto& t : threadList)
@@ -105,8 +103,7 @@ void PlaneFitFilter::filter(PointView& view)
 }
 
 double PlaneFitFilter::absDistance(PointView& view, const PointId& i,
-                                   Vector3d& centroid,
-                                   Vector3d& normal)
+                                   Vector3d& centroid, Vector3d& normal)
 {
     double x = view.getFieldAs<double>(Id::X, i);
     double y = view.getFieldAs<double>(Id::Y, i);

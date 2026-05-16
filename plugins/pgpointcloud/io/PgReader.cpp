@@ -1,37 +1,37 @@
 /******************************************************************************
-* Copyright (c) 2012, Howard Butler, hobu.inc@gmail.com
-* Copyright (c) 2013, Paul Ramsey, pramsey@cleverelephant.ca
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2012, Howard Butler, hobu.inc@gmail.com
+ * Copyright (c) 2013, Paul Ramsey, pramsey@cleverelephant.ca
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "PgReader.hpp"
 #include <pdal/PointView.hpp>
@@ -43,30 +43,31 @@
 namespace pdal
 {
 
-static PluginInfo const s_info
-{
+static PluginInfo const s_info{
     "readers.pgpointcloud",
-    "Read data from pgpointcloud format. \"query\" option needs to be a \n" \
-        "SQL statement selecting the data.",
-    "https://pdal.org/stages/readers.pgpointcloud.html"
-};
+    "Read data from pgpointcloud format. \"query\" option needs to be a \n"
+    "SQL statement selecting the data.",
+    "https://pdal.org/stages/readers.pgpointcloud.html"};
 
 CREATE_SHARED_STAGE(PgReader, s_info)
 
-std::string PgReader::getName() const { return s_info.name; }
+std::string PgReader::getName() const
+{
+    return s_info.name;
+}
 
-PgReader::PgReader() : m_session(NULL), m_pcid(0), m_cached_point_count(0),
-    m_cached_max_points(0)
-{}
-
+PgReader::PgReader()
+    : m_session(NULL), m_pcid(0), m_cached_point_count(0),
+      m_cached_max_points(0)
+{
+}
 
 PgReader::~PgReader()
 {
-    //ABELL - Do bad things happen if we don't do this?  Already in done().
+    // ABELL - Do bad things happen if we don't do this?  Already in done().
     if (m_session)
         PQfinish(m_session);
 }
-
 
 void PgReader::addArgs(ProgramArgs& args)
 {
@@ -77,23 +78,23 @@ void PgReader::addArgs(ProgramArgs& args)
     args.add("where", "Where clause for selection", m_where);
 }
 
-
 point_count_t PgReader::getNumPoints() const
 {
     if (m_cached_point_count)
         return m_cached_point_count;
 
     std::ostringstream oss;
-    oss << "SELECT Sum(PC_NumPoints(" << pg_quote_identifier(m_column_name) << ")) AS numpoints, ";
-    oss << "Max(PC_NumPoints(" << pg_quote_identifier(m_column_name) <<
-        ")) AS maxpoints FROM ";
+    oss << "SELECT Sum(PC_NumPoints(" << pg_quote_identifier(m_column_name)
+        << ")) AS numpoints, ";
+    oss << "Max(PC_NumPoints(" << pg_quote_identifier(m_column_name)
+        << ")) AS maxpoints FROM ";
     if (m_schema_name.size())
         oss << pg_quote_identifier(m_schema_name) << ".";
     oss << pg_quote_identifier(m_table_name);
     if (m_where.size())
         oss << " WHERE " << m_where;
 
-    PGresult *result = pg_query_result(m_session, oss.str());
+    PGresult* result = pg_query_result(m_session, oss.str());
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK)
         throwError("Unable to get point count.");
@@ -105,33 +106,30 @@ point_count_t PgReader::getNumPoints() const
     return m_cached_point_count;
 }
 
-
 std::string PgReader::getDataQuery() const
 {
     std::ostringstream oss;
-    oss << "SELECT text(PC_Uncompress(" << pg_quote_identifier(m_column_name) <<
-        ")) AS pa, ";
-    oss << "PC_NumPoints(" << pg_quote_identifier(m_column_name) <<
-        ") AS npoints FROM ";
+    oss << "SELECT text(PC_Uncompress(" << pg_quote_identifier(m_column_name)
+        << ")) AS pa, ";
+    oss << "PC_NumPoints(" << pg_quote_identifier(m_column_name)
+        << ") AS npoints FROM ";
     if (!m_schema_name.empty())
         oss << pg_quote_identifier(m_schema_name) << ".";
     oss << pg_quote_identifier(m_table_name);
     if (!m_where.empty())
         oss << " WHERE " << m_where;
 
-    log()->get(LogLevel::Debug) << "Constructed data query " <<
-        oss.str() << std::endl;
+    log()->get(LogLevel::Debug)
+        << "Constructed data query " << oss.str() << std::endl;
     return oss.str();
 }
-
 
 point_count_t PgReader::getMaxPoints() const
 {
     if (m_cached_point_count == 0)
-        getNumPoints();  // Fills m_cached_max_points.
+        getNumPoints(); // Fills m_cached_max_points.
     return m_cached_max_points;
 }
-
 
 uint32_t PgReader::fetchPcid() const
 {
@@ -145,15 +143,15 @@ uint32_t PgReader::fetchPcid() const
     oss << "FROM pg_class c, pg_attribute a";
     if (!m_schema_name.empty())
     {
-      oss << ", pg_namespace n";
+        oss << ", pg_namespace n";
     }
     oss << " WHERE c.relname = " << pg_quote_literal(m_table_name);
     oss << " AND a.attname = " << pg_quote_literal(m_column_name);
-    oss << " AND a.attrelid = c.oid " ;
+    oss << " AND a.attrelid = c.oid ";
     if (!m_schema_name.empty())
     {
-        oss << " AND c.relnamespace = n.oid AND n.nspname = " <<
-            pg_quote_literal(m_schema_name);
+        oss << " AND c.relnamespace = n.oid AND n.nspname = "
+            << pg_quote_literal(m_schema_name);
     }
 
     std::string pcid_str = pg_query_once(m_session, oss.str());
@@ -161,16 +159,16 @@ uint32_t PgReader::fetchPcid() const
     uint32_t pcid = 0;
     if (pcid_str.size())
     {
-       pcid = atoi(pcid_str.c_str());
+        pcid = atoi(pcid_str.c_str());
     }
 
     if (!pcid) // Are pcid == 0 valid?
     {
         std::ostringstream oss;
-        oss << "Unable to fetch pcid with column '"
-            << m_column_name <<"' and  table ";
+        oss << "Unable to fetch pcid with column '" << m_column_name
+            << "' and  table ";
         if (!m_schema_name.empty())
-          oss << "'" << m_schema_name << "'.";
+            oss << "'" << m_schema_name << "'.";
         oss << "'" << m_table_name << "'";
         throwError(oss.str());
     }
@@ -179,7 +177,6 @@ uint32_t PgReader::fetchPcid() const
     m_pcid = pcid;
     return pcid;
 }
-
 
 void PgReader::addDimensions(PointLayoutPtr layout)
 {
@@ -196,7 +193,6 @@ void PgReader::addDimensions(PointLayoutPtr layout)
 
     loadSchema(layout, xmlStr);
 }
-
 
 pdal::SpatialReference PgReader::fetchSpatialReference() const
 {
@@ -224,7 +220,6 @@ pdal::SpatialReference PgReader::fetchSpatialReference() const
         return pdal::SpatialReference();
 }
 
-
 void PgReader::ready(PointTableRef /*table*/)
 {
     m_atEnd = false;
@@ -234,7 +229,6 @@ void PgReader::ready(PointTableRef /*table*/)
 
     CursorSetup();
 }
-
 
 void PgReader::done(PointTableRef /*table*/)
 {
@@ -256,7 +250,6 @@ void PgReader::initialize()
         setSpatialReference(fetchSpatialReference());
 }
 
-
 void PgReader::CursorSetup()
 {
     std::ostringstream oss;
@@ -264,10 +257,9 @@ void PgReader::CursorSetup()
     pg_begin(m_session);
     pg_execute(m_session, oss.str());
 
-    log()->get(LogLevel::Debug) << "SQL cursor prepared: " <<
-        oss.str() << std::endl;
+    log()->get(LogLevel::Debug)
+        << "SQL cursor prepared: " << oss.str() << std::endl;
 }
-
 
 void PgReader::CursorTeardown()
 {
@@ -276,7 +268,6 @@ void PgReader::CursorTeardown()
     log()->get(LogLevel::Debug) << "SQL cursor closed." << std::endl;
 }
 
-
 point_count_t PgReader::readPgPatch(PointViewPtr view, point_count_t numPts)
 {
     point_count_t numRemaining = m_patch.remaining;
@@ -284,7 +275,7 @@ point_count_t PgReader::readPgPatch(PointViewPtr view, point_count_t numPts)
     point_count_t numRead = 0;
     PointRef point(*view, nextId);
     size_t offset = (m_patch.count - m_patch.remaining) * packedPointSize();
-    char *pos = (char *)(m_patch.binary.data() + offset);
+    char* pos = (char*)(m_patch.binary.data() + offset);
 
     while (numRead < numPts && numRemaining > 0)
     {
@@ -302,7 +293,7 @@ point_count_t PgReader::readPgPatch(PointViewPtr view, point_count_t numPts)
 bool PgReader::readPgPatch(PointRef& point)
 {
     size_t offset = (m_patch.count - m_patch.remaining) * packedPointSize();
-    char *pos = (char *)(m_patch.binary.data() + offset);
+    char* pos = (char*)(m_patch.binary.data() + offset);
 
     writePoint(point, pos);
     m_patch.remaining--;
@@ -342,15 +333,14 @@ bool PgReader::NextBuffer()
     return true;
 }
 
-
 point_count_t PgReader::read(PointViewPtr view, point_count_t count)
 {
     if (eof())
         return 0;
 
     log()->get(LogLevel::Debug) << "readBufferImpl called with "
-        "PointView filled to " << view->size() << " points" <<
-        std::endl;
+                                   "PointView filled to "
+                                << view->size() << " points" << std::endl;
 
     point_count_t totalNumRead = 0;
     while (totalNumRead < count)
@@ -374,4 +364,4 @@ bool PgReader::processOne(PointRef& point)
     return readPgPatch(point);
 }
 
-} // pdal
+} // namespace pdal

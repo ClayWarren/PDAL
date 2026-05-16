@@ -48,12 +48,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.range",
-    "Pass only points given a dimension/range.",
-    "https://pdal.org/stages/filters.range.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.range", "Pass only points given a dimension/range.",
+    "https://pdal.org/stages/filters.range.html"};
 
 CREATE_STATIC_STAGE(RangeFilter, s_info)
 
@@ -62,20 +59,14 @@ std::string RangeFilter::getName() const
     return s_info.name;
 }
 
+RangeFilter::RangeFilter() {}
 
-RangeFilter::RangeFilter()
-{}
-
-
-RangeFilter::~RangeFilter()
-{}
-
+RangeFilter::~RangeFilter() {}
 
 void RangeFilter::addArgs(ProgramArgs& args)
 {
     args.add("limits", "Range limits", m_ranges).setPositional();
 }
-
 
 void RangeFilter::prepared(PointTableRef table)
 {
@@ -86,11 +77,10 @@ void RangeFilter::prepared(PointTableRef table)
         r.m_id = layout->findDim(r.m_name);
         if (r.m_id == Dimension::Id::Unknown)
             throwError("Invalid dimension name in 'limits' option: '" +
-                r.m_name + "'.");
+                       r.m_name + "'.");
     }
     std::sort(m_ranges.begin(), m_ranges.end());
 }
-
 
 // The range list is sorted by dimension, so the logic here should work
 // as ORs between ranges of the same dimension and ANDs between ranges
@@ -100,7 +90,6 @@ bool RangeFilter::processOne(PointRef& point)
 {
     return DimRange::pointPasses(m_ranges, point);
 }
-
 
 PointViewSet RangeFilter::run(PointViewPtr inView)
 {

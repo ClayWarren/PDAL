@@ -50,12 +50,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.h3",
-    "Compute H3 indexes for points",
-    "https://pdal.org/stages/filters.h3.html"
-};
+static StaticPluginInfo const s_info{"filters.h3",
+                                     "Compute H3 indexes for points",
+                                     "https://pdal.org/stages/filters.h3.html"};
 
 CREATE_STATIC_STAGE(H3Filter, s_info)
 
@@ -69,24 +66,16 @@ struct H3Filter::Args
     int m_resolution;
 };
 
+H3Filter::H3Filter() : m_args(new Args) {}
 
-H3Filter::H3Filter() : m_args(new Args)
-{}
-
-
-H3Filter::~H3Filter()
-{}
-
+H3Filter::~H3Filter() {}
 
 void H3Filter::addArgs(ProgramArgs& args)
 {
     // Set resolution and such
-    args.add("resolution",
-        "H3 resolution parameter",
-        m_args->m_resolution).setPositional();
+    args.add("resolution", "H3 resolution parameter", m_args->m_resolution)
+        .setPositional();
 }
-
-
 
 void H3Filter::addDimensions(PointLayoutPtr layout)
 {
@@ -95,8 +84,6 @@ void H3Filter::addDimensions(PointLayoutPtr layout)
 
 bool H3Filter::processOne(PointRef& point)
 {
-
-
 
     double x(point.getFieldAs<double>(Dimension::Id::X));
     double y(point.getFieldAs<double>(Dimension::Id::Y));
@@ -117,13 +104,15 @@ bool H3Filter::processOne(PointRef& point)
         if (err == E_SUCCESS)
         {
             point.setField(Dimension::Id::H3, index);
-        } else
+        }
+        else
         {
             throwError("Unable to compute H3 cell id for point!");
         }
     }
     else
-        throwError("Couldn't reproject point with X/Y/Z coordinates of (" +
+        throwError(
+            "Couldn't reproject point with X/Y/Z coordinates of (" +
             std::to_string(point.getFieldAs<double>(Dimension::Id::X)) + ", " +
             std::to_string(point.getFieldAs<double>(Dimension::Id::Y)) + ").");
     return ok;
@@ -156,6 +145,5 @@ void H3Filter::filter(PointView& view)
         processOne(point);
     }
 }
-
 
 } // namespace pdal

@@ -1,46 +1,46 @@
 /******************************************************************************
-* Copyright (c) 2020, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2020, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
 #include <array>
 
 #include <pdal/DimUtil.hpp>
-#include <pdal/pdal_types.hpp>
-#include <pdal/SpatialReference.hpp>
-#include <pdal/util/Bounds.hpp>
 #include <pdal/Metadata.hpp>
+#include <pdal/SpatialReference.hpp>
+#include <pdal/pdal_types.hpp>
+#include <pdal/util/Bounds.hpp>
 
 #include "GDALError.hpp"
 
@@ -53,7 +53,7 @@ namespace pdal
 namespace gdal
 {
 
-template<typename ITER>
+template <typename ITER>
 using ITER_VAL = typename std::iterator_traits<ITER>::value_type;
 
 class Raster;
@@ -64,30 +64,29 @@ class Raster;
 class PDAL_EXPORT BaseBand
 {
 protected:
-    BaseBand(GDALDataset *ds, int bandNum, const std::string& name);
+    BaseBand(GDALDataset* ds, int bandNum, const std::string& name);
 
     void totalSize(int& x, int& y);
     void blockSize(int& x, int& y);
-    void readBlockBuf(int x, int y, uint8_t *buf);
-    void writeBlockBuf(int x, int y, const uint8_t *buf);
-    void statistics(double *minimum, double *maximum, double *mean,
-        double *stddev, bool approx, bool force) const;
+    void readBlockBuf(int x, int y, uint8_t* buf);
+    void writeBlockBuf(int x, int y, const uint8_t* buf);
+    void statistics(double* minimum, double* maximum, double* mean,
+                    double* stddev, bool approx, bool force) const;
 
 private:
-    GDALRasterBand *m_band;             /// Band handle
+    GDALRasterBand* m_band; /// Band handle
 };
 
-template<typename T>
-class Band : public BaseBand
+template <typename T> class Band : public BaseBand
 {
-friend class Raster;
+    friend class Raster;
 
 private:
-    double m_dstNoData;                 /// Output no data value.
-    size_t m_xTotalSize, m_yTotalSize;  /// Total size (x and y) of the raster
-    size_t m_xBlockSize, m_yBlockSize;  /// Size (x and y) of blocks
-    size_t m_xBlockCnt, m_yBlockCnt;    /// Number of blocks in each direction
-    std::vector<T> m_buf;               /// Block read buffer.
+    double m_dstNoData;                /// Output no data value.
+    size_t m_xTotalSize, m_yTotalSize; /// Total size (x and y) of the raster
+    size_t m_xBlockSize, m_yBlockSize; /// Size (x and y) of blocks
+    size_t m_xBlockCnt, m_yBlockCnt;   /// Number of blocks in each direction
+    std::vector<T> m_buf;              /// Block read buffer.
 
     /**
       Create an object for reading a band of a GDAL dataset.
@@ -97,9 +96,10 @@ private:
       \param bandNum  Band number (1-indexed).
       \param name  Name of the raster band.
     */
-    Band(GDALDataset *ds, int bandNum, double dstNoData = -9999.0,
-            const std::string& name = "") : BaseBand(ds, bandNum, name),
-        m_dstNoData(dstNoData), m_xBlockSize(0), m_yBlockSize(0)
+    Band(GDALDataset* ds, int bandNum, double dstNoData = -9999.0,
+         const std::string& name = "")
+        : BaseBand(ds, bandNum, name), m_dstNoData(dstNoData), m_xBlockSize(0),
+          m_yBlockSize(0)
     {
         int xTotalSize;
         int yTotalSize;
@@ -109,8 +109,8 @@ private:
         int yBlockSize;
         blockSize(xBlockSize, yBlockSize);
 
-        if (xBlockSize <= 0 || yBlockSize <= 0 ||
-            xTotalSize <= 0 || yTotalSize <= 0)
+        if (xBlockSize <= 0 || yBlockSize <= 0 || xTotalSize <= 0 ||
+            yTotalSize <= 0)
             throw BadBand();
 
         m_xTotalSize = (size_t)xTotalSize;
@@ -158,7 +158,7 @@ private:
     {
         // Block indices are guaranteed not to overflow an int.
         readBlockBuf(static_cast<int>(x), static_cast<int>(y),
-            reinterpret_cast<uint8_t *>(m_buf.data()));
+                     reinterpret_cast<uint8_t*>(m_buf.data()));
 
         size_t xWidth = 0;
         if (x == m_xBlockCnt - 1)
@@ -208,16 +208,16 @@ private:
         T t;
         if (!Utils::numericCast(m_dstNoData, t))
         {
-            throw CantWriteBlock("Invalid nodata value " +
-                Utils::toString(m_dstNoData) + " for output data_type '" +
-                Utils::typeidName<T>() + "'.");
+            throw CantWriteBlock(
+                "Invalid nodata value " + Utils::toString(m_dstNoData) +
+                " for output data_type '" + Utils::typeidName<T>() + "'.");
         }
         return t;
     }
 
     template <typename SOURCE_ITER>
     void writeBlock(size_t x, size_t y, SOURCE_ITER sourceBegin,
-        ITER_VAL<SOURCE_ITER> srcNoData)
+                    ITER_VAL<SOURCE_ITER> srcNoData)
     {
         size_t xWidth = 0;
         if (x == m_xBlockCnt - 1)
@@ -228,7 +228,7 @@ private:
         size_t yHeight = 0;
         if (y == m_yBlockCnt - 1)
             yHeight = m_yTotalSize % m_yBlockSize;
-       if (yHeight == 0)
+        if (yHeight == 0)
             yHeight = m_yBlockSize;
 
         T dstNoData = getNoData();
@@ -243,23 +243,26 @@ private:
 
             auto si = sourceBegin + (wholeRowElts + partialRowElts);
             std::transform(si, si + xWidth, di,
-                [srcNoData, dstNoData](ITER_VAL<SOURCE_ITER> s){
-                    T t;
+                           [srcNoData, dstNoData](ITER_VAL<SOURCE_ITER> s)
+                           {
+                               T t;
 
-                    if (srcNoData == s ||
-                        (std::isnan(srcNoData) && std::isnan(s)))
-                        t = dstNoData;
-                    else
-                    {
-                        if (!Utils::numericCast(s, t))
-                        {
-                        throw CantWriteBlock("Unable to convert data for "
-                            "raster type as requested: " + Utils::toString(s) +
-                            " -> " + Utils::typeidName<T>());
-                        }
-                    }
-                    return t;
-                });
+                               if (srcNoData == s ||
+                                   (std::isnan(srcNoData) && std::isnan(s)))
+                                   t = dstNoData;
+                               else
+                               {
+                                   if (!Utils::numericCast(s, t))
+                                   {
+                                       throw CantWriteBlock(
+                                           "Unable to convert data for "
+                                           "raster type as requested: " +
+                                           Utils::toString(s) + " -> " +
+                                           Utils::typeidName<T>());
+                                   }
+                               }
+                               return t;
+                           });
 
             // Blocks are always full-sized, even if only some of the data
             // is valid, so we use m_xBlockSize instead of xWidth.
@@ -268,10 +271,9 @@ private:
 
         //  x and y are guaranteed to fit into an int
         writeBlockBuf(static_cast<int>(x), static_cast<int>(y),
-            reinterpret_cast<const uint8_t *>(m_buf.data()));
+                      reinterpret_cast<const uint8_t*>(m_buf.data()));
     }
 };
-
 
 class PDAL_EXPORT Raster
 {
@@ -294,8 +296,7 @@ public:
         geolocations.
     */
     Raster(const std::string& filename, const std::string& drivername,
-        const SpatialReference& srs, const std::array<double, 6> pixelToPos);
-
+           const SpatialReference& srs, const std::array<double, 6> pixelToPos);
 
     /**
       Destructor.  Closes an open raster.
@@ -311,7 +312,7 @@ public:
       \param pixelToPos  Transformation matrix to convert raster positions to
         geolocations.
     */
-    Raster(GDALDataset *ds) : m_ds (ds) {};
+    Raster(GDALDataset* ds) : m_ds(ds) {};
 
     /**
       Return a GDAL MEM driver copy of the raster
@@ -334,7 +335,7 @@ public:
       \param options  GDAL driver options.
     */
     GDALError open(int width, int height, int numBands, Dimension::Type type,
-        double noData, StringList options = StringList());
+                   double noData, StringList options = StringList());
 
     /**
       Close the raster and deallocate the underlying dataset.
@@ -349,8 +350,7 @@ public:
       \param nBand  Band number to read.  Band numbers start at 1.
       \return Error code or GDALError::None.
     */
-    template<typename T>
-    GDALError readBand(std::vector<T>& points, int nBand)
+    template <typename T> GDALError readBand(std::vector<T>& points, int nBand)
     {
         try
         {
@@ -359,19 +359,20 @@ public:
         catch (InvalidBand)
         {
             m_errorMsg = "Unable to get band " + std::to_string(nBand) +
-                " from raster '" + m_filename + "'.";
+                         " from raster '" + m_filename + "'.";
             return GDALError::InvalidBand;
         }
         catch (BadBand)
         {
             m_errorMsg = "Unable to read band/block information from "
-                "raster '" + m_filename + "'.";
+                         "raster '" +
+                         m_filename + "'.";
             return GDALError::BadBand;
         }
         catch (CantReadBlock)
         {
-            m_errorMsg = "Unable to read block for for raster '" +
-                m_filename + "'.";
+            m_errorMsg =
+                "Unable to read block for for raster '" + m_filename + "'.";
             return GDALError::CantReadBlock;
         }
         return GDALError::None;
@@ -385,53 +386,53 @@ public:
       \param nBand  Band number to write.
       \param name  Name of the raster band.
     */
-    template<typename SOURCE_ITER>
+    template <typename SOURCE_ITER>
     GDALError writeBand(SOURCE_ITER si, ITER_VAL<SOURCE_ITER> srcNoData,
-        int nBand, const std::string& name = "")
+                        int nBand, const std::string& name = "")
     {
         try
         {
             switch (m_bandType)
             {
             case Dimension::Type::Unsigned8:
-                Band<uint8_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<uint8_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Signed8:
-                Band<int8_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<int8_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Unsigned16:
-                Band<uint16_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<uint16_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Signed16:
-                Band<int16_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<int16_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Unsigned32:
-                Band<uint32_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<uint32_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Signed32:
-                Band<int32_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<int32_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Unsigned64:
-                Band<uint64_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<uint64_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Signed64:
-                Band<int64_t>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<int64_t>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Float:
-                Band<float>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<float>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::Double:
-                Band<double>(m_ds, nBand, m_dstNoData, name).
-                    write(si, srcNoData);
+                Band<double>(m_ds, nBand, m_dstNoData, name)
+                    .write(si, srcNoData);
                 break;
             case Dimension::Type::None:
                 throw CantWriteBlock();
@@ -440,19 +441,20 @@ public:
         catch (InvalidBand)
         {
             m_errorMsg = "Unable to get band " + std::to_string(nBand) +
-                " from raster '" + m_filename + "'.";
+                         " from raster '" + m_filename + "'.";
             return GDALError::InvalidBand;
         }
         catch (BadBand)
         {
             m_errorMsg = "Unable to read band/block information from "
-                "raster '" + m_filename + "'.";
+                         "raster '" +
+                         m_filename + "'.";
             return GDALError::BadBand;
         }
         catch (CantWriteBlock err)
         {
-            m_errorMsg = "Unable to write block for for raster '" +
-                m_filename + "'.";
+            m_errorMsg =
+                "Unable to write block for for raster '" + m_filename + "'.";
             if (err.what.size())
                 m_errorMsg += "\n" + err.what;
             return GDALError::CantWriteBlock;
@@ -468,7 +470,8 @@ public:
       \param y  Y position to read
       \param data  Vector in which to store data.
     */
-    GDALError read(double x, double y, std::vector<double>& data, std::array<double, 2>& pix);
+    GDALError read(double x, double y, std::vector<double>& data,
+                   std::array<double, 2>& pix);
 
     /**
      Read a block of data for a band into a vector of bytes.
@@ -480,13 +483,16 @@ public:
      \param height How many pixels to read in the Y direction.
      \param data Vector in which to store data.
     */
-    GDALError read(int band, int x, int y, int width, int height, std::vector<double>& data);
+    GDALError read(int band, int x, int y, int width, int height,
+                   std::vector<double>& data);
 
     /**
       Get a vector of dimensions that map to the bands of a raster.
     */
     std::vector<pdal::Dimension::Type> getPDALDimensionTypes() const
-       { return m_types; }
+    {
+        return m_types;
+    }
 
     /**
       Convert an X/Y raster position into geo-located position using the
@@ -509,7 +515,9 @@ public:
       Get the most recent error message.
     */
     std::string errorMsg() const
-        { return m_errorMsg; }
+    {
+        return m_errorMsg;
+    }
 
     /**
       Get the number of bands in the raster.
@@ -517,34 +525,43 @@ public:
       \return  The number of bands in the raster.
     */
     int bandCount() const
-        { return m_numBands; }
+    {
+        return m_numBands;
+    }
 
     /**
       Get the width of the raster (X direction)
     */
     int width() const
-        { return m_width; }
+    {
+        return m_width;
+    }
 
     /**
       Get the height of the raster (Y direction)
     */
     int height() const
-        { return m_height; }
+    {
+        return m_height;
+    }
 
     std::string const& filename()
-        { return m_filename; }
+    {
+        return m_filename;
+    }
 
     GDALError statistics(int nBand, double* minimum, double* maximum,
-        double* mean, double* stddev, bool approx = true,
-        bool force = true) const;
+                         double* mean, double* stddev, bool approx = true,
+                         bool force = true) const;
 
     BOX2D bounds() const;
     BOX3D bounds(int nBand) const;
 
-    MetadataNode getMetadata(std::string domain="") const;
-    GDALError addMetadata(std::string name, std::string value, std::string domain="");
+    MetadataNode getMetadata(std::string domain = "") const;
+    GDALError addMetadata(std::string name, std::string value,
+                          std::string domain = "");
 
-    void getBlockSize(int band, int &xSize, int &ySize) const;
+    void getBlockSize(int band, int& xSize, int& ySize) const;
 
 private:
     std::string m_filename;
@@ -556,7 +573,7 @@ private:
     std::array<double, 6> m_forwardTransform;
     std::array<double, 6> m_inverseTransform;
     SpatialReference m_srs;
-    GDALDataset *m_ds;
+    GDALDataset* m_ds;
     Dimension::Type m_bandType;
     double m_dstNoData;
 
@@ -565,12 +582,11 @@ private:
     mutable std::string m_errorMsg;
     mutable std::vector<pdal::Dimension::Type> m_types;
 
-    GDALError validateType(Dimension::Type& type, GDALDriver *driver);
-    bool getPixelAndLinePosition(double x, double y,
-        int32_t& pixel, int32_t& line);
+    GDALError validateType(Dimension::Type& type, GDALDriver* driver);
+    bool getPixelAndLinePosition(double x, double y, int32_t& pixel,
+                                 int32_t& line);
     GDALError computePDALDimensionTypes();
 };
 
 } // namespace gdal
 } // namespace pdal
-

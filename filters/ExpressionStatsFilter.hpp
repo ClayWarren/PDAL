@@ -37,14 +37,14 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace pdal
 {
 
-class PDAL_EXPORT ExpressionStatsFilter : public Filter,  public Streamable
+class PDAL_EXPORT ExpressionStatsFilter : public Filter, public Streamable
 {
 public:
     ExpressionStatsFilter();

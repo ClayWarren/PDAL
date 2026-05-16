@@ -38,8 +38,8 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "pdal_util_export.hpp"
 #include "Utils.hpp"
+#include "pdal_util_export.hpp"
 
 namespace pdal
 {
@@ -52,21 +52,22 @@ class PDAL_EXPORT BOX2D
 public:
     struct error : public std::runtime_error
     {
-        error(const std::string& err) : std::runtime_error(err)
-        {}
+        error(const std::string& err) : std::runtime_error(err) {}
     };
 
-    double minx;  ///< Minimum X value.
-    double maxx;  ///< Maximum X value.
-    double miny;  ///< Minimum Y value.
-    double maxy;  ///< Maximum Y value.
+    double minx;     ///< Minimum X value.
+    double maxx;     ///< Maximum X value.
+    double miny;     ///< Minimum Y value.
+    double maxy;     ///< Maximum Y value.
     std::string wkt; ///< WKT/PROJJSON/EPSG:code/etc GDAL-readable SRS format
 
     /**
       Construct an "empty" bounds box.
     */
     BOX2D()
-        { clear(); }
+    {
+        clear();
+    }
 
     /**
       Construct and initialize a bounds box.
@@ -76,9 +77,10 @@ public:
       \param maxx  Maximum X value.
       \param maxy  Maximum Y value.
     */
-    BOX2D(double minx, double miny, double maxx, double maxy) :
-        minx(minx), maxx(maxx), miny(miny), maxy(maxy)
-    {}
+    BOX2D(double minx, double miny, double maxx, double maxy)
+        : minx(minx), maxx(maxx), miny(miny), maxy(maxy)
+    {
+    }
 
     /**
       Determine whether a bounds box has not had any bounds set.
@@ -123,7 +125,9 @@ public:
         box values and equal to or more than the minimum box values.
     */
     bool contains(double x, double y) const
-        { return minx <= x && x <= maxx && miny <= y && y <= maxy; }
+    {
+        return minx <= x && x <= maxx && miny <= y && y <= maxy;
+    }
 
     /**
       Determine if the bounds of this box are the same as that of another
@@ -135,8 +139,8 @@ public:
     */
     bool equal(const BOX2D& other) const
     {
-        return  minx == other.minx && maxx == other.maxx &&
-            miny == other.miny && maxy == other.maxy;
+        return minx == other.minx && maxx == other.maxx && miny == other.miny &&
+               maxy == other.maxy;
     }
 
     /**
@@ -172,11 +176,15 @@ public:
     */
     BOX2D& grow(const BOX2D& other)
     {
-        if (other.minx < minx) minx = other.minx;
-        if (other.maxx > maxx) maxx = other.maxx;
+        if (other.minx < minx)
+            minx = other.minx;
+        if (other.maxx > maxx)
+            maxx = other.maxx;
 
-        if (other.miny < miny) miny = other.miny;
-        if (other.maxy > maxy) maxy = other.maxy;
+        if (other.miny < miny)
+            miny = other.miny;
+        if (other.maxy > maxy)
+            maxy = other.maxy;
         return *this;
     }
 
@@ -204,8 +212,8 @@ public:
     **/
     bool contains(const BOX2D& other) const
     {
-        return minx <= other.minx && maxx >= other.maxx &&
-            miny <= other.miny && maxy >= other.maxy;
+        return minx <= other.minx && maxx >= other.maxx && miny <= other.miny &&
+               maxy >= other.maxy;
     }
 
     /**
@@ -216,8 +224,8 @@ public:
     */
     bool overlaps(const BOX2D& other) const
     {
-        return minx <= other.maxx && maxx >= other.minx &&
-            miny <= other.maxy && maxy >= other.miny;
+        return minx <= other.maxx && maxx >= other.minx && miny <= other.maxy &&
+               maxy >= other.miny;
     }
 
     /**
@@ -234,8 +242,8 @@ public:
         oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
         oss << "box2d(";
-            oss << minx << " " << miny << ", ";
-            oss << maxx << " " << maxy << ")";
+        oss << minx << " " << miny << ", ";
+        oss << maxx << " " << maxy << ")";
         return oss.str();
     }
 
@@ -281,8 +289,8 @@ public:
 
         oss.precision(precision);
         oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
-        oss << "{\"bbox\":[" << minx << ", " << miny << ", " <<
-            maxx <<  "," << maxy << "]}";
+        oss << "{\"bbox\":[" << minx << ", " << miny << ", " << maxx << ","
+            << maxy << "]}";
         return oss.str();
     }
 
@@ -303,7 +311,6 @@ public:
     void parse(const std::string& s, std::string::size_type& pos);
 };
 
-
 /**
   BOX3D represents a three-dimensional box with double-precision bounds.
 */
@@ -312,33 +319,30 @@ class PDAL_EXPORT BOX3D : private BOX2D
 public:
     struct error : public std::runtime_error
     {
-        error(const std::string& err) : std::runtime_error(err)
-        {}
+        error(const std::string& err) : std::runtime_error(err) {}
     };
 
-    using BOX2D::minx;
     using BOX2D::maxx;
-    using BOX2D::miny;
     using BOX2D::maxy;
-    double minz;   ///< Minimum Z value.
-    double maxz;   ///< Maximum Z value.
+    using BOX2D::minx;
+    using BOX2D::miny;
+    double minz; ///< Minimum Z value.
+    double maxz; ///< Maximum Z value.
     using BOX2D::wkt;
 
     /**
       Clear the bounds box to an empty state.
     */
     BOX3D()
-       { clear(); }
+    {
+        clear();
+    }
 
-    BOX3D(const BOX3D& box) :
-        BOX2D(box), minz(box.minz), maxz(box.maxz)
-    {}
+    BOX3D(const BOX3D& box) : BOX2D(box), minz(box.minz), maxz(box.maxz) {}
 
     BOX3D& operator=(const BOX3D& box) = default;
 
-    explicit BOX3D(const BOX2D& box) :
-        BOX2D(box), minz(0), maxz(0)
-    {}
+    explicit BOX3D(const BOX2D& box) : BOX2D(box), minz(0), maxz(0) {}
 
     /**
       Construct and initialize a bounds box.
@@ -351,8 +355,10 @@ public:
       \param maxz  Maximum Z value.
     */
     BOX3D(double minx, double miny, double minz, double maxx, double maxy,
-        double maxz) : BOX2D(minx, miny, maxx, maxy), minz(minz), maxz(maxz)
-    {}
+          double maxz)
+        : BOX2D(minx, miny, maxx, maxy), minz(minz), maxz(maxz)
+    {
+    }
 
     /**
       Determine whether a bounds box has not had any bounds set (is in a state
@@ -386,7 +392,6 @@ public:
     */
     void clear();
 
-
     /**
       Determine if a bounds box contains a point.
 
@@ -411,8 +416,8 @@ public:
     **/
     bool contains(const BOX3D& other) const
     {
-        return BOX2D::contains(other) &&
-            minz <= other.minz && other.maxz <= maxz;
+        return BOX2D::contains(other) && minz <= other.minz &&
+               other.maxz <= maxz;
     }
 
     /**
@@ -425,8 +430,7 @@ public:
     */
     bool equal(const BOX3D& other) const
     {
-        return  BOX2D::equal(other) &&
-            minz == other.minz && maxz == other.maxz;
+        return BOX2D::equal(other) && minz == other.minz && maxz == other.maxz;
     }
 
     /**
@@ -463,8 +467,10 @@ public:
     BOX3D& grow(const BOX3D& other)
     {
         BOX2D::grow(other);
-        if (other.minz < minz) minz = other.minz;
-        if (other.maxz > maxz) maxz = other.maxz;
+        if (other.minz < minz)
+            minz = other.minz;
+        if (other.maxz > maxz)
+            maxz = other.maxz;
         return *this;
     }
 
@@ -490,8 +496,10 @@ public:
     void clip(const BOX3D& other)
     {
         BOX2D::clip(other);
-        if (other.minz > minz && other.minz < maxz) minz = other.minz;
-        if (other.maxz < maxz && other.maxz > minz) maxz = other.maxz;
+        if (other.minz > minz && other.minz < maxz)
+            minz = other.minz;
+        if (other.maxz < maxz && other.maxz > minz)
+            maxz = other.maxz;
     }
 
     /**
@@ -502,8 +510,8 @@ public:
     */
     bool overlaps(const BOX3D& other) const
     {
-        return BOX2D::overlaps(other) &&
-           minz <= other.maxz && maxz >= other.minz;
+        return BOX2D::overlaps(other) && minz <= other.maxz &&
+               maxz >= other.minz;
     }
 
     /**
@@ -529,8 +537,8 @@ public:
         oss.precision(precision);
         oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
-        oss << "box3d(" << minx << " " << miny << " " << minz << ", " <<
-            maxx << " " << maxy << " " << maxz << ")";
+        oss << "box3d(" << minx << " " << miny << " " << minz << ", " << maxx
+            << " " << maxy << " " << maxz << ")";
         return oss.str();
     }
 
@@ -552,42 +560,30 @@ public:
 
         oss << "POLYHEDRON Z ( ";
 
-        oss << "((" << minx << " " << miny << " " << minz << ", " <<
-                       maxx << " " << miny << " " << minz << ", " <<
-                       maxx << " " << maxy << " " << minz << ", " <<
-                       minx << " " << maxy << " " << minz << ", " <<
-                       minx << " " << miny << " " << minz << ", " <<
-               ")), ";
-        oss << "((" << minx << " " << miny << " " << minz << ", " <<
-                       maxx << " " << miny << " " << minz << ", " <<
-                       maxx << " " << miny << " " << maxz << ", " <<
-                       minx << " " << miny << " " << maxz << ", " <<
-                       minx << " " << miny << " " << minz << ", " <<
-               ")), ";
-        oss << "((" << maxx << " " << miny << " " << minz << ", " <<
-                       maxx << " " << maxy << " " << minz << ", " <<
-                       maxx << " " << maxy << " " << maxz << ", " <<
-                       maxx << " " << miny << " " << maxz << ", " <<
-                       maxx << " " << miny << " " << minz << ", " <<
-               ")), ";
-        oss << "((" << maxx << " " << maxy << " " << minz << ", " <<
-                       minx << " " << maxy << " " << minz << ", " <<
-                       minx << " " << maxy << " " << maxz << ", " <<
-                       maxx << " " << maxy << " " << maxz << ", " <<
-                       maxx << " " << maxy << " " << minz << ", " <<
-               ")), ";
-        oss << "((" << minx << " " << maxy << " " << minz << ", " <<
-                       minx << " " << miny << " " << minz << ", " <<
-                       minx << " " << miny << " " << maxz << ", " <<
-                       minx << " " << maxy << " " << maxz << ", " <<
-                       minx << " " << maxy << " " << minz << ", " <<
-               ")), ";
-        oss << "((" << minx << " " << miny << " " << maxz << ", " <<
-                       maxx << " " << miny << " " << maxz << ", " <<
-                       maxx << " " << maxy << " " << maxz << ", " <<
-                       minx << " " << maxy << " " << maxz << ", " <<
-                       minx << " " << miny << " " << maxz << ", " <<
-               "))";
+        oss << "((" << minx << " " << miny << " " << minz << ", " << maxx << " "
+            << miny << " " << minz << ", " << maxx << " " << maxy << " " << minz
+            << ", " << minx << " " << maxy << " " << minz << ", " << minx << " "
+            << miny << " " << minz << ", " << ")), ";
+        oss << "((" << minx << " " << miny << " " << minz << ", " << maxx << " "
+            << miny << " " << minz << ", " << maxx << " " << miny << " " << maxz
+            << ", " << minx << " " << miny << " " << maxz << ", " << minx << " "
+            << miny << " " << minz << ", " << ")), ";
+        oss << "((" << maxx << " " << miny << " " << minz << ", " << maxx << " "
+            << maxy << " " << minz << ", " << maxx << " " << maxy << " " << maxz
+            << ", " << maxx << " " << miny << " " << maxz << ", " << maxx << " "
+            << miny << " " << minz << ", " << ")), ";
+        oss << "((" << maxx << " " << maxy << " " << minz << ", " << minx << " "
+            << maxy << " " << minz << ", " << minx << " " << maxy << " " << maxz
+            << ", " << maxx << " " << maxy << " " << maxz << ", " << maxx << " "
+            << maxy << " " << minz << ", " << ")), ";
+        oss << "((" << minx << " " << maxy << " " << minz << ", " << minx << " "
+            << miny << " " << minz << ", " << minx << " " << miny << " " << maxz
+            << ", " << minx << " " << maxy << " " << maxz << ", " << minx << " "
+            << maxy << " " << minz << ", " << ")), ";
+        oss << "((" << minx << " " << miny << " " << maxz << ", " << maxx << " "
+            << miny << " " << maxz << ", " << maxx << " " << maxy << " " << maxz
+            << ", " << minx << " " << maxy << " " << maxz << ", " << minx << " "
+            << miny << " " << maxz << ", " << "))";
 
         oss << " )";
 
@@ -620,12 +616,10 @@ class PDAL_EXPORT Bounds
 public:
     struct error : public std::runtime_error
     {
-        error(const std::string& err) : std::runtime_error(err)
-        {}
+        error(const std::string& err) : std::runtime_error(err) {}
     };
 
-    Bounds()
-    {}
+    Bounds() {}
 
     explicit Bounds(const BOX3D& box);
     explicit Bounds(const BOX2D& box);
@@ -642,10 +636,10 @@ public:
     void grow(double x, double y, double z);
     void parse(const std::string& s, std::string::size_type& pos);
 
-    friend PDAL_EXPORT std::istream& operator >> (std::istream& in,
-        Bounds& bounds);
-    friend PDAL_EXPORT std::ostream& operator << (std::ostream& out,
-        const Bounds& bounds);
+    friend PDAL_EXPORT std::istream& operator>>(std::istream& in,
+                                                Bounds& bounds);
+    friend PDAL_EXPORT std::ostream& operator<<(std::ostream& out,
+                                                const Bounds& bounds);
 
 private:
     BOX3D m_box;
@@ -660,7 +654,7 @@ private:
   \param ostr  Stream to write to.
   \param bounds  Box to write.
 */
-inline std::ostream& operator << (std::ostream& ostr, const BOX2D& bounds)
+inline std::ostream& operator<<(std::ostream& ostr, const BOX2D& bounds)
 {
     if (bounds.empty())
     {
@@ -670,8 +664,8 @@ inline std::ostream& operator << (std::ostream& ostr, const BOX2D& bounds)
     Utils::StringStreamClassicLocale ss;
     ss.precision(16); // or..?
     ss << "(";
-    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " <<
-          "[" << bounds.miny << ", " << bounds.maxy << "]";
+    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " << "["
+       << bounds.miny << ", " << bounds.maxy << "]";
     ss << ")";
     ostr << ss.str();
     return ostr;
@@ -683,7 +677,7 @@ inline std::ostream& operator << (std::ostream& ostr, const BOX2D& bounds)
   \param ostr  Stream to write to.
   \param bounds  Box to write.
 */
-inline std::ostream& operator << (std::ostream& ostr, const BOX3D& bounds)
+inline std::ostream& operator<<(std::ostream& ostr, const BOX3D& bounds)
 {
     if (bounds.empty())
     {
@@ -693,9 +687,9 @@ inline std::ostream& operator << (std::ostream& ostr, const BOX3D& bounds)
     Utils::StringStreamClassicLocale ss;
     ss.precision(16); // or..?
     ss << "(";
-    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " <<
-          "[" << bounds.miny << ", " << bounds.maxy << "], " <<
-          "[" << bounds.minz << ", " << bounds.maxz << "]";
+    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " << "["
+       << bounds.miny << ", " << bounds.maxy << "], " << "[" << bounds.minz
+       << ", " << bounds.maxz << "]";
     ss << ")";
     ostr << ss.str();
     return ostr;
@@ -723,65 +717,65 @@ extern PDAL_EXPORT std::istream& operator>>(std::istream& istr, BOX3D& bounds);
   \param istr  in to read from.
   \param bounds  Bounds box to populate.
 */
-PDAL_EXPORT std::istream& operator >> (std::istream& in, Bounds& bounds);
+PDAL_EXPORT std::istream& operator>>(std::istream& in, Bounds& bounds);
 
 /**
   Write a Bounds (2D/3D) box from a string in PDAL format.
 */
-PDAL_EXPORT std::ostream& operator << (std::ostream& out, const Bounds& bounds);
+PDAL_EXPORT std::ostream& operator<<(std::ostream& out, const Bounds& bounds);
 
 namespace Utils
 {
-    // Catch exceptions that might be thrown by native BOX2D parsing.
-    template<>
-    inline StatusWithReason fromString(const std::string& s, BOX2D& bounds)
+// Catch exceptions that might be thrown by native BOX2D parsing.
+template <>
+inline StatusWithReason fromString(const std::string& s, BOX2D& bounds)
+{
+    try
     {
-        try
-        {
-            Utils::IStringStreamClassicLocale iss(s);
-            iss >> bounds;
-        }
-        catch (BOX2D::error& error)
-        {
-            std::string msg = "Error parsing '" + s + "': " + error.what();
-            return StatusWithReason(-1, msg);
-        }
-        return true;
+        Utils::IStringStreamClassicLocale iss(s);
+        iss >> bounds;
     }
-
-    // Catch exceptions that might be thrown by native BOX3D parsing.
-    template<>
-    inline StatusWithReason fromString(const std::string& s, BOX3D& bounds)
+    catch (BOX2D::error& error)
     {
-        try
-        {
-            Utils::IStringStreamClassicLocale iss(s);
-            iss >> bounds;
-        }
-        catch (BOX3D::error& error)
-        {
-            std::string msg = "Error parsing '" + s + "': " + error.what();
-            return StatusWithReason(-1, msg);
-        }
-        return true;
+        std::string msg = "Error parsing '" + s + "': " + error.what();
+        return StatusWithReason(-1, msg);
     }
-
-    // Catch exceptions that might be thrown by native Bounds parsing.
-    template<>
-    inline StatusWithReason fromString(const std::string& s, Bounds& bounds)
-    {
-        try
-        {
-            Utils::IStringStreamClassicLocale iss(s);
-            iss >> bounds;
-        }
-        catch (Bounds::error& error)
-        {
-            std::string msg = "Error parsing '" + s + "': " + error.what();
-            return StatusWithReason(-1, msg);
-        }
-        return true;
-    }
+    return true;
 }
+
+// Catch exceptions that might be thrown by native BOX3D parsing.
+template <>
+inline StatusWithReason fromString(const std::string& s, BOX3D& bounds)
+{
+    try
+    {
+        Utils::IStringStreamClassicLocale iss(s);
+        iss >> bounds;
+    }
+    catch (BOX3D::error& error)
+    {
+        std::string msg = "Error parsing '" + s + "': " + error.what();
+        return StatusWithReason(-1, msg);
+    }
+    return true;
+}
+
+// Catch exceptions that might be thrown by native Bounds parsing.
+template <>
+inline StatusWithReason fromString(const std::string& s, Bounds& bounds)
+{
+    try
+    {
+        Utils::IStringStreamClassicLocale iss(s);
+        iss >> bounds;
+    }
+    catch (Bounds::error& error)
+    {
+        std::string msg = "Error parsing '" + s + "': " + error.what();
+        return StatusWithReason(-1, msg);
+    }
+    return true;
+}
+} // namespace Utils
 
 } // namespace pdal

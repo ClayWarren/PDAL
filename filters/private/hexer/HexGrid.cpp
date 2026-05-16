@@ -3,8 +3,7 @@
 namespace hexer
 {
 
-HexGrid::~HexGrid()
-{}
+HexGrid::~HexGrid() {}
 
 void HexGrid::processHeight(double height)
 {
@@ -63,7 +62,7 @@ HexId HexGrid::findHexagon(Point p)
     if (m_counts.empty())
     {
         m_origin = p;
-        return HexId{0,0};
+        return HexId{0, 0};
     }
 
     // Offset by the origin.
@@ -82,14 +81,14 @@ HexId HexGrid::findHexagon(Point p)
     // Compute the column remainder to determine if we are in a strip where
     // the hexagons overlap (the mini-column).
     double xcolOffset = col - floor(col);
-    if (xcolOffset > 2.0/3.0)
+    if (xcolOffset > 2.0 / 3.0)
     {
         // Calculate the xvalue as a fraction of the width of the column-piece
         // containing multiple hex columns.  These overlap columns are 1/3
         // the total width of any column.
 
         // Subtract the 2/3 of the value not relevant to the mini-column.
-        xcolOffset -= 2.0/3.0;
+        xcolOffset -= 2.0 / 3.0;
         // Scale the value to the width of the mini-column.
         xcolOffset *= 3.0;
 
@@ -130,18 +129,20 @@ HexId HexGrid::findHexagon(Point p)
 
 HexId HexGrid::edgeHex(HexId hex, int edge) const
 {
-/*
-    //               (+ Y)
-    //                __3_
-    //             2 /    \ 4
-    //              /      \
-    //              \      /
-    //             1 \____/ 5
-    //                  0
-    //               (- Y)
-*/
-    static const HexId even[] = {{0, -1}, {-1, -1}, {-1, 0}, {0, 1}, {1, 0}, {1, -1}};
-    static const HexId odd[] = {{0, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}};
+    /*
+        //               (+ Y)
+        //                __3_
+        //             2 /    \ 4
+        //              /      \
+        //              \      /
+        //             1 \____/ 5
+        //                  0
+        //               (- Y)
+    */
+    static const HexId even[] = {{0, -1}, {-1, -1}, {-1, 0},
+                                 {0, 1},  {1, 0},   {1, -1}};
+    static const HexId odd[] = {{0, -1}, {-1, 0}, {-1, 1},
+                                {0, 1},  {1, 1},  {1, 0}};
 
     if (hex.i % 2)
         return hex + odd[edge];
@@ -149,11 +150,12 @@ HexId HexGrid::edgeHex(HexId hex, int edge) const
         return hex + even[edge];
 }
 
-// Finds the possibilities for the next boundary segment, moving counter-clockwise
+// Finds the possibilities for the next boundary segment, moving
+// counter-clockwise
 Segment HexGrid::nextSegment(const Segment& s) const
 {
-    static const int next[] { 5, 0, 1, 2, 3, 4 };
-    static const int prev[] { 1, 2, 3, 4, 5, 0 };
+    static const int next[]{5, 0, 1, 2, 3, 4};
+    static const int prev[]{1, 2, 3, 4, 5, 0};
 
     Segment left(s.hex, next[s.edge]);
     Segment right(edgeHex(s.hex, left.edge), prev[s.edge]);

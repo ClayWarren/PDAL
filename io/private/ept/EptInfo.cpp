@@ -32,8 +32,8 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include "../connector/Connector.hpp"
 #include "EptInfo.hpp"
+#include "../connector/Connector.hpp"
 #include "EptSupport.hpp"
 
 #include <pdal/util/FileUtils.hpp>
@@ -50,15 +50,16 @@ EptInfo::EptInfo(const std::string& info)
     {
         m_info = NL::json::parse(info);
     }
-    catch(NL::json::parse_error&)
+    catch (NL::json::parse_error&)
     {
         throw pdal_error("Unable to parse EPT info as JSON.");
     }
     initialize();
 }
 
-EptInfo::EptInfo(const std::string& filename, const connector::Connector& connector) :
-    m_filename(filename)
+EptInfo::EptInfo(const std::string& filename,
+                 const connector::Connector& connector)
+    : m_filename(filename)
 {
     if (Utils::startsWith(m_filename, "ept://"))
     {
@@ -91,17 +92,20 @@ void EptInfo::initialize()
         {
             if (!iWkt->is_string())
                 throw pdal_error("srs.wkt must be specified as a string. "
-                        "Found '" + iWkt->dump() + "'.");
+                                 "Found '" +
+                                 iWkt->dump() + "'.");
             wkt = iWkt->get<std::string>();
         }
         else
         {
             if (iAuthority == iSrs->end() || iHorizontal == iSrs->end())
-                throw pdal_error("srs must be defined with at least one of "
-                        "wkt or both authority and horizontal specifications.");
+                throw pdal_error(
+                    "srs must be defined with at least one of "
+                    "wkt or both authority and horizontal specifications.");
             if (!iAuthority->is_string())
                 throw pdal_error("srs.authority must be specified as a "
-                        "string.  Found '" + iAuthority->dump() + "'.");
+                                 "string.  Found '" +
+                                 iAuthority->dump() + "'.");
             wkt = iAuthority->get<std::string>();
 
             std::string horiz;
@@ -111,8 +115,9 @@ void EptInfo::initialize()
                 horiz = iHorizontal->get<std::string>();
             else
                 throw pdal_error("srs.horizontal must be specified as a "
-                    "non-negative integer or equivalent string. "
-                    "Found '" + iHorizontal->dump() + "'.");
+                                 "non-negative integer or equivalent string. "
+                                 "Found '" +
+                                 iHorizontal->dump() + "'.");
             wkt += ":" + horiz;
 
             if (iVertical != iSrs->end())
@@ -123,9 +128,11 @@ void EptInfo::initialize()
                 else if (iVertical->is_string())
                     vert = iVertical->get<std::string>();
                 else
-                    throw pdal_error("srs.vertical must be specified as a "
-                            "non-negative integer or equivalent string. "
-                            "Found '" + iVertical->dump() + "'.");
+                    throw pdal_error(
+                        "srs.vertical must be specified as a "
+                        "non-negative integer or equivalent string. "
+                        "Found '" +
+                        iVertical->dump() + "'.");
                 wkt += "+" + vert;
             }
         }
@@ -147,25 +154,33 @@ void EptInfo::initialize()
     NL::json& schema = m_info["schema"];
 
     // There are 2 cases where we do some special things regarding flags:
-    //  - If the ClassFlags dimension exists, we will instead use the constituent flags
-    //  - If the data-type is laszip, then we should always add these flags.  Since EPT
+    //  - If the ClassFlags dimension exists, we will instead use the
+    //  constituent flags
+    //  - If the data-type is laszip, then we should always add these flags.
+    //  Since EPT
     //    metadata cannot represent bitfields, these fields can be packed into
     //    Classification so we need to expand them out here.
-    auto addFlags([this]() {
-        m_remoteLayout.registerDim(Dimension::Id::Withheld);
-        m_dims["Withheld"] = DimType(Dimension::Id::Withheld, Dimension::Type::Unsigned8, 1.0, 0);
+    auto addFlags(
+        [this]()
+        {
+            m_remoteLayout.registerDim(Dimension::Id::Withheld);
+            m_dims["Withheld"] = DimType(Dimension::Id::Withheld,
+                                         Dimension::Type::Unsigned8, 1.0, 0);
 
-        m_remoteLayout.registerDim(Dimension::Id::Overlap);
-        m_dims["Overlap"] = DimType(Dimension::Id::Overlap, Dimension::Type::Unsigned8, 1.0, 0);
+            m_remoteLayout.registerDim(Dimension::Id::Overlap);
+            m_dims["Overlap"] = DimType(Dimension::Id::Overlap,
+                                        Dimension::Type::Unsigned8, 1.0, 0);
 
-        m_remoteLayout.registerDim(Dimension::Id::Synthetic);
-        m_dims["Synthetic"] = DimType(Dimension::Id::Synthetic, Dimension::Type::Unsigned8, 1.0, 0);
+            m_remoteLayout.registerDim(Dimension::Id::Synthetic);
+            m_dims["Synthetic"] = DimType(Dimension::Id::Synthetic,
+                                          Dimension::Type::Unsigned8, 1.0, 0);
 
-        m_remoteLayout.registerDim(Dimension::Id::KeyPoint);
-        m_dims["KeyPoint"] = DimType(Dimension::Id::KeyPoint, Dimension::Type::Unsigned8, 1.0, 0);
-    });
+            m_remoteLayout.registerDim(Dimension::Id::KeyPoint);
+            m_dims["KeyPoint"] = DimType(Dimension::Id::KeyPoint,
+                                         Dimension::Type::Unsigned8, 1.0, 0);
+        });
 
-    for (NL::json element: schema)
+    for (NL::json element : schema)
     {
         std::string name = element["name"].get<std::string>();
         std::string typestring = element["type"].get<std::string>();
@@ -182,7 +197,8 @@ void EptInfo::initialize()
         }
         else
         {
-            Dimension::Id id = m_remoteLayout.registerOrAssignFixedDim(name, type);
+            Dimension::Id id =
+                m_remoteLayout.registerOrAssignFixedDim(name, type);
             m_dims[name] = DimType(id, type, scale, offset);
         }
     }
@@ -193,7 +209,7 @@ void EptInfo::initialize()
 
 DimType EptInfo::dimType(Dimension::Id id) const
 {
-    //ABELL - This is yuck.  The map of strings to DimType is bad.
+    // ABELL - This is yuck.  The map of strings to DimType is bad.
     for (auto it = m_dims.begin(); it != m_dims.end(); ++it)
         if (it->second.m_id == id)
             return it->second;
@@ -217,4 +233,3 @@ std::string EptInfo::sourcesDir() const
 
 } // namespace ept
 } // namespace pdal
-

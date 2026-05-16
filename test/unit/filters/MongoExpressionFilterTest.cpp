@@ -40,9 +40,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <filters/MongoExpressionFilter.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/StageFactory.hpp>
-#include <filters/MongoExpressionFilter.hpp>
 
 using namespace pdal;
 
@@ -50,7 +50,7 @@ namespace
 {
 
 using D = Dimension::Id;
-const Dimension::IdList dims { { D::X, D::Y, D::Z } };
+const Dimension::IdList dims{{D::X, D::Y, D::Z}};
 
 std::unique_ptr<FixedPointTable> makeTable()
 {
@@ -61,7 +61,7 @@ std::unique_ptr<FixedPointTable> makeTable()
 }
 
 std::unique_ptr<MongoExpressionFilter> makeFilter(BasePointTable& table,
-    NL::json expression)
+                                                  NL::json expression)
 {
     Options o;
     o.add("expression", expression.dump());
@@ -94,13 +94,13 @@ TEST(MongoExpressionFilterTest, missingDimension)
 
     {
         // Missing LHS dimension.
-        NL::json e {"Red", 42};
+        NL::json e{"Red", 42};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 
     {
         // Missing RHS dimension.
-        NL::json e {"X", "Red"};
+        NL::json e{"X", "Red"};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 }
@@ -112,13 +112,13 @@ TEST(MongoExpressionFilterTest, invalidSingleComparisons)
 
     {
         // Comparison operators must take values, not arrays.
-        NL::json e {"X", {"$eq", {1}} };
+        NL::json e{"X", {"$eq", {1}}};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 
     {
         // Comparison operators must take values, not objects.
-        NL::json e {"X", {"$eq", {"asdf", 42} } };
+        NL::json e{"X", {"$eq", {"asdf", 42}}};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 }
@@ -129,7 +129,7 @@ TEST(MongoExpressionFilterTest, singleComparisons)
 
     {
         // Implicit $eq.
-        NL::json e { { "X", 0 } };
+        NL::json e{{"X", 0}};
 
         auto f(makeFilter(*table, e));
         PointRef pr(*table, 0);
@@ -145,7 +145,7 @@ TEST(MongoExpressionFilterTest, singleComparisons)
     }
     {
         // Across dimensions.
-        NL::json e { {"X", "Y"} };
+        NL::json e{{"X", "Y"}};
         auto f(makeFilter(*table, e));
         PointRef pr(*table, 0);
 
@@ -161,26 +161,28 @@ TEST(MongoExpressionFilterTest, singleComparisons)
         EXPECT_FALSE(f->processOne(pr));
     }
 
-
-    auto constant = [&table](const std::string& comp,
-        bool neg, bool zero, bool pos)
+    auto constant =
+        [&table](const std::string& comp, bool neg, bool zero, bool pos)
     {
         PointRef pr(*table, 0);
 
-        NL::json e {{"X", {{comp, 0}} }};
+        NL::json e{{"X", {{comp, 0}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, -1);
         EXPECT_EQ(f->processOne(pr), neg) << "Error comparing to 0 "
-            "with comparator " << comp << " and negative test.";
+                                             "with comparator "
+                                          << comp << " and negative test.";
 
         pr.setField(Dimension::Id::X, 0);
         EXPECT_EQ(f->processOne(pr), zero) << "Error comparing to 0 "
-            "with comparator " << comp << " and zero test.";
+                                              "with comparator "
+                                           << comp << " and zero test.";
 
         pr.setField(Dimension::Id::X, 1);
         EXPECT_EQ(f->processOne(pr), pos) << "Error comparing to 0 "
-            "with comparator " << comp << " and positive test.";
+                                             "with comparator "
+                                          << comp << " and positive test.";
     };
 
     constant("$eq", false, true, false);
@@ -190,27 +192,30 @@ TEST(MongoExpressionFilterTest, singleComparisons)
     constant("$lt", true, false, false);
     constant("$lte", true, true, false);
 
-    auto across = [&table](const std::string& comp,
-        bool neg, bool zero, bool pos)
+    auto across =
+        [&table](const std::string& comp, bool neg, bool zero, bool pos)
     {
         PointRef pr(*table, 0);
 
-        NL::json e {{"X", {{comp, "Y"}} }};
+        NL::json e{{"X", {{comp, "Y"}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::Y, 0);
 
         pr.setField(Dimension::Id::X, -1);
         EXPECT_EQ(f->processOne(pr), neg) << "Error comparing across "
-            "dimensions with comparator " << comp << " and negative test.";
+                                             "dimensions with comparator "
+                                          << comp << " and negative test.";
 
         pr.setField(Dimension::Id::X, 0);
         EXPECT_EQ(f->processOne(pr), zero) << "Error comparing across "
-            "dimensions with comparator " << comp << " and zero test.";
+                                              "dimensions with comparator "
+                                           << comp << " and zero test.";
 
         pr.setField(Dimension::Id::X, 1);
         EXPECT_EQ(f->processOne(pr), pos) << "Error comparing across "
-            "dimensions with comparator " << comp << " and positive test.";
+                                             "dimensions with comparator "
+                                          << comp << " and positive test.";
     };
 
     across("$eq", false, true, false);
@@ -228,17 +233,17 @@ TEST(MongoExpressionFilterTest, invalidMultiComparisons)
 
     {
         // Comparison operators must take arrays, not values.
-        NL::json e {"X", {"$in", 42} };
+        NL::json e{"X", {"$in", 42}};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
     {
         // Comparison operators must take arrays, not objects.
-        NL::json e {"X", {"$in", {"asdf", 42} } };
+        NL::json e{"X", {"$in", {"asdf", 42}}};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
     {
         // Dimensions must exist.
-        NL::json e {"X", {"$in", {"Red"}} };
+        NL::json e{"X", {"$in", {"Red"}}};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 }
@@ -250,7 +255,7 @@ TEST(MongoExpressionFilterTest, multiComparisons)
 
     // $in.
     {
-        NL::json e {{ "X", {{"$in", {0, 1, 2} }} }};
+        NL::json e{{"X", {{"$in", {0, 1, 2}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, 0);
@@ -265,7 +270,7 @@ TEST(MongoExpressionFilterTest, multiComparisons)
 
     // $in across dimensions.
     {
-        NL::json e {{ "X", {{"$in", {0, 1, "Y"} }} }};
+        NL::json e{{"X", {{"$in", {0, 1, "Y"}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::Y, 2);
@@ -282,7 +287,7 @@ TEST(MongoExpressionFilterTest, multiComparisons)
 
     // $nin.
     {
-        NL::json e {{ "X", {{"$nin", {0, 1, 2} }} }};
+        NL::json e{{"X", {{"$nin", {0, 1, 2}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, 0);
@@ -297,7 +302,7 @@ TEST(MongoExpressionFilterTest, multiComparisons)
 
     // $nin across dimensions.
     {
-        NL::json e {{ "X", {{"$nin", {0, 1, "Y"} }} }};
+        NL::json e{{"X", {{"$nin", {0, 1, "Y"}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::Y, 2);
@@ -320,13 +325,13 @@ TEST(MongoExpressionFilterTest, invalidLogicalOperators)
 
     // Logical operators cannot point to values.
     {
-        NL::json e {"$and", 42};
+        NL::json e{"$and", 42};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 
     // Logical operators cannot point to objects.
     {
-        NL::json e {"$and", "X"};
+        NL::json e{"$and", "X"};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 
@@ -335,13 +340,13 @@ TEST(MongoExpressionFilterTest, invalidLogicalOperators)
 
     // Logical NOT cannot point to values.
     {
-        NL::json e {"$not", 42};
+        NL::json e{"$not", 42};
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
 
     // Logical NOT must accept only a single expression.
     {
-        NL::json e {"$not", {{"X", 0}, {"Y", 1}} };
+        NL::json e{"$not", {{"X", 0}, {"Y", 1}}};
 
         EXPECT_THROW(makeFilter(*table, e), pdal_error);
     }
@@ -354,7 +359,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // Implicit $and.
     {
-        NL::json e {{"X", {{"$gt", 0}, {"$lt", 2}} }};
+        NL::json e{{"X", {{"$gt", 0}, {"$lt", 2}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, 0);
@@ -369,7 +374,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // Implicit $and across dimensions.
     {
-        NL::json e {{"X", {{"$gt", 0}, {"$lt", "Y"}} }};
+        NL::json e{{"X", {{"$gt", 0}, {"$lt", "Y"}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::Y, 2);
@@ -386,7 +391,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // $and.
     {
-        NL::json e {{"$and", { {{"X", 0}}, {{"Y", 1}}, {{"Z", 2}} } }};
+        NL::json e{{"$and", {{{"X", 0}}, {{"Y", 1}}, {{"Z", 2}}}}};
 
         auto f(makeFilter(*table, e));
 
@@ -401,8 +406,9 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     pr.setField(Dimension::Id::Z, z);
 
                     bool check(x == 0 && y == 1 && z == 2);
-                    EXPECT_EQ(f->processOne(pr), check) << x << ", " << y <<
-                        ", " << z << " != " << check << std::endl;
+                    EXPECT_EQ(f->processOne(pr), check)
+                        << x << ", " << y << ", " << z << " != " << check
+                        << std::endl;
                 }
             }
         }
@@ -410,7 +416,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // $or.
     {
-        NL::json e {{"$or", { {{"X", 0}}, {{"Y", 1}}, {{"Z", 2}} } }};
+        NL::json e{{"$or", {{{"X", 0}}, {{"Y", 1}}, {{"Z", 2}}}}};
         auto f(makeFilter(*table, e));
 
         for (PointId x(0); x < 3; ++x)
@@ -424,8 +430,9 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     pr.setField(Dimension::Id::Z, z);
 
                     bool check(x == 0 || y == 1 || z == 2);
-                    EXPECT_EQ(f->processOne(pr), check) << x << ", " << y <<
-                        ", " << z << " != " << check << std::endl;
+                    EXPECT_EQ(f->processOne(pr), check)
+                        << x << ", " << y << ", " << z << " != " << check
+                        << std::endl;
                 }
             }
         }
@@ -433,7 +440,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // $nor.
     {
-        NL::json e {{"$nor", { {{"X", 0}}, {{"Y", 1}}, {{"Z", 2}} } }};
+        NL::json e{{"$nor", {{{"X", 0}}, {{"Y", 1}}, {{"Z", 2}}}}};
 
         auto f(makeFilter(*table, e));
 
@@ -448,8 +455,9 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     pr.setField(Dimension::Id::Z, z);
 
                     bool check(!(x == 0 || y == 1 || z == 2));
-                    EXPECT_EQ(f->processOne(pr), check) << x << ", " << y <<
-                        ", " << z << " != " << check << std::endl;
+                    EXPECT_EQ(f->processOne(pr), check)
+                        << x << ", " << y << ", " << z << " != " << check
+                        << std::endl;
                 }
             }
         }
@@ -457,7 +465,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // $not
     {
-        NL::json e {{"$not", {{"X", {{"$gt", 0}} }} }};
+        NL::json e{{"$not", {{"X", {{"$gt", 0}}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, -1);
@@ -472,7 +480,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
 
     // $not with inner multi-comparison
     {
-        NL::json e {{"$not", {{"X", {{"$in", {0, 1, 2} }} }} }};
+        NL::json e{{"$not", {{"X", {{"$in", {0, 1, 2}}}}}}};
         auto f(makeFilter(*table, e));
 
         pr.setField(Dimension::Id::X, 0);
@@ -485,4 +493,3 @@ TEST(MongoExpressionFilterTest, logicalOperators)
         EXPECT_TRUE(f->processOne(pr));
     }
 }
-

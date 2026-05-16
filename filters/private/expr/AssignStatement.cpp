@@ -54,4 +54,3 @@ Utils::StatusWithReason AssignStatement::prepare(PointLayoutPtr layout)
 
 } // namespace expr
 } // namespace pdal
-

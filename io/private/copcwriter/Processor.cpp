@@ -1,43 +1,42 @@
 /******************************************************************************
-* Copyright (c) 2021, Hobu Inc. (info@hobu.co)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
-
+ * Copyright (c) 2021, Hobu Inc. (info@hobu.co)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <numeric>
 #include <random>
 
-#include <pdal/StageFactory.hpp>
 #include <io/BufferReader.hpp>
+#include <pdal/StageFactory.hpp>
 
 #include <lazperf/writers.hpp>
 
@@ -50,10 +49,11 @@ namespace pdal
 namespace copcwriter
 {
 
-Processor::Processor(PyramidManager& manager, const VoxelInfo& v, const BaseInfo& b) :
-    m_vi(v), b(b), m_manager(manager)
-{}
-
+Processor::Processor(PyramidManager& manager, const VoxelInfo& v,
+                     const BaseInfo& b)
+    : m_vi(v), b(b), m_manager(manager)
+{
+}
 
 void Processor::run()
 {
@@ -69,7 +69,8 @@ void Processor::run()
         if (child.numPoints() < MinimumPoints)
             m_vi.octant().movePoints(child);
     }
-    // It's possible that all the file infos have been moved above, but this is cheap.
+    // It's possible that all the file infos have been moved above, but this is
+    // cheap.
     if (totalPoints < MinimumTotalPoints)
         for (int i = 0; i < 8; ++i)
         {
@@ -99,7 +100,6 @@ void Processor::write()
     if (m_vi.key() == VoxelKey(0, 0, 0, 0))
         writeCompressed(parent.key(), parent.source());
 }
-
 
 void Processor::sample()
 {
@@ -136,8 +136,8 @@ void Processor::sample()
         {
             GridKey k = m_vi.gridKey(PointRef(*v, idx));
 
-            // If we're accepting this point into this voxel from it's child, add it
-            // to the accepted list and also stick it in the grid.
+            // If we're accepting this point into this voxel from it's child,
+            // add it to the accepted list and also stick it in the grid.
             if (acceptable(k))
             {
                 accepted->appendPoint(*v, idx);
@@ -149,7 +149,6 @@ void Processor::sample()
         v = rejected;
     }
 }
-
 
 bool Processor::acceptable(GridKey key)
 {
@@ -163,7 +162,6 @@ bool Processor::acceptable(GridKey key)
     return true;
 }
 
-
 void Processor::writeCompressed(VoxelKey k, PointViewPtr v)
 {
     if (v->size() == 0)
@@ -174,8 +172,10 @@ void Processor::writeCompressed(VoxelKey k, PointViewPtr v)
 
     PointLayoutPtr layout = v->layout();
 
-    std::vector<char> buf(lazperf::baseCount(b.pointFormatId) + b.numExtraBytes);
-    lazperf::writer::chunk_compressor compressor(b.pointFormatId, b.numExtraBytes);
+    std::vector<char> buf(lazperf::baseCount(b.pointFormatId) +
+                          b.numExtraBytes);
+    lazperf::writer::chunk_compressor compressor(b.pointFormatId,
+                                                 b.numExtraBytes);
 
     // Sort by GPS time - no-op if there's no GPS time.
     v->sort(Dimension::Id::GpsTime);
@@ -187,11 +187,13 @@ void Processor::writeCompressed(VoxelKey k, PointViewPtr v)
         compressor.compress(buf.data());
     }
     std::vector<unsigned char> chunk = compressor.done();
-    uint64_t location = m_manager.newChunk(k, (uint32_t)chunk.size(), (uint32_t)v->size());
+    uint64_t location =
+        m_manager.newChunk(k, (uint32_t)chunk.size(), (uint32_t)v->size());
 
-    std::ofstream out(b.filename, std::ios::out | std::ios::in | std::ios::binary);
+    std::ofstream out(b.filename,
+                      std::ios::out | std::ios::in | std::ios::binary);
     out.seekp(std::ofstream::pos_type(location));
-    out.write(reinterpret_cast<const char *>(chunk.data()), chunk.size());
+    out.write(reinterpret_cast<const char*>(chunk.data()), chunk.size());
     out.close();
     if (!out)
         throw pdal_error("Failure writing to '" + b.filename + "'.");

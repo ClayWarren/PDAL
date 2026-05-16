@@ -1,6 +1,6 @@
-#include <set>
-#include <iostream>
 #include <cmath>
+#include <iostream>
+#include <set>
 
 #include <h3api.h>
 
@@ -10,8 +10,7 @@
 namespace hexer
 {
 
-BaseGrid::~BaseGrid()
-{}
+BaseGrid::~BaseGrid() {}
 
 void BaseGrid::addPoint(Point& p)
 {
@@ -26,10 +25,11 @@ void BaseGrid::addPoint(Point& p)
     // add the hexagon to the grid, and increment its count if it exists.
     int count = increment(h);
 
-    // if the hexagon of interest has reached the density threshold, we see if it
-    // has neighbors at edge 0. If not, it's added to our list of possible starting points
-    // for path finding (m_possibleRoots). If the hexagon at edge 3 was in m_possibleRoots we
-    // remove it since it no longer has a non-dense neighbor at edge 0.
+    // if the hexagon of interest has reached the density threshold, we see if
+    // it has neighbors at edge 0. If not, it's added to our list of possible
+    // starting points for path finding (m_possibleRoots). If the hexagon at
+    // edge 3 was in m_possibleRoots we remove it since it no longer has a
+    // non-dense neighbor at edge 0.
     if (count == m_denseLimit)
     {
         HexId above = edgeHex(h, 0);
@@ -61,7 +61,8 @@ void BaseGrid::flushSamples()
 
     double height = computeHexSize();
     processHeight(height);
-    for (Point p : m_sample) {
+    for (Point p : m_sample)
+    {
         addPoint(p);
     }
     m_sample.clear();
@@ -104,7 +105,7 @@ void BaseGrid::findShapes()
 {
     if (m_possibleRoots.empty())
         throw hexer_error("No areas of sufficient density - no shapes. "
-            "Decrease density or area size.");
+                          "Decrease density or area size.");
 
     while (m_possibleRoots.size())
         findShape(*m_possibleRoots.begin());
@@ -119,12 +120,14 @@ void BaseGrid::findShape(HexId root)
     const Segment first(root, 0);
     Segment cur(root, 0);
 
-    do {
+    do
+    {
         // removes possible roots that are passed over, and sets information
         // to be used in parentOrChild()
         if (cur.horizontal())
         {
-            // all hexagons with non-dense neighbors at edge 0 are possible roots.
+            // all hexagons with non-dense neighbors at edge 0 are possible
+            // roots.
             if (cur.edge == 0)
                 m_possibleRoots.erase(cur.hex);
 
@@ -152,14 +155,16 @@ void BaseGrid::findShape(HexId root)
 // Determine whether a path is enclosed within another
 void BaseGrid::findParentPaths()
 {
-    for (auto& p : m_paths) {
+    for (auto& p : m_paths)
+    {
         // the only real difference between parentOrChild in the two grid
         // types is whether they look down i or j.
         parentOrChild(p);
 
-        !p.parent() ?  m_roots.push_back(&p) : p.parent()->addChild(&p);
+        !p.parent() ? m_roots.push_back(&p) : p.parent()->addChild(&p);
     }
-    for (size_t i = 0; i < m_roots.size(); ++i) {
+    for (size_t i = 0; i < m_roots.size(); ++i)
+    {
         m_roots[i]->finalize(CLOCKWISE);
     }
 }
@@ -178,7 +183,7 @@ void BaseGrid::parentOrChild(Path& p)
         if (it != m_hexPaths.end())
         {
             // get the path associated with the current hexagon
-            Path *parentPath = it->second;
+            Path* parentPath = it->second;
             // if we pass through another path an even number of times,
             // it can't be our path's parent.
             // a path's parent is always null to start
@@ -218,7 +223,7 @@ double BaseGrid::computeHexSize()
 void BaseGrid::sortPaths()
 {
     std::sort(m_roots.begin(), m_roots.end(), [](const Path* p1, const Path* p2)
-        { return p1->rootHex() < p2->rootHex(); });
+              { return p1->rootHex() < p2->rootHex(); });
     for (Path* p : m_roots)
     {
         p->sortPath();
@@ -227,10 +232,7 @@ void BaseGrid::sortPaths()
 
 void BaseGrid::toWKT(std::ostream& output) const
 {
-    auto outputPath = [&output](Path *p)
-    {
-        p->toWKT(output);
-    };
+    auto outputPath = [&output](Path* p) { p->toWKT(output); };
 
     output << "MULTIPOLYGON (";
 

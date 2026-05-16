@@ -9,27 +9,38 @@ class PDAL_EXPORT HexGrid : public BaseGrid
 {
 public:
     HexGrid(double height, int denseLimit) : BaseGrid(denseLimit)
-        { processHeight(height); }
-    HexGrid(int denseLimit) : BaseGrid(denseLimit), m_height(-1.0),
-        m_width(-1.0), m_minY((std::numeric_limits<int>::max)())
-    {}
+    {
+        processHeight(height);
+    }
+    HexGrid(int denseLimit)
+        : BaseGrid(denseLimit), m_height(-1.0), m_width(-1.0),
+          m_minY((std::numeric_limits<int>::max)())
+    {
+    }
     ~HexGrid();
 
-
     void addXY(double& x, double& y)
-        {
-          Point p{x, y};
-          addPoint(p);
-        }
+    {
+        Point p{x, y};
+        addPoint(p);
+    }
 
     Point offset(int idx) const
-        { return m_offsets[idx]; }
+    {
+        return m_offsets[idx];
+    }
     double height()
-        { return m_height; }
+    {
+        return m_height;
+    }
     bool sampling() const
-        { return m_width < 0; }
+    {
+        return m_width < 0;
+    }
     uint64_t getID(HexId ij)
-        { return (((uint64_t)ij.i << 32) | (uint32_t)ij.j); }
+    {
+        return (((uint64_t)ij.i << 32) | (uint32_t)ij.j);
+    }
     Point findPoint(Segment& s);
 
 private:
@@ -39,13 +50,20 @@ private:
     Segment nextSegment(const Segment& s) const;
 
     bool inGrid(HexId& h)
-        { return h.j >= m_minY; }
+    {
+        return h.j >= m_minY;
+    }
     HexId moveCoord(HexId& h)
-        { return HexId{h.i, h.j - 1}; }
+    {
+        return HexId{h.i, h.j - 1};
+    }
 
-    // minimum Y (HexId.j) value, used in inGrid() for finding root/child paths in parentOrChild()
+    // minimum Y (HexId.j) value, used in inGrid() for finding root/child paths
+    // in parentOrChild()
     void setMinCoord(HexId& h)
-        { m_minY = (std::min)(m_minY, h.j); }
+    {
+        m_minY = (std::min)(m_minY, h.j);
+    }
 
     /// Height of the hexagons in the grid (2x apothem)
     double m_height;
@@ -59,7 +77,6 @@ private:
     Point m_centerOffset;
     /// Origin of the hex grid in point coordinates
     Point m_origin;
-
 };
 
 } // namespace hexer

@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Howard Butler, hobu.inc@gmail.com
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include "TerrasolidReader.hpp"
 
@@ -42,17 +42,18 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.terrasolid",
     "TerraSolid Reader",
     "https://pdal.org/stages/readers.terrasolid.html",
-    { "bin" }
-};
+    {"bin"}};
 
 CREATE_STATIC_STAGE(TerrasolidReader, s_info)
 
-std::string TerrasolidReader::getName() const { return s_info.name; }
+std::string TerrasolidReader::getName() const
+{
+    return s_info.name;
+}
 
 void TerrasolidReader::initialize()
 {
@@ -68,7 +69,7 @@ void TerrasolidReader::initialize()
 
     if (m_header->RecogVal != 970401)
         throwError("Header identifier was not '970401', is this "
-            "a TerraSolid .bin file?");
+                   "a TerraSolid .bin file?");
 
     m_haveColor = (m_header->Color != 0);
     m_haveTime = (m_header->Time != 0);
@@ -76,11 +77,11 @@ void TerrasolidReader::initialize()
 
     if ((m_format != TERRASOLID_Format_1) && (m_format != TERRASOLID_Format_2))
         throwError("Version was '" + Utils::toString(m_format) + "', not '" +
-            Utils::toString(TERRASOLID_Format_1) + "' or '" +
-            Utils::toString(TERRASOLID_Format_2) + "'");
+                   Utils::toString(TERRASOLID_Format_1) + "' or '" +
+                   Utils::toString(TERRASOLID_Format_2) + "'");
 
-    log()->get(LogLevel::Debug) << "TerraSolid Reader::initialize format: " <<
-        m_format << std::endl;
+    log()->get(LogLevel::Debug)
+        << "TerraSolid Reader::initialize format: " << m_format << std::endl;
     log()->get(LogLevel::Debug) << "OrgX: " << m_header->OrgX << std::endl;
     log()->get(LogLevel::Debug) << "OrgY: " << m_header->OrgY << std::endl;
     log()->get(LogLevel::Debug) << "OrgZ: " << m_header->OrgZ << std::endl;
@@ -88,10 +89,9 @@ void TerrasolidReader::initialize()
     log()->get(LogLevel::Debug) << "Time: " << m_header->Time << std::endl;
     log()->get(LogLevel::Debug) << "Color: " << m_header->Color << std::endl;
     log()->get(LogLevel::Debug) << "Count: " << m_header->PntCnt << std::endl;
-    log()->get(LogLevel::Debug) << "RecogVal: " << m_header->RecogVal <<
-        std::endl;
+    log()->get(LogLevel::Debug)
+        << "RecogVal: " << m_header->RecogVal << std::endl;
 }
-
 
 void TerrasolidReader::addDimensions(PointLayoutPtr layout)
 {
@@ -130,7 +130,6 @@ void TerrasolidReader::addDimensions(PointLayoutPtr layout)
     }
 }
 
-
 void TerrasolidReader::ready(PointTableRef)
 {
     m_istream.reset(new IStream(m_filename));
@@ -138,7 +137,6 @@ void TerrasolidReader::ready(PointTableRef)
     m_istream->seek(56);
     m_index = 0;
 }
-
 
 point_count_t TerrasolidReader::read(PointViewPtr view, point_count_t count)
 {
@@ -166,7 +164,7 @@ point_count_t TerrasolidReader::read(PointViewPtr view, point_count_t count)
                 z;
 
             view->setField(Dimension::Id::Classification, nextId,
-                          classification);
+                           classification);
             view->setField(Dimension::Id::PointSourceId, nextId, flight_line);
             switch (echo_int)
             {
@@ -181,11 +179,11 @@ point_count_t TerrasolidReader::read(PointViewPtr view, point_count_t count)
                 break;
             }
             view->setField(Dimension::Id::X, nextId,
-                          (x - m_header->OrgX) / m_header->Units);
+                           (x - m_header->OrgX) / m_header->Units);
             view->setField(Dimension::Id::Y, nextId,
-                          (y - m_header->OrgY) / m_header->Units);
+                           (y - m_header->OrgY) / m_header->Units);
             view->setField(Dimension::Id::Z, nextId,
-                          (z - m_header->OrgZ) / m_header->Units);
+                           (z - m_header->OrgZ) / m_header->Units);
         }
 
         if (m_format == TERRASOLID_Format_2)
@@ -198,13 +196,13 @@ point_count_t TerrasolidReader::read(PointViewPtr view, point_count_t count)
                 mark >> flight_line >> intensity;
 
             view->setField(Dimension::Id::X, nextId,
-                          (x - m_header->OrgX) / m_header->Units);
+                           (x - m_header->OrgX) / m_header->Units);
             view->setField(Dimension::Id::Y, nextId,
-                          (y - m_header->OrgY) / m_header->Units);
+                           (y - m_header->OrgY) / m_header->Units);
             view->setField(Dimension::Id::Z, nextId,
-                          (z - m_header->OrgZ) / m_header->Units);
+                           (z - m_header->OrgZ) / m_header->Units);
             view->setField(Dimension::Id::Classification, nextId,
-                          classification);
+                           classification);
             switch (echo_int)
             {
             case 0: // only echo
@@ -258,7 +256,6 @@ point_count_t TerrasolidReader::read(PointViewPtr view, point_count_t count)
 
     return count;
 }
-
 
 void TerrasolidReader::done(PointTableRef)
 {

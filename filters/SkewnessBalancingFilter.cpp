@@ -52,13 +52,18 @@ std::string SkewnessBalancingFilter::getName() const
 
 void SkewnessBalancingFilter::addArgs(ProgramArgs& args)
 {
-    args.add("ground_class", "Classification value of ground points."
-        " [Default: 2]", m_groundClass, ClassLabel::Ground);
-    args.add("other_class", "Classification value of non-ground points."
-        " [Default: 1]", m_otherClass, ClassLabel::Unclassified);
-    args.add("only_ground", "Set to true to only modify the CLassification"
-        " value of detected ground points. [Default: false]",
-        m_onlyGround, false);
+    args.add("ground_class",
+             "Classification value of ground points."
+             " [Default: 2]",
+             m_groundClass, ClassLabel::Ground);
+    args.add("other_class",
+             "Classification value of non-ground points."
+             " [Default: 1]",
+             m_otherClass, ClassLabel::Unclassified);
+    args.add("only_ground",
+             "Set to true to only modify the CLassification"
+             " value of detected ground points. [Default: false]",
+             m_onlyGround, false);
 }
 
 void SkewnessBalancingFilter::addDimensions(PointLayoutPtr layout)
@@ -66,13 +71,12 @@ void SkewnessBalancingFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Dimension::Id::Classification);
 }
 
-
 void SkewnessBalancingFilter::prepared(PointTableRef table)
 {
     if ((m_groundClass == m_otherClass) && !m_onlyGround)
     {
         throwError("Ground and non-ground class cannot be"
-            "equal when only_ground is false.");
+                   "equal when only_ground is false.");
     }
 }
 
@@ -122,7 +126,6 @@ void SkewnessBalancingFilter::processGround(PointViewPtr view)
     else if (!m_onlyGround)
         setClass(lastPositive, view->size() - 1, m_otherClass);
 }
-
 
 PointViewSet SkewnessBalancingFilter::run(PointViewPtr input)
 {

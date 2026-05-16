@@ -66,4 +66,4 @@ std::string generate_uuid()
            "-" + generate_hex(2) + "-" + generate_hex(6);
 }
 } // namespace uuidGenerator
-}
+} // namespace pdal

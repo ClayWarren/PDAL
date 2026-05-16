@@ -58,5 +58,4 @@ private:
     virtual void write(const PointViewPtr view) override;
 };
 
-
 } // namespace pdal

@@ -34,11 +34,9 @@
 
 #include "ExpressionStatsFilter.hpp"
 
+#include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
-#include "./private/expr/ConditionalExpression.hpp"
-
-
 
 #include <cctype>
 #include <limits>
@@ -49,12 +47,11 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "filters.expressionstats",
-    "Accumulate count statistics for a given dimension for an array of expressions",
-    "https://pdal.org/stages/filters.expressionstats.html"
-};
+    "Accumulate count statistics for a given dimension for an array of "
+    "expressions",
+    "https://pdal.org/stages/filters.expressionstats.html"};
 
 CREATE_STATIC_STAGE(ExpressionStatsFilter, s_info)
 
@@ -67,28 +64,25 @@ struct ExpressionStatsFilter::Args
 {
     std::vector<expr::ConditionalExpression> m_expressions;
     std::string m_dimName;
-    Arg *m_whereArg;
+    Arg* m_whereArg;
 };
 
+ExpressionStatsFilter::ExpressionStatsFilter() : m_args(new Args) {}
 
-ExpressionStatsFilter::ExpressionStatsFilter() : m_args(new Args)
-{}
-
-
-ExpressionStatsFilter::~ExpressionStatsFilter()
-{}
-
+ExpressionStatsFilter::~ExpressionStatsFilter() {}
 
 void ExpressionStatsFilter::addArgs(ProgramArgs& args)
 {
     m_args->m_whereArg = &args.add("expressions",
-        "Conditional expressions describing points to be passed to this filter",
-        m_args->m_expressions).setPositional();
-    args.add("dimension", "Dimension on which apply expression to calculate statistics",
-        m_dimName).setPositional();
-
+                                   "Conditional expressions describing points "
+                                   "to be passed to this filter",
+                                   m_args->m_expressions)
+                              .setPositional();
+    args.add("dimension",
+             "Dimension on which apply expression to calculate statistics",
+             m_dimName)
+        .setPositional();
 }
-
 
 void ExpressionStatsFilter::prepared(PointTableRef table)
 {
@@ -96,15 +90,15 @@ void ExpressionStatsFilter::prepared(PointTableRef table)
 
     m_dimId = layout->findDim(m_dimName);
     if (m_dimId == Dimension::Id::Unknown)
-        throwError("Invalid dimension name in 'dimension' option: '" + m_dimName + "'.");
+        throwError("Invalid dimension name in 'dimension' option: '" +
+                   m_dimName + "'.");
 
-    for (auto& expression: m_args->m_expressions)
+    for (auto& expression : m_args->m_expressions)
     {
         if (!expression.valid())
         {
             std::stringstream oss;
-            oss << "The expression '" <<  expression
-                << "' is invalid";
+            oss << "The expression '" << expression << "' is invalid";
             throwError(oss.str());
         }
 
@@ -114,12 +108,11 @@ void ExpressionStatsFilter::prepared(PointTableRef table)
     }
 }
 
-
 bool ExpressionStatsFilter::processOne(PointRef& point)
 {
     double value = point.getFieldAs<double>(m_dimId);
 
-    for(const auto& expr: m_args->m_expressions)
+    for (const auto& expr : m_args->m_expressions)
     {
         bool status = expr.eval(point);
         auto& stat = m_stats[expr.print()];
@@ -128,7 +121,6 @@ bool ExpressionStatsFilter::processOne(PointRef& point)
     }
     return true;
 }
-
 
 void ExpressionStatsFilter::filter(PointView& view)
 {
@@ -149,9 +141,9 @@ void ExpressionStatsFilter::extractMetadata(PointTableRef table)
 {
     uint32_t position(0);
 
-
-    MetadataNode c = m_metadata.add("dimension", table.layout()->dimName(m_dimId));
-    for (auto& stat: m_stats)
+    MetadataNode c =
+        m_metadata.add("dimension", table.layout()->dimName(m_dimId));
+    for (auto& stat : m_stats)
     {
         auto& expression_str = stat.first;
         auto& bin_map = stat.second;
@@ -160,7 +152,7 @@ void ExpressionStatsFilter::extractMetadata(PointTableRef table)
         t.add("expression", expression_str);
         t.add("position", position);
 
-        for (auto& bin: bin_map)
+        for (auto& bin : bin_map)
         {
 
             auto& value = bin.first;
@@ -173,9 +165,6 @@ void ExpressionStatsFilter::extractMetadata(PointTableRef table)
 
         position++;
     }
-
 }
-
-
 
 } // namespace pdal

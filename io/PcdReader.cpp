@@ -41,13 +41,11 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
+static StaticPluginInfo const s_info{
     "readers.pcd",
     "Read data in the Point Cloud Library (PCL) format.",
     "https://pdal.org/stages/readers.pcd.html",
-    {"pcd"}
-};
+    {"pcd"}};
 
 CREATE_STATIC_STAGE(PcdReader, s_info)
 
@@ -56,8 +54,7 @@ std::string PcdReader::getName() const
     return s_info.name;
 }
 
-PcdReader::PcdReader()
-{}
+PcdReader::PcdReader() {}
 
 QuickInfo PcdReader::inspect()
 {
@@ -119,7 +116,8 @@ void PcdReader::addDimensions(PointLayoutPtr layout)
         if (i.m_label == "X" || i.m_label == "Y" || i.m_label == "Z")
             t = Dimension::Type::Double;
         i.m_id = layout->registerOrAssignDim(i.m_label, t);
-        if (Utils::contains(m_dims, i.m_id) && i.m_id != pdal::Dimension::Id::Unknown)
+        if (Utils::contains(m_dims, i.m_id) &&
+            i.m_id != pdal::Dimension::Id::Unknown)
             throwError("Duplicate dimension '" + i.m_label +
                        "' detected in input file '" + m_filename + "'.");
         m_dims.push_back(i.m_id);
@@ -141,7 +139,8 @@ bool PcdReader::fillFields()
             continue;
 
         Utils::trim(buf);
-        m_fields = Utils::split(buf, [](char c) { return c == '\t' || c == '\r' || c == ' '; });
+        m_fields = Utils::split(buf, [](char c)
+                                { return c == '\t' || c == '\r' || c == ' '; });
         if (m_fields.size() != m_dims.size())
         {
             log()->get(LogLevel::Error)
@@ -302,7 +301,7 @@ void PcdReader::initialize()
         m_header.clear();
         *m_istreamPtr >> m_header;
     }
-    catch( ... )
+    catch (...)
     {
         Utils::closeFile(m_istreamPtr);
         m_istreamPtr = nullptr;

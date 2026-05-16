@@ -1,45 +1,45 @@
 /******************************************************************************
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/Filter.hpp>
-#include <pdal/PointTable.hpp>
-#include <io/FauxReader.hpp>
-#include <pdal/StageFactory.hpp>
+#include "Support.hpp"
 #include <filters/MergeFilter.hpp>
 #include <filters/StreamCallbackFilter.hpp>
-#include "Support.hpp"
+#include <io/FauxReader.hpp>
+#include <pdal/Filter.hpp>
+#include <pdal/PointTable.hpp>
+#include <pdal/StageFactory.hpp>
 
 using namespace pdal;
 
@@ -115,7 +115,9 @@ class R : public Reader, public Streamable
 
 public:
     std::string getName() const
-    { return "readers.r"; }
+    {
+        return "readers.r";
+    }
 
 private:
     virtual void ready(PointTableRef table)
@@ -137,8 +139,10 @@ private:
 
     virtual void addDimensions(PointLayoutPtr layout)
     {
-        Dimension::Id id = layout->registerOrAssignDim("something", Dimension::Type::Double);
-        Dimension::Id x = layout->registerOrAssignDim("X", Dimension::Type::Double);
+        Dimension::Id id =
+            layout->registerOrAssignDim("something", Dimension::Type::Double);
+        Dimension::Id x =
+            layout->registerOrAssignDim("X", Dimension::Type::Double);
     }
 
     virtual point_count_t read(PointViewPtr view, point_count_t numPts)
@@ -156,7 +160,7 @@ private:
             idx++;
         }
         return cnt;
-     }
+    }
 
 private:
     bool m_entered;
@@ -167,7 +171,9 @@ class F : public Filter, public Streamable
 
 public:
     std::string getName() const
-    { return "filters.f"; };
+    {
+        return "filters.f";
+    };
 
 private:
     virtual bool processOne(PointRef& point)
@@ -182,33 +188,21 @@ private:
     }
 };
 
-} // unnamed pdal
+} // namespace
 
 TEST(Streaming, order)
 {
 
-StaticPluginInfo const f_info
-{
-    "filters.f",
-    "F Filter",
-    "",
-    {}
-};
+    StaticPluginInfo const f_info{"filters.f", "F Filter", "", {}};
 
-CREATE_STATIC_STAGE(F, f_info)
+    CREATE_STATIC_STAGE(F, f_info)
 
-StaticPluginInfo const r_info
-{
-    "readers.r",
-    "R Reader",
-    "",
-    {}
-};
+    StaticPluginInfo const r_info{"readers.r", "R Reader", "", {}};
 
-CREATE_STATIC_STAGE(R, r_info)
+    CREATE_STATIC_STAGE(R, r_info)
 
-std::string pipeline =
-R"(
+    std::string pipeline =
+        R"(
 {
     "pipeline" : [
         {
@@ -250,18 +244,18 @@ R"(
 }
 )";
 
-/**
-  Tree representation of the pipeline above:
+    /**
+      Tree representation of the pipeline above:
 
-       G   H
-        \ /
-     D   E   F
-      \  |  /
-       \ | /
-         B  C
-         | /
-         A
-**/
+           G   H
+            \ /
+         D   E   F
+          \  |  /
+           \ | /
+             B  C
+             | /
+             A
+    **/
 
     std::ostringstream oss;
 
@@ -308,10 +302,12 @@ TEST(Streaming, issue_2009)
     class TestFilter : public Filter, public Streamable
     {
     public:
-        TestFilter() : m_srsCnt(0)
-        {}
+        TestFilter() : m_srsCnt(0) {}
 
-        std::string getName() const { return "filters.test"; }
+        std::string getName() const
+        {
+            return "filters.test";
+        }
 
         int m_srsCnt;
 
@@ -352,10 +348,12 @@ TEST(Streaming, issue_2038)
     class TestFilter : public Filter, public Streamable
     {
     public:
-        TestFilter() : m_srsCnt(0)
-        {}
+        TestFilter() : m_srsCnt(0) {}
 
-        std::string getName() const { return "filters.test"; }
+        std::string getName() const
+        {
+            return "filters.test";
+        }
 
         int m_srsCnt;
 
@@ -394,7 +392,7 @@ TEST(Streaming, issue_2069)
     opts.add("spatialreference", "EPSG:4326");
     r->setOptions(opts);
 
-    Stage *ferry = f.createStage("filters.ferry");
+    Stage* ferry = f.createStage("filters.ferry");
     Options opts2;
     opts2.add("dimensions", "X=>NewX");
     ferry->setOptions(opts2);
@@ -404,12 +402,19 @@ TEST(Streaming, issue_2069)
     {
     public:
         virtual std::string getName() const
-            { return "filters.test"; }
+        {
+            return "filters.test";
+        }
+
     private:
         virtual void spatialReferenceChanged(const SpatialReference& srs)
-            { EXPECT_EQ(srs, "EPSG:4326"); }
+        {
+            EXPECT_EQ(srs, "EPSG:4326");
+        }
         virtual bool processOne(PointRef& point)
-            { return true; }
+        {
+            return true;
+        }
     };
 
     TestFilter t;
@@ -424,7 +429,7 @@ TEST(Streaming, issue_2069)
 TEST(Streaming, issue_2086)
 {
     StageFactory f;
-    Stage *r = f.createStage("readers.las");
+    Stage* r = f.createStage("readers.las");
     Options opts;
     opts.add("filename", Support::datapath("las/autzen_trim.las"));
     opts.add("count", 35U);
@@ -462,28 +467,16 @@ TEST(Streaming, issue_2086)
 TEST(Streaming, issue_2287)
 {
 
-StaticPluginInfo const f_info
-{
-    "filters.f",
-    "F Filter",
-    "",
-    {}
-};
+    StaticPluginInfo const f_info{"filters.f", "F Filter", "", {}};
 
-CREATE_STATIC_STAGE(F, f_info)
+    CREATE_STATIC_STAGE(F, f_info)
 
-StaticPluginInfo const r_info
-{
-    "readers.r",
-    "R Reader",
-    "",
-    {}
-};
+    StaticPluginInfo const r_info{"readers.r", "R Reader", "", {}};
 
-CREATE_STATIC_STAGE(R, r_info)
+    CREATE_STATIC_STAGE(R, r_info)
 
-std::string pipeline =
-R"(
+    std::string pipeline =
+        R"(
 {
     "pipeline" : [
         {
@@ -509,16 +502,15 @@ R"(
 }
 )";
 
-/**point.setField(Dimension::Id::X, 0.0);
-  Tree representation of the pipeline above:
+    /**point.setField(Dimension::Id::X, 0.0);
+      Tree representation of the pipeline above:
 
-         D
-        / \
-       B   C
-        \ /
-         A
-**/
-
+             D
+            / \
+           B   C
+            \ /
+             A
+    **/
 
     // Order of traversal based on one point from each source.
     {

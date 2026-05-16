@@ -194,10 +194,10 @@ public:
     }
 
     friend PDAL_EXPORT std::istream& operator>>(std::istream& in,
-                                             DomainBounds& bounds);
+                                                DomainBounds& bounds);
 
     friend PDAL_EXPORT std::ostream& operator<<(std::ostream& out,
-                                             const DomainBounds& bounds);
+                                                const DomainBounds& bounds);
 
 private:
     std::vector<std::array<double, 2>> m_data;

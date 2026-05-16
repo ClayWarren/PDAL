@@ -46,16 +46,16 @@ const size_t Header::LEGACY_RETURN_COUNT;
 const size_t Header::RETURN_COUNT;
 #endif
 
-Header::Header() : m_sourceId(0), m_globalEncoding(0), m_versionMinor(0),
-    m_createDOY(0), m_createYear(0), m_vlrOffset(0), m_pointOffset(0),
-    m_vlrCount(0), m_pointFormat(0), m_pointLen(0), m_pointCount(0),
-    m_isCompressed(false), m_eVlrOffset(0), m_eVlrCount(0)
+Header::Header()
+    : m_sourceId(0), m_globalEncoding(0), m_versionMinor(0), m_createDOY(0),
+      m_createYear(0), m_vlrOffset(0), m_pointOffset(0), m_vlrCount(0),
+      m_pointFormat(0), m_pointLen(0), m_pointCount(0), m_isCompressed(false),
+      m_eVlrOffset(0), m_eVlrCount(0)
 {
     m_pointCountByReturn.fill(0);
     m_scales.fill(1.0);
     m_offsets.fill(0.0);
 }
-
 
 uint16_t Header::basePointLen(uint8_t type)
 {
@@ -79,7 +79,6 @@ uint16_t Header::basePointLen(uint8_t type)
     return 0;
 }
 
-
 bool Header::valid() const
 {
     if (m_fileSig != FILE_SIGNATURE)
@@ -89,7 +88,7 @@ bool Header::valid() const
     if (m_createDOY > 366)
         return false;
     if (m_createYear < 1970 || m_createYear > 2100)
-       return false;
+        return false;
     return true;
 }
 
@@ -103,7 +102,7 @@ void get(ILeStream& in, Uuid& uuid)
     uuid.unpack(buf.data());
 }
 
-} // unnamed namespace;
+} // namespace
 
 ILeStream& operator>>(ILeStream& in, Header& h)
 {
@@ -120,9 +119,8 @@ ILeStream& operator>>(ILeStream& in, Header& h)
     in.get(h.m_systemId, 32);
 
     in.get(h.m_softwareId, 32);
-    in >> h.m_createDOY >> h.m_createYear >> h.m_vlrOffset >>
-        h.m_pointOffset >> h.m_vlrCount >> h.m_pointFormat >>
-        h.m_pointLen >> legacyPointCount;
+    in >> h.m_createDOY >> h.m_createYear >> h.m_vlrOffset >> h.m_pointOffset >>
+        h.m_vlrCount >> h.m_pointFormat >> h.m_pointLen >> legacyPointCount;
     h.m_pointCount = legacyPointCount;
 
     // Although it isn't part of the LAS spec, the two high bits have been used
@@ -160,15 +158,16 @@ ILeStream& operator>>(ILeStream& in, Header& h)
         if (numPoints && (numPoints != h.m_pointCount))
         {
             std::stringstream ss;
-            ss << "1.4 point count (" << h.m_pointCount << ") "
-                "doesn't match legacy point count (" << numPoints << ").";
+            ss << "1.4 point count (" << h.m_pointCount
+               << ") "
+                  "doesn't match legacy point count ("
+               << numPoints << ").";
             throw Exception(ss.str());
         }
     }
 
     return in;
 }
-
 
 std::ostream& operator<<(std::ostream& out, const Header& h)
 {
@@ -187,16 +186,16 @@ std::ostream& operator<<(std::ostream& out, const Header& h)
     out << "Point offset: " << h.m_pointOffset << "\n";
     out << "Point count: " << h.m_pointCount << "\n";
     for (size_t i = 0; i < Header::RETURN_COUNT; ++i)
-        out << "Point count by return[" << i << "]: " <<
-            h.m_pointCountByReturn[i] << "\n";
-    out << "Scales X/Y/Z: " << h.m_scales[0] << "/" <<
-        h.m_scales[1] << "/" << h.m_scales[2] << "\n";
-    out << "Offsets X/Y/Z: " << h.m_offsets[0] << "/" <<
-        h.m_offsets[1] << "/" << h.m_offsets[2] << "\n";
-    out << "Max X/Y/Z: " << h.maxX() << "/" <<
-        h.maxY() << "/" << h.maxZ() << "\n";
-    out << "Min X/Y/Z: " << h.minX() << "/" <<
-        h.minY() << "/" << h.minZ() << "\n";
+        out << "Point count by return[" << i
+            << "]: " << h.m_pointCountByReturn[i] << "\n";
+    out << "Scales X/Y/Z: " << h.m_scales[0] << "/" << h.m_scales[1] << "/"
+        << h.m_scales[2] << "\n";
+    out << "Offsets X/Y/Z: " << h.m_offsets[0] << "/" << h.m_offsets[1] << "/"
+        << h.m_offsets[2] << "\n";
+    out << "Max X/Y/Z: " << h.maxX() << "/" << h.maxY() << "/" << h.maxZ()
+        << "\n";
+    out << "Min X/Y/Z: " << h.minX() << "/" << h.minY() << "/" << h.minZ()
+        << "\n";
     if (h.versionAtLeast(1, 4))
     {
         out << "Ext. VLR offset: " << h.m_eVlrOffset << "\n";
@@ -208,4 +207,3 @@ std::ostream& operator<<(std::ostream& out, const Header& h)
 
 } // namespace lasdump
 } // namespace pdal
-

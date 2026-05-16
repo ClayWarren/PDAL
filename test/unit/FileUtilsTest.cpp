@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2011, Michael P. Gerlek (mpg@flaxen.com)
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
@@ -55,8 +55,8 @@ TEST(FileUtilsTest, test_file_ops)
     // first, clean up from any previous test run
     FileUtils::deleteFile(tmp1);
     FileUtils::deleteFile(tmp2);
-    EXPECT_TRUE(FileUtils::fileExists(tmp1)==false);
-    EXPECT_TRUE(FileUtils::fileExists(tmp2)==false);
+    EXPECT_TRUE(FileUtils::fileExists(tmp1) == false);
+    EXPECT_TRUE(FileUtils::fileExists(tmp2) == false);
 
     // write test
     std::ostream* ostr = FileUtils::createFile(tmp1);
@@ -67,20 +67,20 @@ TEST(FileUtilsTest, test_file_ops)
     EXPECT_EQ(FileUtils::fileSize(tmp1), 3U);
 
     // rename test
-    FileUtils::renameFile(tmp2,tmp1);
-    EXPECT_TRUE(FileUtils::fileExists(tmp1)==false);
-    EXPECT_TRUE(FileUtils::fileExists(tmp2)==true);
+    FileUtils::renameFile(tmp2, tmp1);
+    EXPECT_TRUE(FileUtils::fileExists(tmp1) == false);
+    EXPECT_TRUE(FileUtils::fileExists(tmp2) == true);
 
     // read test
     std::istream* istr = FileUtils::openFile(tmp2);
     std::string yow;
     *istr >> yow;
     FileUtils::closeFile(istr);
-    EXPECT_TRUE(yow=="yow");
+    EXPECT_TRUE(yow == "yow");
 
     // delete test
     FileUtils::deleteFile(tmp2);
-    EXPECT_TRUE(FileUtils::fileExists(tmp2)==false);
+    EXPECT_TRUE(FileUtils::fileExists(tmp2) == false);
 
     EXPECT_THROW(FileUtils::openFile("~foo1.glob"), pdal::pdal_error);
     EXPECT_NO_THROW(FileUtils::openFile("foo~1.glob"));
@@ -102,7 +102,7 @@ TEST(FileUtilsTest, test_vsi)
     std::string yowVsi;
     *iStrVsi >> yowVsi;
     FileUtils::closeFile(iStrVsi);
-    EXPECT_TRUE(yowVsi=="yow");
+    EXPECT_TRUE(yowVsi == "yow");
 }
 
 TEST(FileUtilsTest, test_readFileIntoString)
@@ -112,7 +112,8 @@ TEST(FileUtilsTest, test_readFileIntoString)
 
     std::string source = FileUtils::readFileIntoString(filename);
 
-    std::string ref = "This is a file that allows us to test that we "
+    std::string ref =
+        "This is a file that allows us to test that we "
         "can read a text file into a string through the file utils.\n";
 
     EXPECT_TRUE(source == ref);
@@ -153,12 +154,14 @@ TEST(FileUtilsTest, test_toAbsolutePath)
     const string c = FileUtils::toAbsolutePath("foo.txt", drive + "/a/b/c/d");
     compare_paths(c, drive + "/a/b/c/d/foo.txt");
 
-    // check 2-arg version: make absolute when file is relative, via given base (which isn't absolute)
+    // check 2-arg version: make absolute when file is relative, via given base
+    // (which isn't absolute)
     const string d = FileUtils::toAbsolutePath("foo.txt", "x/y/z");
     compare_paths(d, root + "x/y/z/" + "foo.txt");
 
     // check 1-arg version: make absolute when file is already absolute
-    const string e = FileUtils::toAbsolutePath(drive+"/baz/foo.txt", drive+"/a/b/c/d");
+    const string e =
+        FileUtils::toAbsolutePath(drive + "/baz/foo.txt", drive + "/a/b/c/d");
     compare_paths(e, drive + "/baz/foo.txt");
 }
 
@@ -233,10 +236,7 @@ TEST(FileUtilsTest, stem)
 
 TEST(FileUtilsTest, glob)
 {
-    auto TP = [](const std::string s)
-    {
-        return Support::temppath(s);
-    };
+    auto TP = [](const std::string s) { return Support::temppath(s); };
 
     auto filenames = [&TP]()
     {
@@ -256,7 +256,8 @@ TEST(FileUtilsTest, glob)
     for (std::string& file : filenames())
         FileUtils::deleteFile(file);
 
-    for (std::string& file : filenames()) {
+    for (std::string& file : filenames())
+    {
         auto f = FileUtils::createFile(file);
         FileUtils::closeFile(f);
     }
@@ -289,30 +290,30 @@ TEST(FileUtilsTest, test_file_ops_with_unicode_paths)
     // 3. Create a file in the directory. /word/word/word.unicode
     // 4. Exercise the FileUtils using the Unicode-based path.
 
-    for (std::string japanese_txt: {"japanese-pr2135.txt", "japanese-pr2227.txt"})
+    for (std::string japanese_txt :
+         {"japanese-pr2135.txt", "japanese-pr2227.txt"})
     {
         japanese_txt = Support::datapath("unicode/" + japanese_txt);
         EXPECT_TRUE(FileUtils::fileExists(japanese_txt));
         auto const japanese = FileUtils::readFileIntoString(japanese_txt);
         EXPECT_FALSE(japanese.empty());
 
-        auto const japanese_root_dir = Support::temppath(japanese);     
-        std::string tmp1(japanese_root_dir + "/"  + japanese + "/" + japanese + ".unicode");
+        auto const japanese_root_dir = Support::temppath(japanese);
+        std::string tmp1(japanese_root_dir + "/" + japanese + "/" + japanese +
+                         ".unicode");
 
-
-        std::string japanese_dir = FileUtils::getDirectory(tmp1) ;
+        std::string japanese_dir = FileUtils::getDirectory(tmp1);
         EXPECT_TRUE(FileUtils::createDirectories(japanese_dir));
 
         // test directoryList
         auto const dirs = FileUtils::directoryList(japanese_root_dir);
         EXPECT_GE(dirs.size(), 1U);
-        auto const dircount = std::count_if(dirs.cbegin(), dirs.cend(),
-            [&japanese_dir](std::string const& d) {
-                 return normalize(d + "/" ) == normalize(japanese_dir); });
+        auto const dircount = std::count_if(
+            dirs.cbegin(), dirs.cend(), [&japanese_dir](std::string const& d)
+            { return normalize(d + "/") == normalize(japanese_dir); });
         EXPECT_EQ(dircount, 1);
 
         std::string tmp2(Support::temppath("nonunicode.tmp"));
-        
 
         // first, clean up from any previous test run
         FileUtils::deleteFile(tmp1);
@@ -321,7 +322,7 @@ TEST(FileUtilsTest, test_file_ops_with_unicode_paths)
         EXPECT_FALSE(FileUtils::fileExists(tmp2));
 
         // write test
-        std::ostream *ostr = FileUtils::createFile(tmp1);
+        std::ostream* ostr = FileUtils::createFile(tmp1);
         EXPECT_TRUE(ostr != nullptr);
         *ostr << "yow";
         FileUtils::closeFile(ostr);
@@ -332,8 +333,9 @@ TEST(FileUtilsTest, test_file_ops_with_unicode_paths)
         // glob for files with Unicode path
         auto const filenames = FileUtils::glob(japanese_dir + "*");
         EXPECT_GE(filenames.size(), 1U);
-        auto const tmp1count = std::count_if(filenames.cbegin(), filenames.cend(),
-            [&tmp1](std::string const& f) { return normalize(f) == normalize(tmp1); });
+        auto const tmp1count = std::count_if(
+            filenames.cbegin(), filenames.cend(), [&tmp1](std::string const& f)
+            { return normalize(f) == normalize(tmp1); });
         EXPECT_EQ(tmp1count, 1);
 
         // rename test
@@ -342,7 +344,7 @@ TEST(FileUtilsTest, test_file_ops_with_unicode_paths)
         EXPECT_TRUE(FileUtils::fileExists(tmp2));
 
         // read test
-        std::istream *istr = FileUtils::openFile(tmp2);
+        std::istream* istr = FileUtils::openFile(tmp2);
         std::string yow;
         *istr >> yow;
         FileUtils::closeFile(istr);
@@ -360,7 +362,7 @@ TEST(FileUtilsTest, test_file_ops_with_unicode_paths)
 #if !defined(_WIN32) || defined(_WIN64)
 TEST(FileUtilsTest, map)
 {
-    std::ostream *out;
+    std::ostream* out;
     // This turns on sparse file support. Otherwise, we're going to make a huge
     // file that won't fit on many filesystems and an error will occur. If we
     // can't set the file to sparse, we just return.  UNIX filesystems I'm
@@ -372,14 +374,16 @@ TEST(FileUtilsTest, map)
     auto toNative = [](const std::string& in) -> std::wstring
     {
         // TODO: C++11 define convert with static thread_local
-	std::wstring_convert<std::codecvt_utf8_utf16<uint16_t>, uint16_t> convert;
-	auto s = convert.from_bytes(in);
-	auto p = reinterpret_cast<wchar_t const*>(s.data());
-	return std::wstring(p, p + s.size());
+        std::wstring_convert<std::codecvt_utf8_utf16<uint16_t>, uint16_t>
+            convert;
+        auto s = convert.from_bytes(in);
+        auto p = reinterpret_cast<wchar_t const*>(s.data());
+        return std::wstring(p, p + s.size());
     };
 
-    auto f = CreateFileW(toNative(filename).data(), GENERIC_READ | GENERIC_WRITE,
-        0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    auto f =
+        CreateFileW(toNative(filename).data(), GENERIC_READ | GENERIC_WRITE, 0,
+                    NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
     DWORD flags;
     GetVolumeInformationByHandleW(f, NULL, 0, NULL, NULL, &flags, NULL, 0);
     bool ok = false;
@@ -409,7 +413,7 @@ TEST(FileUtilsTest, map)
 
     auto ctx = FileUtils::mapFile(filename);
     assert(ctx.addr());
-    char *c = reinterpret_cast<char *>(ctx.addr()) + 50000;
+    char* c = reinterpret_cast<char*>(ctx.addr()) + 50000;
 
     EXPECT_EQ(*c++, '1');
     EXPECT_EQ(*c++, '2');
@@ -420,7 +424,7 @@ TEST(FileUtilsTest, map)
     EXPECT_EQ(*c++, 's');
     EXPECT_EQ(*c++, 't');
 
-    c = reinterpret_cast<char *>(ctx.addr()) + 0x10FFFFFFFF;
+    c = reinterpret_cast<char*>(ctx.addr()) + 0x10FFFFFFFF;
     EXPECT_EQ(*c++, '5');
     EXPECT_EQ(*c++, '6');
     EXPECT_EQ(*c++, '7');

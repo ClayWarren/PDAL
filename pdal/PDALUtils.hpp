@@ -34,12 +34,12 @@
 
 #pragma once
 
-#include <pdal/Metadata.hpp>
 #include <pdal/Dimension.hpp>
+#include <pdal/Metadata.hpp>
 #include <pdal/pdal_export.hpp>
 #include <pdal/util/Bounds.hpp>
-#include <pdal/util/Inserter.hpp>
 #include <pdal/util/Extractor.hpp>
+#include <pdal/util/Inserter.hpp>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -105,95 +105,93 @@ inline double toDouble(const Everything& e, Dimension::Type type)
     return d;
 }
 
-template<typename INPUT>
+template <typename INPUT>
 inline Everything extractDim(INPUT& ext, Dimension::Type type)
 {
     using Type = Dimension::Type;
 
-	Everything e;
+    Everything e;
     switch (type)
     {
-        case Type::Unsigned8:
-            ext >> e.u8;
-            break;
-        case Type::Unsigned16:
-            ext >> e.u16;
-            break;
-        case Type::Unsigned32:
-            ext >> e.u32;
-            break;
-        case Type::Unsigned64:
-            ext >> e.u64;
-            break;
-        case Type::Signed8:
-            ext >> e.s8;
-            break;
-        case Type::Signed16:
-            ext >> e.s16;
-            break;
-        case Type::Signed32:
-            ext >> e.s32;
-            break;
-        case Type::Signed64:
-            ext >> e.s64;
-            break;
-        case Type::Float:
-            ext >> e.f;
-            break;
-        case Type::Double:
-            ext >> e.d;
-            break;
-        case Type::None:
-        default:
-            e.u64 = 0;
-            break;
+    case Type::Unsigned8:
+        ext >> e.u8;
+        break;
+    case Type::Unsigned16:
+        ext >> e.u16;
+        break;
+    case Type::Unsigned32:
+        ext >> e.u32;
+        break;
+    case Type::Unsigned64:
+        ext >> e.u64;
+        break;
+    case Type::Signed8:
+        ext >> e.s8;
+        break;
+    case Type::Signed16:
+        ext >> e.s16;
+        break;
+    case Type::Signed32:
+        ext >> e.s32;
+        break;
+    case Type::Signed64:
+        ext >> e.s64;
+        break;
+    case Type::Float:
+        ext >> e.f;
+        break;
+    case Type::Double:
+        ext >> e.d;
+        break;
+    case Type::None:
+    default:
+        e.u64 = 0;
+        break;
     }
     return e;
 }
 
-
-template<typename OUTPUT>
+template <typename OUTPUT>
 inline void insertDim(OUTPUT& ins, Dimension::Type type, const Everything& e)
 {
     using Type = Dimension::Type;
 
     switch (type)
     {
-        case Type::Unsigned8:
-            ins << e.u8;
-            break;
-        case Type::Unsigned16:
-            ins << e.u16;
-            break;
-        case Type::Unsigned32:
-            ins << e.u32;
-            break;
-        case Type::Unsigned64:
-            ins << e.u64;
-            break;
-        case Type::Signed8:
-            ins << e.s8;
-            break;
-        case Type::Signed16:
-            ins << e.s16;
-            break;
-        case Type::Signed32:
-            ins << e.s32;
-            break;
-        case Type::Signed64:
-            ins << e.s64;
-            break;
-        case Type::Float:
-            ins << e.f;
-            break;
-        case Type::Double:
-            ins << e.d;
-            break;
-        case Type::None:
-            break;
+    case Type::Unsigned8:
+        ins << e.u8;
+        break;
+    case Type::Unsigned16:
+        ins << e.u16;
+        break;
+    case Type::Unsigned32:
+        ins << e.u32;
+        break;
+    case Type::Unsigned64:
+        ins << e.u64;
+        break;
+    case Type::Signed8:
+        ins << e.s8;
+        break;
+    case Type::Signed16:
+        ins << e.s16;
+        break;
+    case Type::Signed32:
+        ins << e.s32;
+        break;
+    case Type::Signed64:
+        ins << e.s64;
+        break;
+    case Type::Float:
+        ins << e.f;
+        break;
+    case Type::Double:
+        ins << e.d;
+        break;
+    case Type::None:
+        break;
     }
 }
-
 
 inline MetadataNode toMetadata(const BOX2D& bounds)
 {
@@ -233,7 +231,6 @@ inline int openProgress(const std::string& filename)
 #endif
 }
 
-
 inline void closeProgress(int fd)
 {
 #ifdef _WIN32
@@ -243,9 +240,8 @@ inline void closeProgress(int fd)
 #endif
 }
 
-
 inline void writeProgress(int fd, const std::string& type,
-    const std::string& text)
+                          const std::string& text)
 {
 #ifdef _WIN32
 #else
@@ -267,16 +263,19 @@ std::string PDAL_EXPORT toJSON(const MetadataNode& m);
 void PDAL_EXPORT toJSON(const MetadataNode& m, std::ostream& o);
 bool PDAL_EXPORT isJSON(const std::string& value);
 uintmax_t PDAL_EXPORT fileSize(const std::string& path);
-std::istream PDAL_EXPORT *openFile(const std::string& path, bool asBinary = true);
-std::ostream PDAL_EXPORT *createFile(const std::string& path,
-    bool asBinary = true);
-void PDAL_EXPORT closeFile(std::istream *in);
-void PDAL_EXPORT closeFile(std::ostream *out);
+std::istream PDAL_EXPORT* openFile(const std::string& path,
+                                   bool asBinary = true);
+std::ostream PDAL_EXPORT* createFile(const std::string& path,
+                                     bool asBinary = true);
+void PDAL_EXPORT closeFile(std::istream* in);
+void PDAL_EXPORT closeFile(std::ostream* out);
 std::string PDAL_EXPORT fetchRemote(const std::string& path);
 bool PDAL_EXPORT isRemote(const std::string& path);
 bool PDAL_EXPORT fileExists(const std::string& path);
-double PDAL_EXPORT computeHausdorff(PointViewPtr srcView, PointViewPtr candView);
-std::pair<double, double> PDAL_EXPORT computeHausdorffPair(PointViewPtr srcView, PointViewPtr candView);
+double PDAL_EXPORT computeHausdorff(PointViewPtr srcView,
+                                    PointViewPtr candView);
+std::pair<double, double> PDAL_EXPORT
+computeHausdorffPair(PointViewPtr srcView, PointViewPtr candView);
 double PDAL_EXPORT computeChamfer(PointViewPtr srcView, PointViewPtr candView);
 std::string PDAL_EXPORT tempFilename(const std::string& path);
 std::vector<std::string> PDAL_EXPORT glob(const std::string& path);

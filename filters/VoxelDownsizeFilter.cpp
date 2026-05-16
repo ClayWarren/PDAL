@@ -39,12 +39,9 @@
 namespace pdal
 {
 
-static StaticPluginInfo const s_info
-{
-    "filters.voxeldownsize",
-    "First Entry Voxel Filter", 
-    "https://pdal.org/stages/filters.voxeldownsize.html"
-};
+static StaticPluginInfo const s_info{
+    "filters.voxeldownsize", "First Entry Voxel Filter",
+    "https://pdal.org/stages/filters.voxeldownsize.html"};
 
 CREATE_STATIC_STAGE(VoxelDownsizeFilter, s_info)
 
@@ -59,14 +56,14 @@ std::istream& operator>>(std::istream& in, VoxelDownsizeFilter::Mode& mode)
     else if (s == "first")
         mode = VoxelDownsizeFilter::Mode::First;
     else
-        throw pdal_error("filters.voxeldownsize: Invalid 'mode' option '" +
-            s + "'. " "Valid options are 'center' and 'first'");
+        throw pdal_error("filters.voxeldownsize: Invalid 'mode' option '" + s +
+                         "'. "
+                         "Valid options are 'center' and 'first'");
     return in;
 }
 
-
 std::ostream& operator<<(std::ostream& out,
-    const VoxelDownsizeFilter::Mode& mode)
+                         const VoxelDownsizeFilter::Mode& mode)
 {
     switch (mode)
     {
@@ -80,10 +77,7 @@ std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-
-VoxelDownsizeFilter::VoxelDownsizeFilter()
-{}
-
+VoxelDownsizeFilter::VoxelDownsizeFilter() {}
 
 std::string VoxelDownsizeFilter::getName() const
 {
@@ -93,14 +87,14 @@ std::string VoxelDownsizeFilter::getName() const
 void VoxelDownsizeFilter::addArgs(ProgramArgs& args)
 {
     args.add("cell", "Cell size", m_cell, 0.001);
-    args.add("mode", "Method for downsizing : center / first",
-        m_mode, Mode::Center);
+    args.add("mode", "Method for downsizing : center / first", m_mode,
+             Mode::Center);
 }
 
-
 void VoxelDownsizeFilter::ready(PointTableRef)
-{ m_populatedVoxels.clear(); }
-
+{
+    m_populatedVoxels.clear();
+}
 
 PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
 {
@@ -117,7 +111,6 @@ PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
     viewSet.insert(output);
     return viewSet;
 }
-
 
 bool VoxelDownsizeFilter::voxelize(PointRef& point)
 {
@@ -141,17 +134,18 @@ bool VoxelDownsizeFilter::voxelize(PointRef& point)
     z -= m_originZ;
 
     Voxel v = std::make_tuple((int)(std::floor(x / m_cell)),
-        (int)(std::floor(y / m_cell)), (int)(std::floor(z / m_cell)));
+                              (int)(std::floor(y / m_cell)),
+                              (int)(std::floor(z / m_cell)));
 
     auto inserted = m_populatedVoxels.insert(v).second;
     if ((m_mode == Mode::Center) && inserted)
     {
         point.setField(Dimension::Id::X,
-            (std::get<0>(v) + 0.5) * m_cell + m_originX);
+                       (std::get<0>(v) + 0.5) * m_cell + m_originX);
         point.setField(Dimension::Id::Y,
-            (std::get<1>(v) + 0.5) * m_cell + m_originY);
+                       (std::get<1>(v) + 0.5) * m_cell + m_originY);
         point.setField(Dimension::Id::Z,
-            (std::get<2>(v) + 0.5) * m_cell + m_originZ);
+                       (std::get<2>(v) + 0.5) * m_cell + m_originZ);
     }
     return inserted;
 }

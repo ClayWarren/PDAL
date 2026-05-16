@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2019, Helix Re Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Helix Re Inc. nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2019, Helix Re Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Helix Re Inc. nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #include <climits>
 #include <limits>
@@ -42,7 +42,7 @@ namespace pdal
 namespace e57plugin
 {
 
-Dimension::Id e57ToPdal(const std::string &e57Dimension)
+Dimension::Id e57ToPdal(const std::string& e57Dimension)
 {
     if (e57Dimension == "cartesianX")
         return Dimension::Id::X;
@@ -83,52 +83,72 @@ std::string pdalToE57(Dimension::Id pdalDimension)
 {
     switch (pdalDimension)
     {
-        case pdal::Dimension::Id::X:
-            return "cartesianX";
-        case pdal::Dimension::Id::Y:
-            return "cartesianY";
-        case pdal::Dimension::Id::Z:
-            return "cartesianZ";
-        case pdal::Dimension::Id::NormalX:
-            return "nor:normalX";
-        case pdal::Dimension::Id::NormalY:
-            return "nor:normalY";
-        case pdal::Dimension::Id::NormalZ:
-            return "nor:normalZ";
-        case pdal::Dimension::Id::Red:
-            return "colorRed";
-        case pdal::Dimension::Id::Green:
-            return "colorGreen";
-        case pdal::Dimension::Id::Blue:
-            return "colorBlue";
-        case pdal::Dimension::Id::Intensity:
-            return "intensity";
-        case pdal::Dimension::Id::Classification:
-            return "classification";
-        case pdal::Dimension::Id::Omit:
-            return "cartesianInvalidState";
-        default:
-            return std::string();
+    case pdal::Dimension::Id::X:
+        return "cartesianX";
+    case pdal::Dimension::Id::Y:
+        return "cartesianY";
+    case pdal::Dimension::Id::Z:
+        return "cartesianZ";
+    case pdal::Dimension::Id::NormalX:
+        return "nor:normalX";
+    case pdal::Dimension::Id::NormalY:
+        return "nor:normalY";
+    case pdal::Dimension::Id::NormalZ:
+        return "nor:normalZ";
+    case pdal::Dimension::Id::Red:
+        return "colorRed";
+    case pdal::Dimension::Id::Green:
+        return "colorGreen";
+    case pdal::Dimension::Id::Blue:
+        return "colorBlue";
+    case pdal::Dimension::Id::Intensity:
+        return "intensity";
+    case pdal::Dimension::Id::Classification:
+        return "classification";
+    case pdal::Dimension::Id::Omit:
+        return "cartesianInvalidState";
+    default:
+        return std::string();
     }
 }
 
 std::vector<Dimension::Id> supportedPdalTypes()
 {
-    return {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z,
-            Dimension::Id::SphericalRange, Dimension::Id::SphericalAzimuth, Dimension::Id::SphericalElevation,
-            Dimension::Id::NormalX, Dimension::Id::NormalY, Dimension::Id::NormalZ,
-            Dimension::Id::Red, Dimension::Id::Green, Dimension::Id::Blue,
-            Dimension::Id::Intensity, Dimension::Id::Omit, Dimension::Id::Classification
-           };
+    return {Dimension::Id::X,
+            Dimension::Id::Y,
+            Dimension::Id::Z,
+            Dimension::Id::SphericalRange,
+            Dimension::Id::SphericalAzimuth,
+            Dimension::Id::SphericalElevation,
+            Dimension::Id::NormalX,
+            Dimension::Id::NormalY,
+            Dimension::Id::NormalZ,
+            Dimension::Id::Red,
+            Dimension::Id::Green,
+            Dimension::Id::Blue,
+            Dimension::Id::Intensity,
+            Dimension::Id::Omit,
+            Dimension::Id::Classification};
 }
 
 std::vector<std::string> supportedE57Types()
 {
-    return {"cartesianX",  "cartesianY", "cartesianZ",
-            "sphericalRange", "sphericalAzimuth", "sphericalElevation",
-            "nor:normalX", "nor:normalY", "nor:normalZ",
-            "colorRed", "colorGreen", "colorBlue", "intensity",
-            "cartesianInvalidState", "sphericalInvalidState", "classification"};
+    return {"cartesianX",
+            "cartesianY",
+            "cartesianZ",
+            "sphericalRange",
+            "sphericalAzimuth",
+            "sphericalElevation",
+            "nor:normalX",
+            "nor:normalY",
+            "nor:normalZ",
+            "colorRed",
+            "colorGreen",
+            "colorBlue",
+            "intensity",
+            "cartesianInvalidState",
+            "sphericalInvalidState",
+            "classification"};
 }
 
 std::vector<std::string> scalableE57Types()
@@ -159,10 +179,10 @@ bool getLimits(const e57::StructureNode& prototype,
         {
             minmax.second =
                 static_cast<e57::ScaledIntegerNode>(intbox.get(maxKey))
-                .scaledValue();
+                    .scaledValue();
             minmax.first =
                 static_cast<e57::ScaledIntegerNode>(intbox.get(minKey))
-                .scaledValue();
+                    .scaledValue();
         }
         else if (intbox.get(maxKey).type() == e57::E57_FLOAT)
         {
@@ -174,9 +194,9 @@ bool getLimits(const e57::StructureNode& prototype,
         else if (intbox.get(maxKey).type() == e57::E57_INTEGER)
         {
             minmax.second = static_cast<double>(
-                                static_cast<e57::IntegerNode>(intbox.get(maxKey)).value());
+                static_cast<e57::IntegerNode>(intbox.get(maxKey)).value());
             minmax.first = static_cast<double>(
-                               static_cast<e57::IntegerNode>(intbox.get(minKey)).value());
+                static_cast<e57::IntegerNode>(intbox.get(minKey)).value());
         }
     }
     else if (prototype.isDefined(fieldName))
@@ -184,26 +204,26 @@ bool getLimits(const e57::StructureNode& prototype,
         if (prototype.get(fieldName).type() == e57::E57_INTEGER)
         {
             minmax.first = static_cast<double>(
-                               static_cast<e57::IntegerNode>(prototype.get(fieldName))
-                               .minimum());
+                static_cast<e57::IntegerNode>(prototype.get(fieldName))
+                    .minimum());
             minmax.second = static_cast<double>(
-                                static_cast<e57::IntegerNode>(prototype.get(fieldName))
-                                .maximum());
+                static_cast<e57::IntegerNode>(prototype.get(fieldName))
+                    .maximum());
         }
         else if (prototype.get(fieldName).type() == e57::E57_SCALED_INTEGER)
         {
             double scale =
                 static_cast<e57::ScaledIntegerNode>(prototype.get(fieldName))
-                .scale();
+                    .scale();
             double offset =
                 static_cast<e57::ScaledIntegerNode>(prototype.get(fieldName))
-                .offset();
+                    .offset();
             int64_t minimum =
                 static_cast<e57::ScaledIntegerNode>(prototype.get(fieldName))
-                .minimum();
+                    .minimum();
             int64_t maximum =
                 static_cast<e57::ScaledIntegerNode>(prototype.get(fieldName))
-                .maximum();
+                    .maximum();
             minmax.first = minimum * scale + offset;
             minmax.second = maximum * scale + offset;
         }
@@ -232,7 +252,8 @@ std::pair<uint64_t, uint64_t> getPdalBounds(pdal::Dimension::Id id)
     if (typeName.find("uint") == 0)
     {
         uint64_t maxVal = ~0;
-	    maxVal = maxVal >> (sizeof(uint64_t) - pdal::Dimension::size(type)) * CHAR_BIT;
+        maxVal = maxVal >>
+                 (sizeof(uint64_t) - pdal::Dimension::size(type)) * CHAR_BIT;
         return {0, maxVal};
     }
     throw pdal_error("Cannot retrieve bounds for : " + typeName);
@@ -299,10 +320,7 @@ std::vector<Dim>::iterator ExtraDims::deleteDim(std::vector<Dim>::iterator itr)
 std::vector<Dim>::iterator ExtraDims::findDim(std::string name)
 {
     return std::find_if(begin(), end(),
-                        [name](Dim d)
-    {
-        return d.m_name == name;
-    });
+                        [name](Dim d) { return d.m_name == name; });
 }
 
 void ExtraDims::parse(pdal::StringList dimList)
@@ -320,11 +338,9 @@ void ExtraDims::parse(pdal::StringList dimList)
         {
             throw pdal_error("Invalid extra dimension type specified: '" + dim +
                              "'.  Need <dimension>=<type>. ");
-
         }
         addDim(s[0], type);
     }
 }
 } // namespace e57plugin
 } // namespace pdal
-

@@ -42,19 +42,31 @@ namespace las
 class Tile
 {
 public:
-    Tile(uint32_t chunk, uint32_t size) : m_chunk(chunk), m_data(size), m_pos(m_data.data())
-    {}
+    Tile(uint32_t chunk, uint32_t size)
+        : m_chunk(chunk), m_data(size), m_pos(m_data.data())
+    {
+    }
 
-    const char *data() const
-    { return m_data.data(); }
-    char *data()
-    { return m_data.data(); }
+    const char* data() const
+    {
+        return m_data.data();
+    }
+    char* data()
+    {
+        return m_data.data();
+    }
     size_t size() const
-    { return m_data.size(); }
-    const char *pos() const
-    { return m_pos; }
+    {
+        return m_data.size();
+    }
+    const char* pos() const
+    {
+        return m_pos;
+    }
     uint32_t chunk() const
-    { return m_chunk; }
+    {
+        return m_chunk;
+    }
     bool advance(int pointSize)
     {
         m_pos += pointSize;
@@ -64,10 +76,9 @@ public:
 private:
     uint32_t m_chunk;
     std::vector<char> m_data;
-    char *m_pos;
+    char* m_pos;
 };
 using TilePtr = std::unique_ptr<Tile>;
 
 } // namespace las
 } // namespace pdal
-

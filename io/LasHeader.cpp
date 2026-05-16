@@ -35,13 +35,13 @@
 
 #include "LasHeader.hpp"
 
-#include <pdal/pdal_config.hpp>
-#include <pdal/Scaling.hpp>
-#include <pdal/util/Utils.hpp>
-#include <pdal/util/Algorithm.hpp>
 #include <io/private/las/Header.hpp>
 #include <io/private/las/Srs.hpp>
 #include <io/private/las/Utils.hpp>
+#include <pdal/Scaling.hpp>
+#include <pdal/pdal_config.hpp>
+#include <pdal/util/Algorithm.hpp>
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
@@ -55,12 +55,16 @@ std::string GetDefaultSoftwareId()
 
 struct LasHeader::Private
 {
-    Private(las::Header& h, las::Srs& srs, las::VlrList& vlrs) : h(h), srs(srs), vlrs(vlrs)
-    {}
+    Private(las::Header& h, las::Srs& srs, las::VlrList& vlrs)
+        : h(h), srs(srs), vlrs(vlrs)
+    {
+    }
 
-    Private(const Private& src) : h(src.h), srs(src.srs), vlrs(src.vlrs),
-        interfaceVlrs(src.interfaceVlrs)
-    {}
+    Private(const Private& src)
+        : h(src.h), srs(src.srs), vlrs(src.vlrs),
+          interfaceVlrs(src.interfaceVlrs)
+    {
+    }
 
     las::Header& h;
     las::Srs& srs;
@@ -69,15 +73,17 @@ struct LasHeader::Private
     VlrList interfaceVlrs;
 };
 
-LasHeader::LasHeader(las::Header& h, las::Srs& srs, las::VlrList& vlrs) :
-    d(std::make_unique<Private>(h, srs, vlrs))
-{}
+LasHeader::LasHeader(las::Header& h, las::Srs& srs, las::VlrList& vlrs)
+    : d(std::make_unique<Private>(h, srs, vlrs))
+{
+}
 
-LasHeader::LasHeader(const LasHeader& src) : d(std::make_unique<Private>(*(src.d)))
-{}
+LasHeader::LasHeader(const LasHeader& src)
+    : d(std::make_unique<Private>(*(src.d)))
+{
+}
 
-LasHeader::LasHeader(LasHeader&& src) : d(std::move(src.d))
-{}
+LasHeader::LasHeader(LasHeader&& src) : d(std::move(src.d)) {}
 
 LasHeader& LasHeader::operator=(const LasHeader& src)
 {
@@ -91,8 +97,7 @@ LasHeader& LasHeader::operator=(LasHeader&& src)
     return *this;
 }
 
-LasHeader::~LasHeader()
-{}
+LasHeader::~LasHeader() {}
 
 std::string LasHeader::getSystemIdentifier() const
 {
@@ -151,7 +156,8 @@ void LasHeader::setVersionMinor(uint8_t v)
 
 std::string LasHeader::versionString() const
 {
-    return std::to_string(versionMajor()) + "." + std::to_string(versionMinor());
+    return std::to_string(versionMajor()) + "." +
+           std::to_string(versionMinor());
 }
 
 bool LasHeader::versionAtLeast(uint8_t major, uint8_t minor) const
@@ -237,16 +243,19 @@ void LasHeader::setPointFormat(uint8_t format)
 Utils::StatusWithReason LasHeader::pointFormatSupported() const
 {
     if (hasWave())
-        return { -1, "PDAL does not support point formats with waveform data (4, 5, 9 and 10)" };
+        return {-1, "PDAL does not support point formats with waveform data "
+                    "(4, 5, 9 and 10)"};
     if (versionAtLeast(1, 4))
     {
         if (pointFormat() > 10)
-            return { -1, "LAS version " + versionString() + " only supports point formats 0-10." };
+            return {-1, "LAS version " + versionString() +
+                            " only supports point formats 0-10."};
     }
     else
     {
         if (pointFormat() > 5)
-            return { -1, "LAS version '" + versionString() + " only supports point formats 0-5." };
+            return {-1, "LAS version '" + versionString() +
+                            " only supports point formats 0-5."};
     }
     return true;
 }
@@ -283,7 +292,8 @@ void LasHeader::setPointCount(uint64_t pointCount)
 
 uint64_t LasHeader::pointCountByReturn(std::size_t index) const
 {
-    return versionMinor() == 4 ? d->h.ePointsByReturn[index] : d->h.legacyPointsByReturn[index];
+    return versionMinor() == 4 ? d->h.ePointsByReturn[index]
+                               : d->h.legacyPointsByReturn[index];
 }
 
 void LasHeader::setPointCountByReturn(std::size_t index, uint64_t count)
@@ -449,7 +459,7 @@ void LasHeader::setEVlrCount(uint32_t count)
     (void)count;
 }
 
-std::string const& LasHeader:: compressionInfo() const
+std::string const& LasHeader::compressionInfo() const
 {
     static std::string dummy;
     return dummy;
@@ -485,7 +495,8 @@ Dimension::IdList LasHeader::usedDims() const
     return las::pdrfDims(pointFormat());
 }
 
-const LasVLR *LasHeader::findVlr(const std::string& userId, uint16_t recordId) const
+const LasVLR* LasHeader::findVlr(const std::string& userId,
+                                 uint16_t recordId) const
 {
     // Update interface VLRs before searching.
     d->interfaceVlrs.clear();

@@ -54,10 +54,14 @@ inline bool isLogicalOperator(std::string s)
 
 inline LogicalOperator toLogicalOperator(std::string s)
 {
-    if (s == "$and")    return LogicalOperator::lAnd;
-    if (s == "$not")    return LogicalOperator::lNot;
-    if (s == "$or")     return LogicalOperator::lOr;
-    if (s == "$nor")    return LogicalOperator::lNor;
+    if (s == "$and")
+        return LogicalOperator::lAnd;
+    if (s == "$not")
+        return LogicalOperator::lNot;
+    if (s == "$or")
+        return LogicalOperator::lOr;
+    if (s == "$nor")
+        return LogicalOperator::lNor;
     throw pdal_error("Invalid logical operator: " + s);
 }
 
@@ -65,11 +69,16 @@ inline std::string opToString(LogicalOperator o)
 {
     switch (o)
     {
-    case LogicalOperator::lAnd: return "$and";
-    case LogicalOperator::lNot: return "$not";
-    case LogicalOperator::lOr:  return "$or";
-    case LogicalOperator::lNor: return "$nor";
-    default: throw pdal_error("Invalid logical operator");
+    case LogicalOperator::lAnd:
+        return "$and";
+    case LogicalOperator::lNot:
+        return "$not";
+    case LogicalOperator::lOr:
+        return "$or";
+    case LogicalOperator::lNor:
+        return "$nor";
+    default:
+        throw pdal_error("Invalid logical operator");
     }
 }
 
@@ -96,8 +105,10 @@ public:
     virtual std::string toString(std::string pre) const override
     {
         std::ostringstream ss;
-        if (m_filters.size()) ss << pre << opToString(type()) << std::endl;
-        for (const auto& c : m_filters) ss << c->toString(pre + "  ");
+        if (m_filters.size())
+            ss << pre << opToString(type()) << std::endl;
+        for (const auto& c : m_filters)
+            ss << c->toString(pre + "  ");
         return ss.str();
     }
 
@@ -114,7 +125,8 @@ public:
     {
         for (const auto& f : m_filters)
         {
-            if (!(*f)(pr)) return false;
+            if (!(*f)(pr))
+                return false;
         }
 
         return true;
@@ -158,7 +170,8 @@ public:
     {
         for (const auto& f : m_filters)
         {
-            if ((*f)(pr)) return true;
+            if ((*f)(pr))
+                return true;
         }
 
         return false;
@@ -188,4 +201,3 @@ protected:
 };
 
 } // namespace pdal
-

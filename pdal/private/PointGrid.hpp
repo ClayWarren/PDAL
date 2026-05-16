@@ -1,36 +1,36 @@
 /******************************************************************************
-* Copyright (c) 2025, Hobu Inc.
-*
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following
-* conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in
-*       the documentation and/or other materials provided
-*       with the distribution.
-*     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
-*       names of its contributors may be used to endorse or promote
-*       products derived from this software without specific prior
-*       written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-* AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-* OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-* OF SUCH DAMAGE.
-****************************************************************************/
+ * Copyright (c) 2025, Hobu Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following
+ * conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
+ *       names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior
+ *       written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ ****************************************************************************/
 
 #pragma once
 
@@ -49,16 +49,16 @@ class PointGrid
     using Cell = std::vector<PointId>;
 
 public:
-    PointGrid(BOX2D bounds, const PointView& view, int approxPerCell = 200) :
-        m_bounds(bounds), m_view(view), m_approxPerCell(approxPerCell)
+    PointGrid(BOX2D bounds, const PointView& view, int approxPerCell = 200)
+        : m_bounds(bounds), m_view(view), m_approxPerCell(approxPerCell)
     {
         int pointsPerCell = (approxPerCell > 0 ? approxPerCell : 1);
-double cells = std::floor(std::sqrt(
-    static_cast<double>(view.size()) / pointsPerCell));
-cells = std::max(cells, 1.0);
-if (cells >= std::numeric_limits<uint16_t>::max())
-    throw pdal_error("PointGrid: Too many cells requested.");
-m_cells1d = static_cast<uint16_t>(cells);
+        double cells = std::floor(
+            std::sqrt(static_cast<double>(view.size()) / pointsPerCell));
+        cells = std::max(cells, 1.0);
+        if (cells >= std::numeric_limits<uint16_t>::max())
+            throw pdal_error("PointGrid: Too many cells requested.");
+        m_cells1d = static_cast<uint16_t>(cells);
         // Adding a small amount to make sure the max value is in a cell.
         m_xlen = (m_bounds.maxx - m_bounds.minx) / m_cells1d + .0001;
         m_ylen = (m_bounds.maxy - m_bounds.miny) / m_cells1d + .0001;
@@ -84,7 +84,7 @@ m_cells1d = static_cast<uint16_t>(cells);
     {
         uint16_t xi = static_cast<uint16_t>((x - m_bounds.minx) / m_xlen);
         uint16_t yi = static_cast<uint16_t>((y - m_bounds.miny) / m_ylen);
-        return { xi, yi };
+        return {xi, yi};
     }
 
     const Cell& cell(uint16_t i, uint16_t j) const
@@ -100,7 +100,9 @@ m_cells1d = static_cast<uint16_t>(cells);
     const BOX2D bounds(int i, int j) const
     {
         return BOX2D(m_bounds.minx + m_xlen * i, m_bounds.miny + m_ylen * j,
-            m_bounds.minx + m_xlen * (i + 1), m_bounds.minx + m_ylen * (j + 1));;
+                     m_bounds.minx + m_xlen * (i + 1),
+                     m_bounds.minx + m_ylen * (j + 1));
+        ;
     }
 
     const PointView& view() const

@@ -46,9 +46,8 @@
 
 #include <pdal/KDIndex.hpp>
 
-#include <limits>
 #include <Eigen/Core>
-
+#include <limits>
 
 namespace pdal
 {
@@ -68,14 +67,11 @@ std::string SupervoxelFilter::getName() const
     return s_info.name;
 }
 
-SupervoxelFilter::SupervoxelFilter() : Filter()
-{
-}
+SupervoxelFilter::SupervoxelFilter() : Filter() {}
 
 void SupervoxelFilter::addArgs(ProgramArgs& args)
 {
-    args.add("knn", "k nearest neighbours", m_knn,
-             static_cast<uint64_t>(32));
+    args.add("knn", "k nearest neighbours", m_knn, static_cast<uint64_t>(32));
     args.add("resolution", "Resolution", m_R, 1.0);
 }
 
@@ -87,21 +83,20 @@ void SupervoxelFilter::addDimensions(PointLayoutPtr layout)
 void SupervoxelFilter::prepared(PointTableRef table)
 {
     const PointLayoutPtr layout(table.layout());
-    if (!(layout->hasDim(Id::NormalX)) ||
-        !(layout->hasDim(Id::NormalY)) ||
+    if (!(layout->hasDim(Id::NormalX)) || !(layout->hasDim(Id::NormalY)) ||
         !(layout->hasDim(Id::NormalZ)))
         throwError("No normals found.");
 }
 
 /** Estimate number of supervoxels based on resolution.
-  * Code copied from VoxelDownSizeFilter.cpp
-  */
-size_t SupervoxelFilter::estimateClusterCount(PointView &view)
+ * Code copied from VoxelDownSizeFilter.cpp
+ */
+size_t SupervoxelFilter::estimateClusterCount(PointView& view)
 {
     using Voxel = std::tuple<int, int, int>;
     std::set<Voxel> populatedVoxels;
     PointRef point(view);
-    double x,y,z;
+    double x, y, z;
     double originX, originY, originZ;
 
     for (PointId id = 0; id < view.size(); ++id)
@@ -124,43 +119,44 @@ size_t SupervoxelFilter::estimateClusterCount(PointView &view)
         z -= originZ;
 
         Voxel v = std::make_tuple((int)(std::floor(x / m_R)),
-            (int)(std::floor(y / m_R)), (int)(std::floor(z / m_R)));
+                                  (int)(std::floor(y / m_R)),
+                                  (int)(std::floor(z / m_R)));
 
         populatedVoxels.insert(v);
     }
     return populatedVoxels.size();
 }
 
-double SupervoxelFilter::lambda0(PointView &view, std::vector<PointIdList> &G)
+double SupervoxelFilter::lambda0(PointView& view, std::vector<PointIdList>& G)
 {
-   std::vector<double> dists(G.size(), std::numeric_limits<double>::max());
-   double d;
-   PointRef i_ref(view);
-   PointRef j_ref(view);
-   for (PointId i = 0; i < G.size(); ++i)
-   {
-       for (PointId const j : G[i])
-       {
-           if (i == j) continue;
-           i_ref.setPointId(i);
-           j_ref.setPointId(j);
-           d = dist(i_ref, j_ref);
-           dists[i] = std::min(dists[i], d);
-       }
-   }
-   // Determine median value
-   std::nth_element(dists.begin(), dists.begin()+dists.size()/2, dists.end());
-   return std::max(dists[dists.size()/2],
-                   std::numeric_limits<double>::epsilon());
+    std::vector<double> dists(G.size(), std::numeric_limits<double>::max());
+    double d;
+    PointRef i_ref(view);
+    PointRef j_ref(view);
+    for (PointId i = 0; i < G.size(); ++i)
+    {
+        for (PointId const j : G[i])
+        {
+            if (i == j)
+                continue;
+            i_ref.setPointId(i);
+            j_ref.setPointId(j);
+            d = dist(i_ref, j_ref);
+            dists[i] = std::min(dists[i], d);
+        }
+    }
+    // Determine median value
+    std::nth_element(dists.begin(), dists.begin() + dists.size() / 2,
+                     dists.end());
+    return std::max(dists[dists.size() / 2],
+                    std::numeric_limits<double>::epsilon());
 }
 
 double SupervoxelFilter::dist(const PointRef& pi, const PointRef& pj)
 {
-    Vector3d p1(pi.getFieldAs<double>(Id::X),
-                pi.getFieldAs<double>(Id::Y),
+    Vector3d p1(pi.getFieldAs<double>(Id::X), pi.getFieldAs<double>(Id::Y),
                 pi.getFieldAs<double>(Id::Z));
-    Vector3d p2(pj.getFieldAs<double>(Id::X),
-                pj.getFieldAs<double>(Id::Y),
+    Vector3d p2(pj.getFieldAs<double>(Id::X), pj.getFieldAs<double>(Id::Y),
                 pj.getFieldAs<double>(Id::Z));
     Vector3d n1(pi.getFieldAs<double>(Id::NormalX),
                 pi.getFieldAs<double>(Id::NormalY),
@@ -169,16 +165,17 @@ double SupervoxelFilter::dist(const PointRef& pi, const PointRef& pj)
                 pj.getFieldAs<double>(Id::NormalY),
                 pj.getFieldAs<double>(Id::NormalZ));
     double d = 1 - abs(n1.dot(n2));
-    d += 0.4*(p1 - p2).norm()/m_R;
+    d += 0.4 * (p1 - p2).norm() / m_R;
     return d;
 }
 
-void SupervoxelFilter::filter(PointView& view) {
+void SupervoxelFilter::filter(PointView& view)
+{
     const point_count_t n_points = view.size();
     KD3Index& kdi = view.build3dIndex();
     size_t ncluster = estimateClusterCount(view);
-    log()->get(LogLevel::Info) << getName() << ": number of clusters: "
-        << ncluster << std::endl;
+    log()->get(LogLevel::Info)
+        << getName() << ": number of clusters: " << ncluster << std::endl;
     DisjointSet djset(n_points);
     std::set<PointId> roots;
     std::vector<bool> visited(n_points, false);
@@ -193,8 +190,8 @@ void SupervoxelFilter::filter(PointView& view) {
     }
 
     double lambda = lambda0(view, G);
-    log()->get(LogLevel::Debug) << getName() << ": initial lambda value: "
-        << lambda << std::endl;
+    log()->get(LogLevel::Debug)
+        << getName() << ": initial lambda value: " << lambda << std::endl;
 
     ////////////////////////////
     // Fusion based minimization
@@ -204,12 +201,15 @@ void SupervoxelFilter::filter(PointView& view) {
     PointRef ri_ref(view);
     PointRef rj_ref(view);
     PointIdList queue(n_points);
-    while (roots.size() > ncluster) {
+    while (roots.size() > ncluster)
+    {
         for (auto ri : roots)
         {
-            if (G[ri].empty()) continue;
+            if (G[ri].empty())
+                continue;
 
-            front = 0; back = 1;
+            front = 0;
+            back = 1;
             visited[ri] = true;
             queue[front++] = ri;
             for (PointId j : G[ri])
@@ -243,8 +243,11 @@ void SupervoxelFilter::filter(PointView& view) {
                         }
                     }
                     G[rj] = PointIdList(); // Empty G[rj]
-                    if (roots.size() == ncluster) break;
-                } else {
+                    if (roots.size() == ncluster)
+                        break;
+                }
+                else
+                {
                     Gi.push_back(rj);
                 }
             }
@@ -254,16 +257,20 @@ void SupervoxelFilter::filter(PointView& view) {
             {
                 visited[queue[i]] = false;
             }
-            if (roots.size() == ncluster) break;
+            if (roots.size() == ncluster)
+                break;
         }
 
-
-        if (roots.size() == ncluster) break;
+        if (roots.size() == ncluster)
+            break;
 
         lambda *= 2.0;
-        if (lambda == std::numeric_limits<double>::infinity()) {
-            log()->get(LogLevel::Warning) << getName() << ": lambda "
-                "reached it limit." << std::endl;
+        if (lambda == std::numeric_limits<double>::infinity())
+        {
+            log()->get(LogLevel::Warning) << getName()
+                                          << ": lambda "
+                                             "reached it limit."
+                                          << std::endl;
             break;
         }
     }
@@ -287,13 +294,16 @@ void SupervoxelFilter::filter(PointView& view) {
             pi_ref.setPointId(i);
             ri_ref.setPointId(ri);
             dists[i] = dist(pi_ref, ri_ref);
-        } else {
+        }
+        else
+        {
             dists[i] = 0;
         }
         visited[i] = false;
     }
 
-    // Re-initialise neighbour list, as it has been modified in the previous step
+    // Re-initialise neighbour list, as it has been modified in the previous
+    // step
     for (PointId idx = 0; idx < n_points; ++idx)
     {
         G[idx] = kdi.neighbors(idx, m_knn);
@@ -303,9 +313,10 @@ void SupervoxelFilter::filter(PointView& view) {
     std::queue<PointId> q;
     for (PointId pi = 0; pi < n_points; ++pi)
     {
-        for (auto pj: G[pi])
+        for (auto pj : G[pi])
         {
-            if (labels[pi] == labels[pj]) continue;
+            if (labels[pi] == labels[pj])
+                continue;
             if (!visited[pi])
             {
                 q.push(pi);
@@ -325,11 +336,12 @@ void SupervoxelFilter::filter(PointView& view) {
         q.pop();
         visited[pi] = false;
         bool change = false;
-        for (auto pj: G[pi])
+        for (auto pj : G[pi])
         {
             PointId ri = labels[pi];
             PointId rj = labels[pj];
-            if (ri == rj) continue;
+            if (ri == rj)
+                continue;
             pi_ref.setPointId(pi);
             rj_ref.setPointId(rj);
             double d = this->dist(pi_ref, rj_ref);
@@ -342,7 +354,7 @@ void SupervoxelFilter::filter(PointView& view) {
         }
         if (change)
         {
-            for (auto pj: G[pi])
+            for (auto pj : G[pi])
             {
                 if ((labels[pi] != labels[pj]) && (!visited[pj]))
                 {
@@ -352,7 +364,6 @@ void SupervoxelFilter::filter(PointView& view) {
             }
         }
     }
-
 
     ////////////////////////////////////////
     // Map cluster ids to consecutive labels

@@ -84,12 +84,9 @@ struct CSArgs
     std::string m_dir;
 };
 
-CSFilter::CSFilter() : m_args(new CSArgs)
-{
-}
+CSFilter::CSFilter() : m_args(new CSArgs) {}
 
-CSFilter::~CSFilter()
-{}
+CSFilter::~CSFilter() {}
 
 std::string CSFilter::getName() const
 {
@@ -108,15 +105,21 @@ void CSFilter::addArgs(ProgramArgs& args)
     args.add("ignore", "Ignore values", m_args->m_ignored);
     args.add("returns", "Include last returns?", m_args->m_returns,
              {"last", "only"});
-    args.add("debug", "Enable debugging output and use the dir argument", m_args->m_debug, false);
+    args.add("debug", "Enable debugging output and use the dir argument",
+             m_args->m_debug, false);
     args.add("dir", "Optional output directory for debugging", m_args->m_dir);
-    args.add("ground_class", "Classification value of ground points."
-        " [Default: 2]", m_groundClass, ClassLabel::Ground);
-    args.add("other_class", "Classification value of non-ground points."
-        " [Default: 1]", m_otherClass, ClassLabel::Unclassified);
-    args.add("only_ground", "Set to true to only modify the CLassification"
-        " value of detected ground points. [Default: false]",
-        m_onlyGround, false);
+    args.add("ground_class",
+             "Classification value of ground points."
+             " [Default: 2]",
+             m_groundClass, ClassLabel::Ground);
+    args.add("other_class",
+             "Classification value of non-ground points."
+             " [Default: 1]",
+             m_otherClass, ClassLabel::Unclassified);
+    args.add("only_ground",
+             "Set to true to only modify the CLassification"
+             " value of detected ground points. [Default: false]",
+             m_onlyGround, false);
 }
 
 void CSFilter::addDimensions(PointLayoutPtr layout)
@@ -140,7 +143,7 @@ void CSFilter::prepared(PointTableRef table)
     if ((m_groundClass == m_otherClass) && !m_onlyGround)
     {
         throwError("Ground and non-ground class cannot be"
-            "equal when only_ground is false.");
+                   "equal when only_ground is false.");
     }
 
     for (auto& r : m_args->m_ignored)

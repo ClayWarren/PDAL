@@ -36,8 +36,8 @@
 
 #include "Support.hpp"
 
-#include <io/LasReader.hpp>
 #include "../io/MatlabReader.hpp"
+#include <io/LasReader.hpp>
 #include <pdal/util/FileUtils.hpp>
 
 using namespace pdal;
@@ -59,4 +59,3 @@ TEST(MatlabReaderTest, t1)
     SpatialReference ref = tv->spatialReference();
     ASSERT_FALSE(ref.empty());
 }
-
