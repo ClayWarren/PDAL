@@ -1,0 +1,9 @@
+[package]
+name = "pdal-filters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rust port of PDAL filters."
+
+[dependencies]
+pdal-core = { path = "../pdal-core" }

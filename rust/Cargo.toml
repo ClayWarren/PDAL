@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["pdal-core", "pdal-filters", "pdal-capi"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "BSD-3-Clause"

@@ -1,0 +1,13 @@
+[package]
+name = "pdal-capi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "C ABI for PDAL Rust port spike."
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+pdal-core = { path = "../pdal-core" }
+pdal-filters = { path = "../pdal-filters" }

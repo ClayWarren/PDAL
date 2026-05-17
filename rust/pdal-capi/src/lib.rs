@@ -1,0 +1,1220 @@
+//! C ABI for the PDAL Rust port spike.
+//!
+//! Every function in this crate is `extern "C"` and intended to be called from
+//! C or C++ through the header `include/pdal_capi.h`.
+
+use pdal_core::options::Options;
+use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::stage::{Filter, StageError, Streamable};
+use pdal_filters::assign;
+use pdal_filters::decimation::DecimationFilter;
+use pdal_filters::divider;
+use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
+use pdal_filters::ferry::FerryFilter;
+use pdal_filters::griddecimation;
+use pdal_filters::groupby::GroupByFilter;
+use pdal_filters::head::HeadFilter;
+use pdal_filters::labelduplicates::LabelDuplicatesFilter;
+use pdal_filters::locate::LocateFilter;
+use pdal_filters::merge::MergeFilter;
+use pdal_filters::mortonorder::MortonOrderFilter;
+use pdal_filters::randomize::RandomizeFilter;
+use pdal_filters::range::{RangeFilter, RangeLimit};
+use pdal_filters::returns::ReturnsFilter;
+use pdal_filters::sample::SampleFilter;
+use pdal_filters::separatescanline::SeparateScanLineFilter;
+use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
+use pdal_filters::stats;
+use pdal_filters::tail::TailFilter;
+use pdal_filters::transformation::TransformationFilter;
+use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
+use std::cell::RefCell;
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::rc::Rc;
+
+thread_local! {
+    static LAST_ERROR: RefCell<CString> =
+        RefCell::new(CString::new("").expect("empty CString is valid"));
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Map a C string dimension name to the Rust `DimId` enum.
+fn dim_id_from_name(name: &str) -> DimId {
+    match name {
+        "X" => DimId::X,
+        "Y" => DimId::Y,
+        "Z" => DimId::Z,
+        "Intensity" => DimId::Intensity,
+        "OffsetTime" => DimId::OffsetTime,
+        "Classification" => DimId::Classification,
+        other => DimId::Other(other.to_string()),
+    }
+}
+
+/// Map an integer type id from the C side to a `DimType`.
+fn dim_type_from_id(ty_id: i32) -> DimType {
+    match ty_id {
+        0 => DimType::U8,
+        1 => DimType::U16,
+        2 => DimType::U32,
+        3 => DimType::U64,
+        4 => DimType::I8,
+        5 => DimType::I16,
+        6 => DimType::I32,
+        7 => DimType::I64,
+        8 => DimType::F32,
+        9 => DimType::F64,
+        _ => DimType::F64,
+    }
+}
+
+fn set_last_error(message: impl Into<String>) {
+    let sanitized = message.into().replace('\0', "\\0");
+    LAST_ERROR.with(|slot| {
+        *slot.borrow_mut() = CString::new(sanitized).expect("interior NULs removed");
+    });
+}
+
+fn clear_last_error() {
+    LAST_ERROR.with(|slot| {
+        *slot.borrow_mut() = CString::new("").expect("empty CString is valid");
+    });
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "Rust panic".to_string()
+    }
+}
+
+fn ffi_catch<T>(fallback: T, f: impl FnOnce() -> T) -> T {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(value) => value,
+        Err(payload) => {
+            set_last_error(panic_message(payload.as_ref()));
+            fallback
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_last_error() -> *const c_char {
+    LAST_ERROR.with(|slot| slot.borrow().as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_clear_error() {
+    clear_last_error();
+}
+
+// ---------------------------------------------------------------------------
+// Options ABI
+// ---------------------------------------------------------------------------
+
+/// Create a new, empty options set. Returns an owned pointer.
+#[no_mangle]
+pub extern "C" fn pdal_options_create() -> *mut Options {
+    Box::into_raw(Box::new(Options::new()))
+}
+
+/// Add a floating-point option.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_add_f64(ops: *mut Options, key: *const c_char, value: f64) {
+    if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        ops.add(&k, value.to_string());
+    }
+}
+
+/// Add an unsigned 64-bit integer option.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_add_u64(ops: *mut Options, key: *const c_char, value: u64) {
+    if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        ops.add(&k, value.to_string());
+    }
+}
+
+/// Add a string option.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` and `value` must be valid, NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_add_str(
+    ops: *mut Options,
+    key: *const c_char,
+    value: *const c_char,
+) {
+    if let (Some(ops), false, false) = (ops.as_mut(), key.is_null(), value.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        let v = CStr::from_ptr(value).to_string_lossy();
+        ops.add(&k, v.to_string());
+    }
+}
+
+/// Destroy an options set.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`, or null.
+/// Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_destroy(ops: *mut Options) {
+    if !ops.is_null() {
+        drop(Box::from_raw(ops));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PointLayout ABI
+// ---------------------------------------------------------------------------
+
+/// Create a new, empty point layout. Returns an owned pointer.
+#[no_mangle]
+pub extern "C" fn pdal_point_layout_create() -> *mut PointLayout {
+    Box::into_raw(Box::new(PointLayout::new()))
+}
+
+/// Register a dimension in the layout.
+///
+/// # Safety
+///
+/// `layout` must be a valid pointer returned by `pdal_point_layout_create`.
+/// `name` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_layout_register_dim(
+    layout: *mut PointLayout,
+    name: *const c_char,
+    ty_id: i32,
+) {
+    if let (Some(layout), false) = (layout.as_mut(), name.is_null()) {
+        let n = CStr::from_ptr(name).to_string_lossy();
+        layout.register(dim_id_from_name(&n), dim_type_from_id(ty_id));
+    }
+}
+
+/// Destroy a point layout.
+///
+/// # Safety
+///
+/// `layout` must be a valid pointer returned by `pdal_point_layout_create`,
+/// or null. Must not be called twice on the same pointer. Must not be called
+/// after the layout has been consumed by `pdal_point_view_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_layout_destroy(layout: *mut PointLayout) {
+    if !layout.is_null() {
+        drop(Box::from_raw(layout));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PointView ABI
+// ---------------------------------------------------------------------------
+
+/// Create a new, empty point view from the given layout.
+///
+/// # Safety
+///
+/// `layout` must be a valid pointer returned by `pdal_point_layout_create`.
+/// Ownership of the layout is transferred — the caller must **not** call
+/// `pdal_point_layout_destroy` on it after this call.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_create(layout: *mut PointLayout) -> *mut PointView {
+    if layout.is_null() {
+        return std::ptr::null_mut();
+    }
+    let layout_rc = Rc::new(*Box::from_raw(layout));
+    Box::into_raw(Box::new(PointView::new(layout_rc)))
+}
+
+/// Add a zero-initialised point to the view. Returns its index.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_add_point(view: *mut PointView) -> u64 {
+    if let Some(view) = view.as_mut() {
+        view.add_point()
+    } else {
+        0
+    }
+}
+
+/// Set a dimension value on a point, converting from `f64`.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+/// `dim_name` must be a valid, NUL-terminated C string.
+/// `idx` must be less than the number of points in the view.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_set_f64(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    val: f64,
+) {
+    if let (Some(view), false) = (view.as_mut(), dim_name.is_null()) {
+        let n = CStr::from_ptr(dim_name).to_string_lossy();
+        view.set_f64(idx, &dim_id_from_name(&n), val);
+    }
+}
+
+/// Get a dimension value from a point, as `f64`.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+/// `dim_name` must be a valid, NUL-terminated C string.
+/// `idx` must be less than the number of points in the view.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_f64(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+) -> f64 {
+    if let (Some(view), false) = (view.as_ref(), dim_name.is_null()) {
+        let n = CStr::from_ptr(dim_name).to_string_lossy();
+        view.get_f64(idx, &dim_id_from_name(&n))
+    } else {
+        0.0
+    }
+}
+
+/// Return the number of points in the view.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_length(view: *mut PointView) -> u64 {
+    if let Some(view) = view.as_ref() {
+        view.len()
+    } else {
+        0
+    }
+}
+
+/// Destroy a point view.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create` or
+/// `pdal_stage_run`, or null. Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_destroy(view: *mut PointView) {
+    if !view.is_null() {
+        drop(Box::from_raw(view));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage ABI
+// ---------------------------------------------------------------------------
+
+/// Opaque wrapper around a Rust filter that implements both `Filter` and
+/// `Streamable`.
+pub struct StageWrapper {
+    filter: Box<dyn FilterWrapper>,
+}
+
+trait FilterWrapper {
+    fn process_one(&mut self) -> bool;
+    fn reset(&mut self);
+    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+impl<T: Filter + Streamable> FilterWrapper for T {
+    fn process_one(&mut self) -> bool {
+        Streamable::process_one(self)
+    }
+    fn reset(&mut self) {
+        Streamable::reset(self)
+    }
+    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        Filter::run(self, input)
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        Filter::as_any(self)
+    }
+}
+
+/// Create a decimation filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_decimation(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let filter = Box::new(DecimationFilter::new(options));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a head filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_head(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let count = options.get_u64("count", 10);
+        let invert = options.get_bool("invert", false);
+        let filter = Box::new(HeadFilter::new(count, invert));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a tail filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_tail(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let count = options.get_u64("count", 10);
+        let invert = options.get_bool("invert", false);
+        let filter = Box::new(TailFilter::new(count, invert));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a locate filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_locate(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let dim_name = options.get_str("dimension", "");
+        let minmax = options.get_str("minmax", "max");
+        let filter = Box::new(LocateFilter::new(dim_name, minmax));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a ferry filter stage.
+///
+/// # Safety
+///
+/// `from_dims` and `to_dims` must be valid arrays of null-terminated strings of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_ferry(
+    from_dims: *const *const std::os::raw::c_char,
+    to_dims: *const *const std::os::raw::c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    if from_dims.is_null() || to_dims.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut dims = Vec::new();
+    for i in 0..count {
+        let from_ptr = *from_dims.offset(i as isize);
+        let to_ptr = *to_dims.offset(i as isize);
+        if from_ptr.is_null() || to_ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        let from_str = CStr::from_ptr(from_ptr).to_string_lossy().into_owned();
+        let to_str = CStr::from_ptr(to_ptr).to_string_lossy().into_owned();
+        dims.push((from_str, to_str));
+    }
+    let filter = Box::new(FerryFilter::new(dims));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Copy values between dimensions on a specific point in a PointView.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer to a stage created with `pdal_stage_create_ferry`.
+/// `view` must be a valid pointer to a `PointView`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_ferry_point(
+    stage: *mut StageWrapper,
+    view: *mut PointView,
+    idx: u64,
+) {
+    if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_mut()) {
+        if let Some(ferry) = stage_wrapper.filter.as_any().downcast_ref::<FerryFilter>() {
+            ferry.ferry_point(pt_view, idx);
+        }
+    }
+}
+
+/// Create a randomize filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_randomize(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let seed = if options.has("seed") {
+            Some(options.get_u64("seed", 0) as u32)
+        } else {
+            None
+        };
+        let filter = Box::new(RandomizeFilter::new(seed));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Range Limit struct for FFI translation.
+#[repr(C)]
+pub struct pdal_range_limit_t {
+    pub dim_name: *const std::os::raw::c_char,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub inclusive_lower: bool,
+    pub inclusive_upper: bool,
+    pub negate: bool,
+}
+
+/// Create a range filter stage.
+///
+/// # Safety
+///
+/// `limits` must be a valid pointer to an array of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_range(
+    limits: *const pdal_range_limit_t,
+    count: u64,
+) -> *mut StageWrapper {
+    if limits.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut vec_limits = Vec::new();
+    for i in 0..count {
+        let limit = &*limits.offset(i as isize);
+        if limit.dim_name.is_null() {
+            return std::ptr::null_mut();
+        }
+        let name = CStr::from_ptr(limit.dim_name)
+            .to_string_lossy()
+            .into_owned();
+        vec_limits.push(RangeLimit {
+            dim_name: name,
+            lower_bound: limit.lower_bound,
+            upper_bound: limit.upper_bound,
+            inclusive_lower: limit.inclusive_lower,
+            inclusive_upper: limit.inclusive_upper,
+            negate: limit.negate,
+        });
+    }
+    let filter = Box::new(RangeFilter::new(vec_limits));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Check if a point passes the RangeFilter limits.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer to a stage created with `pdal_stage_create_range`.
+/// `view` must be a valid pointer to a `PointView`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_range_point_passes(
+    stage: *mut StageWrapper,
+    view: *mut PointView,
+    idx: u64,
+) -> bool {
+    if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_ref()) {
+        if let Some(range) = stage_wrapper.filter.as_any().downcast_ref::<RangeFilter>() {
+            return range.point_passes(pt_view, idx);
+        }
+    }
+    false
+}
+
+/// Destroy a stage.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`, or null.
+/// Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_destroy(stage: *mut StageWrapper) {
+    if !stage.is_null() {
+        drop(Box::from_raw(stage));
+    }
+}
+
+/// Reset the streaming state of a stage.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_reset(stage: *mut StageWrapper) {
+    if let Some(stage) = stage.as_mut() {
+        stage.filter.reset();
+    }
+}
+
+/// Process one point in streaming mode. Returns `true` to keep the point.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> bool {
+    ffi_catch(false, || {
+        clear_last_error();
+        if let Some(stage) = stage.as_mut() {
+            stage.filter.process_one()
+        } else {
+            set_last_error("null stage");
+            false
+        }
+    })
+}
+
+/// Run the filter over a complete input view. Returns a new output view
+/// (caller owns it), or null on error.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+/// `input` must be a valid pointer returned by `pdal_point_view_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_run(
+    stage: *mut StageWrapper,
+    input: *mut PointView,
+) -> *mut PointView {
+    ffi_catch(std::ptr::null_mut(), || {
+        clear_last_error();
+        if let (Some(stage), Some(input)) = (stage.as_mut(), input.as_mut()) {
+            match stage.filter.run(input) {
+                Ok(mut outputs) => {
+                    if !outputs.is_empty() {
+                        return Box::into_raw(Box::new(outputs.remove(0)));
+                    }
+                }
+                Err(err) => set_last_error(err.to_string()),
+            }
+        } else {
+            set_last_error("null stage or input view");
+        }
+        std::ptr::null_mut()
+    })
+}
+
+/// Create a sort filter stage.
+///
+/// # Safety
+///
+/// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
+/// `order` and `algorithm` must be valid NUL-terminated C-strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_sort(
+    dims: *const *const c_char,
+    count: u64,
+    order: *const c_char,
+    algorithm: *const c_char,
+) -> *mut StageWrapper {
+    if dims.is_null() || order.is_null() || algorithm.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut dim_names = Vec::new();
+    for i in 0..count {
+        let ptr = *dims.offset(i as isize);
+        if ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        dim_names.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+
+    let order_str = CStr::from_ptr(order).to_string_lossy();
+    let order_enum = if order_str.eq_ignore_ascii_case("desc") {
+        SortOrder::Desc
+    } else {
+        SortOrder::Asc
+    };
+
+    let alg_str = CStr::from_ptr(algorithm).to_string_lossy();
+    let alg_enum = if alg_str.eq_ignore_ascii_case("stable") {
+        SortAlgorithm::Stable
+    } else {
+        SortAlgorithm::Normal
+    };
+
+    let filter = Box::new(SortFilter::new(dim_names, order_enum, alg_enum));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a returns filter stage.
+///
+/// # Safety
+///
+/// `groups` must be a valid pointer to a C-array of C-strings of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_returns(
+    groups: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    if groups.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut vec_groups = Vec::new();
+    for i in 0..count {
+        let ptr = *groups.offset(i as isize);
+        if ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        vec_groups.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+    let filter = Box::new(ReturnsFilter::new(vec_groups));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a separatescanline filter stage.
+///
+/// # Safety
+///
+/// Safe to call with any u64 value.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_separatescanline(groupby: u64) -> *mut StageWrapper {
+    let filter = Box::new(SeparateScanLineFilter::new(groupby));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Run the filter over a complete input view, returning multiple output views.
+/// The returned pointers are written into the `outputs` buffer, up to `max_outputs`.
+/// Returns the actual number of output views produced.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+/// `input` must be a valid pointer returned by `pdal_point_view_create`.
+/// `outputs` must be a valid pointer to a buffer of size `max_outputs` pointer elements.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_run_multi(
+    stage: *mut StageWrapper,
+    input: *mut PointView,
+    outputs: *mut *mut PointView,
+    max_outputs: u64,
+) -> u64 {
+    ffi_catch(0, || {
+        clear_last_error();
+        if let (Some(stage), Some(input), false) =
+            (stage.as_mut(), input.as_mut(), outputs.is_null())
+        {
+            match stage.filter.run(input) {
+                Ok(mut results) => {
+                    let count = std::cmp::min(results.len() as u64, max_outputs);
+                    for i in 0..count {
+                        let view = results.remove(0);
+                        *outputs.offset(i as isize) = Box::into_raw(Box::new(view));
+                    }
+                    return count;
+                }
+                Err(err) => set_last_error(err.to_string()),
+            }
+        } else {
+            set_last_error("null stage, input view, or output buffer");
+        }
+        0
+    })
+}
+
+/// Create a groupby filter stage.
+///
+/// # Safety
+///
+/// `dim_name` must be a valid NUL-terminated C-string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_groupby(dim_name: *const c_char) -> *mut StageWrapper {
+    if dim_name.is_null() {
+        return std::ptr::null_mut();
+    }
+    let name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+    let filter = Box::new(GroupByFilter::new(name));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a label_duplicates filter stage.
+///
+/// # Safety
+///
+/// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
+    dims: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    if dims.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut vec_dims = Vec::new();
+    for i in 0..count {
+        let ptr = *dims.offset(i as isize);
+        if ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        vec_dims.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+    let filter = Box::new(LabelDuplicatesFilter::new(vec_dims));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a merge filter stage.
+///
+/// # Safety
+///
+/// Always safe to call.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_merge() -> *mut StageWrapper {
+    let filter = Box::new(MergeFilter::new());
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Append a point view to the merge filter's accumulated buffer.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_merge`.
+/// `view` must be a valid pointer to a `PointView`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_merge_append(stage: *mut StageWrapper, view: *mut PointView) {
+    if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_ref()) {
+        if let Some(merge) = stage_wrapper.filter.as_any().downcast_ref::<MergeFilter>() {
+            merge.merge_view(pt_view);
+        }
+    }
+}
+
+/// Create a mortonorder filter stage.
+///
+/// # Safety
+///
+/// Always safe to call.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_mortonorder(reverse: bool) -> *mut StageWrapper {
+    let filter = Box::new(MortonOrderFilter::new(reverse));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a transformation filter stage.
+///
+/// # Safety
+///
+/// `matrix` must be a valid pointer to a 16-element float64 array.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_transformation(matrix: *const f64) -> *mut StageWrapper {
+    if matrix.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut mat = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(matrix, mat.as_mut_ptr(), 16);
+    let filter = Box::new(TransformationFilter::new(mat));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Apply transformation to a single point in the view (for streaming mode).
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_transformation`.
+/// `view` must be a valid pointer to a `PointView`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_transformation_point(
+    stage: *mut StageWrapper,
+    view: *mut PointView,
+    idx: u64,
+) {
+    if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_mut()) {
+        if let Some(xform) = stage_wrapper
+            .filter
+            .as_any()
+            .downcast_ref::<TransformationFilter>()
+        {
+            xform.transform_point(pt_view, idx);
+        }
+    }
+}
+
+/// Create a voxeldownsize filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_voxeldownsize(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let filter = Box::new(VoxelDownsizeFilter::new(options));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a sample filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let filter = Box::new(SampleFilter::new(options));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Get the indices of the kept points in grid decimation.
+/// Caller is responsible for freeing the returned buffer with pdal_free_u64_array.
+///
+/// # Safety
+///
+/// `view` and `output_type` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_grid_decimation_get_kept_indices(
+    view: *const PointView,
+    resolution: f64,
+    output_type: *const c_char,
+    out_len: *mut u64,
+) -> *mut u64 {
+    if view.is_null() || output_type.is_null() || out_len.is_null() {
+        return std::ptr::null_mut();
+    }
+    let output_type_str = CStr::from_ptr(output_type).to_string_lossy();
+    if let Some(pt_view) = view.as_ref() {
+        let kept = griddecimation::get_kept_indices(pt_view, resolution, &output_type_str);
+        *out_len = kept.len() as u64;
+        let mut boxed_slice = kept.into_boxed_slice();
+        let ptr = boxed_slice.as_mut_ptr();
+        std::mem::forget(boxed_slice);
+        ptr
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Free a u64 array allocated by Rust.
+///
+/// # Safety
+///
+/// `ptr` must be a valid pointer returned by a pdal allocator or null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_free_u64_array(ptr: *mut u64, len: u64) {
+    if !ptr.is_null() {
+        let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len as usize));
+    }
+}
+
+/// Create a divider filter stage.
+///
+/// # Safety
+///
+/// `evals` must be a valid pointer of length `evals_count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_divider(
+    mode: i32,
+    size_mode: i32,
+    size: u64,
+    evals: *const u8,
+    evals_count: u64,
+) -> *mut StageWrapper {
+    let mode_enum = match mode {
+        1 => divider::DividerMode::RoundRobin,
+        2 => divider::DividerMode::Expression,
+        _ => divider::DividerMode::Partition,
+    };
+    let size_mode_enum = match size_mode {
+        1 => divider::DividerSizeMode::Capacity,
+        _ => divider::DividerSizeMode::Count,
+    };
+    let mut vec_evals = Vec::new();
+    if !evals.is_null() {
+        let slice = std::slice::from_raw_parts(evals, evals_count as usize);
+        vec_evals = slice.iter().map(|&b| b != 0).collect();
+    }
+    let filter = Box::new(divider::DividerFilter::new(
+        mode_enum,
+        size_mode_enum,
+        size,
+        vec_evals,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a farthestpointsampling filter stage.
+///
+/// # Safety
+///
+/// Always safe.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_farthestpointsampling(count: u64) -> *mut StageWrapper {
+    let filter = Box::new(FarthestPointSamplingFilter::new(count));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Assign Range representation for FFI.
+#[repr(C)]
+pub struct pdal_assign_range_t {
+    pub dim_name: *const c_char,
+    pub value: f64,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub inclusive_lower: bool,
+    pub inclusive_upper: bool,
+    pub negate: bool,
+}
+
+/// Create an assign filter stage.
+///
+/// # Safety
+///
+/// `cond_dim` must be null-terminated or null. `assignments` must be valid pointer of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_assign(
+    has_condition: bool,
+    cond_dim: *const c_char,
+    cond_lower: f64,
+    cond_upper: f64,
+    cond_inclusive_lower: bool,
+    cond_inclusive_upper: bool,
+    cond_negate: bool,
+
+    assignments: *const pdal_assign_range_t,
+    count: u64,
+) -> *mut StageWrapper {
+    let condition = if has_condition && !cond_dim.is_null() {
+        let name = CStr::from_ptr(cond_dim).to_string_lossy().into_owned();
+        Some(assign::AssignCondition {
+            dim_name: name,
+            lower_bound: cond_lower,
+            upper_bound: cond_upper,
+            inclusive_lower: cond_inclusive_lower,
+            inclusive_upper: cond_inclusive_upper,
+            negate: cond_negate,
+        })
+    } else {
+        None
+    };
+
+    let mut vec_assignments = Vec::new();
+    if !assignments.is_null() {
+        for i in 0..count {
+            let r = &*assignments.offset(i as isize);
+            if !r.dim_name.is_null() {
+                let name = CStr::from_ptr(r.dim_name).to_string_lossy().into_owned();
+                vec_assignments.push(assign::AssignRange {
+                    dim_name: name,
+                    value: r.value,
+                    lower_bound: r.lower_bound,
+                    upper_bound: r.upper_bound,
+                    inclusive_lower: r.inclusive_lower,
+                    inclusive_upper: r.inclusive_upper,
+                    negate: r.negate,
+                });
+            }
+        }
+    }
+
+    let filter = Box::new(assign::AssignFilter::new(condition, vec_assignments));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Dim Stats representation for FFI.
+#[repr(C)]
+pub struct pdal_dim_stats_t {
+    pub count: u64,
+    pub min: f64,
+    pub max: f64,
+    pub m1: f64,
+    pub m2: f64,
+    pub m3: f64,
+    pub m4: f64,
+    pub median: f64,
+    pub mad: f64,
+    pub unique_values: *mut f64,
+    pub unique_counts: *mut u64,
+    pub unique_len: u64,
+}
+
+/// Compute statistics on a PointView.
+///
+/// # Safety
+///
+/// Pre-allocated arrays and bounds must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pdal_stats_compute(
+    view: *mut PointView,
+    dims: *const *const c_char,
+    dims_count: u64,
+    advanced: bool,
+    enums: *const *const c_char,
+    enums_count: u64,
+    counts: *const *const c_char,
+    counts_count: u64,
+    globals: *const *const c_char,
+    globals_count: u64,
+    out_stats: *mut pdal_dim_stats_t,
+) {
+    if view.is_null() || dims.is_null() || out_stats.is_null() {
+        return;
+    }
+    let pt_view = &mut *view;
+
+    let mut enum_names = std::collections::HashSet::new();
+    for i in 0..enums_count {
+        let ptr = *enums.offset(i as isize);
+        if !ptr.is_null() {
+            enum_names.insert(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+
+    let mut count_names = std::collections::HashSet::new();
+    for i in 0..counts_count {
+        let ptr = *counts.offset(i as isize);
+        if !ptr.is_null() {
+            count_names.insert(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+
+    let mut global_names = std::collections::HashSet::new();
+    for i in 0..globals_count {
+        let ptr = *globals.offset(i as isize);
+        if !ptr.is_null() {
+            global_names.insert(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+
+    for i in 0..dims_count {
+        let ptr = *dims.offset(i as isize);
+        if ptr.is_null() {
+            continue;
+        }
+        let dim_name = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+
+        let enum_type = if global_names.contains(&dim_name) {
+            3
+        } else if count_names.contains(&dim_name) {
+            2
+        } else if enum_names.contains(&dim_name) {
+            1
+        } else {
+            0
+        };
+
+        let mut summary = stats::Summary::new(dim_name.clone(), enum_type, advanced);
+        let dim_id = DimId::from_name(&dim_name);
+        for pt_idx in 0..pt_view.len() {
+            let val = pt_view.get_f64(pt_idx, &dim_id);
+            summary.insert(val);
+        }
+        if enum_type == 3 {
+            summary.compute_global_stats();
+        }
+
+        let mut unique_values_ptr = std::ptr::null_mut();
+        let mut unique_counts_ptr = std::ptr::null_mut();
+        let mut unique_len = 0;
+
+        if enum_type == 1 || enum_type == 2 {
+            let mut keys: Vec<f64> = summary
+                .values
+                .keys()
+                .map(|&bits| f64::from_bits(bits))
+                .collect();
+            keys.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            unique_len = keys.len() as u64;
+
+            let mut vals = Vec::new();
+            for &k in &keys {
+                let bits = k.to_bits();
+                vals.push(*summary.values.get(&bits).unwrap_or(&0));
+            }
+
+            let mut boxed_keys = keys.into_boxed_slice();
+            unique_values_ptr = boxed_keys.as_mut_ptr();
+            std::mem::forget(boxed_keys);
+
+            let mut boxed_vals = vals.into_boxed_slice();
+            unique_counts_ptr = boxed_vals.as_mut_ptr();
+            std::mem::forget(boxed_vals);
+        }
+
+        *out_stats.offset(i as isize) = pdal_dim_stats_t {
+            count: summary.cnt,
+            min: summary.min,
+            max: summary.max,
+            m1: summary.m1,
+            m2: summary.m2,
+            m3: summary.m3,
+            m4: summary.m4,
+            median: summary.median,
+            mad: summary.mad,
+            unique_values: unique_values_ptr,
+            unique_counts: unique_counts_ptr,
+            unique_len,
+        };
+    }
+}
+
+/// Free the allocated arrays within `pdal_dim_stats_t`.
+///
+/// # Safety
+///
+/// Always safe if pointers match allocated memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_free_stats_arrays(ptr: *mut pdal_dim_stats_t, dims_count: u64) {
+    if ptr.is_null() {
+        return;
+    }
+    for i in 0..dims_count {
+        let stats = &*ptr.offset(i as isize);
+        if !stats.unique_values.is_null() {
+            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                stats.unique_values,
+                stats.unique_len as usize,
+            ));
+        }
+        if !stats.unique_counts.is_null() {
+            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                stats.unique_counts,
+                stats.unique_len as usize,
+            ));
+        }
+    }
+}
