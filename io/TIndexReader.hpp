@@ -81,14 +81,14 @@ public:
     std::string getName() const override;
 
 private:
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual void prepared(PointTableRef table) override;
-    virtual void ready(PointTableRef table) override;
-    virtual PointViewSet run(PointViewPtr view) override;
-    virtual point_count_t read(PointViewPtr view, point_count_t num) override;
-    virtual bool processOne(PointRef& point) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
+    bool processOne(PointRef& point) override;
 
     struct Args;
     std::unique_ptr<Args> m_args;

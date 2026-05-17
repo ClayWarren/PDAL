@@ -52,15 +52,15 @@ public:
     EigenvaluesFilter& operator=(const EigenvaluesFilter&) = delete;
     EigenvaluesFilter(const EigenvaluesFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<EigenvalueArgs> m_args;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

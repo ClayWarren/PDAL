@@ -50,20 +50,20 @@ class PDAL_EXPORT H3Filter : public Filter, public Streamable
 {
 public:
     H3Filter();
-    ~H3Filter();
+    ~H3Filter() override;
 
     struct Args;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<Args> m_args;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual bool processOne(PointRef& point);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void spatialReferenceChanged(const SpatialReference& srs);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    bool processOne(PointRef& point) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    void filter(PointView& view) override;
 
     void createTransform(const SpatialReference& srs);
     std::unique_ptr<SrsTransform> m_transform;

@@ -83,15 +83,15 @@ class PDAL_EXPORT TIndexKernel : public SubcommandKernel
     };
 
 public:
-    std::string getName() const;
+    std::string getName() const override;
     TIndexKernel();
 
 private:
-    virtual void addSubSwitches(ProgramArgs& args,
-                                const std::string& subcommand);
-    virtual void validateSwitches(ProgramArgs& args);
-    virtual int execute();
-    virtual StringList subcommands() const;
+    void addSubSwitches(ProgramArgs& args,
+                                const std::string& subcommand) override;
+    void validateSwitches(ProgramArgs& args) override;
+    int execute() override;
+    StringList subcommands() const override;
 
     void createFile();
     void mergeFile();

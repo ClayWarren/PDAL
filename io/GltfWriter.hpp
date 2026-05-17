@@ -48,18 +48,18 @@ class PDAL_EXPORT GltfWriter : public Writer
 
 public:
     GltfWriter();
-    ~GltfWriter();
+    ~GltfWriter() override;
     GltfWriter(const GltfWriter&) = delete;
     GltfWriter& operator=(const GltfWriter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void ready(PointTableRef table);
-    virtual void write(const PointViewPtr v);
-    virtual void done(PointTableRef table);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr v) override;
+    void done(PointTableRef table) override;
+    void prepared(PointTableRef table) override;
 
     void writeGltfHeader();
     void writeJsonChunk();

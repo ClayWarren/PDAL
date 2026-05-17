@@ -408,7 +408,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     bool check(x == 0 && y == 1 && z == 2);
                     EXPECT_EQ(f->processOne(pr), check)
                         << x << ", " << y << ", " << z << " != " << check
-                        << std::endl;
+                        << '\n';
                 }
             }
         }
@@ -432,7 +432,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     bool check(x == 0 || y == 1 || z == 2);
                     EXPECT_EQ(f->processOne(pr), check)
                         << x << ", " << y << ", " << z << " != " << check
-                        << std::endl;
+                        << '\n';
                 }
             }
         }
@@ -457,7 +457,7 @@ TEST(MongoExpressionFilterTest, logicalOperators)
                     bool check(!(x == 0 || y == 1 || z == 2));
                     EXPECT_EQ(f->processOne(pr), check)
                         << x << ", " << y << ", " << z << " != " << check
-                        << std::endl;
+                        << '\n';
                 }
             }
         }

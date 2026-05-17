@@ -49,17 +49,17 @@ public:
     SupervoxelFilter& operator=(const SupervoxelFilter&) = delete;
     SupervoxelFilter(const SupervoxelFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     point_count_t m_knn;
     double m_R;
 
     size_t estimateClusterCount(PointView& view);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     double dist(const PointRef& i, const PointRef& j);
     double lambda0(PointView& view, std::vector<PointIdList>& G);

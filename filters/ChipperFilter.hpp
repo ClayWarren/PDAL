@@ -110,11 +110,11 @@ class PDAL_EXPORT ChipperFilter : public pdal::Filter
 {
 public:
     ChipperFilter() {}
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
 
     void load(PointView& view, ChipRefList& xvec, ChipRefList& yvec,
               ChipRefList& spare);

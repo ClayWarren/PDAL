@@ -58,8 +58,8 @@ namespace Utils
 
 inline void printError(const std::string& s)
 {
-    std::cerr << "PDAL: " << s << std::endl;
-    std::cerr << std::endl;
+    std::cerr << "PDAL: " << s << '\n';
+    std::cerr << '\n';
 }
 
 inline double toDouble(const Everything& e, Dimension::Type type)

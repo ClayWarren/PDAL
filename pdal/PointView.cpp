@@ -249,10 +249,10 @@ void PointView::dump(std::ostream& ostr) const
     const Dimension::IdList& dims = layout->dims();
 
     point_count_t numPoints = size();
-    ostr << "Contains " << numPoints << "  points" << endl;
+    ostr << "Contains " << numPoints << "  points" << '\n';
     for (PointId idx = 0; idx < numPoints; idx++)
     {
-        ostr << "Point: " << idx << endl;
+        ostr << "Point: " << idx << '\n';
 
         for (auto di = dims.begin(); di != dims.end(); ++di)
         {
@@ -317,7 +317,7 @@ void PointView::dump(std::ostream& ostr) const
                 ostr << "NONE";
                 break;
             }
-            ostr << endl;
+            ostr << '\n';
         }
     }
 }

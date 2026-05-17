@@ -104,7 +104,7 @@ public:
 
     operator bool() const
     {
-        return m_geom != NULL;
+        return m_geom != nullptr;
     }
     static void throwNoGeos();
 

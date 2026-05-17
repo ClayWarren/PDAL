@@ -46,11 +46,11 @@ class PointView;
 class PDAL_EXPORT ChamferKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute(); // overrride
+    std::string getName() const override;
+    int execute() override; // overrride
 
 private:
-    virtual void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
     PointViewPtr loadSet(const std::string& filename, PointTableRef table);
 
     std::string m_sourceFile;

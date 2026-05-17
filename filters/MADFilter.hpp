@@ -49,7 +49,7 @@ class PDAL_EXPORT MADFilter : public Filter
 public:
     MADFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_multiplier;
@@ -57,9 +57,9 @@ private:
     Dimension::Id m_dimId;
     double m_madMultiplier;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     MADFilter& operator=(const MADFilter&); // not implemented
     MADFilter(const MADFilter&);            // not implemented

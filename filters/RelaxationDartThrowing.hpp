@@ -50,7 +50,7 @@ public:
     RelaxationDartThrowing& operator=(const RelaxationDartThrowing&) = delete;
     RelaxationDartThrowing(const RelaxationDartThrowing&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_decay;
@@ -61,8 +61,8 @@ private:
     Arg* m_seedArg;
     unsigned m_seed;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
 };
 
 } // namespace pdal

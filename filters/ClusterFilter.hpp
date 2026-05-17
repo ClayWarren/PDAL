@@ -50,7 +50,7 @@ public:
     ClusterFilter& operator=(const ClusterFilter&) = delete;
     ClusterFilter(const ClusterFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     uint64_t m_minPoints;
@@ -58,9 +58,9 @@ private:
     double m_tolerance;
     bool m_is3d;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

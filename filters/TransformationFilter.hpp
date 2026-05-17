@@ -50,7 +50,7 @@ public:
     class Transform;
 
     TransformationFilter();
-    ~TransformationFilter();
+    ~TransformationFilter() override;
     TransformationFilter& operator=(const TransformationFilter&) = delete;
     TransformationFilter(const TransformationFilter&) = delete;
 
@@ -58,11 +58,11 @@ public:
     void doFilter(PointView& view, const Transform& matrix);
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual bool processOne(PointRef& point) override;
-    virtual void filter(PointView& view) override;
-    virtual void spatialReferenceChanged(const SpatialReference& srs) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
 
     std::unique_ptr<Transform> m_matrix;
     SpatialReference m_overrideSrs;

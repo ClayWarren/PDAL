@@ -70,20 +70,20 @@ public:
     {
     }
 
-    std::string getName() const;
+    std::string getName() const override;
     BOX3D bounds() const
     {
         return m_bounds;
     }
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void prepared(PointTableRef table);
-    virtual void done(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void prepared(PointTableRef table) override;
+    void done(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     void parsePointSpec();
     void parseQuerySpec();

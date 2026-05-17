@@ -213,7 +213,7 @@ OGRGeometry* createFromWkb(const std::string& s, std::string& srs)
 
     size_t nBytesRead;
     OGRErr err = OGRGeometryFactory::createFromWkb(
-        s.c_str(), NULL, &newGeom, s.size(), wkbVariantIso, nBytesRead);
+        s.c_str(), nullptr, &newGeom, s.size(), wkbVariantIso, nBytesRead);
     if (!newGeom)
         throw pdal_error("Couldn't convert WKB string to geometry.");
 
@@ -300,7 +300,7 @@ std::vector<Polygon> getPolygons(const OGRSpecOptions& ogr)
         GDAL_OF_READONLY | GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR;
     GDALDataset* ds;
     ds = (GDALDataset*)GDALOpenEx(ogr.datasource.c_str(), openFlags,
-                                  papszDriverOptions, papszOpenOptions, NULL);
+                                  papszDriverOptions, papszOpenOptions, nullptr);
     CSLDestroy(papszDriverOptions);
     CSLDestroy(papszOpenOptions);
     if (!ds)
@@ -341,7 +341,7 @@ std::vector<Polygon> getPolygons(const OGRSpecOptions& ogr)
         {
             // Determine the layer's SRS and assign it to the geometry
             // or transform to that SRS.
-            poLayer = ds->ExecuteSQL(query.c_str(), NULL, dialect.c_str());
+            poLayer = ds->ExecuteSQL(query.c_str(), nullptr, dialect.c_str());
             if (!poLayer)
                 throw pdal_error("Unable to execute OGR SQL query.");
 
@@ -367,7 +367,7 @@ std::vector<Polygon> getPolygons(const OGRSpecOptions& ogr)
     }
 
     std::vector<Polygon> polys;
-    while ((poFeature = poLayer->GetNextFeature()) != NULL)
+    while ((poFeature = poLayer->GetNextFeature()) != nullptr)
     {
         polys.emplace_back(
             reinterpret_cast<OGRGeometryH>(poFeature->GetGeometryRef()));

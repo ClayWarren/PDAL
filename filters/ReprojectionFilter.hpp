@@ -48,20 +48,20 @@ class PDAL_EXPORT ReprojectionFilter : public Filter, public Streamable
 {
 public:
     ReprojectionFilter();
-    ~ReprojectionFilter();
+    ~ReprojectionFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     ReprojectionFilter& operator=(const ReprojectionFilter&) = delete;
     ReprojectionFilter(const ReprojectionFilter&) = delete;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
-    virtual bool processOne(PointRef& point);
-    virtual void spatialReferenceChanged(const SpatialReference& srs);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    void prepared(PointTableRef table) override;
 
     void createTransform(const SpatialReference& srs);
 

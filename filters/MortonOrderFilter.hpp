@@ -46,11 +46,11 @@ public:
     MortonOrderFilter& operator=(const MortonOrderFilter&) = delete;
     MortonOrderFilter(const MortonOrderFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
 
     PointViewSet reverseMorton(PointViewPtr view);
     PointViewSet morton(PointViewPtr view);

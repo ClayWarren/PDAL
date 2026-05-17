@@ -48,13 +48,13 @@ public:
     operator=(const FarthestPointSamplingFilter&) = delete;
     FarthestPointSamplingFilter(const FarthestPointSamplingFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     point_count_t m_count;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
 };
 
 } // namespace pdal

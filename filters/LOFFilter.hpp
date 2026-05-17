@@ -50,14 +50,14 @@ public:
     LOFFilter& operator=(const LOFFilter&) = delete;
     LOFFilter(const LOFFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     size_t m_minpts;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

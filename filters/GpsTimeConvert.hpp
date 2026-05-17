@@ -44,7 +44,7 @@ class PDAL_EXPORT GpsTimeConvert : public Filter, public Streamable
 {
 public:
     GpsTimeConvert() : Filter() {}
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::string m_conversion;
@@ -80,11 +80,11 @@ private:
 
     void testTimeType(std::string& type);
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
-    virtual bool processOne(PointRef& point);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
 
     GpsTimeConvert& operator=(const GpsTimeConvert&); // not implemented
     GpsTimeConvert(const GpsTimeConvert&);            // not implemented

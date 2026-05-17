@@ -46,15 +46,15 @@ class PDAL_EXPORT MongoExpressionFilter : public Filter, public Streamable
 {
 public:
     MongoExpressionFilter();
-    ~MongoExpressionFilter();
+    ~MongoExpressionFilter() override;
 
     std::string getName() const override;
-    virtual bool processOne(PointRef& point) override;
+    bool processOne(PointRef& point) override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void prepared(PointTableRef table) override;
-    virtual PointViewSet run(PointViewPtr view) override;
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     struct Args;
     std::unique_ptr<Args> m_args;

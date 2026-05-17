@@ -44,7 +44,7 @@ namespace pdal
 {
 
 const stats::Summary::EnumMap GetClassifications(Stage& s,
-                                                 point_count_t* count = NULL)
+                                                 point_count_t* count = nullptr)
 {
     StatsFilter stats;
     stats.setInput(s);

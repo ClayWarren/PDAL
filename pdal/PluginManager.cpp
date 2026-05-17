@@ -268,7 +268,7 @@ bool PluginManager<T>::l_loadDynamic(const std::string& driverName)
     if (path.empty())
     {
         m_log->get(LogLevel::Debug) << "No plugin file found for driver '"
-                                    << driverName << "'." << std::endl;
+                                    << driverName << "'." << '\n';
         return false;
     }
     return loadByPath(path);
@@ -286,13 +286,13 @@ template <typename T> bool PluginManager<T>::loadByPath(const std::string& path)
         return true;
 
     m_log->get(LogLevel::Debug)
-        << "Attempting to load plugin '" << path << "'." << std::endl;
+        << "Attempting to load plugin '" << path << "'." << '\n';
     DynamicLibrary* d = loadLibrary(path);
     if (!d)
         return false;
 
     m_log->get(LogLevel::Debug)
-        << "Loaded plugin '" << path << "'." << std::endl;
+        << "Loaded plugin '" << path << "'." << '\n';
     PF_InitFunc initFunc;
 
     // This awfulness is to work around a warning that some compilers
@@ -303,12 +303,12 @@ template <typename T> bool PluginManager<T>::loadByPath(const std::string& path)
     {
         m_log->get(LogLevel::Debug) << "No symbol 'PF_initPlugin' found "
                                        "in plugin '"
-                                    << path << "'." << std::endl;
+                                    << path << "'." << '\n';
         return false;
     }
     initFunc();
     m_log->get(LogLevel::Debug)
-        << "Initialized plugin '" << path << "'." << std::endl;
+        << "Initialized plugin '" << path << "'." << '\n';
 
     return true;
 }

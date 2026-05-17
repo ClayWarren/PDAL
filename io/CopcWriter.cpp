@@ -306,7 +306,7 @@ void CopcWriter::prepared(PointTableRef table)
         log()->get(LogLevel::Info)
             << getName() << ": Writing dimension " << dim.m_name << "("
             << Dimension::interpretationName(dim.m_dimType.m_type) << ") "
-            << " to COPC extra bytes." << std::endl;
+            << " to COPC extra bytes." << '\n';
     }
 }
 

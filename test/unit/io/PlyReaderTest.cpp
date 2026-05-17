@@ -129,13 +129,13 @@ TEST(PlyReader, ReadBinaryStream)
     class Checker : public Filter, public Streamable
     {
     public:
-        std::string getName() const
+        std::string getName() const override
         {
             return "checker";
         }
 
     private:
-        bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             static int cnt = 0;
             if (cnt == 0)

@@ -85,25 +85,25 @@ void HagDemFilter::ready(PointTableRef table)
     m_raster.reset(new gdal::Raster(m_rasterName));
 
     log()->get(LogLevel::Debug)
-        << "Nodata HAG override was set to " << m_noDataHeight << std::endl;
+        << "Nodata HAG override was set to " << m_noDataHeight << '\n';
 
     if (m_zeroGround)
         log()->get(LogLevel::Debug)
-            << "Setting ground-classified points to 0 HAG" << std::endl;
+            << "Setting ground-classified points to 0 HAG" << '\n';
 
     if (m_minClamp != (std::numeric_limits<double>::min)())
         log()->get(LogLevel::Debug)
-            << "min_clamp set to " << m_minClamp << std::endl;
+            << "min_clamp set to " << m_minClamp << '\n';
 
     if (m_maxClamp != (std::numeric_limits<double>::max)())
         log()->get(LogLevel::Debug)
-            << "max_clamp set to " << m_maxClamp << std::endl;
+            << "max_clamp set to " << m_maxClamp << '\n';
 
     gdal::GDALError response = m_raster->open();
     if (response == gdal::GDALError::NotOpen)
     {
         log()->get(LogLevel::Error)
-            << "Unable to open raster " << m_rasterName << std::endl;
+            << "Unable to open raster " << m_rasterName << '\n';
         throwError(m_raster->errorMsg());
     }
 }

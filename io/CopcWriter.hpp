@@ -47,16 +47,16 @@ class PDAL_EXPORT CopcWriter : public Writer
 {
 public:
     CopcWriter();
-    virtual ~CopcWriter();
+    ~CopcWriter() override;
     std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize(PointTableRef table) override;
-    virtual void prepared(PointTableRef table) override;
-    virtual void ready(PointTableRef table) override;
-    virtual void write(const PointViewPtr view) override;
-    virtual void done(PointTableRef table) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
 
     void fillForwardList();
     template <typename T>

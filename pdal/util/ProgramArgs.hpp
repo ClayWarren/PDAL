@@ -427,7 +427,7 @@ public:
 
       \param s  Value to set.
     */
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         if (m_set)
         {
@@ -467,7 +467,7 @@ public:
       as if no command-line parsing had occurred.
       \note  For testing.  Not intended to be called from user code.
     */
-    virtual void reset()
+    void reset() override
     {
         m_var = m_defaultVal;
         m_set = false;
@@ -483,7 +483,7 @@ public:
 
       \param vals  The list of command-line args.
     */
-    virtual void assignPositional(ArgValList& vals)
+    void assignPositional(ArgValList& vals) override
     {
         if (m_positional == PosType::None || m_set)
             return;
@@ -506,7 +506,7 @@ public:
 
       \return  Whether a default was provided.
     */
-    virtual bool defaultProvided() const
+    bool defaultProvided() const override
     {
         return m_defaultProvided;
     }
@@ -516,7 +516,7 @@ public:
 
       \return  Default value as a string.
     */
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         return Utils::toString(m_defaultVal);
     }
@@ -580,7 +580,7 @@ public:
       \return false  Boolean values don't need a value.
       \note  Not intended to be called from user code.
     */
-    virtual bool needsValue() const
+    bool needsValue() const override
     {
         return false;
     }
@@ -595,7 +595,7 @@ public:
 
       \param s  Value to set [ignored].
     */
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         if (s.size() && s[0] == '-')
         {
@@ -618,7 +618,7 @@ public:
       as if no command-line parsing had occurred.
       \note  For testing.  Not intended to be called from user code.
     */
-    virtual void reset()
+    void reset() override
     {
         m_val = m_defaultVal;
         m_set = false;
@@ -631,7 +631,7 @@ public:
       Throws an exception to indicate that boolean arguments can't
       positional.
     */
-    virtual Arg& setPositional()
+    Arg& setPositional() override
     {
         throw arg_error("Boolean argument '" + m_longname +
                         "' can't be positional.");
@@ -644,7 +644,7 @@ public:
       Throws an exception to indicate that boolean arguments can't
       positional.
     */
-    virtual Arg& setOptionalPositional()
+    Arg& setOptionalPositional() override
     {
         throw arg_error("Boolean argument '" + m_longname +
                         "' can't be positional.");
@@ -655,7 +655,7 @@ public:
 
       \return  Whether a default was provided.
     */
-    virtual bool defaultProvided() const
+    bool defaultProvided() const override
     {
         return m_defaultProvided;
     }
@@ -664,7 +664,7 @@ public:
 
       \return  Default value as a string.
     */
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         return Utils::toString(m_defaultVal);
     }
@@ -708,7 +708,7 @@ public:
 
       \param vals  The list of command-line args.
     */
-    virtual void assignPositional(ArgValList& vals)
+    void assignPositional(ArgValList& vals) override
     {
         if (m_positional == PosType::None || m_set)
             return;
@@ -742,7 +742,7 @@ public:
 
       \return  Whether a default was provided.
     */
-    virtual bool defaultProvided() const
+    bool defaultProvided() const override
     {
         return m_defaultProvided;
     }
@@ -806,7 +806,7 @@ public:
 
       \param s  Value to set.
     */
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         T var;
 
@@ -840,7 +840,7 @@ public:
       as if no command-line parsing had occurred.
       \note  For testing.  Not intended to be called from user code.
     */
-    virtual void reset()
+    void reset() override
     {
         m_var = m_defaultVal;
         m_set = false;
@@ -853,7 +853,7 @@ public:
 
       \return  Default value as a string.
     */
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         std::string s;
 
@@ -920,7 +920,7 @@ public:
 
       \param s  Value to set.
     */
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         RegEx val(s);
         m_rawVal = s;
@@ -938,7 +938,7 @@ public:
       as if no command-line parsing had occurred.
       \note  For testing.  Not intended to be called from user code.
     */
-    virtual void reset()
+    void reset() override
     {
         m_var = m_defaultVal;
         m_set = false;
@@ -951,7 +951,7 @@ public:
 
       \return  Default value as a string.
     */
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         std::string s;
 
@@ -1021,7 +1021,7 @@ public:
 
       \param s  Value to set.
     */
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         std::vector<std::string> slist = Utils::split2(s, ',');
         for (auto& ts : slist)
@@ -1045,7 +1045,7 @@ public:
       as if no command-line parsing had occurred.
       \note  For testing.  Not intended to be called from user code.
     */
-    virtual void reset()
+    void reset() override
     {
         m_var = m_defaultVal;
         m_set = false;
@@ -1058,7 +1058,7 @@ public:
 
       \return  Default value as a string.
     */
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         std::string s;
 
@@ -1418,16 +1418,16 @@ public:
             std::string name = i.first;
             out << std::string(indent, ' ');
             if (skipfirst)
-                out << name << std::endl;
+                out << name << '\n';
             else
             {
                 name.resize(namelen, ' ');
                 out << name << std::string(postNameSpacing, ' ') << descrip[0]
-                    << std::endl;
+                    << '\n';
             }
             for (size_t ii = 1; ii < descrip.size(); ++ii)
                 out << std::string(secondIndent, ' ') << descrip[ii]
-                    << std::endl;
+                    << '\n';
         }
     }
 
@@ -1452,14 +1452,14 @@ public:
             out << std::string(nameIndent, ' ') << a->longname();
             if (a->defaultProvided())
                 out << " [" << a->defaultVal() << "]";
-            out << std::endl;
+            out << '\n';
             std::vector<std::string> descrip =
                 Utils::wordWrap(a->description(), width);
             if (descrip.empty())
                 descrip.push_back("<no description available>");
             for (std::string& s : descrip)
-                out << std::string(descripIndent, ' ') << s << std::endl;
-            out << std::endl;
+                out << std::string(descripIndent, ' ') << s << '\n';
+            out << '\n';
         }
     }
 
@@ -1561,7 +1561,7 @@ private:
         auto si = m_longargs.find(s);
         if (si != m_longargs.end())
             return si->second;
-        return NULL;
+        return nullptr;
     }
 
     /*
@@ -1576,7 +1576,7 @@ private:
         auto si = m_shortargs.find(s);
         if (si != m_shortargs.end())
             return si->second;
-        return NULL;
+        return nullptr;
     }
 
     /*

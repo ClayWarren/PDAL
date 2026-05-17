@@ -115,15 +115,15 @@ TEST(PointTable, userView)
         double m_z;
 
     public:
-        PointId addPoint()
+        PointId addPoint() override
         {
             return 0;
         }
-        char* getPoint(PointId idx)
+        char* getPoint(PointId idx) override
         {
-            return NULL;
+            return nullptr;
         }
-        void setFieldInternal(Dimension::Id id, PointId idx, const void* value)
+        void setFieldInternal(Dimension::Id id, PointId idx, const void* value) override
         {
             if (id == Dimension::Id::X)
                 m_x = *(const double*)value;
@@ -132,7 +132,7 @@ TEST(PointTable, userView)
             else if (id == Dimension::Id::Z)
                 m_z = *(const double*)value;
         }
-        void getFieldInternal(Dimension::Id id, PointId idx, void* value) const
+        void getFieldInternal(Dimension::Id id, PointId idx, void* value) const override
         {
             if (id == Dimension::Id::X)
                 *(double*)value = m_x;

@@ -175,7 +175,7 @@ void SupervoxelFilter::filter(PointView& view)
     KD3Index& kdi = view.build3dIndex();
     size_t ncluster = estimateClusterCount(view);
     log()->get(LogLevel::Info)
-        << getName() << ": number of clusters: " << ncluster << std::endl;
+        << getName() << ": number of clusters: " << ncluster << '\n';
     DisjointSet djset(n_points);
     std::set<PointId> roots;
     std::vector<bool> visited(n_points, false);
@@ -191,7 +191,7 @@ void SupervoxelFilter::filter(PointView& view)
 
     double lambda = lambda0(view, G);
     log()->get(LogLevel::Debug)
-        << getName() << ": initial lambda value: " << lambda << std::endl;
+        << getName() << ": initial lambda value: " << lambda << '\n';
 
     ////////////////////////////
     // Fusion based minimization
@@ -270,7 +270,7 @@ void SupervoxelFilter::filter(PointView& view)
             log()->get(LogLevel::Warning) << getName()
                                           << ": lambda "
                                              "reached it limit."
-                                          << std::endl;
+                                          << '\n';
             break;
         }
     }

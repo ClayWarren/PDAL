@@ -50,12 +50,12 @@ class PDAL_EXPORT HexBin : public Filter, public Streamable
 {
 public:
     HexBin();
-    ~HexBin();
+    ~HexBin() override;
 
     HexBin& operator=(const HexBin&) = delete;
     HexBin(const HexBin&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
     hexer::BaseGrid* grid() const;
 
 private:
@@ -77,13 +77,13 @@ private:
     SpatialReference m_srs;
     std::string m_driver;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void ready(PointTableRef table);
-    virtual void filter(PointView& view);
-    virtual bool processOne(PointRef& point);
-    virtual void spatialReferenceChanged(const SpatialReference& srs);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void ready(PointTableRef table) override;
+    void filter(PointView& view) override;
+    bool processOne(PointRef& point) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    void done(PointTableRef table) override;
     bool createGrid();
 };
 

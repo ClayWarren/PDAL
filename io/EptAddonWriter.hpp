@@ -65,7 +65,7 @@ class PDAL_EXPORT EptAddonWriter : public NoFilenameWriter
 {
 public:
     EptAddonWriter();
-    virtual ~EptAddonWriter();
+    ~EptAddonWriter() override;
 
     std::string getName() const override;
 
@@ -73,11 +73,11 @@ private:
     struct Args;
     std::unique_ptr<Args> m_args;
 
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void prepared(PointTableRef table) override;
-    virtual void ready(PointTableRef table) override;
-    virtual void write(const PointViewPtr view) override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
 
     struct HierarchyWriter;
     void writeOne(const PointViewPtr view, const ept::Addon& addon,

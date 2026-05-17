@@ -87,12 +87,12 @@ PointViewSet MADFilter::run(PointViewPtr view)
 
     double median = estimate_median(z);
     log()->get(LogLevel::Debug)
-        << getName() << " estimated median value: " << median << std::endl;
+        << getName() << " estimated median value: " << median << '\n';
 
     std::transform(z.begin(), z.end(), z.begin(),
                    [median](double v) { return std::fabs(v - median); });
     double mad = estimate_median(z) * m_madMultiplier;
-    log()->get(LogLevel::Debug) << getName() << " mad " << mad << std::endl;
+    log()->get(LogLevel::Debug) << getName() << " mad " << mad << '\n';
 
     for (PointId j = 0; j < view->size(); ++j)
     {
@@ -105,7 +105,7 @@ PointViewSet MADFilter::run(PointViewPtr view)
 
     log()->get(LogLevel::Debug)
         << getName() << " cropping " << m_dimName << " in the range ("
-        << low_fence << "," << hi_fence << ")" << std::endl;
+        << low_fence << "," << hi_fence << ")" << '\n';
 
     PointViewSet viewSet;
     viewSet.insert(output);

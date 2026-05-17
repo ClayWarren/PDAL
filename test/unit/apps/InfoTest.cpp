@@ -60,8 +60,8 @@ void test(const std::string options, const std::string validation)
 
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
     EXPECT_NE(output.find(validation), std::string::npos)
-        << "Found: '" << output << "'" << std::endl
-        << "expected: '" << validation << "'" << std::endl;
+        << "Found: '" << output << "'" << '\n'
+        << "expected: '" << validation << "'" << '\n';
 }
 
 TEST(Info, point)
@@ -247,6 +247,6 @@ TEST(Info, stac)
 
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
     EXPECT_NE(output.find(validation), std::string::npos)
-        << "Found: '" << output << "'" << std::endl
-        << "expected: '" << validation << "'" << std::endl;
+        << "Found: '" << output << "'" << '\n'
+        << "expected: '" << validation << "'" << '\n';
 }

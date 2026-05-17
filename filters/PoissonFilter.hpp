@@ -46,7 +46,7 @@ public:
     PoissonFilter& operator=(const PoissonFilter&) = delete;
     PoissonFilter(const PoissonFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     bool m_density;
@@ -54,9 +54,9 @@ private:
     bool m_normalsProvided;
     bool m_doColor;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual PointViewSet run(PointViewPtr view);
-    virtual void addArgs(ProgramArgs& args);
+    void addDimensions(PointLayoutPtr layout) override;
+    PointViewSet run(PointViewPtr view) override;
+    void addArgs(ProgramArgs& args) override;
 };
 
 } // namespace pdal

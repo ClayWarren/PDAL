@@ -143,7 +143,7 @@ void TileKernel::checkReaders(const Readers& readers)
                         << "No 'out_srs' specified "
                            "and input files have multiple SRSs.  Using SRS of "
                            "first input file as output SRS."
-                        << std::endl;
+                        << '\n';
                     warned = true;
                     m_outSrs = srs;
                 }

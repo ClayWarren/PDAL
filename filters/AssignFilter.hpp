@@ -46,18 +46,18 @@ class PDAL_EXPORT AssignFilter : public Filter, public Streamable
 {
 public:
     AssignFilter();
-    ~AssignFilter();
+    ~AssignFilter() override;
 
-    std::string getName() const
+    std::string getName() const override
     {
         return "filters.assign";
     }
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
 
     AssignFilter& operator=(const AssignFilter&) = delete;
     AssignFilter(const AssignFilter&) = delete;

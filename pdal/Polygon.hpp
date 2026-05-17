@@ -52,7 +52,7 @@ class PDAL_EXPORT Polygon : public Geometry
 
 public:
     Polygon();
-    virtual ~Polygon() = default;
+    ~Polygon() override = default;
 
     Polygon(const std::string& wkt_or_json,
             SpatialReference ref = SpatialReference());
@@ -69,8 +69,8 @@ public:
     Polygon(const Polygon& poly);
     Polygon& operator=(const Polygon& src);
 
-    virtual void modified() override;
-    virtual void clear() override;
+    void modified() override;
+    void clear() override;
     void simplify(double distance_tolerance, double area_tolerance,
                   bool preserve_topology = true);
     double area() const;

@@ -51,7 +51,7 @@ public:
     LloydKMeansFilter& operator=(const LloydKMeansFilter&) = delete;
     LloydKMeansFilter(const LloydKMeansFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     uint16_t m_k;
@@ -59,10 +59,10 @@ private:
     StringList m_dimStringList;
     Dimension::IdList m_dimIdList;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

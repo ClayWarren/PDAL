@@ -62,10 +62,10 @@ public:
     std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual PointViewSet run(PointViewPtr view) override;
-    virtual void ready(PointTableRef) override;
-    virtual bool processOne(PointRef& point) override;
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
+    void ready(PointTableRef) override;
+    bool processOne(PointRef& point) override;
 
     bool voxelize(PointRef& point);
 

@@ -79,11 +79,11 @@ protected:
     SpatialReference m_overrideSrs;
     SpatialReference m_defaultSrs;
 
-    virtual void setSpatialReference(MetadataNode& m,
-                                     const SpatialReference& srs);
+    void setSpatialReference(MetadataNode& m,
+                                     const SpatialReference& srs) override;
 
 private:
-    virtual PointViewSet run(PointViewPtr view)
+    PointViewSet run(PointViewPtr view) override
     {
         PointViewSet viewSet;
 
@@ -91,13 +91,13 @@ private:
         viewSet.insert(view);
         return viewSet;
     }
-    virtual void l_initialize(PointTableRef table) final;
-    virtual void l_addArgs(ProgramArgs& args) final;
-    virtual void l_prepared(PointTableRef table) final;
+    void l_initialize(PointTableRef table) final;
+    void l_addArgs(ProgramArgs& args) final;
+    void l_prepared(PointTableRef table) final;
 
-    virtual void assignParsedOptions() final;
-    virtual const expr::ConditionalExpression* whereExpr() const;
-    virtual WhereMergeMode mergeMode() const;
+    void assignParsedOptions() final;
+    const expr::ConditionalExpression* whereExpr() const override;
+    WhereMergeMode mergeMode() const override;
     virtual point_count_t read(PointViewPtr /*view*/, point_count_t /*num*/)
     {
         return 0;

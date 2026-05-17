@@ -284,31 +284,31 @@ std::istream& operator>>(std::istream& in, PcdHeader& header)
 
 std::ostream& operator<<(std::ostream& out, PcdHeader& header)
 {
-    out << "VERSION " << header.m_version << std::endl;
+    out << "VERSION " << header.m_version << '\n';
 
     out << "FIELDS";
     for (auto i : header.m_fields)
         out << " " << Utils::tolower(i.m_label);
-    out << std::endl;
+    out << '\n';
 
     out << "SIZE";
     for (auto i : header.m_fields)
         out << " " << i.m_size;
-    out << std::endl;
+    out << '\n';
 
     out << "TYPE";
     for (auto i : header.m_fields)
         out << " " << i.m_type;
-    out << std::endl;
+    out << '\n';
 
     out << "COUNT";
     for (auto i : header.m_fields)
         out << " " << i.m_count;
-    out << std::endl;
+    out << '\n';
 
-    out << "WIDTH " << header.m_width << std::endl;
+    out << "WIDTH " << header.m_width << '\n';
 
-    out << "HEIGHT " << header.m_height << std::endl;
+    out << "HEIGHT " << header.m_height << '\n';
 
     if (header.m_version == PcdVersion::PCD_V7)
     {
@@ -318,12 +318,12 @@ std::ostream& operator<<(std::ostream& out, PcdHeader& header)
         out << "VIEWPOINT " << std::fixed << std::noshowpoint;
         out << orig.x() << " " << orig.y() << " " << orig.z() << " ";
         out << orient.w() << " " << orient.x() << " " << orient.y() << " "
-            << orient.z() << std::endl;
+            << orient.z() << '\n';
     }
 
-    out << "POINTS " << header.m_pointCount << std::endl;
+    out << "POINTS " << header.m_pointCount << '\n';
 
-    out << "DATA " << header.m_dataStorage << std::endl;
+    out << "DATA " << header.m_dataStorage << '\n';
 
     return out;
 }

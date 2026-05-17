@@ -39,16 +39,16 @@ class ZsmoothFilter : public Filter
     struct Private;
 
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     ZsmoothFilter();
-    ~ZsmoothFilter();
+    ~ZsmoothFilter() override;
 
 private:
-    void addArgs(ProgramArgs& args);
-    void addDimensions(PointLayoutPtr layout);
-    void prepared(PointTableRef table);
-    void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     std::unique_ptr<Private> m_p;
 };

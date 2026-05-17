@@ -56,7 +56,7 @@ class PDAL_EXPORT OutlierFilter : public pdal::Filter
 public:
     OutlierFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::string m_method;
@@ -66,11 +66,11 @@ private:
     double m_multiplier;
     uint8_t m_class;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
     Indices processRadius(PointViewPtr inView);
     Indices processStatistical(PointViewPtr inView);
-    virtual PointViewSet run(PointViewPtr view);
+    PointViewSet run(PointViewPtr view) override;
 
     OutlierFilter& operator=(const OutlierFilter&); // not implemented
     OutlierFilter(const OutlierFilter&);            // not implemented

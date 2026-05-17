@@ -76,7 +76,7 @@ void ShellFilter::initialize()
 PointViewSet ShellFilter::run(PointViewPtr view)
 {
     log()->get(LogLevel::Debug)
-        << "running command : '" << m_command << "'" << std::endl;
+        << "running command : '" << m_command << "'" << '\n';
 
     int status = Utils::run_shell_command(m_command.c_str(), m_command_output);
     if (status)
@@ -88,8 +88,8 @@ PointViewSet ShellFilter::run(PointViewPtr view)
     }
 
     log()->get(LogLevel::Debug)
-        << "command output: '" << m_command_output << "'" << std::endl;
-    log()->get(LogLevel::Debug) << "status: '" << status << "'" << std::endl;
+        << "command output: '" << m_command_output << "'" << '\n';
+    log()->get(LogLevel::Debug) << "status: '" << status << "'" << '\n';
 
     PointViewSet views;
     views.insert(view);

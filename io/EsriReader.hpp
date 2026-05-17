@@ -63,7 +63,7 @@ class PDAL_EXPORT EsriReader : public Reader, public Streamable
 {
 public:
     EsriReader(std::unique_ptr<i3s::Interface> interface);
-    ~EsriReader();
+    ~EsriReader() override;
 
 private:
     struct Args;
@@ -89,12 +89,12 @@ private:
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_contentsCv;
 
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize(PointTableRef table) override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void ready(PointTableRef table) override;
-    virtual point_count_t read(PointViewPtr view, point_count_t count) override;
-    virtual bool processOne(PointRef&) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    bool processOne(PointRef&) override;
     void createView(std::string localUrl, int nodeIndex, PointView& view);
     void traverseTree(i3s::PagePtr page, int node);
     void load(int nodeId);

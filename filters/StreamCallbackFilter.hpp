@@ -45,7 +45,7 @@ namespace pdal
 class PDAL_EXPORT StreamCallbackFilter : public Filter, public Streamable
 {
 public:
-    std::string getName() const
+    std::string getName() const override
     {
         return "filters.streamcallback";
     }
@@ -59,7 +59,7 @@ public:
     }
 
 private:
-    virtual void filter(PointView& view)
+    void filter(PointView& view) override
     {
         PointRef p(view, 0);
         for (PointId idx = 0; idx < view.size(); ++idx)
@@ -69,7 +69,7 @@ private:
         }
     }
 
-    virtual bool processOne(PointRef& point)
+    bool processOne(PointRef& point) override
     {
         if (m_callback)
             return m_callback(point);

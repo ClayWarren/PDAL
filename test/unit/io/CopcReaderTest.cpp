@@ -225,7 +225,7 @@ TEST(CopcReaderTest, boundedRead2d)
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
             ASSERT_TRUE(bounds.contains(x, y))
-                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
+                << bounds << ": " << x << ", " << y << ", " << z << '\n';
             ASSERT_TRUE(o < 4);
         }
     }
@@ -284,7 +284,7 @@ TEST(CopcReaderTest, boundedRead3d)
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
             ASSERT_TRUE(bounds.contains(x, y, z))
-                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
+                << bounds << ": " << x << ", " << y << ", " << z << '\n';
             ASSERT_TRUE(o < 4);
         }
     }
@@ -355,12 +355,12 @@ TEST(CopcReaderTest, stream)
         }
 
     protected:
-        virtual void reset() override
+        void reset() override
         {
             m_offset += numPoints();
         }
 
-        virtual char* getPoint(PointId index) override
+        char* getPoint(PointId index) override
         {
             return m_view.getOrAddPoint(m_offset + index);
         }

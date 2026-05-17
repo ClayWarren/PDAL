@@ -51,15 +51,15 @@ public:
     EstimateRankFilter& operator=(const EstimateRankFilter&) = delete;
     EstimateRankFilter(const EstimateRankFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_knn;
     double m_thresh;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

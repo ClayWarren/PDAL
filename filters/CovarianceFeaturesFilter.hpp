@@ -49,7 +49,7 @@ public:
     operator=(const CovarianceFeaturesFilter&) = delete;
     CovarianceFeaturesFilter(const CovarianceFeaturesFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     enum class Mode
@@ -70,10 +70,10 @@ private:
     Arg* m_radiusArg;
     bool m_optimal;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view);
-    virtual void prepared(PointTableRef table);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
+    void prepared(PointTableRef table) override;
 
     void setDimensionality(PointView& view, const PointId& id,
                            const KD3Index& kid);

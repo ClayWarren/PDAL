@@ -262,7 +262,7 @@ void StatsFilter::prepared(PointTableRef table)
                 getWarn() << "Dimension '" << s
                           << "' listed in --dimensions "
                              "option does not exist.  Ignoring."
-                          << std::endl;
+                          << '\n';
             else
                 dims[s] = Summary::NoEnum;
         }
@@ -275,7 +275,7 @@ void StatsFilter::prepared(PointTableRef table)
             getWarn() << "Dimension '" << s
                       << "' listed in --enumerate option "
                          "does not exist.  Ignoring."
-                      << std::endl;
+                      << '\n';
         else
             dims[s] = Summary::Enumerate;
     }
@@ -287,7 +287,7 @@ void StatsFilter::prepared(PointTableRef table)
             getWarn() << "Dimension '" << s
                       << "' listed in --count option "
                          "does not exist.  Ignoring."
-                      << std::endl;
+                      << '\n';
         else
             dims[s] = Summary::Count;
     }
@@ -299,7 +299,7 @@ void StatsFilter::prepared(PointTableRef table)
             getWarn() << "Dimension '" << s
                       << "' listed in --global option "
                          "does not exist.  Ignoring."
-                      << std::endl;
+                      << '\n';
         else
             dims[s] = Summary::Global;
     }

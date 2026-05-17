@@ -82,7 +82,7 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
         log()->get(LogLevel::Debug)
             << "Input point cloud has fewer points " << np
             << " than requested output size of " << m_maxSize
-            << ". Terminating." << std::endl;
+            << ". Terminating." << '\n';
         viewSet.insert(inView);
         return viewSet;
     }
@@ -120,7 +120,7 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
             log()->get(LogLevel::Debug)
                 << "Minimum radius of " << m_terminalRadius << " reached at "
                 << radius << ". Terminating with " << finalIds.size()
-                << " points." << std::endl;
+                << " points." << '\n';
             break;
         }
 
@@ -188,7 +188,7 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
             radius = m_decay * radius;
             log()->get(LogLevel::Debug2)
                 << "Currently have " << finalIds.size()
-                << " ids, reducing radius to " << radius << std::endl;
+                << " ids, reducing radius to " << radius << '\n';
         }
     }
 

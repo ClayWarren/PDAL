@@ -59,15 +59,15 @@ public:
     HagDemFilter& operator=(const HagDemFilter&) = delete;
     HagDemFilter(const HagDemFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual void filter(PointView& view);
-    virtual bool processOne(PointRef& point);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    void filter(PointView& view) override;
+    bool processOne(PointRef& point) override;
 
     std::unique_ptr<gdal::Raster> m_raster;
     std::string m_rasterName;

@@ -167,7 +167,7 @@ std::string SpatialReference::getPROJJSON() const
 
 #if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 1, 0)
     char* poJSON(nullptr);
-    char** papszOptions = NULL;
+    char** papszOptions = nullptr;
     papszOptions = CSLSetNameValue(papszOptions, "INDENTATION_WIDTH", "2");
     papszOptions = CSLSetNameValue(papszOptions, "SCHEMA", "");
     poSRS->exportToPROJJSON(&poJSON, papszOptions);
@@ -209,7 +209,7 @@ void SpatialReference::set(std::string v)
         return;
     }
 
-    OGRSpatialReference srs(NULL);
+    OGRSpatialReference srs(nullptr);
 
     CPLErrorReset();
     const char* input = v.c_str();
@@ -238,7 +238,7 @@ std::string SpatialReference::getProj4() const
 
     const char* poWKT = m_wkt.c_str();
 
-    OGRSpatialReference srs(NULL);
+    OGRSpatialReference srs(nullptr);
     if (OGRERR_NONE == srs.importFromWkt(const_cast<char**>(&poWKT)))
     {
         char* proj4 = nullptr;
@@ -261,7 +261,7 @@ std::string SpatialReference::getVertical() const
     if (!poSRS)
         return tmp;
 
-    char* pszWKT = NULL;
+    char* pszWKT = nullptr;
 
     OGR_SRSNode* node = poSRS->GetAttrNode("VERT_CS");
     if (node && poSRS)

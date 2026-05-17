@@ -61,8 +61,8 @@ TEST(RadiusAssignFilterTest, basic_usage)
         }
         // Check that some points are updated
         EXPECT_TRUE(nbUpdatedPoints[ii] == nbExpectedUpdatedPoints[ii])
-            << "Found: '" << nbUpdatedPoints[ii] << "'" << std::endl
-            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << std::endl;
+            << "Found: '" << nbUpdatedPoints[ii] << "'" << '\n'
+            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << '\n';
     }
 }
 
@@ -120,8 +120,8 @@ TEST(RadiusAssignFilterTest, with_z_limit)
         }
         // Check that some points are updated
         EXPECT_TRUE(nbUpdatedPoints[ii] == nbExpectedUpdatedPoints[ii])
-            << "Found: '" << nbUpdatedPoints[ii] << "'" << std::endl
-            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << std::endl;
+            << "Found: '" << nbUpdatedPoints[ii] << "'" << '\n'
+            << "expected: '" << nbExpectedUpdatedPoints[ii] << "'" << '\n';
     }
 }
 
@@ -172,8 +172,8 @@ TEST(RadiusAssignFilterTest, with_src_domain)
     }
     // Check that some points are updated
     EXPECT_TRUE(nbUpdatedPoints == 6)
-        << "Found: '" << nbUpdatedPoints << "'" << std::endl
-        << "expected: '5'" << std::endl;
+        << "Found: '" << nbUpdatedPoints << "'" << '\n'
+        << "expected: '5'" << '\n';
 }
 
 TEST(RadiusAssignFilterTest, missing_param)

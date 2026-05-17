@@ -54,7 +54,7 @@ private:
 public:
     VSIIStream(const std::string& filename, std::ios::openmode mode,
                std::size_t bufferSize = 0);
-    virtual ~VSIIStream();
+    ~VSIIStream() override;
 
     VSIIStream(const VSIIStream&) = delete;
     VSIIStream& operator=(const VSIIStream&) = delete;
@@ -70,7 +70,7 @@ private:
 public:
     VSIOStream(const std::string& filename, std::ios::openmode mode,
                std::size_t bufferSize = 0);
-    virtual ~VSIOStream();
+    ~VSIOStream() override;
 
     VSIOStream(const VSIOStream&) = delete;
     VSIOStream& operator=(const VSIOStream&) = delete;

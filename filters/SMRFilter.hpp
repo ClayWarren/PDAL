@@ -48,11 +48,11 @@ class PDAL_EXPORT SMRFilter : public Filter
 {
 public:
     SMRFilter();
-    ~SMRFilter();
+    ~SMRFilter() override;
     SMRFilter& operator=(const SMRFilter&) = delete;
     SMRFilter(const SMRFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_rows;
@@ -64,11 +64,11 @@ private:
     uint8_t m_otherClass;
     bool m_onlyGround;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     void classifyGround(PointViewPtr, std::vector<double>&);
     std::vector<int> createLowMask(std::vector<double> const&);

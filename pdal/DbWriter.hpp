@@ -75,9 +75,9 @@ protected:
     }
 
 private:
-    void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
 
     DimTypeList m_dimTypes;
     XMLDimList m_dbDims;

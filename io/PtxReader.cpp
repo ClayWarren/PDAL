@@ -278,7 +278,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
             {
                 log()->get(LogLevel::Error)
                     << "Line " << line << " in '" << m_filename
-                    << "' contains an invalid header!" << std::endl;
+                    << "' contains an invalid header!" << '\n';
                 throw;
             }
 
@@ -304,7 +304,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
                 << fields.size() << " fields when " << m_dimensions.size()
                 << " were expected.  "
                    "Ignoring."
-                << std::endl;
+                << '\n';
             continue;
         }
 
@@ -324,7 +324,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
                        "field '"
                     << fields[i] << "' to numeric value on line " << line
                     << " in '" << m_filename << "'. " << status.what()
-                    << " Setting to 0." << std::endl;
+                    << " Setting to 0." << '\n';
                 value = 0.0;
             }
 
@@ -353,7 +353,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
             {
                 log()->get(LogLevel::Debug)
                     << "Line " << line << " in '" << m_filename
-                    << "' is a missing point. Ignoring." << std::endl;
+                    << "' is a missing point. Ignoring." << '\n';
                 continue;
             }
         }
@@ -377,7 +377,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
         log()->get(LogLevel::Warning)
             << "Expected " << (header.m_columns * header.m_rows)
             << " points but only " << countPerHeader << " were found."
-            << std::endl;
+            << '\n';
     }
 
     return count;

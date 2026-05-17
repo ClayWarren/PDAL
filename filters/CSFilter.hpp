@@ -45,12 +45,12 @@ class PDAL_EXPORT CSFilter : public Filter
 {
 public:
     CSFilter();
-    ~CSFilter();
+    ~CSFilter() override;
 
     CSFilter& operator=(const CSFilter&) = delete;
     CSFilter(const CSFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<CSArgs> m_args;
@@ -58,11 +58,11 @@ private:
     uint8_t m_otherClass;
     bool m_onlyGround;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     void classifyGround(PointViewPtr, std::vector<double>&);
 };

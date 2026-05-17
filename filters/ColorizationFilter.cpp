@@ -183,7 +183,7 @@ void ColorizationFilter::ready(PointTableRef table)
             error == GDALError::NotInvertible)
         {
             log()->get(LogLevel::Warning)
-                << getName() << ": " << m_raster->errorMsg() << std::endl;
+                << getName() << ": " << m_raster->errorMsg() << '\n';
         }
         else
         {

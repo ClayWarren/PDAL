@@ -44,11 +44,11 @@ class PDAL_EXPORT VectorPointTable : public SimplePointTable
 public:
     VectorPointTable(PointLayout& layout) : SimplePointTable(layout) {}
 
-    virtual PointId addPoint() override
+    PointId addPoint() override
     {
         return 0;
     }
-    virtual bool supportsView() const override
+    bool supportsView() const override
     {
         return true;
     }
@@ -62,7 +62,7 @@ public:
     }
 
 protected:
-    virtual char* getPoint(PointId id) override
+    char* getPoint(PointId id) override
     {
         return m_buffer.data() + pointsToBytes(id);
     }

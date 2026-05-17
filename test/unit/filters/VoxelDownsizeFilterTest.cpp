@@ -144,11 +144,11 @@ void stream_test(std::string mode)
         int m_count = 0;
 
     public:
-        std::string getName() const
+        std::string getName() const override
         {
             return "readers.stream";
         }
-        bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             constexpr std::array<std::array<double, 2>, 9> a{{
                 {2, 2},
@@ -176,7 +176,7 @@ void stream_test(std::string mode)
     public:
         TestFilter(const std::string& mode) : m_mode(mode) {}
 
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.testfilter";
         }
@@ -185,7 +185,7 @@ void stream_test(std::string mode)
         std::string m_mode;
         point_count_t m_count = 0;
 
-        virtual bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             EXPECT_LT(m_count, 5U);
 

@@ -48,7 +48,7 @@ class PDAL_EXPORT SmrmsgReader : public Reader, public Streamable
 public:
     SmrmsgReader() : Reader() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<ILeStream> m_stream;
@@ -57,11 +57,11 @@ private:
     point_count_t m_index;
     Dimension::IdList m_dims;
 
-    virtual bool processOne(PointRef& point);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
+    bool processOne(PointRef& point) override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
     virtual bool eof();
 
     void seek(PointId idx);

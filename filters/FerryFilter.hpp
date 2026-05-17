@@ -62,15 +62,15 @@ class PDAL_EXPORT FerryFilter : public Filter, public Streamable
 public:
     FerryFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
 
     FerryFilter& operator=(const FerryFilter&) = delete;
     FerryFilter(const FerryFilter&) = delete;

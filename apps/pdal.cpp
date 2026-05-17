@@ -92,29 +92,29 @@ private:
 
 void App::outputVersion()
 {
-    m_out << headline << std::endl;
-    m_out << "pdal " << Config::fullVersionString() << std::endl;
-    m_out << headline << std::endl;
-    m_out << std::endl;
+    m_out << headline << '\n';
+    m_out << "pdal " << Config::fullVersionString() << '\n';
+    m_out << headline << '\n';
+    m_out << '\n';
 }
 
 void App::outputHelp(const ProgramArgs& args)
 {
-    m_out << "Usage:" << std::endl;
-    m_out << "  pdal <options>" << std::endl;
-    m_out << "  pdal <command> <command options>" << std::endl;
+    m_out << "Usage:" << '\n';
+    m_out << "  pdal <options>" << '\n';
+    m_out << "  pdal <command> <command options>" << '\n';
 
     args.dump(m_out, 2, 80);
-    m_out << std::endl;
+    m_out << '\n';
 
-    m_out << "The following commands are available:" << std::endl;
+    m_out << "The following commands are available:" << '\n';
 
     // Load all kernels so that we can report the names.
     StageFactory f;
     PluginManager<Kernel>::loadAll();
     outputCommands("  - ");
-    m_out << std::endl;
-    m_out << "See https://pdal.org/apps/ for more detail" << std::endl;
+    m_out << '\n';
+    m_out << "See https://pdal.org/apps/ for more detail" << '\n';
 }
 
 void App::outputDrivers()
@@ -132,11 +132,11 @@ void App::outputDrivers()
         std::string tablehead(std::string(nameColLen, '=') + ' ' +
                               std::string(descripColLen, '='));
 
-        m_out << std::endl;
-        m_out << tablehead << std::endl;
+        m_out << '\n';
+        m_out << tablehead << '\n';
         m_out << std::left << std::setw(nameColLen) << "Name" << " Description"
-              << std::endl;
-        m_out << tablehead << std::endl;
+              << '\n';
+        m_out << tablehead << '\n';
 
         m_out << std::left;
 
@@ -147,12 +147,12 @@ void App::outputDrivers()
             for (size_t i = 0; i < lines.size(); ++i)
             {
                 m_out << std::setw(nameColLen) << name << " " << lines[i]
-                      << std::endl;
+                      << '\n';
                 name.clear();
             }
         }
 
-        m_out << tablehead << std::endl << std::endl;
+        m_out << tablehead << '\n' << '\n';
     }
     else
     {
@@ -182,7 +182,7 @@ void App::outputCommands(const std::string& leader)
     {
         if (Utils::startsWith(name, kernelbase))
             name = name.substr(kernelbase.size());
-        m_out << leader << name << std::endl;
+        m_out << leader << name << '\n';
     }
 }
 
@@ -204,8 +204,8 @@ void App::outputOptions(std::string const& stageName, std::ostream& strm)
     if (!m_showJSON)
     {
         strm << stageName << " -- " << PluginManager<Stage>::link(stageName)
-             << std::endl;
-        strm << headline << std::endl;
+             << '\n';
+        strm << headline << '\n';
 
         args.dump2(strm, 2, 6, headline.size());
     }
@@ -240,7 +240,7 @@ void App::outputOptions()
         for (auto const& n : nv)
         {
             outputOptions(n, m_out);
-            m_out << std::endl;
+            m_out << '\n';
         }
     }
     else
@@ -327,7 +327,7 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         log->setLevel(m_logLevel);
     else if (m_debug)
         log->setLevel(LogLevel::Debug);
-    log->get(LogLevel::Debug) << "Debugging..." << std::endl;
+    log->get(LogLevel::Debug) << "Debugging..." << '\n';
     PluginManager<Stage>::setLog(log);
     PluginManager<Kernel>::setLog(log);
 #ifndef _WIN32
@@ -341,7 +341,7 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
                    StringList lines = Utils::backtrace();
 
                    for (const auto& l : lines)
-                       logPtr->get(LogLevel::Debug) << l << std::endl;
+                       logPtr->get(LogLevel::Debug) << l << '\n';
                    exit(1);
                });
     }
@@ -371,8 +371,8 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         else
         {
             log->get(LogLevel::Error)
-                << "Command '" << m_command << "' not recognized" << std::endl
-                << std::endl;
+                << "Command '" << m_command << "' not recognized" << '\n'
+                << '\n';
             ret = 1;
         }
         return ret;

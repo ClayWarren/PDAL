@@ -65,7 +65,7 @@ public:
         the same \ref table used in the \ref prepare function.
 
     */
-    virtual void execute(StreamPointTable& table);
+    void execute(StreamPointTable& table) override;
     using Stage::execute;
 
     /**
@@ -73,7 +73,7 @@ public:
 
       \return Whether the pipeline is streamable.
     */
-    virtual bool pipelineStreamable() const;
+    bool pipelineStreamable() const override;
 
 protected:
     Streamable& operator=(const Streamable&) = delete;
@@ -114,7 +114,7 @@ protected:
       \return  NULL if the pipeline is streamable, otherwise return
         a pointer to the first found stage that's not streamable.
     */
-    const Stage* findNonstreamable() const;
+    const Stage* findNonstreamable() const override;
 };
 
 } // namespace pdal

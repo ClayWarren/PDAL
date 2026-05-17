@@ -65,7 +65,7 @@ auto check = [](const TransformationFilter::Transform& m)
 class TransformationFilterTest : public ::testing::Test
 {
 public:
-    virtual void SetUp()
+    void SetUp() override
     {
         StageFactory f;
 

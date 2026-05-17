@@ -50,14 +50,14 @@ public:
     RadialDensityFilter& operator=(const RadialDensityFilter&) = delete;
     RadialDensityFilter(const RadialDensityFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_rad;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

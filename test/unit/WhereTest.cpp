@@ -62,12 +62,12 @@ void exec1(const std::string& where, size_t expKeep, size_t expViews,
 
     class TestFilter : public Filter
     {
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
 
-        void filter(PointView& v)
+        void filter(PointView& v) override
         {
             g_count = v.size();
         }
@@ -112,12 +112,12 @@ void exec2(const std::string& where, size_t expKeep, size_t expViews,
         }
 
     private:
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
 
-        void filter(PointView& v)
+        void filter(PointView& v) override
         {
             g_count = v.size();
             v.setField(Dimension::Id::X, v.size(), 1);
@@ -156,12 +156,12 @@ void exec3(const std::string& where, size_t expKeep, size_t expViews,
 
     class TestFilter : public Filter
     {
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
 
-        PointViewSet run(PointViewPtr v)
+        PointViewSet run(PointViewPtr v) override
         {
             g_count = v->size();
             PointViewSet s;
@@ -203,12 +203,12 @@ void exec4(const std::string& where, size_t expKeep, size_t expViews,
 
     class TestWriter : public NoFilenameWriter
     {
-        std::string getName() const
+        std::string getName() const override
         {
             return "writers.test";
         }
 
-        PointViewSet run(PointViewPtr v)
+        PointViewSet run(PointViewPtr v) override
         {
             g_count = v->size();
             PointViewSet s;
@@ -249,12 +249,12 @@ void exec5(const std::string& where, size_t expKeep)
 
     class TestWriter : public NoFilenameWriter, public Streamable
     {
-        std::string getName() const
+        std::string getName() const override
         {
             return "writers.test";
         }
 
-        bool processOne(PointRef& p)
+        bool processOne(PointRef& p) override
         {
             g_count++;
             return true;
@@ -296,12 +296,12 @@ void exec6(const std::string& where, size_t expKeep, size_t expViews,
         }
 
     private:
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
 
-        PointViewSet run(PointViewPtr v)
+        PointViewSet run(PointViewPtr v) override
         {
             PointViewSet s;
             if (v->empty())

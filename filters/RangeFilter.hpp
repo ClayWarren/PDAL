@@ -50,17 +50,17 @@ class PDAL_EXPORT RangeFilter : public Filter, public Streamable
 {
 public:
     RangeFilter();
-    ~RangeFilter();
+    ~RangeFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::vector<DimRange> m_ranges;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
 
     RangeFilter& operator=(const RangeFilter&) = delete;
     RangeFilter(const RangeFilter&) = delete;

@@ -248,7 +248,7 @@ class PDAL_EXPORT StatsFilter : public Filter, public Streamable
 public:
     StatsFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
     const stats::Summary& getStats(Dimension::Id d) const;
     void reset();
@@ -256,11 +256,11 @@ public:
 private:
     StatsFilter& operator=(const StatsFilter&); // not implemented
     StatsFilter(const StatsFilter&);            // not implemented
-    virtual void addArgs(ProgramArgs& args);
-    virtual bool processOne(PointRef& point);
-    virtual void prepared(PointTableRef table);
-    virtual void done(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    bool processOne(PointRef& point) override;
+    void prepared(PointTableRef table) override;
+    void done(PointTableRef table) override;
+    void filter(PointView& view) override;
     void extractMetadata(PointTableRef table);
 
     StringList m_dimNames;

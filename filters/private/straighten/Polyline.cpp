@@ -144,7 +144,7 @@ void Polyline::init()
 Polyline::Polyline(const std::string& wkt_or_json, SpatialReference ref)
     : Geometry(wkt_or_json, ref)
 {
-    std::cout << "init from string" << std::endl;
+    std::cout << "init from string" << '\n';
     init();
 }
 

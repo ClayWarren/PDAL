@@ -29,7 +29,11 @@ Checks: >
   bugprone-unused-return-value,
   bugprone-use-after-move,
   bugprone-virtual-near-miss,
-  portability-std-allocator-const
+  portability-std-allocator-const,
+  modernize-use-override,
+  modernize-use-nullptr,
+  performance-avoid-endl
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*(apps|examples|filters|io|kernels|pdal|plugins|test|tools)/.*'
+ExcludeHeaderFilterRegex: '.*(vendor/|filters/private/csf/|filters/private/miniball/|filters/private/delaunator\.|plugins/e57/libE57Format/|plugins/nitf/io/nitflib\.).*'
 SystemHeaders: false

@@ -143,12 +143,12 @@ void test_file_type_stream(const std::string& filename)
             float z;
         };
 
-        std::string getName() const
+        std::string getName() const override
         {
             return "checker";
         }
 
-        bool processOne(PointRef& p)
+        bool processOne(PointRef& p) override
         {
             PtData pts0[3] = {{494057.312f, 4877433.5f, 130.630005f},
                               {494133.812f, 4877440.0f, 130.440002f},

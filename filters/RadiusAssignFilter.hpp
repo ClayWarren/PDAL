@@ -17,27 +17,27 @@ class PDAL_EXPORT RadiusAssignFilter : public Filter
 {
 public:
     RadiusAssignFilter();
-    ~RadiusAssignFilter();
+    ~RadiusAssignFilter() override;
 
     static void* create();
     static int32_t destroy(void*);
-    std::string getName() const
+    std::string getName() const override
     {
         return "filters.radiusassign";
     }
 
 private:
-    virtual void addArgs(ProgramArgs& args);
+    void addArgs(ProgramArgs& args) override;
     virtual void preparedDomain(std::vector<DimRange>& domain,
                                 PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
+    void prepared(PointTableRef table) override;
     bool doOne(PointRef& point);
     void doOneNoDomain(PointRef& point);
-    virtual void filter(PointView& view);
+    void filter(PointView& view) override;
     virtual void initializeDomain(StringList domainSpec,
                                   std::vector<DimRange>& domain);
-    virtual void initialize();
-    virtual void ready(PointTableRef);
+    void initialize() override;
+    void ready(PointTableRef) override;
     RadiusAssignFilter& operator=(const RadiusAssignFilter&) = delete;
     RadiusAssignFilter(const RadiusAssignFilter&) = delete;
     StringList m_referenceDomainSpec;

@@ -67,7 +67,7 @@ void subnodesToJSON(const MetadataNode& parent, std::ostream& o, int level)
 
     std::vector<std::string> names = parent.childNames();
 
-    o << indent << "{" << endl;
+    o << indent << "{" << '\n';
     for (auto ni = names.begin(); ni != names.end(); ++ni)
     {
         MetadataNodeList children = parent.children(*ni);
@@ -75,14 +75,14 @@ void subnodesToJSON(const MetadataNode& parent, std::ostream& o, int level)
         MetadataNode& node = *children.begin();
         if (node.kind() == MetadataType::Array)
         {
-            o << indent << "  \"" << node.name() << "\":" << std::endl;
+            o << indent << "  \"" << node.name() << "\":" << '\n';
             arrayToJSON(children, o, level + 1);
         }
         else
             toJSON(node, o, level + 1);
         if (ni != names.rbegin().base() - 1)
             o << ",";
-        o << std::endl;
+        o << '\n';
     }
     o << indent << "}";
 }
@@ -91,7 +91,7 @@ void arrayToJSON(const MetadataNodeList& children, std::ostream& o, int level)
 {
     const std::string indent(level * 2, ' ');
 
-    o << indent << "[" << std::endl;
+    o << indent << "[" << '\n';
     for (auto ci = children.begin(); ci != children.end(); ++ci)
     {
         const MetadataNode& m = *ci;
@@ -99,7 +99,7 @@ void arrayToJSON(const MetadataNodeList& children, std::ostream& o, int level)
         arrayEltToJSON(m, o, level + 1);
         if (ci != children.rbegin().base() - 1)
             o << ",";
-        o << std::endl;
+        o << '\n';
     }
     o << indent << "]";
 }
@@ -113,7 +113,7 @@ void arrayEltToJSON(const MetadataNode& m, std::ostream& o, int level)
     // This is a case from XML.  In JSON, you can't have two values.
     if (!value.empty() && children)
     {
-        o << value << "," << std::endl;
+        o << value << "," << '\n';
         subnodesToJSON(m, o, level);
     }
     else if (!value.empty())
@@ -137,7 +137,7 @@ void toJSON(const MetadataNode& m, std::ostream& o, int level)
     // This is a case from XML.  In JSON, you can't have two values.
     if (!value.empty() && children)
     {
-        o << indent << "\"" << name << "\": " << value << "," << std::endl;
+        o << indent << "\"" << name << "\": " << value << "," << '\n';
         o << indent << "\"" << name << "\": ";
         subnodesToJSON(m, o, level);
     }
@@ -145,7 +145,7 @@ void toJSON(const MetadataNode& m, std::ostream& o, int level)
         o << indent << "\"" << name << "\": " << value;
     else
     {
-        o << indent << "\"" << name << "\":" << std::endl;
+        o << indent << "\"" << name << "\":" << '\n';
         subnodesToJSON(m, o, level);
     }
     // There is the case where we have a name and no value to handle.  What
@@ -177,12 +177,12 @@ void toJSON(const MetadataNode& m, std::ostream& o)
         pdal::subnodesToJSON(m, o, 0);
     else
     {
-        o << "{" << std::endl;
+        o << "{" << '\n';
         pdal::toJSON(m, o, 1);
-        o << std::endl;
+        o << '\n';
         o << "}";
     }
-    o << std::endl;
+    o << '\n';
 }
 
 bool isJSON(const std::string& value)
@@ -239,7 +239,7 @@ public:
     {
     }
 
-    virtual ~ArbiterOutStream()
+    ~ArbiterOutStream() override
     {
         close();
         arbiter::Arbiter a;

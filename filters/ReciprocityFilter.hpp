@@ -51,15 +51,15 @@ public:
     ReciprocityFilter& operator=(const ReciprocityFilter&) = delete;
     ReciprocityFilter(const ReciprocityFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_knn;
     int m_threads;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
 
     void setReciprocity(PointView& view, const PointId& i);
 };

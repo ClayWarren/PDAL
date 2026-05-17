@@ -47,9 +47,9 @@ class PDAL_EXPORT PMFFilter : public Filter
 {
 public:
     PMFFilter();
-    ~PMFFilter();
+    ~PMFFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<PMFArgs> m_args;
@@ -57,10 +57,10 @@ private:
     uint8_t m_otherClass;
     bool m_onlyGround;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     void processGround(PointViewPtr view);
 

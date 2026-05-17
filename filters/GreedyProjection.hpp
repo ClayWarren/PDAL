@@ -156,7 +156,7 @@ public:
           uvn_sfn_(), uvn_next_ffn_(), uvn_next_sfn_(), tmp_(), view_(nullptr),
           mesh_(nullptr) {};
 
-    std::string getName() const;
+    std::string getName() const override;
 
     /** \brief Don't consider points for triangulation if their normal deviates
      * more than this value from the query point's normal.
@@ -420,10 +420,10 @@ private:
         return state_[idx] != GP3Type::NONE && state_[idx] != GP3Type::FREE;
     }
 
-    void addArgs(ProgramArgs& args);
-    void addDimensions(PointLayoutPtr layout);
-    void initialize();
-    void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void initialize() override;
+    void filter(PointView& view) override;
     void addTriangle(PointId a, PointId b, PointId c);
     Eigen::Vector3d getCoord(PointId id);
     Eigen::Vector3d getNormalCoord(PointId id);

@@ -46,10 +46,10 @@ class GzipDecompressor : public Decompressor
 {
 public:
     PDAL_EXPORT GzipDecompressor(BlockCb cb);
-    PDAL_EXPORT ~GzipDecompressor();
+    PDAL_EXPORT ~GzipDecompressor() override;
 
-    PDAL_EXPORT void decompress(const char* buf, size_t bufsize);
-    PDAL_EXPORT void done();
+    PDAL_EXPORT void decompress(const char* buf, size_t bufsize) override;
+    PDAL_EXPORT void done() override;
 
 private:
     // Gzip uses deflate.

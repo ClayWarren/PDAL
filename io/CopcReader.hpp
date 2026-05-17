@@ -69,18 +69,18 @@ class PDAL_EXPORT CopcReader : public Reader, public Streamable
 {
 public:
     CopcReader();
-    virtual ~CopcReader();
+    ~CopcReader() override;
     std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize(PointTableRef table) override;
-    virtual QuickInfo inspect() override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void ready(PointTableRef) override;
-    virtual point_count_t read(PointViewPtr view, point_count_t count) override;
-    virtual bool processOne(PointRef& point) override;
-    virtual void done(PointTableRef) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
+    QuickInfo inspect() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    bool processOne(PointRef& point) override;
+    void done(PointTableRef) override;
 
     std::vector<char> fetch(uint64_t offset, int32_t size);
     void fetchHeader();

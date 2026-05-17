@@ -119,7 +119,7 @@ void NormalFilter::prepared(PointTableRef table)
     if (m_args->m_up && m_viewpointArg->set())
     {
         log()->get(LogLevel::Warning)
-            << "Viewpoint provided. Ignoring always_up = TRUE." << std::endl;
+            << "Viewpoint provided. Ignoring always_up = TRUE." << '\n';
         m_args->m_up = false;
     }
 

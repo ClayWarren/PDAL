@@ -90,7 +90,7 @@ void FauxReader::initialize()
     if (m_mode == Mode::Uniform || m_mode == Mode::Normal)
     {
         if (!m_seedArg->set())
-            m_seed = (uint32_t)std::time(NULL);
+            m_seed = (uint32_t)std::time(nullptr);
         m_generator.seed(m_seed);
     }
     if (m_mode == Mode::Grid)
@@ -187,7 +187,7 @@ void FauxReader::ready(PointTableRef /*table*/)
 {
     m_returnNum = 1;
     m_time = 0;
-    m_seed = (uint32_t)std::time(NULL);
+    m_seed = (uint32_t)std::time(nullptr);
     m_index = 0;
 }
 

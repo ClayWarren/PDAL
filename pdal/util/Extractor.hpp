@@ -220,7 +220,7 @@ public:
       \param v  Unsigned byte to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(uint8_t& v)
+    LeExtractor& operator>>(uint8_t& v) override
     {
         v = *(const uint8_t*)m_gptr++;
         return *this;
@@ -232,7 +232,7 @@ public:
       \param v  Byte to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(int8_t& v)
+    LeExtractor& operator>>(int8_t& v) override
     {
         v = *(const int8_t*)m_gptr++;
         return *this;
@@ -244,7 +244,7 @@ public:
       \param v  Short to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(uint16_t& v)
+    LeExtractor& operator>>(uint16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le16toh(v);
@@ -258,7 +258,7 @@ public:
       \param v  Short to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(int16_t& v)
+    LeExtractor& operator>>(int16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int16_t)le16toh((uint16_t)v);
@@ -272,7 +272,7 @@ public:
       \param v  Unsigned int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(uint32_t& v)
+    LeExtractor& operator>>(uint32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le32toh(v);
@@ -286,7 +286,7 @@ public:
       \param v  int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(int32_t& v)
+    LeExtractor& operator>>(int32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int32_t)le32toh((uint32_t)v);
@@ -300,7 +300,7 @@ public:
       \param v  unsigned long int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(uint64_t& v)
+    LeExtractor& operator>>(uint64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = le64toh(v);
@@ -314,7 +314,7 @@ public:
       \param v  long int to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(int64_t& v)
+    LeExtractor& operator>>(int64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int64_t)le64toh((uint64_t)v);
@@ -328,7 +328,7 @@ public:
       \param v  float to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(float& v)
+    LeExtractor& operator>>(float& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint32_t tmp = le32toh(*(uint32_t*)(&v));
@@ -343,7 +343,7 @@ public:
       \param v  double to extract to.
       \return  This extractor.
     */
-    LeExtractor& operator>>(double& v)
+    LeExtractor& operator>>(double& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint64_t tmp = le64toh(*(uint64_t*)(&v));
@@ -373,7 +373,7 @@ public:
       \param v  unsigned byte to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(uint8_t& v)
+    BeExtractor& operator>>(uint8_t& v) override
     {
         v = *(const uint8_t*)m_gptr++;
         return *this;
@@ -385,7 +385,7 @@ public:
       \param v  byte to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(int8_t& v)
+    BeExtractor& operator>>(int8_t& v) override
     {
         v = *(const int8_t*)m_gptr++;
         return *this;
@@ -397,7 +397,7 @@ public:
       \param v  unsigned short to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(uint16_t& v)
+    BeExtractor& operator>>(uint16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be16toh(v);
@@ -411,7 +411,7 @@ public:
       \param v  short to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(int16_t& v)
+    BeExtractor& operator>>(int16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int16_t)be16toh((uint16_t)v);
@@ -425,7 +425,7 @@ public:
       \param v  unsigned int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(uint32_t& v)
+    BeExtractor& operator>>(uint32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be32toh(v);
@@ -439,7 +439,7 @@ public:
       \param v  int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(int32_t& v)
+    BeExtractor& operator>>(int32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int32_t)be32toh((uint32_t)v);
@@ -453,7 +453,7 @@ public:
       \param v  unsigned long int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(uint64_t& v)
+    BeExtractor& operator>>(uint64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = be64toh(v);
@@ -467,7 +467,7 @@ public:
       \param v  long int to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(int64_t& v)
+    BeExtractor& operator>>(int64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = (int64_t)be64toh((uint64_t)v);
@@ -481,7 +481,7 @@ public:
       \param v  float to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(float& v)
+    BeExtractor& operator>>(float& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint32_t tmp = be32toh(*(uint32_t*)(&v));
@@ -496,7 +496,7 @@ public:
       \param v  double to extract to.
       \return  This extractor.
     */
-    BeExtractor& operator>>(double& v)
+    BeExtractor& operator>>(double& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint64_t tmp = be64toh(*(uint64_t*)(&v));
@@ -571,7 +571,7 @@ public:
       \param v  unsigned byte to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(uint8_t& v)
+    SwitchableExtractor& operator>>(uint8_t& v) override
     {
         v = *(const uint8_t*)m_gptr++;
         return *this;
@@ -583,7 +583,7 @@ public:
       \param v  byte to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(int8_t& v)
+    SwitchableExtractor& operator>>(int8_t& v) override
     {
         v = *(const int8_t*)m_gptr++;
         return *this;
@@ -595,7 +595,7 @@ public:
       \param v  unsigned short to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(uint16_t& v)
+    SwitchableExtractor& operator>>(uint16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? le16toh(v) : be16toh(v);
@@ -609,7 +609,7 @@ public:
       \param v  short to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(int16_t& v)
+    SwitchableExtractor& operator>>(int16_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? (int16_t)le16toh((uint16_t)v)
@@ -624,7 +624,7 @@ public:
       \param v  unsigned int to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(uint32_t& v)
+    SwitchableExtractor& operator>>(uint32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? le32toh(v) : be32toh(v);
@@ -638,7 +638,7 @@ public:
       \param v  int to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(int32_t& v)
+    SwitchableExtractor& operator>>(int32_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? (int32_t)le32toh((uint32_t)v)
@@ -653,7 +653,7 @@ public:
       \param v  unsigned long to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(uint64_t& v)
+    SwitchableExtractor& operator>>(uint64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? le64toh(v) : be64toh(v);
@@ -667,7 +667,7 @@ public:
       \param v  long to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(int64_t& v)
+    SwitchableExtractor& operator>>(int64_t& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         v = isLittleEndian() ? (int64_t)le64toh((uint64_t)v)
@@ -682,7 +682,7 @@ public:
       \param v  float to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(float& v)
+    SwitchableExtractor& operator>>(float& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint32_t tmp = isLittleEndian() ? le32toh(*(uint32_t*)(&v))
@@ -698,7 +698,7 @@ public:
       \param v  double to extract to.
       \return  This extractor.
     */
-    SwitchableExtractor& operator>>(double& v)
+    SwitchableExtractor& operator>>(double& v) override
     {
         memcpy(&v, m_gptr, sizeof(v));
         uint64_t tmp = isLittleEndian() ? le64toh(*(uint64_t*)(&v))

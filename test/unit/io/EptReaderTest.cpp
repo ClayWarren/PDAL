@@ -260,12 +260,12 @@ TEST(EptReaderTest, unreadableTileFailureStreaming)
         }
 
     protected:
-        virtual void reset() override
+        void reset() override
         {
             m_offset += numPoints();
         }
 
-        virtual char* getPoint(PointId index) override
+        char* getPoint(PointId index) override
         {
             return m_view.getOrAddPoint(m_offset + index);
         }
@@ -328,12 +328,12 @@ TEST(EptReaderTest, unreadableDataIgnoredStreaming)
 {
     class TestWriter : public NoFilenameWriter, public Streamable
     {
-        std::string getName() const
+        std::string getName() const override
         {
             return "writers.test";
         }
 
-        bool processOne(PointRef& p)
+        bool processOne(PointRef& p) override
         {
             count++;
             return true;
@@ -476,7 +476,7 @@ TEST(EptReaderTest, boundedRead2d)
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
             ASSERT_TRUE(bounds.contains(x, y))
-                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
+                << bounds << ": " << x << ", " << y << ", " << z << '\n';
             ASSERT_TRUE(o < 4);
         }
     }
@@ -537,7 +537,7 @@ TEST(EptReaderTest, boundedRead3d)
             z = view->getFieldAs<double>(Dimension::Id::Z, i);
             o = view->getFieldAs<uint64_t>(Dimension::Id::OriginId, i);
             ASSERT_TRUE(bounds.contains(x, y, z))
-                << bounds << ": " << x << ", " << y << ", " << z << std::endl;
+                << bounds << ": " << x << ", " << y << ", " << z << '\n';
             ASSERT_TRUE(o < 4);
         }
     }
@@ -676,12 +676,12 @@ void streamTest(const std::string src)
         }
 
     protected:
-        virtual void reset() override
+        void reset() override
         {
             m_offset += numPoints();
         }
 
-        virtual char* getPoint(PointId index) override
+        char* getPoint(PointId index) override
         {
             return m_view.getOrAddPoint(m_offset + index);
         }

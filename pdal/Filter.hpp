@@ -53,20 +53,20 @@ class PDAL_EXPORT Filter : public virtual Stage
 
 public:
     Filter();
-    ~Filter();
+    ~Filter() override;
 
     Filter& operator=(const Filter&) = delete;
     Filter(const Filter&) = delete;
 
 private:
-    virtual void l_initialize(PointTableRef table) final;
-    virtual void l_addArgs(ProgramArgs& args) final;
-    virtual void l_prepared(PointTableRef table) final;
-    virtual const expr::ConditionalExpression* whereExpr() const;
-    virtual WhereMergeMode mergeMode() const;
-    virtual PointViewSet run(PointViewPtr view);
+    void l_initialize(PointTableRef table) final;
+    void l_addArgs(ProgramArgs& args) final;
+    void l_prepared(PointTableRef table) final;
+    const expr::ConditionalExpression* whereExpr() const override;
+    WhereMergeMode mergeMode() const override;
+    PointViewSet run(PointViewPtr view) override;
     virtual void filter(PointView& /*view*/) {}
-    virtual void assignParsedOptions() final {}
+    void assignParsedOptions() final {}
 
     friend PDAL_EXPORT std::istream& operator>>(std::istream& in,
                                                 Filter::WhereMergeMode& mode);

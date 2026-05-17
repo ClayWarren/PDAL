@@ -46,18 +46,18 @@ namespace pdal
 class PDAL_EXPORT PcdReader : public Reader, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     PcdReader();
 
 private:
-    virtual QuickInfo inspect();
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts);
-    virtual void done(PointTableRef table);
-    virtual bool processOne(PointRef& point);
+    QuickInfo inspect() override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
+    void done(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
     bool fillFields();
 
     PcdHeader m_header;

@@ -50,19 +50,19 @@ namespace pdal
 class OStream
 {
 public:
-    PDAL_EXPORT OStream() : m_stream(NULL), m_fstream(NULL) {}
+    PDAL_EXPORT OStream() : m_stream(nullptr), m_fstream(nullptr) {}
     PDAL_EXPORT OStream(const std::string& filename)
-        : m_stream(NULL), m_fstream(NULL)
+        : m_stream(nullptr), m_fstream(nullptr)
     {
         open(filename);
     }
     PDAL_EXPORT OStream(std::ostream* stream)
-        : m_stream(stream), m_fstream(NULL)
+        : m_stream(stream), m_fstream(nullptr)
     {
     }
     PDAL_EXPORT ~OStream()
     {
-        if (m_fstream != NULL)
+        if (m_fstream != nullptr)
             FileUtils::closeFile(m_fstream);
     }
 
@@ -78,10 +78,10 @@ public:
     PDAL_EXPORT void close()
     {
         flush();
-        if (m_fstream != NULL)
+        if (m_fstream != nullptr)
             FileUtils::closeFile(m_fstream);
-        m_fstream = NULL;
-        m_stream = NULL;
+        m_fstream = nullptr;
+        m_stream = nullptr;
     }
     PDAL_EXPORT bool isOpen() const
     {

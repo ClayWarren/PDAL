@@ -105,7 +105,7 @@ OGRGeometryH collectHexagon(hexer::HexId const& id, hexer::BaseGrid& grid)
 
 OGR::OGR(std::string const& filename, const std::string& wkt,
          std::string driver, std::string layerName)
-    : m_filename(filename), m_driver(driver), m_ds(0), m_layer(0),
+    : m_filename(filename), m_driver(driver), m_ds(nullptr), m_layer(nullptr),
       m_layerName(layerName)
 {
     createLayer(wkt);
@@ -120,7 +120,7 @@ void OGR::createLayer(const std::string& wkt)
 {
     gdal::registerDrivers();
     OGRSFDriverH driver = OGRGetDriverByName(m_driver.c_str());
-    if (driver == NULL)
+    if (driver == nullptr)
     {
         throw pdal::pdal_error("OGR Driver was null!");
     }
@@ -129,8 +129,8 @@ void OGR::createLayer(const std::string& wkt)
         m_ds = OGR_Dr_Open(driver, m_filename.c_str(), TRUE /*update*/);
     else
     {
-        m_ds = OGR_Dr_CreateDataSource(driver, m_filename.c_str(), NULL);
-        if (m_ds == NULL)
+        m_ds = OGR_Dr_CreateDataSource(driver, m_filename.c_str(), nullptr);
+        if (m_ds == nullptr)
             throw pdal_error("Unable to create output file '" + m_filename +
                              "' for density output.");
     }
@@ -139,8 +139,8 @@ void OGR::createLayer(const std::string& wkt)
         m_layerName = m_filename;
     gdal::SpatialRef srs(wkt);
     m_layer = GDALDatasetCreateLayer(m_ds, m_layerName.c_str(), srs.get(),
-                                     wkbMultiPolygon, NULL);
-    if (m_layer == NULL)
+                                     wkbMultiPolygon, nullptr);
+    if (m_layer == nullptr)
         throw pdal_error("Layer creation was null!");
 
     OGRFieldDefnH hFieldDefn;

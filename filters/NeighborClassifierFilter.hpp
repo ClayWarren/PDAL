@@ -48,15 +48,15 @@ class PDAL_EXPORT NeighborClassifierFilter : public Filter
 public:
     NeighborClassifierFilter();
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
     bool doOne(PointRef& point, PointRef& temp, KD3Index& kdi);
-    virtual void filter(PointView& view);
-    virtual void initialize();
-    virtual void ready(PointTableRef);
+    void filter(PointView& view) override;
+    void initialize() override;
+    void ready(PointTableRef) override;
     void doOneNoDomain(PointRef& point, PointRef& temp, KD3Index& kdi);
     PointViewPtr loadSet(const std::string& candFileName, PointTableRef table);
     NeighborClassifierFilter&

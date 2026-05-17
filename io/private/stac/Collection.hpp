@@ -50,9 +50,9 @@ class Collection : public Catalog
 
 public:
     using Catalog::Catalog;
-    ~Collection();
+    ~Collection() override;
 
-    virtual void validate();
+    void validate() override;
 };
 
 } // namespace stac

@@ -44,11 +44,11 @@ class PDAL_EXPORT RandomKernel : public Kernel
 {
 public:
     RandomKernel();
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
 
 private:
-    void addSwitches(ProgramArgs& arg);
+    void addSwitches(ProgramArgs& arg) override;
 
     std::string m_outputFile;
     bool m_bCompress;

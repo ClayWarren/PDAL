@@ -49,12 +49,12 @@ class PDAL_EXPORT TileKernel : public Kernel
 
 public:
     TileKernel();
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
 
 private:
-    void addSwitches(ProgramArgs& args);
-    void validateSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
+    void validateSwitches(ProgramArgs& args) override;
     Streamable* prepareReader(const std::string& filename);
     void process(const Readers& readers);
     void checkReaders(const Readers& readers);

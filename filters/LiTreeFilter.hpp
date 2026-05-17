@@ -46,7 +46,7 @@ public:
     LiTreeFilter& operator=(const LiTreeFilter&) = delete;
     LiTreeFilter(const LiTreeFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::vector<int> m_localMax;
@@ -54,10 +54,10 @@ private:
     double m_minHag;
     double m_dummyRadius;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     PointId locateHighestPoint(PointView& view, PointIdList const& Ui);
     PointId locateDummyPoint(PointView& view, PointIdList const& Ui,

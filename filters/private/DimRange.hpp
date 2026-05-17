@@ -107,7 +107,7 @@ public:
     {
     }
 
-    virtual void setValue(const std::string& s)
+    void setValue(const std::string& s) override
     {
         std::vector<std::string> slist = Utils::split2(s, ',');
         for (auto& ts : slist)
@@ -128,14 +128,14 @@ public:
         m_set = true;
     }
 
-    virtual void reset()
+    void reset() override
     {
         m_var = m_defaultVal;
         m_set = false;
         m_hidden = false;
     }
 
-    virtual std::string defaultVal() const
+    std::string defaultVal() const override
     {
         std::string s;
 

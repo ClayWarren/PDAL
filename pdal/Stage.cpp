@@ -203,7 +203,7 @@ PointViewSet Stage::execute(PointTableRef table)
             {
                 log()->get(LogLevel::Warning)
                     << "Dimension " << Dimension::name(id) << " is deprecated"
-                    << std::endl;
+                    << '\n';
             }
         }
     }
@@ -234,7 +234,7 @@ PointViewSet Stage::execute(PointTableRef table)
     std::map<StageInstance, StageInstance> children;
 
     m_log->get(LogLevel::Debug)
-        << "Executing pipeline in standard mode." << std::endl;
+        << "Executing pipeline in standard mode." << '\n';
 
     pending.push(StageInstance(this, stageInstanceId++));
 

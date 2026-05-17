@@ -45,14 +45,14 @@ namespace pdal
 class PDAL_EXPORT PipelineKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
     PipelineKernel();
 
 private:
-    void addSwitches(ProgramArgs& args);
-    void validateSwitches(ProgramArgs& args);
-    virtual bool isStagePrefix(const std::string& stage);
+    void addSwitches(ProgramArgs& args) override;
+    void validateSwitches(ProgramArgs& args) override;
+    bool isStagePrefix(const std::string& stage) override;
 
     std::string m_inputFile;
     std::string m_pipelineFile;

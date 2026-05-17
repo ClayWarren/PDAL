@@ -51,13 +51,13 @@ public:
     LabelDuplicatesFilter& operator=(const LabelDuplicatesFilter&) = delete;
     LabelDuplicatesFilter(const LabelDuplicatesFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
+    void prepared(PointTableRef table) override;
 
     Dimension::IdList m_dims;
     StringList m_dimNames;

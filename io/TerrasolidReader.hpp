@@ -78,7 +78,7 @@ class PDAL_EXPORT TerrasolidReader : public pdal::Reader
 {
 public:
     TerrasolidReader() : pdal::Reader(), m_format(TERRASOLID_Format_Unknown) {}
-    std::string getName() const;
+    std::string getName() const override;
 
     point_count_t getNumPoints() const
     {
@@ -104,11 +104,11 @@ private:
     std::unique_ptr<IStream> m_istream;
     point_count_t m_index;
 
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
-    virtual void done(PointTableRef table);
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    void done(PointTableRef table) override;
     virtual bool eof()
     {
         return m_index >= getNumPoints();

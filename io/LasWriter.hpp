@@ -77,10 +77,10 @@ class PDAL_EXPORT LasWriter : public FlexWriter, public Streamable
     struct Private;
 
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     LasWriter();
-    ~LasWriter();
+    ~LasWriter() override;
 
 protected:
     void prepOutput(std::ostream* out, const SpatialReference& srs);
@@ -103,18 +103,18 @@ private:
     MetadataNode m_forwardMetadata;
     bool m_firstPoint;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void prepared(PointTableRef table);
-    virtual void readyTable(PointTableRef table);
-    virtual void readyFile(const std::string& filename,
-                           const SpatialReference& srs);
-    virtual bool srsOverridden() const;
-    void prerunFile(const PointViewSet& pvSet);
-    virtual void writeView(const PointViewPtr view);
-    virtual bool processOne(PointRef& point);
-    void spatialReferenceChanged(const SpatialReference& srs);
-    virtual void doneFile();
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void prepared(PointTableRef table) override;
+    void readyTable(PointTableRef table) override;
+    void readyFile(const std::string& filename,
+                           const SpatialReference& srs) override;
+    bool srsOverridden() const override;
+    void prerunFile(const PointViewSet& pvSet) override;
+    void writeView(const PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    void doneFile() override;
 
     void handleLaszip(int result);
     void fillForwardList();

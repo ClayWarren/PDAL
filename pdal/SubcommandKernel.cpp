@@ -85,7 +85,7 @@ void SubcommandKernel::outputHelp()
         ProgramArgs args;
         addBasicSwitches(args);
 
-        std::cout << "standard options:" << std::endl;
+        std::cout << "standard options:" << '\n';
         args.dump(std::cout, 2, Utils::screenWidth());
     };
 
@@ -94,7 +94,7 @@ void SubcommandKernel::outputHelp()
         ProgramArgs args;
         addSubSwitches(args, sub);
 
-        std::cout << "subcommand '" << sub << "' options:" << std::endl;
+        std::cout << "subcommand '" << sub << "' options:" << '\n';
         args.dump(std::cout, 2, Utils::screenWidth());
     };
 
@@ -108,7 +108,7 @@ void SubcommandKernel::outputHelp()
 
         std::cout << "usage: " << "pdal " << getShortName() << " "
                   << m_subcommand << " [options] " << args.commandLine()
-                  << std::endl;
+                  << '\n';
 
         outputStdOpts();
         outputSubOpts(m_subcommand);
@@ -116,7 +116,7 @@ void SubcommandKernel::outputHelp()
     else
     {
         std::cout << "usage: " << "pdal " << getShortName()
-                  << " <subcommand> [options] " << std::endl;
+                  << " <subcommand> [options] " << '\n';
 
         outputStdOpts();
         for (const std::string& subcmd : subcommands())
@@ -125,7 +125,7 @@ void SubcommandKernel::outputHelp()
 
     std::cout << "\nFor more information, see the full documentation for "
                  "PDAL at https://pdal.org/\n"
-              << std::endl;
+              << '\n';
 }
 
 } // namespace pdal

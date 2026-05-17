@@ -49,7 +49,7 @@ public:
     {
         m_views.insert(view);
     }
-    std::string getName() const
+    std::string getName() const override
     {
         return "readers.buffer";
     }
@@ -57,7 +57,7 @@ public:
 private:
     PointViewSet m_views;
 
-    virtual PointViewSet run(PointViewPtr /*view*/)
+    PointViewSet run(PointViewPtr /*view*/) override
     {
         return m_views;
     }

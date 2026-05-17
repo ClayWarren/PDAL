@@ -47,18 +47,18 @@ class PDAL_EXPORT SbetReader : public Reader, public Streamable
 {
 public:
     SbetReader();
-    ~SbetReader();
+    ~SbetReader() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual bool processOne(PointRef& point);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
+    bool processOne(PointRef& point) override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
     virtual bool eof();
-    virtual void done(PointTableRef table);
+    void done(PointTableRef table) override;
 
     void seek(PointId idx);
 

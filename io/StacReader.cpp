@@ -360,7 +360,7 @@ std::string listStr(std::string key, std::vector<RegEx> ids)
     for (auto& id : ids)
         s << id.m_str << ", ";
     s.seekp(-2, std::ios_base::end);
-    s << "]" << std::endl;
+    s << "]" << '\n';
     return s.str();
 }
 
@@ -371,7 +371,7 @@ void StacReader::Private::initializeArgs()
     m_colFilters = std::make_unique<Catalog::Filters>();
     m_icFilters = std::make_unique<ItemCollection::Filters>();
 
-    log()->get(LogLevel::Debug) << "Filters: " << std::endl;
+    log()->get(LogLevel::Debug) << "Filters: " << '\n';
     if (!m_args->items.empty())
     {
         std::string itIdStr = listStr("Item Ids", m_args->items);
@@ -399,7 +399,7 @@ void StacReader::Private::initializeArgs()
 
     if (!m_args->dates.empty())
     {
-        log()->get(LogLevel::Debug) << "Dates: " << m_args->dates << std::endl;
+        log()->get(LogLevel::Debug) << "Dates: " << m_args->dates << '\n';
 
         for (auto& datepair : m_args->dates)
         {
@@ -439,7 +439,7 @@ void StacReader::Private::initializeArgs()
             throw pdal_error(
                 "Properties argument must be a valid JSON object.");
         log()->get(LogLevel::Debug)
-            << "Property Pruning: " << m_args->properties.dump() << std::endl;
+            << "Property Pruning: " << m_args->properties.dump() << '\n';
         m_itemFilters->properties = m_args->properties;
     }
 
@@ -450,7 +450,7 @@ void StacReader::Private::initializeArgs()
         if (!m_args->bounds.valid())
             throw pdal_error("Supplied bounds are not valid.");
         log()->get(LogLevel::Debug)
-            << "Bounds: " << m_args->bounds << std::endl;
+            << "Bounds: " << m_args->bounds << '\n';
 
         Polygon boundsPoly(m_args->bounds.to2d());
         if (!m_args->bounds.spatialReference().empty())
@@ -467,7 +467,7 @@ void StacReader::Private::initializeArgs()
         for (auto& name : m_args->assetNames)
             s << name << ", ";
         s.seekp(-2, std::ios_base::end);
-        s << "]" << std::endl;
+        s << "]" << '\n';
         auto it = m_itemFilters->assetNames.begin();
         log()->get(LogLevel::Debug) << s.str();
         m_itemFilters->assetNames.insert(it, m_args->assetNames.begin(),
@@ -476,7 +476,7 @@ void StacReader::Private::initializeArgs()
 
     if (m_args->validateSchema)
         log()->get(LogLevel::Debug)
-            << "JSON Schema validation flag is set." << std::endl;
+            << "JSON Schema validation flag is set." << '\n';
 
     m_colFilters->itemFilters = m_itemFilters.get();
     m_catFilters->itemFilters = m_itemFilters.get();

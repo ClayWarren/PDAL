@@ -45,9 +45,9 @@ namespace pdal
 class PDAL_EXPORT TextReader : public Reader, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
-    TextReader() : m_istream(NULL) {}
+    TextReader() : m_istream(nullptr) {}
 
 private:
     /**
@@ -56,7 +56,7 @@ private:
 
       \param table  Point table being initialized.
     */
-    virtual QuickInfo inspect();
+    QuickInfo inspect() override;
 
     /**
       Initialize the reader by opening the file and reading the header line.
@@ -64,27 +64,27 @@ private:
 
       \param table  Point table being initialized.
     */
-    virtual void initialize(PointTableRef table);
+    void initialize(PointTableRef table) override;
 
     /**
       Add arguments to those accepted at the command line.
       \param args  Argument list to modify.
     */
-    virtual void addArgs(ProgramArgs& args);
+    void addArgs(ProgramArgs& args) override;
 
     /**
       Add dimensions found in the header line to the layout.
 
       \param layout  Layout to which the dimenions are added.
     */
-    virtual void addDimensions(PointLayoutPtr layout);
+    void addDimensions(PointLayoutPtr layout) override;
 
     /**
       Reopen the file in preparation for reading.
 
       \param table  Point table to make ready.
     */
-    virtual void ready(PointTableRef table);
+    void ready(PointTableRef table) override;
 
     /**
       Read up to numPts points into the \ref view.
@@ -93,14 +93,14 @@ private:
       \param numPts  Maximum number of points to read.
       \return  Number of points read.
     */
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts);
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
 
     /**
       Close input file.
 
       \param table  PointTable we're done with.
     */
-    virtual void done(PointTableRef table);
+    void done(PointTableRef table) override;
 
     /**
       Read a single point from the input.
@@ -108,7 +108,7 @@ private:
       \param point  Reference to point to fill with data.
       \return  False if no point could be read.
     */
-    virtual bool processOne(PointRef& point);
+    bool processOne(PointRef& point) override;
 
     bool fillFields();
 

@@ -311,8 +311,8 @@ public:
     V10BaseLoader(const Scaling& scaling);
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     Scaling m_scaling;
 };
@@ -323,8 +323,8 @@ public:
     V14BaseLoader(const Scaling& scaling);
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     Scaling m_scaling;
 };
@@ -335,8 +335,8 @@ public:
     GpstimeLoader(int offset) : m_offset(offset) {}
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     int m_offset;
 };
@@ -347,8 +347,8 @@ public:
     ColorLoader(int offset) : m_offset(offset) {}
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     int m_offset;
 };
@@ -359,8 +359,8 @@ public:
     NirLoader(int offset) : m_offset(offset) {}
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     int m_offset;
 };
@@ -371,8 +371,8 @@ public:
     ExtraDimLoader(const ExtraDims& extraDims) : m_extraDims(extraDims) {}
 
 private:
-    virtual void load(PointRef& point, const char* buf, int bufsize) override;
-    virtual void pack(const PointRef& point, char* buf, int bufsize) override;
+    void load(PointRef& point, const char* buf, int bufsize) override;
+    void pack(const PointRef& point, char* buf, int bufsize) override;
 
     ExtraDims m_extraDims;
 };

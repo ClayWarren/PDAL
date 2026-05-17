@@ -190,17 +190,17 @@ public:
     {
     }
 
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         return compare(pr.getFieldAs<double>(m_dimId), m_operand.get(pr));
     }
 
-    virtual std::string toString(std::string pre) const override
+    std::string toString(std::string pre) const override
     {
         std::ostringstream ss;
         ss << pre << Dimension::name(m_dimId) << " ";
         ss << pre << typeToString(type()) << " " << m_operand.toString()
-           << std::endl;
+           << '\n';
         return ss.str();
     }
 
@@ -217,11 +217,11 @@ public:
     ComparisonEqual(Dimension::Id id, Operand op) : ComparisonSingle(id, op) {}
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a == b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::eq;
     }
@@ -235,11 +235,11 @@ public:
     }
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a > b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::gt;
     }
@@ -254,11 +254,11 @@ public:
     }
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a >= b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::gte;
     }
@@ -270,11 +270,11 @@ public:
     ComparisonLess(Dimension::Id id, Operand op) : ComparisonSingle(id, op) {}
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a < b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::lt;
     }
@@ -288,11 +288,11 @@ public:
     }
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a <= b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::lte;
     }
@@ -306,11 +306,11 @@ public:
     }
 
 protected:
-    virtual bool compare(double a, double b) const override
+    bool compare(double a, double b) const override
     {
         return a != b;
     }
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::ne;
     }
@@ -324,14 +324,14 @@ public:
     {
     }
 
-    virtual std::string toString(std::string pre) const override
+    std::string toString(std::string pre) const override
     {
         std::ostringstream ss;
         ss << pre << Dimension::name(m_dimId) << " ";
         ss << pre << typeToString(type()) << " ";
         for (const auto& op : m_operands)
             ss << op.toString() << " ";
-        ss << std::endl;
+        ss << '\n';
         return ss.str();
     }
 
@@ -345,12 +345,12 @@ public:
     ComparisonAny(Dimension::Id id, Operands ops) : ComparisonMulti(id, ops) {}
 
 protected:
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::in;
     }
 
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         const double val(pr.getFieldAs<double>(m_dimId));
         return std::any_of(m_operands.begin(), m_operands.end(),
@@ -365,12 +365,12 @@ public:
     ComparisonNone(Dimension::Id id, Operands ops) : ComparisonMulti(id, ops) {}
 
 protected:
-    virtual ComparisonType type() const override
+    ComparisonType type() const override
     {
         return ComparisonType::nin;
     }
 
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         const double val(pr.getFieldAs<double>(m_dimId));
         return std::none_of(m_operands.begin(), m_operands.end(),

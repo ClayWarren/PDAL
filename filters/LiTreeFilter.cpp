@@ -99,7 +99,7 @@ PointId LiTreeFilter::locateHighestPoint(PointView& view, PointIdList const& Ui)
             t0 = i;
         }
     }
-    log()->get(LogLevel::Debug2) << "Max HAG value of " << vmax << std::endl;
+    log()->get(LogLevel::Debug2) << "Max HAG value of " << vmax << '\n';
 
     return t0;
 }
@@ -258,7 +258,7 @@ void LiTreeFilter::segmentTree(PointView& view, PointIdList& Ui,
     }
 
     log()->get(LogLevel::Debug3)
-        << "|Pi| = " << Pi.size() << ", |Ni| = " << Ni.size() << std::endl;
+        << "|Pi| = " << Pi.size() << ", |Ni| = " << Ni.size() << '\n';
     // Use Pi to assign current tree_id to TreeID dimension, only if minimum
     // size is met
     if (Pi.size() >= m_minSize)

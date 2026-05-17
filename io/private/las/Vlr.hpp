@@ -154,8 +154,8 @@ struct Evlr : public Vlr
         writeAsEVLR = false;
     }
 
-    virtual void fillHeader(const char* buf) override;
-    virtual std::vector<char> headerData() const override;
+    void fillHeader(const char* buf) override;
+    std::vector<char> headerData() const override;
 
     using DataCreationFunc = std::function<void(Evlr&, MetadataNode)>;
     DataCreationFunc dataFunc;

@@ -53,7 +53,7 @@ enum Orientation
 class Path
 {
 public:
-    Path(HexId root_hex) : m_rootHex(root_hex), m_parent(NULL) {}
+    Path(HexId root_hex) : m_rootHex(root_hex), m_parent(nullptr) {}
 
     void toWKT(std::ostream& output) const;
 

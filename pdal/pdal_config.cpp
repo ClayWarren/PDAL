@@ -141,28 +141,28 @@ std::string debugInformation()
 
     std::ostringstream os;
 
-    os << headline << std::endl;
-    os << "PDAL debug information" << std::endl;
-    os << headline << std::endl << std::endl;
+    os << headline << '\n';
+    os << "PDAL debug information" << '\n';
+    os << headline << '\n' << '\n';
 
-    os << "Version information" << std::endl;
-    os << headline << std::endl;
-    os << "(" << fullVersionString() << ")" << std::endl;
-    os << std::endl;
+    os << "Version information" << '\n';
+    os << headline << '\n';
+    os << "(" << fullVersionString() << ")" << '\n';
+    os << '\n';
 
-    os << "Debug build status" << std::endl;
-    os << headline << std::endl;
-    os << PDAL_BUILD_TYPE << std::endl << std::endl;
+    os << "Debug build status" << '\n';
+    os << headline << '\n';
+    os << PDAL_BUILD_TYPE << '\n' << '\n';
 
-    os << "Enabled libraries" << std::endl;
-    os << headline << std::endl << std::endl;
+    os << "Enabled libraries" << '\n';
+    os << headline << '\n' << '\n';
 
     os << "GDAL (" << GDALVersionInfo("RELEASE_NAME") << ") - "
-       << "http://www.gdal.org" << std::endl;
+       << "http://www.gdal.org" << '\n';
 
 #ifdef PDAL_HAVE_LIBXML2
     os << "libxml (" << LIBXML_DOTTED_VERSION << ") - "
-       << "http://www.xmlsoft.org/" << std::endl;
+       << "http://www.xmlsoft.org/" << '\n';
 #endif
 
     return os.str();

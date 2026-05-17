@@ -60,7 +60,7 @@ public:
     SplitterFilter();
     using PointAdder = std::function<void(PointRef&, int, int)>;
 
-    std::string getName() const;
+    std::string getName() const override;
     void setOrigin(double xOrigin, double yOrigin);
     void processPoint(PointRef& p, PointAdder adder);
     PointViewPtr view(const Coord& c);
@@ -80,9 +80,9 @@ private:
     double m_buffer;
     std::map<Coord, PointViewPtr, CoordCompare> m_viewMap;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
     bool squareContains(int xpos, int ypos, double x, double y) const;
 
     SplitterFilter& operator=(const SplitterFilter&); // not implemented

@@ -78,21 +78,21 @@ class PDAL_EXPORT OverlayFilter : public Filter, public Streamable
     };
 
 public:
-    OverlayFilter() : m_ds(0), m_lyr(0) {}
+    OverlayFilter() : m_ds(nullptr), m_lyr(nullptr) {}
 
-    std::string getName() const
+    std::string getName() const override
     {
         return "filters.overlay";
     }
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void spatialReferenceChanged(const SpatialReference& srs);
-    virtual bool processOne(PointRef& point);
-    virtual void initialize();
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    bool processOne(PointRef& point) override;
+    void initialize() override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     OverlayFilter& operator=(const OverlayFilter&) = delete;
     OverlayFilter(const OverlayFilter&) = delete;

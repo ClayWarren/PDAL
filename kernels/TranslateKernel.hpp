@@ -48,13 +48,13 @@ namespace pdal
 class PDAL_EXPORT TranslateKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
     TranslateKernel();
 
 private:
-    virtual void addSwitches(ProgramArgs& args);
-    virtual void validateSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
+    void validateSwitches(ProgramArgs& args) override;
     void makeJSONPipeline();
     void makeArgPipeline();
 

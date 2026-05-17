@@ -12,7 +12,7 @@ namespace expr
 class ConditionalExpression : public Expression
 {
 public:
-    Utils::StatusWithReason prepare(PointLayoutPtr layout);
+    Utils::StatusWithReason prepare(PointLayoutPtr layout) override;
     bool eval(PointRef& p) const;
 };
 

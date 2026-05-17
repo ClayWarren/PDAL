@@ -50,16 +50,16 @@ class PDAL_EXPORT ELMFilter : public Filter
 public:
     ELMFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_cell;
     double m_threshold;
     uint8_t m_class;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 
     ELMFilter& operator=(const ELMFilter&); // not implemented
     ELMFilter(const ELMFilter&);            // not implemented

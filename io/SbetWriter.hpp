@@ -45,16 +45,16 @@ namespace pdal
 class PDAL_EXPORT SbetWriter : public Writer
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<OLeStream> m_stream;
     bool m_anglesAreDegrees;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void ready(PointTableRef table);
-    virtual void write(const PointViewPtr view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
 };
 
 } // namespace pdal

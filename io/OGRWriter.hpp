@@ -46,20 +46,20 @@ namespace pdal
 class PDAL_EXPORT OGRWriter : public FlexWriter, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     OGRWriter();
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void prepared(PointTableRef table);
-    virtual void readyTable(PointTableRef table);
-    virtual void readyFile(const std::string& filename,
-                           const SpatialReference& srs);
-    virtual void writeView(const PointViewPtr view);
-    virtual bool processOne(PointRef& point);
-    virtual void doneFile();
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void prepared(PointTableRef table) override;
+    void readyTable(PointTableRef table) override;
+    void readyFile(const std::string& filename,
+                           const SpatialReference& srs) override;
+    void writeView(const PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
+    void doneFile() override;
 
     // I don't think this needs to be deleted.
     GDALDriver* m_driver;

@@ -47,14 +47,14 @@ public:
     OptimalNeighborhood& operator=(const OptimalNeighborhood&) = delete;
     OptimalNeighborhood(const OptimalNeighborhood&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     point_count_t m_kMin, m_kMax;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

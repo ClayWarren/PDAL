@@ -55,7 +55,7 @@ class Polyline : public Geometry
 {
 public:
     Polyline();
-    virtual ~Polyline();
+    ~Polyline() override;
 
     Polyline(const std::string& wkt_or_json,
              SpatialReference ref = SpatialReference());
@@ -73,8 +73,8 @@ public:
     void interpolate(const PointRef& point, double& x, double& y, double& z,
                      double& m, double& azimuth, double& offset);
 
-    virtual void modified() override;
-    virtual void clear() override;
+    void modified() override;
+    void clear() override;
 
 private:
     void init();

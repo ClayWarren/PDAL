@@ -98,16 +98,16 @@ void EigenvaluesFilter::prepared(PointTableRef table)
     {
         log()->get(LogLevel::Warning)
             << "Radius has been set. Ignoring knn and stride values."
-            << std::endl;
+            << '\n';
         if (m_args->m_radius <= 0.0)
             log()->get(LogLevel::Error)
-                << "Radius must be greater than 0." << std::endl;
+                << "Radius must be greater than 0." << '\n';
     }
     else
     {
         log()->get(LogLevel::Warning) << "No radius specified. Proceeding with "
                                          "knn and stride, but ignoring min_k."
-                                      << std::endl;
+                                      << '\n';
     }
 }
 

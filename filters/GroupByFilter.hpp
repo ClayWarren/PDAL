@@ -50,16 +50,16 @@ class PDAL_EXPORT GroupByFilter : public Filter
 public:
     GroupByFilter();
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::map<uint64_t, PointViewPtr> m_viewMap;
     std::string m_dimName;
     Dimension::Id m_dimId;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     GroupByFilter& operator=(const GroupByFilter&); // not implemented
     GroupByFilter(const GroupByFilter&);            // not implemented

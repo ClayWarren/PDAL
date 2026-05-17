@@ -101,7 +101,7 @@ void GltfWriter::prepared(PointTableRef table)
                "true, but one or more of the normal dimensions are missing. "
                "Not writing vertex "
                "normals."
-            << std::endl;
+            << '\n';
         m_writeNormals = false;
     }
 
@@ -119,7 +119,7 @@ void GltfWriter::prepared(PointTableRef table)
                "true, but one or more color dimensions are missing. Not "
                "writing vertex "
                "colors."
-            << std::endl;
+            << '\n';
         m_colorVertices = false;
     }
 }

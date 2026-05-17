@@ -55,7 +55,7 @@ class PDAL_EXPORT StacReader : public Reader, public Streamable
 {
 public:
     StacReader();
-    ~StacReader();
+    ~StacReader() override;
 
     std::string getName() const override;
 
@@ -64,16 +64,16 @@ private:
 
     std::unique_ptr<Private> m_p;
 
-    virtual void initialize() override;
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual QuickInfo inspect() override;
-    virtual void prepared(PointTableRef table) override;
-    virtual void ready(PointTableRef table) override;
-    virtual point_count_t read(PointViewPtr view, point_count_t num) override;
-    virtual bool processOne(PointRef& point) override;
-    virtual PointViewSet run(PointViewPtr view) override;
-    virtual void done(PointTableRef) override;
+    void initialize() override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    QuickInfo inspect() override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
+    bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
+    void done(PointTableRef) override;
 };
 
 } // namespace pdal

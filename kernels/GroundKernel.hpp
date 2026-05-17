@@ -53,12 +53,12 @@ class PDAL_EXPORT GroundKernel : public Kernel
     struct Args;
 
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
     GroundKernel();
 
 private:
-    virtual void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
 
     std::unique_ptr<Args> m_args;
 };

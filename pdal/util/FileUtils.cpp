@@ -229,7 +229,7 @@ bool createDirectory(const std::string& dirname)
         else
         {
             std::stringstream ss;
-            ss << "Unable to create directory " << dirname << std::endl
+            ss << "Unable to create directory " << dirname << '\n'
                << VSIStrerror(errno);
             throw std::runtime_error(ss.str());
         }
@@ -248,7 +248,7 @@ bool createDirectories(const std::string& dirname)
         else
         {
             std::stringstream ss;
-            ss << "Unable to create directories " << dirname << std::endl
+            ss << "Unable to create directories " << dirname << '\n'
                << VSIStrerror(errno);
             throw std::runtime_error(ss.str());
         }
@@ -500,7 +500,7 @@ std::vector<std::string> glob(std::string path)
 #else
     glob_t glob_result;
 
-    ::glob(path.c_str(), GLOB_NOSORT, NULL, &glob_result);
+    ::glob(path.c_str(), GLOB_NOSORT, nullptr, &glob_result);
     for (unsigned int i = 0; i < glob_result.gl_pathc; ++i)
     {
         std::string filename = glob_result.gl_pathv[i];
@@ -548,7 +548,7 @@ MapContext mapFile(const std::string& filename, bool readOnly, uintmax_t pos,
     ctx.m_size = size;
 
 #ifndef _WIN32
-    ctx.m_addr = ::mmap(0, size, PROT_READ, MAP_SHARED, ctx.m_fd, (off_t)pos);
+    ctx.m_addr = ::mmap(nullptr, size, PROT_READ, MAP_SHARED, ctx.m_fd, (off_t)pos);
     if (ctx.m_addr == MAP_FAILED)
     {
         ctx.m_addr = nullptr;

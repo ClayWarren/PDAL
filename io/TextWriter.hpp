@@ -65,14 +65,14 @@ public:
     TextWriter& operator=(const TextWriter&) = delete;
     TextWriter(const TextWriter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void ready(PointTableRef table);
-    virtual void write(const PointViewPtr view);
-    virtual void done(PointTableRef table);
-    virtual bool processOne(PointRef& point);
+    void addArgs(ProgramArgs& args) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
 
     void writeHeader(PointTableRef table);
     void writeFooter();

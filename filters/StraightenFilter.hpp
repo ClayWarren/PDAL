@@ -48,13 +48,13 @@ public:
     StraightenFilter& operator=(const StraightenFilter&) = delete;
     StraightenFilter(const StraightenFilter&) = delete;
 
-    virtual std::string getName() const override;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual bool processOne(PointRef& point) override;
-    virtual void filter(PointView& view) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
 
     struct Args;
     std::unique_ptr<Args> m_args;

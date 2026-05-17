@@ -158,7 +158,7 @@ void EsriReader::initialize(PointTableRef table)
         m_filename.pop_back();
 
     log()->get(LogLevel::Debug)
-        << "Fetching info from " << m_filename << std::endl;
+        << "Fetching info from " << m_filename << '\n';
 
     // personalize for slpk or i3s
     try
@@ -184,7 +184,7 @@ void EsriReader::initialize(PointTableRef table)
         log()->get(LogLevel::Warning)
             << "This version may not work with "
                "the current implementation of i3s/slpk reader"
-            << std::endl;
+            << '\n';
 
     // find number of nodes per nodepage
     if (jsonBody["store"]["index"].contains("nodesPerPage"))
@@ -195,7 +195,7 @@ void EsriReader::initialize(PointTableRef table)
     {
         log()->get(LogLevel::Warning)
             << "Number of nodes per page not specified. Default is 64."
-            << std::endl;
+            << '\n';
         m_nodeCap = 64;
     }
 
@@ -274,7 +274,7 @@ void EsriReader::addDimensions(PointLayoutPtr layout)
             // Expect that Elevation will be bundled with xyz
             if (dim.name != "ELEVATION")
                 log()->get(LogLevel::Warning)
-                    << "Attribute does not have a type." << std::endl;
+                    << "Attribute does not have a type." << '\n';
             continue;
         }
 
@@ -321,17 +321,17 @@ void EsriReader::addDimensions(PointLayoutPtr layout)
 void EsriReader::ready(PointTableRef table)
 {
     // output arguments for debugging
-    log()->get(LogLevel::Debug) << "filename: " << m_filename << std::endl;
-    log()->get(LogLevel::Debug) << "threads: " << m_args->threads << std::endl;
-    log()->get(LogLevel::Debug) << "obb: " << m_args->obb << std::endl;
+    log()->get(LogLevel::Debug) << "filename: " << m_filename << '\n';
+    log()->get(LogLevel::Debug) << "threads: " << m_args->threads << '\n';
+    log()->get(LogLevel::Debug) << "obb: " << m_args->obb << '\n';
     log()->get(LogLevel::Debug)
-        << "min_density: " << m_args->min_density << std::endl;
+        << "min_density: " << m_args->min_density << '\n';
     log()->get(LogLevel::Debug)
-        << "max_density: " << m_args->max_density << std::endl;
-    log()->get(LogLevel::Debug) << "dimensions: " << std::endl;
+        << "max_density: " << m_args->max_density << '\n';
+    log()->get(LogLevel::Debug) << "dimensions: " << '\n';
 
     for (std::string& dim : m_args->dimensions)
-        log()->get(LogLevel::Debug) << "    -" << dim << std::endl;
+        log()->get(LogLevel::Debug) << "    -" << dim << '\n';
 
     /*
     -3Dscenelayerinfo: <scene-server-url/layers/<layer-id>

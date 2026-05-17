@@ -48,19 +48,19 @@ class PDAL_EXPORT ExpressionFilter : public Filter, public Streamable
 {
 public:
     ExpressionFilter();
-    ~ExpressionFilter();
+    ~ExpressionFilter() override;
 
     struct Args;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<Args> m_args;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
 
     ExpressionFilter& operator=(const ExpressionFilter&) = delete;
     ExpressionFilter(const ExpressionFilter&) = delete;

@@ -51,7 +51,7 @@ public:
     SampleFilter& operator=(const SampleFilter&) = delete;
     SampleFilter(const SampleFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_cell;
@@ -70,11 +70,11 @@ private:
     Arg* m_originZArg;
     std::map<Voxel, CoordList> m_populatedVoxels;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void ready(PointTableRef);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void ready(PointTableRef) override;
+    PointViewSet run(PointViewPtr view) override;
 
     bool keepPoint(PointRef& point);
 

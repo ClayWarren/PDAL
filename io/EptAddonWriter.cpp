@@ -152,7 +152,7 @@ void EptAddonWriter::prepared(PointTableRef table)
     {
         log()->get(LogLevel::Warning)
             << "Using a large thread count: " << threads << " threads"
-            << std::endl;
+            << '\n';
     }
     m_pool.reset(new ThreadPool(threads));
 
@@ -185,13 +185,13 @@ void EptAddonWriter::write(const PointViewPtr view)
     {
         log()->get(LogLevel::Debug)
             << "Writing addon dimension " << addon.name() << " to "
-            << addon.filename() << std::endl;
+            << addon.filename() << '\n';
 
         HierarchyWriter writer(*m_hierarchy, m_hierarchyStep, *m_pool,
                                *m_connector);
         writeOne(view, addon, writer);
 
-        log()->get(LogLevel::Debug) << "\tWritten" << std::endl;
+        log()->get(LogLevel::Debug) << "\tWritten" << '\n';
     }
 }
 

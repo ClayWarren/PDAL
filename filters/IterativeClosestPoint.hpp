@@ -44,7 +44,7 @@ class PDAL_EXPORT IterativeClosestPoint : public Filter
 public:
     IterativeClosestPoint() : Filter(), m_fixed(nullptr), m_complete(false) {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_max_iters;
@@ -58,10 +58,10 @@ private:
     std::string m_matrixStr;
     std::vector<double> m_vec;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
-    virtual void done(PointTableRef _);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
+    void done(PointTableRef _) override;
     PointViewPtr icp(PointViewPtr fixed, PointViewPtr moving) const;
 
     PointViewPtr m_fixed;

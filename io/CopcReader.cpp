@@ -322,7 +322,7 @@ void CopcReader::initialize(PointTableRef table)
     if (m_args->threads > 100)
         log()->get(LogLevel::Warning)
             << "Using a large thread count: " << m_args->threads << " threads"
-            << std::endl;
+            << '\n';
     // Make sure we allow at least as many chunks as we have threads.
     m_args->keepAliveChunkCount =
         (std::max)(m_args->threads, (size_t)m_args->keepAliveChunkCount);
@@ -401,7 +401,7 @@ void CopcReader::initialize(PointTableRef table)
 
     if (m_args->resolution)
         log()->get(LogLevel::Debug)
-            << "Maximum depth: " << m_p->depthEnd << std::endl;
+            << "Maximum depth: " << m_p->depthEnd << '\n';
 
     // Initialize our threadpool
     m_p->pool.reset(new ThreadPool(m_args->threads));
@@ -683,11 +683,11 @@ void CopcReader::ready(PointTableRef table)
 
     if (totalPoints > 1e8)
         log()->get(LogLevel::Warning)
-            << totalPoints << " points will be downloaded" << std::endl;
+            << totalPoints << " points will be downloaded" << '\n';
 
     m_p->tileCount = m_p->hierarchy.size();
     log()->get(LogLevel::Debug)
-        << m_p->tileCount << " overlapping nodes" << std::endl;
+        << m_p->tileCount << " overlapping nodes" << '\n';
 
     m_p->done = false;
     for (const copc::Entry& entry : m_p->hierarchy)

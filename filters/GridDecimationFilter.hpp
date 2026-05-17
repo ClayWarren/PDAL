@@ -24,9 +24,9 @@ class PDAL_EXPORT GridDecimationFilter : public Filter
 {
 public:
     GridDecimationFilter();
-    ~GridDecimationFilter();
+    ~GridDecimationFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     struct GridArgs
@@ -41,12 +41,12 @@ private:
     typedef std::pair<int, int> coordsGrid;
     std::map<coordsGrid, long> grid;
 
-    void addArgs(ProgramArgs& args);
-    virtual void initialize();
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
 
-    virtual void ready(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
-    virtual void prepared(PointTableRef table);
+    void ready(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
+    void prepared(PointTableRef table) override;
 
     void createGrid(BOX2D bounds);
     void processOne(BOX2D bounds, PointRef& point, PointViewPtr view);

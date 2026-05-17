@@ -74,18 +74,18 @@ class PDAL_EXPORT M3C2Filter : public Filter
 
 public:
     M3C2Filter();
-    ~M3C2Filter();
+    ~M3C2Filter() override;
     M3C2Filter& operator=(const M3C2Filter&) = delete;
     M3C2Filter(const M3C2Filter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    void done(PointTableRef table) override;
 
     Eigen::Vector3d findNormal(Eigen::Vector3d pos, const PointGrid& grid);
 

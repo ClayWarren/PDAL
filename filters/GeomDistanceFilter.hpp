@@ -53,20 +53,20 @@ class PDAL_EXPORT GeomDistanceFilter : public Filter, public Streamable
 {
 public:
     GeomDistanceFilter();
-    ~GeomDistanceFilter();
+    ~GeomDistanceFilter() override;
 
     std::string getName() const override;
 
 private:
     std::unique_ptr<GeomDistanceArgs> m_args;
 
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void filter(PointView& view) override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void prepared(PointTableRef table) override;
-    virtual void initialize() override;
-    virtual void ready(PointTableRef table) override;
-    virtual bool processOne(PointRef& point) override;
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void initialize() override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
 
     GeomDistanceFilter& operator=(const GeomDistanceFilter&) = delete;
     GeomDistanceFilter(const GeomDistanceFilter&) = delete;

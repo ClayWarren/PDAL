@@ -49,14 +49,14 @@ public:
     SeparateScanLineFilter& operator=(const SeparateScanLineFilter&) = delete;
     SeparateScanLineFilter(const SeparateScanLineFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     uint64_t m_groupBy;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 };
 
 } // namespace pdal

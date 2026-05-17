@@ -78,12 +78,12 @@ void MongoExpressionFilter::addArgs(ProgramArgs& args)
 void MongoExpressionFilter::prepared(PointTableRef table)
 {
     log()->get(LogLevel::Debug)
-        << "Building expression from: " << m_args->m_json << std::endl;
+        << "Building expression from: " << m_args->m_json << '\n';
 
     m_p->m_expression = Expression(table.layout(), m_args->m_json);
 
     log()->get(LogLevel::Debug)
-        << "Built expression: " << m_p->m_expression << std::endl;
+        << "Built expression: " << m_p->m_expression << '\n';
 }
 
 PointViewSet MongoExpressionFilter::run(PointViewPtr inView)

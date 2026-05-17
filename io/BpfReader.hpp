@@ -58,9 +58,9 @@ class PDAL_EXPORT BpfReader : public Reader, public Streamable
 
 public:
     BpfReader();
-    ~BpfReader();
+    ~BpfReader() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
     virtual point_count_t numPoints() const
     {
@@ -93,14 +93,14 @@ private:
 
     std::string m_remoteFilename;
 
-    virtual QuickInfo inspect();
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr Layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual point_count_t read(PointViewPtr data, point_count_t num);
-    virtual void done(PointTableRef table);
+    QuickInfo inspect() override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr Layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    point_count_t read(PointViewPtr data, point_count_t num) override;
+    void done(PointTableRef table) override;
 
     bool readUlemData();
     bool readUlemFiles();

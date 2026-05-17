@@ -51,7 +51,7 @@ public:
     NNDistanceFilter& operator=(const NNDistanceFilter&) = delete;
     NNDistanceFilter(const NNDistanceFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     enum class Mode
@@ -63,9 +63,9 @@ private:
     size_t m_k;
     Mode m_mode;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 
     friend std::istream& operator>>(std::istream& in,
                                     NNDistanceFilter::Mode& mode);

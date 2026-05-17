@@ -105,7 +105,7 @@ namespace pdal
 // Recursive quadtree implementation.
 struct Tree
 {
-    Tree(BBox bbox, const QuadPointRef* data = 0)
+    Tree(BBox bbox, const QuadPointRef* data = nullptr)
         : bbox(bbox), data(data), nw(), ne(), se(), sw()
     {
     }

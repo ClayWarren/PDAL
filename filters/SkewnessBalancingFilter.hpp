@@ -44,18 +44,18 @@ class PDAL_EXPORT SkewnessBalancingFilter : public Filter
 public:
     SkewnessBalancingFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     uint8_t m_groundClass;
     uint8_t m_otherClass;
     bool m_onlyGround;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
     void processGround(PointViewPtr view);
-    virtual PointViewSet run(PointViewPtr view);
+    PointViewSet run(PointViewPtr view) override;
 
     SkewnessBalancingFilter&
     operator=(const SkewnessBalancingFilter&);               // not implemented

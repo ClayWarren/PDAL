@@ -67,18 +67,18 @@ class PDAL_EXPORT EptReader : public Reader, public Streamable
 
 public:
     EptReader();
-    virtual ~EptReader();
+    ~EptReader() override;
     std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual QuickInfo inspect() override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void ready(PointTableRef table) override;
-    virtual point_count_t read(PointViewPtr view, point_count_t count) override;
-    virtual bool processOne(PointRef& point) override;
-    virtual void done(PointTableRef) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    QuickInfo inspect() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    bool processOne(PointRef& point) override;
+    void done(PointTableRef) override;
 
     // If argument "origin" is specified, this function will clip the query
     // bounds to the bounds of the specified origin and set m_queryOriginId to

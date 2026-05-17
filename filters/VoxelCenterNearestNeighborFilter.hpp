@@ -50,13 +50,13 @@ class PDAL_EXPORT VoxelCenterNearestNeighborFilter : public Filter
 public:
     VoxelCenterNearestNeighborFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_cell;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    PointViewSet run(PointViewPtr view) override;
 
     VoxelCenterNearestNeighborFilter&
     operator=(const VoxelCenterNearestNeighborFilter&); // not implemented

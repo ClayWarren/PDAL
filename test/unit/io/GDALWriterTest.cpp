@@ -111,7 +111,7 @@ void runGdalWriter(const Options& wo, const std::string& infile,
         for (size_t i = 0; i < arr.size(); ++i)
         {
             EXPECT_NEAR(arr[i], data[i], .001)
-                << "Error row/col = " << row << "/" << col << std::endl;
+                << "Error row/col = " << row << "/" << col << '\n';
             if (++col == raster.width())
             {
                 col = 0;

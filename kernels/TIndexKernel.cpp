@@ -72,9 +72,9 @@ public:
         : m_density(density), m_edgeLength(edgeLength), m_sampleSize(sampleSize)
     {
     }
-    ~TindexBoundary() {}
+    ~TindexBoundary() override {}
 
-    std::string getName() const
+    std::string getName() const override
     {
         return "tindex-boundary";
     }
@@ -97,7 +97,7 @@ private:
     double m_edgeLength;
     uint32_t m_sampleSize;
 
-    virtual void ready(PointTableRef table)
+    void ready(PointTableRef table) override
     {
         if (m_edgeLength == 0.0)
         {
@@ -107,7 +107,7 @@ private:
         else
             m_grid.reset(new hexer::HexGrid(m_edgeLength * sqrt(3), m_density));
     }
-    virtual void filter(PointView& view)
+    void filter(PointView& view) override
     {
         PointRef p(view, 0);
 
@@ -117,18 +117,18 @@ private:
             processOne(p);
         }
     }
-    virtual bool processOne(PointRef& point)
+    bool processOne(PointRef& point) override
     {
         double x = point.getFieldAs<double>(Dimension::Id::X);
         double y = point.getFieldAs<double>(Dimension::Id::Y);
         m_grid->addXY(x, y);
         return true;
     }
-    virtual void spatialReferenceChanged(const SpatialReference& srs)
+    void spatialReferenceChanged(const SpatialReference& srs) override
     {
         setSpatialReference(srs);
     }
-    virtual void done(PointTableRef table)
+    void done(PointTableRef table) override
     {
         try
         {
@@ -157,7 +157,7 @@ TIndexKernel::TIndexKernel()
     : SubcommandKernel()
       // ABELL - need to option this.
       ,
-      m_srsColumnName("srs"), m_dataset(NULL), m_layer(NULL),
+      m_srsColumnName("srs"), m_dataset(nullptr), m_layer(nullptr),
       m_overrideASrs(false), m_maxFieldSize(0)
 {
 }
@@ -357,7 +357,7 @@ bool TIndexKernel::isFileIndexed(const FieldIndexes& indexes,
         output = true;
     }
     OGR_L_ResetReading(m_layer);
-    OGR_L_SetAttributeFilter(m_layer, NULL);
+    OGR_L_SetAttributeFilter(m_layer, nullptr);
     return output;
 }
 
@@ -497,7 +497,7 @@ void TIndexKernel::mergeFile()
     m_layer = nullptr;
 
     m_log->get(LogLevel::Info)
-        << "Merge filecount: " << files.size() << std::endl;
+        << "Merge filecount: " << files.size() << '\n';
 
     Options cropOptions;
     if (!m_bounds.empty())
@@ -586,7 +586,7 @@ bool TIndexKernel::createFeature(const FieldIndexes& indexes,
         m_log->get(LogLevel::Warning)
             << "SRS value for " << fileInfo.m_filename
             << " does not match the SRS of other files in the tileindex."
-            << (m_skipMultiSrs ? " Skipping this file" : "") << std::endl;
+            << (m_skipMultiSrs ? " Skipping this file" : "") << '\n';
         if (m_skipMultiSrs)
         {
             OGR_F_Destroy(hFeature);
@@ -606,11 +606,11 @@ bool TIndexKernel::createFeature(const FieldIndexes& indexes,
 
     if (bRet)
         m_log->get(LogLevel::Info)
-            << "Indexed file " << fileInfo.m_filename << std::endl;
+            << "Indexed file " << fileInfo.m_filename << '\n';
     else
         m_log->get(LogLevel::Error) << "Failed to create feature "
                                        "for file '"
-                                    << fileInfo.m_filename << "'" << std::endl;
+                                    << fileInfo.m_filename << "'" << '\n';
 
     return bRet;
 }
@@ -685,7 +685,7 @@ void TIndexKernel::getFileInfo(FileInfo& fileInfo)
             m_log->get(LogLevel::Warning)
                 << "Unable to create exact boundary for tile "
                 << fileInfo.m_filename << " with error: '" << e.what()
-                << std::endl;
+                << '\n';
         }
     }
 
@@ -695,7 +695,7 @@ void TIndexKernel::getFileInfo(FileInfo& fileInfo)
 
 bool TIndexKernel::openDataset(const std::string& filename)
 {
-    m_dataset = OGROpen(filename.c_str(), TRUE, NULL);
+    m_dataset = OGROpen(filename.c_str(), TRUE, nullptr);
     return (bool)m_dataset;
 }
 
@@ -711,7 +711,7 @@ bool TIndexKernel::createDataset(const std::string& filename)
         throw pdal_error(oss.str());
     }
 
-    m_dataset = OGR_Dr_CreateDataSource(hDriver, filename.c_str(), NULL);
+    m_dataset = OGR_Dr_CreateDataSource(hDriver, filename.c_str(), nullptr);
     return (bool)m_dataset;
 }
 
@@ -731,9 +731,9 @@ bool TIndexKernel::createLayer(std::string const& layername)
     if (!srs)
         m_log->get(LogLevel::Error) << "Unable to import srs for layer "
                                        "creation"
-                                    << std::endl;
+                                    << '\n';
 
-    char** papszOptions = NULL;
+    char** papszOptions = nullptr;
     for (std::string& s : m_lcOptions)
         papszOptions = CSLAddString(papszOptions, s.c_str());
 

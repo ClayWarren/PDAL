@@ -72,7 +72,7 @@ void SpatialRef::setFromLayer(OGRLayerH layer)
 
 SpatialRef::operator bool() const
 {
-    return m_ref.get() != NULL;
+    return m_ref.get() != nullptr;
 }
 
 OGRSpatialReferenceH SpatialRef::get() const
@@ -86,7 +86,7 @@ std::string SpatialRef::wkt() const
 
     if (m_ref.get())
     {
-        char* pszWKT = NULL;
+        char* pszWKT = nullptr;
         OSRExportToWkt(m_ref.get(), &pszWKT);
         bool valid = (bool)*pszWKT;
         output = pszWKT;

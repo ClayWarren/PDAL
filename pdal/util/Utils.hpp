@@ -632,7 +632,7 @@ template <typename T> std::string typeidName()
 
 struct RedirectStream
 {
-    RedirectStream() : m_out(NULL), m_buf(NULL), m_null(new NullOStream) {}
+    RedirectStream() : m_out(nullptr), m_buf(nullptr), m_null(new NullOStream) {}
 
     std::ofstream* m_out;
     std::streambuf* m_buf;
@@ -699,8 +699,8 @@ inline void restore(std::ostream& out, RedirectStream& redir)
     out.rdbuf(redir.m_buf);
     if (redir.m_out)
         redir.m_out->close();
-    redir.m_out = NULL;
-    redir.m_buf = NULL;
+    redir.m_out = nullptr;
+    redir.m_buf = nullptr;
 }
 
 // ABELL - This is certainly not as efficient as boost::numeric_cast, but

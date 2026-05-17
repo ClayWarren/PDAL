@@ -54,13 +54,13 @@ public:
     HagDelaunayFilter& operator=(const HagDelaunayFilter&) = delete;
     HagDelaunayFilter(const HagDelaunayFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     bool m_allowExtrapolation;
     point_count_t m_count;

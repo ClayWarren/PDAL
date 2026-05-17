@@ -257,8 +257,8 @@ TEST(LasReaderTest, inspect)
     // completely, this can be fixed.
     std::string testWkt{R"(GEOGCS)"};
 
-    std::cout << "qi.m_srs.getWKT(): " << qi.m_srs.getWKT() << std::endl;
-    std::cout << "testWkt: " << testWkt << std::endl;
+    std::cout << "qi.m_srs.getWKT(): " << qi.m_srs.getWKT() << '\n';
+    std::cout << "testWkt: " << testWkt << '\n';
     EXPECT_TRUE(Utils::startsWith(qi.m_srs.getWKT(), testWkt));
     EXPECT_EQ(qi.m_pointCount, 5380u);
 
@@ -486,7 +486,7 @@ void streamTest(const std::string src)
     class Checker : public Filter, public Streamable
     {
     public:
-        std::string getName() const
+        std::string getName() const override
         {
             return "checker";
         }
@@ -503,7 +503,7 @@ void streamTest(const std::string src)
         std::vector<char> m_buf;
         DimTypeList m_dims;
 
-        bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             PointRef bulkPoint = m_view->point(m_cnt);
 
@@ -515,7 +515,7 @@ void streamTest(const std::string src)
             return true;
         }
 
-        void done(PointTableRef)
+        void done(PointTableRef) override
         {
             EXPECT_EQ(m_cnt, 110000u);
         }

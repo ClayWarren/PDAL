@@ -66,7 +66,7 @@ public:
     /**
       Default constructor.
     */
-    PDAL_EXPORT IStream() : m_stream(NULL), m_fstream(NULL) {}
+    PDAL_EXPORT IStream() : m_stream(nullptr), m_fstream(nullptr) {}
 
     /**
       Construct an IStream from a filename.
@@ -74,7 +74,7 @@ public:
       \param filename  File from which to read.
     */
     PDAL_EXPORT IStream(const std::string& filename)
-        : m_stream(NULL), m_fstream(NULL)
+        : m_stream(nullptr), m_fstream(nullptr)
     {
         open(filename);
     }
@@ -85,7 +85,7 @@ public:
       \param stream  Stream from which to read.
     */
     PDAL_EXPORT IStream(std::istream* stream)
-        : m_stream(stream), m_fstream(NULL)
+        : m_stream(stream), m_fstream(nullptr)
     {
     }
 
@@ -115,10 +115,10 @@ public:
     */
     PDAL_EXPORT void close()
     {
-        if (m_fstream != NULL)
+        if (m_fstream != nullptr)
             FileUtils::closeFile(m_fstream);
-        m_fstream = NULL;
-        m_stream = NULL;
+        m_fstream = nullptr;
+        m_stream = nullptr;
     }
 
     /**

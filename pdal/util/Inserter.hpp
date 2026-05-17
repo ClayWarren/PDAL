@@ -118,19 +118,19 @@ public:
     LeInserter(char* buf, std::size_t size) : Inserter(buf, size) {}
     LeInserter(unsigned char* buf, std::size_t size) : Inserter(buf, size) {}
 
-    LeInserter& operator<<(uint8_t v)
+    LeInserter& operator<<(uint8_t v) override
     {
         *m_pptr++ = (char)v;
         return *this;
     }
 
-    LeInserter& operator<<(int8_t v)
+    LeInserter& operator<<(int8_t v) override
     {
         *m_pptr++ = v;
         return *this;
     }
 
-    LeInserter& operator<<(uint16_t v)
+    LeInserter& operator<<(uint16_t v) override
     {
         v = htole16(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -138,7 +138,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(int16_t v)
+    LeInserter& operator<<(int16_t v) override
     {
         v = (int16_t)htole16((uint16_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -146,7 +146,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(uint32_t v)
+    LeInserter& operator<<(uint32_t v) override
     {
         v = htole32(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -154,7 +154,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(int32_t v)
+    LeInserter& operator<<(int32_t v) override
     {
         v = (int32_t)htole32((uint32_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -162,7 +162,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(uint64_t v)
+    LeInserter& operator<<(uint64_t v) override
     {
         v = htole64(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -170,7 +170,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(int64_t v)
+    LeInserter& operator<<(int64_t v) override
     {
         v = (int64_t)htole64((uint64_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -178,7 +178,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(float v)
+    LeInserter& operator<<(float v) override
     {
         union
         {
@@ -193,7 +193,7 @@ public:
         return *this;
     }
 
-    LeInserter& operator<<(double v)
+    LeInserter& operator<<(double v) override
     {
         union
         {
@@ -217,19 +217,19 @@ public:
     BeInserter(char* buf, std::size_t size) : Inserter(buf, size) {}
     BeInserter(unsigned char* buf, std::size_t size) : Inserter(buf, size) {}
 
-    BeInserter& operator<<(uint8_t v)
+    BeInserter& operator<<(uint8_t v) override
     {
         *m_pptr++ = (char)v;
         return *this;
     }
 
-    BeInserter& operator<<(int8_t v)
+    BeInserter& operator<<(int8_t v) override
     {
         *m_pptr++ = v;
         return *this;
     }
 
-    BeInserter& operator<<(uint16_t v)
+    BeInserter& operator<<(uint16_t v) override
     {
         v = htobe16(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -237,7 +237,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(int16_t v)
+    BeInserter& operator<<(int16_t v) override
     {
         v = (int16_t)htobe16((uint16_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -245,7 +245,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(uint32_t v)
+    BeInserter& operator<<(uint32_t v) override
     {
         v = htobe32(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -253,7 +253,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(int32_t v)
+    BeInserter& operator<<(int32_t v) override
     {
         v = (int32_t)htobe32((uint32_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -261,7 +261,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(uint64_t v)
+    BeInserter& operator<<(uint64_t v) override
     {
         v = htobe64(v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -269,7 +269,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(int64_t v)
+    BeInserter& operator<<(int64_t v) override
     {
         v = (int64_t)htobe64((uint64_t)v);
         memcpy(m_pptr, &v, sizeof(v));
@@ -277,7 +277,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(float v)
+    BeInserter& operator<<(float v) override
     {
         union
         {
@@ -292,7 +292,7 @@ public:
         return *this;
     }
 
-    BeInserter& operator<<(double v)
+    BeInserter& operator<<(double v) override
     {
         union
         {

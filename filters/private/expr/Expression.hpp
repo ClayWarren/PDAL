@@ -113,7 +113,7 @@ class LogicalNode : public Node
 public:
     LogicalNode(NodeType type) : Node(type) {}
 
-    virtual bool isBool() const
+    bool isBool() const override
     {
         return true;
     }
@@ -124,7 +124,7 @@ class ValueNode : public Node
 public:
     ValueNode(NodeType type) : Node(type) {}
 
-    virtual bool isBool() const
+    bool isBool() const override
     {
         return false;
     }
@@ -135,9 +135,9 @@ class BinMathNode : public ValueNode
 public:
     BinMathNode(NodeType type, NodePtr left, NodePtr right);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     NodePtr m_left;
@@ -149,9 +149,9 @@ class FuncNode : public ValueNode
 public:
     FuncNode(NodeType type, Func1 func, NodePtr sub);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     Func1 m_func;
@@ -163,9 +163,9 @@ class UnMathNode : public ValueNode
 public:
     UnMathNode(NodeType type, NodePtr sub);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     NodePtr m_sub;
@@ -176,9 +176,9 @@ class BoolFuncNode : public LogicalNode
 public:
     BoolFuncNode(NodeType type, BoolFunc1 func, NodePtr sub);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     BoolFunc1 m_func;
@@ -190,9 +190,9 @@ class NotNode : public LogicalNode
 public:
     NotNode(NodeType type, NodePtr sub);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     NodePtr m_sub;
@@ -203,9 +203,9 @@ class BoolNode : public LogicalNode
 public:
     BoolNode(NodeType type, NodePtr left, NodePtr right);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     NodePtr m_left;
@@ -217,9 +217,9 @@ class CompareNode : public LogicalNode
 public:
     CompareNode(NodeType type, NodePtr left, NodePtr right);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
 
 private:
     NodePtr m_left;
@@ -231,9 +231,9 @@ class ConstValueNode : public ValueNode
 public:
     ConstValueNode(double d);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef&) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef&) const override;
 
     double value() const;
 
@@ -246,9 +246,9 @@ class ConstLogicalNode : public LogicalNode
 public:
     ConstLogicalNode(bool b);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef&) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef&) const override;
 
     bool value() const;
 
@@ -261,9 +261,9 @@ class VarNode : public ValueNode
 public:
     VarNode(const std::string& s);
 
-    virtual std::string print() const;
-    virtual Utils::StatusWithReason prepare(PointLayoutPtr l);
-    virtual Result eval(PointRef& p) const;
+    std::string print() const override;
+    Utils::StatusWithReason prepare(PointLayoutPtr l) override;
+    Result eval(PointRef& p) const override;
     Dimension::Id eval() const;
     inline std::string const& name() const
     {

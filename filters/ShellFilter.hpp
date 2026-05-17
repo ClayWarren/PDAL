@@ -46,14 +46,14 @@ class PDAL_EXPORT ShellFilter : public Filter
 {
 public:
     std::string getName() const override;
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual PointViewSet run(PointViewPtr view) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
 
 private:
     std::string m_command;
     std::string m_command_output;
-    virtual void done(PointTableRef table) override;
+    void done(PointTableRef table) override;
 };
 
 } // namespace pdal

@@ -17,50 +17,50 @@ public:
           m_minY((std::numeric_limits<int>::max)())
     {
     }
-    ~HexGrid();
+    ~HexGrid() override;
 
-    void addXY(double& x, double& y)
+    void addXY(double& x, double& y) override
     {
         Point p{x, y};
         addPoint(p);
     }
 
-    Point offset(int idx) const
+    Point offset(int idx) const override
     {
         return m_offsets[idx];
     }
-    double height()
+    double height() override
     {
         return m_height;
     }
-    bool sampling() const
+    bool sampling() const override
     {
         return m_width < 0;
     }
-    uint64_t getID(HexId ij)
+    uint64_t getID(HexId ij) override
     {
         return (((uint64_t)ij.i << 32) | (uint32_t)ij.j);
     }
-    Point findPoint(Segment& s);
+    Point findPoint(Segment& s) override;
 
 private:
-    void processHeight(double height);
-    HexId findHexagon(Point p);
-    HexId edgeHex(HexId hex, int edge) const;
-    Segment nextSegment(const Segment& s) const;
+    void processHeight(double height) override;
+    HexId findHexagon(Point p) override;
+    HexId edgeHex(HexId hex, int edge) const override;
+    Segment nextSegment(const Segment& s) const override;
 
-    bool inGrid(HexId& h)
+    bool inGrid(HexId& h) override
     {
         return h.j >= m_minY;
     }
-    HexId moveCoord(HexId& h)
+    HexId moveCoord(HexId& h) override
     {
         return HexId{h.i, h.j - 1};
     }
 
     // minimum Y (HexId.j) value, used in inGrid() for finding root/child paths
     // in parentOrChild()
-    void setMinCoord(HexId& h)
+    void setMinCoord(HexId& h) override
     {
         m_minY = (std::min)(m_minY, h.j);
     }

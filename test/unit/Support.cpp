@@ -263,12 +263,12 @@ uint32_t diff_files(std::istream& str1, std::istream& str2,
 
 uint32_t diff_files(const std::string& file1, const std::string& file2)
 {
-    return diff_files(file1, file2, NULL, NULL, 0);
+    return diff_files(file1, file2, nullptr, nullptr, 0);
 }
 
 uint32_t diff_files(std::istream& str1, std::istream& str2)
 {
-    return diff_files(str1, str2, NULL, NULL, 0);
+    return diff_files(str1, str2, nullptr, nullptr, 0);
 }
 
 bool compare_files(const std::string& file1, const std::string& file2)
@@ -297,10 +297,10 @@ void checkXYZ(const std::string& file1, const std::string& file2)
     EXPECT_NE(driver2, "") << "Can't find driver";
 
     Stage* reader1 = f.createStage(driver1);
-    EXPECT_NE(reader1, (Stage*)NULL) << "Couldn't create stage";
+    EXPECT_NE(reader1, (Stage*)nullptr) << "Couldn't create stage";
 
     Stage* reader2 = f.createStage(driver2);
-    EXPECT_NE(reader1, (Stage*)NULL) << "Couldn't create stage";
+    EXPECT_NE(reader1, (Stage*)nullptr) << "Couldn't create stage";
 
     Options o1;
     o1.add("filename", file1);

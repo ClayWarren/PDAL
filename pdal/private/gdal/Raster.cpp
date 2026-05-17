@@ -183,7 +183,7 @@ Raster* Raster::memoryCopy() const
 */
 Raster::Raster(const std::string& filename, const std::string& drivername)
     : m_filename(filename), m_width(0), m_height(0), m_numBands(0),
-      m_drivername(drivername), m_ds(0)
+      m_drivername(drivername), m_ds(nullptr)
 {
     m_forwardTransform.fill(0);
     m_forwardTransform[1] = 1;
@@ -204,7 +204,7 @@ Raster::Raster(const std::string& filename, const std::string& drivername,
                const std::array<double, 6> pixelToPos)
     : m_filename(filename), m_width(0), m_height(0), m_numBands(0),
       m_drivername(drivername), m_forwardTransform(pixelToPos), m_srs(srs),
-      m_ds(0)
+      m_ds(nullptr)
 {
 }
 
@@ -274,11 +274,11 @@ GDALError Raster::open(int width, int height, int numBands,
         opts.push_back(options[i].data());
     }
     opts.push_back("INTERLEAVE=BAND");
-    opts.push_back(NULL);
+    opts.push_back(nullptr);
 
     m_ds = driver->Create(m_filename.data(), m_width, m_height, m_numBands,
                           toGdalType(type), const_cast<char**>(opts.data()));
-    if (m_ds == NULL)
+    if (m_ds == nullptr)
     {
         m_errorMsg = "Unable to open GDAL datasource '" + m_filename + "'.";
         return GDALError::CantCreate;
@@ -327,8 +327,8 @@ GDALError Raster::open(StringList options)
     if (m_ds)
         return GDALError::None;
 
-    const char** driverP = NULL;
-    const char* drivers[2] = {0};
+    const char** driverP = nullptr;
+    const char* drivers[2] = {nullptr};
     if (!m_drivername.empty())
     {
         drivers[0] = m_drivername.c_str();
@@ -342,7 +342,7 @@ GDALError Raster::open(StringList options)
     {
         opts.push_back(options[i].data());
     }
-    opts.push_back(NULL);
+    opts.push_back(nullptr);
 
     m_ds = (GDALDataset*)GDALOpenEx(m_filename.c_str(),
                                     GDAL_OF_READONLY | GDAL_OF_RASTER, driverP,
@@ -356,7 +356,7 @@ GDALError Raster::open(StringList options)
 GDALError Raster::wake()
 {
     GDALError error = GDALError::None;
-    if (m_ds == NULL)
+    if (m_ds == nullptr)
     {
         m_errorMsg = "Unable to open GDAL datasource '" + m_filename + "'.";
         return GDALError::CantOpen;

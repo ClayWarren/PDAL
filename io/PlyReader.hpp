@@ -48,7 +48,7 @@ namespace pdal
 class PDAL_EXPORT PlyReader : public Reader, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     typedef std::map<std::string, Dimension::Id> DimensionMap;
 
@@ -84,9 +84,9 @@ private:
         Dimension::Type m_type;
         Dimension::Id m_dim;
 
-        virtual void read(std::istream* stream, PlyReader::Format format,
+        void read(std::istream* stream, PlyReader::Format format,
                           PointRef& point) override;
-        virtual void setDim(Dimension::Id id) override
+        void setDim(Dimension::Id id) override
         {
             m_dim = id;
         }
@@ -103,7 +103,7 @@ private:
         Dimension::Type m_countType;
         Dimension::Type m_listType;
 
-        virtual void read(std::istream* stream, PlyReader::Format format,
+        void read(std::istream* stream, PlyReader::Format format,
                           PointRef& point) override;
     };
 
@@ -129,13 +129,13 @@ private:
     PointId m_index;
     Element* m_vertexElt;
 
-    virtual QuickInfo inspect();
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t num);
-    virtual void done(PointTableRef table);
-    virtual bool processOne(PointRef& point);
+    QuickInfo inspect() override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
+    void done(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
 
     std::string readLine();
     void pushLine();

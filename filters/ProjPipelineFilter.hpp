@@ -50,18 +50,18 @@ public:
     class CoordTransform;
 
     ProjPipelineFilter();
-    ~ProjPipelineFilter();
+    ~ProjPipelineFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     ProjPipelineFilter& operator=(const ProjPipelineFilter&) = delete;
     ProjPipelineFilter(const ProjPipelineFilter&) = delete;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
-    virtual bool processOne(PointRef& point);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
 
     void createTransform(const std::string coordOperation, bool reverseTransfo);
 

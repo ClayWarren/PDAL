@@ -88,7 +88,7 @@ public:
     LogicGate() = default;
     LogicGate(LogicGate&&) = default;
     LogicGate& operator=(LogicGate&&) = default;
-    virtual ~LogicGate() = default;
+    ~LogicGate() override = default;
 
     static std::unique_ptr<LogicGate> create(std::string s)
     {
@@ -102,11 +102,11 @@ public:
         m_filters.push_back(std::move(f));
     }
 
-    virtual std::string toString(std::string pre) const override
+    std::string toString(std::string pre) const override
     {
         std::ostringstream ss;
         if (m_filters.size())
-            ss << pre << opToString(type()) << std::endl;
+            ss << pre << opToString(type()) << '\n';
         for (const auto& c : m_filters)
             ss << c->toString(pre + "  ");
         return ss.str();
@@ -121,7 +121,7 @@ protected:
 class LogicalAnd : public LogicGate
 {
 public:
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         for (const auto& f : m_filters)
         {
@@ -133,7 +133,7 @@ public:
     }
 
 protected:
-    virtual LogicalOperator type() const override
+    LogicalOperator type() const override
     {
         return LogicalOperator::lAnd;
     }
@@ -143,7 +143,7 @@ class LogicalNot : public LogicGate
 {
 public:
     using LogicGate::push;
-    virtual void push(std::unique_ptr<Filterable> f) override
+    void push(std::unique_ptr<Filterable> f) override
     {
         if (!m_filters.empty())
             throw pdal_error("Cannot push onto a logical NOT");
@@ -151,13 +151,13 @@ public:
         LogicGate::push(std::move(f));
     }
 
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         return !(*m_filters.at(0))(pr);
     }
 
 private:
-    virtual LogicalOperator type() const override
+    LogicalOperator type() const override
     {
         return LogicalOperator::lNot;
     }
@@ -166,7 +166,7 @@ private:
 class LogicalOr : public LogicGate
 {
 public:
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         for (const auto& f : m_filters)
         {
@@ -178,7 +178,7 @@ public:
     }
 
 protected:
-    virtual LogicalOperator type() const override
+    LogicalOperator type() const override
     {
         return LogicalOperator::lOr;
     }
@@ -188,13 +188,13 @@ class LogicalNor : public LogicalOr
 {
 public:
     using LogicalOr::operator();
-    virtual bool operator()(const pdal::PointRef& pr) const override
+    bool operator()(const pdal::PointRef& pr) const override
     {
         return !LogicalOr::operator()(pr);
     }
 
 protected:
-    virtual LogicalOperator type() const override
+    LogicalOperator type() const override
     {
         return LogicalOperator::lNor;
     }

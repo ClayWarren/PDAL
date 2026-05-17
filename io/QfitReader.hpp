@@ -57,7 +57,7 @@ class PDAL_EXPORT QfitReader : public pdal::Reader
 public:
     QfitReader();
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     QFIT_Format_Type m_format;
@@ -71,12 +71,12 @@ private:
     std::unique_ptr<IStream> m_istream;
     point_count_t m_index;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr buf, point_count_t count);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr buf, point_count_t count) override;
+    void done(PointTableRef table) override;
 
     QfitReader& operator=(const QfitReader&) = delete;
     QfitReader(const QfitReader&) = delete;

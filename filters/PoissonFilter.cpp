@@ -54,11 +54,11 @@ class PointViewSource : public PointSource
 public:
     PointViewSource(PointView& view) : m_view(view), m_current(0) {}
 
-    virtual void reset()
+    void reset() override
     {
         m_current = 0;
     }
-    virtual bool nextPoint(Point& point)
+    bool nextPoint(Point& point) override
     {
         using namespace Dimension;
 
@@ -84,11 +84,11 @@ class ColorPointViewSource : public ColorPointSource
 public:
     ColorPointViewSource(PointView& view) : m_view(view), m_current(0) {}
 
-    virtual void reset()
+    void reset() override
     {
         m_current = 0;
     }
-    virtual bool nextPoint(Point& point, Point3D<double>& color)
+    bool nextPoint(Point& point, Point3D<double>& color) override
     {
         using namespace Dimension;
 
@@ -122,15 +122,15 @@ public:
         resetIterator();
     }
 
-    virtual int pointCount() const
+    int pointCount() const override
     {
         return static_cast<int>(m_view.size());
     }
-    virtual int polygonCount() const
+    int polygonCount() const override
     {
         return m_mesh.size();
     }
-    virtual int newPoint(const std::array<double, 3>& position)
+    int newPoint(const std::array<double, 3>& position) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -139,7 +139,7 @@ public:
         return static_cast<int>(cnt);
     }
 
-    virtual int newPoint(const std::array<double, 3>& position, double density)
+    int newPoint(const std::array<double, 3>& position, double density) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -149,8 +149,8 @@ public:
         return static_cast<int>(cnt);
     }
 
-    virtual int newPoint(const std::array<double, 3>& position,
-                         const std::array<uint8_t, 3>& color)
+    int newPoint(const std::array<double, 3>& position,
+                         const std::array<uint8_t, 3>& color) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -162,8 +162,8 @@ public:
         return static_cast<int>(cnt);
     }
 
-    virtual int newPoint(const std::array<double, 3>& position,
-                         const std::array<uint8_t, 3>& color, double density)
+    int newPoint(const std::array<double, 3>& position,
+                         const std::array<uint8_t, 3>& color, double density) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -176,24 +176,24 @@ public:
         return static_cast<int>(cnt);
     }
 
-    virtual void newPolygon(std::vector<int>& poly)
+    void newPolygon(std::vector<int>& poly) override
     {
         assert(poly.size() == 3);
         m_mesh.add(poly[0], poly[1], poly[2]);
     }
 
-    virtual bool hasDensity() const
+    bool hasDensity() const override
     {
         return m_view.hasDim(Dimension::Id::Density);
     }
 
-    virtual void resetIterator()
+    void resetIterator() override
     {
         m_polyIdx = 0;
         m_pointIdx = 0;
     }
 
-    virtual bool nextPolygon(Kazhdan::Polygon& poly)
+    bool nextPolygon(Kazhdan::Polygon& poly) override
     {
         if (m_polyIdx >= m_mesh.size())
             return false;
@@ -204,7 +204,7 @@ public:
         return true;
     }
 
-    virtual bool nextPoint(Kazhdan::Point& point)
+    bool nextPoint(Kazhdan::Point& point) override
     {
         if (m_pointIdx > m_view.size())
             return false;

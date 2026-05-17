@@ -42,12 +42,12 @@ namespace pdal
 class PDAL_EXPORT SplitKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
 
 private:
-    void addSwitches(ProgramArgs& args);
-    void validateSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
+    void validateSwitches(ProgramArgs& args) override;
 
     std::string m_inputFile;
     std::string m_outputFile;

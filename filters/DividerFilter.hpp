@@ -44,9 +44,9 @@ class PDAL_EXPORT DividerFilter : public Filter
 public:
 public:
     DividerFilter();
-    ~DividerFilter();
+    ~DividerFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
     struct Args;
 
@@ -66,10 +66,10 @@ private:
 
     std::unique_ptr<Args> m_args;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual PointViewSet run(PointViewPtr view);
-    virtual void prepared(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    void prepared(PointTableRef table) override;
 
     DividerFilter& operator=(const DividerFilter&); // not implemented
     DividerFilter(const DividerFilter&);            // not implemented

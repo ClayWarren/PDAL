@@ -50,19 +50,19 @@ public:
         BinaryBe
     };
 
-    std::string getName() const;
+    std::string getName() const override;
 
     PlyWriter();
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void readyTable(PointTableRef table);
-    virtual void doneTable(PointTableRef table);
-    virtual void readyFile(const std::string& filename,
-                           const SpatialReference& srs);
-    virtual void writeView(const PointViewPtr data);
-    virtual void doneFile();
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void readyTable(PointTableRef table) override;
+    void doneTable(PointTableRef table) override;
+    void readyFile(const std::string& filename,
+                           const SpatialReference& srs) override;
+    void writeView(const PointViewPtr data) override;
+    void doneFile() override;
 
     std::string getType(Dimension::Type type) const;
     void writeHeader(PointLayoutPtr layout, point_count_t pointCount,

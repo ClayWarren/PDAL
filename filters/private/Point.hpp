@@ -52,7 +52,7 @@ public:
     Point(const std::string& wkt_or_json, SpatialReference ref);
     bool is3d() const;
     bool empty() const;
-    void clear();
+    void clear() override;
     double x() const;
     double y() const;
     double z() const;
@@ -60,7 +60,7 @@ public:
     void y(double y);
     void z(double z);
 
-    virtual void update(const std::string& wkt_or_json);
+    void update(const std::string& wkt_or_json) override;
 };
 
 } // namespace filter

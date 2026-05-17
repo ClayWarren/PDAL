@@ -49,7 +49,7 @@ class PDAL_EXPORT FbiReader : public pdal::Reader
 {
 public:
     FbiReader();
-    std::string getName() const;
+    std::string getName() const override;
 
     point_count_t getNumPoints() const
     {
@@ -69,12 +69,12 @@ private:
     std::unique_ptr<fbi::FbiHdr> hdr;
     std::istream* m_istreamPtr;
 
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
-    virtual void done(PointTableRef table);
-    virtual void addArgs(ProgramArgs& args);
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    void done(PointTableRef table) override;
+    void addArgs(ProgramArgs& args) override;
 
     FbiReader& operator=(const FbiReader&); // not implemented
     FbiReader(const FbiReader&);            // not implemented

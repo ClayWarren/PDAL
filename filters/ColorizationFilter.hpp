@@ -71,20 +71,20 @@ public:
     };
 
     ColorizationFilter();
-    ~ColorizationFilter();
+    ~ColorizationFilter() override;
 
     ColorizationFilter& operator=(const ColorizationFilter&) = delete;
     ColorizationFilter(const ColorizationFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
 
     StringList m_dimSpec;
     std::string m_rasterFilename;

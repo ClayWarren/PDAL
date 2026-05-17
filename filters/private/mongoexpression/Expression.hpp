@@ -70,7 +70,7 @@ private:
 
 inline std::ostream& operator<<(std::ostream& os, const Expression& expression)
 {
-    os << expression.toString() << std::endl;
+    os << expression.toString() << '\n';
     return os;
 }
 

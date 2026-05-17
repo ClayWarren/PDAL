@@ -191,7 +191,7 @@ PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
 
         // Finalize and log the MSE.
         mse /= moving_idx.size();
-        log()->get(LogLevel::Debug2) << "MSE: " << mse << std::endl;
+        log()->get(LogLevel::Debug2) << "MSE: " << mse << '\n';
 
         // Estimate rigid transformation using Umeyama method, logging the
         // current translation in X and Y.
@@ -199,13 +199,13 @@ PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
         auto B = math::pointViewToEigen(*tempMovingTransformed, moving_idx);
         auto T = Eigen::umeyama(B.transpose(), A.transpose(), false);
         log()->get(LogLevel::Debug2) << "Current dx: " << T.coeff(0, 3) << ", "
-                                     << "dy: " << T.coeff(1, 3) << std::endl;
+                                     << "dy: " << T.coeff(1, 3) << '\n';
 
         // Update the final_transformation and log the X and Y translations.
         final_transformation = final_transformation * T;
         log()->get(LogLevel::Debug2)
             << "Cumulative dx: " << final_transformation.coeff(0, 3) << ", "
-            << "dy: " << final_transformation.coeff(1, 3) << std::endl;
+            << "dy: " << final_transformation.coeff(1, 3) << '\n';
 
         bool is_similar = false;
 
@@ -216,9 +216,9 @@ PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
         double translation_sqr = T.coeff(0, 3) * T.coeff(0, 3) +
                                  T.coeff(1, 3) * T.coeff(1, 3) +
                                  T.coeff(2, 3) * T.coeff(2, 3);
-        log()->get(LogLevel::Debug2) << "Rotation: " << cos_angle << std::endl;
+        log()->get(LogLevel::Debug2) << "Rotation: " << cos_angle << '\n';
         log()->get(LogLevel::Debug2)
-            << "Translation: " << translation_sqr << std::endl;
+            << "Translation: " << translation_sqr << '\n';
 
         // Check for change in MSE.
         if (std::fabs(mse - prev_mse) < m_mse_abs)
@@ -299,7 +299,7 @@ PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
         }
     }
     mse /= mse_n;
-    log()->get(LogLevel::Debug2) << "MSE: " << mse << std::endl;
+    log()->get(LogLevel::Debug2) << "MSE: " << mse << '\n';
 
     // Transformation to demean coords
     Matrix4d pretrans = Matrix4d::Identity();

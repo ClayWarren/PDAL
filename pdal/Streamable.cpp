@@ -69,7 +69,7 @@ const Stage* Streamable::findNonstreamable() const
 void Streamable::execute(StreamPointTable& table)
 {
     m_log->get(LogLevel::Debug)
-        << "Executing pipeline in stream mode." << std::endl;
+        << "Executing pipeline in stream mode." << '\n';
     struct StreamableList : public std::list<Streamable*>
     {
         StreamableList operator-(const StreamableList& other) const
@@ -130,7 +130,7 @@ void Streamable::execute(StreamPointTable& table)
             {
                 log()->get(LogLevel::Warning)
                     << "Dimension " << Dimension::name(id) << " is deprecated"
-                    << std::endl;
+                    << '\n';
             }
         }
     }

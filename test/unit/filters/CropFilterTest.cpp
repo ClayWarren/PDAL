@@ -378,11 +378,11 @@ TEST(CropFilterTest, stream)
     class StreamReader : public Reader, public Streamable
     {
     public:
-        std::string getName() const
+        std::string getName() const override
         {
             return "readers.stream";
         }
-        bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             static int i = 0;
 
@@ -438,19 +438,19 @@ TEST(CropFilterTest, stream)
     class TestFilter : public Filter, public Streamable
     {
     public:
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.testfilter";
         }
         point_count_t m_count;
 
     private:
-        virtual void ready(PointTableRef)
+        void ready(PointTableRef) override
         {
             m_count = 0;
         }
 
-        virtual bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             if (m_count == 0)
             {

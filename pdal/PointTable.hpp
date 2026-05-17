@@ -172,7 +172,7 @@ private:
 
 public:
     RowPointTable() : SimplePointTable(m_layout), m_numPts(0) {}
-    virtual ~RowPointTable();
+    ~RowPointTable() override;
     bool supportsView() const override
     {
         return true;
@@ -207,7 +207,7 @@ private:
 
 public:
     ColumnPointTable() : SimplePointTable(m_layout), m_numPts(0) {}
-    virtual ~ColumnPointTable();
+    ~ColumnPointTable() override;
     bool supportsView() const override
     {
         return true;

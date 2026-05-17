@@ -352,12 +352,12 @@ int Utils::run_shell_command(const std::string& cmd, std::string& output)
 
     FILE* fp = portable_popen(cmd.c_str(), "r");
 
-    if (fp == NULL)
+    if (fp == nullptr)
         return 1;
 
     while (!feof(fp))
     {
-        if (fgets(buf, maxbuf, fp) == NULL)
+        if (fgets(buf, maxbuf, fp) == nullptr)
         {
             if (feof(fp))
                 break;
@@ -513,7 +513,7 @@ std::string Utils::demangle(const std::string& s)
 #ifndef _WIN32
     int status;
     std::unique_ptr<char[], void (*)(void*)> result(
-        abi::__cxa_demangle(s.c_str(), 0, 0, &status), std::free);
+        abi::__cxa_demangle(s.c_str(), nullptr, nullptr, &status), std::free);
     if (status == 0)
         return std::string(result.get());
 #endif

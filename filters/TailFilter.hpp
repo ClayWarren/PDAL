@@ -46,13 +46,13 @@ public:
     TailFilter& operator=(const TailFilter&) = delete;
     TailFilter(const TailFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     point_count_t m_count;
     bool m_invert;
 
-    void addArgs(ProgramArgs& args)
+    void addArgs(ProgramArgs& args) override
     {
         args.add("count",
                  "Number of points to return from end. "
@@ -64,7 +64,7 @@ private:
                  m_invert);
     }
 
-    PointViewSet run(PointViewPtr view)
+    PointViewSet run(PointViewPtr view) override
     {
         if (m_count > view->size())
             log()->get(LogLevel::Warning)

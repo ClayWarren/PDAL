@@ -47,14 +47,14 @@ class PDAL_EXPORT RandomizeFilter : public Filter
 public:
     RandomizeFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     Arg* m_seedArg;
     unsigned m_seed;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view)
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override
     {
         if (!m_seedArg->set())
         {

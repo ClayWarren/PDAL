@@ -81,16 +81,16 @@ void TerrasolidReader::initialize()
                    Utils::toString(TERRASOLID_Format_2) + "'");
 
     log()->get(LogLevel::Debug)
-        << "TerraSolid Reader::initialize format: " << m_format << std::endl;
-    log()->get(LogLevel::Debug) << "OrgX: " << m_header->OrgX << std::endl;
-    log()->get(LogLevel::Debug) << "OrgY: " << m_header->OrgY << std::endl;
-    log()->get(LogLevel::Debug) << "OrgZ: " << m_header->OrgZ << std::endl;
-    log()->get(LogLevel::Debug) << "Units: " << m_header->Units << std::endl;
-    log()->get(LogLevel::Debug) << "Time: " << m_header->Time << std::endl;
-    log()->get(LogLevel::Debug) << "Color: " << m_header->Color << std::endl;
-    log()->get(LogLevel::Debug) << "Count: " << m_header->PntCnt << std::endl;
+        << "TerraSolid Reader::initialize format: " << m_format << '\n';
+    log()->get(LogLevel::Debug) << "OrgX: " << m_header->OrgX << '\n';
+    log()->get(LogLevel::Debug) << "OrgY: " << m_header->OrgY << '\n';
+    log()->get(LogLevel::Debug) << "OrgZ: " << m_header->OrgZ << '\n';
+    log()->get(LogLevel::Debug) << "Units: " << m_header->Units << '\n';
+    log()->get(LogLevel::Debug) << "Time: " << m_header->Time << '\n';
+    log()->get(LogLevel::Debug) << "Color: " << m_header->Color << '\n';
+    log()->get(LogLevel::Debug) << "Count: " << m_header->PntCnt << '\n';
     log()->get(LogLevel::Debug)
-        << "RecogVal: " << m_header->RecogVal << std::endl;
+        << "RecogVal: " << m_header->RecogVal << '\n';
 }
 
 void TerrasolidReader::addDimensions(PointLayoutPtr layout)

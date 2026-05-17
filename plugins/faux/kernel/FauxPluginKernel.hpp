@@ -42,11 +42,11 @@ namespace pdal
 class PDAL_EXPORT FauxPluginKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
 
 private:
-    virtual void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
 
     int m_fakeArg;
 };

@@ -201,7 +201,7 @@ void TransformationFilter::spatialReferenceChanged(const SpatialReference& srs)
     if (!srs.empty() && !m_overrideSrs.empty())
         log()->get(LogLevel::Warning)
             << getName() << ": overriding input spatial reference."
-            << std::endl;
+            << '\n';
 }
 
 void TransformationFilter::filter(PointView& view)
@@ -209,7 +209,7 @@ void TransformationFilter::filter(PointView& view)
     if (!view.spatialReference().empty() && !m_overrideSrs.empty())
         log()->get(LogLevel::Warning)
             << getName() << ": overriding input spatial reference."
-            << std::endl;
+            << '\n';
 
     PointRef point(view, 0);
     for (PointId idx = 0; idx < view.size(); ++idx)

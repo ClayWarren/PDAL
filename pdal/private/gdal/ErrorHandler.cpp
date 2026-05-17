@@ -134,7 +134,7 @@ void ErrorHandler::setDebug(bool debug)
     if (debug)
         CPLSetThreadLocalConfigOption("CPL_DEBUG", "ON");
     else
-        CPLSetThreadLocalConfigOption("CPL_DEBUG", NULL);
+        CPLSetThreadLocalConfigOption("CPL_DEBUG", nullptr);
 }
 
 /**
@@ -163,13 +163,13 @@ void ErrorHandler::handle(int level, int num, char const* msg)
     {
         oss << "GDAL failure (" << num << ") " << msg;
         if (m_log)
-            m_log->get(LogLevel::Error) << oss.str() << std::endl;
+            m_log->get(LogLevel::Error) << oss.str() << '\n';
     }
     else if (m_debug && level == CE_Debug)
     {
         oss << "GDAL debug: " << msg;
         if (m_log)
-            m_log->get(LogLevel::Debug) << oss.str() << std::endl;
+            m_log->get(LogLevel::Debug) << oss.str() << '\n';
     }
 }
 

@@ -97,7 +97,7 @@ void SchemaStructuredErrorHandler
 
         xmlParserPrintFileContext(input);
     }
-    std::cerr << oss.str() << std::endl;
+    std::cerr << oss.str() << '\n';
 }
 
 void SchemaParserStructuredErrorHandler
@@ -108,7 +108,7 @@ void SchemaParserStructuredErrorHandler
 #endif
 {
     std::cerr << "Schema parsing error: '" << error->message << "' "
-              << "on line " << error->line << std::endl;
+              << "on line " << error->line << '\n';
 }
 
 void SchemaValidationStructuredErrorHandler
@@ -119,7 +119,7 @@ void SchemaValidationStructuredErrorHandler
 #endif
 {
     std::cerr << "Schema validation error: '" << error->message << "' "
-              << "on line " << error->line << std::endl;
+              << "on line " << error->line << '\n';
 }
 
 void SchemaValidityError(void* /*ctx*/, const char* message, ...)
@@ -132,7 +132,7 @@ void SchemaValidityError(void* /*ctx*/, const char* message, ...)
     vsnprintf(error, ERROR_MESSAGE_SIZE, message, arg_ptr);
     va_end(arg_ptr);
 
-    std::cerr << "Schema validity error: '" << error << "' " << std::endl;
+    std::cerr << "Schema validity error: '" << error << "' " << '\n';
 }
 
 void SchemaValidityDebug(void* /*ctx*/, const char* message, ...)
@@ -160,7 +160,7 @@ void SchemaGenericErrorHandler(void* /*ctx*/, const char* message, ...)
 
     std::ostringstream oss;
 
-    std::cerr << "Generic error: '" << error << "'" << std::endl;
+    std::cerr << "Generic error: '" << error << "'" << '\n';
 }
 
 XMLSchema::XMLSchema(std::string xml, std::string xsd, Orientation orientation)
@@ -195,14 +195,14 @@ std::string XMLSchema::xml() const
     xmlTextWriterPtr w = xmlNewTextWriterMemory(b, 0);
 
     xmlTextWriterSetIndent(w, 1);
-    xmlTextWriterStartDocument(w, NULL, "utf-8", NULL);
+    xmlTextWriterStartDocument(w, nullptr, "utf-8", nullptr);
     xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-                                (const xmlChar*)"PointCloudSchema", NULL);
+                                (const xmlChar*)"PointCloudSchema", nullptr);
     xmlTextWriterWriteAttributeNS(
-        w, (const xmlChar*)"xmlns", (const xmlChar*)"pc", NULL,
+        w, (const xmlChar*)"xmlns", (const xmlChar*)"pc", nullptr,
         (const xmlChar*)"http://pointcloud.org/schemas/PC/");
     xmlTextWriterWriteAttributeNS(
-        w, (const xmlChar*)"xmlns", (const xmlChar*)"xsi", NULL,
+        w, (const xmlChar*)"xmlns", (const xmlChar*)"xsi", nullptr,
         (const xmlChar*)"http://www.w3.org/2001/XMLSchema-instance");
 
     writeXml(w);
@@ -239,13 +239,13 @@ xmlDocPtr XMLSchema::init(const std::string& xml, const std::string& xsd)
         (xmlStructuredErrorFunc)&SchemaStructuredErrorHandler);
 
     xmlDocPtr doc =
-        xmlReadMemory(xml.c_str(), xml.size(), NULL, NULL, parserOption);
+        xmlReadMemory(xml.c_str(), xml.size(), nullptr, nullptr, parserOption);
 
     if (xsd.size() && !validate(doc, xsd))
     {
         xmlFreeDoc(doc);
-        doc = NULL;
-        std::cerr << "Document did not validate against schema." << std::endl;
+        doc = nullptr;
+        std::cerr << "Document did not validate against schema." << '\n';
     }
     return doc;
 }
@@ -255,7 +255,7 @@ bool XMLSchema::validate(xmlDocPtr doc, const std::string& xsd)
     xmlParserOption parserOption(XML_PARSE_NONET);
 
     xmlDocPtr schemaDoc =
-        xmlReadMemory(xsd.c_str(), xsd.size(), NULL, NULL, parserOption);
+        xmlReadMemory(xsd.c_str(), xsd.size(), nullptr, nullptr, parserOption);
     xmlSchemaParserCtxtPtr parserCtxt = xmlSchemaNewDocParserCtxt(schemaDoc);
     xmlSchemaSetParserStructuredErrors(
         parserCtxt, &SchemaParserStructuredErrorHandler, m_global_context);
@@ -548,7 +548,7 @@ void addMetadataEntry(xmlTextWriterPtr w, const MetadataNode& input)
     };
 
     xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-                                (const xmlChar*)"metadata", NULL);
+                                (const xmlChar*)"metadata", nullptr);
 
     for (auto& m : input.children())
         if (!m.empty())
@@ -566,24 +566,24 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
     for (auto di = m_dims.begin(); di != m_dims.end(); ++di, ++pos)
     {
         xmlTextWriterStartElementNS(w, (const xmlChar*)"pc",
-                                    (const xmlChar*)"dimension", NULL);
+                                    (const xmlChar*)"dimension", nullptr);
 
         Utils::OStringStreamClassicLocale position;
         position << (pos + 1);
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                    (const xmlChar*)"position", NULL,
+                                    (const xmlChar*)"position", nullptr,
                                     (const xmlChar*)position.str().c_str());
 
         Utils::OStringStreamClassicLocale size;
         size << Dimension::size(di->m_dimType.m_type);
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                    (const xmlChar*)"size", NULL,
+                                    (const xmlChar*)"size", nullptr,
                                     (const xmlChar*)size.str().c_str());
 
         std::string description = Dimension::description(di->m_dimType.m_id);
         if (description.size())
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                        (const xmlChar*)"description", NULL,
+                                        (const xmlChar*)"description", nullptr,
                                         (const xmlChar*)description.c_str());
 
         XForm xform = di->m_dimType.m_xform;
@@ -601,26 +601,26 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
 
             out << xform.m_scale.m_val;
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                        (const xmlChar*)"scale", NULL,
+                                        (const xmlChar*)"scale", nullptr,
                                         (const xmlChar*)scale.data());
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                        (const xmlChar*)"offset", NULL,
+                                        (const xmlChar*)"offset", nullptr,
                                         (const xmlChar*)offset.data());
         }
 
         std::string name = di->m_name;
         if (name.size())
             xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                        (const xmlChar*)"name", NULL,
+                                        (const xmlChar*)"name", nullptr,
                                         (const xmlChar*)name.c_str());
 
         xmlTextWriterWriteElementNS(
-            w, (const xmlChar*)"pc", (const xmlChar*)"interpretation", NULL,
+            w, (const xmlChar*)"pc", (const xmlChar*)"interpretation", nullptr,
             (const xmlChar*)Dimension::interpretationName(di->m_dimType.m_type)
                 .c_str());
 
         xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                    (const xmlChar*)"active", NULL,
+                                    (const xmlChar*)"active", nullptr,
                                     (const xmlChar*)"true");
 
         xmlTextWriterEndElement(w);
@@ -636,11 +636,11 @@ void XMLSchema::writeXml(xmlTextWriterPtr w) const
         addMetadataEntry(w, m_metadata);
     }
     xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                (const xmlChar*)"orientation", NULL,
+                                (const xmlChar*)"orientation", nullptr,
                                 (const xmlChar*)orientation.str().c_str());
 
     xmlTextWriterWriteElementNS(w, (const xmlChar*)"pc",
-                                (const xmlChar*)"version", NULL,
+                                (const xmlChar*)"version", nullptr,
                                 (const xmlChar*)PDAL_XML_SCHEMA_VERSION);
 
     xmlTextWriterEndElement(w);

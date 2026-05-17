@@ -52,8 +52,8 @@ namespace pdal
 class PDAL_EXPORT InfoKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute(); // overrride
+    std::string getName() const override;
+    int execute() override; // overrride
 
     InfoKernel();
     void setup(const std::string& filename);
@@ -77,8 +77,8 @@ public:
     }
 
 private:
-    void addSwitches(ProgramArgs& args);
-    void validateSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
+    void validateSwitches(ProgramArgs& args) override;
     void makeReader(const std::string& filename);
     void makePipeline();
     void dump(MetadataNode& root);

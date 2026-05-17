@@ -69,7 +69,7 @@ PointViewSet MergeFilter::run(PointViewPtr in)
         log()->get(LogLevel::Warning) << getName()
                                       << ": merging points "
                                          "with inconsistent spatial references."
-                                      << std::endl;
+                                      << '\n';
     m_view->append(*in.get());
     viewSet.insert(m_view);
     return viewSet;

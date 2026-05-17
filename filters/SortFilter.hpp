@@ -63,7 +63,7 @@ class PDAL_EXPORT SortFilter : public Filter
 public:
     SortFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     StringList m_dimNames;
@@ -73,9 +73,9 @@ private:
     SortOrder m_order;
     SortAlgorithm m_algorithm;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 
     SortFilter& operator=(const SortFilter&) = delete;
     SortFilter(const SortFilter&) = delete;

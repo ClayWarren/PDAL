@@ -167,7 +167,7 @@ void ColorinterpFilter::ready(PointTableRef table)
 
     log()->get(LogLevel::Debug)
         << getName() << " raster connection: " << m_raster->filename()
-        << std::endl;
+        << '\n';
 
     m_raster->readBand(m_redBand, 1);
     m_raster->readBand(m_greenBand, 2);
@@ -216,13 +216,13 @@ void ColorinterpFilter::filter(PointView& view)
             m_max = median + threshold;
 
             log()->get(LogLevel::Debug)
-                << getName() << " mad " << mad << std::endl;
+                << getName() << " mad " << mad << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " median " << median << std::endl;
+                << getName() << " median " << median << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " minimum " << m_min << std::endl;
+                << getName() << " minimum " << m_min << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " maximum " << m_max << std::endl;
+                << getName() << " maximum " << m_max << '\n';
         }
         else
         {
@@ -231,13 +231,13 @@ void ColorinterpFilter::filter(PointView& view)
             m_max = median + threshold;
 
             log()->get(LogLevel::Debug)
-                << getName() << " stddev threshold " << threshold << std::endl;
+                << getName() << " stddev threshold " << threshold << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " median " << median << std::endl;
+                << getName() << " median " << median << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " minimum " << m_min << std::endl;
+                << getName() << " minimum " << m_min << '\n';
             log()->get(LogLevel::Debug)
-                << getName() << " maximum " << m_max << std::endl;
+                << getName() << " maximum " << m_max << '\n';
         }
     }
 

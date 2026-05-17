@@ -99,11 +99,11 @@ protected:
 
 public:
     LasReader();
-    ~LasReader();
+    ~LasReader() override;
     LasReader& operator=(const LasReader&) = delete;
     LasReader(const LasReader&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
     const LasHeader& header() const;
     uint64_t vlrData(const std::string& userId, uint16_t recordId,
@@ -114,15 +114,15 @@ protected:
     virtual LasStreamPtr createStream();
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
     virtual void initializeLocal(PointTableRef table, MetadataNode& m);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual QuickInfo inspect();
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
-    virtual bool processOne(PointRef& point);
-    virtual void done(PointTableRef table);
+    void addDimensions(PointLayoutPtr layout) override;
+    QuickInfo inspect() override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    bool processOne(PointRef& point) override;
+    void done(PointTableRef table) override;
 
     void setSrs(MetadataNode& m);
     void readExtraBytesVlr();

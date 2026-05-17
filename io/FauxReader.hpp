@@ -128,7 +128,7 @@ class PDAL_EXPORT FauxReader : public Reader, public Streamable
 public:
     FauxReader() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     using nd = std::normal_distribution<double>;
@@ -159,13 +159,13 @@ private:
     std::unique_ptr<urd> m_uniformY;
     std::unique_ptr<urd> m_uniformZ;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
     virtual bool eof()
     {
         return false;

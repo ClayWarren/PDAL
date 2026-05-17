@@ -65,12 +65,12 @@ typedef std::map<std::string, DimIndex> DimIndexMap;
 class PDAL_EXPORT DeltaKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
     DeltaKernel();
 
 private:
-    void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
     PointViewPtr loadSet(const std::string& filename, PointTableRef table);
     MetadataNode dump(PointViewPtr& srcView, PointViewPtr& candView,
                       KD3Index& index, DimIndexMap& dims);

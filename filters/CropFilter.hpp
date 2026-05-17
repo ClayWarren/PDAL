@@ -58,9 +58,9 @@ class PDAL_EXPORT CropFilter : public Filter, public Streamable
 {
 public:
     CropFilter();
-    ~CropFilter();
+    ~CropFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     // This is just a way to marry a (multi)polygon with a list of its
@@ -78,13 +78,13 @@ private:
     std::vector<ViewGeom> m_geoms;
     std::vector<Bounds> m_boxes;
 
-    void addArgs(ProgramArgs& args);
-    virtual void initialize();
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
 
-    virtual void ready(PointTableRef table);
-    virtual void spatialReferenceChanged(const SpatialReference& srs);
-    virtual bool processOne(PointRef& point);
-    virtual PointViewSet run(PointViewPtr view);
+    void ready(PointTableRef table) override;
+    void spatialReferenceChanged(const SpatialReference& srs) override;
+    bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
     bool crop(const PointRef& point, const BOX2D& box);
     bool crop(const PointRef& point, const BOX3D& box);
     void crop(const BOX3D& box, PointView& input, PointView& output);

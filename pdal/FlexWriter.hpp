@@ -68,7 +68,7 @@ protected:
 private:
     std::string::size_type m_hashPos;
 
-    virtual void l_initialize(PointTableRef table) final
+    void l_initialize(PointTableRef table) final
     {
         Writer::l_initialize(table);
         try
@@ -97,7 +97,7 @@ private:
         return false;
     }
 
-    virtual void ready(PointTableRef table) final
+    void ready(PointTableRef table) final
     {
         readyTable(table);
 
@@ -107,12 +107,12 @@ private:
             if (!table.spatialReferenceUnique() && !srsOverridden())
                 log()->get(LogLevel::Error)
                     << getName() << ": Attempting to write '" << filename()
-                    << "' with multiple point spatial references." << std::endl;
+                    << "' with multiple point spatial references." << '\n';
             readyFile(generateFilename(), table.spatialReference());
         }
     }
 
-    virtual void prerun(const PointViewSet& views) final
+    void prerun(const PointViewSet& views) final
     {
         // If the output is a consolidation of all views, call
         // prerun with all views.
@@ -125,7 +125,7 @@ private:
     // is a test to see if the filename specification is a template.  If it's
     // not a template, ready() and done() are taken care of in the ready()
     // and done() functions in this class.
-    virtual void write(const PointViewPtr view) final
+    void write(const PointViewPtr view) final
     {
         if (m_hashPos != std::string::npos)
         {
@@ -140,7 +140,7 @@ private:
             doneFile();
     }
 
-    virtual void done(PointTableRef table) final
+    void done(PointTableRef table) final
     {
         if (m_hashPos == std::string::npos)
             doneFile();

@@ -72,9 +72,9 @@ public:
     };
 
     Ilvis2Reader();
-    ~Ilvis2Reader();
+    ~Ilvis2Reader() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<std::ifstream> m_stream;
@@ -86,13 +86,13 @@ private:
     std::string m_metadataFile;
     Ilvis2MetadataReader m_mdReader;
 
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual point_count_t read(PointViewPtr view, point_count_t count);
-    virtual void done(PointTableRef table);
+    void addDimensions(PointLayoutPtr layout) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    point_count_t read(PointViewPtr view, point_count_t count) override;
+    void done(PointTableRef table) override;
 
     virtual void readPoint(PointRef& point, StringList s, std::string pointMap);
 };

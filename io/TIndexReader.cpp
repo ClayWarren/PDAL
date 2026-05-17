@@ -192,14 +192,14 @@ void TIndexReader::initialize()
         m_args->m_wkt = m_args->m_bounds.toWKT();
     m_out_ref.reset(new gdal::SpatialRef());
 
-    log()->get(LogLevel::Debug) << "Opening file " << m_filename << std::endl;
+    log()->get(LogLevel::Debug) << "Opening file " << m_filename << '\n';
 
     gdal::registerDrivers();
-    m_dataset = OGROpen(m_filename.c_str(), FALSE, NULL);
+    m_dataset = OGROpen(m_filename.c_str(), FALSE, nullptr);
     if (!m_dataset)
         throwError("Unable to datasource '" + m_filename + "'");
 
-    OGRGeometryH geometry(0);
+    OGRGeometryH geometry(nullptr);
     if (m_args->m_sql.size())
     {
         m_layer = OGR_DS_ExecuteSQL(m_dataset, m_args->m_sql.c_str(), geometry,
@@ -270,7 +270,7 @@ void TIndexReader::initialize()
     for (auto f : getFiles())
     {
         log()->get(LogLevel::Debug) << "Adding file " << f.m_filename
-                                    << " to merge filter" << std::endl;
+                                    << " to merge filter" << '\n';
 
         std::string driver = m_factory.inferReaderDriver(f.m_filename);
         Stage* reader = m_factory.createStage(driver);
@@ -311,7 +311,7 @@ void TIndexReader::initialize()
             crop->setInput(*premerge);
             log()->get(LogLevel::Debug3)
                 << "Cropping data with wkt '" << m_args->m_wkt.substr(0, 400)
-                << "......'" << std::endl;
+                << "......'" << '\n';
             premerge = crop;
         }
 
@@ -328,8 +328,8 @@ void TIndexReader::initialize()
     {
         OGR_DS_Destroy(m_dataset);
     }
-    m_layer = 0;
-    m_dataset = 0;
+    m_layer = nullptr;
+    m_dataset = nullptr;
 
     setInput(m_merge);
 }

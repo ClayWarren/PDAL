@@ -48,15 +48,15 @@ public:
     MiniballFilter& operator=(const MiniballFilter&) = delete;
     MiniballFilter(const MiniballFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_knn;
     int m_threads;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 
     void setMiniball(PointView& view, const PointId& i);
 };

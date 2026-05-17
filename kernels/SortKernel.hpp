@@ -42,12 +42,12 @@ namespace pdal
 class PDAL_EXPORT SortKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
     SortKernel();
 
 private:
-    void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
 
     std::string m_inputFile;
     std::string m_outputFile;

@@ -74,14 +74,14 @@ class PDAL_EXPORT NormalFilter : public Filter
 {
 public:
     NormalFilter();
-    ~NormalFilter();
+    ~NormalFilter() override;
 
     NormalFilter& operator=(const NormalFilter&) = delete;
     NormalFilter(const NormalFilter&) = delete;
 
     void doFilter(PointView& view, int knn = 8);
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<NormalArgs> m_args;
@@ -97,10 +97,10 @@ private:
            std::priority_queue<Edge, EdgeList, CompareEdgeWeight> edge_queue,
            PointId updateIdx);
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

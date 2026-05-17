@@ -106,7 +106,7 @@ private:
     };
 
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     MemoryViewReader();
 
@@ -133,7 +133,7 @@ public:
 private:
     /**
      */
-    virtual void addArgs(ProgramArgs& args)
+    void addArgs(ProgramArgs& args) override
     {
         args.add("order",
                  "Order of synthetic X/Y/Z values "
@@ -147,22 +147,22 @@ private:
 
       \param layout  Layout to which the dimenions are added.
     */
-    virtual void addDimensions(PointLayoutPtr layout);
+    void addDimensions(PointLayoutPtr layout) override;
 
     /**
       Initialize the stage.
     */
-    virtual void initialize();
+    void initialize() override;
 
     /**
       Set state based on the stage being prepared.
     */
-    virtual void prepared(PointTableRef);
+    void prepared(PointTableRef) override;
 
     /**
       Make MemoryViewReader ready for reading.
     */
-    virtual void ready(PointTableRef);
+    void ready(PointTableRef) override;
 
     /**
       Read up to numPts points into the \ref view.
@@ -171,7 +171,7 @@ private:
       \param numPts  Maximum number of points to read.
       \return  Number of points read.
     */
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts);
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
 
     /**
       Read a single point from the input.
@@ -179,7 +179,7 @@ private:
       \param point  Reference to point to fill with data.
       \return  False if no point could be read.
     */
-    virtual bool processOne(PointRef& point);
+    bool processOne(PointRef& point) override;
 
 private:
     PointIncrementer m_incrementer;

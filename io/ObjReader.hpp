@@ -47,7 +47,7 @@ namespace pdal
 class PDAL_EXPORT ObjReader : public Reader
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     /**
@@ -56,10 +56,10 @@ private:
 
       \param table  Point table being initialized.
     */
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual void done(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts);
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    void done(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
 
 private:
     struct XYZW

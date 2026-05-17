@@ -48,7 +48,7 @@ class NullStreambuf : public std::streambuf
     char dummyBuffer[64];
 
 protected:
-    virtual int overflow(int c)
+    int overflow(int c) override
     {
         setp(dummyBuffer, dummyBuffer + sizeof(dummyBuffer));
         return (c == traits_type::eof()) ? '\0' : c;

@@ -44,8 +44,8 @@ namespace pdal
 class PDAL_EXPORT PtsReader : public Reader
 {
 public:
-    PtsReader() : m_separator(' '), m_PointCount(0), m_istream(NULL) {}
-    std::string getName() const;
+    PtsReader() : m_separator(' '), m_PointCount(0), m_istream(nullptr) {}
+    std::string getName() const override;
 
 private:
     /**
@@ -55,7 +55,7 @@ private:
 
       \param table  Point table being initialized.
     */
-    virtual void initialize(PointTableRef table);
+    void initialize(PointTableRef table) override;
 
     /**
       Add dimensions fixed dimensions for PTS format
@@ -63,14 +63,14 @@ private:
 
       \param layout  Layout to which the dimenions are added.
     */
-    virtual void addDimensions(PointLayoutPtr layout);
+    void addDimensions(PointLayoutPtr layout) override;
 
     /**
       Reopen the file in preparation for reading.
 
       \param table  Point table to make ready.
     */
-    virtual void ready(PointTableRef table);
+    void ready(PointTableRef table) override;
 
     /**
       Read up to numPts points into the \ref view.
@@ -79,14 +79,14 @@ private:
       \param numPts  Maximum number of points to read.
       \return  Number of points read.
     */
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts);
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
 
     /**
       Close input file.
 
       \param table  PointTable we're done with.
     */
-    virtual void done(PointTableRef table);
+    void done(PointTableRef table) override;
 
 private:
     char m_separator;

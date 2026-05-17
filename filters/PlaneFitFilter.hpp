@@ -52,15 +52,15 @@ public:
     PlaneFitFilter& operator=(const PlaneFitFilter&) = delete;
     PlaneFitFilter(const PlaneFitFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     int m_knn;
     int m_threads;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void filter(PointView& view) override;
 
     void setPlaneFit(PointView& view, const PointId& i);
     double absDistance(PointView& view, const PointId& i, Vector3d& centroid,

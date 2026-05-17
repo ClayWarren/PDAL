@@ -43,8 +43,8 @@ namespace pdal
 class PDAL_EXPORT DensityKernel : public Kernel
 {
 public:
-    std::string getName() const;
-    int execute();
+    std::string getName() const override;
+    int execute() override;
 
 private:
     Stage* m_hexbinStage;
@@ -60,7 +60,7 @@ private:
     bool m_isH3;
     int m_h3Res;
 
-    virtual void addSwitches(ProgramArgs& args);
+    void addSwitches(ProgramArgs& args) override;
     void outputDensity(pdal::SpatialReference const& ref);
 };
 

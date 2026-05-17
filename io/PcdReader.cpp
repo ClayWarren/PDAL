@@ -148,7 +148,7 @@ bool PcdReader::fillFields()
                 << m_fields.size() << " fields when " << m_dims.size()
                 << " were expected.  "
                    "Ignoring."
-                << std::endl;
+                << '\n';
             continue;
         }
         return true;
@@ -171,7 +171,7 @@ bool PcdReader::processOne(PointRef& point)
                 log()->get(LogLevel::Error)
                     << "Can't convert field '" << m_fields[i]
                     << "' to numeric value on line " << m_line << " in '"
-                    << m_filename << "'.  Setting to 0." << std::endl;
+                    << m_filename << "'.  Setting to 0." << '\n';
                 d = 0;
             }
             point.setField(m_dims[i], d);

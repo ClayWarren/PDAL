@@ -58,20 +58,20 @@ class PDAL_EXPORT DEMFilter : public Filter, public Streamable
 {
 public:
     DEMFilter();
-    ~DEMFilter();
+    ~DEMFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<DEMArgs> m_args;
     std::unique_ptr<gdal::Raster> m_raster;
 
-    virtual void ready(PointTableRef table);
-    virtual void addArgs(ProgramArgs& args);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
-    virtual bool processOne(PointRef& point);
+    void ready(PointTableRef table) override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
 
     DEMFilter& operator=(const DEMFilter&); // not implemented
     DEMFilter(const DEMFilter&);            // not implemented

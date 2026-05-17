@@ -98,7 +98,7 @@ void TextReader::checkHeader(const std::string& header)
     if (it == header.end())
         log()->get(LogLevel::Warning)
             << getName() << ": file '" << m_filename
-            << "' doesn't appear to contain a header line." << std::endl;
+            << "' doesn't appear to contain a header line." << '\n';
 }
 
 void TextReader::parseHeader(const std::string& header)
@@ -286,7 +286,7 @@ bool TextReader::processOne(PointRef& point)
                 << "Can't convert "
                    "field '"
                 << m_fields[i] << "' to numeric value on line " << m_line
-                << " in '" << m_filename << "'.  Setting to 0." << std::endl;
+                << " in '" << m_filename << "'.  Setting to 0." << '\n';
             d = 0;
         }
         point.setField(m_dims[i], d);
@@ -321,7 +321,7 @@ bool TextReader::fillFields()
                 << m_fields.size() << " fields when " << m_dims.size()
                 << " were expected.  "
                    "Ignoring."
-                << std::endl;
+                << '\n';
             continue;
         }
         return true;

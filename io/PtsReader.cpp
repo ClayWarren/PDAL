@@ -147,7 +147,7 @@ point_count_t PtsReader::read(PointViewPtr view, point_count_t numPts)
                 << fields.size() << " fields when " << m_dims.size()
                 << " were expected.  "
                    "Ignoring."
-                << std::endl;
+                << '\n';
             continue;
         }
 
@@ -161,7 +161,7 @@ point_count_t PtsReader::read(PointViewPtr view, point_count_t numPts)
                        "field '"
                     << fields[i] << "' to numeric value on line " << line
                     << " in '" << m_filename << "'.  Setting to 0."
-                    << std::endl;
+                    << '\n';
                 d = 0;
             }
             if (i ==
@@ -179,7 +179,7 @@ point_count_t PtsReader::read(PointViewPtr view, point_count_t numPts)
     {
         log()->get(LogLevel::Warning)
             << "Expected " << m_PointCount << " points but only " << cnt
-            << " were found." << std::endl;
+            << " were found." << '\n';
     }
 
     return cnt;

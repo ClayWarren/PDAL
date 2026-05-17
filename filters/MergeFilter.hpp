@@ -45,17 +45,17 @@ class PDAL_EXPORT MergeFilter : public Filter, public Streamable
 public:
     MergeFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     PointViewPtr m_view;
 
-    virtual void ready(PointTableRef table);
-    virtual bool processOne(PointRef& point)
+    void ready(PointTableRef table) override;
+    bool processOne(PointRef& point) override
     {
         return true;
     }
-    virtual PointViewSet run(PointViewPtr in);
+    PointViewSet run(PointViewPtr in) override;
 
     MergeFilter& operator=(const MergeFilter&); // not implemented
     MergeFilter(const MergeFilter&);            // not implemented

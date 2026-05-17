@@ -44,15 +44,15 @@ namespace pdal
 class PDAL_EXPORT RasterWriter : public Writer
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     RasterWriter();
-    ~RasterWriter();
+    ~RasterWriter() override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void write(const PointViewPtr view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
 
     std::string m_drivername;
     StringList m_options;

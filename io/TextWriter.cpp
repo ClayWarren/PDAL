@@ -195,7 +195,7 @@ void TextWriter::ready(PointTableRef table)
     }
 
     if (!m_writeHeader)
-        log()->get(LogLevel::Debug) << "Not writing header" << std::endl;
+        log()->get(LogLevel::Debug) << "Not writing header" << '\n';
     else
         writeHeader(table);
     m_idx = 0;
@@ -204,7 +204,7 @@ void TextWriter::ready(PointTableRef table)
 void TextWriter::writeHeader(PointTableRef table)
 {
     log()->get(LogLevel::Debug)
-        << "Writing header to filename: " << filename() << std::endl;
+        << "Writing header to filename: " << filename() << '\n';
     if (m_outputType == OutputType::GEOJSON)
         writeGeoJSONHeader();
     else if (m_outputType == OutputType::CSV)

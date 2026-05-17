@@ -61,7 +61,7 @@ public:
         int m_val;
     };
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     StringList m_outputDims; ///< List of dimensions to write
@@ -77,14 +77,14 @@ private:
     std::string m_curFilename;
     std::string m_remoteFilename;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void prepared(PointTableRef table);
-    virtual void readyFile(const std::string& filename,
-                           const SpatialReference& srs);
-    void prerunFile(const PointViewSet& pvSet);
-    virtual void writeView(const PointViewPtr data);
-    virtual void doneFile();
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void prepared(PointTableRef table) override;
+    void readyFile(const std::string& filename,
+                           const SpatialReference& srs) override;
+    void prerunFile(const PointViewSet& pvSet) override;
+    void writeView(const PointViewPtr data) override;
+    void doneFile() override;
 
     double getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
                             PointId idx);

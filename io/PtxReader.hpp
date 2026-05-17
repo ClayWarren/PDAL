@@ -43,8 +43,8 @@ class PDAL_EXPORT PtxReader : public Reader
 {
 public:
     PtxReader() = default;
-    ~PtxReader();
-    virtual std::string getName() const override;
+    ~PtxReader() override;
+    std::string getName() const override;
 
 protected:
     struct PtxHeader
@@ -60,13 +60,13 @@ protected:
     PtxHeader readHeader();
 
 private:
-    virtual void initialize(PointTableRef table) override;
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void addDimensions(PointLayoutPtr layout) override;
-    virtual void ready(PointTableRef table) override;
-    virtual point_count_t read(PointViewPtr view,
+    void initialize(PointTableRef table) override;
+    void addArgs(ProgramArgs& args) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view,
                                point_count_t numPts) override;
-    virtual void done(PointTableRef table) override;
+    void done(PointTableRef table) override;
 
 private:
     bool m_discardMissingPoints{true};

@@ -46,7 +46,7 @@ class PDAL_EXPORT DecimationFilter : public Filter, public Streamable
 public:
     DecimationFilter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_step;
@@ -55,14 +55,14 @@ private:
     PointId m_index = 0;
     point_count_t m_kept = 0;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    void ready(PointTableRef table)
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void ready(PointTableRef table) override
     {
         m_index = 0;
     }
-    bool processOne(PointRef& point);
-    PointViewSet run(PointViewPtr view);
+    bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
     void decimate(PointView& input, PointView& output);
 
     DecimationFilter& operator=(const DecimationFilter&); // not implemented

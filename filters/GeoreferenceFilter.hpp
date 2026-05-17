@@ -49,7 +49,7 @@ class PDAL_EXPORT GeoreferenceFilter : public Filter, public Streamable
 {
 public:
     GeoreferenceFilter();
-    ~GeoreferenceFilter();
+    ~GeoreferenceFilter() override;
 
     GeoreferenceFilter& operator=(const GeoreferenceFilter&) = delete;
     GeoreferenceFilter(const GeoreferenceFilter&) = delete;
@@ -57,11 +57,11 @@ public:
     std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args) override;
-    virtual void initialize() override;
-    virtual bool processOne(PointRef& point) override;
-    virtual void filter(PointView& view) override;
-    virtual void prepared(PointTableRef table) override;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
+    void prepared(PointTableRef table) override;
 
     struct Config;
     std::unique_ptr<Config> m_config;

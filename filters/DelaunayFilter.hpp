@@ -45,12 +45,12 @@ public:
     DelaunayFilter& operator=(const DelaunayFilter&) = delete;
     DelaunayFilter(const DelaunayFilter&) = delete;
     DelaunayFilter();
-    virtual ~DelaunayFilter();
+    ~DelaunayFilter() override;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void filter(PointView& view);
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

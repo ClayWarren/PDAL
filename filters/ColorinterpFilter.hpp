@@ -64,17 +64,17 @@ public:
     }
     ColorinterpFilter& operator=(const ColorinterpFilter&) = delete;
     ColorinterpFilter(const ColorinterpFilter&) = delete;
-    std::string getName() const;
+    std::string getName() const override;
 
-    virtual bool pipelineStreamable() const;
+    bool pipelineStreamable() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void filter(PointView& view);
-    virtual void prepared(PointTableRef table);
-    virtual void ready(PointTableRef table);
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual bool processOne(PointRef& point);
+    void addArgs(ProgramArgs& args) override;
+    void filter(PointView& view) override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
+    void addDimensions(PointLayoutPtr layout) override;
+    bool processOne(PointRef& point) override;
 
     Dimension::Id m_interpDim;
     std::string m_interpDimString;

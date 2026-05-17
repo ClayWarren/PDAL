@@ -114,18 +114,18 @@ class R : public Reader, public Streamable
 {
 
 public:
-    std::string getName() const
+    std::string getName() const override
     {
         return "readers.r";
     }
 
 private:
-    virtual void ready(PointTableRef table)
+    void ready(PointTableRef table) override
     {
         m_entered = false;
     }
 
-    virtual bool processOne(PointRef& point)
+    bool processOne(PointRef& point) override
     {
         if (!m_entered)
         {
@@ -137,7 +137,7 @@ private:
         return false;
     }
 
-    virtual void addDimensions(PointLayoutPtr layout)
+    void addDimensions(PointLayoutPtr layout) override
     {
         Dimension::Id id =
             layout->registerOrAssignDim("something", Dimension::Type::Double);
@@ -145,7 +145,7 @@ private:
             layout->registerOrAssignDim("X", Dimension::Type::Double);
     }
 
-    virtual point_count_t read(PointViewPtr view, point_count_t numPts)
+    point_count_t read(PointViewPtr view, point_count_t numPts) override
     {
 
         PointId idx = view->size();
@@ -170,19 +170,19 @@ class F : public Filter, public Streamable
 {
 
 public:
-    std::string getName() const
+    std::string getName() const override
     {
         return "filters.f";
     };
 
 private:
-    virtual bool processOne(PointRef& point)
+    bool processOne(PointRef& point) override
     {
         std::cout << tag();
         return true;
     }
 
-    virtual void filter(PointView& view)
+    void filter(PointView& view) override
     {
         std::cout << tag();
     }
@@ -304,7 +304,7 @@ TEST(Streaming, issue_2009)
     public:
         TestFilter() : m_srsCnt(0) {}
 
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
@@ -312,12 +312,12 @@ TEST(Streaming, issue_2009)
         int m_srsCnt;
 
     private:
-        virtual void spatialReferenceChanged(const SpatialReference&)
+        void spatialReferenceChanged(const SpatialReference&) override
         {
             m_srsCnt++;
         }
 
-        virtual bool processOne(PointRef&)
+        bool processOne(PointRef&) override
         {
             return true;
         }
@@ -350,7 +350,7 @@ TEST(Streaming, issue_2038)
     public:
         TestFilter() : m_srsCnt(0) {}
 
-        std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
@@ -358,12 +358,12 @@ TEST(Streaming, issue_2038)
         int m_srsCnt;
 
     private:
-        virtual void spatialReferenceChanged(const SpatialReference&)
+        void spatialReferenceChanged(const SpatialReference&) override
         {
             m_srsCnt++;
         }
 
-        virtual bool processOne(PointRef&)
+        bool processOne(PointRef&) override
         {
             EXPECT_EQ(m_srsCnt, 1);
             return true;
@@ -401,17 +401,17 @@ TEST(Streaming, issue_2069)
     class TestFilter : public Filter, public Streamable
     {
     public:
-        virtual std::string getName() const
+        std::string getName() const override
         {
             return "filters.test";
         }
 
     private:
-        virtual void spatialReferenceChanged(const SpatialReference& srs)
+        void spatialReferenceChanged(const SpatialReference& srs) override
         {
             EXPECT_EQ(srs, "EPSG:4326");
         }
-        virtual bool processOne(PointRef& point)
+        bool processOne(PointRef& point) override
         {
             return true;
         }

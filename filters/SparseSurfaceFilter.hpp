@@ -48,16 +48,16 @@ public:
     SparseSurfaceFilter& operator=(const SparseSurfaceFilter&) = delete;
     SparseSurfaceFilter(const SparseSurfaceFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     double m_radius;
     uint8_t m_groundClass;
     uint8_t m_lowPointClass;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void filter(PointView& view) override;
 };
 
 } // namespace pdal

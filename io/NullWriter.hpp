@@ -43,11 +43,11 @@ namespace pdal
 class PDAL_EXPORT NullWriter : public NoFilenameWriter, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void write(const PointViewPtr /*view*/) {}
-    virtual bool processOne(PointRef& p)
+    void write(const PointViewPtr /*view*/) override {}
+    bool processOne(PointRef& p) override
     {
         return true;
     }

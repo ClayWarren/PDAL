@@ -67,7 +67,7 @@ void Srs::init(const VlrList& vlrs, std::vector<SrsType> srsOrder, bool useWkt,
     if (wkt1 && gtiff && log)
         log->get(LogLevel::Debug) << "File contains both "
                                      "WKT and GeoTiff VLRs which is disallowed."
-                                  << std::endl;
+                                  << '\n';
 
     try
     {
@@ -116,7 +116,7 @@ void Srs::extractGeotiff(const Vlr* vlr, const VlrList& vlrs, LogPtr log)
     std::vector<char> directoryRec(data, data + dataLen);
 
     vlr = findVlr(TransformUserId, GeotiffDoublesRecordId, vlrs);
-    data = NULL;
+    data = nullptr;
     dataLen = 0;
     if (vlr && !vlr->empty())
     {
@@ -126,7 +126,7 @@ void Srs::extractGeotiff(const Vlr* vlr, const VlrList& vlrs, LogPtr log)
     std::vector<char> doublesRec(data, data + dataLen);
 
     vlr = findVlr(TransformUserId, GeotiffAsciiRecordId, vlrs);
-    data = NULL;
+    data = nullptr;
     dataLen = 0;
     if (vlr && !vlr->empty())
     {
@@ -141,7 +141,7 @@ void Srs::extractGeotiff(const Vlr* vlr, const VlrList& vlrs, LogPtr log)
         GeotiffSrs geotiffSrs(directoryRec, doublesRec, asciiRec, log);
         m_geotiffString = geotiffSrs.gtiffPrintString();
         if (log)
-            log->get(LogLevel::Debug3) << m_geotiffString << std::endl;
+            log->get(LogLevel::Debug3) << m_geotiffString << '\n';
         m_srs = geotiffSrs.srs();
     }
     catch (Geotiff::error& err)

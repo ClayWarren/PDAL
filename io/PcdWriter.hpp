@@ -57,17 +57,17 @@ class PDAL_EXPORT PcdWriter : public Writer
     };
 
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     PcdWriter();
     PcdWriter& operator=(const PcdWriter&) = delete;
     PcdWriter(const PcdWriter&) = delete;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void ready(PointTableRef table);
-    virtual void write(const PointViewPtr view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
 
     DimSpec extractDim(std::string dim, PointTableRef table);
     bool findDim(Dimension::Id id, DimSpec& ds);

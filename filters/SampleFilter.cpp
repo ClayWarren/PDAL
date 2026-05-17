@@ -103,7 +103,7 @@ void SampleFilter::ready(PointTableRef)
         m_cell = 2.0 * m_radius / std::sqrt(3.0);
 
     log()->get(LogLevel::Debug)
-        << "cell " << m_cell << ", radius " << m_radius << std::endl;
+        << "cell " << m_cell << ", radius " << m_radius << '\n';
 
     m_radiusSqr = m_radius * m_radius;
 }

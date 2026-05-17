@@ -54,8 +54,8 @@ void Ilvis2MetadataReader::readMetadataFile(std::string filename,
     xmlDocPtr doc;
     xmlNodePtr node;
 
-    doc = xmlReadFile(filename.c_str(), NULL, 0);
-    if (doc == NULL)
+    doc = xmlReadFile(filename.c_str(), nullptr, 0);
+    if (doc == nullptr)
     {
         return;
     }
@@ -593,7 +593,7 @@ xmlNodePtr Ilvis2MetadataReader::getFirstChildElementNode(xmlNodePtr node)
     xmlNodePtr child = node->children;
     if (!child)
     {
-        return NULL;
+        return nullptr;
     }
     else if (child->type == XML_ELEMENT_NODE)
     {

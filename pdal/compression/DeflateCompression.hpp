@@ -44,10 +44,10 @@ class DeflateCompressor : public Compressor
 {
 public:
     PDAL_EXPORT DeflateCompressor(BlockCb cb);
-    PDAL_EXPORT ~DeflateCompressor();
+    PDAL_EXPORT ~DeflateCompressor() override;
 
-    PDAL_EXPORT void compress(const char* buf, size_t bufsize);
-    PDAL_EXPORT void done();
+    PDAL_EXPORT void compress(const char* buf, size_t bufsize) override;
+    PDAL_EXPORT void done() override;
 
 private:
     std::unique_ptr<DeflateCompressorImpl> m_impl;
@@ -59,10 +59,10 @@ class DeflateDecompressor : public Decompressor
 {
 public:
     PDAL_EXPORT DeflateDecompressor(BlockCb cb);
-    PDAL_EXPORT ~DeflateDecompressor();
+    PDAL_EXPORT ~DeflateDecompressor() override;
 
-    PDAL_EXPORT void decompress(const char* buf, size_t bufsize);
-    PDAL_EXPORT void done();
+    PDAL_EXPORT void decompress(const char* buf, size_t bufsize) override;
+    PDAL_EXPORT void done() override;
 
 private:
     std::unique_ptr<DeflateDecompressorImpl> m_impl;

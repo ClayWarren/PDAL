@@ -85,13 +85,13 @@ PointViewSet IQRFilter::run(PointViewPtr view)
         z[j] = view->getFieldAs<double>(m_dimId, j);
 
     double pc25 = quartile(z, 0.25);
-    log()->get(LogLevel::Debug) << "25th percentile: " << pc25 << std::endl;
+    log()->get(LogLevel::Debug) << "25th percentile: " << pc25 << '\n';
 
     double pc75 = quartile(z, 0.75);
-    log()->get(LogLevel::Debug) << "75th percentile: " << pc75 << std::endl;
+    log()->get(LogLevel::Debug) << "75th percentile: " << pc75 << '\n';
 
     double iqr = pc75 - pc25;
-    log()->get(LogLevel::Debug) << "IQR: " << iqr << std::endl;
+    log()->get(LogLevel::Debug) << "IQR: " << iqr << '\n';
 
     double low_fence = pc25 - m_multiplier * iqr;
     double hi_fence = pc75 + m_multiplier * iqr;
@@ -104,7 +104,7 @@ PointViewSet IQRFilter::run(PointViewPtr view)
     }
     log()->get(LogLevel::Debug)
         << "Cropping " << m_dimName << " in the range (" << low_fence << ","
-        << hi_fence << ")" << std::endl;
+        << hi_fence << ")" << '\n';
 
     PointViewSet viewSet;
     viewSet.insert(output);

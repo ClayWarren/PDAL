@@ -237,7 +237,7 @@ bool ObjReader::readFace(FACE& face, PointViewPtr view)
                 std::stringstream errorMessage;
                 errorMessage << "Could not convert vertex specification to "
                                 "double on line #"
-                             << lineOfFile << ": '" << line << "'" << std::endl;
+                             << lineOfFile << ": '" << line << "'" << '\n';
                 throwError(errorMessage.str());
             };
 
@@ -274,7 +274,7 @@ bool ObjReader::readFace(FACE& face, PointViewPtr view)
                 std::stringstream ss;
                 ss << "Could not convert texture vertex specification to "
                       "double on line #"
-                   << lineOfFile << ": '" << line << "'" << std::endl;
+                   << lineOfFile << ": '" << line << "'" << '\n';
                 throwError(ss.str());
             };
             // Vertex texture
@@ -319,7 +319,7 @@ bool ObjReader::readFace(FACE& face, PointViewPtr view)
                 std::stringstream ss;
                 ss << "Could not convert normal vertex specification to double "
                       "on line #"
-                   << lineOfFile << ": '" << line << "'" << std::endl;
+                   << lineOfFile << ": '" << line << "'" << '\n';
                 throwError(ss.str());
             }
         }

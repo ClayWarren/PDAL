@@ -10,7 +10,7 @@ namespace expr
 class IdentExpression : public Expression
 {
 public:
-    Utils::StatusWithReason prepare(PointLayoutPtr layout);
+    Utils::StatusWithReason prepare(PointLayoutPtr layout) override;
     Dimension::Id eval() const;
     std::string name() const;
 };

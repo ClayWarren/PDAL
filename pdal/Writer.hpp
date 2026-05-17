@@ -66,7 +66,7 @@ class PDAL_EXPORT Writer : public virtual Stage
 
 public:
     Writer();
-    ~Writer();
+    ~Writer() override;
     Writer& operator=(const Writer&) = delete;
     Writer(const Writer&) = delete;
 
@@ -86,19 +86,19 @@ public:
     static std::string replaceTags(std::string filename);
 
 private:
-    virtual PointViewSet run(PointViewPtr view)
+    PointViewSet run(PointViewPtr view) override
     {
         PointViewSet viewSet;
         write(view);
         viewSet.insert(view);
         return viewSet;
     }
-    virtual void l_addArgs(ProgramArgs& args) final;
-    virtual void l_initialize(PointTableRef table);
-    virtual void l_prepared(PointTableRef table) final;
+    void l_addArgs(ProgramArgs& args) final;
+    void l_initialize(PointTableRef table) override;
+    void l_prepared(PointTableRef table) final;
 
-    virtual const expr::ConditionalExpression* whereExpr() const;
-    virtual WhereMergeMode mergeMode() const;
+    const expr::ConditionalExpression* whereExpr() const override;
+    WhereMergeMode mergeMode() const override;
     /**
       Write the point in a PointView.  This is a simplification of the
       \ref run() interface for convenience.  Impelment in subclass if desired.
@@ -107,7 +107,7 @@ private:
     {
         std::cerr << "Can't write with stage = " << getName() << "!\n";
     }
-    virtual void assignParsedOptions() final {}
+    void assignParsedOptions() final {}
 
     std::unique_ptr<Args> m_args;
 };

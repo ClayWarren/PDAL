@@ -67,13 +67,13 @@ bool Catalog::init(const Filters& filters, NL::json rawReaderArgs,
     if (type == "Catalog")
     {
         m_log->get(LogLevel::Debug)
-            << "Selected Catalog: " << id() << std::endl;
+            << "Selected Catalog: " << id() << '\n';
         m_type = GroupType::catalog;
     }
     if (type == "Collection")
     {
         m_log->get(LogLevel::Debug)
-            << "Selected Collection: " << id() << std::endl;
+            << "Selected Collection: " << id() << '\n';
         m_type = GroupType::collection;
     }
 

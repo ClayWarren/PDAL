@@ -111,7 +111,7 @@ struct LasWriter::Private
 };
 
 LasWriter::LasWriter()
-    : d(new Private), m_compressor(nullptr), m_ostream(NULL), m_srsCnt(0)
+    : d(new Private), m_compressor(nullptr), m_ostream(nullptr), m_srsCnt(0)
 {
 }
 
@@ -221,7 +221,7 @@ void LasWriter::spatialReferenceChanged(const SpatialReference&)
             << getName() << ": Attempting to write '" << filename()
             << "' with multiple "
                "point spatial references."
-            << std::endl;
+            << '\n';
 }
 
 void LasWriter::prepared(PointTableRef table)
@@ -263,7 +263,7 @@ void LasWriter::prepared(PointTableRef table)
         log()->get(LogLevel::Info)
             << getName() << ": Writing dimension " << dim.m_name << "("
             << Dimension::interpretationName(dim.m_dimType.m_type) << ") "
-            << " to LAS extra bytes." << std::endl;
+            << " to LAS extra bytes." << '\n';
     }
 }
 
@@ -783,7 +783,7 @@ bool LasWriter::processOne(PointRef& point)
                 log()->get(LogLevel::Warning)
                     << "Auto scale for " << name
                     << " requested in stream mode.  Using value of 1.0."
-                    << std::endl;
+                    << '\n';
         };
 
         doScale(m_scaling.m_xXform.m_scale, "X");
@@ -799,7 +799,7 @@ bool LasWriter::processOne(PointRef& point)
                 log()->get(LogLevel::Warning)
                     << "Auto offset for '" << name
                     << "' requested in stream mode.  Using value of "
-                    << offset.m_val << "." << std::endl;
+                    << offset.m_val << "." << '\n';
             }
         };
 
@@ -1005,7 +1005,7 @@ bool LasWriter::fillPointBuf(PointRef& point, LeInserter& ostream)
                     << "ignoring overlap for LAS "
                     << std::to_string(d->header.versionMajor) << "."
                     << std::to_string(d->header.versionMinor) << "."
-                    << std::endl;
+                    << '\n';
             }
         }
 
@@ -1023,7 +1023,7 @@ bool LasWriter::fillPointBuf(PointRef& point, LeInserter& ostream)
                 << ". It was replaced with value 1. "
                    "Use a different PDRF if you need to support "
                    "classifications greater than 31"
-                << std::endl;
+                << '\n';
             classification = ClassLabel::Unclassified;
         }
 
@@ -1110,7 +1110,7 @@ void LasWriter::doneFile()
     Utils::writeProgress(m_progressFd, "DONEFILE", d->curFilename);
     getMetadata().addList("filename", d->curFilename);
     delete m_ostream;
-    m_ostream = NULL;
+    m_ostream = nullptr;
 }
 
 void LasWriter::finishOutput()
@@ -1119,7 +1119,7 @@ void LasWriter::finishOutput()
         finishLazPerfOutput();
     log()->get(LogLevel::Debug)
         << "Wrote " << (int)d->summary.getTotalNumPoints()
-        << " points to the LAS file" << std::endl;
+        << " points to the LAS file" << '\n';
 
     // addVlr prevents any evlrs from being added before version 1.4.
     d->header.evlrOffset = (m_evlrs.size() ? (uint32_t)m_ostream->tellp() : 0);

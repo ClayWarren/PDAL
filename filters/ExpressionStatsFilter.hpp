@@ -48,20 +48,20 @@ class PDAL_EXPORT ExpressionStatsFilter : public Filter, public Streamable
 {
 public:
     ExpressionStatsFilter();
-    ~ExpressionStatsFilter();
+    ~ExpressionStatsFilter() override;
 
     struct Args;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::unique_ptr<Args> m_args;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual void filter(PointView& view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    void filter(PointView& view) override;
+    void done(PointTableRef table) override;
 
     Dimension::Id m_dimId;
     std::string m_dimName;

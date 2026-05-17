@@ -62,7 +62,7 @@ struct geotiff_dir_printer
     void operator()(char* data, void* /*aux*/)
     {
 
-        if (0 != data)
+        if (nullptr != data)
         {
             m_oss << data;
         }
@@ -90,7 +90,7 @@ extern "C"
     {
         pdal::las::geotiff_dir_printer* printer =
             reinterpret_cast<pdal::las::geotiff_dir_printer*>(aux);
-        (*printer)(data, 0);
+        (*printer)(data, nullptr);
         return static_cast<int>(printer->size());
     }
 
@@ -235,25 +235,25 @@ void GeotiffSrs::validateDirectory(const Entry* ent, size_t numEntries,
         if (ent->count == 0)
             m_log->get(LogLevel::Warning)
                 << "Geotiff directory contains " << "key " << ent->key
-                << " with 0 count." << std::endl;
+                << " with 0 count." << '\n';
         if (ent->location == 0 && ent->count != 1)
             m_log->get(LogLevel::Error)
                 << "Geotiff directory contains key " << ent->key
-                << " with short entry and more than one value." << std::endl;
+                << " with short entry and more than one value." << '\n';
         if (ent->location == GeotiffDirectoryRecordId)
             if (ent->offset + ent->count > numDoubles)
                 m_log->get(LogLevel::Error)
                     << "Geotiff directory contains " << "key " << ent->key
                     << " with count/offset outside of valid "
                        "range of doubles record."
-                    << std::endl;
+                    << '\n';
         if (ent->location == GeotiffAsciiRecordId)
             if (ent->offset + ent->count > asciiSize)
                 m_log->get(LogLevel::Error)
                     << "Geotiff directory contains " << " key " << ent->key
                     << " with count/offset outside of "
                        "valid range of ascii record."
-                    << std::endl;
+                    << '\n';
         ent++;
     }
 }

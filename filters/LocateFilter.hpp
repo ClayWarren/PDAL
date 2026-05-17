@@ -50,16 +50,16 @@ class PDAL_EXPORT LocateFilter : public Filter
 public:
     LocateFilter() : Filter() {}
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     std::string m_dimName;
     Dimension::Id m_dimId;
     std::string m_minmax;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     LocateFilter& operator=(const LocateFilter&); // not implemented
     LocateFilter(const LocateFilter&);            // not implemented

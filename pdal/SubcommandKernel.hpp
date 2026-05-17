@@ -44,7 +44,7 @@ class PDAL_EXPORT SubcommandKernel : public Kernel
 public:
     SubcommandKernel& operator=(const Kernel&) = delete;
     SubcommandKernel(const SubcommandKernel&) = delete;
-    virtual ~SubcommandKernel() {}
+    ~SubcommandKernel() override {}
 
 protected:
     SubcommandKernel() {}
@@ -53,16 +53,16 @@ protected:
 
 private:
     /// \return true on success, false if the user is asking for help
-    virtual bool doSwitches(const StringList& cmdArgs, ProgramArgs& args);
+    bool doSwitches(const StringList& cmdArgs, ProgramArgs& args) override;
     // Prevent the standard addSwitches() from being defined.
-    virtual void addSwitches(ProgramArgs& args) final {}
+    void addSwitches(ProgramArgs& args) final {}
     virtual void addSubSwitches(ProgramArgs& args,
                                 const std::string& subcommand)
     {
     }
 
     virtual StringList subcommands() const = 0;
-    virtual void outputHelp();
+    void outputHelp() override;
 };
 
 } // namespace pdal

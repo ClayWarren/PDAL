@@ -188,7 +188,7 @@ void BaseGrid::parentOrChild(Path& p)
             // it can't be our path's parent.
             // a path's parent is always null to start
             if (parentPath == p.parent())
-                p.setParent(NULL);
+                p.setParent(nullptr);
             // if a unique path is passed through an odd # of times, it's
             // set as our path's parent if our doesn't have one already.
             else if (!p.parent() && parentPath != &p)

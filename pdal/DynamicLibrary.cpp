@@ -70,7 +70,7 @@ DynamicLibrary::~DynamicLibrary()
 
 void DynamicLibrary::clear()
 {
-    m_handle = NULL;
+    m_handle = nullptr;
 }
 
 DynamicLibrary* DynamicLibrary::load(const std::string& name,
@@ -79,10 +79,10 @@ DynamicLibrary* DynamicLibrary::load(const std::string& name,
     if (name.empty())
     {
         errorString = "Empty path.";
-        return NULL;
+        return nullptr;
     }
 
-    void* handle = NULL;
+    void* handle = nullptr;
 
 #ifdef _WIN32
 #ifdef PDAL_WIN32_STL
@@ -109,7 +109,7 @@ DynamicLibrary* DynamicLibrary::load(const std::string& name,
         errorString += "Failed to load \"" + name + '"';
         if (dlErrorString.size())
             errorString += ": " + dlErrorString;
-        return NULL;
+        return nullptr;
     }
 #endif
     return new DynamicLibrary(handle);
@@ -118,7 +118,7 @@ DynamicLibrary* DynamicLibrary::load(const std::string& name,
 void* DynamicLibrary::getSymbol(const std::string& symbol)
 {
     if (!m_handle)
-        return NULL;
+        return nullptr;
 
     void* sym;
 #ifdef _WIN32

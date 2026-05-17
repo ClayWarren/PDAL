@@ -49,13 +49,13 @@ class PDAL_EXPORT FbiWriter : public Writer
 {
 public:
     FbiWriter();
-    virtual ~FbiWriter();
+    ~FbiWriter() override;
 
     std::string getName() const override;
 
 private:
     std::unique_ptr<fbi::FbiHdr> hdr;
-    virtual void write(const PointViewPtr view) override;
+    void write(const PointViewPtr view) override;
 };
 
 } // namespace pdal

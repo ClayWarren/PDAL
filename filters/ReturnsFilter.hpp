@@ -54,15 +54,15 @@ public:
     static const int returnLast = 4;
     static const int returnOnly = 8;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
     StringList m_returnsString;
     int m_outputTypes;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef table);
-    virtual PointViewSet run(PointViewPtr view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    PointViewSet run(PointViewPtr view) override;
 
     ReturnsFilter& operator=(const ReturnsFilter&) = delete; // not implemented
     ReturnsFilter(const ReturnsFilter&) = delete;            // not implemented

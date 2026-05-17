@@ -125,7 +125,7 @@ Kernel::ParseStageResult Kernel::parseStageOption(std::string o,
 
 std::ostream& operator<<(std::ostream& ostr, const Kernel& kernel)
 {
-    ostr << "  Name: " << kernel.getName() << std::endl;
+    ostr << "  Name: " << kernel.getName() << '\n';
     return ostr;
 }
 
@@ -283,16 +283,16 @@ void Kernel::outputHelp()
     addSwitches(args);
 
     std::cout << "usage: " << "pdal " << getShortName() << " [options] "
-              << args.commandLine() << std::endl;
+              << args.commandLine() << '\n';
 
-    std::cout << "standard options:" << std::endl;
+    std::cout << "standard options:" << '\n';
     basicArgs.dump(std::cout, 2, Utils::screenWidth());
-    std::cout << "options:" << std::endl;
+    std::cout << "options:" << '\n';
     args.dump(std::cout, 2, Utils::screenWidth());
 
     std::cout << "\nFor more information, see the full documentation for "
                  "PDAL at https://pdal.org/\n"
-              << std::endl;
+              << '\n';
 }
 
 void Kernel::addBasicSwitches(ProgramArgs& args)
@@ -353,11 +353,11 @@ Kernel::ParseStageResult Kernel::test_parseStageOption(std::string o,
     class TestKernel : public Kernel
     {
     public:
-        virtual std::string getName() const
+        std::string getName() const override
         {
             return "TestKernel";
         }
-        int execute()
+        int execute() override
         {
             return 0;
         }

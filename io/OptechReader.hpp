@@ -50,7 +50,7 @@ namespace pdal
 class PDAL_EXPORT OptechReader : public Reader
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     static const size_t MaximumNumberOfReturns = 4;
     static const size_t NumBytesInRecord = 69;
@@ -65,12 +65,12 @@ private:
     typedef std::vector<char> buffer_t;
     typedef buffer_t::size_type buffer_size_t;
 
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t num);
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
     size_t fillBuffer();
-    virtual void done(PointTableRef table);
+    void done(PointTableRef table) override;
 
     CsdHeader m_header;
     georeference::RotationMatrix m_boresightMatrix;

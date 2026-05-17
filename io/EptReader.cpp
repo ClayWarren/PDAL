@@ -229,7 +229,7 @@ void EptReader::initialize()
     if (threads > 100)
         log()->get(LogLevel::Warning)
             << "Using a large thread count: " << threads << " threads"
-            << std::endl;
+            << '\n';
     m_p->pool.reset(new ThreadPool(threads));
 
     m_p->connector.reset(new connector::Connector(m_filespec));
@@ -315,7 +315,7 @@ void EptReader::initialize()
             (m_p->info->bounds().maxx - m_p->info->bounds().minx) /
             m_p->info->span();
 
-        debug << "Root resolution: " << currentResolution << std::endl;
+        debug << "Root resolution: " << currentResolution << '\n';
 
         // To select the current resolution level, we need depthEnd to be one
         // beyond it - this is a non-inclusive parameter.
@@ -333,7 +333,7 @@ void EptReader::initialize()
     }
 
     debug << "Query bounds: " << m_p->bounds.box << "\n";
-    debug << "Threads: " << m_p->pool->size() << std::endl;
+    debug << "Threads: " << m_p->pool->size() << '\n';
 }
 
 void EptReader::handleOriginQuery()
@@ -344,7 +344,7 @@ void EptReader::handleOriginQuery()
         return;
 
     log()->get(LogLevel::Debug)
-        << "Searching sources for " << search << std::endl;
+        << "Searching sources for " << search << '\n';
 
     // In the initial EPT version 1.0.0, a source-file summary was stored in
     // "list.json", with detailed metadata for each file being stored together
@@ -391,7 +391,7 @@ void EptReader::handleOriginQuery()
         throwError("Failed to fetch input sources metadata");
     }
 
-    log()->get(LogLevel::Debug) << "Fetched sources list" << std::endl;
+    log()->get(LogLevel::Debug) << "Fetched sources list" << '\n';
 
     if (!sources.is_array())
     {
@@ -454,7 +454,7 @@ void EptReader::handleOriginQuery()
 
         log()->get(LogLevel::Debug)
             << "Query origin " << m_queryOriginId << ": "
-            << found.at("path").get<std::string>() << std::endl;
+            << found.at("path").get<std::string>() << '\n';
     }
     catch (std::exception& e)
     {
@@ -481,7 +481,7 @@ QuickInfo EptReader::inspect()
     if (m_p->hasSpatialFilter())
     {
         log()->get(LogLevel::Debug)
-            << "Determining overlapping point count" << std::endl;
+            << "Determining overlapping point count" << '\n';
 
         m_p->hierarchy.reset(new ept::Hierarchy);
         overlaps();
@@ -550,7 +550,7 @@ void EptReader::load(const ept::Overlap& overlap)
             {
                 log()->get(LogLevel::Warning)
                     << "Failed to read " << tile.key().toString() << ": "
-                    << tile.error() << std::endl;
+                    << tile.error() << '\n';
             }
 
             if (tile.error().empty() || !m_args->m_ignoreUnreadable)
@@ -614,7 +614,7 @@ void EptReader::ready(PointTableRef table)
 
         log()->get(LogLevel::Warning)
             << "An origin query was given but no OriginId dimension exists - "
-            << "points from other origins may be included" << std::endl;
+            << "points from other origins may be included" << '\n';
     }
 
     m_p->hierarchy.reset(new ept::Hierarchy);
@@ -636,7 +636,7 @@ void EptReader::ready(PointTableRef table)
     if (overlapPoints > 1e8)
     {
         log()->get(LogLevel::Warning)
-            << overlapPoints << " points will be downloaded" << std::endl;
+            << overlapPoints << " points will be downloaded" << '\n';
     }
 
     m_pointId = 0;
@@ -808,7 +808,7 @@ void EptReader::checkTile(const ept::TileContents& tile)
         m_p->pool->stop();
         log()->get(LogLevel::Warning)
             << "Use readers.ept.ignore_unreadable to ignore this error"
-            << std::endl;
+            << '\n';
         throwError("Error reading tile " + tile.key().toString() + ": " +
                    tile.error());
     }

@@ -79,18 +79,18 @@ public:
 
     VSIStreamBuffer(std::string filename, std::ios_base::openmode mode,
                     std::size_t bufferSize = 0);
-    ~VSIStreamBuffer();
+    ~VSIStreamBuffer() override;
 
-    virtual std::streamsize showmanyc();
-    virtual int_type underflow();
-    virtual int_type overflow(int_type c = traits_type::eof());
-    virtual int sync();
-    virtual pos_type seekoff(
+    std::streamsize showmanyc() override;
+    int_type underflow() override;
+    int_type overflow(int_type c = traits_type::eof()) override;
+    int sync() override;
+    pos_type seekoff(
         off_type off, std::ios_base::seekdir way,
-        std::ios_base::openmode which = std::ios_base::in | std::ios_base::out);
-    virtual pos_type
+        std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
+    pos_type
     seekpos(pos_type sp, std::ios_base::openmode which = std::ios_base::in |
-                                                         std::ios_base::out);
+                                                         std::ios_base::out) override;
 
 private:
     PDALVirtualHandleUniquePtr fp{};

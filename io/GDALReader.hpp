@@ -55,10 +55,10 @@ typedef std::map<std::string, Dimension::Id> DimensionMap;
 class PDAL_EXPORT GDALReader : public Reader, public Streamable
 {
 public:
-    std::string getName() const;
+    std::string getName() const override;
 
     GDALReader();
-    ~GDALReader();
+    ~GDALReader() override;
 
 private:
     class BlockReader
@@ -94,14 +94,14 @@ private:
         std::array<double, 2> m_coords;
     };
 
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t num);
-    virtual void done(PointTableRef table);
-    virtual bool processOne(PointRef& point);
-    virtual QuickInfo inspect();
-    virtual void addArgs(ProgramArgs& args);
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
+    void done(PointTableRef table) override;
+    bool processOne(PointRef& point) override;
+    QuickInfo inspect() override;
+    void addArgs(ProgramArgs& args) override;
 
     std::unique_ptr<gdal::Raster> m_raster;
     std::vector<Dimension::Type> m_bandTypes;

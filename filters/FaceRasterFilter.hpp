@@ -48,16 +48,16 @@ class PDAL_EXPORT FaceRasterFilter : public pdal::Filter
 {
 public:
     FaceRasterFilter();
-    ~FaceRasterFilter();
+    ~FaceRasterFilter() override;
     FaceRasterFilter& operator=(const FaceRasterFilter&) = delete;
     FaceRasterFilter(const FaceRasterFilter&) = delete;
 
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void prepared(PointTableRef);
-    virtual void filter(PointView& view);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef) override;
+    void filter(PointView& view) override;
 
     std::unique_ptr<RasterLimits> m_limits;
     std::string m_meshName;
