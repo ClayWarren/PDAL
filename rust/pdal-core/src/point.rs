@@ -30,6 +30,7 @@ pub enum DimId {
     LocalReachabilityDistance,
     RadialDensity,
     NNDistance,
+    Reciprocity,
     Other(String),
 }
 
@@ -49,6 +50,7 @@ impl DimId {
             DimId::LocalReachabilityDistance => "LocalReachabilityDistance",
             DimId::RadialDensity => "RadialDensity",
             DimId::NNDistance => "NNDistance",
+            DimId::Reciprocity => "Reciprocity",
             DimId::Other(s) => s,
         }
     }
@@ -68,6 +70,7 @@ impl DimId {
             "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
             "RadialDensity" => DimId::RadialDensity,
             "NNDistance" => DimId::NNDistance,
+            "Reciprocity" => DimId::Reciprocity,
             other => DimId::Other(other.to_string()),
         }
     }

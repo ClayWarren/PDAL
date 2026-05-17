@@ -89,6 +89,7 @@ pdal_stage_t* pdal_stage_create_cluster(uint64_t min_points, uint64_t max_points
 pdal_stage_t* pdal_stage_create_sparsesurface(double radius, uint8_t ground_class, uint8_t low_point_class);
 pdal_stage_t* pdal_stage_create_voxelcenternearestneighbor(double cell);
 pdal_stage_t* pdal_stage_create_voxelcentroidnearestneighbor(double cell);
+pdal_stage_t* pdal_stage_create_reciprocity(uint64_t knn);
 
 uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
 void pdal_free_u64_array(uint64_t* ptr, uint64_t len);

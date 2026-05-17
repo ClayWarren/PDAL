@@ -19,6 +19,7 @@ pub mod outlier;
 pub mod radialdensity;
 pub mod randomize;
 pub mod range;
+pub mod reciprocity;
 pub mod returns;
 pub mod sample;
 pub mod separatescanline;

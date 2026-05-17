@@ -60,8 +60,6 @@ private:
     void addDimensions(PointLayoutPtr layout) override;
     void addArgs(ProgramArgs& args) override;
     void filter(PointView& view) override;
-
-    void setReciprocity(PointView& view, const PointId& i);
 };
 
 } // namespace pdal

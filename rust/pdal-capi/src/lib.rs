@@ -27,6 +27,7 @@ use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
+use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
@@ -69,6 +70,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
         "RadialDensity" => DimId::RadialDensity,
         "NNDistance" => DimId::NNDistance,
+        "Reciprocity" => DimId::Reciprocity,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1099,6 +1101,13 @@ pub extern "C" fn pdal_stage_create_voxelcenternearestneighbor(cell: f64) -> *mu
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_voxelcentroidnearestneighbor(cell: f64) -> *mut StageWrapper {
     let filter = Box::new(VoxelCentroidNearestNeighborFilter::new(cell));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a reciprocity filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_reciprocity(knn: u64) -> *mut StageWrapper {
+    let filter = Box::new(ReciprocityFilter::new(knn as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
