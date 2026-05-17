@@ -34,11 +34,10 @@
 
 #include "EigenvaluesFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
-#include <pdal/util/ProgramArgs.hpp>
+#include "private/RustViewConverter.hpp"
 
-#include <Eigen/Dense>
+#include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include <string>
 
@@ -46,7 +45,6 @@ namespace pdal
 {
 
 using namespace Dimension;
-using namespace Eigen;
 
 static StaticPluginInfo const s_info{
     "filters.eigenvalues",
@@ -112,63 +110,14 @@ void EigenvaluesFilter::prepared(PointTableRef table)
 
 void EigenvaluesFilter::filter(PointView& view)
 {
-    const KD3Index& kdi = view.build3dIndex();
+    pdal_stage_t* stage = pdal_stage_create_eigenvalues(
+        m_args->m_knn, m_args->m_normalize, m_args->m_stride,
+        m_args->m_radiusArg->set(), m_args->m_radius, m_args->m_minK);
+    if (!stage)
+        throwError("Failed to create Rust eigenvalues stage.");
 
-    for (PointRef p : view)
-    {
-        // find neighbors, either by radius or k nearest neighbors
-        PointIdList ids;
-        if (m_args->m_radiusArg->set())
-        {
-            ids = kdi.radius(p, m_args->m_radius);
-
-            // if insufficient number of neighbors, eigen solver will fail
-            // anyway, it may be okay to silently return without setting any of
-            // the computed features?
-            if (ids.size() < (size_t)m_args->m_minK)
-            {
-                log()->get(LogLevel::Info)
-                    << "Skipping point " << p.pointId() << ". Found "
-                    << ids.size() << " neighbors but required "
-                    << m_args->m_minK << ".\n";
-                continue;
-            }
-        }
-        else
-        {
-            ids = kdi.neighbors(p, m_args->m_knn + 1, m_args->m_stride);
-        }
-
-        // compute covariance of the neighborhood
-        Matrix3d B = math::computeCovariance(view, ids);
-
-        // Check if the covariance matrix is all zeros
-        if (B.isZero())
-        {
-            log()->get(LogLevel::Info)
-                << "Skipping point " << p.pointId()
-                << ". Covariance matrix is all zeros. This suggests a large "
-                   "number of redundant points. Consider using filters.sample "
-                   "with a small radius to remove redundant points.\n";
-            continue;
-        }
-
-        // perform the eigen decomposition
-        Eigen::SelfAdjointEigenSolver<Matrix3d> solver(B);
-        if (solver.info() != Eigen::Success)
-            throwError("Cannot perform eigen decomposition.");
-        Vector3d ev = solver.eigenvalues();
-
-        if (m_args->m_normalize)
-        {
-            double sum = ev[0] + ev[1] + ev[2];
-            ev /= sum;
-        }
-
-        p.setField(Id::Eigenvalue0, ev[0]);
-        p.setField(Id::Eigenvalue1, ev[1]);
-        p.setField(Id::Eigenvalue2, ev[2]);
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

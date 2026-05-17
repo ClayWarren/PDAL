@@ -4,6 +4,7 @@ pub mod cluster;
 pub mod dbscan;
 pub mod decimation;
 pub mod divider;
+pub mod eigenvalues;
 pub mod estimate_rank;
 pub mod farthestpointsampling;
 pub mod ferry;

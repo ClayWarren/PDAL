@@ -12,6 +12,7 @@ use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
+use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
@@ -77,6 +78,9 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Rank" => DimId::Rank,
         "Coplanar" => DimId::Coplanar,
         "PlaneFit" => DimId::PlaneFit,
+        "Eigenvalue0" => DimId::Eigenvalue0,
+        "Eigenvalue1" => DimId::Eigenvalue1,
+        "Eigenvalue2" => DimId::Eigenvalue2,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1143,6 +1147,26 @@ pub extern "C" fn pdal_stage_create_approximatecoplanar(
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_planefit(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(PlaneFitFilter::new(knn as usize));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an eigenvalues filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_eigenvalues(
+    knn: u64,
+    normalize: bool,
+    stride: u64,
+    has_radius: bool,
+    radius: f64,
+    min_k: u64,
+) -> *mut StageWrapper {
+    let filter = Box::new(EigenvaluesFilter::new(
+        knn as usize,
+        normalize,
+        stride as usize,
+        has_radius.then_some(radius),
+        min_k as usize,
+    ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

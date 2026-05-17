@@ -34,6 +34,9 @@ pub enum DimId {
     Rank,
     Coplanar,
     PlaneFit,
+    Eigenvalue0,
+    Eigenvalue1,
+    Eigenvalue2,
     Other(String),
 }
 
@@ -57,6 +60,9 @@ impl DimId {
             DimId::Rank => "Rank",
             DimId::Coplanar => "Coplanar",
             DimId::PlaneFit => "PlaneFit",
+            DimId::Eigenvalue0 => "Eigenvalue0",
+            DimId::Eigenvalue1 => "Eigenvalue1",
+            DimId::Eigenvalue2 => "Eigenvalue2",
             DimId::Other(s) => s,
         }
     }
@@ -80,6 +86,9 @@ impl DimId {
             "Rank" => DimId::Rank,
             "Coplanar" => DimId::Coplanar,
             "PlaneFit" => DimId::PlaneFit,
+            "Eigenvalue0" => DimId::Eigenvalue0,
+            "Eigenvalue1" => DimId::Eigenvalue1,
+            "Eigenvalue2" => DimId::Eigenvalue2,
             other => DimId::Other(other.to_string()),
         }
     }

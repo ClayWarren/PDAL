@@ -93,6 +93,7 @@ pdal_stage_t* pdal_stage_create_reciprocity(uint64_t knn);
 pdal_stage_t* pdal_stage_create_estimaterank(uint64_t knn, double threshold);
 pdal_stage_t* pdal_stage_create_approximatecoplanar(uint64_t knn, double threshold1, double threshold2);
 pdal_stage_t* pdal_stage_create_planefit(uint64_t knn);
+pdal_stage_t* pdal_stage_create_eigenvalues(uint64_t knn, bool normalize, uint64_t stride, bool has_radius, double radius, uint64_t min_k);
 
 uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
 void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
