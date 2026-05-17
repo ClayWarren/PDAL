@@ -50,6 +50,22 @@ impl<'a> SpatialIndex3d<'a> {
         ids
     }
 
+    pub fn radius_dims(&self, idx: PointId, radius: f64, dims: &[DimId]) -> Vec<PointId> {
+        let radius_sqr = radius * radius;
+        let mut ids = Vec::new();
+        for candidate in 0..self.view.len() {
+            let mut distance = 0.0;
+            for dim in dims {
+                let delta = self.view.get_f64(candidate, dim) - self.view.get_f64(idx, dim);
+                distance += delta * delta;
+            }
+            if distance <= radius_sqr {
+                ids.push(candidate);
+            }
+        }
+        ids
+    }
+
     pub fn knn(&self, idx: PointId, k: usize) -> Vec<(PointId, f64)> {
         let x = self.view.get_f64(idx, &DimId::X);
         let y = self.view.get_f64(idx, &DimId::Y);
@@ -141,5 +157,29 @@ mod tests {
 
         let index = SpatialIndex3d::new(&view);
         assert_eq!(index.radius_2d_excluding(0, 1.0), vec![1, 3]);
+    }
+
+    #[test]
+    fn radius_dims_uses_only_requested_dimensions() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+
+        for (x, y, z) in [(0.0, 0.0, 0.0), (0.5, 0.0, 100.0), (2.0, 0.0, 0.0)] {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+        }
+
+        let index = SpatialIndex3d::new(&view);
+        assert_eq!(index.radius_dims(0, 1.0, &[DimId::X, DimId::Y]), vec![0, 1]);
+        assert_eq!(
+            index.radius_dims(0, 1.0, &[DimId::X, DimId::Y, DimId::Z]),
+            vec![0]
+        );
     }
 }

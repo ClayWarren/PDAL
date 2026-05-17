@@ -37,10 +37,12 @@
 
 #include "DBSCANFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
 
 #include <string>
-#include <unordered_set>
+#include <vector>
 
 namespace pdal
 {
@@ -94,79 +96,23 @@ void DBSCANFilter::prepared(PointTableRef table)
 
 void DBSCANFilter::filter(PointView& view)
 {
-    // Construct KDFlexIndex for radius search.
-    KDFlexIndex kdfi(view, m_dimIdList);
-    kdfi.build();
-
-    // First pass through point cloud precomputes neighbor indices and
-    // initializes ClusterID to -2.
-    std::vector<PointIdList> neighbors(view.size());
-    for (PointId idx = 0; idx < view.size(); ++idx)
+    std::vector<std::string> dimNames;
+    std::vector<const char*> dimNamePtrs;
+    dimNames.reserve(m_dimIdList.size());
+    dimNamePtrs.reserve(m_dimIdList.size());
+    for (Dimension::Id id : m_dimIdList)
     {
-        neighbors[idx] = kdfi.radius(idx, m_eps);
-        view.setField(Id::ClusterID, idx, -2);
+        dimNames.push_back(view.layout()->dimName(id));
+        dimNamePtrs.push_back(dimNames.back().c_str());
     }
 
-    // Second pass through point cloud performs DBSCAN clustering.
-    int64_t cluster_label = 0;
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        // Point has already been labeled, so move on to next.
-        if (view.getFieldAs<int64_t>(Id::ClusterID, idx) != -2)
-            continue;
+    pdal_stage_t* stage = pdal_stage_create_dbscan(
+        m_minPoints, m_eps, dimNamePtrs.data(), dimNamePtrs.size());
+    if (!stage)
+        throwError("Failed to create Rust dbscan stage.");
 
-        // Density of the neighborhood does not meet minimum number of points
-        // constraint, label as noise.
-        if (neighbors[idx].size() < m_minPoints)
-        {
-            view.setField(Id::ClusterID, idx, -1);
-            continue;
-        }
-
-        // Initialize some bookkeeping to track which neighbors have been
-        // considered for addition to the current cluster.
-        std::unordered_set<PointId> neighbors_next(neighbors[idx].begin(),
-                                                   neighbors[idx].end());
-        std::unordered_set<PointId> neighbors_visited;
-        neighbors_visited.insert(idx);
-
-        // Unlabeled point encountered; assign cluster label.
-        view.setField(Id::ClusterID, idx, cluster_label);
-
-        // Consider all neighbors.
-        while (!neighbors_next.empty())
-        {
-            // Select first neighbor and move it to the visited set.
-            PointId p = *neighbors_next.begin();
-            neighbors_next.erase(neighbors_next.begin());
-            neighbors_visited.insert(p);
-
-            // Reassign cluster label to neighbor previously marked as noise.
-            if (view.getFieldAs<int64_t>(Id::ClusterID, p) == -1)
-                view.setField(Id::ClusterID, p, cluster_label);
-
-            // Neighbor has already been labeled, so move on to next.
-            if (view.getFieldAs<int64_t>(Id::ClusterID, p) != -2)
-                continue;
-
-            // Assign cluster label to neighbor.
-            view.setField(Id::ClusterID, p, cluster_label);
-
-            // If density of neighbor's neighborhood is sufficient, add it's
-            // neighbors to the set of neighbors to consider if they are not
-            // already.
-            if (neighbors[p].size() >= m_minPoints)
-            {
-                for (PointId q : neighbors[p])
-                {
-                    if (neighbors_visited.count(q) == 0)
-                        neighbors_next.insert(q);
-                }
-            }
-        }
-
-        cluster_label++;
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

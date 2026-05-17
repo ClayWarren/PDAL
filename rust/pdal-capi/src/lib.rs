@@ -7,6 +7,7 @@ use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use pdal_filters::assign;
+use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
@@ -56,6 +57,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Intensity" => DimId::Intensity,
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
+        "ClusterID" => DimId::ClusterID,
         "RadialDensity" => DimId::RadialDensity,
         "NNDistance" => DimId::NNDistance,
         other => DimId::Other(other.to_string()),
@@ -976,6 +978,33 @@ pub unsafe extern "C" fn pdal_stage_create_outlier(
         multiplier,
         class_label,
     ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a DBSCAN filter stage.
+///
+/// # Safety
+///
+/// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_dbscan(
+    min_points: u64,
+    eps: f64,
+    dims: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    if dims.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut dim_names = Vec::new();
+    for i in 0..count {
+        let ptr = *dims.offset(i as isize);
+        if ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        dim_names.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+    let filter = Box::new(DbscanFilter::new(min_points as usize, eps, dim_names));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
