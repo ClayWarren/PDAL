@@ -34,11 +34,12 @@
 
 #include "EstimateRankFilter.hpp"
 
-#include <string>
+#include "private/RustViewConverter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
+
+#include <string>
 
 namespace pdal
 {
@@ -69,13 +70,12 @@ void EstimateRankFilter::addDimensions(PointLayoutPtr layout)
 
 void EstimateRankFilter::filter(PointView& view)
 {
-    const KD3Index& kdi = view.build3dIndex();
+    pdal_stage_t* stage = pdal_stage_create_estimaterank(m_knn, m_thresh);
+    if (!stage)
+        throwError("Failed to create Rust estimate rank stage.");
 
-    for (PointRef p : view)
-    {
-        PointIdList ids = kdi.neighbors(p, m_knn);
-        p.setField(Id::Rank, math::computeRank(view, ids, m_thresh));
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

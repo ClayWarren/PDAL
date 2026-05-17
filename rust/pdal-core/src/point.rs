@@ -31,6 +31,7 @@ pub enum DimId {
     RadialDensity,
     NNDistance,
     Reciprocity,
+    Rank,
     Other(String),
 }
 
@@ -51,6 +52,7 @@ impl DimId {
             DimId::RadialDensity => "RadialDensity",
             DimId::NNDistance => "NNDistance",
             DimId::Reciprocity => "Reciprocity",
+            DimId::Rank => "Rank",
             DimId::Other(s) => s,
         }
     }
@@ -71,6 +73,7 @@ impl DimId {
             "RadialDensity" => DimId::RadialDensity,
             "NNDistance" => DimId::NNDistance,
             "Reciprocity" => DimId::Reciprocity,
+            "Rank" => DimId::Rank,
             other => DimId::Other(other.to_string()),
         }
     }

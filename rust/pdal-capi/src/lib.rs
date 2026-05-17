@@ -11,6 +11,7 @@ use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
+use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::griddecimation;
@@ -71,6 +72,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "RadialDensity" => DimId::RadialDensity,
         "NNDistance" => DimId::NNDistance,
         "Reciprocity" => DimId::Reciprocity,
+        "Rank" => DimId::Rank,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1108,6 +1110,13 @@ pub extern "C" fn pdal_stage_create_voxelcentroidnearestneighbor(cell: f64) -> *
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_reciprocity(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(ReciprocityFilter::new(knn as usize));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an estimate rank filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_estimaterank(knn: u64, threshold: f64) -> *mut StageWrapper {
+    let filter = Box::new(EstimateRankFilter::new(knn as usize, threshold));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
