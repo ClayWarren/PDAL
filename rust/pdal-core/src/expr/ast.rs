@@ -87,6 +87,17 @@ pub trait Node {
     fn const_value(&self) -> Option<f64> {
         None
     }
+
+    /// If this node is a boolean constant, its value -- used to reject
+    /// always-true / always-false conditional expressions.
+    fn const_logical(&self) -> Option<bool> {
+        None
+    }
+
+    /// If this node is a dimension reference, the node itself.
+    fn as_var(&self) -> Option<&VarNode> {
+        None
+    }
 }
 
 /// A boxed AST node -- the Rust analog of PDAL's `NodePtr`.
@@ -481,6 +492,9 @@ impl Node for ConstLogicalNode {
     fn eval(&self, _view: &PointView, _idx: PointId) -> EvalValue {
         EvalValue::boolean(self.val)
     }
+    fn const_logical(&self) -> Option<bool> {
+        Some(self.val)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -533,6 +547,9 @@ impl Node for VarNode {
     }
     fn eval(&self, view: &PointView, idx: PointId) -> EvalValue {
         EvalValue::num(view.get_f64(idx, &self.id))
+    }
+    fn as_var(&self) -> Option<&VarNode> {
+        Some(self)
     }
 }
 

@@ -72,6 +72,22 @@ pub fn parse_math(text: &str) -> Result<Expression, String> {
     parse(text, Mode::Math)
 }
 
+/// Parse `text` as an assignment statement, returning its three component
+/// expressions: the target identifier, the value expression, and the
+/// (possibly empty) `WHERE` condition.
+pub fn parse_assign_parts(
+    text: &str,
+) -> Result<(Expression, Expression, Expression), String> {
+    let mut parser = Parser::new(text, Mode::Math);
+    let mut ident = Expression::new();
+    let mut value = Expression::new();
+    let mut cond = Expression::new();
+    if !parser.assignment(&mut ident, &mut value, &mut cond) || !parser.check_end() {
+        return Err(parser.error);
+    }
+    Ok((ident, value, cond))
+}
+
 fn parse(text: &str, mode: Mode) -> Result<Expression, String> {
     let mut parser = Parser::new(text, mode);
     let mut expr = Expression::new();
@@ -543,6 +559,67 @@ impl Parser {
         let sub = expr.pop_node().expect("logical_function1: argument");
         expr.push_node(Box::new(BoolFuncNode::new(name, func, sub)));
         true
+    }
+
+    // -- AssignParser -------------------------------------------------------
+
+    /// Parse `dim = <value> [WHERE <condition>]` into its three expressions.
+    fn assignment(
+        &mut self,
+        ident: &mut Expression,
+        value: &mut Expression,
+        cond: &mut Expression,
+    ) -> bool {
+        if !self.accept(TokenType::Identifier) {
+            self.set_error("Expected dimension name for assignment.");
+            return false;
+        }
+        let name = self.cur_sval();
+        ident.push_node(Box::new(VarNode::new(name)));
+
+        if !self.accept(TokenType::Assign) {
+            self.set_error("Expected '=' after dimension name in assignment.");
+            return false;
+        }
+
+        // The value is a math expression, terminated by end-of-input or the
+        // `WHERE` keyword.
+        self.mode = Mode::Math;
+        if !self.addexpr(value) {
+            return false;
+        }
+        let next = self.peek();
+        let at_end = next.ty() == TokenType::Eof
+            || (next.ty() == TokenType::Identifier
+                && next.sval().eq_ignore_ascii_case("WHERE"));
+        if !at_end {
+            self.set_error(format!(
+                "Invalid token '{}' following valid math expression",
+                next.sval()
+            ));
+            return false;
+        }
+        self.where_clause(cond)
+    }
+
+    /// Parse an optional `WHERE <condition>` clause.
+    fn where_clause(&mut self, cond: &mut Expression) -> bool {
+        if self.accept(TokenType::Eof) {
+            return true;
+        }
+        if self.accept(TokenType::Identifier)
+            && self.cur_tok.sval().eq_ignore_ascii_case("WHERE")
+        {
+            self.mode = Mode::Conditional;
+            return self.orexpr(cond);
+        }
+        let found = self.peek().sval().to_string();
+        self.set_error(format!(
+            "Expected keyword 'WHERE' to precede condition assignment. \
+             Found '{}' instead.",
+            found
+        ));
+        false
     }
 }
 
