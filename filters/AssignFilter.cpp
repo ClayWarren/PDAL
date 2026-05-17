@@ -34,11 +34,11 @@
  ****************************************************************************/
 
 #include "AssignFilter.hpp"
+#include "private/DimRange.hpp"
+#include "private/RustViewConverter.hpp"
+#include "private/expr/AssignStatement.hpp"
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include "private/DimRange.hpp"
-#include "private/expr/AssignStatement.hpp"
-#include "private/RustViewConverter.hpp"
 #include <pdal_capi.h>
 
 namespace pdal
@@ -168,7 +168,8 @@ bool AssignFilter::processOne(PointRef& point)
 void AssignFilter::filter(PointView& view)
 {
     bool has_condition = !m_args->m_condition.m_name.empty();
-    const char* cond_dim = has_condition ? m_args->m_condition.m_name.c_str() : nullptr;
+    const char* cond_dim =
+        has_condition ? m_args->m_condition.m_name.c_str() : nullptr;
 
     std::vector<pdal_assign_range_t> assignments;
     for (const auto& r : m_args->m_assignments)
@@ -185,24 +186,16 @@ void AssignFilter::filter(PointView& view)
     }
 
     pdal_stage_t* stage = pdal_stage_create_assign(
-        has_condition,
-        cond_dim,
-        m_args->m_condition.m_lower_bound,
+        has_condition, cond_dim, m_args->m_condition.m_lower_bound,
         m_args->m_condition.m_upper_bound,
         m_args->m_condition.m_inclusive_lower_bound,
         m_args->m_condition.m_inclusive_upper_bound,
         m_args->m_condition.m_negate,
-        assignments.empty() ? nullptr : assignments.data(),
-        assignments.size()
-    );
+        assignments.empty() ? nullptr : assignments.data(), assignments.size());
+    if (!stage)
+        throwError("Failed to create Rust assign stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
-
-    rust_view_converter::fromRust(rust_out, view);
-
-    pdal_point_view_destroy(rust_in);
-    pdal_point_view_destroy(rust_out);
+    rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);
 
     for (PointId id = 0; id < view.size(); ++id)

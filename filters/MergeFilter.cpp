@@ -50,7 +50,6 @@ std::string MergeFilter::getName() const
     return s_info.name;
 }
 
-
 MergeFilter::~MergeFilter()
 {
     if (m_rust_stage)
@@ -79,21 +78,16 @@ PointViewSet MergeFilter::run(PointViewPtr in)
     if (getSpatialReference().empty() &&
         (in->spatialReference() != m_view->spatialReference()))
         log()->get(LogLevel::Warning) << getName()
-                                       << ": merging points "
-                                          "with inconsistent spatial references."
-                                       << '\n';
+                                      << ": merging points "
+                                         "with inconsistent spatial references."
+                                      << '\n';
 
     if (!m_rust_stage)
         m_rust_stage = pdal_stage_create_merge();
+    if (!m_rust_stage)
+        throwError("Failed to create Rust merge stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(in);
-    pdal_point_view_t* rust_out = pdal_stage_run(m_rust_stage, rust_in);
-
-    rust_view_converter::fromRust(rust_out, *m_view);
-
-    if (rust_out)
-        pdal_point_view_destroy(rust_out);
-    pdal_point_view_destroy(rust_in);
+    rust_view_converter::runInto(m_rust_stage, in, *m_view);
 
     viewSet.insert(m_view);
     return viewSet;

@@ -81,7 +81,6 @@ void LabelDuplicatesFilter::prepared(PointTableRef table)
     }
 }
 
-
 void LabelDuplicatesFilter::filter(PointView& view)
 {
     log()->get(LogLevel::Debug) << "Finding duplicates...\n";
@@ -90,18 +89,12 @@ void LabelDuplicatesFilter::filter(PointView& view)
     for (const auto& s : m_dimNames)
         dims.push_back(s.c_str());
 
-    pdal_stage_t* stage = pdal_stage_create_labelduplicates(dims.data(), dims.size());
+    pdal_stage_t* stage =
+        pdal_stage_create_labelduplicates(dims.data(), dims.size());
     if (!stage)
         throwError("Failed to create Rust labelduplicates stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
-
-    rust_view_converter::fromRust(rust_out, view);
-
-    if (rust_out)
-        pdal_point_view_destroy(rust_out);
-    pdal_point_view_destroy(rust_in);
+    rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);
 }
 

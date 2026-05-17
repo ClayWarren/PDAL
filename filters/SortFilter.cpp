@@ -80,7 +80,6 @@ void SortFilter::prepared(PointTableRef table)
         throwError("At least one valid dimension name must be provided!");
 }
 
-
 void SortFilter::filter(PointView& view)
 {
     std::vector<const char*> dims;
@@ -88,20 +87,15 @@ void SortFilter::filter(PointView& view)
         dims.push_back(s.c_str());
 
     const char* orderStr = (m_order == SortOrder::DESC) ? "desc" : "asc";
-    const char* algStr = (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
+    const char* algStr =
+        (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
 
-    pdal_stage_t* stage = pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);
+    pdal_stage_t* stage =
+        pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);
     if (!stage)
         throwError("Failed to create Rust sort stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
-
-    rust_view_converter::fromRust(rust_out, view);
-
-    if (rust_out)
-        pdal_point_view_destroy(rust_out);
-    pdal_point_view_destroy(rust_in);
+    rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);
 }
 

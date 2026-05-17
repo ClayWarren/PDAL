@@ -134,7 +134,6 @@ private:
     }
 };
 
-
 PointViewSet MortonOrderFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
@@ -143,15 +142,8 @@ PointViewSet MortonOrderFilter::run(PointViewPtr inView)
     if (!stage)
         throwError("Failed to create Rust mortonorder stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
-
-    PointViewPtr outView = rust_view_converter::fromRust(rust_out, inView);
+    PointViewPtr outView = rust_view_converter::runSingle(stage, inView);
     viewSet.insert(outView);
-
-    if (rust_out)
-        pdal_point_view_destroy(rust_out);
-    pdal_point_view_destroy(rust_in);
     pdal_stage_destroy(stage);
 
     return viewSet;

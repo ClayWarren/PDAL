@@ -71,33 +71,18 @@ void ReturnsFilter::prepared(PointTableRef table)
     }
 }
 
-
 PointViewSet ReturnsFilter::run(PointViewPtr inView)
 {
-    PointViewSet viewSet;
-
     std::vector<const char*> groups;
     for (const auto& r : m_returnsString)
         groups.push_back(r.c_str());
 
-    pdal_stage_t* stage = pdal_stage_create_returns(groups.data(), groups.size());
+    pdal_stage_t* stage =
+        pdal_stage_create_returns(groups.data(), groups.size());
     if (!stage)
         throwError("Failed to create Rust returns stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
-
-    pdal_point_view_t* rust_outputs[4] = {nullptr, nullptr, nullptr, nullptr};
-    uint64_t count = pdal_stage_run_multi(stage, rust_in, rust_outputs, 4);
-
-    for (uint64_t i = 0; i < count; ++i) {
-        if (rust_outputs[i]) {
-            PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
-            viewSet.insert(outView);
-            pdal_point_view_destroy(rust_outputs[i]);
-        }
-    }
-
-    pdal_point_view_destroy(rust_in);
+    PointViewSet viewSet = rust_view_converter::runMulti(stage, inView, 4);
     pdal_stage_destroy(stage);
 
     return viewSet;

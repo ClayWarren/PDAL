@@ -37,7 +37,8 @@
 #include "private/RustViewConverter.hpp"
 #include <pdal_capi.h>
 
-extern "C" {
+extern "C"
+{
     pdal_stage_t* pdal_stage_create_farthestpointsampling(uint64_t count);
 }
 
@@ -75,13 +76,10 @@ PointViewSet FarthestPointSamplingFilter::run(PointViewPtr inView)
     }
 
     pdal_stage_t* stage = pdal_stage_create_farthestpointsampling(m_count);
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+    if (!stage)
+        throwError("Failed to create Rust farthestpointsampling stage.");
 
-    PointViewPtr outView = rust_view_converter::fromRust(rust_out, inView);
-
-    pdal_point_view_destroy(rust_in);
-    pdal_point_view_destroy(rust_out);
+    PointViewPtr outView = rust_view_converter::runSingle(stage, inView);
     pdal_stage_destroy(stage);
 
     viewSet.insert(outView);

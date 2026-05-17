@@ -66,29 +66,14 @@ void GroupByFilter::prepared(PointTableRef table)
     // also need to check that we have a dimension with discrete values
 }
 
-
 PointViewSet GroupByFilter::run(PointViewPtr inView)
 {
-    PointViewSet viewSet;
-
     pdal_stage_t* stage = pdal_stage_create_groupby(m_dimName.c_str());
     if (!stage)
         throwError("Failed to create Rust groupby stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
-
-    std::vector<pdal_point_view_t*> rust_outputs(inView->size() + 1, nullptr);
-    uint64_t count = pdal_stage_run_multi(stage, rust_in, rust_outputs.data(), rust_outputs.size());
-
-    for (uint64_t i = 0; i < count; ++i) {
-        if (rust_outputs[i]) {
-            PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
-            viewSet.insert(outView);
-            pdal_point_view_destroy(rust_outputs[i]);
-        }
-    }
-
-    pdal_point_view_destroy(rust_in);
+    PointViewSet viewSet =
+        rust_view_converter::runMulti(stage, inView, inView->size() + 1);
     pdal_stage_destroy(stage);
 
     return viewSet;

@@ -109,25 +109,12 @@ PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
 
     pdal_stage_t* stage = pdal_stage_create_voxeldownsize(ops);
     if (!stage)
-        throwError("Failed to create Rust voxeldownsize stage.");
-
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
-    pdal_point_view_destroy(rust_in);
-
-    if (!rust_out)
     {
-        pdal_stage_destroy(stage);
         pdal_options_destroy(ops);
-        const char* message = pdal_last_error();
-        if (message && message[0])
-            throwError(message);
-        throwError("Rust voxeldownsize stage failed.");
+        throwError("Failed to create Rust voxeldownsize stage.");
     }
 
-    PointViewPtr outView = rust_view_converter::fromRust(rust_out, view);
-
-    pdal_point_view_destroy(rust_out);
+    PointViewPtr outView = rust_view_converter::runSingle(stage, view);
     pdal_stage_destroy(stage);
     pdal_options_destroy(ops);
 

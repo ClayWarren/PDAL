@@ -117,7 +117,10 @@ std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-TransformationFilter::TransformationFilter() : m_matrix(new Transform), m_rust_stage(nullptr) {}
+TransformationFilter::TransformationFilter()
+    : m_matrix(new Transform), m_rust_stage(nullptr)
+{
+}
 
 TransformationFilter::~TransformationFilter()
 {
@@ -208,7 +211,6 @@ void TransformationFilter::spatialReferenceChanged(const SpatialReference& srs)
             << getName() << ": overriding input spatial reference." << '\n';
 }
 
-
 void TransformationFilter::filter(PointView& view)
 {
     if (!view.spatialReference().empty() && !m_overrideSrs.empty())
@@ -226,14 +228,7 @@ void TransformationFilter::filter(PointView& view)
     if (!m_rust_stage)
         throwError("Failed to create Rust transformation stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    pdal_point_view_t* rust_out = pdal_stage_run(m_rust_stage, rust_in);
-
-    rust_view_converter::fromRust(rust_out, view);
-
-    if (rust_out)
-        pdal_point_view_destroy(rust_out);
-    pdal_point_view_destroy(rust_in);
+    rust_view_converter::runInPlace(m_rust_stage, view);
 
     view.invalidateProducts();
 }

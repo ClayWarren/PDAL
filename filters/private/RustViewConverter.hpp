@@ -4,10 +4,27 @@
 #include <pdal/pdal_types.hpp>
 #include <pdal_capi.h>
 
+#include <string>
+#include <vector>
+
 namespace pdal
 {
 namespace rust_view_converter
 {
+
+inline void throwLastError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+inline bool hasLastError()
+{
+    const char* message = pdal_last_error();
+    return message && message[0];
+}
 
 inline pdal_point_view_t* toRust(PointView& inView)
 {
@@ -75,16 +92,67 @@ inline PointViewPtr runSingle(pdal_stage_t* stage, PointViewPtr inView)
     pdal_point_view_destroy(rustIn);
 
     if (!rustOut)
-    {
-        const char* message = pdal_last_error();
-        if (message && message[0])
-            throw pdal_error(message);
-        return inView->makeNew();
-    }
+        throwLastError("Rust stage failed.");
 
     PointViewPtr outView = fromRust(rustOut, inView);
     pdal_point_view_destroy(rustOut);
     return outView;
+}
+
+inline void runInPlace(pdal_stage_t* stage, PointView& view)
+{
+    pdal_point_view_t* rustIn = toRust(view);
+    pdal_point_view_t* rustOut = pdal_stage_run(stage, rustIn);
+    pdal_point_view_destroy(rustIn);
+
+    if (!rustOut)
+        throwLastError("Rust stage failed.");
+
+    fromRust(rustOut, view);
+    pdal_point_view_destroy(rustOut);
+}
+
+inline void runInto(pdal_stage_t* stage, PointViewPtr inView,
+                    PointView& outView)
+{
+    pdal_point_view_t* rustIn = toRust(inView);
+    pdal_point_view_t* rustOut = pdal_stage_run(stage, rustIn);
+    pdal_point_view_destroy(rustIn);
+
+    if (!rustOut)
+        throwLastError("Rust stage failed.");
+
+    fromRust(rustOut, outView);
+    pdal_point_view_destroy(rustOut);
+}
+
+inline PointViewSet runMulti(pdal_stage_t* stage, PointViewPtr inView,
+                             uint64_t maxOutputs)
+{
+    pdal_point_view_t* rustIn = toRust(inView);
+    std::vector<pdal_point_view_t*> rustOutputs(maxOutputs, nullptr);
+    uint64_t count =
+        pdal_stage_run_multi(stage, rustIn, rustOutputs.data(), maxOutputs);
+    pdal_point_view_destroy(rustIn);
+
+    if (count == 0)
+    {
+        for (pdal_point_view_t* output : rustOutputs)
+            pdal_point_view_destroy(output);
+        if (hasLastError())
+            throwLastError("Rust stage failed.");
+    }
+
+    PointViewSet viewSet;
+    for (uint64_t i = 0; i < count; ++i)
+    {
+        if (rustOutputs[i])
+        {
+            viewSet.insert(fromRust(rustOutputs[i], inView));
+            pdal_point_view_destroy(rustOutputs[i]);
+        }
+    }
+    return viewSet;
 }
 
 } // namespace rust_view_converter

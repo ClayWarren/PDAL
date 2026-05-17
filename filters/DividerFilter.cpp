@@ -37,14 +37,11 @@
 #include "private/RustViewConverter.hpp"
 #include <pdal_capi.h>
 
-extern "C" {
-    pdal_stage_t* pdal_stage_create_divider(
-        int32_t mode,
-        int32_t size_mode,
-        uint64_t size,
-        const uint8_t* evals,
-        uint64_t evals_count
-    );
+extern "C"
+{
+    pdal_stage_t* pdal_stage_create_divider(int32_t mode, int32_t size_mode,
+                                            uint64_t size, const uint8_t* evals,
+                                            uint64_t evals_count);
 }
 
 namespace pdal
@@ -217,33 +214,12 @@ PointViewSet DividerFilter::run(PointViewPtr inView)
     }
 
     pdal_stage_t* stage = pdal_stage_create_divider(
-        mode_val,
-        size_mode_val,
-        m_args->m_size,
-        evals.empty() ? nullptr : evals.data(),
-        evals.size()
-    );
+        mode_val, size_mode_val, m_args->m_size,
+        evals.empty() ? nullptr : evals.data(), evals.size());
+    if (!stage)
+        throwError("Failed to create Rust divider stage.");
 
-    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
-
-    uint64_t max_outputs = inView->size() + 2;
-    std::vector<pdal_point_view_t*> rust_outputs(max_outputs, nullptr);
-
-    uint64_t actual_outputs = pdal_stage_run_multi(
-        stage,
-        rust_in,
-        rust_outputs.data(),
-        max_outputs
-    );
-
-    for (uint64_t i = 0; i < actual_outputs; ++i)
-    {
-        PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
-        result.insert(outView);
-        pdal_point_view_destroy(rust_outputs[i]);
-    }
-
-    pdal_point_view_destroy(rust_in);
+    result = rust_view_converter::runMulti(stage, inView, inView->size() + 2);
     pdal_stage_destroy(stage);
 
     return result;
