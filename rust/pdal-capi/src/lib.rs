@@ -7,6 +7,7 @@ use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use pdal_filters::assign;
+use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
@@ -1033,6 +1034,23 @@ pub extern "C" fn pdal_stage_create_hagnn(
         max_distance,
         allow_extrapolation,
         class_label,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a cluster filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_cluster(
+    min_points: u64,
+    max_points: u64,
+    tolerance: f64,
+    is_3d: bool,
+) -> *mut StageWrapper {
+    let filter = Box::new(ClusterFilter::new(
+        min_points as usize,
+        max_points as usize,
+        tolerance,
+        is_3d,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

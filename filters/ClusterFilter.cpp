@@ -34,9 +34,9 @@
 
 #include "ClusterFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include "private/RustViewConverter.hpp"
 
-#include "private/Segmentation.hpp"
+#include <pdal_capi.h>
 
 #include <string>
 
@@ -71,21 +71,13 @@ void ClusterFilter::addDimensions(PointLayoutPtr layout)
 
 void ClusterFilter::filter(PointView& view)
 {
-    std::deque<PointIdList> clusters;
-    if (m_is3d)
-        clusters = Segmentation::extractClusters<KD3Index>(
-            view, m_minPoints, m_maxPoints, m_tolerance);
-    else
-        clusters = Segmentation::extractClusters<KD2Index>(
-            view, m_minPoints, m_maxPoints, m_tolerance);
+    pdal_stage_t* stage = pdal_stage_create_cluster(m_minPoints, m_maxPoints,
+                                                    m_tolerance, m_is3d);
+    if (!stage)
+        throwError("Failed to create Rust cluster stage.");
 
-    uint64_t id = 1;
-    for (auto const& c : clusters)
-    {
-        for (auto const& i : c)
-            view.setField(Dimension::Id::ClusterID, i, id);
-        id++;
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

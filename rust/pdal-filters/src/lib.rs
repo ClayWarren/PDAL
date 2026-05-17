@@ -1,4 +1,5 @@
 pub mod assign;
+pub mod cluster;
 pub mod dbscan;
 pub mod decimation;
 pub mod divider;

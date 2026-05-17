@@ -84,6 +84,7 @@ pdal_stage_t* pdal_stage_create_outlier(const char* method, uint64_t min_k, doub
 pdal_stage_t* pdal_stage_create_dbscan(uint64_t min_points, double eps, const char* const* dims, uint64_t count);
 pdal_stage_t* pdal_stage_create_lof(uint64_t minpts);
 pdal_stage_t* pdal_stage_create_hagnn(uint64_t count, double max_distance, bool allow_extrapolation, uint8_t class_label);
+pdal_stage_t* pdal_stage_create_cluster(uint64_t min_points, uint64_t max_points, double tolerance, bool is_3d);
 
 uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
 void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
