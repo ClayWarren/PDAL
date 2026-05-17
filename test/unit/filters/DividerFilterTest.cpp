@@ -118,6 +118,29 @@ TEST(DividerFilterTest, partition_capacity)
     }
 }
 
+TEST(DividerFilterTest, zero_capacity)
+{
+    point_count_t count = 10;
+
+    Options readerOps;
+    readerOps.add("bounds",
+                  BOX3D(1, 1, 1, (double)count, (double)count, (double)count));
+    readerOps.add("mode", "ramp");
+    readerOps.add("count", count);
+
+    FauxReader r;
+    r.setOptions(readerOps);
+
+    Options filterOps;
+    filterOps.add("capacity", 0);
+    DividerFilter f;
+    f.setInput(r);
+    f.setOptions(filterOps);
+
+    PointTable t;
+    EXPECT_THROW(f.prepare(t), pdal_error);
+}
+
 TEST(DividerFilterTest, round_robin_count)
 {
     point_count_t count = 1000;

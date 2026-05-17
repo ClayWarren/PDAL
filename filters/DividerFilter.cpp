@@ -170,7 +170,11 @@ void DividerFilter::initialize()
                 throwError("Option 'count' must be in the range [2, 1000].");
         }
         if (m_args->m_capArg->set())
+        {
             m_args->m_sizeMode = SizeMode::Capacity;
+            if (m_args->m_size == 0)
+                throwError("Option 'capacity' must be greater than 0.");
+        }
     }
 }
 

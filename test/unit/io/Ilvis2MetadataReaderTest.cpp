@@ -95,3 +95,16 @@ TEST(Ilvis2MetadataReaderTest, testReadMetadata)
     EXPECT_EQ(std::size_t{1}, l.size());
     EXPECT_EQ(std::size_t{0}, l[0].value().find("POLYGON"));
 }
+
+TEST(Ilvis2MetadataReaderTest, missingExpectedElement)
+{
+    std::string filename = Support::temppath("ilvis2-missing-element.xml");
+    std::ofstream out(filename);
+    out << "<GranuleMetaDataFile/>\n";
+    out.close();
+
+    Ilvis2MetadataReader reader;
+    MetadataNode metadata;
+    EXPECT_THROW(reader.readMetadataFile(filename, &metadata),
+                 Ilvis2MetadataReader::error);
+}

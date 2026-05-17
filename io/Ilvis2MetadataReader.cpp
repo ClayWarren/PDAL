@@ -622,8 +622,12 @@ void Ilvis2MetadataReader::assertElementIs(xmlNodePtr node,
                                            std::string expected)
 {
     if (!node || !nodeElementIs(node, expected))
-        throw error("Expected element '" + expected + "', found '" +
-                    std::string((const char*)node->name) + "'");
+    {
+        std::string found =
+            node && node->name ? std::string((const char*)node->name) : "none";
+        throw error("Expected element '" + expected + "', found '" + found +
+                    "'");
+    }
 }
 
 // Throws an error if the node is not null
