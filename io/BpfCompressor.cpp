@@ -82,6 +82,8 @@ void BpfCompressor::compress()
     while (m_strm.avail_in)
     {
         int ret = ::deflate(&m_strm, Z_NO_FLUSH);
+        if (ret != Z_OK)
+            throw error("Couldn't compress BPF data.");
         size_t written = CHUNKSIZE - m_strm.avail_out;
         m_compressedSize += written;
         m_out.put(m_tmpbuf, written);

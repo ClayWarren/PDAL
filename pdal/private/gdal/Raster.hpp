@@ -451,7 +451,7 @@ public:
                          m_filename + "'.";
             return GDALError::BadBand;
         }
-        catch (CantWriteBlock err)
+        catch (const CantWriteBlock& err)
         {
             m_errorMsg =
                 "Unable to write block for for raster '" + m_filename + "'.";

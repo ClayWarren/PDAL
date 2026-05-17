@@ -115,7 +115,7 @@ PointViewSet SampleFilter::run(PointViewPtr view)
     {
         if (keepPoint(point))
         {
-            bool kept = voxelize(point);
+            voxelize(point);
             output->appendPoint(*view, point.pointId());
         }
     }

@@ -214,7 +214,7 @@ OGRGeometry* createFromWkb(const std::string& s, std::string& srs)
     size_t nBytesRead;
     OGRErr err = OGRGeometryFactory::createFromWkb(
         s.c_str(), nullptr, &newGeom, s.size(), wkbVariantIso, nBytesRead);
-    if (!newGeom)
+    if (err != OGRERR_NONE || !newGeom)
         throw pdal_error("Couldn't convert WKB string to geometry.");
 
     return newGeom;
@@ -299,8 +299,9 @@ std::vector<Polygon> getPolygons(const OGRSpecOptions& ogr)
     unsigned int openFlags =
         GDAL_OF_READONLY | GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR;
     GDALDataset* ds;
-    ds = (GDALDataset*)GDALOpenEx(ogr.datasource.c_str(), openFlags,
-                                  papszDriverOptions, papszOpenOptions, nullptr);
+    ds =
+        (GDALDataset*)GDALOpenEx(ogr.datasource.c_str(), openFlags,
+                                 papszDriverOptions, papszOpenOptions, nullptr);
     CSLDestroy(papszDriverOptions);
     CSLDestroy(papszOpenOptions);
     if (!ds)

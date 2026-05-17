@@ -711,7 +711,7 @@ public:
     PDAL_EXPORT ISwitchableStream& operator>>(double& v)
     {
         m_stream->read((char*)&v, sizeof(v));
-        uint64_t tmp = isLittleEndian() ? be64toh(*(uint64_t*)(&v))
+        uint64_t tmp = isLittleEndian() ? le64toh(*(uint64_t*)(&v))
                                         : be64toh(*(uint64_t*)(&v));
         std::memcpy(&v, &tmp, sizeof(tmp));
         return *this;

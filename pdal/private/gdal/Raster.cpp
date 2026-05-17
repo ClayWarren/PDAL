@@ -569,7 +569,7 @@ GDALError Raster::read(int band, int x, int y, int width, int height,
         return GDALError::NotOpen;
     }
 
-    data.resize(width * height);
+    data.resize((size_t)width * (size_t)height);
 
     int validHeight = height;
     if (y + height > this->height())
@@ -589,6 +589,8 @@ GDALError Raster::read(int band, int x, int y, int width, int height,
     CPLErr readResult = GDALRasterIO(b, GF_Read, x, y, validWidth, validHeight,
                                      data.data(), validWidth, validHeight,
                                      GDT_Float64, nPixelSpace, nLineSpace);
+    if (readResult != CE_None)
+        return GDALError::CantReadBlock;
 
     return GDALError::None;
 }

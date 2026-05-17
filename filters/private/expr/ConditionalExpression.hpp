@@ -25,8 +25,6 @@ template <>
 inline StatusWithReason fromString(const std::string& from,
                                    pdal::expr::ConditionalExpression& expr)
 {
-    std::string error;
-
     expr::Lexer lexer(from);
     expr::ConditionalParser parser(lexer);
     if (!parser.expression(expr))

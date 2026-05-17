@@ -695,7 +695,6 @@ void V10BaseLoader::pack(const PointRef& point, char* buf, int bufsize)
     uint8_t synthetic = point.getFieldAs<uint8_t>(Dimension::Id::Synthetic);
     uint8_t keypoint = point.getFieldAs<uint8_t>(Dimension::Id::KeyPoint);
     uint8_t withheld = point.getFieldAs<uint8_t>(Dimension::Id::Withheld);
-    uint8_t overlap = point.getFieldAs<uint8_t>(Dimension::Id::Overlap);
     uint8_t classificationWithFlags =
         (classification & 0x1F) | ((synthetic & 0x01) << 5) |
         ((keypoint & 0x01) << 6) | ((withheld & 0x01) << 7);

@@ -88,8 +88,8 @@ std::string SpatialRef::wkt() const
     {
         char* pszWKT = nullptr;
         OSRExportToWkt(m_ref.get(), &pszWKT);
-        bool valid = (bool)*pszWKT;
-        output = pszWKT;
+        if (pszWKT && *pszWKT)
+            output = pszWKT;
         CPLFree(pszWKT);
     }
     return output;

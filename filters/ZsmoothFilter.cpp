@@ -93,8 +93,6 @@ void ZsmoothFilter::filter(PointView& view)
 
     for (PointId idx = 0; idx < view.size(); ++idx)
     {
-        double d = view.getFieldAs<double>(Dimension::Id::Z, idx);
-
         std::vector<double> valList;
         PointIdList nears = kdi.radius(idx, m_p->radius);
         for (PointId n = 1; n < nears.size(); ++n)
@@ -107,9 +105,7 @@ void ZsmoothFilter::filter(PointView& view)
         double val;
         if (valList.empty())
             val = view.getFieldAs<double>(Dimension::Id::Z, idx);
-        else if (valList.size() == 1)
-            val = valList[0];
-        else if (m_p->pos == 0.0)
+        else if (valList.size() == 1 || m_p->pos == 0.0)
             val = valList[0];
         else if (m_p->pos == 1.0)
             val = valList[valList.size() - 1];

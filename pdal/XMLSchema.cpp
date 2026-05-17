@@ -345,7 +345,6 @@ bool XMLSchema::load(xmlDocPtr doc)
     const unsigned SENTINEL_POS = 100000;
     unsigned missingPos = SENTINEL_POS + 1;
 
-    xmlNode* dimension = root->children;
     pdal::Metadata metadata;
     for (xmlNode* dimension = root->children; dimension;
          dimension = dimension->next)

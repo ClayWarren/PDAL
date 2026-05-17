@@ -170,8 +170,6 @@ void Processor::writeCompressed(VoxelKey k, PointViewPtr v)
         return;
     }
 
-    PointLayoutPtr layout = v->layout();
-
     std::vector<char> buf(lazperf::baseCount(b.pointFormatId) +
                           b.numExtraBytes);
     lazperf::writer::chunk_compressor compressor(b.pointFormatId,

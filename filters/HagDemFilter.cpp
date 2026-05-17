@@ -132,9 +132,8 @@ bool HagDemFilter::processOne(PointRef& point)
 
     double x = point.getFieldAs<double>(Id::X);
     double y = point.getFieldAs<double>(Id::Y);
-    double z;
     double val;
-    double hag(m_noDataHeight);
+    double hag;
 
     if (m_zeroGround)
     {

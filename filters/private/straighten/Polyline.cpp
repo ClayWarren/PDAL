@@ -155,7 +155,8 @@ Polyline::Polyline(const Polyline& poly) : Geometry(poly)
 
 Polyline& Polyline::operator=(const Polyline& src)
 {
-    ((Geometry*)this)->operator=((const Geometry&)src);
+    if (this != &src)
+        ((Geometry*)this)->operator=((const Geometry&)src);
     return *this;
 }
 
@@ -175,7 +176,6 @@ void Polyline::interpolate(const PointRef& point, double& x, double& y,
                            double& z, double& m, double& azimuth,
                            double& offset)
 {
-    OGRLineString* p = static_cast<OGRLineString*>(m_geom.get());
     const double pk = point.getFieldAs<double>(Dimension::Id::X);
     point_count_t size = m_view->size();
     if (size == 0 || size == 1)

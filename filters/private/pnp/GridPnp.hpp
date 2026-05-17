@@ -266,7 +266,6 @@ private:
         size_t numEdges{0};
         for (EdgeIt it(m_rings); it; it.next())
         {
-            EdgeId id = *it;
             const Point& p1 = point1(*it);
             const Point& p2 = point2(*it);
 

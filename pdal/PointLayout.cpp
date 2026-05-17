@@ -225,13 +225,6 @@ bool PointLayout::update(Dimension::Detail dd, const std::string& name)
     if (!used)
         detail.push_back(dd);
 
-    // Find the dimension in the list that we're referring to with
-    // this update.
-    auto di = std::find_if(detail.begin(), detail.end(),
-                           [dd](const Dimension::Detail& td)
-                           { return td.id() == dd.id(); });
-    Dimension::Detail* cur = &(*di);
-
     {
         auto sorter = [](const Dimension::Detail& d1,
                          const Dimension::Detail& d2) -> bool

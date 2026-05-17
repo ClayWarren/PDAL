@@ -105,7 +105,6 @@ void GridDecimationFilter::processOne(BOX2D bounds, PointRef& point,
     // get the grid cell
     double x = point.getFieldAs<double>(Dimension::Id::X);
     double y = point.getFieldAs<double>(Dimension::Id::Y);
-    int id = point.getFieldAs<double>(Dimension::Id::PointId);
 
     // if x==(xmax of the cell), we assume the point are in the upper cell
     // if y==(ymax of the cell), we assume the point are in the right cell
@@ -157,9 +156,6 @@ void GridDecimationFilter::createGrid(BOX2D bounds)
         throwError("Grid width out of range.");
     if (d_height < 0.0 || d_height > (std::numeric_limits<int>::max)())
         throwError("Grid height out of range.");
-
-    int width = static_cast<int>(d_width);
-    int height = static_cast<int>(d_height);
 
     for (size_t l(0); l < d_height; l++)
         for (size_t c(0); c < d_width; c++)

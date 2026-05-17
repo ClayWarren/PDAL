@@ -157,8 +157,7 @@ void EsriReader::initialize(PointTableRef table)
     if (m_filename.back() == '/')
         m_filename.pop_back();
 
-    log()->get(LogLevel::Debug)
-        << "Fetching info from " << m_filename << '\n';
+    log()->get(LogLevel::Debug) << "Fetching info from " << m_filename << '\n';
 
     // personalize for slpk or i3s
     try
@@ -194,8 +193,7 @@ void EsriReader::initialize(PointTableRef table)
     else
     {
         log()->get(LogLevel::Warning)
-            << "Number of nodes per page not specified. Default is 64."
-            << '\n';
+            << "Number of nodes per page not specified. Default is 64." << '\n';
         m_nodeCap = 64;
     }
 
@@ -542,7 +540,6 @@ void EsriReader::traverseTree(PagePtr page, int node)
 
     // find node information
     NL::json& j = *page;
-    int firstNode = j["nodes"][0]["resourceId"].get<int>();
     int name = j["nodes"][index]["resourceId"].get<int>();
     int firstChild = j["nodes"][index]["firstChild"].get<int>();
     int cCount = j["nodes"][index]["childCount"].get<int>();

@@ -354,7 +354,6 @@ void GreedyProjection::filter(PointView& view)
         }
 
         // Set the index of the first free point in isFree.
-        done = true;
         auto it = std::find(state_.begin(), state_.end(), GP3Type::FREE);
         if (it == state_.end())
             done = true;
@@ -727,7 +726,6 @@ void GreedyProjection::filter(PointView& view)
 
             // Finding visibility region of R
             bool need_invert = false;
-            int sourceIdx = nnn_;
             if ((source_[R_] == ffn_[R_]) || (source_[R_] == sfn_[R_]))
             {
                 if ((angles_[end].angle - angles_[start].angle) < M_PI)
@@ -735,7 +733,8 @@ void GreedyProjection::filter(PointView& view)
             }
             else
             {
-                for (sourceIdx = 0; sourceIdx < nnn_; sourceIdx++)
+                int sourceIdx = 0;
+                for (; sourceIdx < nnn_; sourceIdx++)
                     if (angles_[sourceIdx].index == source_[R_])
                         break;
                 if (sourceIdx == nnn_)
