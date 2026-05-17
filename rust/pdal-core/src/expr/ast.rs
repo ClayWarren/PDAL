@@ -81,6 +81,12 @@ pub trait Node {
 
     /// Evaluate the node for point `idx` of `view`.
     fn eval(&self, view: &PointView, idx: PointId) -> EvalValue;
+
+    /// If this node is a numeric constant, its value -- used by the parser
+    /// for constant folding. Non-constant nodes return `None`.
+    fn const_value(&self) -> Option<f64> {
+        None
+    }
 }
 
 /// A boxed AST node -- the Rust analog of PDAL's `NodePtr`.
@@ -437,6 +443,9 @@ impl Node for ConstValueNode {
     }
     fn eval(&self, _view: &PointView, _idx: PointId) -> EvalValue {
         EvalValue::num(self.val)
+    }
+    fn const_value(&self) -> Option<f64> {
+        Some(self.val)
     }
 }
 
