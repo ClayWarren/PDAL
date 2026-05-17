@@ -30,17 +30,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "StatsFilter.hpp"
-
+#include "private/RustViewConverter.hpp"
 #include <cmath>
-#include <unordered_map>
-
 #include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/Polygon.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
+#include <unordered_map>
+
+// Redundant extern C removed because pdal_capi.h is included.
 
 namespace pdal
 {
@@ -95,36 +98,11 @@ void Summary::extractMetadata(MetadataNode& m)
     }
     else if (m_enumerate == Global)
     {
-        computeGlobalStats();
         m.add("median", m_median);
         m.add("mad", m_mad);
     }
     else if (m_enumerate == Count)
     {
-        // For some reason we first started adding 'counts' items that look like
-        // this:
-        //
-        //         "counts":
-        //         [
-        //           "1.000000/108",
-        //           "7.000000/24",
-        //           "9.000000/122704"
-        //         ]
-
-        // But these are hard to use and require custom parsing. They aren't
-        // JSON. Why aren't they JSON?
-        //
-        // I'm adding a "bins" parameter that at least won't require custom
-        // parsing, but we are not simply replacing "counts" because people
-        // could now be parsing the silly things.
-        //
-        //         "bins":
-        //         {
-        //           "1.000000": "108",
-        //           "7.000000": "24",
-        //           "9.000000": "122704"
-        //         }
-
         MetadataNode bins = m.add("bins");
         for (auto& v : m_values)
         {
@@ -137,61 +115,86 @@ void Summary::extractMetadata(MetadataNode& m)
 
 void Summary::computeGlobalStats()
 {
-    auto compute_median = [](std::vector<double> vals)
-    {
-        std::nth_element(vals.begin(), vals.begin() + vals.size() / 2,
-                         vals.end());
-        return *(vals.begin() + vals.size() / 2);
-    };
+    if (m_data.empty())
+        return;
 
-    // TODO add quantiles
-    m_median = compute_median(m_data);
-    std::transform(m_data.begin(), m_data.end(), m_data.begin(),
-                   [this](double v) { return std::fabs(v - this->m_median); });
-    m_mad = compute_median(m_data);
+    std::sort(m_data.begin(), m_data.end());
+    size_t mid = m_data.size() / 2;
+    m_median = m_data[mid];
+
+    std::vector<double> diffs(m_data.size());
+    for (size_t i = 0; i < m_data.size(); ++i)
+        diffs[i] = std::abs(m_data[i] - m_median);
+    std::sort(diffs.begin(), diffs.end());
+    m_mad = diffs[mid];
 }
 
-// Math comes from
-// https://prod.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
-// (Pebay paper from Sandia labs, 2008)
 bool Summary::merge(const Summary& s)
 {
-    if ((m_name != s.m_name) || (m_enumerate != s.m_enumerate) ||
-        (m_advanced != s.m_advanced))
+    if (m_name != s.m_name || m_enumerate != s.m_enumerate ||
+        m_advanced != s.m_advanced)
         return false;
 
-    double n1 = (double)m_cnt;
-    double n2 = (double)s.m_cnt;
-    double n = n1 + n2;
-    double nsq = n * n;
-    double n1n2 = n1 * n2;
-    double n1sq = n1 * n1;
-    double n2sq = n2 * n2;
-    double ncube = n * n * n;
-    double deltaMean = s.M1 - M1;
-
-    if (n == 0)
+    if (s.m_cnt == 0)
         return true;
 
-    double m1 = M1 + s.m_cnt * deltaMean / n;
-    double m2 = M2 + s.M2 + n1n2 * std::pow(deltaMean, 2) / n;
-    double m3 = M3 + s.M3 + n1n2 * (n1 - n2) * std::pow(deltaMean, 3) / nsq +
-                3 * (n1 * s.M2 - n2 * M2) * deltaMean / n;
-    double m4 = M4 + s.M4 +
-                n1n2 * (n1sq - n1n2 + n2sq) * std::pow(deltaMean, 4) / ncube +
-                6 * (n1sq * s.M2 + n2sq * M2) * std::pow(deltaMean, 2) / nsq +
-                4 * (n1 * s.M3 - n2 * M3) * deltaMean / n;
+    if (m_cnt == 0)
+    {
+        m_min = s.m_min;
+        m_max = s.m_max;
+        m_cnt = s.m_cnt;
+        M1 = s.M1;
+        M2 = s.M2;
+        M3 = s.M3;
+        M4 = s.M4;
+        m_median = s.m_median;
+        m_mad = s.m_mad;
+        m_values = s.m_values;
+        m_data = s.m_data;
+        return true;
+    }
 
-    M1 = m1;
-    M2 = m2;
-    M3 = m3;
-    M4 = m4;
-    m_min = (std::min)(m_min, s.m_min);
-    m_max = (std::max)(m_max, s.m_max);
-    m_cnt = s.m_cnt + m_cnt;
-    m_data.insert(m_data.begin(), s.m_data.begin(), s.m_data.end());
-    for (auto p : s.m_values)
-        m_values[p.first] += p.second;
+    double n1 = m_cnt;
+    double n2 = s.m_cnt;
+    double n = n1 + n2;
+
+    double delta = s.M1 - M1;
+    double delta2 = delta * delta;
+    double delta3 = delta2 * delta;
+    double delta4 = delta3 * delta;
+
+    m_cnt = n;
+    m_min = std::min(m_min, s.m_min);
+    m_max = std::max(m_max, s.m_max);
+
+    M1 = (n1 * M1 + n2 * s.M1) / n;
+
+    if (m_advanced)
+    {
+        double new_M4 =
+            M4 + s.M4 +
+            delta4 * n1 * n2 * (n1 * n1 - n1 * n2 + n2 * n2) / (n * n * n) +
+            6.0 * delta2 * (n1 * n1 * s.M2 + n2 * n2 * M2) / (n * n) +
+            4.0 * delta * (n1 * s.M3 - n2 * M3) / n;
+        double new_M3 = M3 + s.M3 + delta3 * n1 * n2 * (n1 - n2) / (n * n) +
+                        3.0 * delta * (n1 * s.M2 - n2 * M2) / n;
+        M4 = new_M4;
+        M3 = new_M3;
+    }
+
+    M2 = M2 + s.M2 + delta2 * n1 * n2 / n;
+
+    if (m_enumerate != NoEnum)
+    {
+        for (auto const& pair : s.m_values)
+            m_values[pair.first] += pair.second;
+    }
+
+    if (m_enumerate == Global)
+    {
+        m_data.insert(m_data.end(), s.m_data.begin(), s.m_data.end());
+        computeGlobalStats();
+    }
 
     return true;
 }
@@ -213,12 +216,80 @@ bool StatsFilter::processOne(PointRef& point)
 
 void StatsFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
+    if (view.empty())
+        return;
+
+    std::vector<std::string> dim_names;
+    dim_names.reserve(m_stats.size());
+    std::vector<const char*> dims_ptrs;
+    dims_ptrs.reserve(m_stats.size());
+    for (auto const& pair : m_stats)
     {
-        point.setPointId(idx);
-        processOne(point);
+        dim_names.push_back(pair.second.m_name);
+        dims_ptrs.push_back(dim_names.back().c_str());
     }
+
+    std::vector<const char*> enums_ptrs;
+    for (auto const& s : m_enums)
+    {
+        enums_ptrs.push_back(s.c_str());
+    }
+
+    std::vector<const char*> counts_ptrs;
+    for (auto const& s : m_counts)
+    {
+        counts_ptrs.push_back(s.c_str());
+    }
+
+    std::vector<const char*> globals_ptrs;
+    for (auto const& s : m_global)
+    {
+        globals_ptrs.push_back(s.c_str());
+    }
+
+    std::vector<pdal_dim_stats_t> out_stats(m_stats.size());
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+
+    pdal_stats_compute(
+        rust_in, dims_ptrs.data(), dims_ptrs.size(), m_advanced,
+        enums_ptrs.empty() ? nullptr : enums_ptrs.data(), enums_ptrs.size(),
+        counts_ptrs.empty() ? nullptr : counts_ptrs.data(), counts_ptrs.size(),
+        globals_ptrs.empty() ? nullptr : globals_ptrs.data(),
+        globals_ptrs.size(), out_stats.data());
+
+    pdal_point_view_destroy(rust_in);
+
+    size_t idx = 0;
+    for (auto& pair : m_stats)
+    {
+        Summary& s = pair.second;
+        const auto& rstats = out_stats[idx];
+        s.m_cnt = rstats.count;
+        s.m_min = rstats.min;
+        s.m_max = rstats.max;
+
+        s.M1 = rstats.m1;
+        s.M2 = rstats.m2;
+        if (s.m_advanced)
+        {
+            s.M3 = rstats.m3;
+            s.M4 = rstats.m4;
+        }
+
+        s.m_median = rstats.median;
+        s.m_mad = rstats.mad;
+
+        s.m_values.clear();
+        for (uint64_t j = 0; j < rstats.unique_len; ++j)
+        {
+            s.m_values[rstats.unique_values[j]] = rstats.unique_counts[j];
+        }
+
+        idx++;
+    }
+
+    pdal_free_stats_arrays(out_stats.data(), out_stats.size());
 }
 
 void StatsFilter::done(PointTableRef table)
@@ -248,7 +319,6 @@ void StatsFilter::prepared(PointTableRef table)
     auto getWarn([this]() -> std::ostream&
                  { return log()->get(LogLevel::Warning); });
 
-    // Add dimensions to the list.
     if (m_dimNames.empty())
     {
         for (auto id : layout->dims())
@@ -268,7 +338,6 @@ void StatsFilter::prepared(PointTableRef table)
         }
     }
 
-    // Set the enumeration flag for those dimensions specified.
     for (auto& s : m_enums)
     {
         if (dims.find(s) == dims.end())
@@ -280,7 +349,6 @@ void StatsFilter::prepared(PointTableRef table)
             dims[s] = Summary::Enumerate;
     }
 
-    // Set the count flag for those dimensions specified.
     for (auto& s : m_counts)
     {
         if (dims.find(s) == dims.end())
@@ -292,7 +360,6 @@ void StatsFilter::prepared(PointTableRef table)
             dims[s] = Summary::Count;
     }
 
-    // Set the global flag for those dimensions specified.
     for (auto& s : m_global)
     {
         if (dims.find(s) == dims.end())
@@ -303,7 +370,7 @@ void StatsFilter::prepared(PointTableRef table)
         else
             dims[s] = Summary::Global;
     }
-    // Create the summary objects.
+
     for (auto& dv : dims)
         m_stats.insert(
             std::make_pair(layout->findDim(dv.first),
@@ -326,7 +393,6 @@ void StatsFilter::extractMetadata(PointTableRef table)
         s.extractMetadata(t);
     }
 
-    // If we have X, Y, & Z dims, output bboxes
     auto xs = m_stats.find(Dimension::Id::X);
     auto ys = m_stats.find(Dimension::Id::Y);
     auto zs = m_stats.find(Dimension::Id::Z);
@@ -346,8 +412,6 @@ void StatsFilter::extractMetadata(PointTableRef table)
             "boundary", p.json(), "json", "GeoJSON boundary");
         MetadataNode bbox = metadata.add(mbox);
         SpatialReference ref = table.anySpatialReference();
-        // if we don't get an SRS from the PointTableRef,
-        // we won't add another metadata node
         if (!ref.empty())
         {
             p.setSpatialReference(ref);

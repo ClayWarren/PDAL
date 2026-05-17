@@ -30,12 +30,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "RangeFilter.hpp"
 
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 #include "private/DimRange.hpp"
 
@@ -59,9 +63,12 @@ std::string RangeFilter::getName() const
     return s_info.name;
 }
 
-RangeFilter::RangeFilter() {}
+RangeFilter::RangeFilter() : m_rust_stage(nullptr) {}
 
-RangeFilter::~RangeFilter() {}
+RangeFilter::~RangeFilter()
+{
+    pdal_stage_destroy(m_rust_stage);
+}
 
 void RangeFilter::addArgs(ProgramArgs& args)
 {
@@ -80,6 +87,24 @@ void RangeFilter::prepared(PointTableRef table)
                        r.m_name + "'.");
     }
     std::sort(m_ranges.begin(), m_ranges.end());
+
+    std::vector<pdal_range_limit_t> limits;
+    for (auto const& r : m_ranges)
+    {
+        pdal_range_limit_t limit;
+        limit.dim_name = r.m_name.c_str();
+        limit.lower_bound = r.m_lower_bound;
+        limit.upper_bound = r.m_upper_bound;
+        limit.inclusive_lower = r.m_inclusive_lower_bound;
+        limit.inclusive_upper = r.m_inclusive_upper_bound;
+        limit.negate = r.m_negate;
+        limits.push_back(limit);
+    }
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_range(limits.data(), limits.size());
 }
 
 // The range list is sorted by dimension, so the logic here should work
@@ -94,17 +119,7 @@ bool RangeFilter::processOne(PointRef& point)
 PointViewSet RangeFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-
-    PointViewPtr outView = inView->makeNew();
-
-    for (PointId i = 0; i < inView->size(); ++i)
-    {
-        PointRef point = inView->point(i);
-        if (processOne(point))
-            outView->appendPoint(*inView, i);
-    }
-
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     return viewSet;
 }
 

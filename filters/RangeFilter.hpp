@@ -41,6 +41,8 @@
 #include <memory>
 #include <string>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -56,6 +58,7 @@ public:
 
 private:
     std::vector<DimRange> m_ranges;
+    pdal_stage* m_rust_stage;
 
     void addArgs(ProgramArgs& args) override;
     void prepared(PointTableRef table) override;

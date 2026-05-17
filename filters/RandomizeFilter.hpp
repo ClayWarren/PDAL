@@ -31,13 +31,14 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #pragma once
 
 #include <pdal/Filter.hpp>
 
-#include <random>
+struct pdal_stage;
 
 namespace pdal
 {
@@ -45,28 +46,23 @@ namespace pdal
 class PDAL_EXPORT RandomizeFilter : public Filter
 {
 public:
-    RandomizeFilter() {}
+    RandomizeFilter();
+    ~RandomizeFilter() override;
 
     std::string getName() const override;
 
 private:
     Arg* m_seedArg;
     unsigned m_seed;
+    pdal_stage* m_rust_stage;
 
     void addArgs(ProgramArgs& args) override;
-    void filter(PointView& view) override
-    {
-        if (!m_seedArg->set())
-        {
-            std::random_device rng;
-            m_seed = rng();
-        }
-        std::mt19937 mt(m_seed);
-        std::shuffle(view.begin(), view.end(), mt);
-    }
+    void initialize() override;
+    PointViewSet run(PointViewPtr view) override;
+    void filter(PointView& view) override;
 
-    RandomizeFilter& operator=(const RandomizeFilter&); // not implemented
-    RandomizeFilter(const RandomizeFilter&);            // not implemented
+    RandomizeFilter& operator=(const RandomizeFilter&) = delete;
+    RandomizeFilter(const RandomizeFilter&) = delete;
 };
 
 } // namespace pdal

@@ -30,15 +30,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "AssignFilter.hpp"
-
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-
 #include "private/DimRange.hpp"
 #include "private/expr/AssignStatement.hpp"
+#include "private/RustViewConverter.hpp"
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -161,30 +162,56 @@ void AssignFilter::prepared(PointTableRef table)
 
 bool AssignFilter::processOne(PointRef& point)
 {
-    if (m_args->m_condition.m_id != Dimension::Id::Unknown)
-    {
-        double condVal = point.getFieldAs<double>(m_args->m_condition.m_id);
-        if (!m_args->m_condition.valuePasses(condVal))
-            return true;
-    }
-    for (AssignRange& r : m_args->m_assignments)
-        if (r.valuePasses(point.getFieldAs<double>(r.m_id)))
-            point.setField(r.m_id, r.m_value);
-    for (expr::AssignStatement& expr : m_args->m_statements)
-        if (expr.conditionalExpr().eval(point))
-            point.setField(expr.identExpr().eval(),
-                           expr.valueExpr().eval(point));
-
     return true;
 }
 
 void AssignFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
+    bool has_condition = !m_args->m_condition.m_name.empty();
+    const char* cond_dim = has_condition ? m_args->m_condition.m_name.c_str() : nullptr;
+
+    std::vector<pdal_assign_range_t> assignments;
+    for (const auto& r : m_args->m_assignments)
+    {
+        pdal_assign_range_t range;
+        range.dim_name = r.m_name.c_str();
+        range.value = r.m_value;
+        range.lower_bound = r.m_lower_bound;
+        range.upper_bound = r.m_upper_bound;
+        range.inclusive_lower = r.m_inclusive_lower_bound;
+        range.inclusive_upper = r.m_inclusive_upper_bound;
+        range.negate = r.m_negate;
+        assignments.push_back(range);
+    }
+
+    pdal_stage_t* stage = pdal_stage_create_assign(
+        has_condition,
+        cond_dim,
+        m_args->m_condition.m_lower_bound,
+        m_args->m_condition.m_upper_bound,
+        m_args->m_condition.m_inclusive_lower_bound,
+        m_args->m_condition.m_inclusive_upper_bound,
+        m_args->m_condition.m_negate,
+        assignments.empty() ? nullptr : assignments.data(),
+        assignments.size()
+    );
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+
+    rust_view_converter::fromRust(rust_out, view);
+
+    pdal_point_view_destroy(rust_in);
+    pdal_point_view_destroy(rust_out);
+    pdal_stage_destroy(stage);
+
     for (PointId id = 0; id < view.size(); ++id)
     {
-        point.setPointId(id);
-        processOne(point);
+        PointRef point(view, id);
+        for (expr::AssignStatement& expr : m_args->m_statements)
+            if (expr.conditionalExpr().eval(point))
+                point.setField(expr.identExpr().eval(),
+                               expr.valueExpr().eval(point));
     }
 }
 

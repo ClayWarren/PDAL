@@ -30,13 +30,13 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "SampleFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
-#include <pdal/util/ProgramArgs.hpp>
-
-#include <string>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -110,18 +110,46 @@ void SampleFilter::ready(PointTableRef)
 
 PointViewSet SampleFilter::run(PointViewPtr view)
 {
-    PointViewPtr output = view->makeNew();
-    for (PointRef point : *view)
+    pdal_options_t* ops = pdal_options_create();
+    if (m_cellArg->set())
+        pdal_options_add_f64(ops, "cell", m_cell);
+    if (m_radiusArg->set())
+        pdal_options_add_f64(ops, "radius", m_radius);
+    if (m_dimensionArg->set())
+        pdal_options_add_str(ops, "dimension", m_dimensionName.c_str());
+    if (m_originXArg->set())
+        pdal_options_add_f64(ops, "origin_x", m_originX);
+    if (m_originYArg->set())
+        pdal_options_add_f64(ops, "origin_y", m_originY);
+    if (m_originZArg->set())
+        pdal_options_add_f64(ops, "origin_z", m_originZ);
+
+    pdal_stage_t* stage = pdal_stage_create_sample(ops);
+    if (!stage)
+        throwError("Failed to create Rust sample stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+    pdal_point_view_destroy(rust_in);
+
+    if (!rust_out)
     {
-        if (keepPoint(point))
-        {
-            voxelize(point);
-            output->appendPoint(*view, point.pointId());
-        }
+        pdal_stage_destroy(stage);
+        pdal_options_destroy(ops);
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(message);
+        throwError("Rust sample stage failed.");
     }
 
+    PointViewPtr outView = rust_view_converter::fromRust(rust_out, view);
+
+    pdal_point_view_destroy(rust_out);
+    pdal_stage_destroy(stage);
+    pdal_options_destroy(ops);
+
     PointViewSet viewSet;
-    viewSet.insert(output);
+    viewSet.insert(outView);
     return viewSet;
 }
 
@@ -131,8 +159,6 @@ bool SampleFilter::voxelize(PointRef& point)
     double y = point.getFieldAs<double>(Id::Y);
     double z = point.getFieldAs<double>(Id::Z);
 
-    // Use the coordinates of the first point as origin to offset data and
-    // derive integer voxel indices.
     if (m_populatedVoxels.empty())
     {
         if (!m_originXArg->set())
@@ -143,38 +169,26 @@ bool SampleFilter::voxelize(PointRef& point)
             m_originZ = y;
     }
 
-    // Get voxel indices for current point.
     Voxel v = std::make_tuple((int)(std::floor((x - m_originX) / m_cell)),
                               (int)(std::floor((y - m_originY) / m_cell)),
                               (int)(std::floor((z - m_originZ) / m_cell)));
 
-    // Check current voxel before any of the neighbors. We will most often have
-    // points that are too close in the point's enclosing voxel, thus saving
-    // cycles.
     if (m_populatedVoxels.find(v) != m_populatedVoxels.end())
     {
-        // Get list of coordinates in candidate voxel.
         CoordList coords = m_populatedVoxels[v];
         for (Coord const& coord : coords)
         {
-            // Compute Euclidean distance between current point and
-            // candidate voxel.
             double xv = std::get<0>(coord);
             double yv = std::get<1>(coord);
             double zv = std::get<2>(coord);
             double distSqr =
                 (xv - x) * (xv - x) + (yv - y) * (yv - y) + (zv - z) * (zv - z);
 
-            // If any point is closer than the minimum radius, we can
-            // immediately return false, as the minimum distance
-            // criterion is violated.
             if (distSqr < m_radiusSqr)
                 return false;
         }
     }
 
-    // Iterate over immediate neighbors of current voxel, computing minimum
-    // distance between any already added point and the current point.
     for (int xi = std::get<0>(v) - 1; xi < std::get<0>(v) + 2; ++xi)
     {
         for (int yi = std::get<1>(v) - 1; yi < std::get<1>(v) + 2; ++yi)
@@ -183,30 +197,22 @@ bool SampleFilter::voxelize(PointRef& point)
             {
                 Voxel candidate = std::make_tuple(xi, yi, zi);
 
-                // We have already visited the center voxel, and can skip it.
                 if (v == candidate)
                     continue;
 
-                // Check that candidate voxel is occupied.
                 if (m_populatedVoxels.find(candidate) ==
                     m_populatedVoxels.end())
                     continue;
 
-                // Get list of coordinates in candidate voxel.
                 CoordList coords = m_populatedVoxels[candidate];
                 for (Coord const& coord : coords)
                 {
-                    // Compute Euclidean distance between current point and
-                    // candidate voxel.
                     double xv = std::get<0>(coord);
                     double yv = std::get<1>(coord);
                     double zv = std::get<2>(coord);
                     double distSqr = (xv - x) * (xv - x) + (yv - y) * (yv - y) +
                                      (zv - z) * (zv - z);
 
-                    // If any point is closer than the minimum radius, we can
-                    // immediately return false, as the minimum distance
-                    // criterion is violated.
                     if (distSqr < m_radiusSqr)
                         return false;
                 }

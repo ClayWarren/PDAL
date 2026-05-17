@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "LabelDuplicatesFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 #include <string>
 #include <vector>
@@ -80,34 +81,28 @@ void LabelDuplicatesFilter::prepared(PointTableRef table)
     }
 }
 
+
 void LabelDuplicatesFilter::filter(PointView& view)
 {
     log()->get(LogLevel::Debug) << "Finding duplicates...\n";
 
-    // No duplicates if we have less than 2 points
-    if (view.size() < 2)
-        return;
+    std::vector<const char*> dims;
+    for (const auto& s : m_dimNames)
+        dims.push_back(s.c_str());
 
-    auto isDuplicatePoint = [&view, this](auto idx)
-    {
-        assert(idx > 0);
+    pdal_stage_t* stage = pdal_stage_create_labelduplicates(dims.data(), dims.size());
+    if (!stage)
+        throwError("Failed to create Rust labelduplicates stage.");
 
-        for (auto dimId : m_dims)
-        {
-            double current = view.getFieldAs<double>(dimId, idx);
-            double previous = view.getFieldAs<double>(dimId, idx - 1);
-            if (current != previous)
-                return false;
-        }
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
 
-        return true;
-    };
+    rust_view_converter::fromRust(rust_out, view);
 
-    for (PointId idx = 1; idx < view.size(); ++idx)
-    {
-        view.setField(Dimension::Id::Duplicate, idx,
-                      (uint8_t)(isDuplicatePoint(idx)));
-    }
+    if (rust_out)
+        pdal_point_view_destroy(rust_out);
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

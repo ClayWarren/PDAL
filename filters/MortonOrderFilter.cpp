@@ -32,6 +32,7 @@
  ****************************************************************************/
 
 #include "MortonOrderFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 #include <climits>
 #include <iostream>
@@ -133,98 +134,27 @@ private:
     }
 };
 
-PointViewSet MortonOrderFilter::reverseMorton(PointViewPtr inView)
-{
-    const int32_t cell = static_cast<int32_t>(sqrt(inView->size()));
-
-    // compute range
-    BOX2D buffer_bounds;
-    inView->calculateBounds(buffer_bounds);
-    const double xrange = buffer_bounds.maxx - buffer_bounds.minx;
-    const double yrange = buffer_bounds.maxy - buffer_bounds.miny;
-
-    const double cell_width = xrange / cell;
-    const double cell_height = yrange / cell;
-
-    // compute reverse morton code for each point
-    std::multimap<uint32_t, PointId> codes;
-    for (PointId idx = 0; idx < inView->size(); idx++)
-    {
-        const double x = inView->getFieldAs<double>(Dimension::Id::X, idx);
-        const int32_t xpos = static_cast<int32_t>(
-            std::floor((x - buffer_bounds.minx) / cell_width));
-
-        const double y = inView->getFieldAs<double>(Dimension::Id::Y, idx);
-        const int32_t ypos = static_cast<int32_t>(
-            std::floor((y - buffer_bounds.miny) / cell_height));
-
-        const uint32_t code = ReverseZOrder::encode_morton(xpos, ypos);
-        const uint32_t reverse = ReverseZOrder::reverse_morton(code);
-
-        codes.insert(std::pair<uint32_t, PointId>(reverse, idx));
-    }
-
-    // a map is yet order by key so its naturally ordered by lod
-    std::multimap<uint32_t, PointId>::iterator it;
-    PointViewPtr outView = inView->makeNew();
-    for (it = codes.begin(); it != codes.end(); ++it)
-    {
-        outView->appendPoint(*inView, it->second);
-    }
-
-    // build output view
-    PointViewSet viewSet;
-    viewSet.insert(outView);
-
-    return viewSet;
-}
-
-PointViewSet MortonOrderFilter::morton(PointViewPtr inView)
-{
-    PointViewSet viewSet;
-    if (!inView->size())
-        return viewSet;
-    CmpZOrder compare;
-    std::multimap<Coord, PointId, CmpZOrder> sorted(compare);
-
-    BOX2D buffer_bounds;
-    inView->calculateBounds(buffer_bounds);
-    double xrange = buffer_bounds.maxx - buffer_bounds.minx;
-    double yrange = buffer_bounds.maxy - buffer_bounds.miny;
-
-    for (PointId idx = 0; idx < inView->size(); idx++)
-    {
-        double xpos = (inView->getFieldAs<double>(Dimension::Id::X, idx) -
-                       buffer_bounds.minx) /
-                      xrange;
-        double ypos = (inView->getFieldAs<double>(Dimension::Id::Y, idx) -
-                       buffer_bounds.miny) /
-                      yrange;
-        Coord loc(xpos, ypos);
-        sorted.insert(std::make_pair(loc, idx));
-    }
-
-    PointViewPtr outView = inView->makeNew();
-    std::multimap<Coord, PointId, CmpZOrder>::iterator pos;
-    for (pos = sorted.begin(); pos != sorted.end(); ++pos)
-    {
-        outView->appendPoint(*inView, pos->second);
-    }
-    viewSet.insert(outView);
-
-    return viewSet;
-}
 
 PointViewSet MortonOrderFilter::run(PointViewPtr inView)
 {
-    if (m_reverse)
-    {
-        return reverseMorton(inView);
-    }
-    else
-    {
-        return morton(inView);
-    }
+    PointViewSet viewSet;
+
+    pdal_stage_t* stage = pdal_stage_create_mortonorder(m_reverse);
+    if (!stage)
+        throwError("Failed to create Rust mortonorder stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+
+    PointViewPtr outView = rust_view_converter::fromRust(rust_out, inView);
+    viewSet.insert(outView);
+
+    if (rust_out)
+        pdal_point_view_destroy(rust_out);
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
+
+    return viewSet;
 }
 
 } // namespace pdal

@@ -36,6 +36,9 @@
 
 #include <pdal/PointView.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -45,6 +48,14 @@ static StaticPluginInfo const s_info{
     "https://pdal.org/stages/filters.decimation.html"};
 
 CREATE_STATIC_STAGE(DecimationFilter, s_info)
+
+DecimationFilter::DecimationFilter() {}
+
+DecimationFilter::~DecimationFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 std::string DecimationFilter::getName() const
 {
@@ -64,39 +75,42 @@ void DecimationFilter::initialize()
 {
     if (m_step < 1.0)
         throwError("Option step must be >= 1.0");
+
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_f64(ops, "step", m_step);
+    pdal_options_add_u64(ops, "offset", m_offset);
+    pdal_options_add_u64(ops, "limit", m_limit);
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_decimation(ops);
+    pdal_options_destroy(ops);
+}
+
+void DecimationFilter::ready(PointTableRef table)
+{
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 PointViewSet DecimationFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-    PointViewPtr outView = inView->makeNew();
-    decimate(*inView.get(), *outView.get());
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     return viewSet;
 }
 
 bool DecimationFilter::processOne(PointRef& point)
 {
-    bool keep = true;
-    if (m_index < m_offset || m_index >= m_limit)
-        keep = false;
-    else if (m_index != (m_offset + std::llround(m_kept * m_step)))
-        keep = false;
-    else
-        m_kept++;
-
-    m_index++;
-    return keep;
+    if (m_rust_stage)
+        return pdal_stage_process_one(m_rust_stage);
+    return false;
 }
 
 void DecimationFilter::decimate(PointView& input, PointView& output)
 {
-
-    uint64_t last_idx = (std::min)(m_limit, input.size());
-    uint64_t count = std::llround((last_idx - m_offset) / m_step);
-
-    for (uint64_t idx = 0; idx < count; ++idx)
-        output.appendPoint(input, m_offset + std::llround(idx * m_step));
+    // Not used anymore as run is fully overridden
 }
 
 } // namespace pdal

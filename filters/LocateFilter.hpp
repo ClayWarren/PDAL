@@ -39,6 +39,8 @@
 #include <map>
 #include <string>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -57,7 +59,10 @@ private:
     Dimension::Id m_dimId;
     std::string m_minmax;
 
+    pdal_stage* m_rust_stage = nullptr;
+
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     void prepared(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
 

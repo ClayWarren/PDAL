@@ -30,9 +30,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "RandomizeFilter.hpp"
+
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
+#include <random>
 
 namespace pdal
 {
@@ -43,6 +49,13 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(RandomizeFilter, s_info)
 
+RandomizeFilter::RandomizeFilter() : m_rust_stage(nullptr) {}
+
+RandomizeFilter::~RandomizeFilter()
+{
+    pdal_stage_destroy(m_rust_stage);
+}
+
 std::string RandomizeFilter::getName() const
 {
     return s_info.name;
@@ -51,6 +64,39 @@ std::string RandomizeFilter::getName() const
 void RandomizeFilter::addArgs(ProgramArgs& args)
 {
     m_seedArg = &args.add("seed", "Random number generator seed", m_seed, 0u);
+}
+
+void RandomizeFilter::initialize()
+{
+    pdal_options_t* ops = pdal_options_create();
+    if (m_seedArg->set())
+    {
+        pdal_options_add_u64(ops, "seed", m_seed);
+    }
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_randomize(ops);
+    pdal_options_destroy(ops);
+}
+
+PointViewSet RandomizeFilter::run(PointViewPtr inView)
+{
+    PointViewSet viewSet;
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
+    return viewSet;
+}
+
+void RandomizeFilter::filter(PointView& view)
+{
+    if (!m_seedArg->set())
+    {
+        std::random_device rng;
+        m_seed = rng();
+    }
+    std::mt19937 mt(m_seed);
+    std::shuffle(view.begin(), view.end(), mt);
 }
 
 } // namespace pdal

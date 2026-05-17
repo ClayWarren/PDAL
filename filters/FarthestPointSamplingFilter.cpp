@@ -30,20 +30,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "FarthestPointSamplingFilter.hpp"
+#include "private/RustViewConverter.hpp"
+#include <pdal_capi.h>
 
-#include "private/Segmentation.hpp"
-
-#include <pdal/KDIndex.hpp>
-#include <pdal/util/ProgramArgs.hpp>
-
-#include <algorithm>
-#include <limits>
-#include <numeric>
-#include <string>
-#include <vector>
+extern "C" {
+    pdal_stage_t* pdal_stage_create_farthestpointsampling(uint64_t count);
+}
 
 namespace pdal
 {
@@ -68,23 +64,26 @@ void FarthestPointSamplingFilter::addArgs(ProgramArgs& args)
 
 PointViewSet FarthestPointSamplingFilter::run(PointViewPtr inView)
 {
-    // Return empty PointViewSet if the input PointView has no points.
     PointViewSet viewSet;
     if (!inView->size())
         return viewSet;
 
-    // Return inView if input PointView has fewer than count points.
     if (inView->size() < m_count)
     {
         viewSet.insert(inView);
         return viewSet;
     }
 
-    PointIdList ids = Segmentation::farthestPointSampling(*inView, m_count);
+    pdal_stage_t* stage = pdal_stage_create_farthestpointsampling(m_count);
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
 
-    PointViewPtr outView = inView->makeNew();
-    for (auto const& id : ids)
-        outView->appendPoint(*inView, id);
+    PointViewPtr outView = rust_view_converter::fromRust(rust_out, inView);
+
+    pdal_point_view_destroy(rust_in);
+    pdal_point_view_destroy(rust_out);
+    pdal_stage_destroy(stage);
+
     viewSet.insert(outView);
     return viewSet;
 }

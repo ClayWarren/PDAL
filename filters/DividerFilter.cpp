@@ -29,11 +29,23 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "DividerFilter.hpp"
-
 #include "./private/expr/ConditionalExpression.hpp"
+#include "private/RustViewConverter.hpp"
+#include <pdal_capi.h>
+
+extern "C" {
+    pdal_stage_t* pdal_stage_create_divider(
+        int32_t mode,
+        int32_t size_mode,
+        uint64_t size,
+        const uint8_t* evals,
+        uint64_t evals_count
+    );
+}
 
 namespace pdal
 {
@@ -181,78 +193,59 @@ void DividerFilter::initialize()
 PointViewSet DividerFilter::run(PointViewPtr inView)
 {
     PointViewSet result;
+    if (inView->empty())
+        return result;
 
-    if (m_args->m_sizeMode == SizeMode::Capacity)
-        m_args->m_size = ((inView->size() - 1) / m_args->m_size) + 1;
-
-    std::vector<PointViewPtr> views;
-
-    // If we are Partition or RoundRobin, we
-    // make views of m_args->m_size. If we are Expression mode,
-    // we will make new views once the expression passes the 'count'
-    // number of times
-    if (m_args->m_mode == Mode::Partition || m_args->m_mode == Mode::RoundRobin)
-    {
-        for (point_count_t i = 0; i < m_args->m_size; ++i)
-        {
-            PointViewPtr v(inView->makeNew());
-            views.push_back(v);
-            result.insert(v);
-        }
-    }
-
-    if (m_args->m_mode == Mode::Partition)
-    {
-        point_count_t limit = ((inView->size() - 1) / m_args->m_size) + 1;
-        unsigned viewNum = 0;
-        for (PointId i = 0; i < inView->size();)
-        {
-            views[viewNum]->appendPoint(*inView, i++);
-            if (i % limit == 0)
-                viewNum++;
-        }
-    }
-    else if (m_args->m_mode == Mode::RoundRobin)
-    {
-        unsigned viewNum = 0;
-        for (PointId i = 0; i < inView->size(); ++i)
-        {
-            views[viewNum]->appendPoint(*inView, i);
-            viewNum++;
-            if (viewNum == m_args->m_size)
-                viewNum = 0;
-        }
-    }
+    int32_t mode_val = 0;
+    if (m_args->m_mode == Mode::RoundRobin)
+        mode_val = 1;
     else if (m_args->m_mode == Mode::Expression)
+        mode_val = 2;
+
+    int32_t size_mode_val = 0;
+    if (m_args->m_sizeMode == SizeMode::Capacity)
+        size_mode_val = 1;
+
+    std::vector<uint8_t> evals;
+    if (m_args->m_mode == Mode::Expression)
     {
-        // Go make our first view to insert points into. If none of the points
-        // pass the expression, all of the points will be in a single view
-
-        PointViewPtr firstView(inView->makeNew());
-        views.push_back(firstView);
-        result.insert(firstView);
-
-        unsigned viewNum(0);
-
+        evals.reserve(inView->size());
         for (PointRef point : *inView)
         {
-            bool passed = m_args->m_splitExpression.eval(point);
-            if (passed)
-            {
-                // Make a new view
-                PointViewPtr tempView(inView->makeNew());
-                views.push_back(tempView);
-                result.insert(tempView);
-                viewNum++;
-            }
-
-            views[viewNum]->appendPoint(*inView.get(), point.pointId());
+            evals.push_back(m_args->m_splitExpression.eval(point) ? 1 : 0);
         }
     }
-    else
+
+    pdal_stage_t* stage = pdal_stage_create_divider(
+        mode_val,
+        size_mode_val,
+        m_args->m_size,
+        evals.empty() ? nullptr : evals.data(),
+        evals.size()
+    );
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+
+    uint64_t max_outputs = inView->size() + 2;
+    std::vector<pdal_point_view_t*> rust_outputs(max_outputs, nullptr);
+
+    uint64_t actual_outputs = pdal_stage_run_multi(
+        stage,
+        rust_in,
+        rust_outputs.data(),
+        max_outputs
+    );
+
+    for (uint64_t i = 0; i < actual_outputs; ++i)
     {
-        throwError("unhandled divider mode in filters.divider!");
+        PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
+        result.insert(outView);
+        pdal_point_view_destroy(rust_outputs[i]);
     }
+
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
+
     return result;
 }
 

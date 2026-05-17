@@ -58,7 +58,6 @@ public:
 
 private:
     StringList m_returnsString;
-    int m_outputTypes;
 
     void addArgs(ProgramArgs& args) override;
     void prepared(PointTableRef table) override;

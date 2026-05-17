@@ -37,6 +37,8 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -44,6 +46,7 @@ class PDAL_EXPORT HeadFilter : public Filter, public Streamable
 {
 public:
     HeadFilter() {}
+    ~HeadFilter() override;
     HeadFilter& operator=(const HeadFilter&) = delete;
     HeadFilter(const HeadFilter&) = delete;
 
@@ -54,7 +57,10 @@ private:
     point_count_t m_index;
     bool m_invert;
 
+    pdal_stage* m_rust_stage = nullptr;
+
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     bool processOne(PointRef& point) override;
     PointViewSet run(PointViewPtr view) override;
     void ready(PointTableRef table) override;

@@ -37,6 +37,10 @@
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
 
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
+
 namespace pdal
 {
 
@@ -59,6 +63,19 @@ void LocateFilter::addArgs(ProgramArgs& args)
              m_minmax, "max");
 }
 
+void LocateFilter::initialize()
+{
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_str(ops, "dimension", m_dimName.c_str());
+    pdal_options_add_str(ops, "minmax", m_minmax.c_str());
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_locate(ops);
+    pdal_options_destroy(ops);
+}
+
 void LocateFilter::prepared(PointTableRef table)
 {
     PointLayoutPtr layout(table.layout());
@@ -69,36 +86,8 @@ void LocateFilter::prepared(PointTableRef table)
 
 PointViewSet LocateFilter::run(PointViewPtr inView)
 {
-
     PointViewSet viewSet;
-    PointId minidx(0);
-    PointId maxidx(0);
-    double minval = (std::numeric_limits<double>::max)();
-    double maxval = std::numeric_limits<double>::lowest();
-
-    for (PointId idx = 0; idx < inView->size(); idx++)
-    {
-        double val = inView->getFieldAs<double>(m_dimId, idx);
-        if (val > maxval)
-        {
-            maxval = val;
-            maxidx = idx;
-        }
-        if (val < minval)
-        {
-            minval = val;
-            minidx = idx;
-        }
-    }
-
-    PointViewPtr outView = inView->makeNew();
-
-    if (Utils::iequals("min", m_minmax))
-        outView->appendPoint(*inView.get(), minidx);
-    if (Utils::iequals("max", m_minmax))
-        outView->appendPoint(*inView.get(), maxidx);
-
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     return viewSet;
 }
 

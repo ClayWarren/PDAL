@@ -37,18 +37,25 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+extern "C" {
+    struct pdal_stage;
+    typedef struct pdal_stage pdal_stage_t;
+}
+
 namespace pdal
 {
 
 class PDAL_EXPORT MergeFilter : public Filter, public Streamable
 {
 public:
-    MergeFilter() {}
+    MergeFilter() : m_rust_stage(nullptr) {}
+    ~MergeFilter() override;
 
     std::string getName() const override;
 
 private:
     PointViewPtr m_view;
+    pdal_stage_t* m_rust_stage;
 
     void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override

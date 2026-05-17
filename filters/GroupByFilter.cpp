@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "GroupByFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -65,23 +66,31 @@ void GroupByFilter::prepared(PointTableRef table)
     // also need to check that we have a dimension with discrete values
 }
 
+
 PointViewSet GroupByFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
 
-    for (PointId idx = 0; idx < inView->size(); idx++)
-    {
-        int64_t val = inView->getFieldAs<int64_t>(m_dimId, idx);
-        PointViewPtr& outView = m_viewMap[val];
-        if (!outView)
-            outView = inView->makeNew();
-        outView->appendPoint(*inView.get(), idx);
+    pdal_stage_t* stage = pdal_stage_create_groupby(m_dimName.c_str());
+    if (!stage)
+        throwError("Failed to create Rust groupby stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+
+    std::vector<pdal_point_view_t*> rust_outputs(inView->size() + 1, nullptr);
+    uint64_t count = pdal_stage_run_multi(stage, rust_in, rust_outputs.data(), rust_outputs.size());
+
+    for (uint64_t i = 0; i < count; ++i) {
+        if (rust_outputs[i]) {
+            PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
+            viewSet.insert(outView);
+            pdal_point_view_destroy(rust_outputs[i]);
+        }
     }
 
-    // Pull the buffers out of the map and stick them in the standard
-    // output set.
-    for (auto bi = m_viewMap.begin(); bi != m_viewMap.end(); ++bi)
-        viewSet.insert(bi->second);
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
+
     return viewSet;
 }
 

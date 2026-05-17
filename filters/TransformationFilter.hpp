@@ -41,6 +41,11 @@
 #include <pdal/Streamable.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+extern "C" {
+    struct pdal_stage;
+    typedef struct pdal_stage pdal_stage_t;
+}
+
 namespace pdal
 {
 
@@ -67,6 +72,7 @@ private:
     std::unique_ptr<Transform> m_matrix;
     SpatialReference m_overrideSrs;
     bool m_invert;
+    pdal_stage_t* m_rust_stage;
 };
 
 class TransformationFilter::Transform

@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "TransformationFilter.hpp"
+#include "private/RustViewConverter.hpp"
 #include <pdal/util/FileUtils.hpp>
 
 #include <Eigen/Dense>
@@ -116,9 +117,13 @@ std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-TransformationFilter::TransformationFilter() : m_matrix(new Transform) {}
+TransformationFilter::TransformationFilter() : m_matrix(new Transform), m_rust_stage(nullptr) {}
 
-TransformationFilter::~TransformationFilter() {}
+TransformationFilter::~TransformationFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 std::string TransformationFilter::getName() const
 {
@@ -203,18 +208,33 @@ void TransformationFilter::spatialReferenceChanged(const SpatialReference& srs)
             << getName() << ": overriding input spatial reference." << '\n';
 }
 
+
 void TransformationFilter::filter(PointView& view)
 {
     if (!view.spatialReference().empty() && !m_overrideSrs.empty())
         log()->get(LogLevel::Warning)
             << getName() << ": overriding input spatial reference." << '\n';
 
-    PointRef point(view, 0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        point.setPointId(idx);
-        processOne(point);
-    }
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    std::vector<double> mat_vals(16);
+    for (size_t i = 0; i < 16; ++i)
+        mat_vals[i] = (*m_matrix)[i];
+
+    m_rust_stage = pdal_stage_create_transformation(mat_vals.data());
+    if (!m_rust_stage)
+        throwError("Failed to create Rust transformation stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(m_rust_stage, rust_in);
+
+    rust_view_converter::fromRust(rust_out, view);
+
+    if (rust_out)
+        pdal_point_view_destroy(rust_out);
+    pdal_point_view_destroy(rust_in);
+
     view.invalidateProducts();
 }
 

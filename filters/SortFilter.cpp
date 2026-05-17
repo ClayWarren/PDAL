@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "SortFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -79,34 +80,29 @@ void SortFilter::prepared(PointTableRef table)
         throwError("At least one valid dimension name must be provided!");
 }
 
+
 void SortFilter::filter(PointView& view)
 {
-    for (Dimension::IdList::size_type i = 0; i < m_dims.size(); ++i)
-    {
-        PointView::Compare cmp;
-        cmp = [&view, dim = m_dims[i]](PointId id1, PointId id2)
-        { return view.compare(dim, id1, id2); };
-        if (m_order == SortOrder::DESC)
-            cmp = [&view, dim = m_dims[i]](PointId id1, PointId id2)
-            { return view.compare(dim, id2, id1); };
+    std::vector<const char*> dims;
+    for (const auto& s : m_dimNames)
+        dims.push_back(s.c_str());
 
-        if (m_dims.size() > 1)
-        {
-            // If we have multiple dimensions, sort the first one
-            // and then stable_sort the rest
-            if (i == 0)
-                view.sort(cmp);
-            else
-                view.stableSort(cmp);
-        }
-        else
-        {
-            if (m_algorithm == SortAlgorithm::Stable)
-                view.stableSort(cmp);
-            else if (m_algorithm == SortAlgorithm::Normal)
-                view.sort(cmp);
-        }
-    }
+    const char* orderStr = (m_order == SortOrder::DESC) ? "desc" : "asc";
+    const char* algStr = (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
+
+    pdal_stage_t* stage = pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);
+    if (!stage)
+        throwError("Failed to create Rust sort stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+
+    rust_view_converter::fromRust(rust_out, view);
+
+    if (rust_out)
+        pdal_point_view_destroy(rust_out);
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
 }
 
 std::istream& operator>>(std::istream& in, SortOrder& order)

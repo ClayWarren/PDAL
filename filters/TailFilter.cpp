@@ -33,6 +33,10 @@
 
 #include "TailFilter.hpp"
 
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
+
 namespace pdal
 {
 
@@ -42,9 +46,51 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(TailFilter, s_info)
 
+TailFilter::~TailFilter()
+{
+    pdal_stage_destroy(m_rust_stage);
+}
+
 std::string TailFilter::getName() const
 {
     return s_info.name;
+}
+
+void TailFilter::addArgs(ProgramArgs& args)
+{
+    args.add("count",
+             "Number of points to return from end. "
+             "If 'invert' is true, number of points to drop from the end.",
+             m_count, point_count_t(10));
+    args.add("invert",
+             "If true, 'count' specifies the number of points "
+             "at the end to drop.",
+             m_invert, false);
+}
+
+void TailFilter::initialize()
+{
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_u64(ops, "count", m_count);
+    pdal_options_add_str(ops, "invert", m_invert ? "true" : "false");
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_tail(ops);
+    pdal_options_destroy(ops);
+}
+
+PointViewSet TailFilter::run(PointViewPtr inView)
+{
+    if (m_count > inView->size())
+        log()->get(LogLevel::Warning)
+            << "Requested number of points (count=" << m_count
+            << ") exceeds number of available points.\n";
+
+    PointViewSet viewSet;
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
+    return viewSet;
 }
 
 } // namespace pdal

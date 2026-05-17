@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "ReturnsFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -70,82 +71,34 @@ void ReturnsFilter::prepared(PointTableRef table)
     }
 }
 
+
 PointViewSet ReturnsFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
 
-    m_outputTypes = 0;
-    for (auto& r : m_returnsString)
-    {
-        Utils::trim(r);
-        if (r == "first")
-            m_outputTypes |= returnFirst;
-        else if (r == "intermediate")
-            m_outputTypes |= returnIntermediate;
-        else if (r == "last")
-            m_outputTypes |= returnLast;
-        else if (r == "only")
-            m_outputTypes |= returnOnly;
-        else
-            throwError("Invalid output type: '" + r + "'.");
+    std::vector<const char*> groups;
+    for (const auto& r : m_returnsString)
+        groups.push_back(r.c_str());
+
+    pdal_stage_t* stage = pdal_stage_create_returns(groups.data(), groups.size());
+    if (!stage)
+        throwError("Failed to create Rust returns stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+
+    pdal_point_view_t* rust_outputs[4] = {nullptr, nullptr, nullptr, nullptr};
+    uint64_t count = pdal_stage_run_multi(stage, rust_in, rust_outputs, 4);
+
+    for (uint64_t i = 0; i < count; ++i) {
+        if (rust_outputs[i]) {
+            PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
+            viewSet.insert(outView);
+            pdal_point_view_destroy(rust_outputs[i]);
+        }
     }
 
-    PointViewPtr firstView = inView->makeNew();
-    PointViewPtr intermediateView = inView->makeNew();
-    PointViewPtr lastView = inView->makeNew();
-    PointViewPtr onlyView = inView->makeNew();
-
-    for (PointId idx = 0; idx < inView->size(); idx++)
-    {
-        PointRef p = inView->point(idx);
-        uint8_t rn = p.getFieldAs<uint8_t>(Dimension::Id::ReturnNumber);
-        uint8_t nr = p.getFieldAs<uint8_t>(Dimension::Id::NumberOfReturns);
-        if ((m_outputTypes & returnFirst) && (rn == 1) && (nr > 1))
-            firstView->appendPoint(*inView.get(), idx);
-        if ((m_outputTypes & returnIntermediate) && (rn > 1) && (rn < nr) &&
-            (nr > 2))
-            intermediateView->appendPoint(*inView.get(), idx);
-        if ((m_outputTypes & returnLast) && (rn == nr) && (nr > 1))
-            lastView->appendPoint(*inView.get(), idx);
-        if ((m_outputTypes & returnOnly) && (nr == 1))
-            onlyView->appendPoint(*inView.get(), idx);
-    }
-
-    if (m_outputTypes & returnFirst)
-    {
-        if (firstView->size())
-            viewSet.insert(firstView);
-        else
-            log()->get(LogLevel::Warning)
-                << "Requested returns group 'first' is empty\n";
-    }
-
-    if (m_outputTypes & returnIntermediate)
-    {
-        if (intermediateView->size())
-            viewSet.insert(intermediateView);
-        else
-            log()->get(LogLevel::Warning)
-                << "Requested returns group 'intermediate' is empty\n";
-    }
-
-    if (m_outputTypes & returnLast)
-    {
-        if (lastView->size())
-            viewSet.insert(lastView);
-        else
-            log()->get(LogLevel::Warning)
-                << "Requested returns group 'last' is empty\n";
-    }
-
-    if (m_outputTypes & returnOnly)
-    {
-        if (onlyView->size())
-            viewSet.insert(onlyView);
-        else
-            log()->get(LogLevel::Warning)
-                << "Requested returns group 'only' is empty\n";
-    }
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
 
     return viewSet;
 }

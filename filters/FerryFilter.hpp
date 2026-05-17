@@ -40,6 +40,8 @@
 #include <string>
 #include <vector>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -60,7 +62,8 @@ class PDAL_EXPORT FerryFilter : public Filter, public Streamable
     };
 
 public:
-    FerryFilter() {}
+    FerryFilter();
+    ~FerryFilter() override;
 
     std::string getName() const override;
 
@@ -70,6 +73,7 @@ private:
     void addDimensions(PointLayoutPtr layout) override;
     void prepared(PointTableRef table) override;
     bool processOne(PointRef& point) override;
+    PointViewSet run(PointViewPtr view) override;
     void filter(PointView& view) override;
 
     FerryFilter& operator=(const FerryFilter&) = delete;
@@ -77,6 +81,7 @@ private:
 
     StringList m_dimSpec;
     std::vector<Info> m_dims;
+    pdal_stage* m_rust_stage;
 };
 
 } // namespace pdal

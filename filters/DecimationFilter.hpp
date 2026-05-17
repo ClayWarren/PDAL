@@ -37,6 +37,8 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage; // forward declaration for Rust stage
+
 namespace pdal
 {
 
@@ -44,7 +46,8 @@ namespace pdal
 class PDAL_EXPORT DecimationFilter : public Filter, public Streamable
 {
 public:
-    DecimationFilter() {}
+    DecimationFilter();
+    ~DecimationFilter() override;
 
     std::string getName() const override;
 
@@ -52,15 +55,13 @@ private:
     double m_step;
     point_count_t m_offset;
     point_count_t m_limit;
-    PointId m_index = 0;
-    point_count_t m_kept = 0;
+
+    // Rust stage instance
+    pdal_stage* m_rust_stage = nullptr;
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
-    void ready(PointTableRef table) override
-    {
-        m_index = 0;
-    }
+    void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     PointViewSet run(PointViewPtr view) override;
     void decimate(PointView& input, PointView& output);

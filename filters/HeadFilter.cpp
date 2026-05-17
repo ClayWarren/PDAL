@@ -33,6 +33,10 @@
 
 #include "HeadFilter.hpp"
 
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
+
 namespace pdal
 {
 
@@ -41,6 +45,11 @@ static StaticPluginInfo const s_info{
     "https://pdal.org/stages/filters.head.html"};
 
 CREATE_STATIC_STAGE(HeadFilter, s_info)
+
+HeadFilter::~HeadFilter()
+{
+    pdal_stage_destroy(m_rust_stage);
+}
 
 std::string HeadFilter::getName() const
 {
@@ -60,39 +69,37 @@ void HeadFilter::addArgs(ProgramArgs& args)
              m_invert, false);
 }
 
+void HeadFilter::initialize()
+{
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_u64(ops, "count", m_count);
+    pdal_options_add_str(ops, "invert", m_invert ? "true" : "false");
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_head(ops);
+    pdal_options_destroy(ops);
+}
+
 void HeadFilter::ready(PointTableRef table)
 {
     m_index = 0;
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 bool HeadFilter::processOne(PointRef& point)
 {
-
-    bool keep = false;
-    if (m_index < m_count)
-        keep = true;
-    m_index++;
-
-    if (m_invert)
-        keep = !keep;
-    return keep;
+    if (m_rust_stage)
+        return pdal_stage_process_one(m_rust_stage);
+    return false;
 }
 
 PointViewSet HeadFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-
-    m_index = 0;
-
-    PointViewPtr outView = inView->makeNew();
-
-    for (PointRef point : *inView)
-    {
-        if (processOne(point))
-            outView->appendPoint(*inView, point.pointId());
-    }
-
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     return viewSet;
 }
 

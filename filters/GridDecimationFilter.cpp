@@ -30,6 +30,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "GridDecimationFilter.hpp"
@@ -44,6 +45,13 @@
 
 #include <cstdarg>
 #include <sstream>
+#include "private/RustViewConverter.hpp"
+#include <pdal_capi.h>
+
+extern "C" {
+    uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
+    void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
+}
 
 namespace pdal
 {
@@ -102,84 +110,30 @@ void GridDecimationFilter::ready(PointTableRef table)
 void GridDecimationFilter::processOne(BOX2D bounds, PointRef& point,
                                       PointViewPtr view)
 {
-    // get the grid cell
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-
-    // if x==(xmax of the cell), we assume the point are in the upper cell
-    // if y==(ymax of the cell), we assume the point are in the right cell
-    int width = static_cast<int>((x - bounds.minx) / m_args->m_edgeLength);
-    int height = static_cast<int>((y - bounds.miny) / m_args->m_edgeLength);
-
-    // to avoid numeric pb due to the division (append if the point is on the
-    // grid)
-    if (x < bounds.minx + width * m_args->m_edgeLength)
-        width--;
-    if (y < bounds.miny + height * m_args->m_edgeLength)
-        height--;
-    if (x >= bounds.minx + (width + 1) * m_args->m_edgeLength)
-        width++;
-    if (y >= bounds.miny + (height + 1) * m_args->m_edgeLength)
-        height++;
-
-    auto mptRefid = this->grid.find(std::make_pair(width, height));
-    assert(mptRefid != this->grid.end());
-    auto ptRefid = mptRefid->second;
-
-    if (ptRefid == -1)
-    {
-        this->grid[std::make_pair(width, height)] = (long)point.pointId();
-        return;
-    }
-
-    PointRef ptRef = view->point(ptRefid);
-
-    double z = point.getFieldAs<double>(Dimension::Id::Z);
-    double zRef = ptRef.getFieldAs<double>(Dimension::Id::Z);
-
-    if (this->m_args->m_methodKeep == "max" && z > zRef)
-        this->grid[std::make_pair(width, height)] = (long)point.pointId();
-    if (this->m_args->m_methodKeep == "min" && z < zRef)
-        this->grid[std::make_pair(width, height)] = (long)point.pointId();
 }
 
 void GridDecimationFilter::createGrid(BOX2D bounds)
 {
-    // +2 to be sur to deal with all points (avoid some numeric precision issue
-    // due to the division)
-    size_t d_width =
-        std::floor((bounds.maxx - bounds.minx) / m_args->m_edgeLength) + 2;
-    size_t d_height =
-        std::floor((bounds.maxy - bounds.miny) / m_args->m_edgeLength) + 2;
-
-    if (d_width < 0.0 || d_width > (std::numeric_limits<int>::max)())
-        throwError("Grid width out of range.");
-    if (d_height < 0.0 || d_height > (std::numeric_limits<int>::max)())
-        throwError("Grid height out of range.");
-
-    for (size_t l(0); l < d_height; l++)
-        for (size_t c(0); c < d_width; c++)
-            this->grid.insert(std::make_pair(std::make_pair(c, l), -1));
 }
 
 PointViewSet GridDecimationFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
 
-    BOX2D bounds;
-    view->calculateBounds(bounds);
-    createGrid(bounds);
-
-    for (PointId i = 0; i < view->size(); ++i)
-    {
-        PointRef point = view->point(i);
-        processOne(bounds, point, view);
-    }
+    uint64_t kept_len = 0;
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    uint64_t* kept_indices = pdal_grid_decimation_get_kept_indices(rust_in, m_args->m_edgeLength, m_args->m_methodKeep.c_str(), &kept_len);
 
     std::set<PointId> keepPoint;
-    for (auto it : this->grid)
-        if (it.second != -1)
-            keepPoint.insert(it.second);
+    if (kept_indices)
+    {
+        for (uint64_t i = 0; i < kept_len; ++i)
+        {
+            keepPoint.insert(kept_indices[i]);
+        }
+        pdal_free_u64_array(kept_indices, kept_len);
+    }
+    pdal_point_view_destroy(rust_in);
 
     for (PointId i = 0; i < view->size(); ++i)
     {

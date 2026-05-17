@@ -33,6 +33,7 @@
  ****************************************************************************/
 
 #include "SeparateScanLineFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -64,29 +65,30 @@ void SeparateScanLineFilter::prepared(PointTableRef table)
         throwError("Layout does not contains EdgeOfFlightLine dimension.");
 }
 
+
 PointViewSet SeparateScanLineFilter::run(PointViewPtr inView)
 {
     PointViewSet result;
-    PointViewPtr v(inView->makeNew());
-    result.insert(v);
 
-    uint64_t lineNum = 1;
-    for (PointId i = 0; i < inView->size(); ++i)
-    {
-        v->appendPoint(*inView, i);
-        if (inView->getFieldAs<uint8_t>(Dimension::Id::EdgeOfFlightLine, i))
-        {
-            if (++lineNum > m_groupBy)
-            {
-                v = inView->makeNew();
-                result.insert(v);
-                lineNum = 1;
-            }
+    pdal_stage_t* stage = pdal_stage_create_separatescanline(m_groupBy);
+    if (!stage)
+        throwError("Failed to create Rust separatescanline stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(inView);
+
+    std::vector<pdal_point_view_t*> rust_outputs(inView->size() + 1, nullptr);
+    uint64_t count = pdal_stage_run_multi(stage, rust_in, rust_outputs.data(), rust_outputs.size());
+
+    for (uint64_t i = 0; i < count; ++i) {
+        if (rust_outputs[i]) {
+            PointViewPtr outView = rust_view_converter::fromRust(rust_outputs[i], inView);
+            result.insert(outView);
+            pdal_point_view_destroy(rust_outputs[i]);
         }
     }
-    // if last point was an edge of flight line
-    if (v->empty())
-        result.erase(v);
+
+    pdal_point_view_destroy(rust_in);
+    pdal_stage_destroy(stage);
 
     return result;
 }

@@ -32,9 +32,13 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "VoxelDownsizeFilter.hpp"
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -98,26 +102,42 @@ void VoxelDownsizeFilter::ready(PointTableRef)
 
 PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
 {
-    PointViewPtr output = view->makeNew();
-    PointRef point(*view);
-    for (PointId id = 0; id < view->size(); ++id)
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_f64(ops, "cell", m_cell);
+    pdal_options_add_str(ops, "mode",
+                         m_mode == Mode::Center ? "center" : "first");
+
+    pdal_stage_t* stage = pdal_stage_create_voxeldownsize(ops);
+    if (!stage)
+        throwError("Failed to create Rust voxeldownsize stage.");
+
+    pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
+    pdal_point_view_t* rust_out = pdal_stage_run(stage, rust_in);
+    pdal_point_view_destroy(rust_in);
+
+    if (!rust_out)
     {
-        point.setPointId(id);
-        if (voxelize(point))
-            output->appendPoint(*view, id);
+        pdal_stage_destroy(stage);
+        pdal_options_destroy(ops);
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(message);
+        throwError("Rust voxeldownsize stage failed.");
     }
 
+    PointViewPtr outView = rust_view_converter::fromRust(rust_out, view);
+
+    pdal_point_view_destroy(rust_out);
+    pdal_stage_destroy(stage);
+    pdal_options_destroy(ops);
+
     PointViewSet viewSet;
-    viewSet.insert(output);
+    viewSet.insert(outView);
     return viewSet;
 }
 
 bool VoxelDownsizeFilter::voxelize(PointRef& point)
 {
-    /*
-     * Calculate the voxel coordinates for the incoming point.
-     * gx, gy, gz will be the global coordinates from (0, 0, 0).
-     */
     double x = point.getFieldAs<double>(Dimension::Id::X);
     double y = point.getFieldAs<double>(Dimension::Id::Y);
     double z = point.getFieldAs<double>(Dimension::Id::Z);
@@ -128,7 +148,6 @@ bool VoxelDownsizeFilter::voxelize(PointRef& point)
         m_originZ = z - (m_cell / 2);
     }
 
-    // Offset by origin.
     x -= m_originX;
     y -= m_originY;
     z -= m_originZ;

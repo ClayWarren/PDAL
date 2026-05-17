@@ -30,12 +30,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
+ *
  ****************************************************************************/
 
 #include "FerryFilter.hpp"
 
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -45,6 +49,13 @@ static StaticPluginInfo const s_info{
     "https://pdal.org/stages/filters.ferry.html"};
 
 CREATE_STATIC_STAGE(FerryFilter, s_info)
+
+FerryFilter::FerryFilter() : m_rust_stage(nullptr) {}
+
+FerryFilter::~FerryFilter()
+{
+    pdal_stage_destroy(m_rust_stage);
+}
 
 std::string FerryFilter::getName() const
 {
@@ -83,6 +94,20 @@ void FerryFilter::initialize()
         toNames.push_back(s[1]);
         m_dims.emplace_back(s[0], s[1]);
     }
+
+    std::vector<const char*> fromDims;
+    std::vector<const char*> toDims;
+    for (auto const& info : m_dims)
+    {
+        fromDims.push_back(info.m_fromName.c_str());
+        toDims.push_back(info.m_toName.c_str());
+    }
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage =
+        pdal_stage_create_ferry(fromDims.data(), toDims.data(), m_dims.size());
 }
 
 void FerryFilter::addDimensions(PointLayoutPtr layout)
@@ -123,6 +148,13 @@ bool FerryFilter::processOne(PointRef& point)
         }
     }
     return true;
+}
+
+PointViewSet FerryFilter::run(PointViewPtr inView)
+{
+    PointViewSet viewSet;
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
+    return viewSet;
 }
 
 void FerryFilter::filter(PointView& view)

@@ -39,11 +39,13 @@
 
 namespace pdal
 {
+class StatsFilter;
 namespace stats
 {
 
 class PDAL_EXPORT Summary
 {
+    friend class ::pdal::StatsFilter;
 public:
     enum EnumType
     {
