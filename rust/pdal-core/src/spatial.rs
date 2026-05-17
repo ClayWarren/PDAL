@@ -25,14 +25,32 @@ impl<'a> SpatialIndex3d<'a> {
         let radius_sqr = radius * radius;
         let mut ids = Vec::new();
         for idx in 0..self.view.len() {
-            let dx = self.view.get_f64(idx, &DimId::X) - x;
-            let dy = self.view.get_f64(idx, &DimId::Y) - y;
-            let dz = self.view.get_f64(idx, &DimId::Z) - z;
-            if dx * dx + dy * dy + dz * dz <= radius_sqr {
+            if self.squared_distance(idx, x, y, z) <= radius_sqr {
                 ids.push(idx);
             }
         }
         ids
+    }
+
+    pub fn knn(&self, idx: PointId, k: usize) -> Vec<(PointId, f64)> {
+        let x = self.view.get_f64(idx, &DimId::X);
+        let y = self.view.get_f64(idx, &DimId::Y);
+        let z = self.view.get_f64(idx, &DimId::Z);
+
+        let mut neighbors = Vec::with_capacity(self.view.len() as usize);
+        for candidate in 0..self.view.len() {
+            neighbors.push((candidate, self.squared_distance(candidate, x, y, z)));
+        }
+        neighbors.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
+        neighbors.truncate(k.min(neighbors.len()));
+        neighbors
+    }
+
+    fn squared_distance(&self, idx: PointId, x: f64, y: f64, z: f64) -> f64 {
+        let dx = self.view.get_f64(idx, &DimId::X) - x;
+        let dy = self.view.get_f64(idx, &DimId::Y) - y;
+        let dz = self.view.get_f64(idx, &DimId::Z) - z;
+        dx * dx + dy * dy + dz * dz
     }
 }
 
@@ -60,5 +78,25 @@ mod tests {
 
         let index = SpatialIndex3d::new(&view);
         assert_eq!(index.radius(0, 1.0), vec![0, 1]);
+    }
+
+    #[test]
+    fn knn_sorts_by_squared_distance() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+
+        for (x, y, z) in [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (1.0, 0.0, 0.0)] {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+        }
+
+        let index = SpatialIndex3d::new(&view);
+        assert_eq!(index.knn(0, 3), vec![(0, 0.0), (2, 1.0), (1, 4.0)]);
     }
 }

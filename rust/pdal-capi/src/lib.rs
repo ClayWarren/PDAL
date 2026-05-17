@@ -18,6 +18,7 @@ use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
+use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
@@ -54,6 +55,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
         "RadialDensity" => DimId::RadialDensity,
+        "NNDistance" => DimId::NNDistance,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -906,6 +908,24 @@ pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut S
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut StageWrapper {
     let filter = Box::new(RadialDensityFilter::new(radius));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an nndistance filter stage.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_nndistance(
+    k: u64,
+    mode: *const c_char,
+) -> *mut StageWrapper {
+    let mode = if mode.is_null() {
+        NNDistanceMode::Kth
+    } else {
+        match CStr::from_ptr(mode).to_string_lossy().as_ref() {
+            "avg" => NNDistanceMode::Average,
+            _ => NNDistanceMode::Kth,
+        }
+    };
+    let filter = Box::new(NNDistanceFilter::new(k as usize, mode));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

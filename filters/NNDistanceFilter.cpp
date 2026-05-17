@@ -33,11 +33,11 @@
  ****************************************************************************/
 
 #include "NNDistanceFilter.hpp"
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
 
 #include <string>
-#include <vector>
-
-#include <pdal/KDIndex.hpp>
 
 namespace pdal
 {
@@ -95,37 +95,15 @@ void NNDistanceFilter::addDimensions(PointLayoutPtr layout)
 
 void NNDistanceFilter::filter(PointView& view)
 {
-    using namespace Dimension;
-
-    // Build the 3D KD-tree.
-    KD3Index& index = view.build3dIndex();
-
-    // Increment the minimum number of points, as knnSearch will be returning
-    // the query point along with the neighbors.
-    size_t k = m_k + 1;
-
-    // Compute the k-distance for each point. The k-distance is the Euclidean
-    // distance to k-th nearest neighbor.
     log()->get(LogLevel::Debug) << "Computing k-distances...\n";
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        PointIdList indices(k);
-        std::vector<double> sqr_dists(k);
-        index.knnSearch(idx, k, &indices, &sqr_dists);
-        double val;
-        if (m_mode == Mode::Kth)
-            val = std::sqrt(sqr_dists[k - 1]);
-        else // m_mode == Mode::Average
-        {
-            val = 0;
 
-            // We start at 1 since index 0 is the test point.
-            for (size_t i = 1; i < k; ++i)
-                val += std::sqrt(sqr_dists[i]);
-            val /= (k - 1);
-        }
-        view.setField(Dimension::Id::NNDistance, idx, val);
-    }
+    const char* mode = m_mode == Mode::Average ? "avg" : "kth";
+    pdal_stage_t* stage = pdal_stage_create_nndistance(m_k, mode);
+    if (!stage)
+        throwError("Failed to create Rust nndistance stage.");
+
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal
