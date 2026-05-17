@@ -33,8 +33,9 @@
  ****************************************************************************/
 
 #include "RadialDensityFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include <pdal_capi.h>
 
 #include <string>
 
@@ -66,19 +67,14 @@ void RadialDensityFilter::addDimensions(PointLayoutPtr layout)
 
 void RadialDensityFilter::filter(PointView& view)
 {
-    // Build the 3D KD-tree.
-    const KD3Index& index = view.build3dIndex();
-
-    // Search for neighboring points within the specified radius. The number of
-    // neighbors (which includes the query point) is normalized by the volume
-    // of the search sphere and recorded as the density.
     log()->get(LogLevel::Debug) << "Computing densities...\n";
-    double factor = 1.0 / ((4.0 / 3.0) * 3.14159 * (m_rad * m_rad * m_rad));
-    for (PointRef p : view)
-    {
-        PointIdList pts = index.radius(p, m_rad);
-        p.setField(Id::RadialDensity, pts.size() * factor);
-    }
+
+    pdal_stage_t* stage = pdal_stage_create_radialdensity(m_rad);
+    if (!stage)
+        throwError("Failed to create Rust radialdensity stage.");
+
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

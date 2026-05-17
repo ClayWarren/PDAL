@@ -18,6 +18,7 @@ use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
+use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
 use pdal_filters::returns::ReturnsFilter;
@@ -52,6 +53,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Intensity" => DimId::Intensity,
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
+        "RadialDensity" => DimId::RadialDensity,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -898,6 +900,13 @@ pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut S
     } else {
         std::ptr::null_mut()
     }
+}
+
+/// Create a radialdensity filter stage.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut StageWrapper {
+    let filter = Box::new(RadialDensityFilter::new(radius));
+    Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Get the indices of the kept points in grid decimation.

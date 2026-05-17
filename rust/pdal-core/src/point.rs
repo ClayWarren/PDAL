@@ -24,6 +24,7 @@ pub enum DimId {
     Intensity,
     OffsetTime,
     Classification,
+    RadialDensity,
     Other(String),
 }
 
@@ -37,6 +38,7 @@ impl DimId {
             DimId::Intensity => "Intensity",
             DimId::OffsetTime => "OffsetTime",
             DimId::Classification => "Classification",
+            DimId::RadialDensity => "RadialDensity",
             DimId::Other(s) => s,
         }
     }
@@ -50,6 +52,7 @@ impl DimId {
             "Intensity" => DimId::Intensity,
             "OffsetTime" => DimId::OffsetTime,
             "Classification" => DimId::Classification,
+            "RadialDensity" => DimId::RadialDensity,
             other => DimId::Other(other.to_string()),
         }
     }

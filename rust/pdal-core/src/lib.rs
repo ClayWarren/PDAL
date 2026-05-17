@@ -6,4 +6,5 @@
 
 pub mod options;
 pub mod point;
+pub mod spatial;
 pub mod stage;
