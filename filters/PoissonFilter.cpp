@@ -150,7 +150,7 @@ public:
     }
 
     int newPoint(const std::array<double, 3>& position,
-                         const std::array<uint8_t, 3>& color) override
+                 const std::array<uint8_t, 3>& color) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);
@@ -163,7 +163,7 @@ public:
     }
 
     int newPoint(const std::array<double, 3>& position,
-                         const std::array<uint8_t, 3>& color, double density) override
+                 const std::array<uint8_t, 3>& color, double density) override
     {
         PointId cnt = m_view.size();
         m_view.setField(Dimension::Id::X, cnt, position[0]);

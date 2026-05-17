@@ -79,10 +79,9 @@ PointViewSet RelaxationDartThrowing::run(PointViewPtr inView)
     // Return inView if the PointView is already smaller than m_maxSize.
     if (np < m_maxSize)
     {
-        log()->get(LogLevel::Debug)
-            << "Input point cloud has fewer points " << np
-            << " than requested output size of " << m_maxSize
-            << ". Terminating." << '\n';
+        log()->get(LogLevel::Debug) << "Input point cloud has fewer points "
+                                    << np << " than requested output size of "
+                                    << m_maxSize << ". Terminating." << '\n';
         viewSet.insert(inView);
         return viewSet;
     }

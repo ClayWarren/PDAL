@@ -123,8 +123,7 @@ void runOgrWriterInfo(const Options& wo, const std::string& infile,
     std::string info;
     if (Utils::run_shell_command(cmd, info))
     {
-        std::cerr << "WARNING: error running ogrinfo, skipping test"
-                  << '\n';
+        std::cerr << "WARNING: error running ogrinfo, skipping test" << '\n';
         return;
     }
 

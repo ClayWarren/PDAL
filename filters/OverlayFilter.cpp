@@ -109,7 +109,8 @@ void OverlayFilter::ready(PointTableRef table)
     if (m_layer.size())
         m_lyr = OGR_DS_GetLayerByName(m_ds.get(), m_layer.c_str());
     else if (m_query.size())
-        m_lyr = OGR_DS_ExecuteSQL(m_ds.get(), m_query.c_str(), nullptr, nullptr);
+        m_lyr =
+            OGR_DS_ExecuteSQL(m_ds.get(), m_query.c_str(), nullptr, nullptr);
     else
         m_lyr = OGR_DS_GetLayer(m_ds.get(), 0);
 

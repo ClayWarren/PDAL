@@ -80,7 +80,7 @@ protected:
     SpatialReference m_defaultSrs;
 
     void setSpatialReference(MetadataNode& m,
-                                     const SpatialReference& srs) override;
+                             const SpatialReference& srs) override;
 
 private:
     PointViewSet run(PointViewPtr view) override

@@ -160,8 +160,7 @@ point_count_t PtsReader::read(PointViewPtr view, point_count_t numPts)
                     << "Can't convert "
                        "field '"
                     << fields[i] << "' to numeric value on line " << line
-                    << " in '" << m_filename << "'.  Setting to 0."
-                    << '\n';
+                    << " in '" << m_filename << "'.  Setting to 0." << '\n';
                 d = 0;
             }
             if (i ==

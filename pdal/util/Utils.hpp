@@ -632,7 +632,9 @@ template <typename T> std::string typeidName()
 
 struct RedirectStream
 {
-    RedirectStream() : m_out(nullptr), m_buf(nullptr), m_null(new NullOStream) {}
+    RedirectStream() : m_out(nullptr), m_buf(nullptr), m_null(new NullOStream)
+    {
+    }
 
     std::ofstream* m_out;
     std::streambuf* m_buf;

@@ -42,27 +42,18 @@ namespace fbi
 
 void FbiHdr::dump(const LogPtr& log)
 {
-    log->get(LogLevel::Debug)
-        << "Fbi header : Signature " << Signature << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Version " << Version << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : HdrSize " << HdrSize << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : TimeType " << TimeType << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Signature " << Signature << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Version " << Version << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : HdrSize " << HdrSize << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : TimeType " << TimeType << '\n';
     log->get(LogLevel::Debug) << "Fbi header : Order " << Order << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Reserved1 " << Reserved1 << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Reserved1 " << Reserved1 << '\n';
     log->get(LogLevel::Debug) << "Fbi header : VlrCnt " << VlrCnt << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : VlrSize " << VlrSize << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : RecSize " << RecSize << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : FastCnt " << FastCnt << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : VlrSize " << VlrSize << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : RecSize " << RecSize << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : FastCnt " << FastCnt << '\n';
     log->get(LogLevel::Debug) << "Fbi header : RecCnt " << RecCnt << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : UnitsXyz " << UnitsXyz << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : UnitsXyz " << UnitsXyz << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : UnitsDistance " << UnitsDistance << '\n';
     log->get(LogLevel::Debug) << "Fbi header : OrgX " << OrgX << '\n';
@@ -75,43 +66,33 @@ void FbiHdr::dump(const LogPtr& log)
     log->get(LogLevel::Debug) << "Fbi header : MinZ " << MinZ << '\n';
     log->get(LogLevel::Debug) << "Fbi header : MaxZ " << MaxZ << '\n';
     log->get(LogLevel::Debug) << "Fbi header : System " << System << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Software " << Software << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Reserved2 " << Reserved2 << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Software " << Software << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Reserved2 " << Reserved2 << '\n';
     log->get(LogLevel::Debug) << "Fbi header : BitsX " << BitsX << '\n';
     log->get(LogLevel::Debug) << "Fbi header : BitsY " << BitsY << '\n';
     log->get(LogLevel::Debug) << "Fbi header : BitsZ " << BitsZ << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsTime " << BitsTime << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsTime " << BitsTime << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsDistance " << BitsDistance << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsGroup " << BitsGroup << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsImage " << BitsImage << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsGroup " << BitsGroup << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsImage " << BitsImage << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsNormal " << BitsNormal << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsColor " << BitsColor << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsColor " << BitsColor << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsIntensity " << BitsIntensity << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsLine " << BitsLine << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsLine " << BitsLine << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsEchoLen " << BitsEchoLen << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsAmplitude " << BitsAmplitude << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsScanner " << BitsScanner << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsEcho " << BitsEcho << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsAngle " << BitsAngle << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsEcho " << BitsEcho << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsAngle " << BitsAngle << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsEchoNorm " << BitsEchoNorm << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : BitsClass " << BitsClass << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : BitsClass " << BitsClass << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsEchoPos " << BitsEchoPos << '\n';
     log->get(LogLevel::Debug)
@@ -120,56 +101,42 @@ void FbiHdr::dump(const LogPtr& log)
         << "Fbi header : BitsDeviation " << BitsDeviation << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : BitsReliab " << BitsReliab << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Reserved5 " << Reserved5 << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Reserved5 " << Reserved5 << '\n';
     log->get(LogLevel::Debug) << "Fbi header : PosVlr " << PosVlr << '\n';
     log->get(LogLevel::Debug) << "Fbi header : PosXyz " << PosXyz << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosTime " << PosTime << " " << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosDistance " << PosDistance << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosGroup " << PosGroup << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosNormal " << PosNormal << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosColor " << PosColor << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosGroup " << PosGroup << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosNormal " << PosNormal << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosColor " << PosColor << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosIntensity " << PosIntensity << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosLine " << PosLine << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosLine " << PosLine << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosEchoLen " << PosEchoLen << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosAmplitude " << PosAmplitude << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosScanner " << PosScanner << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosEcho " << PosEcho << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosAngle " << PosAngle << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosEcho " << PosEcho << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosAngle " << PosAngle << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosEchoNorm " << PosEchoNorm << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosClass " << PosClass << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosRecord " << PosRecord << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosClass " << PosClass << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosRecord " << PosRecord << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosEchoPos " << PosEchoPos << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosImage " << PosImage << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosImage " << PosImage << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosReflect " << PosReflect << '\n';
     log->get(LogLevel::Debug)
         << "Fbi header : PosDeviatio " << PosDeviation << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosReliab " << PosReliab << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : PosImgNbr " << PosImgNbr << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : ImgNbrCnt " << ImgNbrCnt << '\n';
-    log->get(LogLevel::Debug)
-        << "Fbi header : Reserved6 " << Reserved6 << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosReliab " << PosReliab << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : PosImgNbr " << PosImgNbr << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : ImgNbrCnt " << ImgNbrCnt << '\n';
+    log->get(LogLevel::Debug) << "Fbi header : Reserved6 " << Reserved6 << '\n';
 }
 
 } // namespace fbi

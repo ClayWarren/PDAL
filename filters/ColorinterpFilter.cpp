@@ -166,8 +166,7 @@ void ColorinterpFilter::ready(PointTableRef table)
         throwError(m_raster->errorMsg());
 
     log()->get(LogLevel::Debug)
-        << getName() << " raster connection: " << m_raster->filename()
-        << '\n';
+        << getName() << " raster connection: " << m_raster->filename() << '\n';
 
     m_raster->readBand(m_redBand, 1);
     m_raster->readBand(m_greenBand, 2);
@@ -215,8 +214,7 @@ void ColorinterpFilter::filter(PointView& view)
             m_min = median - threshold;
             m_max = median + threshold;
 
-            log()->get(LogLevel::Debug)
-                << getName() << " mad " << mad << '\n';
+            log()->get(LogLevel::Debug) << getName() << " mad " << mad << '\n';
             log()->get(LogLevel::Debug)
                 << getName() << " median " << median << '\n';
             log()->get(LogLevel::Debug)

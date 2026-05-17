@@ -68,8 +68,7 @@ const Stage* Streamable::findNonstreamable() const
 // Streamed execution.
 void Streamable::execute(StreamPointTable& table)
 {
-    m_log->get(LogLevel::Debug)
-        << "Executing pipeline in stream mode." << '\n';
+    m_log->get(LogLevel::Debug) << "Executing pipeline in stream mode." << '\n';
     struct StreamableList : public std::list<Streamable*>
     {
         StreamableList operator-(const StreamableList& other) const

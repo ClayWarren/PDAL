@@ -449,8 +449,7 @@ void StacReader::Private::initializeArgs()
 
         if (!m_args->bounds.valid())
             throw pdal_error("Supplied bounds are not valid.");
-        log()->get(LogLevel::Debug)
-            << "Bounds: " << m_args->bounds << '\n';
+        log()->get(LogLevel::Debug) << "Bounds: " << m_args->bounds << '\n';
 
         Polygon boundsPoly(m_args->bounds.to2d());
         if (!m_args->bounds.spatialReference().empty())

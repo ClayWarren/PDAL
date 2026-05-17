@@ -102,9 +102,8 @@ PointViewSet IQRFilter::run(PointViewPtr view)
         if (val > low_fence && val < hi_fence)
             output->appendPoint(*view, j);
     }
-    log()->get(LogLevel::Debug)
-        << "Cropping " << m_dimName << " in the range (" << low_fence << ","
-        << hi_fence << ")" << '\n';
+    log()->get(LogLevel::Debug) << "Cropping " << m_dimName << " in the range ("
+                                << low_fence << "," << hi_fence << ")" << '\n';
 
     PointViewSet viewSet;
     viewSet.insert(output);

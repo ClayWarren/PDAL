@@ -64,8 +64,7 @@ private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
     void ready(PointTableRef table) override;
-    point_count_t read(PointViewPtr view,
-                               point_count_t numPts) override;
+    point_count_t read(PointViewPtr view, point_count_t numPts) override;
     void done(PointTableRef table) override;
 
 private:

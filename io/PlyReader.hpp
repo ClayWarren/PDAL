@@ -85,7 +85,7 @@ private:
         Dimension::Id m_dim;
 
         void read(std::istream* stream, PlyReader::Format format,
-                          PointRef& point) override;
+                  PointRef& point) override;
         void setDim(Dimension::Id id) override
         {
             m_dim = id;
@@ -104,7 +104,7 @@ private:
         Dimension::Type m_listType;
 
         void read(std::istream* stream, PlyReader::Format format,
-                          PointRef& point) override;
+                  PointRef& point) override;
     };
 
     struct Element

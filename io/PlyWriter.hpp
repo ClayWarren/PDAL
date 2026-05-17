@@ -60,7 +60,7 @@ private:
     void readyTable(PointTableRef table) override;
     void doneTable(PointTableRef table) override;
     void readyFile(const std::string& filename,
-                           const SpatialReference& srs) override;
+                   const SpatialReference& srs) override;
     void writeView(const PointViewPtr data) override;
     void doneFile() override;
 

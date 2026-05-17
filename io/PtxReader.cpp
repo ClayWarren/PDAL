@@ -376,8 +376,7 @@ point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
     {
         log()->get(LogLevel::Warning)
             << "Expected " << (header.m_columns * header.m_rows)
-            << " points but only " << countPerHeader << " were found."
-            << '\n';
+            << " points but only " << countPerHeader << " were found." << '\n';
     }
 
     return count;

@@ -98,9 +98,10 @@ protected:
       \param which  I/O mode [default: rw]
       \return  Current position adjusted for buffer offset.
     */
-    std::ios::pos_type seekpos(
-        std::ios::pos_type pos,
-        std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
+    std::ios::pos_type
+    seekpos(std::ios::pos_type pos,
+            std::ios_base::openmode which = std::ios_base::in |
+                                            std::ios_base::out) override;
 
     /**
       Seek to a position based on an offset from a position.
@@ -110,9 +111,10 @@ protected:
       \param which  I/O mode [default: rw]
       \return  Current position adjusted for buffer offset.
     */
-    std::ios::pos_type seekoff(
-        std::ios::off_type off, std::ios_base::seekdir dir,
-        std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
+    std::ios::pos_type
+    seekoff(std::ios::off_type off, std::ios_base::seekdir dir,
+            std::ios_base::openmode which = std::ios_base::in |
+                                            std::ios_base::out) override;
 
 private:
     /**

@@ -55,7 +55,7 @@ public:
 
 protected:
     PDAL_EXPORT bool update(pdal::Dimension::Detail dimDetail,
-                                    const std::string& name) override;
+                            const std::string& name) override;
 };
 
 } // namespace pdal

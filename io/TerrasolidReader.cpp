@@ -89,8 +89,7 @@ void TerrasolidReader::initialize()
     log()->get(LogLevel::Debug) << "Time: " << m_header->Time << '\n';
     log()->get(LogLevel::Debug) << "Color: " << m_header->Color << '\n';
     log()->get(LogLevel::Debug) << "Count: " << m_header->PntCnt << '\n';
-    log()->get(LogLevel::Debug)
-        << "RecogVal: " << m_header->RecogVal << '\n';
+    log()->get(LogLevel::Debug) << "RecogVal: " << m_header->RecogVal << '\n';
 }
 
 void TerrasolidReader::addDimensions(PointLayoutPtr layout)

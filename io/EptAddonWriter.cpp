@@ -151,8 +151,7 @@ void EptAddonWriter::prepared(PointTableRef table)
     if (threads > 100)
     {
         log()->get(LogLevel::Warning)
-            << "Using a large thread count: " << threads << " threads"
-            << '\n';
+            << "Using a large thread count: " << threads << " threads" << '\n';
     }
     m_pool.reset(new ThreadPool(threads));
 

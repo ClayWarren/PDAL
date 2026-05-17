@@ -88,7 +88,7 @@ public:
 
 private:
     void addSubSwitches(ProgramArgs& args,
-                                const std::string& subcommand) override;
+                        const std::string& subcommand) override;
     void validateSwitches(ProgramArgs& args) override;
     int execute() override;
     StringList subcommands() const override;

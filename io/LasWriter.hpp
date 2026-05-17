@@ -108,7 +108,7 @@ private:
     void prepared(PointTableRef table) override;
     void readyTable(PointTableRef table) override;
     void readyFile(const std::string& filename,
-                           const SpatialReference& srs) override;
+                   const SpatialReference& srs) override;
     bool srsOverridden() const override;
     void prerunFile(const PointViewSet& pvSet) override;
     void writeView(const PointViewPtr view) override;
