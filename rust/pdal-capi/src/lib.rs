@@ -17,6 +17,7 @@ use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
+use pdal_filters::lof::LofFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
@@ -58,6 +59,8 @@ fn dim_id_from_name(name: &str) -> DimId {
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
         "ClusterID" => DimId::ClusterID,
+        "LocalOutlierFactor" => DimId::LocalOutlierFactor,
+        "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
         "RadialDensity" => DimId::RadialDensity,
         "NNDistance" => DimId::NNDistance,
         other => DimId::Other(other.to_string()),
@@ -1005,6 +1008,13 @@ pub unsafe extern "C" fn pdal_stage_create_dbscan(
         dim_names.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
     }
     let filter = Box::new(DbscanFilter::new(min_points as usize, eps, dim_names));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a LOF filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_lof(minpts: u64) -> *mut StageWrapper {
+    let filter = Box::new(LofFilter::new(minpts as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

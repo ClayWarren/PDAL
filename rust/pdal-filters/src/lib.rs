@@ -9,6 +9,7 @@ pub mod groupby;
 pub mod head;
 pub mod labelduplicates;
 pub mod locate;
+pub mod lof;
 pub mod merge;
 pub mod mortonorder;
 pub mod nndistance;
