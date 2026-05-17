@@ -67,8 +67,10 @@ TEST(Merge, Simple)
 {
     std::string file1(Support::datapath("las/utm15.las"));
     std::string file2(Support::datapath("las/utm17.las"));
-    std::string outfile(Support::temppath("out.las"));
+    std::string outfile(Support::temppath("merge_simple.las"));
     std::string cmd = appName() + " " + file1 + " " + file2 + " " + outfile;
+
+    FileUtils::deleteFile(outfile);
 
     std::string output;
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
@@ -87,11 +89,13 @@ TEST(Merge, Args)
 {
     std::string file1(Support::datapath("las/utm15.las"));
     std::string file2(Support::datapath("las/utm17.las"));
-    std::string outfile(Support::temppath("out.las"));
+    std::string outfile(Support::temppath("merge_args.las"));
     std::string cmd =
         appName() +
         " --writers.las.scale_x=.001 --writers.las.offset_x=289814 " + file1 +
         " " + file2 + " " + outfile;
+
+    FileUtils::deleteFile(outfile);
 
     std::string output;
     EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);

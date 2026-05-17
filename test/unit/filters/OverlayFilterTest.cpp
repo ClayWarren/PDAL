@@ -65,7 +65,8 @@ void testOverlay(int numReaders, bool stream)
     }
     f.setOptions(fo);
 
-    std::string tempfile(Support::temppath("out.las"));
+    std::string tempfile(Support::temppath(stream ? "overlay_stream.las"
+                                                  : "overlay_nostream.las"));
 
     Options wo;
     wo.add("filename", tempfile);
