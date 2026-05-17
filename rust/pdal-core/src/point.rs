@@ -150,6 +150,7 @@ impl PointLayout {
 pub struct PointView {
     layout: Rc<PointLayout>,
     data: Vec<u8>,
+    source_indices: Vec<PointId>,
 }
 
 impl PointView {
@@ -158,6 +159,7 @@ impl PointView {
         PointView {
             layout,
             data: Vec::new(),
+            source_indices: Vec::new(),
         }
     }
 
@@ -166,6 +168,7 @@ impl PointView {
         PointView {
             layout: Rc::clone(&self.layout),
             data: Vec::new(),
+            source_indices: Vec::new(),
         }
     }
 
@@ -190,6 +193,7 @@ impl PointView {
         let id = self.len();
         let ps = self.layout.point_size();
         self.data.resize(self.data.len() + ps, 0);
+        self.source_indices.push(id);
         id
     }
 
@@ -199,6 +203,16 @@ impl PointView {
         let ps = self.layout.point_size();
         let start = (src_idx as usize) * ps;
         self.data.extend_from_slice(&src.data[start..start + ps]);
+        self.source_indices.push(src.source_index(src_idx));
+    }
+
+    /// Original source row copied into this point. Used by the C++ bridge to
+    /// preserve PDAL PointView table IDs when filters return subsets.
+    pub fn source_index(&self, idx: PointId) -> PointId {
+        self.source_indices
+            .get(idx as usize)
+            .copied()
+            .unwrap_or(idx)
     }
 
     /// Read a dimension of point `idx` as `f64` (PDAL's `getFieldAs`).

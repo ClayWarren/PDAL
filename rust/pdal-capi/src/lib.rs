@@ -333,6 +333,21 @@ pub unsafe extern "C" fn pdal_point_view_length(view: *mut PointView) -> u64 {
     }
 }
 
+/// Return the original source row for a point in this view.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx: u64) -> u64 {
+    if let Some(view) = view.as_ref() {
+        view.source_index(idx)
+    } else {
+        idx
+    }
+}
+
 /// Destroy a point view.
 ///
 /// # Safety

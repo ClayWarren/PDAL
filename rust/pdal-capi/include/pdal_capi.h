@@ -33,6 +33,7 @@ uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
 void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name, double val);
 double pdal_point_view_get_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name);
 uint64_t pdal_point_view_length(pdal_point_view_t* view);
+uint64_t pdal_point_view_source_index(pdal_point_view_t* view, uint64_t idx);
 void pdal_point_view_destroy(pdal_point_view_t* view);
 
 // Stage

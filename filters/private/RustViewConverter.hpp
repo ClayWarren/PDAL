@@ -77,11 +77,33 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
     }
 }
 
+inline void fromRust(pdal_point_view_t* rust_out_view, PointViewPtr baseView,
+                     PointView& outView)
+{
+    if (rust_out_view)
+    {
+        uint64_t out_len = pdal_point_view_length(rust_out_view);
+        for (PointId idx = 0; idx < out_len; ++idx)
+        {
+            PointId source_idx =
+                pdal_point_view_source_index(rust_out_view, idx);
+            outView.appendPoint(*baseView, source_idx);
+            PointId out_idx = outView.size() - 1;
+            for (auto dim : outView.layout()->dims())
+            {
+                double v = pdal_point_view_get_f64(
+                    rust_out_view, idx, outView.layout()->dimName(dim).c_str());
+                outView.setField(dim, out_idx, v);
+            }
+        }
+    }
+}
+
 inline PointViewPtr fromRust(pdal_point_view_t* rust_out_view,
                              PointViewPtr baseView)
 {
     PointViewPtr outView = baseView->makeNew();
-    fromRust(rust_out_view, *outView);
+    fromRust(rust_out_view, baseView, *outView);
     return outView;
 }
 
