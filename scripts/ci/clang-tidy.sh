@@ -27,8 +27,8 @@ if ! command -v "${RUN_CLANG_TIDY}" >/dev/null 2>&1; then
 fi
 
 DIMENSION_HEADER="${BUILD_DIR}/include/pdal/Dimension.hpp"
-if [ -f "${BUILD_DIR}/build.ninja" ] && [ ! -f "${DIMENSION_HEADER}" ]; then
-    ninja -C "${BUILD_DIR}" "${DIMENSION_HEADER}"
+if [ ! -f "${DIMENSION_HEADER}" ]; then
+    cmake --build "${BUILD_DIR}" --target generate_dimension_hpp
 fi
 
 FILE_LIST="$(mktemp "${TMPDIR:-/tmp}/pdal-clang-tidy-files.XXXXXX")"
@@ -60,14 +60,15 @@ for entry in json.loads(compile_commands.read_text()):
     except ValueError:
         continue
 
-    if any(rel == item.rstrip("/") or rel.startswith(item) for item in excluded):
+    if any(rel.startswith(item) if item.endswith("/") else rel == item
+           for item in excluded):
         continue
 
     if rel in seen:
         continue
 
     seen.add(rel)
-    print(rel)
+    sys.stdout.write(rel + "\0")
 PY
 
 if [ ! -s "${FILE_LIST}" ]; then
@@ -82,7 +83,7 @@ if [ "$(uname -s)" = "Darwin" ] && command -v xcrun >/dev/null 2>&1; then
 fi
 
 cd "${ROOT_DIR}"
-xargs "${RUN_CLANG_TIDY}" \
+xargs -0 "${RUN_CLANG_TIDY}" \
     -quiet \
     -p "${BUILD_DIR}" \
     -clang-tidy-binary "${CLANG_TIDY}" \
