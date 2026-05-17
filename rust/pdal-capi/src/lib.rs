@@ -26,6 +26,7 @@ use pdal_filters::lof::LofFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
+use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
@@ -81,6 +82,8 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Eigenvalue0" => DimId::Eigenvalue0,
         "Eigenvalue1" => DimId::Eigenvalue1,
         "Eigenvalue2" => DimId::Eigenvalue2,
+        "OptimalKNN" => DimId::OptimalKNN,
+        "OptimalRadius" => DimId::OptimalRadius,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1166,6 +1169,19 @@ pub extern "C" fn pdal_stage_create_eigenvalues(
         stride as usize,
         has_radius.then_some(radius),
         min_k as usize,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an optimal neighborhood filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_optimalneighborhood(
+    min_k: u64,
+    max_k: u64,
+) -> *mut StageWrapper {
+    let filter = Box::new(OptimalNeighborhoodFilter::new(
+        min_k as usize,
+        max_k as usize,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

@@ -19,6 +19,7 @@ pub mod math;
 pub mod merge;
 pub mod mortonorder;
 pub mod nndistance;
+pub mod optimal_neighborhood;
 pub mod outlier;
 pub mod planefit;
 pub mod radialdensity;
