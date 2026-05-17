@@ -35,6 +35,7 @@ use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::stats;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::TransformationFilter;
+use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 use pdal_filters::zsmooth::ZsmoothFilter;
 use std::cell::RefCell;
@@ -1083,6 +1084,13 @@ pub extern "C" fn pdal_stage_create_sparsesurface(
         ground_class,
         low_point_class,
     ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a voxel center nearest neighbor filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_voxelcenternearestneighbor(cell: f64) -> *mut StageWrapper {
+    let filter = Box::new(VoxelCenterNearestNeighborFilter::new(cell));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

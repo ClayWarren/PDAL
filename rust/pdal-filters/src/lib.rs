@@ -27,5 +27,6 @@ pub mod sparse_surface;
 pub mod stats;
 pub mod tail;
 pub mod transformation;
+pub mod voxel_center_nearest_neighbor;
 pub mod voxeldownsize;
 pub mod zsmooth;
