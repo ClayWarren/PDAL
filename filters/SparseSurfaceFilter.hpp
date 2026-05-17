@@ -36,8 +36,6 @@
 
 #include <pdal/Filter.hpp>
 
-#include <numeric>
-
 namespace pdal
 {
 

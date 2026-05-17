@@ -31,6 +31,7 @@ use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
+use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::stats;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::TransformationFilter;
@@ -1051,6 +1052,21 @@ pub extern "C" fn pdal_stage_create_cluster(
         max_points as usize,
         tolerance,
         is_3d,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a sparse surface filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_sparsesurface(
+    radius: f64,
+    ground_class: u8,
+    low_point_class: u8,
+) -> *mut StageWrapper {
+    let filter = Box::new(SparseSurfaceFilter::new(
+        radius,
+        ground_class,
+        low_point_class,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

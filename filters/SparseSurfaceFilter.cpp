@@ -34,7 +34,9 @@
 
 #include "SparseSurfaceFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -75,55 +77,13 @@ void SparseSurfaceFilter::prepared(PointTableRef table)
 
 void SparseSurfaceFilter::filter(PointView& view)
 {
-    uint8_t lower = std::min(m_groundClass, m_lowPointClass);
-    uint8_t higher = std::max(m_groundClass, m_lowPointClass);
-    const uint8_t unclassifiedLabel = (higher - lower > 1) ? lower + 1
-                                      : (lower > 0)        ? lower - 1
-                                                           : higher + 1;
+    pdal_stage_t* stage = pdal_stage_create_sparsesurface(
+        m_radius, m_groundClass, m_lowPointClass);
+    if (!stage)
+        throwError("Failed to create Rust sparse surface stage.");
 
-    // Step 1: Relabel all points as unclassified
-    for (auto point : view)
-        point.setField(Id::Classification, unclassifiedLabel);
-
-    // Step 2: Generate a sorted Z index
-    PointIdList zIndex(view.size());
-    std::iota(zIndex.begin(), zIndex.end(), 0);
-
-    auto zComparator = [&view](size_t a, size_t b)
-    {
-        return view.getFieldAs<double>(Id::Z, a) <
-               view.getFieldAs<double>(Id::Z, b);
-    };
-
-    std::sort(zIndex.begin(), zIndex.end(), zComparator);
-
-    // Create a KD-tree index for the point view
-    pdal::KD2Index& index = view.build2dIndex();
-
-    // Steps 3-5: Ground labeling and neighbor processing
-    for (PointId idx : zIndex)
-    {
-        // Check if the point is already labeled
-        uint8_t classification =
-            view.getFieldAs<uint8_t>(Id::Classification, idx);
-        if (classification != unclassifiedLabel)
-            continue;
-
-        // Label the point as ground
-        view.setField(Id::Classification, idx, m_groundClass);
-
-        // Find neighbors within radius R and label them as low noise
-        PointIdList neighbors = index.radius(idx, m_radius);
-        for (PointId neighborIdx : neighbors)
-        {
-            uint8_t neighborClass =
-                view.getFieldAs<uint8_t>(Id::Classification, neighborIdx);
-            if (neighborClass == unclassifiedLabel)
-            {
-                view.setField(Id::Classification, neighborIdx, m_lowPointClass);
-            }
-        }
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal
