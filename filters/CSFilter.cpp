@@ -197,7 +197,7 @@ PointViewSet CSFilter::run(PointViewPtr view)
     bool rnOneZero(false);
     bool nrAllZero(true);
     bool rnAllZero(true);
-    for (PointRef p : *keptView)
+    for (const PointRef& p : *keptView)
     {
         uint8_t nr = p.getFieldAs<uint8_t>(Id::NumberOfReturns);
         uint8_t rn = p.getFieldAs<uint8_t>(Id::ReturnNumber);
@@ -237,7 +237,7 @@ PointViewSet CSFilter::run(PointViewPtr view)
         throwError("No returns to process.");
 
     csf::PointCloud csfPC;
-    for (PointRef point : *firstView)
+    for (const PointRef& point : *firstView)
     {
         csf::Point p;
         p.x = point.getFieldAs<double>(Id::X);

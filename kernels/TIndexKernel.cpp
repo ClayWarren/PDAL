@@ -403,7 +403,7 @@ void TIndexKernel::createFile()
         }
 
     std::vector<FileInfo> infos;
-    for (auto f : m_files)
+    for (const auto& f : m_files)
     {
         FileInfo info;
         info.m_filename = f;
@@ -496,8 +496,7 @@ void TIndexKernel::mergeFile()
     m_dataset = nullptr;
     m_layer = nullptr;
 
-    m_log->get(LogLevel::Info)
-        << "Merge filecount: " << files.size() << '\n';
+    m_log->get(LogLevel::Info) << "Merge filecount: " << files.size() << '\n';
 
     Options cropOptions;
     if (!m_bounds.empty())
@@ -507,7 +506,7 @@ void TIndexKernel::mergeFile()
 
     Stage& merge = makeFilter("filters.merge");
     size_t filecount(0);
-    for (auto f : files)
+    for (const auto& f : files)
     {
         Stage& reader = makeReader(f.m_filename, m_driverOverride);
         Stage* premerge = &reader;
@@ -684,8 +683,7 @@ void TIndexKernel::getFileInfo(FileInfo& fileInfo)
             fast = true;
             m_log->get(LogLevel::Warning)
                 << "Unable to create exact boundary for tile "
-                << fileInfo.m_filename << " with error: '" << e.what()
-                << '\n';
+                << fileInfo.m_filename << " with error: '" << e.what() << '\n';
         }
     }
 

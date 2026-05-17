@@ -228,8 +228,7 @@ void EptReader::initialize()
     const std::size_t threads((std::max)(m_args->m_threads, size_t(4)));
     if (threads > 100)
         log()->get(LogLevel::Warning)
-            << "Using a large thread count: " << threads << " threads"
-            << '\n';
+            << "Using a large thread count: " << threads << " threads" << '\n';
     m_p->pool.reset(new ThreadPool(threads));
 
     m_p->connector.reset(new connector::Connector(m_filespec));
@@ -291,7 +290,7 @@ void EptReader::initialize()
             xform.set(m_p->info->srs(), poly.getSpatialReference());
         for (Polygon& p : exploded)
         {
-            PolyXform ps{std::move(p), xform};
+            PolyXform ps{p, xform};
             m_p->polys.push_back(ps);
         }
     }
@@ -343,8 +342,7 @@ void EptReader::handleOriginQuery()
     if (search.empty())
         return;
 
-    log()->get(LogLevel::Debug)
-        << "Searching sources for " << search << '\n';
+    log()->get(LogLevel::Debug) << "Searching sources for " << search << '\n';
 
     // In the initial EPT version 1.0.0, a source-file summary was stored in
     // "list.json", with detailed metadata for each file being stored together
@@ -807,8 +805,7 @@ void EptReader::checkTile(const ept::TileContents& tile)
         m_p->pool->clearTasks();
         m_p->pool->stop();
         log()->get(LogLevel::Warning)
-            << "Use readers.ept.ignore_unreadable to ignore this error"
-            << '\n';
+            << "Use readers.ept.ignore_unreadable to ignore this error" << '\n';
         throwError("Error reading tile " + tile.key().toString() + ": " +
                    tile.error());
     }

@@ -401,7 +401,7 @@ Expression::Expression(const Expression& expr)
 //   resizing. Instead, it will call the copy ctor, which is bad, since our
 //   copy ctor is busted.
 Expression::Expression(Expression&& expr) noexcept
-    : m_error(expr.m_error), m_nodes(std::move(expr.m_nodes))
+    : m_error(std::move(expr.m_error)), m_nodes(std::move(expr.m_nodes))
 {
 }
 

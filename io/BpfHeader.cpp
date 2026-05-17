@@ -229,11 +229,11 @@ bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims,
             << "BPF: static count: " << staticCnt << "\n";
 
         m_log->get(LogLevel::Error) << "Dims:\n";
-        for (auto d : dims)
+        for (const auto& d : dims)
             m_log->get(LogLevel::Error) << "\t" << d.m_label << "\n";
 
         m_log->get(LogLevel::Error) << "Static:\n";
-        for (auto d : m_staticDims)
+        for (const auto& d : m_staticDims)
             m_log->get(LogLevel::Error) << "\t" << d.m_label << "\n";
     }
 

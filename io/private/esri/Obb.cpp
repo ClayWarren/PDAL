@@ -79,7 +79,7 @@ void Obb::verifyArray(const NL::json& spec, const std::string& name, size_t cnt)
     if (spec.count(name) != 1)
         throw EsriError("Invalid OBB - missing '" + name + "' entry.");
 
-    NL::json arr = spec[name];
+    const NL::json& arr = spec[name];
     if (!arr.is_array())
         throw EsriError("Invalid OBB - '" + name + "' is not an array.");
     if (arr.size() != cnt)
@@ -88,7 +88,7 @@ void Obb::verifyArray(const NL::json& spec, const std::string& name, size_t cnt)
                         "three values.");
     for (size_t i = 0; i < cnt; ++i)
     {
-        NL::json o = arr[i];
+        const NL::json& o = arr[i];
         if (!o.is_number())
             throw EsriError("Invalid OBB - '" + name + "[" + std::to_string(i) +
                             "]' "

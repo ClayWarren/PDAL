@@ -303,7 +303,7 @@ PointViewSet Stage::execute(PointTableRef table, PointViewSet& views)
     ready(table);
 
     // Create a runner for each view.
-    for (PointViewPtr v : views)
+    for (const PointViewPtr& v : views)
     {
         StageRunnerPtr runner(new StageRunner(this, v));
         runners.push_back(runner);
@@ -312,24 +312,24 @@ PointViewSet Stage::execute(PointTableRef table, PointViewSet& views)
     // The stage runner separates the point view into keeps and skips. We put
     // all the kept points together to pass to prerun().
     PointViewSet keeps;
-    for (StageRunnerPtr r : runners)
+    for (const StageRunnerPtr& r : runners)
         keeps.insert(r->keeps());
     prerun(keeps);
 
-    for (StageRunnerPtr r : runners)
+    for (const StageRunnerPtr& r : runners)
         r->run();
 
     // As the stages complete (synchronously at this time), propagate the
     // spatial reference and merge the output views.
     srs = getSpatialReference();
-    for (StageRunnerPtr r : runners)
+    for (const StageRunnerPtr& r : runners)
     {
         PointViewSet temp = r->wait();
 
         // If our stage has a spatial reference, the view takes it on once
         // the stage has been run.
         if (!srs.empty())
-            for (PointViewPtr v : temp)
+            for (const PointViewPtr& v : temp)
                 v->setSpatialReference(srs);
         outViews.insert(temp.begin(), temp.end());
     }

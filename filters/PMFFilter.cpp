@@ -171,7 +171,7 @@ PointViewSet PMFFilter::run(PointViewPtr input)
     bool rnOneZero(false);
     bool nrAllZero(true);
     bool rnAllZero(true);
-    for (PointRef p : *keptView)
+    for (const PointRef& p : *keptView)
     {
         uint8_t nr = p.getFieldAs<uint8_t>(Id::NumberOfReturns);
         uint8_t rn = p.getFieldAs<uint8_t>(Id::ReturnNumber);
@@ -237,7 +237,7 @@ void PMFFilter::processGround(PointViewPtr view)
 
     // loop through all points, identifying minimum Z value for each populated
     // cell
-    for (PointRef p : *view)
+    for (const PointRef& p : *view)
     {
         double x = p.getFieldAs<double>(Id::X);
         double y = p.getFieldAs<double>(Id::Y);

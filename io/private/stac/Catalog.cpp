@@ -66,14 +66,12 @@ bool Catalog::init(const Filters& filters, NL::json rawReaderArgs,
     std::string type = stacValue<std::string>(m_json, "type");
     if (type == "Catalog")
     {
-        m_log->get(LogLevel::Debug)
-            << "Selected Catalog: " << id() << '\n';
+        m_log->get(LogLevel::Debug) << "Selected Catalog: " << id() << '\n';
         m_type = GroupType::catalog;
     }
     if (type == "Collection")
     {
-        m_log->get(LogLevel::Debug)
-            << "Selected Collection: " << id() << '\n';
+        m_log->get(LogLevel::Debug) << "Selected Collection: " << id() << '\n';
         m_type = GroupType::collection;
     }
 
@@ -83,7 +81,7 @@ bool Catalog::init(const Filters& filters, NL::json rawReaderArgs,
 
     NL::json itemLinks = stacValue(m_json, "links");
 
-    for (auto link : itemLinks)
+    for (const auto& link : itemLinks)
     {
         m_pool.add(
             [this, &filters, rawReaderArgs, link]()
@@ -152,7 +150,7 @@ void Catalog::collectErrors()
 {
     for (auto& catalog : m_subCatalogs)
     {
-        for (auto e : catalog->errors())
+        for (const auto& e : catalog->errors())
         {
             m_errors.push_back(e);
         }

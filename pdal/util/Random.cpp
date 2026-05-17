@@ -43,6 +43,7 @@ Random::Random()
 {
     std::vector<int32_t> seed;
     std::random_device rd;
+    seed.reserve(std::mt19937::state_size);
     for (size_t i = 0; i < std::mt19937::state_size; ++i)
         seed.push_back(rd());
     std::seed_seq seedSeq(seed.begin(), seed.end());

@@ -365,7 +365,7 @@ bool Item::filterProperties(const NL::json& filterProps)
     {
         for (auto& it : filterProps.items())
         {
-            std::string key = it.key();
+            const std::string& key = it.key();
             NL::json stacVal = stacValue(itemProperties, key, m_json);
             NL::detail::value_t stacType = stacVal.type();
 

@@ -32,7 +32,14 @@ Checks: >
   portability-std-allocator-const,
   modernize-use-override,
   modernize-use-nullptr,
-  performance-avoid-endl
+  performance-avoid-endl,
+  performance-faster-string-find,
+  performance-for-range-copy,
+  performance-inefficient-string-concatenation,
+  performance-inefficient-vector-operation,
+  performance-move-const-arg,
+  performance-move-constructor-init,
+  performance-unnecessary-copy-initialization
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*(apps|examples|filters|io|kernels|pdal|plugins|test|tools)/.*'
 ExcludeHeaderFilterRegex: '.*(vendor/|filters/private/csf/|filters/private/miniball/|filters/private/delaunator\.|plugins/e57/libE57Format/|plugins/nitf/io/nitflib\.).*'

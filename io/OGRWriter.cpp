@@ -227,6 +227,7 @@ void OGRWriter::readyFile(const std::string& filename,
 
     // Creation options
     std::vector<const char*> ogr_create_options;
+    ogr_create_options.reserve(m_ogrOptions.size());
     for (auto&& o : m_ogrOptions)
         ogr_create_options.push_back(o.c_str());
     ogr_create_options.push_back(nullptr);

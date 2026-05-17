@@ -163,7 +163,7 @@ void TileContents::readAddon(const Addon& addon)
         throw pdal_error("Invalid addon content length");
 
     VectorPointTable* vpt = new VectorPointTable(addon.layout());
-    vpt->buffer() = std::move(data);
+    vpt->buffer() = data;
     m_addonTables[addon.localId()] = BasePointTablePtr(vpt);
 }
 

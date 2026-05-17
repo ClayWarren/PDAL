@@ -79,7 +79,7 @@ std::string validPlugin(const std::string& path, const StringList& types)
 {
     auto typeValid = [&types](std::string& type)
     {
-        for (auto t : types)
+        for (const auto& t : types)
             if (type == t)
                 return true;
         return false;

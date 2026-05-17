@@ -214,7 +214,7 @@ PointViewSet SMRFilter::run(PointViewPtr view)
     bool rnOneZero(false);
     bool nrAllZero(true);
     bool rnAllZero(true);
-    for (PointRef p : *realView)
+    for (const PointRef& p : *realView)
     {
         uint8_t nr = p.getFieldAs<uint8_t>(Id::NumberOfReturns);
         uint8_t rn = p.getFieldAs<uint8_t>(Id::ReturnNumber);
@@ -497,7 +497,7 @@ std::vector<double> SMRFilter::createZImin(PointViewPtr view)
     std::vector<double> ZIminV(m_rows * m_cols,
                                std::numeric_limits<double>::quiet_NaN());
 
-    for (PointRef p : *view)
+    for (const PointRef& p : *view)
     {
         double x = p.getFieldAs<double>(Id::X);
         double y = p.getFieldAs<double>(Id::Y);

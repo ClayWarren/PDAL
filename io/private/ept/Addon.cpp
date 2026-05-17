@@ -67,7 +67,7 @@ AddonList Addon::store(const connector::Connector& connector,
     std::string filename;
     try
     {
-        for (auto it : spec.items())
+        for (const auto& it : spec.items())
         {
             std::string filename = it.key();
             std::string dimName = it.value().get<std::string>();
@@ -113,9 +113,9 @@ AddonList Addon::load(const connector::Connector& connector,
     std::string filename;
     try
     {
-        for (auto it : spec.items())
+        for (const auto& it : spec.items())
         {
-            std::string dimName = it.key();
+            const std::string& dimName = it.key();
             std::string filename = it.value().get<std::string>();
             if (!Utils::endsWith(filename, "ept-addon.json"))
                 filename += "/ept-addon.json";

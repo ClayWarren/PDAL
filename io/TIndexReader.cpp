@@ -267,10 +267,10 @@ void TIndexReader::initialize()
     if (m_args->m_rawReaderArgs.size())
         m_args->m_readerArgs = Utils::handleReaderArgs(m_args->m_rawReaderArgs);
 
-    for (auto f : getFiles())
+    for (const auto& f : getFiles())
     {
-        log()->get(LogLevel::Debug) << "Adding file " << f.m_filename
-                                    << " to merge filter" << '\n';
+        log()->get(LogLevel::Debug)
+            << "Adding file " << f.m_filename << " to merge filter" << '\n';
 
         std::string driver = m_factory.inferReaderDriver(f.m_filename);
         Stage* reader = m_factory.createStage(driver);

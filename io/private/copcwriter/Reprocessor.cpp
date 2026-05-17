@@ -69,7 +69,7 @@ Reprocessor::Reprocessor(CellManager& mgr, PointViewPtr srcView, Grid grid)
 void Reprocessor::run()
 {
     // Remove the reprocessed cell from th4e map as its
-    for (PointRef p : *m_srcView)
+    for (const PointRef& p : *m_srcView)
     {
         double x = p.getFieldAs<double>(Dimension::Id::X);
         double y = p.getFieldAs<double>(Dimension::Id::Y);

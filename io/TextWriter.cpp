@@ -168,7 +168,7 @@ void TextWriter::ready(PointTableRef table)
 
     // Find the dimensions listed and put them on the id list.
     StringList dimNames = Utils::split2(m_dimOrder, ',');
-    for (std::string dim : dimNames)
+    for (const std::string& dim : dimNames)
     {
         const DimSpec& spec = extractDim(dim, table);
         if (spec.id == Dimension::Id::X)

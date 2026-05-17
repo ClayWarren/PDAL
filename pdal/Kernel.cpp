@@ -154,8 +154,14 @@ StringList Kernel::extractStageOptions(const StringList& cmdArgs)
             if (value.empty())
             {
                 if (++it == cmdArgs.end())
-                    throw pdal_error("Stage option '" + stageName + "." +
-                                     opName + "' has no value.");
+                {
+                    std::string msg = "Stage option '";
+                    msg += stageName;
+                    msg += ".";
+                    msg += opName;
+                    msg += "' has no value.";
+                    throw pdal_error(msg);
+                }
                 value = *it;
             }
             Option op(opName, value);

@@ -556,7 +556,7 @@ std::vector<std::string> remoteGlob(const std::string& path)
         StringList globResult = a.resolve(path.substr(0, pos + 1));
         StringList filtered;
         // filter for the suffix
-        for (auto p : globResult)
+        for (const auto& p : globResult)
             if (Utils::endsWith(p, suffix))
                 filtered.push_back(p);
 

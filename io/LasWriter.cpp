@@ -638,7 +638,7 @@ void LasWriter::addVlr(const las::Evlr& evlr)
     if (evlr.dataSize() > las::Vlr::MaxDataSize)
     {
         if (d->header.versionAtLeast(1, 4))
-            m_evlrs.push_back(std::move(evlr));
+            m_evlrs.push_back(evlr);
         else
             throwError("Can't write VLR with user ID/record ID = " +
                        evlr.userId + "/" + std::to_string(evlr.recordId) +
@@ -647,13 +647,13 @@ void LasWriter::addVlr(const las::Evlr& evlr)
     else if (evlr.writeAsEVLR)
     {
         if (d->header.versionAtLeast(1, 4))
-            m_evlrs.push_back(std::move(evlr));
+            m_evlrs.push_back(evlr);
         else
             throwError("User specified writing as EVLR but the file is not a "
                        "1.4+ file!");
     }
     else
-        m_vlrs.push_back(std::move(evlr));
+        m_vlrs.push_back(evlr);
 }
 
 /// Delete a VLR from the vlr list.
@@ -1004,8 +1004,7 @@ bool LasWriter::fillPointBuf(PointRef& point, LeInserter& ostream)
                        "Classification - "
                     << "ignoring overlap for LAS "
                     << std::to_string(d->header.versionMajor) << "."
-                    << std::to_string(d->header.versionMinor) << "."
-                    << '\n';
+                    << std::to_string(d->header.versionMinor) << "." << '\n';
             }
         }
 

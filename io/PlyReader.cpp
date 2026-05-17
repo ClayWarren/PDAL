@@ -297,7 +297,7 @@ QuickInfo PlyReader::inspect()
     ready(t);
     read(v, qi.m_pointCount);
     done(t);
-    for (PointRef p : *v)
+    for (const PointRef& p : *v)
     {
         float x = p.getFieldAs<float>(Dimension::Id::X);
         float y = p.getFieldAs<float>(Dimension::Id::Y);

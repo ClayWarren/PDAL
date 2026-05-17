@@ -243,7 +243,7 @@ OGRGeometry* createFromGeoJson(const std::string& s, std::string& srs)
         // Look for a right bracket -- this indicates the start of the
         // actual message from the parse error.
         std::string s(err.what());
-        auto pos = s.find("]");
+        auto pos = s.find(']');
         if (pos != std::string::npos)
             s = s.substr(pos + 1);
         std::stringstream msg;

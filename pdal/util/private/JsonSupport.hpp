@@ -135,7 +135,7 @@ inline NL::json handleReaderArgs(NL::json rawReaderArgs)
             if (arg.key() == "type")
                 continue;
 
-            std::string key = arg.key();
+            const std::string& key = arg.key();
             readerArgs[driver][key] = {};
             readerArgs[driver][key] = arg.value();
         }
@@ -154,7 +154,7 @@ inline Options setReaderOptions(const NL::json& readerArgs,
         NL::json args = jsonValue(readerArgs, driver);
         for (auto& arg : args.items())
         {
-            std::string key = arg.key();
+            const std::string& key = arg.key();
             NL::json val = arg.value();
             NL::detail::value_t type = val.type();
             // We treat a partial FileSpec as a special case

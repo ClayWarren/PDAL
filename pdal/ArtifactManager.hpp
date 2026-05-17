@@ -90,7 +90,8 @@ public:
     std::vector<std::string> keys() const
     {
         std::vector<std::string> ks;
-        for (auto e : m_storage)
+        ks.reserve(m_storage.size());
+        for (const auto& e : m_storage)
             ks.push_back(e.first);
         return ks;
     }

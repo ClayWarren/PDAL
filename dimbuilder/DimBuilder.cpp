@@ -111,6 +111,7 @@ bool DimBuilder::parseArgs(int argc, char* argv[])
     try
     {
         std::vector<std::string> s;
+        s.reserve(argc);
         for (int i = 0; i < argc; ++i)
             s.push_back(argv[i]);
         args.parse(s);
@@ -440,7 +441,7 @@ void DimBuilder::writeDescriptions(std::ostream& out)
         pi++;
         for (; pi != pieces.end(); ++pi)
         {
-            std::string piece = *pi;
+            const std::string& piece = *pi;
             out << "            \"" << piece << "\"";
             if (pi + 1 == pieces.end())
                 out << ";";

@@ -98,8 +98,8 @@ PointViewSet ShellFilter::run(PointViewPtr view)
 
 void ShellFilter::done(PointTableRef table)
 {
-    bool isJson = (m_command_output.find("{") != m_command_output.npos) ||
-                  (m_command_output.find("}") != m_command_output.npos);
+    bool isJson = (m_command_output.find('{') != m_command_output.npos) ||
+                  (m_command_output.find('}') != m_command_output.npos);
 
     if (isJson)
         m_metadata.addWithType("output", m_command_output, "json",

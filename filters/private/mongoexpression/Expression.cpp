@@ -92,7 +92,7 @@ void Expression::build(LogicGate& gate, const NL::json& json)
             //
             // There cannot be any further nested logical operators
             // within val, since we've already selected a dimension.
-            for (auto inner : val.items())
+            for (const auto& inner : val.items())
             {
                 NL::json nest;
                 nest[inner.key()] = inner.value();

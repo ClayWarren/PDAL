@@ -159,9 +159,9 @@ MetadataNode DeltaKernel::dump(PointViewPtr& srcView, PointViewPtr& candView,
 
     root.add("source", m_sourceFile);
     root.add("candidate", m_candidateFile);
-    for (auto dpair : dims)
+    for (const auto& dpair : dims)
     {
-        DimIndex& d = dpair.second;
+        const DimIndex& d = dpair.second;
 
         MetadataNode dimNode = root.add(d.m_name);
         dimNode.add("min", d.m_min);

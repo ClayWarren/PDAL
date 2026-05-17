@@ -220,9 +220,14 @@ Options Options::fromJsonFile(const std::string& filename, const std::string& s)
         else if (n.is_array() || n.is_object())
             options.add(name, n.get<std::string>());
         else
-            throw pdal_error("Value of stage option '" + name +
-                             "' in options file '" + filename +
-                             "' cannot be converted.");
+        {
+            std::string msg = "Value of stage option '";
+            msg += name;
+            msg += "' in options file '";
+            msg += filename;
+            msg += "' cannot be converted.";
+            throw pdal_error(msg);
+        }
     }
     return options;
 }
@@ -235,21 +240,29 @@ Options Options::fromCmdlineFile(const std::string& filename,
 
     for (size_t i = 0; i < args.size(); ++i)
     {
-        std::string option = args[i];
+        const std::string& option = args[i];
         std::string value;
         if (i + 1 < args.size())
             value = args[i + 1];
 
         if (option.size() < 3)
-            throw pdal_error("Invalid option '" + option +
-                             "' in option "
-                             "file '" +
-                             filename + "'.");
+        {
+            std::string msg = "Invalid option '";
+            msg += option;
+            msg += "' in option file '";
+            msg += filename;
+            msg += "'.";
+            throw pdal_error(msg);
+        }
         if (option[0] != '-' || option[1] != '-')
-            throw pdal_error("Option '" + option +
-                             "' missing leading \"--\" "
-                             "in option file '" +
-                             filename + "'.");
+        {
+            std::string msg = "Option '";
+            msg += option;
+            msg += "' missing leading \"--\" in option file '";
+            msg += filename;
+            msg += "'.";
+            throw pdal_error(msg);
+        }
 
         std::string::size_type pos = 2;
         std::string::size_type count = Option::parse(option, pos);
@@ -260,10 +273,14 @@ Options Options::fromCmdlineFile(const std::string& filename,
         else
             i++;
         if (value.empty())
-            throw pdal_error("No value found for option '" + option +
-                             "' in "
-                             "option file '" +
-                             filename + "'.");
+        {
+            std::string msg = "No value found for option '";
+            msg += option;
+            msg += "' in option file '";
+            msg += filename;
+            msg += "'.";
+            throw pdal_error(msg);
+        }
         Option o(optionName, value);
         options.add(o);
     }

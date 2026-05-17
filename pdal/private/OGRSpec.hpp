@@ -67,7 +67,7 @@ private:
         catch (const NL::json::exception& e)
         {
             std::string s(e.what());
-            auto pos = s.find("]");
+            auto pos = s.find(']');
             if (pos != std::string::npos)
                 s = s.substr(pos + 1);
             std::stringstream msg;

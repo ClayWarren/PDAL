@@ -204,7 +204,7 @@ void PcdWriter::ready(PointTableRef table)
 
     // Find the dimensions listed and put them on the id list.
     StringList dimNames = Utils::split2(m_dimOrder, ',');
-    for (std::string dim : dimNames)
+    for (const std::string& dim : dimNames)
     {
         const DimSpec& spec = extractDim(dim, table);
         if (spec.m_field.m_id == Id::X)
@@ -278,7 +278,7 @@ void PcdWriter::write(const PointViewPtr view)
 
 void PcdWriter::writeAscii(const PointViewPtr view, std::ostream& out)
 {
-    for (PointRef point : *view)
+    for (const PointRef& point : *view)
     {
         out << std::fixed;
         for (DimSpec& dim : m_dims)
@@ -332,7 +332,7 @@ void PcdWriter::writeBinary(const PointViewPtr view, std::ostream& out)
 {
     // Write little-endian binary.
     OLeStream leOut(&out);
-    for (PointRef point : *view)
+    for (const PointRef& point : *view)
     {
         for (DimSpec& dim : m_dims)
         {

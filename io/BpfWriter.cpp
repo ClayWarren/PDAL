@@ -118,7 +118,7 @@ void BpfWriter::initialize()
         m_compression ? BpfCompression::Zlib : BpfCompression::None);
     m_extraData = Utils::base64_decode(m_extraDataSpec);
 
-    for (auto file : m_bundledFilesSpec)
+    for (const auto& file : m_bundledFilesSpec)
     {
         if (!FileUtils::fileExists(file))
             throwError("Bundledfile '" + file + "' doesn't exist.");

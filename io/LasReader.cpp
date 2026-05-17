@@ -646,7 +646,7 @@ void LasReader::queueNextStandardChunk()
 void LasReader::readExtraBytesVlr()
 {
     las::VlrList lVrlEB;
-    for (auto vlr : d->vlrs)
+    for (const auto& vlr : d->vlrs)
     {
         if (vlr.userId != las::SpecUserId ||
             vlr.recordId != las::ExtraBytesRecordId)

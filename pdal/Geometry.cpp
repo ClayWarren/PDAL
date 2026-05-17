@@ -115,11 +115,11 @@ void Geometry::modified() {}
 
 void Geometry::update(const std::string& wkt_or_json)
 {
-    bool isJson = (wkt_or_json.find("{") != wkt_or_json.npos) ||
-                  (wkt_or_json.find("}") != wkt_or_json.npos);
+    bool isJson = (wkt_or_json.find('{') != wkt_or_json.npos) ||
+                  (wkt_or_json.find('}') != wkt_or_json.npos);
 
-    bool maybeWkt = (wkt_or_json.find("(") != wkt_or_json.npos) ||
-                    (wkt_or_json.find(")") != wkt_or_json.npos);
+    bool maybeWkt = (wkt_or_json.find('(') != wkt_or_json.npos) ||
+                    (wkt_or_json.find(')') != wkt_or_json.npos);
 
     // first byte is 00 or 01
     bool maybeWkb = (wkt_or_json[0] == 0 || wkt_or_json[0] == 1);

@@ -263,7 +263,7 @@ next:
         point_count_t cnt = 0;
         for (auto pi = m_viewSet.begin(); pi != m_viewSet.end(); ++pi)
         {
-            PointViewPtr view = *pi;
+            const PointViewPtr& view = *pi;
             cnt += view->size();
         }
         result = {ExecMode::Standard, cnt};

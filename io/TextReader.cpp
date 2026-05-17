@@ -71,14 +71,14 @@ QuickInfo TextReader::inspect()
 
     try
     {
-        stats::Summary xSummary = f.getStats(Dimension::Id::X);
+        const stats::Summary& xSummary = f.getStats(Dimension::Id::X);
         qi.m_pointCount = xSummary.count();
         qi.m_bounds.minx = xSummary.minimum();
         qi.m_bounds.maxx = xSummary.maximum();
-        stats::Summary ySummary = f.getStats(Dimension::Id::Y);
+        const stats::Summary& ySummary = f.getStats(Dimension::Id::Y);
         qi.m_bounds.miny = ySummary.minimum();
         qi.m_bounds.maxy = ySummary.maximum();
-        stats::Summary zSummary = f.getStats(Dimension::Id::Z);
+        const stats::Summary& zSummary = f.getStats(Dimension::Id::Z);
         qi.m_bounds.minz = zSummary.minimum();
         qi.m_bounds.maxz = zSummary.maximum();
         qi.m_valid = true;

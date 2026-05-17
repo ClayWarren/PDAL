@@ -72,7 +72,7 @@ struct CropArgs
 CropFilter::ViewGeom::ViewGeom(const Polygon& poly) : m_poly(poly) {}
 
 CropFilter::ViewGeom::ViewGeom(ViewGeom&& vg)
-    : m_poly(std::move(vg.m_poly)), m_gridPnps(std::move(vg.m_gridPnps))
+    : m_poly(vg.m_poly), m_gridPnps(std::move(vg.m_gridPnps))
 {
 }
 

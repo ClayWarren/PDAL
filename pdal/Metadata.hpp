@@ -84,7 +84,7 @@ private:
     {
         for (auto li = l.begin(); li != l.end(); ++li)
         {
-            MetadataNodeImplPtr node = *li;
+            const MetadataNodeImplPtr& node = *li;
             node->m_kind = MetadataType::Array;
         }
     }
@@ -157,8 +157,8 @@ private:
             auto li2 = ml2.begin();
             for (auto li = ml.begin(); li != ml.end(); ++li, ++li2)
             {
-                auto node1 = *li;
-                auto node2 = *li2;
+                const auto& node1 = *li;
+                const auto& node2 = *li2;
                 if (!(*node1 == *node2))
                     return false;
             }

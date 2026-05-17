@@ -388,7 +388,7 @@ void CopcWriter::write(const PointViewPtr v)
 
     CellManager mgr(v);
 
-    for (PointRef p : *v)
+    for (const PointRef& p : *v)
     {
         double x = p.getFieldAs<double>(Dimension::Id::X);
         double y = p.getFieldAs<double>(Dimension::Id::Y);

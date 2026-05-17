@@ -397,7 +397,7 @@ std::string stem(const std::string& path)
     std::string f = getFilename(path);
     if (f != "." && f != "..")
     {
-        std::string::size_type pos = f.find_last_of(".");
+        std::string::size_type pos = f.find_last_of('.');
         if (pos != std::string::npos)
             f = f.substr(0, pos);
     }
@@ -548,7 +548,8 @@ MapContext mapFile(const std::string& filename, bool readOnly, uintmax_t pos,
     ctx.m_size = size;
 
 #ifndef _WIN32
-    ctx.m_addr = ::mmap(nullptr, size, PROT_READ, MAP_SHARED, ctx.m_fd, (off_t)pos);
+    ctx.m_addr =
+        ::mmap(nullptr, size, PROT_READ, MAP_SHARED, ctx.m_fd, (off_t)pos);
     if (ctx.m_addr == MAP_FAILED)
     {
         ctx.m_addr = nullptr;

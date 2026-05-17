@@ -287,12 +287,12 @@ std::ostream& operator<<(std::ostream& out, PcdHeader& header)
     out << "VERSION " << header.m_version << '\n';
 
     out << "FIELDS";
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
         out << " " << Utils::tolower(i.m_label);
     out << '\n';
 
     out << "SIZE";
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
         out << " " << i.m_size;
     out << '\n';
 
@@ -302,7 +302,7 @@ std::ostream& operator<<(std::ostream& out, PcdHeader& header)
     out << '\n';
 
     out << "COUNT";
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
         out << " " << i.m_count;
     out << '\n';
 
@@ -346,7 +346,7 @@ OLeStream& operator<<(OLeStream& out, PcdHeader& header)
     out.put("\n", 1);
 
     out.put("FIELDS", 6);
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
     {
         out.put(" ", 1);
         out.put(i.m_label);
@@ -354,7 +354,7 @@ OLeStream& operator<<(OLeStream& out, PcdHeader& header)
     out.put("\n", 1);
 
     out.put("SIZE", 4);
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
     {
         out.put(" ", 1);
         std::stringstream ss;
@@ -364,7 +364,7 @@ OLeStream& operator<<(OLeStream& out, PcdHeader& header)
     out.put("\n", 1);
 
     out.put("TYPE", 4);
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
     {
         out.put(" ", 1);
         switch (i.m_type)
@@ -386,7 +386,7 @@ OLeStream& operator<<(OLeStream& out, PcdHeader& header)
     out.put("\n", 1);
 
     out.put("COUNT", 5);
-    for (auto i : header.m_fields)
+    for (const auto& i : header.m_fields)
     {
         out.put(" ", 1);
         std::stringstream ss;

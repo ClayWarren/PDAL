@@ -576,7 +576,7 @@ void CopcReader::createSpatialFilters()
             xform.set(getSpatialReference(), poly.getSpatialReference());
         for (Polygon& p : exploded)
         {
-            PolyXform ps{std::move(p), xform};
+            PolyXform ps{p, xform};
             m_p->polys.push_back(ps);
         }
     }

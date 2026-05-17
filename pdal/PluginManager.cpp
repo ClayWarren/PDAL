@@ -82,7 +82,7 @@ template <typename T> StringList PluginManager<T>::l_names()
     StringList l;
 
     std::lock_guard<std::mutex> lock(m_pluginMutex);
-    for (auto p : m_plugins)
+    for (const auto& p : m_plugins)
         l.push_back(p.first);
     return l;
 }
@@ -203,7 +203,7 @@ template <typename T> void PluginManager<T>::shutdown()
     // reference count is already 0.  Since we're exiting anyway and all the
     // dlls will be closed, there is no need to call dlclose() on them
     // explicitly.
-    for (auto l : m_dynamicLibraryMap)
+    for (const auto& l : m_dynamicLibraryMap)
         l.second->clear();
 
     m_dynamicLibraryMap.clear();
@@ -291,8 +291,7 @@ template <typename T> bool PluginManager<T>::loadByPath(const std::string& path)
     if (!d)
         return false;
 
-    m_log->get(LogLevel::Debug)
-        << "Loaded plugin '" << path << "'." << '\n';
+    m_log->get(LogLevel::Debug) << "Loaded plugin '" << path << "'." << '\n';
     PF_InitFunc initFunc;
 
     // This awfulness is to work around a warning that some compilers

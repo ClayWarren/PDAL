@@ -62,7 +62,7 @@ QuickInfo PcdReader::inspect()
 
     initialize();
 
-    for (auto i : m_header.m_fields)
+    for (const auto& i : m_header.m_fields)
         qi.m_dimNames.push_back(i.m_label);
     qi.m_pointCount = m_header.m_pointCount;
     qi.m_valid = true;

@@ -1410,7 +1410,7 @@ public:
         if (skipfirst)
             firstlen = secondLen;
 
-        for (auto i : info)
+        for (const auto& i : info)
         {
             std::vector<std::string> descrip =
                 Utils::wordWrap(i.second, secondLen, firstlen);
@@ -1426,8 +1426,7 @@ public:
                     << '\n';
             }
             for (size_t ii = 1; ii < descrip.size(); ++ii)
-                out << std::string(secondIndent, ' ') << descrip[ii]
-                    << '\n';
+                out << std::string(secondIndent, ' ') << descrip[ii] << '\n';
         }
     }
 
@@ -1616,7 +1615,7 @@ private:
         std::string name = inName.substr(2);
         std::string value = inValue;
 
-        std::size_t pos = name.find_first_of("=");
+        std::size_t pos = name.find_first_of('=');
         if (pos != std::string::npos)
         {
             if (pos < name.size() + 1)

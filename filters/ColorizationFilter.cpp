@@ -159,7 +159,11 @@ void ColorizationFilter::initialize()
         }
         catch (const std::string& what)
         {
-            throwError("invalid --dimensions option: '" + dim + "': " + what);
+            std::string msg = "invalid --dimensions option: '";
+            msg += dim;
+            msg += "': ";
+            msg += what;
+            throwError(msg);
         }
     }
 }

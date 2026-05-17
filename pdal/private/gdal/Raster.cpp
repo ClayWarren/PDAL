@@ -338,6 +338,7 @@ GDALError Raster::open(StringList options)
     registerDrivers();
 
     std::vector<const char*> opts;
+    opts.reserve(options.size());
     for (size_t i = 0; i < options.size(); ++i)
     {
         opts.push_back(options[i].data());
@@ -691,7 +692,7 @@ MetadataNode Raster::getMetadata(std::string domain) const
     {
         std::string v(papszMetadata[i]);
 
-        const std::size_t pos = v.find_first_of("=");
+        const std::size_t pos = v.find_first_of('=');
         if (pos != std::string::npos)
         {
             const std::string name = v.substr(0, pos);

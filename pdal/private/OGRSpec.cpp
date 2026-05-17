@@ -43,7 +43,7 @@ void OGRSpec::validateInput(const std::string& ogrJsonStr)
     catch (NL::json::parse_error& e)
     {
         std::string s(e.what());
-        auto pos = s.find("]");
+        auto pos = s.find(']');
         if (pos != std::string::npos)
             s = s.substr(pos + 1);
         std::stringstream msg;
@@ -92,7 +92,7 @@ void OGRSpec::parse()
             assignJSON(item.value(), m_opts.sql);
         else if (key == "options")
         {
-            for (auto optItem : item.value().items())
+            for (const auto& optItem : item.value().items())
             {
                 std::string optKey = Utils::tolower(optItem.key());
                 if (optKey == "dialect")
