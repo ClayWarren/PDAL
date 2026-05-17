@@ -28,9 +28,11 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <pdal/KDIndex.hpp>
-
 #include "ZsmoothFilter.hpp"
+
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -89,37 +91,10 @@ void ZsmoothFilter::prepared(PointTableRef)
 
 void ZsmoothFilter::filter(PointView& view)
 {
-    const KD2Index& kdi = view.build2dIndex();
-
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        std::vector<double> valList;
-        PointIdList nears = kdi.radius(idx, m_p->radius);
-        for (PointId n = 1; n < nears.size(); ++n)
-        {
-            double z = view.getFieldAs<double>(Dimension::Id::Z, nears[n]);
-            valList.push_back(z);
-        }
-        std::sort(valList.begin(), valList.end());
-
-        double val;
-        if (valList.empty())
-            val = view.getFieldAs<double>(Dimension::Id::Z, idx);
-        else if (valList.size() == 1 || m_p->pos == 0.0)
-            val = valList[0];
-        else if (m_p->pos == 1.0)
-            val = valList[valList.size() - 1];
-        else
-        {
-            double pos = m_p->pos * (valList.size() - 1);
-            size_t low = (size_t)std::floor(pos);
-            size_t high = low + 1;
-            double highfrac = pos - low;
-            double lowfrac = 1 - highfrac;
-            val = valList[low] * lowfrac + valList[high] * highfrac;
-        }
-        view.setField(m_p->statDim, idx, val);
-    }
+    pdal_stage_t* stage =
+        pdal_stage_create_zsmooth(m_p->radius, m_p->pos, m_p->dimName.c_str());
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

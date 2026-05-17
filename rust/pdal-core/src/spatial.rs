@@ -21,6 +21,24 @@ impl<'a> SpatialIndex3d<'a> {
         self.radius_xyz(x, y, z, radius)
     }
 
+    pub fn radius_2d_excluding(&self, idx: PointId, radius: f64) -> Vec<PointId> {
+        let x = self.view.get_f64(idx, &DimId::X);
+        let y = self.view.get_f64(idx, &DimId::Y);
+        let radius_sqr = radius * radius;
+        let mut ids = Vec::new();
+        for candidate in 0..self.view.len() {
+            if candidate == idx {
+                continue;
+            }
+            let dx = self.view.get_f64(candidate, &DimId::X) - x;
+            let dy = self.view.get_f64(candidate, &DimId::Y) - y;
+            if dx * dx + dy * dy <= radius_sqr {
+                ids.push(candidate);
+            }
+        }
+        ids
+    }
+
     pub fn radius_xyz(&self, x: f64, y: f64, z: f64, radius: f64) -> Vec<PointId> {
         let radius_sqr = radius * radius;
         let mut ids = Vec::new();
@@ -98,5 +116,30 @@ mod tests {
 
         let index = SpatialIndex3d::new(&view);
         assert_eq!(index.knn(0, 3), vec![(0, 0.0), (2, 1.0), (1, 4.0)]);
+    }
+
+    #[test]
+    fn radius_2d_excluding_ignores_z_and_query_point() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+
+        for (x, y, z) in [
+            (0.0, 0.0, 0.0),
+            (0.5, 0.0, 100.0),
+            (1.1, 0.0, 0.0),
+            (0.0, 0.5, -100.0),
+        ] {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+        }
+
+        let index = SpatialIndex3d::new(&view);
+        assert_eq!(index.radius_2d_excluding(0, 1.0), vec![1, 3]);
     }
 }

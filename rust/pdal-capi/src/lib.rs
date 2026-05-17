@@ -30,6 +30,7 @@ use pdal_filters::stats;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::TransformationFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
+use pdal_filters::zsmooth::ZsmoothFilter;
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -926,6 +927,25 @@ pub unsafe extern "C" fn pdal_stage_create_nndistance(
         }
     };
     let filter = Box::new(NNDistanceFilter::new(k as usize, mode));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a zsmooth filter stage.
+///
+/// # Safety
+///
+/// `dim_name` must be a valid NUL-terminated C-string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_zsmooth(
+    radius: f64,
+    position: f64,
+    dim_name: *const c_char,
+) -> *mut StageWrapper {
+    if dim_name.is_null() {
+        return std::ptr::null_mut();
+    }
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+    let filter = Box::new(ZsmoothFilter::new(radius, position, dim_name));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

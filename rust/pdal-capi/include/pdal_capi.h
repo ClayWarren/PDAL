@@ -79,6 +79,7 @@ pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
 pdal_stage_t* pdal_stage_create_sample(const pdal_options_t* ops);
 pdal_stage_t* pdal_stage_create_radialdensity(double radius);
 pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);
+pdal_stage_t* pdal_stage_create_zsmooth(double radius, double position, const char* dim_name);
 
 uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
 void pdal_free_u64_array(uint64_t* ptr, uint64_t len);

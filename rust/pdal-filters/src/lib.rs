@@ -22,3 +22,4 @@ pub mod stats;
 pub mod tail;
 pub mod transformation;
 pub mod voxeldownsize;
+pub mod zsmooth;
