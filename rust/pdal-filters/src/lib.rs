@@ -11,6 +11,7 @@ pub mod locate;
 pub mod merge;
 pub mod mortonorder;
 pub mod nndistance;
+pub mod outlier;
 pub mod radialdensity;
 pub mod randomize;
 pub mod range;

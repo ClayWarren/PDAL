@@ -19,6 +19,7 @@ use pdal_filters::locate::LocateFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
+use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
@@ -946,6 +947,35 @@ pub unsafe extern "C" fn pdal_stage_create_zsmooth(
     }
     let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
     let filter = Box::new(ZsmoothFilter::new(radius, position, dim_name));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an outlier filter stage.
+///
+/// # Safety
+///
+/// `method` must be a valid NUL-terminated C-string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_outlier(
+    method: *const c_char,
+    min_k: u64,
+    radius: f64,
+    mean_k: u64,
+    multiplier: f64,
+    class_label: u8,
+) -> *mut StageWrapper {
+    if method.is_null() {
+        return std::ptr::null_mut();
+    }
+    let method = CStr::from_ptr(method).to_string_lossy().into_owned();
+    let filter = Box::new(OutlierFilter::new(
+        method,
+        min_k as usize,
+        radius,
+        mean_k as usize,
+        multiplier,
+        class_label,
+    ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

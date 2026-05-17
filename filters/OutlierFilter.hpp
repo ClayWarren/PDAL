@@ -43,14 +43,6 @@
 namespace pdal
 {
 
-class Options;
-
-struct Indices
-{
-    PointIdList inliers;
-    PointIdList outliers;
-};
-
 class PDAL_EXPORT OutlierFilter : public pdal::Filter
 {
 public:
@@ -68,8 +60,6 @@ private:
 
     void addDimensions(PointLayoutPtr layout) override;
     void addArgs(ProgramArgs& args) override;
-    Indices processRadius(PointViewPtr inView);
-    Indices processStatistical(PointViewPtr inView);
     PointViewSet run(PointViewPtr view) override;
 
     OutlierFilter& operator=(const OutlierFilter&); // not implemented
