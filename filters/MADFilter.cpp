@@ -34,8 +34,11 @@
 
 #include "MADFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
+
 #include <string>
-#include <vector>
 
 namespace pdal
 {
@@ -70,45 +73,14 @@ void MADFilter::prepared(PointTableRef table)
 
 PointViewSet MADFilter::run(PointViewPtr view)
 {
-    using namespace Dimension;
-
-    PointViewPtr output = view->makeNew();
-
-    auto estimate_median = [](std::vector<double> vals)
-    {
-        std::nth_element(vals.begin(), vals.begin() + vals.size() / 2,
-                         vals.end());
-        return *(vals.begin() + vals.size() / 2);
-    };
-
-    std::vector<double> z(view->size());
-    for (PointId j = 0; j < view->size(); ++j)
-        z[j] = view->getFieldAs<double>(m_dimId, j);
-
-    double median = estimate_median(z);
-    log()->get(LogLevel::Debug)
-        << getName() << " estimated median value: " << median << '\n';
-
-    std::transform(z.begin(), z.end(), z.begin(),
-                   [median](double v) { return std::fabs(v - median); });
-    double mad = estimate_median(z) * m_madMultiplier;
-    log()->get(LogLevel::Debug) << getName() << " mad " << mad << '\n';
-
-    for (PointId j = 0; j < view->size(); ++j)
-    {
-        if (z[j] / mad < m_multiplier)
-            output->appendPoint(*view, j);
-    }
-
-    double low_fence = median - m_multiplier * mad;
-    double hi_fence = median + m_multiplier * mad;
-
-    log()->get(LogLevel::Debug)
-        << getName() << " cropping " << m_dimName << " in the range ("
-        << low_fence << "," << hi_fence << ")" << '\n';
-
+    pdal_stage_t* stage = pdal_stage_create_mad(
+        m_multiplier, view->layout()->dimName(m_dimId).c_str(),
+        m_madMultiplier);
+    if (!stage)
+        throwError("Failed to create Rust MAD stage.");
     PointViewSet viewSet;
-    viewSet.insert(output);
+    viewSet.insert(rust_view_converter::runSingle(stage, view));
+    pdal_stage_destroy(stage);
     return viewSet;
 }
 

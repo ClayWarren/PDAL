@@ -57,6 +57,7 @@ fn test_tail_invert() {
 fn test_tail_stream() {
     let mut filter = TailFilter::new(4, false);
     filter.reset();
+    let mut view = make_ramp_view(1);
     // Streamable::process_one should always return false for TailFilter as it does not stream
-    assert!(!filter.process_one());
+    assert!(!filter.process_one(&mut view, 0));
 }

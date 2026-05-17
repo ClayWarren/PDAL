@@ -68,16 +68,20 @@ pub fn symmetric_eigen_decomposition(mut matrix: [[f64; 3]; 3]) -> ([f64; 3], [[
         matrix[p][p] -= t * mpq;
         matrix[q][q] += t * mpq;
 
-        for r in 0..3 {
+        for (r, row) in matrix.iter_mut().enumerate() {
             if r != p && r != q {
-                let mrp = matrix[r][p];
-                let mrq = matrix[r][q];
-                matrix[r][p] = mrp - s * (mrq + tau * mrp);
-                matrix[p][r] = matrix[r][p];
-                matrix[r][q] = mrq + s * (mrp - tau * mrq);
-                matrix[q][r] = matrix[r][q];
+                let mrp = row[p];
+                let mrq = row[q];
+                row[p] = mrp - s * (mrq + tau * mrp);
+                row[q] = mrq + s * (mrp - tau * mrq);
             }
         }
+        matrix[p][0] = matrix[0][p];
+        matrix[p][1] = matrix[1][p];
+        matrix[p][2] = matrix[2][p];
+        matrix[q][0] = matrix[0][q];
+        matrix[q][1] = matrix[1][q];
+        matrix[q][2] = matrix[2][q];
 
         for row in &mut vectors {
             let vrp = row[p];

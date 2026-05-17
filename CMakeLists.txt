@@ -304,6 +304,7 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${UTFCPP_LIB_NAME}
         ${BACKTRACE_LIBRARIES}
         ${RUST_CAPI_LIB}
+        "/Users/claywarren/PDAL/.pixi/envs/dev/lib/libgeos_c.dylib"
        "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     PUBLIC
         ${WINSOCK_LIBRARY}

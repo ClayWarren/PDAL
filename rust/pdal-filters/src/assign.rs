@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct AssignRange {
@@ -109,8 +109,9 @@ impl Filter for AssignFilter {
 }
 
 impl Streamable for AssignFilter {
-    fn process_one(&mut self) -> bool {
-        false
+    fn process_one(&mut self, view: &mut PointView, idx: PointId) -> bool {
+        self.assign_point(view, idx);
+        true
     }
 
     fn reset(&mut self) {}

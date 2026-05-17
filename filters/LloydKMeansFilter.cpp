@@ -34,9 +34,9 @@
 
 #include "LloydKMeansFilter.hpp"
 
-#include "private/Segmentation.hpp"
+#include "private/RustViewConverter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -91,75 +91,21 @@ void LloydKMeansFilter::prepared(PointTableRef table)
 
 void LloydKMeansFilter::filter(PointView& view)
 {
-    if (!view.size() || (view.size() < m_k))
-        return;
-
-    // come up with k random samples for initial cluster centers (based on
-    // spatial farthest point sampling)
-    PointIdList ids = Segmentation::farthestPointSampling(view, m_k);
-
-    // setup table with at least XYZ as required by KDIndex, plus any
-    // additional dimensions as specified via filter options
-    ColumnPointTable table;
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z});
-    table.layout()->registerDims(m_dimIdList);
-    table.finalize();
-
-    // create view of initial cluster centers
-    PointViewPtr centers(new PointView(table));
-    PointId i(0);
-    for (auto const& id : ids)
+    std::vector<std::string> dims;
+    std::vector<const char*> dimNames;
+    for (auto dim : m_dimIdList)
     {
-        centers->setField(Id::X, i, view.getFieldAs<double>(Id::X, id));
-        centers->setField(Id::Y, i, view.getFieldAs<double>(Id::Y, id));
-        centers->setField(Id::Z, i, view.getFieldAs<double>(Id::Z, id));
-        for (auto const& dimid : m_dimIdList)
-        {
-            centers->setField(dimid, i, view.getFieldAs<double>(dimid, id));
-        }
-        i++;
+        dims.push_back(view.layout()->dimName(dim));
+        dimNames.push_back(dims.back().c_str());
     }
 
-    // construct KDFlexIndex for nearest neighbor search
-    KDFlexIndex kdi(*centers, m_dimIdList);
-    kdi.build();
+    pdal_stage_t* stage = pdal_stage_create_lloydkmeans(
+        m_k, m_maxiters, dimNames.data(), dimNames.size());
+    if (!stage)
+        throwError("Failed to create Rust Lloyd K-means stage.");
 
-    // update cluster centers through specified number of iterations
-    for (int iter = 0; iter < m_maxiters; ++iter)
-    {
-        // initialize mean and count for each cluster
-        std::vector<std::vector<double>> M1(m_dimIdList.size(),
-                                            std::vector<double>(m_k, 0.0));
-        std::vector<point_count_t> cnt(m_k, 0);
-
-        // for every point, find closest cluster center and assign ClusterID
-        for (PointRef p : view)
-        {
-            PointId q = kdi.neighbor(p);
-            p.setField(Id::ClusterID, q);
-
-            // update cluster size and mean
-            cnt[q]++;
-            point_count_t n(cnt[q]);
-            for (size_t i = 0; i < m_dimIdList.size(); ++i)
-            {
-                double delta = p.getFieldAs<double>(m_dimIdList[i]) - M1[i][q];
-                double delta_n = delta / n;
-                M1[i][q] += delta_n;
-            }
-        }
-
-        // adjust clusters based on newly added points
-        for (PointId id = 0; id < m_k; ++id)
-        {
-            for (size_t i = 0; i < m_dimIdList.size(); ++i)
-            {
-                centers->setField(m_dimIdList[i], id, M1[i][id]);
-            }
-        }
-        centers->invalidateProducts();
-        centers->build3dIndex();
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

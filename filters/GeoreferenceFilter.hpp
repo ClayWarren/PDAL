@@ -38,6 +38,9 @@
 #include <pdal/pdal_internal.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+struct pdal_stage;
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 namespace georeference
@@ -45,6 +48,7 @@ namespace georeference
 class TransformationFilter;
 class LocalCartesian;
 } // namespace georeference
+
 class PDAL_EXPORT GeoreferenceFilter : public Filter, public Streamable
 {
 public:
@@ -62,10 +66,14 @@ private:
     bool processOne(PointRef& point) override;
     void filter(PointView& view) override;
     void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
 
     struct Config;
     std::unique_ptr<Config> m_config;
     std::unique_ptr<georeference::LocalCartesian> m_localCartesian;
+
+    // Rust stage instance
+    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

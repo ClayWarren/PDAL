@@ -50,7 +50,7 @@ class PDAL_EXPORT M3C2Filter : public Filter
     {
         double distance;
         double uncertainty;
-        double significant;
+        bool significant;
         double stdDev1;
         double stdDev2;
         int n1;
@@ -89,14 +89,10 @@ private:
 
     Eigen::Vector3d findNormal(Eigen::Vector3d pos, const PointGrid& grid);
 
-    bool calcStats(const std::vector<double>& dists1,
-                   const std::vector<double>& dists2, Stats& stats);
-    std::vector<double> filterPoints(Eigen::Vector3d cylCenter,
-                                     Eigen::Vector3d cylNormal,
-                                     const PointView& ids,
-                                     const PointIdList& neighbors);
-    double pointPasses(Eigen::Vector3d point, Eigen::Vector3d cylCenter,
-                       Eigen::Vector3d cylNormal);
+    bool calcStats(Eigen::Vector3d cylCenter, Eigen::Vector3d cylNormal,
+                   const PointView& view1, const PointIdList& neighbors1,
+                   const PointView& view2, const PointIdList& neighbors2,
+                   Stats& stats);
 
     std::unique_ptr<M3C2Filter::Args> m_args;
 

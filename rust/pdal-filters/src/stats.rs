@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::collections::HashMap;
 
@@ -168,7 +168,7 @@ impl Filter for StatsFilter {
 }
 
 impl Streamable for StatsFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
 

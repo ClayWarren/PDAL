@@ -34,9 +34,12 @@
 
 #include "NeighborClassifierFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
 #include <pdal/KDIndex.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 
@@ -175,28 +178,41 @@ PointViewPtr NeighborClassifierFilter::loadSet(const std::string& filename,
 
 void NeighborClassifierFilter::filter(PointView& view)
 {
-    PointRef point_src(view, 0);
     if (m_candidateFile.empty())
-    { // No candidate file so NN comes from src file
-        KD3Index& kdiSrc = view.build3dIndex();
-        PointRef point_nn(view, 0);
-        for (PointId id = 0; id < view.size(); ++id)
+    {
+        std::vector<std::string> domainNames;
+        std::vector<pdal_range_limit_t> domain;
+        domainNames.reserve(m_domain.size());
+        domain.reserve(m_domain.size());
+        for (DimRange& range : m_domain)
         {
-            point_src.setPointId(id);
-            doOne(point_src, point_nn, kdiSrc);
+            domainNames.push_back(view.layout()->dimName(range.m_id));
+            domain.push_back({domainNames.back().c_str(), range.m_lower_bound,
+                              range.m_upper_bound,
+                              range.m_inclusive_lower_bound,
+                              range.m_inclusive_upper_bound, range.m_negate});
         }
+
+        const std::string dimName = view.layout()->dimName(m_dimId);
+        pdal_stage_t* stage = pdal_stage_create_neighborclassifier(
+            m_k, dimName.c_str(), domain.data(), domain.size());
+        if (!stage)
+            throwError("Failed to create Rust neighborclassifier stage.");
+
+        rust_view_converter::runInPlace(stage, view);
+        pdal_stage_destroy(stage);
+        return;
     }
-    else
-    { // NN comes from candidate file
-        ColumnPointTable candTable;
-        PointViewPtr candView = loadSet(m_candidateFile, candTable);
-        KD3Index& kdiCand = candView->build3dIndex();
-        PointRef point_nn(*candView, 0);
-        for (PointId id = 0; id < view.size(); ++id)
-        {
-            point_src.setPointId(id);
-            doOne(point_src, point_nn, kdiCand);
-        }
+
+    PointRef point_src(view, 0);
+    ColumnPointTable candTable;
+    PointViewPtr candView = loadSet(m_candidateFile, candTable);
+    KD3Index& kdiCand = candView->build3dIndex();
+    PointRef point_nn(*candView, 0);
+    for (PointId id = 0; id < view.size(); ++id)
+    {
+        point_src.setPointId(id);
+        doOne(point_src, point_nn, kdiCand);
     }
 
     for (auto& [pointId, classification] : m_newClass)

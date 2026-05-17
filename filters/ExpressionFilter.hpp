@@ -37,9 +37,11 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
-#include <map>
 #include <memory>
 #include <string>
+
+struct pdal_stage; // forward declaration for Rust stage
+typedef struct pdal_stage pdal_stage_t;
 
 namespace pdal
 {
@@ -57,7 +59,12 @@ public:
 private:
     std::unique_ptr<Args> m_args;
 
+    // Rust stage instance
+    pdal_stage_t* m_rust_stage = nullptr;
+
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void ready(PointTableRef table) override;
     void prepared(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     PointViewSet run(PointViewPtr view) override;

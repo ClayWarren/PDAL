@@ -1,4 +1,4 @@
-use pdal_core::point::PointView;
+use pdal_core::point::{PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct HeadFilter {
@@ -51,7 +51,7 @@ impl Filter for HeadFilter {
 }
 
 impl Streamable for HeadFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         let mut keep = false;
         if self.index < self.count {
             keep = true;

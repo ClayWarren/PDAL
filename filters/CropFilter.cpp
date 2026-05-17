@@ -47,6 +47,9 @@
 
 #include <cstdarg>
 #include <sstream>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -83,7 +86,11 @@ std::string CropFilter::getName() const
 
 CropFilter::CropFilter() : m_args(new CropArgs) {}
 
-CropFilter::~CropFilter() {}
+CropFilter::~CropFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 void CropFilter::addArgs(ProgramArgs& args)
 {
@@ -133,235 +140,87 @@ void CropFilter::initialize()
         m_boxes.push_back(bound);
 
     m_distance2 = m_args->m_distance * m_args->m_distance;
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    std::vector<pdal_box3d_t> bounds;
+    for (auto const& b : m_boxes)
+    {
+        bounds.push_back({b.to3d().minx, b.to3d().miny, b.to3d().minz, b.to3d().maxx, b.to3d().maxy, b.to3d().maxz});
+    }
+
+    std::vector<std::string> polys_wkt;
+    for (auto const& g : m_geoms)
+        polys_wkt.push_back(g.m_poly.wkt());
+
+    std::vector<const char*> polys;
+    for (auto const& s : polys_wkt)
+        polys.push_back(s.c_str());
+
+    std::vector<pdal_point3d_t> centers;
+    for (auto const& c : m_args->m_centers)
+        centers.push_back({c.x(), c.y(), c.z()});
+
+    m_rust_stage = pdal_stage_create_crop(
+        m_args->m_cropOutside,
+        bounds.data(),
+        bounds.size(),
+        polys.data(),
+        polys.size(),
+        centers.data(),
+        centers.size(),
+        m_args->m_distance);
+    
+    if (!m_rust_stage)
+    {
+        std::string err = pdal_last_error();
+        if (!err.empty())
+            throwError(err);
+    }
 }
 
 void CropFilter::ready(PointTableRef table)
 {
-    // If the user didn't provide an SRS, take one from the table.
-    if (m_args->m_assignedSrs.empty())
-    {
-        m_args->m_assignedSrs = table.anySpatialReference();
-        if (!table.spatialReferenceUnique())
-            log()->get(LogLevel::Warning)
-                << "Can't determine spatial "
-                   "reference for provided bounds.  Consider using 'a_srs' "
-                   "option.\n";
-    }
-    for (auto& geom : m_geoms)
-        geom.m_poly.setSpatialReference(m_args->m_assignedSrs);
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 bool CropFilter::processOne(PointRef& point)
 {
-    for (auto& g : m_geoms)
-        for (auto& gridPnp : g.m_gridPnps)
-            if (crop(point, *gridPnp))
-                return true;
-
-    for (auto& box : m_boxes)
-        if (box.is3d())
-        {
-            if (crop(point, box.to3d()))
-                return true;
-        }
-        else
-        {
-            if (crop(point, box.to2d()))
-                return true;
-        }
-
-    for (auto& center : m_args->m_centers)
-        if (crop(point, center))
-            return true;
-
+    if (m_rust_stage)
+    {
+        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+    }
     return false;
 }
 
 void CropFilter::spatialReferenceChanged(const SpatialReference& srs)
 {
-    transform(srs);
 }
 
 void CropFilter::transform(const SpatialReference& srs)
 {
-    for (auto& geom : m_geoms)
-    {
-        auto ok = geom.m_poly.transform(srs);
-        if (!ok)
-            throwError(ok.what());
-        geom.m_gridPnps.clear();
-        std::vector<Polygon> polys = geom.m_poly.polygons();
-        for (auto& p : polys)
-        {
-            std::unique_ptr<GridPnp> gridPnp(
-                new GridPnp(p.exteriorRing(), p.interiorRings()));
-            geom.m_gridPnps.push_back(std::move(gridPnp));
-        }
-    }
-
-    // If we don't have any SRS, do nothing.
-    if (srs.empty() && m_args->m_assignedSrs.empty())
-        return;
-
-    // Note that we should never have assigned SRS empty here since
-    // if it is missing we assign it from the point data.
-    assert(!m_args->m_assignedSrs.empty());
-    if (srs.empty() || m_args->m_assignedSrs.empty())
-        throwError(
-            "Unable to transform crop geometry to point coordinate system.");
-
-    for (auto& box : m_boxes)
-    {
-        if (!gdal::reprojectBounds(box, m_args->m_assignedSrs.getWKT(),
-                                   srs.getWKT()))
-            throwError("Unable to reproject bounds.");
-    }
-    for (auto& point : m_args->m_centers)
-    {
-        point.setSpatialReference(m_args->m_assignedSrs);
-        auto ok = point.transform(srs);
-        if (!ok)
-            throwError(ok.what());
-    }
-    // Set the assigned SRS for the points/bounds to the one we've
-    // transformed to.
-    m_args->m_assignedSrs = srs;
 }
 
 PointViewSet CropFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
-
-    transform(view->spatialReference());
-    for (auto& geom : m_geoms)
+    if (m_rust_stage)
     {
-        PointViewPtr outView = view->makeNew();
-        crop(geom, *view, *outView);
-        viewSet.insert(outView);
+        viewSet.insert(rust_view_converter::runSingle(m_rust_stage, view));
     }
-
-    for (auto& box : m_boxes)
-    {
-        PointViewPtr outView = view->makeNew();
-        crop(box, *view, *outView);
-        viewSet.insert(outView);
-    }
-
-    for (auto& point : m_args->m_centers)
-    {
-        PointViewPtr outView = view->makeNew();
-        crop(point, *view, *outView);
-        viewSet.insert(outView);
-    }
-
     return viewSet;
 }
 
-bool CropFilter::crop(const PointRef& point, const BOX3D& box)
-{
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    double z = point.getFieldAs<double>(Dimension::Id::Z);
-
-    // Return true if we're keeping a point.
-    return (m_args->m_cropOutside != box.contains(x, y, z));
-}
-
-bool CropFilter::crop(const PointRef& point, const BOX2D& box)
-{
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-
-    // Return true if we're keeping a point.
-    return (m_args->m_cropOutside != box.contains(x, y));
-}
-
-void CropFilter::crop(const Bounds& box, PointView& input, PointView& output)
-{
-    bool is3d = box.is3d();
-    if (is3d)
-        crop(box.to3d(), input, output);
-    else
-        crop(box.to2d(), input, output);
-}
-
-void CropFilter::crop(const BOX3D& box, PointView& input, PointView& output)
-{
-    PointRef point = input.point(0);
-    for (PointId idx = 0; idx < input.size(); ++idx)
-    {
-        point.setPointId(idx);
-        if (crop(point, box))
-            output.appendPoint(input, idx);
-    }
-}
-
-void CropFilter::crop(const BOX2D& box, PointView& input, PointView& output)
-{
-    PointRef point = input.point(0);
-    for (PointId idx = 0; idx < input.size(); ++idx)
-    {
-        point.setPointId(idx);
-        if (crop(point, box))
-            output.appendPoint(input, idx);
-    }
-}
-
-bool CropFilter::crop(const PointRef& point, GridPnp& g)
-{
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    return (m_args->m_cropOutside != g.inside(x, y));
-}
-
-void CropFilter::crop(const ViewGeom& g, PointView& input, PointView& output)
-{
-    PointRef point = input.point(0);
-    for (auto& gridPnp : g.m_gridPnps)
-    {
-        for (PointId idx = 0; idx < input.size(); ++idx)
-        {
-            point.setPointId(idx);
-            if (crop(point, const_cast<GridPnp&>(*gridPnp)))
-                output.appendPoint(input, idx);
-        }
-    }
-}
-
-bool CropFilter::crop(const PointRef& point, const filter::Point& center)
-{
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-
-    x = std::abs(x - center.x());
-    y = std::abs(y - center.y());
-    if (x > m_args->m_distance || y > m_args->m_distance)
-        return (m_args->m_cropOutside);
-
-    bool inside;
-    if (center.is3d())
-    {
-        double z = point.getFieldAs<double>(Dimension::Id::Z);
-        z = std::abs(z - center.z());
-        if (z > m_args->m_distance)
-            return (m_args->m_cropOutside);
-        inside = (x * x + y * y + z * z < m_distance2);
-    }
-    else
-        inside = (x * x + y * y < m_distance2);
-    return (m_args->m_cropOutside != inside);
-}
-
-void CropFilter::crop(const filter::Point& center, PointView& input,
-                      PointView& output)
-{
-    PointRef point = input.point(0);
-    for (PointId idx = 0; idx < input.size(); ++idx)
-    {
-        point.setPointId(idx);
-        if (crop(point, center))
-            output.appendPoint(input, idx);
-    }
-}
+bool CropFilter::crop(const PointRef& point, const BOX3D& box) { return false; }
+bool CropFilter::crop(const PointRef& point, const BOX2D& box) { return false; }
+void CropFilter::crop(const Bounds& box, PointView& input, PointView& output) {}
+void CropFilter::crop(const BOX3D& box, PointView& input, PointView& output) {}
+void CropFilter::crop(const BOX2D& box, PointView& input, PointView& output) {}
+bool CropFilter::crop(const PointRef& point, GridPnp& g) { return false; }
+void CropFilter::crop(const ViewGeom& g, PointView& input, PointView& output) {}
+bool CropFilter::crop(const PointRef& point, const filter::Point& center) { return false; }
+void CropFilter::crop(const filter::Point& center, PointView& input, PointView& output) {}
 
 } // namespace pdal

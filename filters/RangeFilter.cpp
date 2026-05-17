@@ -113,6 +113,8 @@ void RangeFilter::prepared(PointTableRef table)
 // common case.
 bool RangeFilter::processOne(PointRef& point)
 {
+    if (m_rust_stage)
+        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
     return DimRange::pointPasses(m_ranges, point);
 }
 

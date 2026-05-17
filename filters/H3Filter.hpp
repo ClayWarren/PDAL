@@ -41,6 +41,9 @@
 #include <memory>
 #include <string>
 
+struct pdal_stage;
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -59,7 +62,12 @@ public:
 private:
     std::unique_ptr<Args> m_args;
 
+    // Rust stage instance
+    pdal_stage_t* m_rust_stage = nullptr;
+
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     void addDimensions(PointLayoutPtr layout) override;
     void spatialReferenceChanged(const SpatialReference& srs) override;

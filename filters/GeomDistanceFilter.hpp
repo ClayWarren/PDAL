@@ -40,6 +40,9 @@
 #include <memory>
 #include <string>
 
+struct pdal_stage;
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -70,6 +73,9 @@ private:
 
     GeomDistanceFilter& operator=(const GeomDistanceFilter&) = delete;
     GeomDistanceFilter(const GeomDistanceFilter&) = delete;
+
+    // Rust stage instance
+    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

@@ -34,8 +34,11 @@
 
 #include "IQRFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
+#include <pdal_capi.h>
+
 #include <string>
-#include <vector>
 
 namespace pdal
 {
@@ -68,45 +71,13 @@ void IQRFilter::prepared(PointTableRef table)
 
 PointViewSet IQRFilter::run(PointViewPtr view)
 {
-    using namespace Dimension;
-
-    PointViewPtr output = view->makeNew();
-
-    auto quartile = [](std::vector<double> vals, double percent)
-    {
-        std::nth_element(vals.begin(),
-                         vals.begin() + int(vals.size() * percent), vals.end());
-
-        return *(vals.begin() + int(vals.size() * percent));
-    };
-
-    std::vector<double> z(view->size());
-    for (PointId j = 0; j < view->size(); ++j)
-        z[j] = view->getFieldAs<double>(m_dimId, j);
-
-    double pc25 = quartile(z, 0.25);
-    log()->get(LogLevel::Debug) << "25th percentile: " << pc25 << '\n';
-
-    double pc75 = quartile(z, 0.75);
-    log()->get(LogLevel::Debug) << "75th percentile: " << pc75 << '\n';
-
-    double iqr = pc75 - pc25;
-    log()->get(LogLevel::Debug) << "IQR: " << iqr << '\n';
-
-    double low_fence = pc25 - m_multiplier * iqr;
-    double hi_fence = pc75 + m_multiplier * iqr;
-
-    for (PointId j = 0; j < view->size(); ++j)
-    {
-        double val = view->getFieldAs<double>(m_dimId, j);
-        if (val > low_fence && val < hi_fence)
-            output->appendPoint(*view, j);
-    }
-    log()->get(LogLevel::Debug) << "Cropping " << m_dimName << " in the range ("
-                                << low_fence << "," << hi_fence << ")" << '\n';
-
+    pdal_stage_t* stage = pdal_stage_create_iqr(
+        m_multiplier, view->layout()->dimName(m_dimId).c_str());
+    if (!stage)
+        throwError("Failed to create Rust IQR stage.");
     PointViewSet viewSet;
-    viewSet.insert(output);
+    viewSet.insert(rust_view_converter::runSingle(stage, view));
+    pdal_stage_destroy(stage);
     return viewSet;
 }
 

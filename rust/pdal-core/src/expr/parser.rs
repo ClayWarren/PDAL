@@ -7,8 +7,8 @@
 //! one [`Parser`] with a [`Mode`] selecting the top-level grammar.
 
 use super::ast::{
-    BinMathNode, BoolFunc1, BoolFuncNode, BoolNode, CompareNode, ConstLogicalNode,
-    ConstValueNode, Expression, Func1, FuncNode, NodeType, NotNode, UnMathNode, VarNode,
+    BinMathNode, BoolFunc1, BoolFuncNode, BoolNode, CompareNode, ConstLogicalNode, ConstValueNode,
+    Expression, Func1, FuncNode, NodeType, NotNode, UnMathNode, VarNode,
 };
 use super::lexer::Lexer;
 use super::token::{Token, TokenType};
@@ -59,8 +59,7 @@ fn is_min(d: f64) -> bool {
 }
 
 /// Predicate functions of one argument, by name (PDAL's logical-function set).
-const BOOL_FUNCS: &[(&str, BoolFunc1)] =
-    &[("isnan", is_nan), ("ismax", is_max), ("ismin", is_min)];
+const BOOL_FUNCS: &[(&str, BoolFunc1)] = &[("isnan", is_nan), ("ismax", is_max), ("ismin", is_min)];
 
 /// Parse `text` as a conditional (boolean-valued) expression.
 pub fn parse_conditional(text: &str) -> Result<Expression, String> {
@@ -75,9 +74,7 @@ pub fn parse_math(text: &str) -> Result<Expression, String> {
 /// Parse `text` as an assignment statement, returning its three component
 /// expressions: the target identifier, the value expression, and the
 /// (possibly empty) `WHERE` condition.
-pub fn parse_assign_parts(
-    text: &str,
-) -> Result<(Expression, Expression, Expression), String> {
+pub fn parse_assign_parts(text: &str) -> Result<(Expression, Expression, Expression), String> {
     let mut parser = Parser::new(text, Mode::Math);
     let mut ident = Expression::new();
     let mut value = Expression::new();
@@ -200,10 +197,7 @@ impl Parser {
                 _ => {
                     if left.is_bool() || right.is_bool() {
                         let op = self.cur_sval();
-                        self.set_error(format!(
-                            "Can't apply '{}' to logical expression.",
-                            op
-                        ));
+                        self.set_error(format!("Can't apply '{}' to logical expression.", op));
                         return false;
                     }
                     expr.push_node(Box::new(BinMathNode::new(ty, left, right)));
@@ -247,10 +241,7 @@ impl Parser {
                 _ => {
                     if left.is_bool() || right.is_bool() {
                         let op = self.cur_sval();
-                        self.set_error(format!(
-                            "Can't apply '{}' to logical expression.",
-                            op
-                        ));
+                        self.set_error(format!("Can't apply '{}' to logical expression.", op));
                         return false;
                     }
                     expr.push_node(Box::new(BinMathNode::new(ty, left, right)));
@@ -382,10 +373,7 @@ impl Parser {
         }
         if !self.accept(TokenType::Rparen) {
             let cur = self.cur_sval();
-            self.set_error(format!(
-                "Expected ')' following expression at '{}'.",
-                cur
-            ));
+            self.set_error(format!("Expected ')' following expression at '{}'.", cur));
             return false;
         }
         true
@@ -474,10 +462,7 @@ impl Parser {
             return true;
         }
         let cur = self.cur_sval();
-        self.set_error(format!(
-            "Expected logical expression following '{}'.",
-            cur
-        ));
+        self.set_error(format!("Expected logical expression following '{}'.", cur));
         false
     }
 
@@ -522,10 +507,7 @@ impl Parser {
                 _ => {
                     if left.is_bool() || right.is_bool() {
                         let op = self.cur_sval();
-                        self.set_error(format!(
-                            "Can't apply '{}' to logical expression.",
-                            op
-                        ));
+                        self.set_error(format!("Can't apply '{}' to logical expression.", op));
                         return false;
                     }
                     expr.push_node(Box::new(CompareNode::new(ty, left, right)));
@@ -590,8 +572,7 @@ impl Parser {
         }
         let next = self.peek();
         let at_end = next.ty() == TokenType::Eof
-            || (next.ty() == TokenType::Identifier
-                && next.sval().eq_ignore_ascii_case("WHERE"));
+            || (next.ty() == TokenType::Identifier && next.sval().eq_ignore_ascii_case("WHERE"));
         if !at_end {
             self.set_error(format!(
                 "Invalid token '{}' following valid math expression",
@@ -607,9 +588,7 @@ impl Parser {
         if self.accept(TokenType::Eof) {
             return true;
         }
-        if self.accept(TokenType::Identifier)
-            && self.cur_tok.sval().eq_ignore_ascii_case("WHERE")
-        {
+        if self.accept(TokenType::Identifier) && self.cur_tok.sval().eq_ignore_ascii_case("WHERE") {
             self.mode = Mode::Conditional;
             return self.orexpr(cond);
         }
@@ -676,11 +655,7 @@ mod tests {
 
     #[test]
     fn conditional_logic_and_precedence() {
-        let view = point(&[
-            (DimId::X, 5.0),
-            (DimId::Y, 1.0),
-            (DimId::Z, 0.0),
-        ]);
+        let view = point(&[(DimId::X, 5.0), (DimId::Y, 1.0), (DimId::Z, 0.0)]);
         assert!(eval_cond("X > 0 && Y < 10", &view));
         assert!(!eval_cond("X > 0 && Y > 10", &view));
         assert!(eval_cond("X > 100 || Y < 10", &view));

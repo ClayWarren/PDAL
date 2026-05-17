@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,7 +81,7 @@ impl Filter for SortFilter {
 }
 
 impl Streamable for SortFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
 

@@ -1,4 +1,4 @@
-﻿/******************************************************************************
+/******************************************************************************
  * Copyright (c) 2019, Aurelien Vila (aurelien.vila@delair.aero)
  *
  * All rights reserved.
@@ -39,6 +39,9 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include <ogr_spatialref.h>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -58,7 +61,11 @@ std::string ProjPipelineFilter::getName() const
 
 ProjPipelineFilter::ProjPipelineFilter() {}
 
-ProjPipelineFilter::~ProjPipelineFilter() {}
+ProjPipelineFilter::~ProjPipelineFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 void ProjPipelineFilter::addArgs(ProgramArgs& args)
 {
@@ -77,46 +84,53 @@ void ProjPipelineFilter::addArgs(ProgramArgs& args)
 void ProjPipelineFilter::initialize()
 {
     setSpatialReference(m_outSRS);
-    createTransform(m_coordOperation, m_reverseTransfo);
+    
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+    
+    m_rust_stage = pdal_stage_create_projpipeline(
+        m_outSRS.getWKT().c_str(),
+        m_coordOperation.c_str(),
+        m_reverseTransfo);
+    
+    if (!m_rust_stage)
+    {
+        std::string err = pdal_last_error();
+        if (!err.empty())
+            throwError(err);
+    }
+}
+
+void ProjPipelineFilter::ready(PointTableRef table)
+{
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 void ProjPipelineFilter::createTransform(const std::string coordOperation,
                                          bool reverseTransfo)
 {
-    m_coordTransform.reset(new CoordTransform(coordOperation, reverseTransfo));
 }
 
 PointViewSet ProjPipelineFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
-    PointViewPtr outView = view->makeNew();
-
-    PointRef point(*view, 0);
-    for (PointId id = 0; id < view->size(); ++id)
+    if (m_rust_stage)
     {
-        point.setPointId(id);
-        if (processOne(point))
-            outView->appendPoint(*view, id);
+        pdal_point_view_set_spatial_reference((pdal_point_view_t*)view.get(), view->spatialReference().getWKT().c_str());
+        viewSet.insert(rust_view_converter::runSingle(m_rust_stage, view));
     }
-
-    viewSet.insert(outView);
     return viewSet;
 }
 
 bool ProjPipelineFilter::processOne(PointRef& point)
 {
-    double x(point.getFieldAs<double>(Dimension::Id::X));
-    double y(point.getFieldAs<double>(Dimension::Id::Y));
-    double z(point.getFieldAs<double>(Dimension::Id::Z));
-
-    bool ok = m_coordTransform->transform(x, y, z);
-    if (ok)
+    if (m_rust_stage)
     {
-        point.setField(Dimension::Id::X, x);
-        point.setField(Dimension::Id::Y, y);
-        point.setField(Dimension::Id::Z, z);
+        pdal_point_view_set_spatial_reference((pdal_point_view_t*)point.view(), point.view()->spatialReference().getWKT().c_str());
+        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
     }
-    return ok;
+    return false;
 }
 
 ProjPipelineFilter::CoordTransform::CoordTransform() {}
@@ -124,19 +138,12 @@ ProjPipelineFilter::CoordTransform::CoordTransform() {}
 ProjPipelineFilter::CoordTransform::CoordTransform(
     const std::string coordOperation, bool reverseTransfo)
 {
-    OGRCoordinateTransformationOptions coordTransfoOptions;
-    coordTransfoOptions.SetCoordinateOperation(coordOperation.c_str(),
-                                               reverseTransfo);
-    OGRSpatialReference nullSrs("");
-    m_transform.reset(OGRCreateCoordinateTransformation(&nullSrs, &nullSrs,
-                                                        coordTransfoOptions));
 }
 
 bool ProjPipelineFilter::CoordTransform::transform(double& x, double& y,
                                                    double& z)
 {
-
-    return m_transform && m_transform->Transform(1, &x, &y, &z);
+    return false;
 }
 
 } // namespace pdal

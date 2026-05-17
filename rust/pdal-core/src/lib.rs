@@ -5,7 +5,10 @@
 //! run a single ported filter end to end. See `rust/README.md` for scope.
 
 pub mod expr;
+pub mod gdal;
+pub mod geometry;
 pub mod options;
 pub mod point;
 pub mod spatial;
+pub mod srs;
 pub mod stage;

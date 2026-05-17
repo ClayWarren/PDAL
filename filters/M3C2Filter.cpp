@@ -40,6 +40,7 @@
 
 #include "private/Comparison.hpp"
 #include <pdal/private/MathUtils.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -219,9 +220,6 @@ void M3C2Filter::done(PointTableRef _)
 
     for (PointRef ref : *m_p->cores)
     {
-        PointIdList pts1;
-        PointIdList pts2;
-
         Eigen::Vector3d core(ref.getFieldAs<double>(Dimension::Id::X),
                              ref.getFieldAs<double>(Dimension::Id::Y),
                              ref.getFieldAs<double>(Dimension::Id::Z));
@@ -247,14 +245,11 @@ void M3C2Filter::done(PointTableRef _)
         box.grow(c3(0), c3(1));
         box.grow(c4(0), c4(1));
 
-        PointIdList pts = g1.findNeighbors(box);
-        std::vector<double> dists1 = filterPoints(core, normal, g1.view(), pts);
-
-        pts = g2.findNeighbors(box);
-        std::vector<double> dists2 = filterPoints(core, normal, g2.view(), pts);
+        PointIdList pts1 = g1.findNeighbors(box);
+        PointIdList pts2 = g2.findNeighbors(box);
 
         Stats stats;
-        if (calcStats(dists1, dists2, stats))
+        if (calcStats(core, normal, g1.view(), pts1, g2.view(), pts2, stats))
         {
             ref.setField(m_p->distanceDim, stats.distance);
             ref.setField(m_p->uncertaintyDim, stats.uncertainty);
@@ -275,103 +270,62 @@ Eigen::Vector3d M3C2Filter::findNormal(Eigen::Vector3d pos,
     return res.normal;
 }
 
-bool M3C2Filter::calcStats(const std::vector<double>& pts1,
-                           const std::vector<double>& pts2, Stats& stats)
+bool M3C2Filter::calcStats(Eigen::Vector3d cylCenter, Eigen::Vector3d cylNormal,
+                           const PointView& view1,
+                           const PointIdList& neighbors1,
+                           const PointView& view2,
+                           const PointIdList& neighbors2, Stats& stats)
 {
-    if ((int)pts1.size() < m_args->minPoints ||
-        (int)pts2.size() < m_args->minPoints)
+    auto collect = [](const PointView& view, const PointIdList& ids)
+    {
+        std::vector<double> values;
+        values.reserve(ids.size() * 3);
+        for (PointId id : ids)
+        {
+            values.push_back(view.getFieldAs<double>(Dimension::Id::X, id));
+            values.push_back(view.getFieldAs<double>(Dimension::Id::Y, id));
+            values.push_back(view.getFieldAs<double>(Dimension::Id::Z, id));
+        }
+        return values;
+    };
+
+    const std::vector<double> pts1 = collect(view1, neighbors1);
+    const std::vector<double> pts2 = collect(view2, neighbors2);
+    const double center[3] = {cylCenter(0), cylCenter(1), cylCenter(2)};
+    const double normal[3] = {cylNormal(0), cylNormal(1), cylNormal(2)};
+    const bool skipFirst1 =
+        view1.size() &&
+        Comparison::closeEnough(
+            cylCenter(0), view1.getFieldAs<double>(Dimension::Id::X, 0)) &&
+        Comparison::closeEnough(
+            cylCenter(1), view1.getFieldAs<double>(Dimension::Id::Y, 0)) &&
+        Comparison::closeEnough(cylCenter(2),
+                                view1.getFieldAs<double>(Dimension::Id::Z, 0));
+    const bool skipFirst2 =
+        view2.size() &&
+        Comparison::closeEnough(
+            cylCenter(0), view2.getFieldAs<double>(Dimension::Id::X, 0)) &&
+        Comparison::closeEnough(
+            cylCenter(1), view2.getFieldAs<double>(Dimension::Id::Y, 0)) &&
+        Comparison::closeEnough(cylCenter(2),
+                                view2.getFieldAs<double>(Dimension::Id::Z, 0));
+
+    pdal_m3c2_stats_t rustStats;
+    const bool ok = pdal_m3c2_compute_stats(
+        pts1.data(), neighbors1.size(), skipFirst1, pts2.data(),
+        neighbors2.size(), skipFirst2, center, normal, m_p->cylRadius2,
+        m_args->cylHalfLen, m_args->minPoints, m_args->regError, &rustStats);
+    if (!ok)
         return false;
 
-    // Set square distances to distances
-    double sum = 0;
-    double sum2 = 0;
-    for (double val : pts1)
-    {
-        sum += val;
-        sum2 += val * val;
-    }
-    double mean1 = sum / pts1.size();
-    // This is a bad variance calcuation from a computational standpoint.
-    double var1 = sum2 / pts1.size() - mean1 * mean1;
-
-    sum = 0;
-    sum2 = 0;
-    for (double val : pts2)
-    {
-        sum += val;
-        sum2 += val * val;
-    }
-    double mean2 = sum / pts2.size();
-    double var2 = sum2 / pts2.size() - mean2 * mean2;
-
-    double lodVar = var1 / pts1.size() + var2 / pts2.size();
-    double lod = 1.96 * (std::sqrt(lodVar) + m_args->regError);
-
-    stats.distance = mean2 - mean1;
-    stats.uncertainty = lod;
-    stats.significant = std::abs(stats.distance) > lod;
-    stats.stdDev1 = std::sqrt(var1);
-    stats.stdDev2 = std::sqrt(var2);
-    stats.n1 = pts1.size();
-    stats.n2 = pts2.size();
-
+    stats.distance = rustStats.distance;
+    stats.uncertainty = rustStats.uncertainty;
+    stats.significant = rustStats.significant;
+    stats.stdDev1 = rustStats.std_dev1;
+    stats.stdDev2 = rustStats.std_dev2;
+    stats.n1 = rustStats.n1;
+    stats.n2 = rustStats.n2;
     return true;
-}
-
-std::vector<double> M3C2Filter::filterPoints(Eigen::Vector3d cylCenter,
-                                             Eigen::Vector3d cylNormal,
-                                             const PointView& view,
-                                             const PointIdList& neighbors)
-{
-    std::vector<double> dists;
-
-    if (!neighbors.size())
-        return dists;
-    dists.reserve(neighbors.size());
-
-    Eigen::Vector3d point(view.getFieldAs<double>(Dimension::Id::X, 0),
-                          view.getFieldAs<double>(Dimension::Id::Y, 0),
-                          view.getFieldAs<double>(Dimension::Id::Z, 0));
-
-    size_t start = 0;
-    // If the first point is the test point, ignore it.
-    if (Comparison::closeEnough(cylCenter(0), point(0)) &&
-        Comparison::closeEnough(cylCenter(1), point(1)) &&
-        Comparison::closeEnough(cylCenter(2), point(2)))
-        start++;
-
-    for (size_t i = start; i < neighbors.size(); i++)
-    {
-        PointId id = neighbors[i];
-        Eigen::Vector3d point(view.getFieldAs<double>(Dimension::Id::X, id),
-                              view.getFieldAs<double>(Dimension::Id::Y, id),
-                              view.getFieldAs<double>(Dimension::Id::Z, id));
-
-        double dist = pointPasses(point, cylCenter, cylNormal);
-        if (!std::isnan(dist))
-            dists.push_back(dist);
-    }
-    return dists;
-}
-
-double M3C2Filter::pointPasses(Eigen::Vector3d point, Eigen::Vector3d cylCenter,
-                               Eigen::Vector3d cylNormal)
-{
-    // Calculate the distance from the point to the line that goes through the
-    // cylinder normal vector. Make sure it's less than the cylinder radius.
-    Eigen::ParametrizedLine<double, 3> line(cylCenter, cylNormal);
-    if (line.squaredDistance(point) > m_p->cylRadius2)
-        return std::numeric_limits<double>::quiet_NaN();
-
-    // Calculate the distance from the point to the plane that's parallel to the
-    // cylinder's end and goes through the cylinder "center" (our core point).
-    // Make sure that's less than the half length of the cylinder.
-    Eigen::Hyperplane<double, 3> plane(cylNormal, cylCenter);
-    double dist = plane.signedDistance(point);
-    if (std::abs(dist) > m_args->cylHalfLen)
-        return std::numeric_limits<double>::quiet_NaN();
-
-    return dist;
 }
 
 } // namespace pdal

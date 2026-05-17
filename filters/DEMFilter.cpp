@@ -39,6 +39,9 @@
 
 #include "private/DimRange.hpp"
 #include <pdal/private/gdal/Raster.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -59,7 +62,11 @@ struct DEMArgs
 
 DEMFilter::DEMFilter() : m_args(new DEMArgs) {}
 
-DEMFilter::~DEMFilter() {}
+DEMFilter::~DEMFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 std::string DEMFilter::getName() const
 {
@@ -77,60 +84,52 @@ void DEMFilter::addArgs(ProgramArgs& args)
     args.add("band", "Band number to filter (count from 1)", m_args->m_band, 1);
 }
 
+void DEMFilter::initialize()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+    
+    m_rust_stage = pdal_stage_create_dem(
+        m_args->m_range.m_name.c_str(),
+        m_args->m_raster.c_str(),
+        m_args->m_band,
+        m_args->m_range.m_lower_bound,
+        m_args->m_range.m_upper_bound);
+    
+    if (!m_rust_stage)
+    {
+        std::string err = pdal_last_error();
+        if (!err.empty())
+            throwError(err);
+    }
+}
+
 void DEMFilter::ready(PointTableRef table)
 {
-    m_raster.reset(new gdal::Raster(m_args->m_raster));
-    m_raster->open();
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 void DEMFilter::prepared(PointTableRef table)
 {
-    const PointLayoutPtr layout(table.layout());
-    m_args->m_dim = layout->findDim(m_args->m_range.m_name);
-    if (m_args->m_dim == Dimension::Id::Unknown)
-        throwError("Missing dimension with name '" + m_args->m_range.m_name +
-                   "'in input PointView.");
-    if (m_args->m_band <= 0)
-        throwError("Band must be greater than 0");
 }
 
 bool DEMFilter::processOne(PointRef& point)
 {
-    static std::vector<double> data;
-    static std::array<double, 2> pix;
-
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    double z = point.getFieldAs<double>(m_args->m_dim);
-
-    bool passes(false);
-
-    if (m_raster->read(x, y, data, pix) == gdal::GDALError::None)
+    if (m_rust_stage)
     {
-        double v = data[m_args->m_band - 1];
-        double lb = v - m_args->m_range.m_lower_bound;
-        double ub = v + m_args->m_range.m_upper_bound;
-
-        if (z >= lb && z <= ub)
-            passes = true;
+        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
     }
-    return passes;
+    return false;
 }
 
 PointViewSet DEMFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-
-    PointViewPtr outView = inView->makeNew();
-
-    for (PointId i = 0; i < inView->size(); ++i)
+    if (m_rust_stage)
     {
-        PointRef point = inView->point(i);
-        if (processOne(point))
-            outView->appendPoint(*inView, i);
+        viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     }
-
-    viewSet.insert(outView);
     return viewSet;
 }
 

@@ -51,6 +51,9 @@
 using OGRLayerH = void*;
 #endif
 
+struct pdal_stage;
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -79,6 +82,7 @@ class PDAL_EXPORT OverlayFilter : public Filter, public Streamable
 
 public:
     OverlayFilter() : m_ds(nullptr), m_lyr(nullptr) {}
+    ~OverlayFilter() override;
 
     std::string getName() const override
     {
@@ -108,6 +112,9 @@ private:
     std::vector<PolyVal> m_polygons;
     BOX2D m_bounds;
     int m_threads;
+
+    // Rust stage instance
+    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

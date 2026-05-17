@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct FarthestPointSamplingFilter {
@@ -92,7 +92,7 @@ impl Filter for FarthestPointSamplingFilter {
 }
 
 impl Streamable for FarthestPointSamplingFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
 

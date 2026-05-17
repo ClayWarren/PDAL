@@ -46,7 +46,11 @@ impl Filter for TailFilter {
 }
 
 impl pdal_core::stage::Streamable for TailFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(
+        &mut self,
+        _view: &mut pdal_core::point::PointView,
+        _idx: pdal_core::point::PointId,
+    ) -> bool {
         // Tail filter cannot stream
         false
     }

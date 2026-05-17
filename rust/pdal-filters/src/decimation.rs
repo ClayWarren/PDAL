@@ -1,5 +1,5 @@
 use pdal_core::options::Options;
-use pdal_core::point::PointView;
+use pdal_core::point::{PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct DecimationFilter {
@@ -59,7 +59,7 @@ impl Streamable for DecimationFilter {
         self.kept = 0;
     }
 
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         let expected = self.offset + (self.kept as f64 * self.step).round() as u64;
         let keep = self.index >= self.offset && self.index < self.limit && self.index == expected;
         if keep {

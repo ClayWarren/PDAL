@@ -1,6 +1,6 @@
 //! RangeFilter: Pass only points given a dimension/range.
 
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 #[derive(Clone)]
@@ -106,9 +106,8 @@ impl Filter for RangeFilter {
 }
 
 impl Streamable for RangeFilter {
-    fn process_one(&mut self) -> bool {
-        // Stateful point-by-point filtering is supported via point_passes in the C ABI
-        false
+    fn process_one(&mut self, view: &mut PointView, idx: PointId) -> bool {
+        self.point_passes(view, idx)
     }
 
     fn reset(&mut self) {}
