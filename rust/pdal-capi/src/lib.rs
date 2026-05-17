@@ -6,6 +6,7 @@
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
+use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::dbscan::DbscanFilter;
@@ -73,6 +74,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "NNDistance" => DimId::NNDistance,
         "Reciprocity" => DimId::Reciprocity,
         "Rank" => DimId::Rank,
+        "Coplanar" => DimId::Coplanar,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1117,6 +1119,21 @@ pub extern "C" fn pdal_stage_create_reciprocity(knn: u64) -> *mut StageWrapper {
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_estimaterank(knn: u64, threshold: f64) -> *mut StageWrapper {
     let filter = Box::new(EstimateRankFilter::new(knn as usize, threshold));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an approximate coplanar filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_approximatecoplanar(
+    knn: u64,
+    threshold1: f64,
+    threshold2: f64,
+) -> *mut StageWrapper {
+    let filter = Box::new(ApproximateCoplanarFilter::new(
+        knn as usize,
+        threshold1,
+        threshold2,
+    ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

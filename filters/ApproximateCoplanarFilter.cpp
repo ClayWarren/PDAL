@@ -34,11 +34,10 @@
 
 #include "ApproximateCoplanarFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
-#include <pdal/util/ProgramArgs.hpp>
+#include "private/RustViewConverter.hpp"
 
-#include <Eigen/Dense>
+#include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include <string>
 
@@ -46,8 +45,6 @@ namespace pdal
 {
 
 using namespace Dimension;
-using namespace Eigen;
-
 static StaticPluginInfo const s_info{
     "filters.approximatecoplanar",
     "Estimates the planarity of a neighborhood of points using eigenvalues.",
@@ -74,39 +71,13 @@ void ApproximateCoplanarFilter::addDimensions(PointLayoutPtr layout)
 
 void ApproximateCoplanarFilter::filter(PointView& view)
 {
-    const KD3Index& kdi = view.build3dIndex();
+    pdal_stage_t* stage =
+        pdal_stage_create_approximatecoplanar(m_knn, m_thresh1, m_thresh2);
+    if (!stage)
+        throwError("Failed to create Rust approximate coplanar stage.");
 
-    for (PointRef p : view)
-    {
-        // find the k-nearest neighbors
-        PointIdList ids = kdi.neighbors(p, m_knn);
-
-        // compute covariance of the neighborhood
-        Matrix3d B = math::computeCovariance(view, ids);
-
-        // Check if the covariance matrix is all zeros
-        if (B.isZero())
-        {
-            log()->get(LogLevel::Info)
-                << "Skipping point " << p.pointId()
-                << ". Covariance matrix is all zeros. This suggests a large "
-                   "number of redundant points. Consider using filters.sample "
-                   "with a small radius to remove redundant points.\n";
-            continue;
-        }
-
-        // perform the eigen decomposition
-        Eigen::SelfAdjointEigenSolver<Matrix3d> solver(B);
-        if (solver.info() != Eigen::Success)
-            throwError("Cannot perform eigen decomposition.");
-        Vector3d ev = solver.eigenvalues();
-
-        // test eigenvalues to label points that are approximately coplanar
-        if ((ev[1] > m_thresh1 * ev[0]) && (m_thresh2 * ev[1] > ev[2]))
-            p.setField(Id::Coplanar, 1u);
-        else
-            p.setField(Id::Coplanar, 0u);
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

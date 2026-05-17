@@ -29,6 +29,10 @@ pub fn covariance(view: &PointView, ids: &[PointId]) -> [[f64; 3]; 3] {
     cov
 }
 
+pub fn is_zero_matrix(matrix: [[f64; 3]; 3]) -> bool {
+    matrix.iter().flatten().all(|value| *value == 0.0)
+}
+
 pub fn rank(view: &PointView, ids: &[PointId], threshold: f64) -> u8 {
     symmetric_eigenvalues(covariance(view, ids))
         .into_iter()

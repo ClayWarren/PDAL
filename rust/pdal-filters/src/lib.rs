@@ -1,3 +1,4 @@
+pub mod approximate_coplanar;
 pub mod assign;
 pub mod cluster;
 pub mod dbscan;
