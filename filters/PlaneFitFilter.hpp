@@ -36,14 +36,10 @@
 
 #include <pdal/Filter.hpp>
 
-#include <Eigen/Dense>
-
 #include <string>
 
 namespace pdal
 {
-
-using namespace Eigen;
 
 class PDAL_EXPORT PlaneFitFilter : public Filter
 {
@@ -61,10 +57,6 @@ private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
     void filter(PointView& view) override;
-
-    void setPlaneFit(PointView& view, const PointId& i);
-    double absDistance(PointView& view, const PointId& i, Vector3d& centroid,
-                       Vector3d& normal);
 };
 
 } // namespace pdal

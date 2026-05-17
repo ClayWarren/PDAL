@@ -26,6 +26,7 @@ use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::outlier::OutlierFilter;
+use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
@@ -75,6 +76,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Reciprocity" => DimId::Reciprocity,
         "Rank" => DimId::Rank,
         "Coplanar" => DimId::Coplanar,
+        "PlaneFit" => DimId::PlaneFit,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -1134,6 +1136,13 @@ pub extern "C" fn pdal_stage_create_approximatecoplanar(
         threshold1,
         threshold2,
     ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a plane fit filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_planefit(knn: u64) -> *mut StageWrapper {
+    let filter = Box::new(PlaneFitFilter::new(knn as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

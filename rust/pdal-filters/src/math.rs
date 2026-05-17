@@ -40,7 +40,16 @@ pub fn rank(view: &PointView, ids: &[PointId], threshold: f64) -> u8 {
         .count() as u8
 }
 
-pub fn symmetric_eigenvalues(mut matrix: [[f64; 3]; 3]) -> [f64; 3] {
+pub fn symmetric_eigenvalues(matrix: [[f64; 3]; 3]) -> [f64; 3] {
+    symmetric_eigen_decomposition(matrix).0
+}
+
+pub fn symmetric_eigen_decomposition(mut matrix: [[f64; 3]; 3]) -> ([f64; 3], [[f64; 3]; 3]) {
+    let mut vectors = [[0.0; 3]; 3];
+    for (idx, row) in vectors.iter_mut().enumerate() {
+        row[idx] = 1.0;
+    }
+
     for _ in 0..32 {
         let (p, q) = largest_off_diagonal(matrix);
         if matrix[p][q].abs() < 1e-12 {
@@ -69,14 +78,32 @@ pub fn symmetric_eigenvalues(mut matrix: [[f64; 3]; 3]) -> [f64; 3] {
                 matrix[q][r] = matrix[r][q];
             }
         }
+
+        for row in &mut vectors {
+            let vrp = row[p];
+            let vrq = row[q];
+            row[p] = vrp - s * (vrq + tau * vrp);
+            row[q] = vrq + s * (vrp - tau * vrq);
+        }
     }
 
-    let mut values = [matrix[0][0], matrix[1][1], matrix[2][2]];
-    values.sort_by(f64::total_cmp);
-    values
+    let mut pairs = [
+        (matrix[0][0], [vectors[0][0], vectors[1][0], vectors[2][0]]),
+        (matrix[1][1], [vectors[0][1], vectors[1][1], vectors[2][1]]),
+        (matrix[2][2], [vectors[0][2], vectors[1][2], vectors[2][2]]),
+    ];
+    pairs.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let values = [pairs[0].0, pairs[1].0, pairs[2].0];
+    let sorted_vectors = [
+        [pairs[0].1[0], pairs[1].1[0], pairs[2].1[0]],
+        [pairs[0].1[1], pairs[1].1[1], pairs[2].1[1]],
+        [pairs[0].1[2], pairs[1].1[2], pairs[2].1[2]],
+    ];
+    (values, sorted_vectors)
 }
 
-fn centroid(view: &PointView, ids: &[PointId]) -> [f64; 3] {
+pub fn centroid(view: &PointView, ids: &[PointId]) -> [f64; 3] {
     let mut centroid = [0.0; 3];
     for id in ids {
         centroid[0] += view.get_f64(*id, &DimId::X);
@@ -108,5 +135,13 @@ mod tests {
             symmetric_eigenvalues([[3.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 2.0]]),
             [1.0, 2.0, 3.0]
         );
+    }
+
+    #[test]
+    fn eigenvectors_follow_sorted_eigenvalues() {
+        let (values, vectors) =
+            symmetric_eigen_decomposition([[3.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 2.0]]);
+        assert_eq!(values, [1.0, 2.0, 3.0]);
+        assert_eq!(vectors, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]);
     }
 }

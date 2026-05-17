@@ -33,6 +33,7 @@ pub enum DimId {
     Reciprocity,
     Rank,
     Coplanar,
+    PlaneFit,
     Other(String),
 }
 
@@ -55,6 +56,7 @@ impl DimId {
             DimId::Reciprocity => "Reciprocity",
             DimId::Rank => "Rank",
             DimId::Coplanar => "Coplanar",
+            DimId::PlaneFit => "PlaneFit",
             DimId::Other(s) => s,
         }
     }
@@ -77,6 +79,7 @@ impl DimId {
             "Reciprocity" => DimId::Reciprocity,
             "Rank" => DimId::Rank,
             "Coplanar" => DimId::Coplanar,
+            "PlaneFit" => DimId::PlaneFit,
             other => DimId::Other(other.to_string()),
         }
     }
