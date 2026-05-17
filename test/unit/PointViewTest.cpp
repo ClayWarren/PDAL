@@ -158,6 +158,92 @@ TEST(PointViewTest, getFloat)
     }
 }
 
+TEST(PointViewTest, calculateBounds)
+{
+    PointTable table;
+    PointLayoutPtr layout(table.layout());
+    layout->registerDim(Dimension::Id::X);
+    layout->registerDim(Dimension::Id::Y);
+    layout->registerDim(Dimension::Id::Z);
+
+    PointView view(table);
+    view.setField(Dimension::Id::X, 0, -10.0);
+    view.setField(Dimension::Id::Y, 0, 5.0);
+    view.setField(Dimension::Id::Z, 0, 100.0);
+    view.setField(Dimension::Id::X, 1, 20.0);
+    view.setField(Dimension::Id::Y, 1, -15.0);
+    view.setField(Dimension::Id::Z, 1, -50.0);
+    view.setField(Dimension::Id::X, 2, 3.0);
+    view.setField(Dimension::Id::Y, 2, 7.0);
+    view.setField(Dimension::Id::Z, 2, 25.0);
+
+    BOX2D box2d;
+    view.calculateBounds(box2d);
+    EXPECT_DOUBLE_EQ(box2d.minx, -10.0);
+    EXPECT_DOUBLE_EQ(box2d.maxx, 20.0);
+    EXPECT_DOUBLE_EQ(box2d.miny, -15.0);
+    EXPECT_DOUBLE_EQ(box2d.maxy, 7.0);
+
+    BOX3D box3d;
+    view.calculateBounds(box3d);
+    EXPECT_DOUBLE_EQ(box3d.minx, -10.0);
+    EXPECT_DOUBLE_EQ(box3d.maxx, 20.0);
+    EXPECT_DOUBLE_EQ(box3d.miny, -15.0);
+    EXPECT_DOUBLE_EQ(box3d.maxy, 7.0);
+    EXPECT_DOUBLE_EQ(box3d.minz, -50.0);
+    EXPECT_DOUBLE_EQ(box3d.maxz, 100.0);
+}
+
+TEST(PointViewTest, pointRef)
+{
+    PointTable table;
+    PointLayoutPtr layout(table.layout());
+    layout->registerDim(Dimension::Id::X);
+    layout->registerDim(Dimension::Id::Y);
+
+    PointView view(table);
+    view.setField(Dimension::Id::X, 0, 10.0);
+    view.setField(Dimension::Id::Y, 0, 20.0);
+    view.setField(Dimension::Id::X, 1, 30.0);
+    view.setField(Dimension::Id::Y, 1, 40.0);
+
+    PointRef point(view, 0);
+    EXPECT_DOUBLE_EQ(point.getFieldAs<double>(Dimension::Id::X), 10.0);
+    point.setField(Dimension::Id::X, 15.0);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 15.0);
+
+    point.setPointId(1);
+    EXPECT_EQ(point.pointId(), 1u);
+    EXPECT_DOUBLE_EQ(point.getFieldAs<double>(Dimension::Id::Y), 40.0);
+
+    PointRef added(view, view.size());
+    added.setField(Dimension::Id::X, 50.0);
+    added.setField(Dimension::Id::Y, 60.0);
+    EXPECT_EQ(view.size(), 3u);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 2), 50.0);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::Y, 2), 60.0);
+
+    PointRef first(view, 0);
+    PointRef second(view, 1);
+    PointRef::swap(first, second);
+    EXPECT_EQ(first.pointId(), 1u);
+    EXPECT_EQ(second.pointId(), 0u);
+    EXPECT_DOUBLE_EQ(first.getFieldAs<double>(Dimension::Id::X), 30.0);
+    EXPECT_DOUBLE_EQ(second.getFieldAs<double>(Dimension::Id::X), 15.0);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 30.0);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 1), 15.0);
+
+    const PointRef constFirst(view, 0);
+    const PointRef constAdded(view, 2);
+    PointRef::swap(constFirst, constAdded);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 50.0);
+    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 2), 30.0);
+
+    PointRef tablePoint(table);
+    tablePoint.setPointId(7);
+    EXPECT_EQ(tablePoint.pointId(), 7u);
+}
+
 TEST(PointViewTest, bigfile)
 {
     PointTable table;

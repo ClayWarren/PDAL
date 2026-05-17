@@ -110,26 +110,25 @@ TEST(UtilsTest, test_comparators)
 TEST(UtilsTest, test_base64)
 {
     std::vector<uint8_t> data;
-    for (int i = 0; i < 2; i++)
-        data.push_back((uint8_t)i);
 
-    uint32_t begin_size(0);
-    for (std::vector<uint8_t>::size_type i = 0; i < data.size(); ++i)
-    {
-        begin_size = begin_size + data[i];
-    }
+    EXPECT_EQ(Utils::base64_encode(data), "");
+    EXPECT_EQ(Utils::base64_decode(""), data);
 
-    std::string encoded = Utils::base64_encode(data);
-    std::vector<uint8_t> decoded = Utils::base64_decode(encoded);
+    data = {'f'};
+    EXPECT_EQ(Utils::base64_encode(data), "Zg==");
+    EXPECT_EQ(Utils::base64_decode("Zg=="), data);
 
-    uint32_t size(0);
-    for (std::vector<uint8_t>::size_type i = 0; i < decoded.size(); ++i)
-    {
-        size = size + decoded[i];
-    }
+    data = {'f', 'o'};
+    EXPECT_EQ(Utils::base64_encode(data), "Zm8=");
+    EXPECT_EQ(Utils::base64_decode("Zm8="), data);
 
-    EXPECT_EQ(decoded.size(), data.size());
-    EXPECT_EQ(size, begin_size);
+    data = {'f', 'o', 'o'};
+    EXPECT_EQ(Utils::base64_encode(data), "Zm9v");
+    EXPECT_EQ(Utils::base64_decode("Zm9v"), data);
+
+    data = {0x00, 0x01, 0x02, 0xfd, 0xfe, 0xff};
+    EXPECT_EQ(Utils::base64_encode(data), "AAEC/f7/");
+    EXPECT_EQ(Utils::base64_decode("AAEC/f7/"), data);
 }
 
 TEST(UtilsTest, blanks)

@@ -270,6 +270,61 @@ TEST(PointTable, simple)
     simpleTest(t);
 }
 
+TEST(ColumnPointTable, typedStorage)
+{
+    ColumnPointTable table;
+    PointLayoutPtr layout = table.layout();
+
+    Dimension::Id s8 = layout->assignDim("s8", Dimension::Type::Signed8);
+    Dimension::Id s16 = layout->assignDim("s16", Dimension::Type::Signed16);
+    Dimension::Id s32 = layout->assignDim("s32", Dimension::Type::Signed32);
+    Dimension::Id s64 = layout->assignDim("s64", Dimension::Type::Signed64);
+    Dimension::Id u8 = layout->assignDim("u8", Dimension::Type::Unsigned8);
+    Dimension::Id u16 = layout->assignDim("u16", Dimension::Type::Unsigned16);
+    Dimension::Id u32 = layout->assignDim("u32", Dimension::Type::Unsigned32);
+    Dimension::Id u64 = layout->assignDim("u64", Dimension::Type::Unsigned64);
+    Dimension::Id f32 = layout->assignDim("f32", Dimension::Type::Float);
+    Dimension::Id f64 = layout->assignDim("f64", Dimension::Type::Double);
+    layout->registerDim(Dimension::Id::X);
+    table.finalize();
+
+    PointView view(table);
+    const PointId blockPoint = 16384;
+    for (PointId id = 0; id <= blockPoint; ++id)
+        view.setField(Dimension::Id::X, id, static_cast<double>(id));
+
+    const auto setValues = [&](PointId id)
+    {
+        view.setField(s8, id, static_cast<int8_t>(-12));
+        view.setField(s16, id, static_cast<int16_t>(-1234));
+        view.setField(s32, id, static_cast<int32_t>(-123456));
+        view.setField(s64, id, static_cast<int64_t>(-1234567890123LL));
+        view.setField(u8, id, static_cast<uint8_t>(250));
+        view.setField(u16, id, static_cast<uint16_t>(65000));
+        view.setField(u32, id, static_cast<uint32_t>(4000000000U));
+        view.setField(u64, id, static_cast<uint64_t>(9000000000000000000ULL));
+        view.setField(f32, id, 1.25f);
+        view.setField(f64, id, -9876.5);
+    };
+
+    setValues(0);
+    setValues(blockPoint);
+
+    for (PointId id : {PointId(0), blockPoint})
+    {
+        EXPECT_EQ(view.getFieldAs<int8_t>(s8, id), -12);
+        EXPECT_EQ(view.getFieldAs<int16_t>(s16, id), -1234);
+        EXPECT_EQ(view.getFieldAs<int32_t>(s32, id), -123456);
+        EXPECT_EQ(view.getFieldAs<int64_t>(s64, id), -1234567890123LL);
+        EXPECT_EQ(view.getFieldAs<uint8_t>(u8, id), 250u);
+        EXPECT_EQ(view.getFieldAs<uint16_t>(u16, id), 65000u);
+        EXPECT_EQ(view.getFieldAs<uint32_t>(u32, id), 4000000000U);
+        EXPECT_EQ(view.getFieldAs<uint64_t>(u64, id), 9000000000000000000ULL);
+        EXPECT_FLOAT_EQ(view.getFieldAs<float>(f32, id), 1.25f);
+        EXPECT_DOUBLE_EQ(view.getFieldAs<double>(f64, id), -9876.5);
+    }
+}
+
 TEST(PointTable, layoutLimit)
 {
     PointTable t;

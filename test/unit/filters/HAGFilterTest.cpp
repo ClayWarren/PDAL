@@ -34,15 +34,35 @@
 
 #include <pdal/pdal_test_main.hpp>
 
+#include <io/BufferReader.hpp>
 #include <pdal/StageFactory.hpp>
 
 #include "Support.hpp"
+
+#include <algorithm>
+#include <vector>
 
 // NOTE: The test data has an accompanying jpg that depicts the points,
 //  their triangulation and the interesting barycentric calculation.
 
 namespace pdal
 {
+
+namespace
+{
+
+std::vector<double> hags(const PointViewSet& views)
+{
+    std::vector<double> output;
+    for (PointViewPtr view : views)
+        for (PointId i = 0; i < view->size(); ++i)
+            output.push_back(
+                view->getFieldAs<double>(Dimension::Id::HeightAboveGround, i));
+    std::sort(output.begin(), output.end());
+    return output;
+}
+
+} // namespace
 
 TEST(HAGFilterTest, delaunay)
 {
@@ -189,6 +209,74 @@ TEST(HAGFilterTest, closest)
         if (i == 3)
             check(4, 4, 20, 16);
     }
+}
+
+TEST(HAGFilterTest, dem)
+{
+    PointTable table;
+    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
+                                  Dimension::Id::Z,
+                                  Dimension::Id::Classification});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 440750.0);
+    view->setField(Dimension::Id::Y, 0, 3751290.0);
+    view->setField(Dimension::Id::Z, 0, 200.0);
+    view->setField(Dimension::Id::Classification, 0, ClassLabel::Ground);
+    view->setField(Dimension::Id::X, 1, 440750.0);
+    view->setField(Dimension::Id::Y, 1, 3751290.0);
+    view->setField(Dimension::Id::Z, 1, 200.0);
+    view->setField(Dimension::Id::Classification, 1, ClassLabel::Unclassified);
+
+    BufferReader reader;
+    reader.addView(view);
+
+    StageFactory factory;
+    Stage& f = *(factory.createStage("filters.hag_dem"));
+    Options opts;
+    opts.add("raster", Support::datapath("gdal/float32.tif"));
+    f.setInput(reader);
+    f.setOptions(opts);
+
+    f.prepare(table);
+    PointViewSet s = f.execute(table);
+    std::vector<double> values = hags(s);
+
+    ASSERT_EQ(values.size(), 2u);
+    EXPECT_DOUBLE_EQ(values[0], 0.0);
+    EXPECT_DOUBLE_EQ(values[1], 93.0);
+}
+
+TEST(HAGFilterTest, dem_clamps)
+{
+    PointTable table;
+    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
+                                  Dimension::Id::Z,
+                                  Dimension::Id::Classification});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 440750.0);
+    view->setField(Dimension::Id::Y, 0, 3751290.0);
+    view->setField(Dimension::Id::Z, 0, 140.0);
+    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
+    BufferReader reader;
+    reader.addView(view);
+
+    StageFactory factory;
+    Stage& f = *(factory.createStage("filters.hag_dem"));
+    Options opts;
+    opts.add("raster", Support::datapath("gdal/float32.tif"));
+    opts.add("min_clamp", -5.0);
+    opts.add("max_clamp", 10.0);
+    f.setInput(reader);
+    f.setOptions(opts);
+
+    f.prepare(table);
+    PointViewSet s = f.execute(table);
+    std::vector<double> values = hags(s);
+
+    ASSERT_EQ(values.size(), 1u);
+    EXPECT_DOUBLE_EQ(values[0], 10.0);
 }
 
 // Should add tests for exact match in neighbors case and for
