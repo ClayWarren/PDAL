@@ -34,45 +34,14 @@
 
 #include "HagNnFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
+#include "private/RustViewConverter.hpp"
 
-#include <cmath>
+#include <pdal_capi.h>
+
 #include <string>
-#include <vector>
 
 namespace pdal
 {
-
-namespace
-{
-
-double neighbor_interp_ground(PointViewPtr gView, const PointIdList& ids,
-                              const std::vector<double>& sqr_dists,
-                              double maxDistance2, double zDefault)
-{
-    double weights = 0;
-    double z_accumulator = 0;
-
-    for (size_t j = 0; j < ids.size(); ++j)
-    {
-        auto z = gView->getFieldAs<double>(Dimension::Id::Z, ids[j]);
-        double sqr_dist = sqr_dists[j];
-        if (maxDistance2 > 0 && sqr_dist > maxDistance2)
-            break;
-        else
-        {
-            double weight = 1 / sqr_dist;
-            weights += weight;
-            z_accumulator += weight * z;
-        }
-    }
-
-    if (weights)
-        return z_accumulator / weights;
-    return zDefault;
-}
-
-} // unnamed namespace
 
 static StaticPluginInfo const s_info{
     "filters.hag_nn",
@@ -125,80 +94,13 @@ void HagNnFilter::prepared(PointTableRef table)
 
 void HagNnFilter::filter(PointView& view)
 {
-    using namespace pdal::Dimension;
+    pdal_stage_t* stage = pdal_stage_create_hagnn(
+        m_count, m_maxDistance, m_allowExtrapolation, m_class);
+    if (!stage)
+        throwError("Failed to create Rust hag_nn stage.");
 
-    PointViewPtr gView = view.makeNew();
-    PointViewPtr ngView = view.makeNew();
-
-    // Separate into ground and non-ground views.
-    for (PointId i = 0; i < view.size(); ++i)
-    {
-        if (view.getFieldAs<uint8_t>(Id::Classification, i) == m_class)
-        {
-            view.setField(Id::HeightAboveGround, i, 0);
-            gView->appendPoint(view, i);
-        }
-        else
-            ngView->appendPoint(view, i);
-    }
-    BOX2D gBounds;
-    gView->calculateBounds(gBounds);
-
-    // Bail if there weren't any points classified as ground.
-    if (gView->size() == 0)
-    {
-        log()->get(LogLevel::Error) << "Input PointView does not have "
-                                       "any points classified as ground.\n";
-        return;
-    }
-
-    // Build the 2D KD-tree.
-    const KD2Index& kdi = gView->build2dIndex();
-
-    double maxDistance2 = std::pow(m_maxDistance, 2.0);
-    // Find Z difference between non-ground points and the nearest
-    // neighbor (2D) in the ground view or between non-ground points and the
-    // locally-computed surface.
-    for (PointId i = 0; i < ngView->size(); ++i)
-    {
-        PointRef point = ngView->point(i);
-
-        // Non-ground view point for which we're trying to calc HAG
-        double x0 = point.getFieldAs<double>(Id::X);
-        double y0 = point.getFieldAs<double>(Id::Y);
-        double z0 = point.getFieldAs<double>(Id::Z);
-
-        PointIdList ids(m_count);
-        std::vector<double> sqr_dists(m_count);
-        kdi.knnSearch(x0, y0, m_count, &ids, &sqr_dists);
-
-        // Closest ground point.
-        double x = gView->getFieldAs<double>(Id::X, ids[0]);
-        double y = gView->getFieldAs<double>(Id::Y, ids[0]);
-        double z = gView->getFieldAs<double>(Id::Z, ids[0]);
-
-        double z1;
-        // If the close ground point is at the same X/Y as the non-ground
-        // point, we're done.  Also, if there's only one ground point, we
-        // just use that.
-        if ((x0 == x && y0 == y) || ids.size() == 1)
-        {
-            z1 = z;
-        }
-        // If the non-ground point is outside the bounds of all the
-        // ground points and we're not doing extrapolation, just return
-        // its current Z, which will give a HAG of 0.
-        else if (!gBounds.contains(x0, y0) && !m_allowExtrapolation)
-        {
-            z1 = z0;
-        }
-        else
-        {
-            z1 =
-                neighbor_interp_ground(gView, ids, sqr_dists, maxDistance2, z0);
-        }
-        ngView->setField(Dimension::Id::HeightAboveGround, i, z0 - z1);
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

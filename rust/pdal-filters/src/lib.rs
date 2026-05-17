@@ -6,6 +6,7 @@ pub mod farthestpointsampling;
 pub mod ferry;
 pub mod griddecimation;
 pub mod groupby;
+pub mod hagnn;
 pub mod head;
 pub mod labelduplicates;
 pub mod locate;

@@ -14,6 +14,7 @@ use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::griddecimation;
 use pdal_filters::groupby::GroupByFilter;
+use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
@@ -59,6 +60,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
         "ClusterID" => DimId::ClusterID,
+        "HeightAboveGround" => DimId::HeightAboveGround,
         "LocalOutlierFactor" => DimId::LocalOutlierFactor,
         "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
         "RadialDensity" => DimId::RadialDensity,
@@ -1015,6 +1017,23 @@ pub unsafe extern "C" fn pdal_stage_create_dbscan(
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_lof(minpts: u64) -> *mut StageWrapper {
     let filter = Box::new(LofFilter::new(minpts as usize));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a HAG nearest-neighbor filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_hagnn(
+    count: u64,
+    max_distance: f64,
+    allow_extrapolation: bool,
+    class_label: u8,
+) -> *mut StageWrapper {
+    let filter = Box::new(HagNnFilter::new(
+        count as usize,
+        max_distance,
+        allow_extrapolation,
+        class_label,
+    ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
