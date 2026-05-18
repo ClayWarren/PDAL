@@ -41,6 +41,7 @@ pub enum DimId {
     OptimalKNN,
     OptimalRadius,
     H3,
+    GpsTime,
     Other(String),
 }
 
@@ -70,6 +71,7 @@ impl DimId {
             DimId::OptimalKNN => "OptimalKNN",
             DimId::OptimalRadius => "OptimalRadius",
             DimId::H3 => "H3",
+            DimId::GpsTime => "GpsTime",
             DimId::Other(s) => s,
         }
     }
@@ -99,6 +101,7 @@ impl DimId {
             "OptimalKNN" => DimId::OptimalKNN,
             "OptimalRadius" => DimId::OptimalRadius,
             "H3" => DimId::H3,
+            "GpsTime" => DimId::GpsTime,
             other => DimId::Other(other.to_string()),
         }
     }

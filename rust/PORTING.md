@@ -256,9 +256,37 @@ Current deliberate gaps:
 ## Filters Status
 
 Safe filter ports currently use Rust-owned views and existing conversion
-helpers. The accepted set includes the dependency-free filters, spatial-index
-filters, and the first pure linear/statistical filters that pass the existing
-C++ filter suite.
+helpers. The accepted Rust-backed set includes the dependency-free filters,
+spatial-index filters, the first pure linear/statistical filters, and the
+remaining pure partition/time filters that pass their existing C++ test
+binaries.
+
+Current C++ stage inventory:
+
+- 84 first-party filter/static stage files in `filters/`.
+- 49 are Rust-backed through the C ABI.
+- 35 intentionally remain C++ for now.
+
+The latest pure filters moved behind the C ABI are:
+
+- `filters.chipper`
+- `filters.gpstimeconvert`
+- `filters.splitter`
+
+The remaining C++ filters are not "missed easy ports"; they are holdouts whose
+Rust port should start with an ABI/algorithm decision, not a direct rewrite:
+
+- GDAL/PROJ/SRS/OGR-backed: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
+  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`,
+  `Reprojection`.
+- Private or specialized algorithms: `CS`, `Delaunay`, `FaceRaster`,
+  `Georeference`, `HagDelaunay`, `HexBin`, `LiTree`, `LloydKMeans`, `M3C2`,
+  `Miniball`, `Normal`, `PMF`, `Poisson`, `SMR`, `Straighten`,
+  `Supervoxel`, `GreedyProjection`, `IterativeClosestPoint`,
+  `RelaxationDartThrowing`.
+- Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
+- Expression/KD-tree hybrid behavior still needing a design pass:
+  `RadiusAssign`, `NeighborClassifier`, `CovarianceFeatures`.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source
 material. Its C++ wiring passed C++ object pointers across the C ABI and broke
@@ -269,14 +297,20 @@ existing filter tests. Do not reapply it wholesale.
 These should not be marked complete without dedicated ABI design and parity
 tests:
 
-- GDAL/PROJ/SRS filters: colorization, overlay, DEM, HagDem, reprojection,
-  ProjPipeline, H3, GeomDistance, Crop, Georeference.
-- Metadata-heavy filters beyond ExpressionStats that require richer
+- GDAL/PROJ/SRS filters: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
+  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`,
+  `Reprojection`.
+- Metadata-heavy filters beyond `ExpressionStats` that require richer
   `MetadataNode` features or pipeline serialization parity.
-- Private-algorithm filters: CSF, Delaunay, FaceRaster, HexBin, Poisson, SMR,
-  PMF, Supervoxel, and similar specialized implementations.
+- Private-algorithm filters: `CS`, `Delaunay`, `FaceRaster`, `Georeference`,
+  `HagDelaunay`, `HexBin`, `LiTree`, `LloydKMeans`, `M3C2`, `Miniball`,
+  `Normal`, `PMF`, `Poisson`, `SMR`, `Straighten`, `Supervoxel`,
+  `GreedyProjection`, `IterativeClosestPoint`, `RelaxationDartThrowing`, and
+  similar specialized implementations.
 - Framework or shell filters that depend on process execution or PDAL pipeline
-  internals.
+  internals: `Info`, `Shell`, `StreamCallback`.
+- Expression/KD-tree hybrid filters that need a small dedicated design before
+  porting: `RadiusAssign`, `NeighborClassifier`, `CovarianceFeatures`.
 
 ## Completion Criteria For Each Port
 

@@ -150,6 +150,9 @@ uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, d
 void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
 
 pdal_stage_t* pdal_stage_create_divider(int32_t mode, int32_t size_mode, uint64_t size, const uint8_t* evals, uint64_t evals_count);
+pdal_stage_t* pdal_stage_create_splitter(double length, double origin_x, double origin_y, double buffer);
+pdal_stage_t* pdal_stage_create_gpstimeconvert(const pdal_options_t* ops);
+pdal_stage_t* pdal_stage_create_chipper(uint64_t capacity);
 pdal_stage_t* pdal_stage_create_farthestpointsampling(uint64_t count);
 
 typedef struct {

@@ -37,6 +37,8 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -44,6 +46,7 @@ class PDAL_EXPORT GpsTimeConvert : public Filter, public Streamable
 {
 public:
     GpsTimeConvert() : Filter() {}
+    ~GpsTimeConvert() override;
     std::string getName() const override;
 
 private:
@@ -51,37 +54,16 @@ private:
     std::string m_inTime;
     std::string m_outTime;
     std::string m_strDate;
-    std::tm m_tmDate;
     bool m_wrap;
     bool m_wrapped;
-    bool m_first;
-    double m_lastTime;
     double m_wrappedTolerance;
-    int m_numSeconds;
-
-    void weekSeconds2GpsTime(PointRef& point);
-    void daySeconds2GpsTime(PointRef& point);
-
-    void gpsTime2WeekSeconds(PointRef& point);
-    void gpsTime2DaySeconds(PointRef& point);
-
-    void gpsTime2GpsTime(PointRef& point);
-
-    std::tm gpsTime2Date(int seconds);
-
-    int weekStartGpsSeconds(std::tm date);
-    int dayStartGpsSeconds(std::tm date);
-
-    void unwrapWeekSeconds(PointRef& point);
-    void wrapWeekSeconds(PointRef& point);
-
-    void unwrapDaySeconds(PointRef& point);
-    void wrapDaySeconds(PointRef& point);
-
-    void testTimeType(std::string& type);
+    pdal_stage* m_rustStage = nullptr;
+    PointLayoutPtr m_layout;
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
     bool processOne(PointRef& point) override;
     void filter(PointView& view) override;

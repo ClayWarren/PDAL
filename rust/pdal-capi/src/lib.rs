@@ -10,6 +10,7 @@ use pdal_core::stage::{Filter, StageError, Streamable};
 use pdal_core::{metadata::MetadataNode, metadata::MetadataValue, srs::SpatialReference};
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
+use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
@@ -21,6 +22,7 @@ use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::expressionstats::ExpressionStatsFilter as ExpressionStatsMetadataFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
+use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::griddecimation;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
@@ -46,6 +48,7 @@ use pdal_filters::separatescanline::SeparateScanLineFilter;
 use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
+use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::TransformationFilter;
@@ -92,6 +95,7 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Eigenvalue2" => DimId::Eigenvalue2,
         "OptimalKNN" => DimId::OptimalKNN,
         "OptimalRadius" => DimId::OptimalRadius,
+        "GpsTime" => DimId::GpsTime,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -2016,6 +2020,46 @@ pub unsafe extern "C" fn pdal_stage_create_divider(
         size,
         vec_evals,
     ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a splitter filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_splitter(
+    length: f64,
+    origin_x: f64,
+    origin_y: f64,
+    buffer: f64,
+) -> *mut StageWrapper {
+    let filter = Box::new(SplitterFilter::new(length, origin_x, origin_y, buffer));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a GPS time conversion filter stage.
+///
+/// # Safety
+///
+/// `ops` may be null or must point to a valid options object.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_gpstimeconvert(
+    ops: *const Options,
+) -> *mut StageWrapper {
+    let options = ops.as_ref().cloned().unwrap_or_default();
+    match GpsTimeConvert::from_options(&options) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(&err.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Create a chipper filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_chipper(capacity: u64) -> *mut StageWrapper {
+    let filter = Box::new(ChipperFilter::new(capacity));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
