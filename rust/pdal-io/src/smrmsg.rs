@@ -55,6 +55,14 @@ impl Reader for SmrmsgReader {
         }
         let file = File::open(Path::new(&self.filename))
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
+        let point_size = (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64;
+        let file_size = file
+            .metadata()
+            .map_err(|e| StageError(e.to_string()))?
+            .len();
+        if file_size == 0 || file_size % point_size != 0 {
+            return Err(StageError("Invalid file size.".to_string()));
+        }
         let mut reader = BufReader::new(file);
 
         let mut layout = PointLayout::new();
@@ -66,23 +74,14 @@ impl Reader for SmrmsgReader {
         let dims = Self::file_dimensions();
         let mut buf = [0u8; 8];
 
-        loop {
-            let mut point_ok = true;
+        for _ in 0..(file_size / point_size) {
             let id = view.add_point();
             for dim in dims {
-                if reader.read_exact(&mut buf).is_err() {
-                    point_ok = false;
-                    break;
-                }
+                reader
+                    .read_exact(&mut buf)
+                    .map_err(|e| StageError(e.to_string()))?;
                 let val = (&buf[..]).read_f64::<LittleEndian>().unwrap();
                 view.set_f64(id, dim, val);
-            }
-            if !point_ok {
-                let current_len = view.len();
-                if current_len > 0 {
-                    view.truncate(current_len - 1);
-                }
-                break;
             }
         }
 

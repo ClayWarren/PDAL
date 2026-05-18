@@ -1,12 +1,12 @@
 //! `readers.qfit` -- NASA Airborne Topographic Mapper (ATM) QFIT format.
 //!
-//! Port of `io/QfitReader.cpp`. QFIT is a big-endian binary format where
-//! records consist of 32-bit (4-byte) signed integers.
+//! Port of `io/QfitReader.cpp`. QFIT is a binary format where records consist
+//! of 32-bit (4-byte) signed integers; files may be big- or little-endian.
 //!
 //! Common formats are 10-word (40 bytes), 12-word (48 bytes), and
 //! 14-word (56 bytes).
 
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -21,6 +21,12 @@ pub struct QfitReader {
     filename: String,
     flip_coordinates: bool,
     scale_z: f64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QfitEndian {
+    Big,
+    Little,
 }
 
 impl QfitReader {
@@ -48,10 +54,19 @@ impl Reader for QfitReader {
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
         let mut reader = BufReader::new(file);
 
-        // Header word 1: Record size in bytes
-        let record_size = reader
-            .read_i32::<BigEndian>()
+        let first_word = reader
+            .read_i32::<LittleEndian>()
             .map_err(|_| StageError("Incomplete QFIT header.".to_string()))?;
+        let endian = if first_word < 100 {
+            QfitEndian::Little
+        } else {
+            QfitEndian::Big
+        };
+        let record_size = if endian == QfitEndian::Little {
+            first_word
+        } else {
+            BigEndian::read_i32(&first_word.to_le_bytes())
+        };
 
         if record_size != 40 && record_size != 48 && record_size != 56 {
             return Err(StageError(format!(
@@ -61,29 +76,18 @@ impl Reader for QfitReader {
         }
         let word_count = (record_size / 4) as usize;
 
-        // Skip the rest of the first header record
         reader
-            .seek(SeekFrom::Start(record_size as u64))
-            .map_err(|_| StageError("Failed to seek to data segment.".to_string()))?;
-
-        // Skip processing history records (records starting with a negative value)
-        let mut first_word = [0u8; 4];
-        loop {
-            reader.read_exact(&mut first_word).map_err(|_| {
-                StageError("Unexpected end of file before data segment.".to_string())
-            })?;
-            let val = (&first_word[..]).read_i32::<BigEndian>().unwrap();
-            if val >= 0 {
-                break;
-            }
-            reader
-                .seek(SeekFrom::Current((record_size - 4) as i64))
-                .map_err(|_| StageError("Failed to skip history record.".to_string()))?;
+            .seek(SeekFrom::Start(record_size as u64 + 4))
+            .map_err(|_| StageError("Failed to seek to QFIT offset record.".to_string()))?;
+        let offset = read_i32(&mut reader, endian)
+            .map_err(|_| StageError("Incomplete QFIT offset record.".to_string()))?;
+        if offset < 0 {
+            return Err(StageError("Invalid negative QFIT data offset.".to_string()));
         }
 
         reader
-            .seek(SeekFrom::Current(-4))
-            .map_err(|_| StageError("Failed to rewind to start of data record.".to_string()))?;
+            .seek(SeekFrom::Start(offset as u64))
+            .map_err(|_| StageError("Failed to seek to QFIT data segment.".to_string()))?;
 
         let mut layout = PointLayout::new();
         layout.register(DimId::OffsetTime, DimType::F64);
@@ -96,27 +100,37 @@ impl Reader for QfitReader {
         layout.register(DimId::Pitch, DimType::F64);
         layout.register(DimId::Roll, DimType::F64);
 
-        if word_count >= 12 {
+        if word_count == 12 {
             layout.register(DimId::Pdop, DimType::F64);
             layout.register(DimId::PulseWidth, DimType::F64);
+        } else if word_count == 14 {
+            layout.register(DimId::PassiveSignal, DimType::F64);
+            layout.register(DimId::PassiveY, DimType::F64);
+            layout.register(DimId::PassiveX, DimType::F64);
+            layout.register(DimId::PassiveZ, DimType::F64);
         }
         // GPS time is discarded as per PDAL behavior.
 
         let mut view = PointView::new(Rc::new(layout));
         let mut buf = vec![0i32; word_count];
 
-        while reader.read_i32_into::<BigEndian>(&mut buf).is_ok() {
+        loop {
+            for value in &mut buf {
+                match read_i32(&mut reader, endian) {
+                    Ok(v) => *value = v,
+                    Err(_) => return Ok(vec![view]),
+                }
+            }
             let id = view.add_point();
 
-            let (lat_idx, lon_idx) = if self.flip_coordinates {
-                (2, 1)
-            } else {
-                (1, 2)
-            };
+            let mut x = buf[2] as f64 / 1_000_000.0;
+            if self.flip_coordinates && x > 180.0 {
+                x -= 360.0;
+            }
 
             view.set_f64(id, &DimId::OffsetTime, buf[0] as f64);
-            view.set_f64(id, &DimId::Y, buf[lat_idx] as f64 / 1_000_000.0);
-            view.set_f64(id, &DimId::X, buf[lon_idx] as f64 / 1_000_000.0);
+            view.set_f64(id, &DimId::Y, buf[1] as f64 / 1_000_000.0);
+            view.set_f64(id, &DimId::X, x);
             view.set_f64(id, &DimId::Z, buf[3] as f64 * self.scale_z);
             view.set_f64(id, &DimId::StartPulse, buf[4] as f64);
             view.set_f64(id, &DimId::ReflectedPulse, buf[5] as f64);
@@ -124,16 +138,30 @@ impl Reader for QfitReader {
             view.set_f64(id, &DimId::Pitch, buf[7] as f64 / 1000.0);
             view.set_f64(id, &DimId::Roll, buf[8] as f64 / 1000.0);
 
-            if word_count >= 12 {
+            if word_count == 12 {
                 view.set_f64(id, &DimId::Pdop, buf[10] as f64 / 10.0);
                 view.set_f64(id, &DimId::PulseWidth, buf[11] as f64);
+            } else if word_count == 14 {
+                let mut passive_x = buf[11] as f64 / 1_000_000.0;
+                if self.flip_coordinates && passive_x > 180.0 {
+                    passive_x -= 360.0;
+                }
+                view.set_f64(id, &DimId::PassiveSignal, buf[9] as f64);
+                view.set_f64(id, &DimId::PassiveY, buf[10] as f64 / 1_000_000.0);
+                view.set_f64(id, &DimId::PassiveX, passive_x);
+                view.set_f64(id, &DimId::PassiveZ, buf[12] as f64 * self.scale_z);
             }
         }
-
-        Ok(vec![view])
     }
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.qfit")
+    }
+}
+
+fn read_i32<R: Read>(reader: &mut R, endian: QfitEndian) -> Result<i32, std::io::Error> {
+    match endian {
+        QfitEndian::Big => reader.read_i32::<BigEndian>(),
+        QfitEndian::Little => reader.read_i32::<LittleEndian>(),
     }
 }

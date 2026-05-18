@@ -4,6 +4,8 @@
 //! fixtures and C++ behavior.
 
 pub mod faux;
+pub mod fbi;
+pub mod fbi_writer;
 pub mod ilvis2;
 pub mod nullwriter;
 pub mod obj;

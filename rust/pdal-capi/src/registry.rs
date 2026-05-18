@@ -22,11 +22,13 @@ use pdal_filters::tail::TailFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 
 use serde_json::Value;
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
 pub const READER_DRIVERS: &[&str] = &[
     "readers.faux",
+    "readers.fbi",
     "readers.text",
     "readers.pcd",
     "readers.pts",
@@ -54,6 +56,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
 
 pub const WRITER_DRIVERS: &[&str] = &[
     "writers.null",
+    "writers.fbi",
     "writers.text",
     "writers.pcd",
     "writers.sbet",
@@ -66,20 +69,10 @@ pub enum CreatedStage {
     Writer(Box<dyn Writer>),
 }
 
-impl CreatedStage {
-    #[cfg(test)]
-    fn kind_name(&self) -> &'static str {
-        match self {
-            CreatedStage::Reader(_) => "reader",
-            CreatedStage::Filter(_) => "filter",
-            CreatedStage::Writer(_) => "writer",
-        }
-    }
-}
-
 pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, StageError> {
     match name {
         "readers.faux" => Ok(Box::new(pdal_io::faux::FauxReader::new(options))),
+        "readers.fbi" => Ok(Box::new(pdal_io::fbi::FbiReader::new(options))),
         "readers.text" => Ok(Box::new(pdal_io::text::TextReader::new(options))),
         "readers.pcd" => Ok(Box::new(pdal_io::pcd::PcdReader::new(options))),
         "readers.pts" => Ok(Box::new(pdal_io::pts::PtsReader::new(options))),
@@ -140,6 +133,7 @@ pub fn create_filter(
 pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, StageError> {
     match name {
         "writers.null" => Ok(Box::new(pdal_io::nullwriter::NullWriter::new(options))),
+        "writers.fbi" => Ok(Box::new(pdal_io::fbi_writer::FbiWriter::new(options))),
         "writers.text" => Ok(Box::new(pdal_io::text_writer::TextWriter::new(options))),
         "writers.pcd" => Ok(Box::new(pdal_io::pcd::PcdWriter::new(options))),
         "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
@@ -165,115 +159,156 @@ pub fn create_stage(name: &str, options: &Options) -> Result<CreatedStage, Stage
 }
 
 pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
-    let value: Value = serde_json::from_str(json).map_err(|e| StageError(e.to_string()))?;
+    let value: Value = serde_json::from_str(json)
+        .map_err(|err| StageError(format!("Invalid pipeline JSON: {err}")))?;
+    let stages = value.as_array().ok_or_else(|| {
+        StageError("Pipeline JSON must be an array of stage objects.".to_string())
+    })?;
+
     let mut pipeline = Pipeline::new();
-    let mut last_stage: Option<usize> = None;
+    let mut tags = HashMap::new();
+    let mut previous: Option<usize> = None;
 
-    let array = value
-        .as_array()
-        .ok_or_else(|| StageError("Pipeline JSON must be an array of stages.".to_string()))?;
+    for (position, stage_val) in stages.iter().enumerate() {
+        let object = stage_val.as_object().ok_or_else(|| {
+            StageError(format!("Pipeline stage {position} must be a JSON object."))
+        })?;
 
-    for stage_val in array {
-        let obj = stage_val
-            .as_object()
-            .ok_or_else(|| StageError("Pipeline stage must be a JSON object.".to_string()))?;
-
-        let driver_name = if let Some(t) = obj.get("type").and_then(|v| v.as_str()) {
-            t.to_string()
-        } else if let Some(filename) = obj.get("filename").and_then(|v| v.as_str()) {
-            // Infer driver from filename
-            if array.len() == 1 || last_stage.is_none() {
-                infer_reader_driver(filename)
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| StageError("Could not infer reader driver.".to_string()))?
-            } else {
-                infer_writer_driver(filename)
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| StageError("Could not infer writer driver.".to_string()))?
-            }
-        } else {
-            return Err(StageError(
-                "Pipeline stage must have a 'type' or 'filename'.".to_string(),
-            ));
-        };
-
-        let mut options = Options::new();
-        for (k, v) in obj {
-            if k == "type" || k == "tag" || k == "inputs" {
-                continue;
-            }
-            match v {
-                Value::String(s) => {
-                    options.add(k, s);
-                }
-                Value::Number(n) => {
-                    if let Some(i) = n.as_u64() {
-                        options.add(k, i);
-                    } else if let Some(f) = n.as_f64() {
-                        options.add(k, f);
-                    }
-                }
-                Value::Bool(b) => {
-                    options.add(k, *b);
-                }
-                _ => {
-                    // Ignore non-scalar options for now
-                }
-            }
-        }
-
+        let options = options_from_object(object)?;
+        let driver_name = stage_name(object, position, stages.len(), &options)?;
         let stage = create_stage(&driver_name, &options)?;
-        let tag = obj.get("tag").and_then(|v| v.as_str());
 
         let idx = match stage {
             CreatedStage::Reader(r) => pipeline.add_reader(&driver_name, r, options),
-            CreatedStage::Filter(f) => {
-                let idx = pipeline.add_stage(&driver_name, f, options);
-                if let Some(inputs) = obj.get("inputs").and_then(|v| v.as_array()) {
-                    for input in inputs {
-                        if let Some(input_tag) = input.as_str() {
-                            if let Some(input_idx) = pipeline.find_by_tag(input_tag) {
-                                pipeline.add_dependency(idx, input_idx)?;
-                            } else {
-                                return Err(StageError(format!(
-                                    "Input tag '{input_tag}' not found for stage '{driver_name}'."
-                                )));
-                            }
-                        }
-                    }
-                } else if let Some(prev) = last_stage {
-                    pipeline.add_dependency(idx, prev)?;
-                }
-                idx
-            }
-            CreatedStage::Writer(w) => {
-                let idx = pipeline.add_writer(&driver_name, w, options);
-                if let Some(inputs) = obj.get("inputs").and_then(|v| v.as_array()) {
-                    for input in inputs {
-                        if let Some(input_tag) = input.as_str() {
-                            if let Some(input_idx) = pipeline.find_by_tag(input_tag) {
-                                pipeline.add_dependency(idx, input_idx)?;
-                            } else {
-                                return Err(StageError(format!(
-                                    "Input tag '{input_tag}' not found for stage '{driver_name}'."
-                                )));
-                            }
-                        }
-                    }
-                } else if let Some(prev) = last_stage {
-                    pipeline.add_dependency(idx, prev)?;
-                }
-                idx
-            }
+            CreatedStage::Filter(f) => pipeline.add_stage(&driver_name, f, options),
+            CreatedStage::Writer(w) => pipeline.add_writer(&driver_name, w, options),
         };
 
-        if let Some(t) = tag {
-            pipeline.set_tag(idx, t)?;
+        if let Some(tag) = object.get("tag").and_then(Value::as_str) {
+            pipeline.set_tag(idx, tag)?;
+            tags.insert(tag.to_string(), idx);
         }
-        last_stage = Some(idx);
+
+        let explicit_inputs = add_explicit_inputs(&mut pipeline, idx, object, &tags)?;
+        if !explicit_inputs && position > 0 {
+            if let Some(input) = previous {
+                pipeline.add_dependency(idx, input)?;
+            }
+        }
+        previous = Some(idx);
     }
 
     Ok(pipeline)
+}
+
+fn stage_name(
+    object: &serde_json::Map<String, Value>,
+    position: usize,
+    len: usize,
+    options: &Options,
+) -> Result<String, StageError> {
+    if let Some(name) = object.get("type").and_then(Value::as_str) {
+        return Ok(name.to_string());
+    }
+    let filename = options.get_str("filename", "");
+    if filename.is_empty() {
+        return Err(StageError(format!(
+            "Pipeline stage {position} is missing a 'type'."
+        )));
+    }
+    if position == 0 {
+        infer_reader_driver(&filename)
+            .map(str::to_string)
+            .ok_or_else(|| StageError(format!("Unable to infer reader for '{filename}'.")))
+    } else if position + 1 == len {
+        infer_writer_driver(&filename)
+            .map(str::to_string)
+            .ok_or_else(|| StageError(format!("Unable to infer writer for '{filename}'.")))
+    } else {
+        Err(StageError(format!(
+            "Pipeline stage {position} needs an explicit 'type'."
+        )))
+    }
+}
+
+fn options_from_object(object: &serde_json::Map<String, Value>) -> Result<Options, StageError> {
+    let mut options = Options::new();
+    for (key, value) in object {
+        if matches!(key.as_str(), "type" | "tag" | "inputs") {
+            continue;
+        }
+        match value {
+            Value::String(s) => {
+                options.add(key, s);
+            }
+            Value::Bool(b) => {
+                options.add(key, *b);
+            }
+            Value::Number(n) => {
+                options.add(key, n);
+            }
+            Value::Array(items) => {
+                let joined = items
+                    .iter()
+                    .map(option_value_to_string)
+                    .collect::<Result<Vec<_>, _>>()?
+                    .join(",");
+                options.add(key, joined);
+            }
+            Value::Null | Value::Object(_) => {
+                return Err(StageError(format!(
+                    "Option '{key}' must be a scalar or scalar array."
+                )));
+            }
+        }
+    }
+    Ok(options)
+}
+
+fn option_value_to_string(value: &Value) -> Result<String, StageError> {
+    match value {
+        Value::String(s) => Ok(s.clone()),
+        Value::Bool(b) => Ok(b.to_string()),
+        Value::Number(n) => Ok(n.to_string()),
+        _ => Err(StageError(
+            "Array options must contain only scalar values.".to_string(),
+        )),
+    }
+}
+
+fn add_explicit_inputs(
+    pipeline: &mut Pipeline,
+    idx: usize,
+    object: &serde_json::Map<String, Value>,
+    tags: &HashMap<String, usize>,
+) -> Result<bool, StageError> {
+    let Some(inputs) = object.get("inputs") else {
+        return Ok(false);
+    };
+    let input_names = match inputs {
+        Value::String(name) => vec![name.as_str()],
+        Value::Array(values) => values
+            .iter()
+            .map(|value| {
+                value.as_str().ok_or_else(|| {
+                    StageError("Pipeline 'inputs' entries must be tag strings.".to_string())
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => {
+            return Err(StageError(
+                "Pipeline 'inputs' must be a tag string or array of tag strings.".to_string(),
+            ));
+        }
+    };
+    for name in input_names {
+        let input = tags
+            .get(name)
+            .copied()
+            .ok_or_else(|| StageError(format!("Unknown pipeline input tag '{name}'.")))?;
+        pipeline.add_dependency(idx, input)?;
+    }
+    Ok(true)
 }
 
 /// Create a pipeline from JSON.
