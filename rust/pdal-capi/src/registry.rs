@@ -34,6 +34,8 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.ilvis2",
     "readers.obj",
     "readers.qfit",
+    "readers.sbet",
+    "readers.smrmsg",
     "readers.ply",
 ];
 
@@ -50,7 +52,13 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.voxeldownsize",
 ];
 
-pub const WRITER_DRIVERS: &[&str] = &["writers.null", "writers.text", "writers.pcd", "writers.ply"];
+pub const WRITER_DRIVERS: &[&str] = &[
+    "writers.null",
+    "writers.text",
+    "writers.pcd",
+    "writers.sbet",
+    "writers.ply",
+];
 
 pub enum CreatedStage {
     Reader(Box<dyn Reader>),
@@ -79,6 +87,8 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.ilvis2" => Ok(Box::new(pdal_io::ilvis2::Ilvis2Reader::new(options))),
         "readers.obj" => Ok(Box::new(pdal_io::obj::ObjReader::new(options))),
         "readers.qfit" => Ok(Box::new(pdal_io::qfit::QfitReader::new(options))),
+        "readers.sbet" => Ok(Box::new(pdal_io::sbet::SbetReader::new(options))),
+        "readers.smrmsg" => Ok(Box::new(pdal_io::smrmsg::SmrmsgReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
         _ => Err(StageError(format!(
             "Reader driver '{name}' is not available in the Rust port."
@@ -132,6 +142,7 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.null" => Ok(Box::new(pdal_io::nullwriter::NullWriter::new(options))),
         "writers.text" => Ok(Box::new(pdal_io::text_writer::TextWriter::new(options))),
         "writers.pcd" => Ok(Box::new(pdal_io::pcd::PcdWriter::new(options))),
+        "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options))),
         _ => Err(StageError(format!(
             "Writer driver '{name}' is not available in the Rust port."

@@ -401,15 +401,22 @@ Current status:
   binary path, including 10, 12, and 14-word formats, big-endian word parsing,
   dimension mapping matching PDAL's C++ reader, and regression coverage
   against installed PDAL.
-- Installed-PDAL regressions for these readers/writers are available with:
+  - `readers.sbet` and `writers.sbet` have a Rust implementation for the
+  deterministic Applanix SBET trajectory format, including all 17 dimensions,
+  little-endian double parsing/writing, angular conversion logic (radians
+  to degrees and back), and bit-parity coverage (when conversion is disabled).
+  - `readers.smrmsg` has a Rust implementation for the SBET RMS message format,
+  covering 10 RMS error dimensions with bit-parity matching PDAL's behavior.
+  - Installed-PDAL regressions for these readers/writers are available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test qfit_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test sbet_regression -- --ignored`,
   and
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test qfit_regression -- --ignored`.
-  - `pdal_core::driver` can infer PDAL reader/writer driver names from filenames
-  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test smrmsg_regression -- --ignored`.
+  - `pdal_core::driver` can infer PDAL reader/writer driver names from filenames  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
   construct only currently implemented Rust local readers/writers by driver
   name. Inference may return unported PDAL drivers; construction must still
   fail cleanly until the stage is actually ported.

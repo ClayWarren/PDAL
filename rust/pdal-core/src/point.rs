@@ -56,6 +56,25 @@ pub enum DimId {
     Roll,
     Pdop,
     PulseWidth,
+    XVelocity,
+    YVelocity,
+    ZVelocity,
+    WanderAngle,
+    XBodyAccel,
+    YBodyAccel,
+    ZBodyAccel,
+    XBodyAngRate,
+    YBodyAngRate,
+    ZBodyAngRate,
+    NorthPositionRMS,
+    EastPositionRMS,
+    DownPositionRMS,
+    NorthVelocityRMS,
+    EastVelocityRMS,
+    DownVelocityRMS,
+    RollRMS,
+    PitchRMS,
+    HeadingRMS,
     Other(String),
 }
 
@@ -100,6 +119,25 @@ impl DimId {
             DimId::Roll => "Roll",
             DimId::Pdop => "Pdop",
             DimId::PulseWidth => "PulseWidth",
+            DimId::XVelocity => "XVelocity",
+            DimId::YVelocity => "YVelocity",
+            DimId::ZVelocity => "ZVelocity",
+            DimId::WanderAngle => "WanderAngle",
+            DimId::XBodyAccel => "XBodyAccel",
+            DimId::YBodyAccel => "YBodyAccel",
+            DimId::ZBodyAccel => "ZBodyAccel",
+            DimId::XBodyAngRate => "XBodyAngRate",
+            DimId::YBodyAngRate => "YBodyAngRate",
+            DimId::ZBodyAngRate => "ZBodyAngRate",
+            DimId::NorthPositionRMS => "NorthPositionRMS",
+            DimId::EastPositionRMS => "EastPositionRMS",
+            DimId::DownPositionRMS => "DownPositionRMS",
+            DimId::NorthVelocityRMS => "NorthVelocityRMS",
+            DimId::EastVelocityRMS => "EastVelocityRMS",
+            DimId::DownVelocityRMS => "DownVelocityRMS",
+            DimId::RollRMS => "RollRMS",
+            DimId::PitchRMS => "PitchRMS",
+            DimId::HeadingRMS => "HeadingRMS",
             DimId::Other(s) => s,
         }
     }
@@ -144,6 +182,25 @@ impl DimId {
             "Roll" => DimId::Roll,
             "Pdop" => DimId::Pdop,
             "PulseWidth" => DimId::PulseWidth,
+            "XVelocity" => DimId::XVelocity,
+            "YVelocity" => DimId::YVelocity,
+            "ZVelocity" => DimId::ZVelocity,
+            "WanderAngle" => DimId::WanderAngle,
+            "XBodyAccel" => DimId::XBodyAccel,
+            "YBodyAccel" => DimId::YBodyAccel,
+            "ZBodyAccel" => DimId::ZBodyAccel,
+            "XBodyAngRate" => DimId::XBodyAngRate,
+            "YBodyAngRate" => DimId::YBodyAngRate,
+            "ZBodyAngRate" => DimId::ZBodyAngRate,
+            "NorthPositionRMS" => DimId::NorthPositionRMS,
+            "EastPositionRMS" => DimId::EastPositionRMS,
+            "DownPositionRMS" => DimId::DownPositionRMS,
+            "NorthVelocityRMS" => DimId::NorthVelocityRMS,
+            "EastVelocityRMS" => DimId::EastVelocityRMS,
+            "DownVelocityRMS" => DimId::DownVelocityRMS,
+            "RollRMS" => DimId::RollRMS,
+            "PitchRMS" => DimId::PitchRMS,
+            "HeadingRMS" => DimId::HeadingRMS,
             other => DimId::Other(other.to_string()),
         }
     }
@@ -286,6 +343,13 @@ impl PointView {
     /// Whether the view holds no points.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Truncate the view to `len` points.
+    pub fn truncate(&mut self, len: u64) {
+        let ps = self.layout.point_size();
+        self.data.truncate((len as usize) * ps);
+        self.source_indices.truncate(len as usize);
     }
 
     /// Append a zero-initialised point and return its index.

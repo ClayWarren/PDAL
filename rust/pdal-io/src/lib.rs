@@ -12,5 +12,8 @@ pub mod ply;
 pub mod pts;
 pub mod ptx;
 pub mod qfit;
+pub mod sbet;
+pub mod sbet_writer;
+pub mod smrmsg;
 pub mod text;
 pub mod text_writer;
