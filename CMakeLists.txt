@@ -5,6 +5,28 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+# Homebrew Rust static libraries on macOS 26 carry a 26.0 minimum version.
+# Match that default when callers have not requested an older deployment target.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND
+        NOT CMAKE_OSX_DEPLOYMENT_TARGET AND
+        NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+    find_program(PDAL_XCRUN_EXECUTABLE xcrun)
+    if(PDAL_XCRUN_EXECUTABLE)
+        execute_process(
+            COMMAND ${PDAL_XCRUN_EXECUTABLE} --sdk macosx --show-sdk-version
+            OUTPUT_VARIABLE PDAL_MACOSX_SDK_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(PDAL_MACOSX_SDK_VERSION MATCHES "^([0-9]+)\\.")
+            set(PDAL_MACOSX_SDK_MAJOR "${CMAKE_MATCH_1}")
+            if(PDAL_MACOSX_SDK_MAJOR GREATER_EQUAL 26)
+                set(CMAKE_OSX_DEPLOYMENT_TARGET "${PDAL_MACOSX_SDK_MAJOR}.0"
+                    CACHE STRING "Minimum macOS deployment version" FORCE)
+            endif()
+        endif()
+    endif()
+endif()
+
 project(PDAL VERSION 2.10.1 LANGUAGES CXX C)
 string(TOLOWER ${PROJECT_NAME} PROJECT_NAME_LOWER)
 
