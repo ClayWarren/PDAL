@@ -5,3 +5,4 @@
 
 pub mod faux;
 pub mod nullwriter;
+pub mod text;

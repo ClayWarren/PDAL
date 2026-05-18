@@ -1,0 +1,371 @@
+use pdal_core::metadata::MetadataNode;
+use pdal_core::options::Options;
+use pdal_core::pipeline::Reader;
+use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::stage::StageError;
+use std::fs;
+use std::path::Path;
+use std::rc::Rc;
+
+/// Text reader for simple numeric delimited files.
+pub struct TextReader {
+    filename: String,
+    separator: Option<char>,
+    header: Option<String>,
+    skip: usize,
+}
+
+impl TextReader {
+    pub fn new(options: &Options) -> Self {
+        let separator = options.get_str("separator", "");
+        let header = options.get_str("header", "");
+
+        Self {
+            filename: options.get_str("filename", ""),
+            separator: separator.chars().next(),
+            header: (!header.is_empty()).then_some(header),
+            skip: options.get_u64("skip", 0) as usize,
+        }
+    }
+
+    fn parse_header(&mut self, header: &str) -> Result<Vec<DimId>, StageError> {
+        if header.is_empty() {
+            return Err(StageError("Empty text header.".to_string()));
+        }
+
+        let names = if header.starts_with('"') {
+            self.parse_quoted_header(header)?
+        } else {
+            self.parse_unquoted_header(header)?
+        };
+
+        let mut dims = Vec::with_capacity(names.len());
+        for name in names {
+            let name = name.trim().trim_end_matches('\r');
+            validate_dimension_name(name)?;
+            let dim = DimId::from_name(name);
+            if dims.contains(&dim) {
+                return Err(StageError(format!(
+                    "Duplicate dimension '{name}' detected in input file '{}'.",
+                    self.filename
+                )));
+            }
+            dims.push(dim);
+        }
+        Ok(dims)
+    }
+
+    fn parse_unquoted_header(&mut self, header: &str) -> Result<Vec<String>, StageError> {
+        let separator = match self.separator {
+            Some(separator) => separator,
+            None => {
+                let separator = header
+                    .chars()
+                    .find(|ch| !ch.is_ascii_alphanumeric())
+                    .unwrap_or(' ');
+                self.separator = Some(separator);
+                separator
+            }
+        };
+
+        let names = split_fields(header, separator);
+        if names.is_empty() {
+            Err(StageError(
+                "Text header contains no dimensions.".to_string(),
+            ))
+        } else {
+            Ok(names)
+        }
+    }
+
+    fn parse_quoted_header(&mut self, header: &str) -> Result<Vec<String>, StageError> {
+        let mut names = Vec::new();
+        let mut pos = 0;
+        let bytes = header.as_bytes();
+        let mut inferred_separator: Option<char> = None;
+
+        loop {
+            skip_ascii_whitespace(bytes, &mut pos);
+            if bytes.get(pos) != Some(&b'"') {
+                break;
+            }
+            pos += 1;
+
+            let name_start = pos;
+            while let Some(&byte) = bytes.get(pos) {
+                if byte == b'"' {
+                    break;
+                }
+                pos += 1;
+            }
+            if bytes.get(pos) != Some(&b'"') {
+                return Err(StageError("Unterminated quoted text header.".to_string()));
+            }
+            names.push(header[name_start..pos].to_string());
+            pos += 1;
+
+            let separator_start = pos;
+            while let Some(&byte) = bytes.get(pos) {
+                if byte == b'"' {
+                    break;
+                }
+                pos += 1;
+            }
+
+            let separator_text = header[separator_start..pos].trim();
+            if !separator_text.is_empty() {
+                let mut chars = separator_text.chars();
+                let separator = chars.next().unwrap();
+                if chars.next().is_some() {
+                    return Err(StageError(
+                        "Found separator longer than a single character.".to_string(),
+                    ));
+                }
+                inferred_separator.get_or_insert(separator);
+            }
+
+            if bytes.get(pos) != Some(&b'"') {
+                break;
+            }
+        }
+
+        if names.is_empty() {
+            return Err(StageError(
+                "Text header contains no dimensions.".to_string(),
+            ));
+        }
+        if pos < bytes.len() && !header[pos..].trim().is_empty() {
+            return Err(StageError(format!(
+                "Invalid character '{}' found while parsing quoted header line.",
+                header[pos..].chars().next().unwrap()
+            )));
+        }
+
+        if self.separator.is_none() {
+            self.separator = inferred_separator.or(Some(' '));
+        }
+        Ok(names)
+    }
+
+    fn data_start(&self) -> usize {
+        if self.header.is_some() {
+            self.skip
+        } else {
+            self.skip + 1
+        }
+    }
+}
+
+impl Reader for TextReader {
+    fn name(&self) -> &str {
+        "readers.text"
+    }
+
+    fn read(&mut self) -> Result<Vec<PointView>, StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "TextReader requires a filename option.".to_string(),
+            ));
+        }
+
+        let text = fs::read_to_string(Path::new(&self.filename))
+            .map_err(|_| StageError(format!("Unable to open text file '{}'.", self.filename)))?;
+        let lines: Vec<&str> = text.lines().collect();
+        let header = match &self.header {
+            Some(header) => header.clone(),
+            None => lines
+                .get(self.skip)
+                .ok_or_else(|| StageError("Text file is missing a header line.".to_string()))?
+                .to_string(),
+        };
+        let dims = self.parse_header(&header)?;
+
+        let mut layout = PointLayout::new();
+        for dim in &dims {
+            layout.register(dim.clone(), DimType::F64);
+        }
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+        let separator = self.separator.unwrap_or(' ');
+
+        for line in lines.iter().skip(self.data_start()) {
+            if line.is_empty() {
+                continue;
+            }
+
+            let fields = split_fields(line, separator);
+            if fields.len() != dims.len() {
+                continue;
+            }
+
+            let point = view.add_point();
+            for (field, dim) in fields.iter().zip(&dims) {
+                let value = field.trim().parse::<f64>().unwrap_or(0.0);
+                view.set_f64(point, dim, value);
+            }
+        }
+
+        Ok(vec![view])
+    }
+
+    fn metadata(&self) -> MetadataNode {
+        MetadataNode::new("readers.text")
+    }
+}
+
+fn split_fields(line: &str, separator: char) -> Vec<String> {
+    if separator == ' ' {
+        line.split_whitespace()
+            .map(|field| field.trim().trim_end_matches('\r').to_string())
+            .filter(|field| !field.is_empty())
+            .collect()
+    } else {
+        line.replace(' ', "")
+            .split(separator)
+            .map(|field| field.trim().trim_end_matches('\r').to_string())
+            .collect()
+    }
+}
+
+fn validate_dimension_name(name: &str) -> Result<(), StageError> {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return Err(StageError(
+            "Empty dimension name in text header.".to_string(),
+        ));
+    };
+    if !first.is_ascii_alphabetic() {
+        return Err(StageError(format!(
+            "Invalid character '{first}' in dimension name."
+        )));
+    }
+    if let Some(invalid) = chars.find(|ch| !ch.is_ascii_alphanumeric() && *ch != '_') {
+        return Err(StageError(format!(
+            "Invalid character '{invalid}' in dimension name."
+        )));
+    }
+    Ok(())
+}
+
+fn skip_ascii_whitespace(bytes: &[u8], pos: &mut usize) {
+    while bytes
+        .get(*pos)
+        .is_some_and(|byte| byte.is_ascii_whitespace())
+    {
+        *pos += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn data_path(path: &str) -> String {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        root.join("test/data").join(path).display().to_string()
+    }
+
+    fn read_text(path: &str, configure: impl FnOnce(&mut Options)) -> PointView {
+        let mut options = Options::new();
+        options.add("filename", data_path(path));
+        configure(&mut options);
+
+        let mut reader = TextReader::new(&options);
+        let mut views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+        views.pop().unwrap()
+    }
+
+    #[test]
+    fn reads_comma_delimited_xyz() {
+        let view = read_text("text/utm17_1.txt", |_| {});
+
+        assert_eq!(view.len(), 10);
+        assert_eq!(view.get_f64(0, &DimId::X), 289814.15);
+        assert_eq!(view.get_f64(0, &DimId::Y), 4320978.61);
+        assert_eq!(view.get_f64(0, &DimId::Z), 170.76);
+        assert_eq!(view.get_f64(9, &DimId::X), 289818.50);
+        assert_eq!(view.get_f64(9, &DimId::Y), 4320980.59);
+        assert_eq!(view.get_f64(9, &DimId::Z), 170.58);
+    }
+
+    #[test]
+    fn reads_space_delimited_xyz() {
+        let view = read_text("text/utm17_2.txt", |_| {});
+
+        assert_eq!(view.len(), 10);
+        assert_eq!(view.get_f64(0, &DimId::X), 289814.15);
+        assert_eq!(view.get_f64(9, &DimId::Y), 4320980.59);
+    }
+
+    #[test]
+    fn skips_bad_rows_with_the_wrong_field_count() {
+        let view = read_text("text/utm17_3.txt", |_| {});
+
+        assert_eq!(view.len(), 10);
+        assert_eq!(view.get_f64(0, &DimId::X), 289814.15);
+        assert_eq!(view.get_f64(0, &DimId::Y), 4320978.61);
+    }
+
+    #[test]
+    fn strips_crlf_from_dimension_names() {
+        let view = read_text("text/crlf_test.txt", |_| {});
+
+        assert_eq!(view.len(), 10);
+        for idx in 0..view.len() {
+            assert_eq!(view.get_f64(idx, &DimId::Intensity), idx as f64);
+        }
+    }
+
+    #[test]
+    fn supports_override_header_and_skip() {
+        let view = read_text("text/crlf_test.txt", |options| {
+            options.add("skip", 1).add("header", "A,B,C,G");
+        });
+
+        assert_eq!(view.len(), 10);
+        assert_eq!(view.get_f64(0, &DimId::Other("A".to_string())), 289814.15);
+        assert_eq!(view.get_f64(9, &DimId::Other("G".to_string())), 9.0);
+    }
+
+    #[test]
+    fn supports_inserted_header_without_skipping_file_header() {
+        let view = read_text("text/crlf_test.txt", |options| {
+            options.add("header", "A,B,C,G");
+        });
+
+        assert_eq!(view.len(), 11);
+        assert_eq!(view.get_f64(0, &DimId::Other("A".to_string())), 0.0);
+        assert_eq!(view.get_f64(10, &DimId::Other("G".to_string())), 9.0);
+    }
+
+    #[test]
+    fn supports_quoted_headers() {
+        let view = read_text("text/quoted.txt", |_| {});
+
+        assert_eq!(view.len(), 9);
+        assert_eq!(view.get_f64(0, &DimId::X), 0.0);
+        assert_eq!(view.get_f64(8, &DimId::Y), 22.0);
+    }
+
+    #[test]
+    fn rejects_duplicate_dimensions() {
+        let mut options = Options::new();
+        options.add("filename", data_path("text/badheader.txt"));
+        let mut reader = TextReader::new(&options);
+
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_quoted_headers() {
+        let mut options = Options::new();
+        options
+            .add("filename", data_path("text/quoted.txt"))
+            .add("skip", 1)
+            .add("header", "\"X\",\"Y\"   \"  ");
+        let mut reader = TextReader::new(&options);
+
+        assert!(reader.read().is_err());
+    }
+}

@@ -23,6 +23,20 @@ pub unsafe extern "C" fn pdal_reader_create_faux(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create a TextReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_text(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::text::TextReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Destroy a reader handle.
 ///
 /// # Safety

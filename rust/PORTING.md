@@ -236,6 +236,16 @@ Done when:
 - The pipeline slice can use the ported I/O path end to end.
 - Existing filter/core tests still pass.
 
+Current status:
+
+- `readers.faux` and `writers.null` live in `pdal-io` as the in-memory pipeline
+  harness.
+- `readers.text` has a first Rust implementation covering existing C++ fixture
+  behavior for simple delimited numeric text, CRLF headers, override/inserted
+  headers, quoted headers, duplicate dimensions, and skipped malformed rows.
+- `writers.text` is the natural next I/O slice before any binary,
+  compression-backed, GDAL-backed, or remote reader/writer work.
+
 ### 7. Apps, Tools, Then Kernels
 
 Goal: move top-layer command behavior only after the library surface is stable.

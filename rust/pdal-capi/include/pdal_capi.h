@@ -254,6 +254,7 @@ pdal_stage_t* pdal_stage_create_crop(bool outside, const pdal_box3d_t* bounds, u
 
 // Reader
 pdal_reader_t* pdal_reader_create_faux(const pdal_options_t* ops);
+pdal_reader_t* pdal_reader_create_text(const pdal_options_t* ops);
 void pdal_reader_destroy(pdal_reader_t* reader);
 
 // Writer
