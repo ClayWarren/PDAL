@@ -508,6 +508,12 @@ PDAL_ADD_TEST(pdal_filters_voxel_downsize_test FILES filters/VoxelDownsizeFilter
 
 PDAL_ADD_TEST(pdal_app_test FILES apps/AppTest.cpp)
 PDAL_ADD_TEST(pdal_app_plugin_test FILES apps/AppPluginTest.cpp)
+PDAL_ADD_TEST(pdal_eval_test
+    FILES
+        apps/EvalTest.cpp
+    INCLUDES
+        ${PDAL_VENDOR_EIGEN_DIR}
+)
 PDAL_ADD_TEST(pdal_info_test FILES apps/InfoTest.cpp)
 PDAL_ADD_TEST(pdal_tile_test FILES apps/TileTest.cpp)
 
