@@ -59,8 +59,8 @@ Current target crates:
   vertical slice begins.
 - `pdal-kernels`: CLI subcommands. Placeholder and intentionally last.
 - `pdal-cli`: thin executable surface.
-- `pdal-plugins`: future plugin SDK placeholder. Do not use until a versioned
-  plugin boundary is designed.
+- `pdal-plugins`: plugin metadata and discovery helpers. Do not port optional
+  plugins or add a loading SDK until a versioned plugin boundary is designed.
 
 What should stay 1:1 with C++:
 

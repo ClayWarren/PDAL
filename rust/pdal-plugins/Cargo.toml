@@ -3,7 +3,7 @@ name = "pdal-plugins"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Placeholder crate for a future PDAL Rust plugin SDK."
+description = "Plugin metadata and discovery helpers for the PDAL Rust port."
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }
