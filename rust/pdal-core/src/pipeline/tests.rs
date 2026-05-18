@@ -77,6 +77,28 @@ impl Streamable for DuplicateFilter {
     }
 }
 
+struct ErrorFilter;
+
+impl Filter for ErrorFilter {
+    fn name(&self) -> &str {
+        "filters.error"
+    }
+
+    fn run(&mut self, _input: &PointView) -> Result<Vec<PointView>, StageError> {
+        Err(StageError("filter failed".to_string()))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Streamable for ErrorFilter {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+        true
+    }
+}
+
 /// A test reader that generates N points with Z = 1..N.
 struct TestReader {
     count: u64,
@@ -344,6 +366,57 @@ fn test_duplicate_tag_error() {
 }
 
 #[test]
+fn test_set_tag_replaces_existing_tag_mapping() {
+    let mut pipeline = Pipeline::new();
+    let stage = pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        Options::new(),
+    );
+
+    pipeline.set_tag(stage, "before").unwrap();
+    assert_eq!(pipeline.find_by_tag("before"), Some(stage));
+
+    pipeline.set_tag(stage, "after").unwrap();
+    assert_eq!(pipeline.find_by_tag("before"), None);
+    assert_eq!(pipeline.find_by_tag("after"), Some(stage));
+}
+
+#[test]
+fn test_set_tag_rejects_duplicate_existing_tag() {
+    let mut pipeline = Pipeline::new();
+    let first = pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        Options::new(),
+    );
+    let second = pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        Options::new(),
+    );
+
+    pipeline.set_tag(first, "used").unwrap();
+    let result = pipeline.set_tag(second, "used");
+
+    assert!(result.is_err());
+    assert_eq!(pipeline.find_by_tag("used"), Some(first));
+}
+
+#[test]
+fn test_add_dependency_rejects_out_of_range_indices() {
+    let mut pipeline = Pipeline::new();
+    let stage = pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        Options::new(),
+    );
+
+    assert!(pipeline.add_dependency(stage, stage + 1).is_err());
+    assert!(pipeline.add_dependency(stage + 1, stage).is_err());
+}
+
+#[test]
 fn test_cycle_detection() {
     let mut pipeline = Pipeline::new();
     let s0 = pipeline.add_stage(
@@ -365,6 +438,21 @@ fn test_cycle_detection() {
 }
 
 #[test]
+fn test_filter_error_stops_pipeline_execution() {
+    let mut pipeline = Pipeline::new();
+    pipeline.add_stage(
+        "filters.error",
+        Box::new(FilterWrapper::new(ErrorFilter)),
+        Options::new(),
+    );
+
+    match pipeline.execute(vec![make_test_view(1)]) {
+        Ok(_) => panic!("expected filter failure"),
+        Err(err) => assert_eq!(err.0, "filter failed"),
+    }
+}
+
+#[test]
 fn test_execute_result() {
     let mut pipeline = Pipeline::new();
     pipeline.add_stage(
@@ -377,6 +465,26 @@ fn test_execute_result() {
     let result = pipeline.execute_with_result(views).unwrap();
     assert_eq!(result.point_count, 42);
     assert_eq!(result.view_count, 1);
+}
+
+#[test]
+fn test_writer_leaf_does_not_hide_other_leaf_outputs() {
+    let mut pipeline = Pipeline::new();
+    let reader = pipeline.add_reader("readers.test", Box::new(TestReader::new(6)), Options::new());
+    let filter = pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        Options::new(),
+    );
+    let writer = pipeline.add_writer("writers.test", Box::new(TestWriter::new()), Options::new());
+
+    pipeline.add_dependency(filter, reader).unwrap();
+    pipeline.add_dependency(writer, reader).unwrap();
+
+    let result = pipeline.execute(Vec::new()).unwrap();
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].len(), 6);
 }
 
 #[test]
