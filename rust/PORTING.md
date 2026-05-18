@@ -66,6 +66,153 @@ Follow this order unless the plan is deliberately revised:
 Do not jump to `kernels/` or broad `io/` work just because those areas are
 smaller or visible. The first milestone is filter parity through the C ABI.
 
+## Checkpoint Roadmap
+
+Treat these as ordered checkpoints on the way to a complete Rust-backed PDAL.
+Each checkpoint should end in a commit with the listed gates passing. Do not
+advance by claiming a directory is "done" only because it builds.
+
+### 1. Filter ABI And Pure Filter Parity
+
+Goal: prove the Rust core -> C ABI -> C++ wrapper loop with filters that do not
+need external libraries.
+
+Required shape:
+
+- Rust-owned `PointLayout`, `PointView`, options, stages, source indices,
+  per-view spatial reference, and explicit C++/Rust view conversion.
+- Dependency-free filters ported in small families, with existing C++ tests
+  passing.
+- C++ tests strengthened first where they do not assert output behavior.
+
+Done when:
+
+- Rust unit/parity tests pass.
+- The matching C++ filter test binaries pass.
+- The full `pdal_filters_*` CTest slice passes.
+- No C++ object pointer crosses the C ABI.
+
+### 2. Filter Bridge Contract Complete
+
+Goal: make the shared C ABI bridge strict enough that later ports cannot pass
+by accidentally dropping behavior.
+
+Required shape:
+
+- Dimension names and storage types round-trip through the C ABI.
+- Rust output dimensions are verified against PDAL's prepared C++ layout.
+- Spatial reference text and coordinate epoch round-trip for Rust-backed views.
+- Metadata produced by Rust can be copied into C++ `MetadataNode` trees.
+- Streaming, in-place, single-output, and multi-output wrapper paths each have
+  representative coverage.
+
+Done when:
+
+- The full `pdal_filters_*` CTest slice passes.
+- Rust `cargo fmt`, `cargo clippy --workspace -- -D warnings`, and
+  `cargo test --workspace` pass.
+- New bridge behavior has direct Rust or C++ regression coverage.
+
+### 3. Spatial And Linear Filter Families
+
+Goal: finish the filter families that need shared algorithmic core support.
+
+Required shape:
+
+- Spatial filters share one Rust spatial-neighbor API. The initial
+  implementation may be brute force, but filters must not bake in a private
+  one-off neighbor search that prevents a later KD-tree swap.
+- Linear/statistical filters share one Rust linear algebra/statistics layer
+  where practical.
+- Existing C++ tests remain the parity gate, with added assertions before ports
+  when tests only exercise code without checking outputs.
+
+Done when:
+
+- Ported spatial and linear/statistical filters pass their C++ test binaries.
+- The full `pdal_filters_*` CTest slice passes.
+- The shared Rust APIs are documented enough that new filters use them instead
+  of duplicating local algorithms.
+
+### 4. Deferred Filter Families
+
+Goal: handle the remaining filters only after their ABI or algorithm choice is
+explicit.
+
+Required shape:
+
+- GDAL/PROJ/SRS filters choose a Rust crate or explicit FFI strategy before
+  porting implementation code.
+- Private-algorithm filters decide per algorithm whether to port to Rust,
+  bind through FFI, or intentionally leave C++ in place.
+- Process/pipeline/framework filters are not ported until the relevant core
+  pipeline model exists behind the C ABI.
+
+Done when:
+
+- Each family has a short design note or commit message explaining port versus
+  FFI versus defer.
+- Existing C++ tests pass, with coverage added first where needed.
+- The full `pdal_filters_*` CTest slice passes.
+
+### 5. Core Pipeline Slice
+
+Goal: expand from filter execution into the minimum `pdal/` core needed to run
+simple pipelines through the ABI.
+
+Required shape:
+
+- Stable C ABI handles for pipeline construction, options, stage creation,
+  point tables/views, metadata, and errors.
+- C++ wrappers remain compatibility peers, not the hidden contract.
+- Pipeline behavior is validated against existing C++ tests or equivalent
+  parity tests using the same inputs and asserted outputs.
+
+Done when:
+
+- A simple reader/filter/writer or in-memory pipeline can run through the Rust
+  core boundary.
+- Relevant `pdal/` unit tests or parity tests pass.
+- Existing filter tests still pass.
+
+### 6. I/O Vertical Slice
+
+Goal: prove readers/writers after the core and filter ABI are stable.
+
+Start with the smallest deterministic format path that avoids unnecessary
+external FFI. Do not begin with LAS, GDAL, PROJ, compression, or remote I/O
+unless the spike explicitly requires that complexity.
+
+Required shape:
+
+- One reader and one writer path behind the C ABI.
+- Byte-level and metadata behavior checked against existing C++ tests or
+  fixtures.
+- External dependencies stay external through Rust crates or explicit FFI.
+
+Done when:
+
+- The matching C++ I/O test binary passes.
+- The pipeline slice can use the ported I/O path end to end.
+- Existing filter/core tests still pass.
+
+### 7. Apps, Tools, Then Kernels
+
+Goal: move top-layer command behavior only after the library surface is stable.
+
+Required shape:
+
+- `apps/` and `tools/` move before `kernels/`.
+- `kernels/` remain last because they sit above pipeline, stage, options, I/O,
+  logging, and error behavior.
+- CLI output and exit behavior are regression-tested against existing commands.
+
+Done when:
+
+- The relevant app/tool/kernel tests pass.
+- Regression comparisons against the C++ implementation are clean or explained.
+- Lower-layer core/filter/I/O tests remain green.
+
 ## Core Status
 
 Current Rust core primitives:
