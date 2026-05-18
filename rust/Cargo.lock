@@ -435,6 +435,7 @@ name = "pdal-io"
 version = "0.0.0"
 dependencies = [
  "pdal-core",
+ "pdal-filters",
 ]
 
 [[package]]

@@ -7,3 +7,6 @@ description = "First-party readers and writers for the PDAL Rust port."
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }
+
+[dev-dependencies]
+pdal-filters = { path = "../pdal-filters" }

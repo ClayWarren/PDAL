@@ -259,6 +259,7 @@ void pdal_reader_destroy(pdal_reader_t* reader);
 
 // Writer
 pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
+pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 void pdal_writer_destroy(pdal_writer_t* writer);
 
 // Pipeline

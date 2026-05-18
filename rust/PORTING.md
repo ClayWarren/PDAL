@@ -278,10 +278,16 @@ Current status:
 
 - `readers.faux` and `writers.null` live in `pdal-io` as the in-memory pipeline
   harness.
-- `readers.text` has a first Rust implementation covering existing C++ fixture
+- `readers.text` has a Rust implementation covering existing C++ fixture
   behavior for simple delimited numeric text, CRLF headers, override/inserted
   headers, quoted headers, duplicate dimensions, and skipped malformed rows.
-- `writers.text` is the natural next I/O slice before any binary,
+- `writers.text` has a Rust implementation covering existing C++ fixture
+  behavior for CSV output, dimension order, per-dimension precision, custom
+  delimiters, quoted/unquoted headers, and simple GeoJSON output.
+- The Rust pipeline has a reader -> decimation filter -> writer regression test
+  for the text slice.
+- The next I/O target should be another local deterministic text-like format
+  only after the text C++ parity gates are wired. Avoid binary,
   compression-backed, GDAL-backed, or remote reader/writer work.
 
 ### 7. Apps, Tools, Then Kernels

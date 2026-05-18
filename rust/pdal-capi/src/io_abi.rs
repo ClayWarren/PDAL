@@ -72,6 +72,20 @@ pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut Wr
     Box::into_raw(Box::new(WriterHandle { writer }))
 }
 
+/// Create a TextWriter.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_text(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::text_writer::TextWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Destroy a writer handle.
 ///
 /// # Safety
