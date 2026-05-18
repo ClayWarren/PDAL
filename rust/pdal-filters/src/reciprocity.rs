@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -38,16 +38,12 @@ impl Filter for ReciprocityFilter {
 }
 
 impl Streamable for ReciprocityFilter {
-    fn process_one(
-        &mut self,
-        _view: &pdal_core::point::PointView,
-        _idx: pdal_core::point::PointId,
-    ) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
         false
     }
 }
 
-fn reciprocity_for(index: &SpatialIndex3d, idx: PointId, knn: usize) -> f64 {
+fn reciprocity_for(index: &SpatialIndex3d, idx: pdal_core::point::PointId, knn: usize) -> f64 {
     if knn == 0 {
         return 0.0;
     }

@@ -97,7 +97,7 @@ impl Filter for RandomizeFilter {
 impl Streamable for RandomizeFilter {
     fn process_one(
         &mut self,
-        _view: &pdal_core::point::PointView,
+        _view: &mut pdal_core::point::PointView,
         _idx: pdal_core::point::PointId,
     ) -> bool {
         // Shuffling points is inherently batch-only and not streamable

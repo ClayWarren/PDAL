@@ -168,11 +168,7 @@ impl Filter for StatsFilter {
 }
 
 impl Streamable for StatsFilter {
-    fn process_one(
-        &mut self,
-        _view: &pdal_core::point::PointView,
-        _idx: pdal_core::point::PointId,
-    ) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
         false
     }
 

@@ -80,16 +80,17 @@ impl Filter for EigenvaluesFilter {
 }
 
 impl Streamable for EigenvaluesFilter {
-    fn process_one(
-        &mut self,
-        _view: &pdal_core::point::PointView,
-        _idx: pdal_core::point::PointId,
-    ) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
         false
     }
 }
 
-fn strided_knn(index: &SpatialIndex3d, idx: PointId, count: usize, stride: usize) -> Vec<PointId> {
+fn strided_knn(
+    index: &SpatialIndex3d,
+    idx: pdal_core::point::PointId,
+    count: usize,
+    stride: usize,
+) -> Vec<PointId> {
     let neighbors = index.knn(idx, count.saturating_mul(stride));
     if stride == 1 {
         return neighbors.into_iter().map(|(id, _dist)| id).collect();

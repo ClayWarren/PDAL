@@ -3,7 +3,7 @@
 
 use pdal_core::expr::ConditionalExpression;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
-use pdal_core::point::{DimId, PointId, PointLayout, PointView};
+use pdal_core::point::{DimId, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::collections::BTreeMap;
 
@@ -112,7 +112,7 @@ impl Streamable for ExpressionStatsFilter {
         }
     }
 
-    fn process_one(&mut self, view: &PointView, idx: PointId) -> bool {
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
         if self.ensure_prepared(view.layout().as_ref()).is_err() {
             return true;
         }

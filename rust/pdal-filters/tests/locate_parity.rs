@@ -61,7 +61,7 @@ fn test_locate_stream() {
     let mut filter = LocateFilter::new("Z".to_string(), "max".to_string());
     filter.reset();
     // Streamable::process_one should always return false for LocateFilter as it does not stream
-    let scratch =
+    let mut scratch =
         pdal_core::point::PointView::new(std::rc::Rc::new(pdal_core::point::PointLayout::new()));
-    assert!(!filter.process_one(&scratch, 0));
+    assert!(!filter.process_one(&mut scratch, 0));
 }

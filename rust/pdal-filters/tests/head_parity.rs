@@ -58,10 +58,10 @@ fn test_head_stream_no_invert() {
     let mut filter = HeadFilter::new(4, false);
     filter.reset();
 
-    let scratch = PointView::new(Rc::new(PointLayout::new()));
+    let mut scratch = PointView::new(Rc::new(PointLayout::new()));
     let mut kept = Vec::new();
     for i in 1u64..=10 {
-        if filter.process_one(&scratch, i) {
+        if filter.process_one(&mut scratch, i) {
             kept.push(i);
         }
     }
@@ -73,10 +73,10 @@ fn test_head_stream_invert() {
     let mut filter = HeadFilter::new(4, true);
     filter.reset();
 
-    let scratch = PointView::new(Rc::new(PointLayout::new()));
+    let mut scratch = PointView::new(Rc::new(PointLayout::new()));
     let mut kept = Vec::new();
     for i in 1u64..=10 {
-        if filter.process_one(&scratch, i) {
+        if filter.process_one(&mut scratch, i) {
             kept.push(i);
         }
     }

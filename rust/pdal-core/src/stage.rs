@@ -43,5 +43,5 @@ pub trait Streamable {
     /// Mirrors PDAL's `Streamable::processOne(PointRef&)`: the point is always
     /// passed. Counter-based filters (decimation, head, tail) ignore it, just
     /// as `DecimationFilter::processOne` ignores its `PointRef&` in C++.
-    fn process_one(&mut self, view: &PointView, idx: PointId) -> bool;
+    fn process_one(&mut self, view: &mut PointView, idx: PointId) -> bool;
 }

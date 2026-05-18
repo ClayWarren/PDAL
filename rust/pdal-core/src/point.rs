@@ -40,6 +40,7 @@ pub enum DimId {
     Eigenvalue2,
     OptimalKNN,
     OptimalRadius,
+    H3,
     Other(String),
 }
 
@@ -68,6 +69,7 @@ impl DimId {
             DimId::Eigenvalue2 => "Eigenvalue2",
             DimId::OptimalKNN => "OptimalKNN",
             DimId::OptimalRadius => "OptimalRadius",
+            DimId::H3 => "H3",
             DimId::Other(s) => s,
         }
     }
@@ -96,6 +98,7 @@ impl DimId {
             "Eigenvalue2" => DimId::Eigenvalue2,
             "OptimalKNN" => DimId::OptimalKNN,
             "OptimalRadius" => DimId::OptimalRadius,
+            "H3" => DimId::H3,
             other => DimId::Other(other.to_string()),
         }
     }

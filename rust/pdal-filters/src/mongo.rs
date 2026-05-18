@@ -9,7 +9,7 @@
 //! document is rejected there); dimension references are resolved against the
 //! point layout on the first run.
 
-use pdal_core::point::{DimId, PointId, PointLayout, PointView};
+use pdal_core::point::{DimId, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use serde_json::{Map, Value};
 
@@ -66,7 +66,7 @@ impl Operand {
         }
     }
 
-    fn get(&self, view: &PointView, idx: PointId) -> f64 {
+    fn get(&self, view: &PointView, idx: pdal_core::point::PointId) -> f64 {
         match self {
             Operand::Value(v) => *v,
             Operand::Dim(d) => view.get_f64(idx, d),
@@ -147,7 +147,7 @@ impl Comparison {
         Ok(())
     }
 
-    fn eval(&self, view: &PointView, idx: PointId) -> bool {
+    fn eval(&self, view: &PointView, idx: pdal_core::point::PointId) -> bool {
         match self {
             Comparison::Single { dim, op, operand } => {
                 let a = view.get_f64(idx, dim);
@@ -199,7 +199,7 @@ impl Gate {
         }
     }
 
-    fn eval(&self, view: &PointView, idx: PointId) -> bool {
+    fn eval(&self, view: &PointView, idx: pdal_core::point::PointId) -> bool {
         match self {
             Gate::And(children) => children.iter().all(|c| c.eval(view, idx)),
             Gate::Or(children) => children.iter().any(|c| c.eval(view, idx)),
@@ -251,7 +251,7 @@ fn build(out: &mut Vec<Gate>, json: &Value) -> Result<(), String> {
                 }
                 _ => unreachable!(),
             });
-        } else if !val.is_object() || val.as_object().map_or(false, |o| o.len() == 1) {
+        } else if !val.is_object() || val.as_object().is_some_and(|o| o.len() == 1) {
             // A comparison object (or a bare value shorthand for `$eq`).
             collected.push(Gate::Compare(Comparison::create(key, val)?));
         } else {
@@ -260,7 +260,10 @@ fn build(out: &mut Vec<Gate>, json: &Value) -> Result<(), String> {
             for (inner_key, inner_val) in val.as_object().unwrap() {
                 let mut nest = Map::new();
                 nest.insert(inner_key.clone(), inner_val.clone());
-                collected.push(Gate::Compare(Comparison::create(key, &Value::Object(nest))?));
+                collected.push(Gate::Compare(Comparison::create(
+                    key,
+                    &Value::Object(nest),
+                )?));
             }
         }
     }
@@ -288,7 +291,7 @@ impl MongoExpressionFilter {
         let value: Value = serde_json::from_str(json_text)
             .map_err(|e| StageError(format!("Invalid JSON expression: {e}")))?;
         if value.is_null() {
-             return Err(StageError("No expressions provided".to_string()));
+            return Err(StageError("No expressions provided".to_string()));
         }
         let mut children: Vec<Gate> = Vec::new();
         build(&mut children, &value).map_err(StageError)?;
@@ -332,7 +335,7 @@ impl Filter for MongoExpressionFilter {
 }
 
 impl Streamable for MongoExpressionFilter {
-    fn process_one(&mut self, view: &PointView, idx: PointId) -> bool {
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
         if self.ensure_prepared(view.layout().as_ref()).is_err() {
             return false;
         }
@@ -361,7 +364,7 @@ mod tests {
     }
 
     fn check(filter: &mut MongoExpressionFilter, view: &PointView) -> bool {
-        filter.process_one(view, 0)
+        filter.process_one(&mut view.clone(), 0)
     }
 
     #[test]
@@ -389,8 +392,7 @@ mod tests {
             ("$lt", true, false, false),
             ("$lte", true, true, false),
         ] {
-            let mut f =
-                MongoExpressionFilter::new(&format!(r#"{{"X": {{"{op}": 0}}}}"#)).unwrap();
+            let mut f = MongoExpressionFilter::new(&format!(r#"{{"X": {{"{op}": 0}}}}"#)).unwrap();
             assert_eq!(check(&mut f, &point(-1.0, 0.0, 0.0)), neg, "{op} neg");
             assert_eq!(check(&mut f, &point(0.0, 0.0, 0.0)), zero, "{op} zero");
             assert_eq!(check(&mut f, &point(1.0, 0.0, 0.0)), pos, "{op} pos");
@@ -410,8 +412,7 @@ mod tests {
 
     #[test]
     fn implicit_and_within_a_dimension() {
-        let mut f =
-            MongoExpressionFilter::new(r#"{"X": {"$gt": 0, "$lt": 2}}"#).unwrap();
+        let mut f = MongoExpressionFilter::new(r#"{"X": {"$gt": 0, "$lt": 2}}"#).unwrap();
         assert!(!check(&mut f, &point(0.0, 0.0, 0.0)));
         assert!(check(&mut f, &point(1.0, 0.0, 0.0)));
         assert!(!check(&mut f, &point(2.0, 0.0, 0.0)));
@@ -437,8 +438,7 @@ mod tests {
 
     #[test]
     fn logical_not() {
-        let mut f =
-            MongoExpressionFilter::new(r#"{"$not": {"X": {"$gt": 0}}}"#).unwrap();
+        let mut f = MongoExpressionFilter::new(r#"{"$not": {"X": {"$gt": 0}}}"#).unwrap();
         assert!(check(&mut f, &point(-1.0, 0.0, 0.0)));
         assert!(check(&mut f, &point(0.0, 0.0, 0.0)));
         assert!(!check(&mut f, &point(1.0, 0.0, 0.0)));

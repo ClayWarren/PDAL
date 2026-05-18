@@ -100,7 +100,7 @@ void pdal_stage_destroy(pdal_stage_t* stage);
 void pdal_stage_reset(pdal_stage_t* stage);
 pdal_metadata_node_t* pdal_stage_metadata(const pdal_stage_t* stage);
 bool pdal_stage_process_one(pdal_stage_t* stage);
-bool pdal_stage_process_one_at(pdal_stage_t* stage, const pdal_point_view_t* view, uint64_t idx);
+bool pdal_stage_process_one_at(pdal_stage_t* stage, pdal_point_view_t* view, uint64_t idx);
 pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage, pdal_point_view_t* input);
 uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input, pdal_point_view_t** outputs, uint64_t max_outputs);
 
@@ -209,6 +209,42 @@ pdal_metadata_node_t* pdal_expressionstats_metadata(
     uint64_t count
 );
 
+
+// GDAL/PROJ Family Additions
+pdal_stage_t* pdal_stage_create_h3(uint64_t resolution);
+pdal_stage_t* pdal_stage_create_reprojection(const char* out_srs, const char* in_srs, bool error_on_failure);
+pdal_stage_t* pdal_stage_create_geomdistance(const char* wkt, const char* dim_name);
+pdal_stage_t* pdal_stage_create_overlay(const char* dim_name, const char* datasource, const char* column);
+pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
+pdal_stage_t* pdal_stage_create_projpipeline(const char* out_srs, const char* coord_op, bool reverse);
+
+typedef struct {
+    const char* name;
+    uint32_t band;
+    double scale;
+} pdal_band_info_t;
+
+pdal_stage_t* pdal_stage_create_colorinterp(const char* dim_name, const char* ramp, double min, double max, bool clamp, bool invert);
+pdal_stage_t* pdal_stage_create_colorization(const char* raster_path, const pdal_band_info_t* bands, uint64_t count);
+pdal_stage_t* pdal_stage_create_dem(const char* dim_name, const char* raster_path, int32_t band, double lower_bound, double upper_bound);
+pdal_stage_t* pdal_stage_create_hag_dem(const char* raster_path, int32_t band, bool zero_ground, double min_clamp, double max_clamp, double nodata_height, uint8_t ground_class);
+
+typedef struct {
+    double minx;
+    double miny;
+    double minz;
+    double maxx;
+    double maxy;
+    double maxz;
+} pdal_box3d_t;
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+} pdal_point3d_t;
+
+pdal_stage_t* pdal_stage_create_crop(bool outside, const pdal_box3d_t* bounds, uint64_t bounds_count, const char* const* polygons, uint64_t poly_count, const pdal_point3d_t* centers, uint64_t center_count, double distance);
 
 #ifdef __cplusplus
 }

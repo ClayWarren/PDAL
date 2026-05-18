@@ -78,11 +78,7 @@ impl Filter for VoxelCentroidNearestNeighborFilter {
 }
 
 impl Streamable for VoxelCentroidNearestNeighborFilter {
-    fn process_one(
-        &mut self,
-        _view: &pdal_core::point::PointView,
-        _idx: pdal_core::point::PointId,
-    ) -> bool {
+    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
         false
     }
 }
@@ -100,7 +96,11 @@ fn centroid(view: &PointView, ids: &[PointId]) -> (f64, f64, f64) {
     (x / count, y / count, z / count)
 }
 
-fn squared_distance_to(view: &PointView, idx: PointId, point: (f64, f64, f64)) -> f64 {
+fn squared_distance_to(
+    view: &PointView,
+    idx: pdal_core::point::PointId,
+    point: (f64, f64, f64),
+) -> f64 {
     let dx = point.0 - view.get_f64(idx, &DimId::X);
     let dy = point.1 - view.get_f64(idx, &DimId::Y);
     let dz = point.2 - view.get_f64(idx, &DimId::Z);

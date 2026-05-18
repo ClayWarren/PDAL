@@ -109,12 +109,9 @@ impl Filter for AssignFilter {
 }
 
 impl Streamable for AssignFilter {
-    fn process_one(
-        &mut self,
-        _view: &pdal_core::point::PointView,
-        _idx: pdal_core::point::PointId,
-    ) -> bool {
-        false
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
+        self.assign_point(view, idx);
+        true
     }
 
     fn reset(&mut self) {}

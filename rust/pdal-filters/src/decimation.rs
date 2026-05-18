@@ -61,7 +61,7 @@ impl Streamable for DecimationFilter {
 
     fn process_one(
         &mut self,
-        _view: &pdal_core::point::PointView,
+        _view: &mut pdal_core::point::PointView,
         _idx: pdal_core::point::PointId,
     ) -> bool {
         let expected = self.offset + (self.kept as f64 * self.step).round() as u64;

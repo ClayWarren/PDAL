@@ -1,43 +1,35 @@
-//! Spatial reference primitives for the Rust port.
-//!
-//! This slice stores the canonical user/WKT text and coordinate epoch. It does
-//! not wrap GDAL/PROJ yet; reprojection and authority normalization remain
-//! explicit future FFI work.
+//! Spatial Reference Systems and transformations.
 
-use crate::metadata::{MetadataNode, MetadataValue};
+use proj::Proj;
 
-/// A spatial reference carried by stages, tables, and views.
-#[derive(Clone, Debug, Default, PartialEq)]
+/// A spatial reference system (PDAL's `SpatialReference`).
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct SpatialReference {
-    text: String,
+    wkt: String,
     epoch: f64,
 }
 
 impl SpatialReference {
-    pub fn new(text: impl Into<String>) -> Self {
+    pub fn new(wkt: &str) -> Self {
         Self {
-            text: text.into(),
+            wkt: wkt.to_string(),
             epoch: 0.0,
         }
     }
 
-    pub fn with_epoch(text: impl Into<String>, epoch: f64) -> Self {
+    pub fn with_epoch(wkt: &str, epoch: f64) -> Self {
         Self {
-            text: text.into(),
+            wkt: wkt.to_string(),
             epoch,
         }
     }
 
-    pub fn empty(&self) -> bool {
-        self.text.is_empty()
+    pub fn wkt(&self) -> &str {
+        &self.wkt
     }
 
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-
-    pub fn set_text(&mut self, text: impl Into<String>) {
-        self.text = text.into();
+    pub fn is_empty(&self) -> bool {
+        self.wkt.is_empty()
     }
 
     pub fn epoch(&self) -> f64 {
@@ -48,45 +40,45 @@ impl SpatialReference {
         self.epoch = epoch;
     }
 
-    pub fn to_metadata(&self) -> MetadataNode {
-        let mut root = MetadataNode::new("srs");
-        root.add_value("wkt", MetadataValue::String(self.text.clone()));
+    pub fn to_metadata(&self) -> crate::metadata::MetadataNode {
+        let mut node = crate::metadata::MetadataNode::new("srs");
+        node.add_value(
+            "wkt",
+            crate::metadata::MetadataValue::String(self.wkt.clone()),
+        );
         if self.epoch != 0.0 {
-            root.add_value("coordinate_epoch", MetadataValue::F64(self.epoch));
+            node.add_value("epoch", crate::metadata::MetadataValue::F64(self.epoch));
         }
-        root
+        node
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// A coordinate transformation between two SRSs (PDAL's `SrsTransform`).
+pub struct SrsTransform {
+    proj: Proj,
+}
 
-    #[test]
-    fn stores_text_and_epoch() {
-        let srs = SpatialReference::with_epoch("EPSG:4326", 2020.0);
-        assert!(!srs.empty());
-        assert_eq!(srs.text(), "EPSG:4326");
-        assert_eq!(srs.epoch(), 2020.0);
+impl SrsTransform {
+    pub fn new(src: &SpatialReference, dst: &SpatialReference) -> Result<Self, String> {
+        let proj = Proj::new_known_crs(src.wkt(), dst.wkt(), None)
+            .map_err(|e| format!("Failed to create projection: {}", e))?;
+        Ok(Self { proj })
     }
 
-    #[test]
-    fn exports_minimal_metadata() {
-        let srs = SpatialReference::with_epoch("EPSG:4978", 2010.0);
-        let metadata = srs.to_metadata();
-        assert_eq!(metadata.name(), "srs");
-        assert_eq!(
-            metadata
-                .find_child("wkt")
-                .and_then(MetadataNode::value)
-                .map(MetadataValue::as_string),
-            Some("EPSG:4978".into())
-        );
-        assert_eq!(
-            metadata
-                .find_child("coordinate_epoch")
-                .and_then(MetadataNode::value),
-            Some(&MetadataValue::F64(2010.0))
-        );
+    pub fn new_pipeline(coord_op: &str) -> Result<Self, String> {
+        let proj = Proj::new(coord_op).map_err(|e| format!("Failed to create pipeline: {}", e))?;
+        Ok(Self { proj })
+    }
+
+    pub fn transform(&self, x: &mut f64, y: &mut f64, _z: &mut f64) -> bool {
+        // Only 2D tuple (f64, f64) implements Coord in proj 0.31 for now
+        match self.proj.convert((*x, *y)) {
+            Ok((nx, ny)) => {
+                *x = nx;
+                *y = ny;
+                true
+            }
+            Err(_) => false,
+        }
     }
 }

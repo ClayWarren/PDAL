@@ -6,7 +6,7 @@
 //! In streaming mode (a single expression) it decides each point in turn.
 
 use pdal_core::expr::ConditionalExpression;
-use pdal_core::point::{PointId, PointLayout, PointView};
+use pdal_core::point::{PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 /// The `filters.expression` stage.
@@ -82,7 +82,7 @@ impl Streamable for ExpressionFilter {
     /// Decide one streaming point. PDAL streams `filters.expression` only with
     /// a single expression; the C++ wrapper rejects other cases before
     /// delegating here, so anything else is defensively dropped.
-    fn process_one(&mut self, view: &PointView, idx: PointId) -> bool {
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
         if self.ensure_prepared(view.layout().as_ref()).is_err() {
             return false;
         }
@@ -154,10 +154,10 @@ mod tests {
 
     #[test]
     fn streaming_evaluates_each_point() {
-        let input = classified(&[1.0, 2.0, 7.0, 2.0]);
+        let mut input = classified(&[1.0, 2.0, 7.0, 2.0]);
         let mut filter = ExpressionFilter::new(&["Classification == 2".to_string()]).unwrap();
-        let kept: Vec<PointId> = (0..input.len())
-            .filter(|&i| filter.process_one(&input, i))
+        let kept: Vec<pdal_core::point::PointId> = (0..input.len())
+            .filter(|&i| filter.process_one(&mut input, i))
             .collect();
         assert_eq!(kept, vec![1, 3]);
     }

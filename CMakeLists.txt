@@ -309,6 +309,8 @@ target_include_directories(${PDAL_LIB_NAME}
         ${UTFCPP_INCLUDE_DIR}
 )
 
+find_library(GEOS_C_LIBRARY NAMES geos_c)
+
 target_link_libraries(${PDAL_LIB_NAME}
     PRIVATE
         ${CMAKE_THREAD_LIBS_INIT}
@@ -326,6 +328,7 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${UTFCPP_LIB_NAME}
         ${BACKTRACE_LIBRARIES}
         ${RUST_CAPI_LIB}
+        ${GEOS_C_LIBRARY}
        "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     PUBLIC
         ${WINSOCK_LIBRARY}

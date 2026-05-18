@@ -524,7 +524,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_create(
     } else {
         CStr::from_ptr(text).to_string_lossy().into_owned()
     };
-    Box::into_raw(Box::new(SpatialReference::new(text)))
+    Box::into_raw(Box::new(SpatialReference::new(&text)))
 }
 
 /// Create a spatial reference from text and coordinate epoch.
@@ -542,7 +542,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_create_with_epoch(
     } else {
         CStr::from_ptr(text).to_string_lossy().into_owned()
     };
-    Box::into_raw(Box::new(SpatialReference::with_epoch(text, epoch)))
+    Box::into_raw(Box::new(SpatialReference::with_epoch(&text, epoch)))
 }
 
 /// Whether a spatial reference has no text.
@@ -553,7 +553,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_create_with_epoch(
 /// `pdal_spatial_reference_create`.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_spatial_reference_empty(srs: *const SpatialReference) -> bool {
-    srs.as_ref().map(SpatialReference::empty).unwrap_or(true)
+    srs.as_ref().map(|s| s.is_empty()).unwrap_or(true)
 }
 
 /// Return the spatial reference text. Caller must free with `pdal_string_free`.
@@ -566,7 +566,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_empty(srs: *const SpatialReferen
 pub unsafe extern "C" fn pdal_spatial_reference_text(srs: *const SpatialReference) -> *mut c_char {
     string_to_c_ptr(
         srs.as_ref()
-            .map(|srs| srs.text().to_string())
+            .map(|srs| srs.wkt().to_string())
             .unwrap_or_default(),
     )
 }
@@ -579,7 +579,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_text(srs: *const SpatialReferenc
 /// `pdal_spatial_reference_create`.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_spatial_reference_epoch(srs: *const SpatialReference) -> f64 {
-    srs.as_ref().map(SpatialReference::epoch).unwrap_or(0.0)
+    srs.as_ref().map(|s| s.epoch()).unwrap_or(0.0)
 }
 
 /// Set the coordinate epoch.
@@ -886,7 +886,7 @@ pub struct StageWrapper {
 }
 
 trait FilterWrapper {
-    fn process_one(&mut self, view: &PointView, idx: u64) -> bool;
+    fn process_one(&mut self, view: &mut PointView, idx: u64) -> bool;
     fn reset(&mut self);
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
     fn metadata(&self) -> MetadataNode;
@@ -894,7 +894,7 @@ trait FilterWrapper {
 }
 
 impl<T: Filter + Streamable> FilterWrapper for T {
-    fn process_one(&mut self, view: &PointView, idx: u64) -> bool {
+    fn process_one(&mut self, view: &mut PointView, idx: u64) -> bool {
         Streamable::process_one(self, view, idx)
     }
     fn reset(&mut self) {
@@ -1149,8 +1149,8 @@ pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> boo
             // Counter-based filters (decimation, head, tail) ignore the point;
             // pass an empty view. Data-dependent filters must instead stream
             // through `pdal_stage_process_one_at`.
-            let empty = PointView::new(std::rc::Rc::new(PointLayout::new()));
-            stage.filter.process_one(&empty, 0)
+            let mut empty = PointView::new(std::rc::Rc::new(PointLayout::new()));
+            stage.filter.process_one(&mut empty, 0)
         } else {
             set_last_error("null stage");
             false
@@ -1173,12 +1173,12 @@ pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> boo
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_process_one_at(
     stage: *mut StageWrapper,
-    view: *const PointView,
+    view: *mut PointView,
     idx: u64,
 ) -> bool {
     ffi_catch(false, || {
         clear_last_error();
-        if let (Some(stage), Some(view)) = (stage.as_mut(), view.as_ref()) {
+        if let (Some(stage), Some(view)) = (stage.as_mut(), view.as_mut()) {
             stage.filter.process_one(view, idx)
         } else {
             set_last_error("null stage or view");
@@ -1382,11 +1382,11 @@ pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_metadata(stage: *const StageWrapper) -> *mut MetadataNode {
-if let Some(stage) = stage.as_ref() {
-    Box::into_raw(Box::new(stage.filter.metadata()))
-} else {
-    std::ptr::null_mut()
-}
+    if let Some(stage) = stage.as_ref() {
+        Box::into_raw(Box::new(stage.filter.metadata()))
+    } else {
+        std::ptr::null_mut()
+    }
 }
 
 /// Create a `filters.expressionstats` stage.
@@ -1397,36 +1397,38 @@ if let Some(stage) = stage.as_ref() {
 /// `exprs` must be a valid pointer to a C-array of `count` C-strings.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_expressionstats(
-dim_name: *const c_char,
-exprs: *const *const c_char,
-count: u64,
+    dim_name: *const c_char,
+    exprs: *const *const c_char,
+    count: u64,
 ) -> *mut StageWrapper {
-clear_last_error();
-if dim_name.is_null() || (count > 0 && exprs.is_null()) {
-    set_last_error("null expressionstats input");
-    return std::ptr::null_mut();
-}
-let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
-let mut sources = Vec::with_capacity(count as usize);
-for i in 0..count {
-    let ptr = *exprs.offset(i as isize);
-    if ptr.is_null() {
-        set_last_error("null expression string");
+    clear_last_error();
+    if dim_name.is_null() || (count > 0 && exprs.is_null()) {
+        set_last_error("null expressionstats input");
         return std::ptr::null_mut();
     }
-    sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
-}
-match pdal_filters::expressionstats::ExpressionStatsFilter::new(&dim_name, &sources) {
-    Ok(f) => Box::into_raw(Box::new(StageWrapper { filter: Box::new(f) })),
-    Err(e) => {
-        set_last_error(&e.to_string());
-        std::ptr::null_mut()
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+    let mut sources = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let ptr = *exprs.offset(i as isize);
+        if ptr.is_null() {
+            set_last_error("null expression string");
+            return std::ptr::null_mut();
+        }
+        sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
     }
-}
+    match pdal_filters::expressionstats::ExpressionStatsFilter::new(&dim_name, &sources) {
+        Ok(f) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(f),
+        })),
+        Err(e) => {
+            set_last_error(e.to_string());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Create a `filters.mongo` stage from a JSON expression string.
-
+///
 /// Returns null and sets the last error if `expr` is null or invalid JSON.
 ///
 /// # Safety
@@ -1443,9 +1445,11 @@ pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
     }
     let json_str = CStr::from_ptr(expr).to_string_lossy();
     match pdal_filters::mongo::MongoExpressionFilter::new(&json_str) {
-        Ok(f) => Box::into_raw(Box::new(StageWrapper { filter: Box::new(f) })),
+        Ok(f) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(f),
+        })),
         Err(e) => {
-            set_last_error(&e.to_string());
+            set_last_error(e.to_string());
             std::ptr::null_mut()
         }
     }
@@ -2264,18 +2268,49 @@ pub unsafe extern "C" fn pdal_expressionstats_metadata(
         match ExpressionStatsMetadataFilter::new(&dim_name, &sources) {
             Ok(mut filter) => {
                 if let Err(e) = Filter::run(&mut filter, view) {
-                    set_last_error(&e.to_string());
+                    set_last_error(e.to_string());
                     std::ptr::null_mut()
                 } else {
                     Box::into_raw(Box::new(Filter::metadata(&filter)))
                 }
             }
             Err(e) => {
-                set_last_error(&e.to_string());
+                set_last_error(e.to_string());
                 std::ptr::null_mut()
             }
         }
     })
+}
+
+/// Create a `filters.reprojection` stage.
+///
+/// # Safety
+///
+/// `out_srs`, `in_srs` must be valid null-terminated C strings (in_srs can be null).
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_reprojection(
+    out_srs: *const c_char,
+    in_srs: *const c_char,
+    error_on_failure: bool,
+) -> *mut StageWrapper {
+    clear_last_error();
+    if out_srs.is_null() {
+        set_last_error("null output srs ");
+        return std::ptr::null_mut();
+    }
+    let out_srs_text = CStr::from_ptr(out_srs).to_string_lossy();
+    let in_srs_text = if in_srs.is_null() {
+        None
+    } else {
+        Some(CStr::from_ptr(in_srs).to_string_lossy().into_owned())
+    };
+
+    let filter = Box::new(pdal_filters::reprojection::ReprojectionFilter::new(
+        &out_srs_text,
+        in_srs_text,
+        error_on_failure,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 #[cfg(test)]

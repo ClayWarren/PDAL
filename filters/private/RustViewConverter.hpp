@@ -155,6 +155,25 @@ inline pdal_point_view_t* toRustPoint(PointRef& point, PointLayoutPtr layout)
     return rustView;
 }
 
+inline void fromRustPoint(pdal_point_view_t* rust_out_view, uint64_t rust_idx,
+                          PointRef& outPoint)
+{
+    if (rust_out_view)
+    {
+        uint64_t dimCount = pdal_point_view_dim_count(rust_out_view);
+        for (uint64_t i = 0; i < dimCount; ++i)
+        {
+            std::string dimName = takeString(pdal_point_view_dim_name(rust_out_view, i));
+            Dimension::Id id = Dimension::id(dimName);
+            if (id != Dimension::Id::Unknown)
+            {
+                double v = pdal_point_view_get_f64(rust_out_view, rust_idx, dimName.c_str());
+                outPoint.setField(id, v);
+            }
+        }
+    }
+}
+
 inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
 {
     if (rust_out_view)
