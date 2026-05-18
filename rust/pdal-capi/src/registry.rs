@@ -31,6 +31,7 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.pts",
     "readers.ptx",
     "readers.ilvis2",
+    "readers.obj",
     "readers.ply",
 ];
 
@@ -73,6 +74,7 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.pts" => Ok(Box::new(pdal_io::pts::PtsReader::new(options))),
         "readers.ptx" => Ok(Box::new(pdal_io::ptx::PtxReader::new(options))),
         "readers.ilvis2" => Ok(Box::new(pdal_io::ilvis2::Ilvis2Reader::new(options))),
+        "readers.obj" => Ok(Box::new(pdal_io::obj::ObjReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
         _ => Err(StageError(format!(
             "Reader driver '{name}' is not available in the Rust port."

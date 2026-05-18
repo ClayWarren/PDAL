@@ -10,3 +10,4 @@ pdal-core = { path = "../pdal-core" }
 
 [dev-dependencies]
 pdal-filters = { path = "../pdal-filters" }
+tempfile = "3.27.0"

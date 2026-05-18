@@ -42,6 +42,13 @@ pub enum DimId {
     OptimalRadius,
     H3,
     GpsTime,
+    W,
+    TextureU,
+    TextureV,
+    TextureW,
+    NormalX,
+    NormalY,
+    NormalZ,
     Other(String),
 }
 
@@ -72,6 +79,13 @@ impl DimId {
             DimId::OptimalRadius => "OptimalRadius",
             DimId::H3 => "H3",
             DimId::GpsTime => "GpsTime",
+            DimId::W => "W",
+            DimId::TextureU => "TextureU",
+            DimId::TextureV => "TextureV",
+            DimId::TextureW => "TextureW",
+            DimId::NormalX => "NormalX",
+            DimId::NormalY => "NormalY",
+            DimId::NormalZ => "NormalZ",
             DimId::Other(s) => s,
         }
     }
@@ -102,6 +116,13 @@ impl DimId {
             "OptimalRadius" => DimId::OptimalRadius,
             "H3" => DimId::H3,
             "GpsTime" => DimId::GpsTime,
+            "W" => DimId::W,
+            "TextureU" => DimId::TextureU,
+            "TextureV" => DimId::TextureV,
+            "TextureW" => DimId::TextureW,
+            "NormalX" => DimId::NormalX,
+            "NormalY" => DimId::NormalY,
+            "NormalZ" => DimId::NormalZ,
             other => DimId::Other(other.to_string()),
         }
     }

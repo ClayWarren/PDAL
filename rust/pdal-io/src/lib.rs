@@ -6,6 +6,7 @@
 pub mod faux;
 pub mod ilvis2;
 pub mod nullwriter;
+pub mod obj;
 pub mod pcd;
 pub mod ply;
 pub mod pts;

@@ -93,6 +93,20 @@ pub unsafe extern "C" fn pdal_reader_create_ilvis2(ops: *const Options) -> *mut 
     }
 }
 
+/// Create an ObjReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_obj(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::obj::ObjReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Create a PlyReader from options.
 ///
 /// # Safety
