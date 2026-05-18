@@ -28,6 +28,9 @@ Off limits unless the user explicitly revises this plan:
 - Do not start LAS/LAZ, GDAL, PROJ, compression, remote I/O, kernels, apps, or
   broad plugin work before the current deterministic local I/O slices are
   complete.
+- Do not port concrete CLI commands yet. `pdal-kernels` may hold registry and
+  command-contract infrastructure, but user-visible commands must wait for the
+  command readiness checkpoint below.
 - Do not add placeholder modules, placeholder crates, or broad skeletons that
   are not tied to a concrete parity milestone.
 - Do not weaken existing C++ validation or tests to make a Rust port pass.
@@ -143,6 +146,23 @@ foundations are not permission to skip ahead to broad top-layer ports.
 Do not jump to `kernels/`, apps/tools, plugins, vendor-heavy work, or broad
 `io/` work just because those areas are smaller or visible. The active
 post-filter milestone is the narrow deterministic text I/O slice.
+
+Command work is allowed only after the library can run realistic pipelines
+without special-case test plumbing:
+
+- At least one local reader -> filter -> writer path runs through the Rust
+  pipeline and C ABI with installed-PDAL regression coverage.
+- Stage creation from user-visible names and options is available for the
+  stages used by the command.
+- Reader/writer inference, option parsing, metadata/errors, and output paths
+  needed by the command have Rust parity coverage.
+- The command can be regression-tested against the installed C++ `pdal` binary
+  for exit status, stdout/stderr shape, and output artifacts.
+
+When those gates are true, start with `pipeline`, then `info`, then simple
+pipeline-shaped commands such as `translate`, `merge`, `sort`, and `split`.
+Keep `tile`, `tindex`, `ground`, and other GDAL/remote/spatially complex
+commands deferred until their lower-layer dependencies are Rust-backed.
 
 ## Checkpoint Roadmap
 
@@ -307,6 +327,11 @@ Required shape:
 - `apps/` and `tools/` move before `kernels/`.
 - `kernels/` remain last because they sit above pipeline, stage, options, I/O,
   logging, and error behavior.
+- Concrete kernel work does not start until the command readiness gates in
+  `Migration Order` are satisfied.
+- `pdal pipeline` is the first command candidate because it proves the library
+  surface directly. `pdal info` follows only after metadata, stats, bounds, and
+  reader behavior are ready.
 - CLI output and exit behavior are regression-tested against existing commands.
 
 Done when:
