@@ -393,11 +393,16 @@ Current status:
   local PLY fixtures, including vertex properties, extra dimensions, list
   properties on non-vertex elements, `dims`, `sized_types`, and precision.
   Binary PLY and mesh faces remain intentionally deferred.
+- `readers.obj` has a Rust implementation for the deterministic Wavefront OBJ
+  ASCII path, including vertex properties, normals, texture coordinates,
+  triangulation for VTN de-duplication, and de-duplication logic matching
+  PDAL's C++ behavior. Mesh face storage is intentionally deferred.
 - Installed-PDAL regressions for these readers/writers are available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`,
   and
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`.
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`.
 - `pdal-core::driver` can infer PDAL reader/writer driver names from filenames
   for existing PDAL extensions. `pdal-capi` has a narrow registry that can
   construct only currently implemented Rust local readers/writers by driver
