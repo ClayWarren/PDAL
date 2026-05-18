@@ -13,7 +13,5 @@ pub mod lexer;
 pub mod parser;
 pub mod token;
 
-pub use expression::{
-    AssignStatement, ConditionalExpression, IdentExpression, MathExpression,
-};
+pub use expression::{AssignStatement, ConditionalExpression, IdentExpression, MathExpression};
 pub use parser::{parse_conditional, parse_math};

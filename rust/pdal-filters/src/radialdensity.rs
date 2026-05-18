@@ -2,6 +2,9 @@ use pdal_core::point::{DimId, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
+#[allow(clippy::approx_constant)]
+const PDAL_PI: f64 = 3.14159;
+
 pub struct RadialDensityFilter {
     pub radius: f64,
 }
@@ -24,7 +27,7 @@ impl Filter for RadialDensityFilter {
         }
 
         let index = SpatialIndex3d::new(view);
-        let factor = 1.0 / ((4.0 / 3.0) * 3.14159 * self.radius.powi(3));
+        let factor = 1.0 / ((4.0 / 3.0) * PDAL_PI * self.radius.powi(3));
         for idx in 0..view.len() {
             let count = index.radius(idx, self.radius).len();
             output.set_f64(idx, &DimId::RadialDensity, count as f64 * factor);
@@ -78,7 +81,7 @@ mod tests {
         ]);
         let mut filter = RadialDensityFilter::new(1.0);
         let out = filter.run(&view).unwrap().remove(0);
-        let factor = 1.0 / ((4.0 / 3.0) * 3.14159);
+        let factor = 1.0 / ((4.0 / 3.0) * PDAL_PI);
         for idx in 0..5 {
             assert!((out.get_f64(idx, &DimId::RadialDensity) - 5.0 * factor).abs() < 1e-9);
         }

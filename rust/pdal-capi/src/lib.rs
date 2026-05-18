@@ -13,6 +13,7 @@ use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
+use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
@@ -20,9 +21,11 @@ use pdal_filters::griddecimation;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
+use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
+use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
@@ -36,6 +39,7 @@ use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
+use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::stats;
@@ -948,6 +952,11 @@ pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut S
 }
 
 /// Create a radialdensity filter stage.
+///
+/// # Safety
+///
+/// This function is unsafe only to match the C ABI surface; it does not
+/// dereference caller-provided pointers.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut StageWrapper {
     let filter = Box::new(RadialDensityFilter::new(radius));
@@ -955,6 +964,10 @@ pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut St
 }
 
 /// Create an nndistance filter stage.
+///
+/// # Safety
+///
+/// `mode` must either be null or point to a valid NUL-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_nndistance(
     k: u64,
@@ -1051,6 +1064,69 @@ pub unsafe extern "C" fn pdal_stage_create_dbscan(
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_lof(minpts: u64) -> *mut StageWrapper {
     let filter = Box::new(LofFilter::new(minpts as usize));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an ELM filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_elm(
+    cell: f64,
+    class_label: u8,
+    threshold: f64,
+) -> *mut StageWrapper {
+    let filter = Box::new(ElmFilter::new(cell, class_label, threshold));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a skewness balancing filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_skewnessbalancing(
+    ground_class: u8,
+    other_class: u8,
+    only_ground: bool,
+) -> *mut StageWrapper {
+    let filter = Box::new(SkewnessBalancingFilter::new(
+        ground_class,
+        other_class,
+        only_ground,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an IQR filter stage.
+///
+/// # Safety
+///
+/// `dim_name` must be a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_iqr(
+    multiplier: f64,
+    dim_name: *const c_char,
+) -> *mut StageWrapper {
+    if dim_name.is_null() {
+        return std::ptr::null_mut();
+    }
+    let dim = dim_id_from_name(&CStr::from_ptr(dim_name).to_string_lossy());
+    let filter = Box::new(IqrFilter::new(multiplier, dim));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a MAD filter stage.
+///
+/// # Safety
+///
+/// `dim_name` must be a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_mad(
+    multiplier: f64,
+    dim_name: *const c_char,
+    mad_multiplier: f64,
+) -> *mut StageWrapper {
+    if dim_name.is_null() {
+        return std::ptr::null_mut();
+    }
+    let dim = dim_id_from_name(&CStr::from_ptr(dim_name).to_string_lossy());
+    let filter = Box::new(MadFilter::new(multiplier, dim, mad_multiplier));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

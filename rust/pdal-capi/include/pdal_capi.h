@@ -84,6 +84,10 @@ pdal_stage_t* pdal_stage_create_zsmooth(double radius, double position, const ch
 pdal_stage_t* pdal_stage_create_outlier(const char* method, uint64_t min_k, double radius, uint64_t mean_k, double multiplier, uint8_t class_label);
 pdal_stage_t* pdal_stage_create_dbscan(uint64_t min_points, double eps, const char* const* dims, uint64_t count);
 pdal_stage_t* pdal_stage_create_lof(uint64_t minpts);
+pdal_stage_t* pdal_stage_create_elm(double cell, uint8_t class_label, double threshold);
+pdal_stage_t* pdal_stage_create_skewnessbalancing(uint8_t ground_class, uint8_t other_class, bool only_ground);
+pdal_stage_t* pdal_stage_create_iqr(double multiplier, const char* dim_name);
+pdal_stage_t* pdal_stage_create_mad(double multiplier, const char* dim_name, double mad_multiplier);
 pdal_stage_t* pdal_stage_create_hagnn(uint64_t count, double max_distance, bool allow_extrapolation, uint8_t class_label);
 pdal_stage_t* pdal_stage_create_cluster(uint64_t min_points, uint64_t max_points, double tolerance, bool is_3d);
 pdal_stage_t* pdal_stage_create_sparsesurface(double radius, uint8_t ground_class, uint8_t low_point_class);

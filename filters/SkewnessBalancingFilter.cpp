@@ -34,7 +34,10 @@
 
 #include "SkewnessBalancingFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -80,64 +83,15 @@ void SkewnessBalancingFilter::prepared(PointTableRef table)
     }
 }
 
-void SkewnessBalancingFilter::processGround(PointViewPtr view)
-{
-    // Sort by height.
-    view->sort(Dimension::Id::Z);
-
-    auto setClass = [&view](PointId first, PointId last, int cl)
-    {
-        for (PointId idx = first; idx <= last; ++idx)
-            view->setField(Dimension::Id::Classification, idx, cl);
-    };
-
-    point_count_t n(0);
-    point_count_t n1(0);
-    double delta, delta_n, term1, M1, M2, M3;
-    M1 = M2 = M3 = 0.0;
-
-    PointId lastPositive = 0;
-    double skewness = 0;
-    double lastSkewness = std::numeric_limits<double>::quiet_NaN();
-    for (PointId i = 0; i < view->size(); ++i)
-    {
-        double z = view->getFieldAs<double>(Dimension::Id::Z, i);
-        n1 = n;
-        n++;
-        delta = z - M1;
-        delta_n = delta / n;
-        term1 = delta * delta_n * n1;
-        M1 += delta_n;
-        M3 += term1 * delta_n * (n - 2) - 3 * delta_n * M2;
-        M2 += term1;
-        skewness = std::sqrt(n) * M3 / std::pow(M2, 1.5);
-        if (skewness > 0 && lastSkewness <= 0)
-        {
-            setClass(lastPositive, i - 1, m_groundClass);
-            lastPositive = i;
-        }
-        lastSkewness = skewness;
-    }
-    // It's possible that all our points have skewness <= 0, in which case
-    // we've never had an opportunity to set the ground state.  Do so now.
-    // Otherwise, set the remaining points to non-ground.
-    if (lastPositive == 0 && skewness <= 0)
-        setClass(lastPositive, view->size() - 1, m_groundClass);
-    else if (!m_onlyGround)
-        setClass(lastPositive, view->size() - 1, m_otherClass);
-}
-
 PointViewSet SkewnessBalancingFilter::run(PointViewPtr input)
 {
+    pdal_stage_t* stage = pdal_stage_create_skewnessbalancing(
+        m_groundClass, m_otherClass, m_onlyGround);
+    if (!stage)
+        throwError("Failed to create Rust skewness balancing stage.");
     PointViewSet viewSet;
-    viewSet.insert(input);
-
-    bool logOutput = log()->getLevel() > LogLevel::Debug1;
-    if (logOutput)
-        log()->floatPrecision(8);
-
-    processGround(input);
-
+    viewSet.insert(rust_view_converter::runSingle(stage, input));
+    pdal_stage_destroy(stage);
     return viewSet;
 }
 
