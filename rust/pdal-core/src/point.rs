@@ -7,6 +7,7 @@
 //! the storage into the view for simplicity -- the shared table is a planned
 //! follow-up, not a behavioural difference for a single filter.
 
+use crate::srs::SpatialReference;
 use std::rc::Rc;
 
 /// Index of a point within a view.
@@ -178,6 +179,7 @@ pub struct PointView {
     layout: Rc<PointLayout>,
     data: Vec<u8>,
     source_indices: Vec<PointId>,
+    spatial_reference: SpatialReference,
 }
 
 impl PointView {
@@ -187,6 +189,7 @@ impl PointView {
             layout,
             data: Vec::new(),
             source_indices: Vec::new(),
+            spatial_reference: SpatialReference::default(),
         }
     }
 
@@ -196,12 +199,23 @@ impl PointView {
             layout: Rc::clone(&self.layout),
             data: Vec::new(),
             source_indices: Vec::new(),
+            spatial_reference: self.spatial_reference.clone(),
         }
     }
 
     /// The view's layout.
     pub fn layout(&self) -> &Rc<PointLayout> {
         &self.layout
+    }
+
+    /// The view's spatial reference.
+    pub fn spatial_reference(&self) -> &SpatialReference {
+        &self.spatial_reference
+    }
+
+    /// Set the view's spatial reference.
+    pub fn set_spatial_reference(&mut self, spatial_reference: SpatialReference) {
+        self.spatial_reference = spatial_reference;
     }
 
     /// Number of points in the view.

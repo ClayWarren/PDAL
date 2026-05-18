@@ -6,6 +6,7 @@
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
+use pdal_core::{metadata::MetadataNode, metadata::MetadataValue, srs::SpatialReference};
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::cluster::ClusterFilter;
@@ -142,6 +143,12 @@ fn ffi_catch<T>(fallback: T, f: impl FnOnce() -> T) -> T {
     }
 }
 
+fn string_to_c_ptr(value: String) -> *mut c_char {
+    CString::new(value.replace('\0', "\\0"))
+        .expect("interior NULs removed")
+        .into_raw()
+}
+
 #[no_mangle]
 pub extern "C" fn pdal_last_error() -> *const c_char {
     LAST_ERROR.with(|slot| slot.borrow().as_ptr())
@@ -150,6 +157,19 @@ pub extern "C" fn pdal_last_error() -> *const c_char {
 #[no_mangle]
 pub extern "C" fn pdal_clear_error() {
     clear_last_error();
+}
+
+/// Free a string returned by this C ABI.
+///
+/// # Safety
+///
+/// `ptr` must be a string pointer returned by this library, or null. Must not
+/// be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_string_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        drop(CString::from_raw(ptr));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +359,41 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
     }
 }
 
+/// Set a point view's spatial reference.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+/// `srs` must be null or a valid pointer returned by
+/// `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_set_spatial_reference(
+    view: *mut PointView,
+    srs: *const SpatialReference,
+) {
+    if let Some(view) = view.as_mut() {
+        let spatial_reference = srs.as_ref().cloned().unwrap_or_default();
+        view.set_spatial_reference(spatial_reference);
+    }
+}
+
+/// Return a copy of a point view's spatial reference. Caller owns the result.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_spatial_reference(
+    view: *const PointView,
+) -> *mut SpatialReference {
+    if let Some(view) = view.as_ref() {
+        Box::into_raw(Box::new(view.spatial_reference().clone()))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Return the number of points in the view.
 ///
 /// # Safety
@@ -379,6 +434,256 @@ pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx:
 pub unsafe extern "C" fn pdal_point_view_destroy(view: *mut PointView) {
     if !view.is_null() {
         drop(Box::from_raw(view));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SpatialReference ABI
+// ---------------------------------------------------------------------------
+
+/// Create a spatial reference from text. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `text` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_create(
+    text: *const c_char,
+) -> *mut SpatialReference {
+    let text = if text.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(text).to_string_lossy().into_owned()
+    };
+    Box::into_raw(Box::new(SpatialReference::new(text)))
+}
+
+/// Create a spatial reference from text and coordinate epoch.
+///
+/// # Safety
+///
+/// `text` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_create_with_epoch(
+    text: *const c_char,
+    epoch: f64,
+) -> *mut SpatialReference {
+    let text = if text.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(text).to_string_lossy().into_owned()
+    };
+    Box::into_raw(Box::new(SpatialReference::with_epoch(text, epoch)))
+}
+
+/// Whether a spatial reference has no text.
+///
+/// # Safety
+///
+/// `srs` must be null or a valid pointer returned by
+/// `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_empty(srs: *const SpatialReference) -> bool {
+    srs.as_ref().map(SpatialReference::empty).unwrap_or(true)
+}
+
+/// Return the spatial reference text. Caller must free with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `srs` must be null or a valid pointer returned by
+/// `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_text(srs: *const SpatialReference) -> *mut c_char {
+    string_to_c_ptr(
+        srs.as_ref()
+            .map(|srs| srs.text().to_string())
+            .unwrap_or_default(),
+    )
+}
+
+/// Return the coordinate epoch.
+///
+/// # Safety
+///
+/// `srs` must be null or a valid pointer returned by
+/// `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_epoch(srs: *const SpatialReference) -> f64 {
+    srs.as_ref().map(SpatialReference::epoch).unwrap_or(0.0)
+}
+
+/// Set the coordinate epoch.
+///
+/// # Safety
+///
+/// `srs` must be a valid pointer returned by `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_set_epoch(srs: *mut SpatialReference, epoch: f64) {
+    if let Some(srs) = srs.as_mut() {
+        srs.set_epoch(epoch);
+    }
+}
+
+/// Convert a spatial reference to metadata. Caller owns the returned node.
+///
+/// # Safety
+///
+/// `srs` must be null or a valid pointer returned by
+/// `pdal_spatial_reference_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_to_metadata(
+    srs: *const SpatialReference,
+) -> *mut MetadataNode {
+    let metadata = srs
+        .as_ref()
+        .map(SpatialReference::to_metadata)
+        .unwrap_or_else(|| SpatialReference::default().to_metadata());
+    Box::into_raw(Box::new(metadata))
+}
+
+/// Destroy a spatial reference.
+///
+/// # Safety
+///
+/// `srs` must be a valid pointer returned by `pdal_spatial_reference_create`,
+/// or null. Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_spatial_reference_destroy(srs: *mut SpatialReference) {
+    if !srs.is_null() {
+        drop(Box::from_raw(srs));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Metadata ABI
+// ---------------------------------------------------------------------------
+
+/// Create a metadata node. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `name` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_create(name: *const c_char) -> *mut MetadataNode {
+    let name = if name.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(name).to_string_lossy().into_owned()
+    };
+    Box::into_raw(Box::new(MetadataNode::new(name)))
+}
+
+/// Return a node's name. Caller must free with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_name(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .map(|node| node.name().to_string())
+            .unwrap_or_default(),
+    )
+}
+
+/// Set a metadata node's string value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+/// `value` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_string(
+    node: *mut MetadataNode,
+    value: *const c_char,
+) {
+    if let Some(node) = node.as_mut() {
+        let value = if value.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(value).to_string_lossy().into_owned()
+        };
+        node.set_value(MetadataValue::String(value));
+    }
+}
+
+/// Return a node's scalar value as a string. Caller must free with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .and_then(MetadataNode::value)
+            .map(MetadataValue::as_string)
+            .unwrap_or_default(),
+    )
+}
+
+/// Add `child` to `node`, transferring ownership of `child`.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+/// `child` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. If non-null, it must not be used after this
+/// call.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_add_child(
+    node: *mut MetadataNode,
+    child: *mut MetadataNode,
+) {
+    if let (Some(node), false) = (node.as_mut(), child.is_null()) {
+        node.add_child(*Box::from_raw(child));
+    }
+}
+
+/// Return the number of child nodes.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_child_count(node: *const MetadataNode) -> u64 {
+    node.as_ref()
+        .map(|node| node.children().len() as u64)
+        .unwrap_or(0)
+}
+
+/// Return a copy of a child node. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_child(
+    node: *const MetadataNode,
+    idx: u64,
+) -> *mut MetadataNode {
+    node.as_ref()
+        .and_then(|node| node.children().get(idx as usize))
+        .map(|child| Box::into_raw(Box::new(child.clone())))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// Destroy a metadata node.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`, or
+/// null. Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
+    if !node.is_null() {
+        drop(Box::from_raw(node));
     }
 }
 
@@ -1577,6 +1882,100 @@ pub unsafe extern "C" fn pdal_free_stats_arrays(ptr: *mut pdal_dim_stats_t, dims
                 stats.unique_counts,
                 stats.unique_len as usize,
             ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    unsafe fn take_string(ptr: *mut c_char) -> String {
+        assert!(!ptr.is_null());
+        let value = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+        pdal_string_free(ptr);
+        value
+    }
+
+    #[test]
+    fn spatial_reference_roundtrips_through_c_abi() {
+        unsafe {
+            let text = CString::new("EPSG:4326").unwrap();
+            let srs = pdal_spatial_reference_create_with_epoch(text.as_ptr(), 2020.0);
+            assert!(!pdal_spatial_reference_empty(srs));
+            assert_eq!(pdal_spatial_reference_epoch(srs), 2020.0);
+            assert_eq!(take_string(pdal_spatial_reference_text(srs)), "EPSG:4326");
+
+            pdal_spatial_reference_set_epoch(srs, 2021.5);
+            assert_eq!(pdal_spatial_reference_epoch(srs), 2021.5);
+            pdal_spatial_reference_destroy(srs);
+        }
+    }
+
+    #[test]
+    fn point_view_carries_spatial_reference() {
+        unsafe {
+            let layout = pdal_point_layout_create();
+            let x = CString::new("X").unwrap();
+            pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+            let view = pdal_point_view_create(layout);
+
+            let text = CString::new("EPSG:4978").unwrap();
+            let srs = pdal_spatial_reference_create(text.as_ptr());
+            pdal_point_view_set_spatial_reference(view, srs);
+
+            let copied = pdal_point_view_spatial_reference(view);
+            assert_eq!(
+                take_string(pdal_spatial_reference_text(copied)),
+                "EPSG:4978"
+            );
+
+            pdal_spatial_reference_destroy(copied);
+            pdal_spatial_reference_destroy(srs);
+            pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
+    fn metadata_tree_roundtrips_through_c_abi() {
+        unsafe {
+            let root_name = CString::new("root").unwrap();
+            let child_name = CString::new("child").unwrap();
+            let child_value = CString::new("value").unwrap();
+
+            let root = pdal_metadata_node_create(root_name.as_ptr());
+            let child = pdal_metadata_node_create(child_name.as_ptr());
+            pdal_metadata_node_set_string(child, child_value.as_ptr());
+            pdal_metadata_node_add_child(root, child);
+
+            assert_eq!(pdal_metadata_node_child_count(root), 1);
+            let copied = pdal_metadata_node_child(root, 0);
+            assert_eq!(take_string(pdal_metadata_node_name(copied)), "child");
+            assert_eq!(take_string(pdal_metadata_node_value(copied)), "value");
+
+            pdal_metadata_node_destroy(copied);
+            pdal_metadata_node_destroy(root);
+        }
+    }
+
+    #[test]
+    fn spatial_reference_exports_metadata() {
+        unsafe {
+            let text = CString::new("EPSG:4326").unwrap();
+            let srs = pdal_spatial_reference_create_with_epoch(text.as_ptr(), 2020.0);
+            let metadata = pdal_spatial_reference_to_metadata(srs);
+
+            assert_eq!(take_string(pdal_metadata_node_name(metadata)), "srs");
+            assert_eq!(pdal_metadata_node_child_count(metadata), 2);
+
+            let wkt = pdal_metadata_node_child(metadata, 0);
+            assert_eq!(take_string(pdal_metadata_node_name(wkt)), "wkt");
+            assert_eq!(take_string(pdal_metadata_node_value(wkt)), "EPSG:4326");
+
+            pdal_metadata_node_destroy(wkt);
+            pdal_metadata_node_destroy(metadata);
+            pdal_spatial_reference_destroy(srs);
         }
     }
 }

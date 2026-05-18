@@ -66,6 +66,30 @@ Follow this order unless the plan is deliberately revised:
 Do not jump to `kernels/` or broad `io/` work just because those areas are
 smaller or visible. The first milestone is filter parity through the C ABI.
 
+## Core Status
+
+Current Rust core primitives:
+
+- Point model: `PointLayout`, `PointView`, dimension IDs/types, source index
+  tracking, and per-view spatial reference storage.
+- Stage model: filter and streamable traits for Rust-backed stages.
+- Options: string-keyed typed getters matching PDAL's option flow.
+- Expressions: conditional/math/assignment parser and evaluator used by the
+  Rust-backed expression/assign work.
+- Spatial index: exact brute-force neighbor queries behind an API that can be
+  replaced by a real KD-tree without changing filters.
+- Metadata: named tree nodes with typed scalar values.
+- Spatial reference: text plus coordinate epoch, with metadata export.
+
+Current deliberate gaps:
+
+- No GDAL/PROJ-backed SRS normalization, reprojection, authority lookup,
+  WKT1/WKT2 conversion, axis ordering, or unit handling yet.
+- No C++ `MetadataNode` bridge yet; the Rust metadata ABI is a foundation for
+  future stage metadata parity, not a full replacement.
+- No geometry ABI yet for polygons, OGR geometries, point-in-polygon, or bounds
+  reprojection.
+
 ## Boundary Rules
 
 - Never cast C++ `pdal::PointView*`, `pdal::PointRef*`, or other C++ objects to

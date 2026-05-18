@@ -10,10 +10,13 @@ extern "C" {
 typedef struct pdal_options pdal_options_t;
 typedef struct pdal_point_layout pdal_point_layout_t;
 typedef struct pdal_point_view pdal_point_view_t;
+typedef struct pdal_spatial_reference pdal_spatial_reference_t;
+typedef struct pdal_metadata_node pdal_metadata_node_t;
 typedef struct pdal_stage pdal_stage_t;
 
 const char* pdal_last_error();
 void pdal_clear_error();
+void pdal_string_free(char* ptr);
 
 // Options
 pdal_options_t* pdal_options_create();
@@ -32,9 +35,31 @@ pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
 uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
 void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name, double val);
 double pdal_point_view_get_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name);
+void pdal_point_view_set_spatial_reference(pdal_point_view_t* view, const pdal_spatial_reference_t* srs);
+pdal_spatial_reference_t* pdal_point_view_spatial_reference(const pdal_point_view_t* view);
 uint64_t pdal_point_view_length(pdal_point_view_t* view);
 uint64_t pdal_point_view_source_index(pdal_point_view_t* view, uint64_t idx);
 void pdal_point_view_destroy(pdal_point_view_t* view);
+
+// SpatialReference
+pdal_spatial_reference_t* pdal_spatial_reference_create(const char* text);
+pdal_spatial_reference_t* pdal_spatial_reference_create_with_epoch(const char* text, double epoch);
+bool pdal_spatial_reference_empty(const pdal_spatial_reference_t* srs);
+char* pdal_spatial_reference_text(const pdal_spatial_reference_t* srs);
+double pdal_spatial_reference_epoch(const pdal_spatial_reference_t* srs);
+void pdal_spatial_reference_set_epoch(pdal_spatial_reference_t* srs, double epoch);
+pdal_metadata_node_t* pdal_spatial_reference_to_metadata(const pdal_spatial_reference_t* srs);
+void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);
+
+// Metadata
+pdal_metadata_node_t* pdal_metadata_node_create(const char* name);
+char* pdal_metadata_node_name(const pdal_metadata_node_t* node);
+void pdal_metadata_node_set_string(pdal_metadata_node_t* node, const char* value);
+char* pdal_metadata_node_value(const pdal_metadata_node_t* node);
+void pdal_metadata_node_add_child(pdal_metadata_node_t* node, pdal_metadata_node_t* child);
+uint64_t pdal_metadata_node_child_count(const pdal_metadata_node_t* node);
+pdal_metadata_node_t* pdal_metadata_node_child(const pdal_metadata_node_t* node, uint64_t idx);
+void pdal_metadata_node_destroy(pdal_metadata_node_t* node);
 
 // Stage
 pdal_stage_t* pdal_stage_create_decimation(const pdal_options_t* ops);
