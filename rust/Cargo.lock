@@ -400,6 +400,7 @@ version = "0.0.0"
 dependencies = [
  "pdal-core",
  "pdal-filters",
+ "pdal-io",
 ]
 
 [[package]]

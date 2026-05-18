@@ -3,7 +3,7 @@ name = "pdal-io"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Placeholder crate for PDAL Rust readers and writers."
+description = "First-party readers and writers for the PDAL Rust port."
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }

@@ -16,7 +16,7 @@ pub struct ReaderHandle {
 #[no_mangle]
 pub unsafe extern "C" fn pdal_reader_create_faux(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
-        let reader = Box::new(pdal_filters::faux::FauxReader::new(options));
+        let reader = Box::new(pdal_io::faux::FauxReader::new(options));
         Box::into_raw(Box::new(ReaderHandle { reader }))
     } else {
         std::ptr::null_mut()
@@ -50,9 +50,11 @@ pub struct WriterHandle {
 #[no_mangle]
 pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut WriterHandle {
     let options = Options::new();
-    let writer = Box::new(pdal_filters::nullwriter::NullWriter::new(
-        if ops.is_null() { &options } else { &*ops },
-    ));
+    let writer = Box::new(pdal_io::nullwriter::NullWriter::new(if ops.is_null() {
+        &options
+    } else {
+        &*ops
+    }));
     Box::into_raw(Box::new(WriterHandle { writer }))
 }
 
