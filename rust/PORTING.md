@@ -286,6 +286,8 @@ Current status:
   delimiters, quoted/unquoted headers, and simple GeoJSON output.
 - The Rust pipeline has a reader -> decimation filter -> writer regression test
   for the text slice.
+- Installed-PDAL regression for the text slice is available with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test text_regression -- --ignored`.
 - The next I/O target should be another local deterministic text-like format
   only after the text C++ parity gates are wired. Avoid binary,
   compression-backed, GDAL-backed, or remote reader/writer work.
