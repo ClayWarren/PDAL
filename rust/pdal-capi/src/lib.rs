@@ -111,6 +111,21 @@ fn dim_type_from_id(ty_id: i32) -> DimType {
     }
 }
 
+fn dim_type_to_id(ty: DimType) -> i32 {
+    match ty {
+        DimType::U8 => 0,
+        DimType::U16 => 1,
+        DimType::U32 => 2,
+        DimType::U64 => 3,
+        DimType::I8 => 4,
+        DimType::I16 => 5,
+        DimType::I32 => 6,
+        DimType::I64 => 7,
+        DimType::F32 => 8,
+        DimType::F64 => 9,
+    }
+}
+
 fn set_last_error(message: impl Into<String>) {
     let sanitized = message.into().replace('\0', "\\0");
     LAST_ERROR.with(|slot| {
@@ -358,6 +373,58 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
     } else {
         0.0
     }
+}
+
+/// Return the number of dimensions in the view layout.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_dim_count(view: *const PointView) -> u64 {
+    if let Some(view) = view.as_ref() {
+        view.layout().dim_count() as u64
+    } else {
+        0
+    }
+}
+
+/// Return a newly allocated dimension name at layout index `idx`.
+///
+/// The caller owns the returned string and must free it with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_dim_name(view: *const PointView, idx: u64) -> *mut c_char {
+    if let Some(view) = view.as_ref() {
+        if let Some((id, _)) = view.layout().dim_at(idx as usize) {
+            return CString::new(id.name())
+                .expect("dimension names do not contain NULs")
+                .into_raw();
+        }
+    }
+    std::ptr::null_mut()
+}
+
+/// Return the integer type id of the dimension at layout index `idx`.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_dim_type(view: *const PointView, idx: u64) -> i32 {
+    if let Some(view) = view.as_ref() {
+        if let Some((_, ty)) = view.layout().dim_at(idx as usize) {
+            return dim_type_to_id(ty);
+        }
+    }
+    -1
 }
 
 /// Set a point view's spatial reference.
@@ -2101,6 +2168,29 @@ mod tests {
 
             pdal_spatial_reference_destroy(copied);
             pdal_spatial_reference_destroy(srs);
+            pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
+    fn point_view_exposes_layout_dimensions() {
+        unsafe {
+            let layout = pdal_point_layout_create();
+            let x = CString::new("X").unwrap();
+            let classification = CString::new("Classification").unwrap();
+            pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+            pdal_point_layout_register_dim(layout, classification.as_ptr(), 0);
+            let view = pdal_point_view_create(layout);
+
+            assert_eq!(pdal_point_view_dim_count(view), 2);
+            assert_eq!(take_string(pdal_point_view_dim_name(view, 0)), "X");
+            assert_eq!(pdal_point_view_dim_type(view, 0), 9);
+            assert_eq!(
+                take_string(pdal_point_view_dim_name(view, 1)),
+                "Classification"
+            );
+            assert_eq!(pdal_point_view_dim_type(view, 1), 0);
+
             pdal_point_view_destroy(view);
         }
     }

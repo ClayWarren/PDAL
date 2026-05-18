@@ -172,6 +172,16 @@ impl PointLayout {
             .find(|d| &d.id == id)
             .map(|d| (d.offset, d.ty))
     }
+
+    /// Number of dimensions in registration order.
+    pub fn dim_count(&self) -> usize {
+        self.dims.len()
+    }
+
+    /// Dimension id and type at registration index `idx`.
+    pub fn dim_at(&self, idx: usize) -> Option<(&DimId, DimType)> {
+        self.dims.get(idx).map(|d| (&d.id, d.ty))
+    }
 }
 
 /// A buffer of points sharing one layout.

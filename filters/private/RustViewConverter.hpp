@@ -59,13 +59,58 @@ inline SpatialReference spatialReference(pdal_point_view_t* rustView)
     return srs;
 }
 
+inline int typeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+inline void verifyRustDims(pdal_point_view_t* rustView, PointLayoutPtr layout)
+{
+    uint64_t dimCount = pdal_point_view_dim_count(rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
+    {
+        std::string name = takeString(pdal_point_view_dim_name(rustView, idx));
+        if (name.empty())
+            continue;
+        if (layout->findDim(name) == Dimension::Id::Unknown)
+            throw pdal_error("Rust stage returned unregistered dimension '" +
+                             name + "'.");
+    }
+}
+
 inline pdal_point_view_t* toRust(PointView& inView)
 {
     pdal_point_layout_t* layout = pdal_point_layout_create();
     for (auto dim : inView.layout()->dims())
     {
-        pdal_point_layout_register_dim(
-            layout, inView.layout()->dimName(dim).c_str(), 9);
+        pdal_point_layout_register_dim(layout,
+                                       inView.layout()->dimName(dim).c_str(),
+                                       typeId(inView.layout()->dimType(dim)));
     }
     pdal_point_view_t* rust_in_view = pdal_point_view_create(layout);
     setSpatialReference(rust_in_view, inView.spatialReference());
@@ -93,6 +138,7 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
 {
     if (rust_out_view)
     {
+        verifyRustDims(rust_out_view, outView.layout());
         uint64_t out_len = pdal_point_view_length(rust_out_view);
         for (PointId idx = 0; idx < out_len; ++idx)
         {
@@ -116,6 +162,7 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointViewPtr baseView,
 {
     if (rust_out_view)
     {
+        verifyRustDims(rust_out_view, outView.layout());
         uint64_t out_len = pdal_point_view_length(rust_out_view);
         for (PointId idx = 0; idx < out_len; ++idx)
         {
