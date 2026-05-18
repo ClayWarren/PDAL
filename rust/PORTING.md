@@ -397,13 +397,18 @@ Current status:
   ASCII path, including vertex properties, normals, texture coordinates,
   triangulation for VTN de-duplication, and de-duplication logic matching
   PDAL's C++ behavior. Mesh face storage is intentionally deferred.
+- `readers.qfit` has a Rust implementation for the deterministic NASA ATM QFIT
+  binary path, including 10, 12, and 14-word formats, big-endian word parsing,
+  dimension mapping matching PDAL's C++ reader, and regression coverage
+  against installed PDAL.
 - Installed-PDAL regressions for these readers/writers are available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`,
   and
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`.
-- `pdal-core::driver` can infer PDAL reader/writer driver names from filenames
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test qfit_regression -- --ignored`.
+  - `pdal_core::driver` can infer PDAL reader/writer driver names from filenames
   for existing PDAL extensions. `pdal-capi` has a narrow registry that can
   construct only currently implemented Rust local readers/writers by driver
   name. Inference may return unported PDAL drivers; construction must still
@@ -485,11 +490,15 @@ Recent stabilization checkpoint:
 - Rust core guard tests now cover pipeline tag/dependency/error behavior,
   point source-index and typed-storage behavior, metadata/options/SRS scalar
   behavior, and spatial/geometry wrapper behavior.
+- Refactored the Stage Model to support multiple input views in `run()`,
+  matching PDAL's `PointViewSet` behavior. Added a default implementation for
+  looping over inputs and calling `run_one()`, and fixed `filters.merge` to
+  correctly handle DAG pipelines without producing redundant points.
 - This was a stabilization pass, not a new broad porting phase. Do not keep
   adding incidental tests here unless they protect a behavior needed by the
   next concrete porting milestone.
-- Latest validation for this checkpoint: Rust workspace tests passed and the
-  full `pdal_filters_*` CTest slice passed.
+- Latest validation for this checkpoint: Rust workspace tests (including DAG
+  pipeline tests) passed and the full `pdal_filters_*` CTest slice passed.
 
 Current deliberate gaps:
 

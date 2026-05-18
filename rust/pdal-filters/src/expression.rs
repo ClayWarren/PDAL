@@ -114,7 +114,7 @@ mod tests {
     fn single_expression_keeps_matching_points() {
         let input = classified(&[1.0, 2.0, 2.0, 7.0]);
         let mut filter = ExpressionFilter::new(&["Classification == 2".to_string()]).unwrap();
-        let out = filter.run(&input).unwrap();
+        let out = filter.run(std::slice::from_ref(&input)).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].len(), 2);
     }
@@ -127,7 +127,7 @@ mod tests {
             "Classification >= 7".to_string(),
         ])
         .unwrap();
-        let out = filter.run(&input).unwrap();
+        let out = filter.run(std::slice::from_ref(&input)).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].len(), 2); // two points classified 2
         assert_eq!(out[1].len(), 1); // one point classified 7
@@ -137,7 +137,7 @@ mod tests {
     fn empty_input_yields_no_views() {
         let input = classified(&[]);
         let mut filter = ExpressionFilter::new(&["Classification == 2".to_string()]).unwrap();
-        assert!(filter.run(&input).unwrap().is_empty());
+        assert!(filter.run(std::slice::from_ref(&input)).unwrap().is_empty());
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod tests {
     fn unknown_dimension_fails_at_run() {
         let input = classified(&[1.0]);
         let mut filter = ExpressionFilter::new(&["NoSuchDim == 1".to_string()]).unwrap();
-        assert!(filter.run(&input).is_err());
+        assert!(filter.run(std::slice::from_ref(&input)).is_err());
     }
 
     #[test]

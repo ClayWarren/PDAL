@@ -76,7 +76,7 @@ mod tests {
         }
 
         let mut filter = IqrFilter::new(1.5, DimId::X);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 4);
     }
 }

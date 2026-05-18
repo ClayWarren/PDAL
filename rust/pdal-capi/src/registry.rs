@@ -24,7 +24,6 @@ use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 use serde_json::Value;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::path::Path;
 
 pub const READER_DRIVERS: &[&str] = &[
     "readers.faux",
@@ -34,6 +33,7 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.ptx",
     "readers.ilvis2",
     "readers.obj",
+    "readers.qfit",
     "readers.ply",
 ];
 
@@ -78,6 +78,7 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.ptx" => Ok(Box::new(pdal_io::ptx::PtxReader::new(options))),
         "readers.ilvis2" => Ok(Box::new(pdal_io::ilvis2::Ilvis2Reader::new(options))),
         "readers.obj" => Ok(Box::new(pdal_io::obj::ObjReader::new(options))),
+        "readers.qfit" => Ok(Box::new(pdal_io::qfit::QfitReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
         _ => Err(StageError(format!(
             "Reader driver '{name}' is not available in the Rust port."
@@ -110,7 +111,9 @@ pub fn create_filter(
             Ok(Box::new(FilterWrapper::new(RandomizeFilter::new(seed))))
         }
         "filters.sample" => Ok(Box::new(FilterWrapper::new(SampleFilter::new(options)))),
-        "filters.stats" => Ok(Box::new(FilterWrapper::new(StatsFilter::from_options(options)))),
+        "filters.stats" => Ok(Box::new(FilterWrapper::new(StatsFilter::from_options(
+            options,
+        )))),
         "filters.tail" => Ok(Box::new(FilterWrapper::new(TailFilter::new(
             options.get_u64("count", 10),
             options.get_bool("invert", false),
@@ -262,6 +265,10 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     Ok(pipeline)
 }
 
+/// Create a pipeline from JSON.
+///
+/// # Safety
+/// `json` must be a valid null-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_pipeline_create_json(json: *const c_char) -> *mut PipelineHandle {
     clear_last_error();
@@ -273,7 +280,7 @@ pub unsafe extern "C" fn pdal_pipeline_create_json(json: *const c_char) -> *mut 
     match pipeline_from_json(&json_str) {
         Ok(pipeline) => Box::into_raw(Box::new(PipelineHandle { pipeline })),
         Err(e) => {
-            set_last_error(&e.to_string());
+            set_last_error(e.to_string());
             std::ptr::null_mut()
         }
     }
@@ -357,7 +364,8 @@ mod tests {
     fn pipeline_json_runs_reader_filter_writer_with_inferred_drivers() {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let input = repo.join("test/data/text/utm17_1.txt");
-        let output = std::env::temp_dir().join(format!("pdal-rust-registry-{}.pcd", std::process::id()));
+        let output =
+            std::env::temp_dir().join(format!("pdal-rust-registry-{}.pcd", std::process::id()));
         let _ = std::fs::remove_file(&output);
 
         let json = format!(

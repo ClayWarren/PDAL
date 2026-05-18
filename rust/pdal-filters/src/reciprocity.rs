@@ -99,7 +99,7 @@ mod tests {
             (18.0, 18.0, 18.0),
         ]);
         let mut filter = ReciprocityFilter::new(3);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::Reciprocity), 100.0);
         assert_eq!(out.get_f64(1, &DimId::Reciprocity), 0.0);
     }

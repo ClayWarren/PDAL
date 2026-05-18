@@ -93,7 +93,7 @@ mod tests {
         }
         let view = view(&points);
         let mut filter = ApproximateCoplanarFilter::new(8, 25.0, 6.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         let coplanar = (0..out.len())
             .map(|idx| out.get_f64(idx, &DimId::Coplanar) as u64)
             .sum::<u64>();
@@ -112,7 +112,7 @@ mod tests {
         }
         let view = view(&points);
         let mut filter = ApproximateCoplanarFilter::new(8, 25.0, 6.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             assert_eq!(out.get_f64(idx, &DimId::Coplanar) as u8, 0);
         }

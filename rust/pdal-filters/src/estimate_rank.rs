@@ -85,7 +85,7 @@ mod tests {
         }
         let view = view(&points);
         let mut filter = EstimateRankFilter::new(8, 0.01);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             assert_eq!(out.get_f64(idx, &DimId::Rank) as u8, 2);
         }
@@ -98,7 +98,7 @@ mod tests {
             .collect::<Vec<_>>();
         let view = view(&points);
         let mut filter = EstimateRankFilter::new(8, 0.01);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             assert_eq!(out.get_f64(idx, &DimId::Rank) as u8, 1);
         }

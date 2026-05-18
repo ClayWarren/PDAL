@@ -117,7 +117,7 @@ mod tests {
         }
 
         let mut filter = ElmFilter::new(10.0, 7, 1.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::Classification), 7.0);
         assert_eq!(out.get_f64(1, &DimId::Classification), 0.0);
     }

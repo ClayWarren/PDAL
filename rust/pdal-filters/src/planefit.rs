@@ -108,7 +108,7 @@ mod tests {
         }
 
         let mut filter = PlaneFitFilter::new(4);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert!((out.get_f64(0, &DimId::PlaneFit) - 1.0).abs() < 1e-6);
     }
 }

@@ -106,7 +106,7 @@ mod tests {
             output_dim,
         );
         let mut filter = ZsmoothFilter::new(1.0, 0.5, output_dim.to_string());
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::from_name(output_dim)), 25.0);
     }
 
@@ -115,7 +115,7 @@ mod tests {
         let output_dim = "Zsmoothed";
         let view = view(&[(0.0, 0.0, 12.0), (10.0, 0.0, 99.0)], output_dim);
         let mut filter = ZsmoothFilter::new(1.0, 0.5, output_dim.to_string());
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::from_name(output_dim)), 12.0);
     }
 }

@@ -116,7 +116,7 @@ mod tests {
             (10.0, 0.0, 2.5),
         ]);
         let mut filter = SparseSurfaceFilter::new(1.0, 2, 7);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         let classes = (0..out.len())
             .map(|idx| out.get_f64(idx, &DimId::Classification) as u8)
             .collect::<Vec<_>>();
@@ -127,7 +127,7 @@ mod tests {
     fn chooses_available_unclassified_label_between_classes() {
         let view = view(&[(0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (10.0, 0.0, 2.0)]);
         let mut filter = SparseSurfaceFilter::new(1.0, 1, 3);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::Classification) as u8, 1);
         assert_eq!(out.get_f64(1, &DimId::Classification) as u8, 3);
         assert_eq!(out.get_f64(2, &DimId::Classification) as u8, 1);

@@ -80,7 +80,7 @@ mod tests {
             (100.0, 100.0, 100.0),
         ]);
         let mut filter = RadialDensityFilter::new(1.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         let factor = 1.0 / ((4.0 / 3.0) * PDAL_PI);
         for idx in 0..5 {
             assert!((out.get_f64(idx, &DimId::RadialDensity) - 5.0 * factor).abs() < 1e-9);

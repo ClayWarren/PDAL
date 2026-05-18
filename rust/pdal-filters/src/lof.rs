@@ -115,7 +115,7 @@ mod tests {
     fn flags_outlier() {
         let view = grid_with_outlier();
         let mut filter = LofFilter::new(10);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         let nn_inlier = out.get_f64(12, &DimId::NNDistance);
         let nn_outlier = out.get_f64(25, &DimId::NNDistance);
@@ -135,9 +135,9 @@ mod tests {
     fn minpts_controls_k_distance() {
         let view = grid_with_outlier();
         let mut near = LofFilter::new(4);
-        let near = near.run(&view).unwrap().remove(0);
+        let near = near.run(std::slice::from_ref(&view)).unwrap().remove(0);
         let mut far = LofFilter::new(10);
-        let far = far.run(&view).unwrap().remove(0);
+        let far = far.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         assert!(near.get_f64(12, &DimId::NNDistance) < far.get_f64(12, &DimId::NNDistance));
     }

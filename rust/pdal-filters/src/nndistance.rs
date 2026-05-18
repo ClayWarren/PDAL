@@ -99,7 +99,7 @@ mod tests {
     fn kth_uses_requested_neighbor_distance() {
         let view = line_view();
         let mut filter = NNDistanceFilter::new(2, NNDistanceMode::Kth);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::NNDistance), 3.0);
         assert_eq!(out.get_f64(1, &DimId::NNDistance), 2.0);
     }
@@ -108,7 +108,7 @@ mod tests {
     fn average_skips_query_point() {
         let view = line_view();
         let mut filter = NNDistanceFilter::new(2, NNDistanceMode::Average);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::NNDistance), 2.0);
         assert_eq!(out.get_f64(1, &DimId::NNDistance), 1.5);
     }

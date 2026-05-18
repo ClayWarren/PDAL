@@ -134,7 +134,7 @@ mod tests {
     fn planar_neighborhood_has_zero_smallest_eigenvalue() {
         let view = plane();
         let mut filter = EigenvaluesFilter::new(8, false, 1, None, 3);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             assert!(out.get_f64(idx, &DimId::Eigenvalue0).abs() < 1e-12);
             assert!(out.get_f64(idx, &DimId::Eigenvalue1) > 0.0);
@@ -146,7 +146,7 @@ mod tests {
     fn normalized_eigenvalues_sum_to_one() {
         let view = plane();
         let mut filter = EigenvaluesFilter::new(8, true, 1, None, 3);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             let sum = out.get_f64(idx, &DimId::Eigenvalue0)
                 + out.get_f64(idx, &DimId::Eigenvalue1)

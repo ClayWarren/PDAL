@@ -466,7 +466,7 @@ mod tests {
             view.set_f64(p, &DimId::X, x);
         }
         let mut f = MongoExpressionFilter::new(r#"{"X": {"$gte": 1}}"#).unwrap();
-        let out = f.run(&view).unwrap();
+        let out = f.run(std::slice::from_ref(&view)).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].len(), 3);
     }

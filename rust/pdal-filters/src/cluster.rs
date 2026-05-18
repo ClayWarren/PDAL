@@ -128,7 +128,7 @@ mod tests {
         points.extend(shape.iter().map(|p| (p.0 + 100.0, p.1, p.2)));
         let view = view(&points);
         let mut filter = ClusterFilter::new(1, usize::MAX, 1.0, true);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         let ids = (0..out.len())
             .map(|idx| out.get_f64(idx, &DimId::ClusterID) as i64)
@@ -151,14 +151,14 @@ mod tests {
         let view = view(&[(0.0, 0.0, 0.0), (0.0, 0.0, 50.0)]);
 
         let mut filter = ClusterFilter::new(1, usize::MAX, 1.0, false);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(
             out.get_f64(0, &DimId::ClusterID),
             out.get_f64(1, &DimId::ClusterID)
         );
 
         let mut filter = ClusterFilter::new(1, usize::MAX, 1.0, true);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_ne!(
             out.get_f64(0, &DimId::ClusterID),
             out.get_f64(1, &DimId::ClusterID)

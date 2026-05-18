@@ -138,7 +138,7 @@ mod tests {
         points.push((500.0, 500.0, 500.0));
         let view = view(&points);
         let mut filter = DbscanFilter::new(6, 1.0, vec!["X".into(), "Y".into(), "Z".into()]);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         for idx in 1..8 {
             assert_eq!(
@@ -165,11 +165,11 @@ mod tests {
         let view = view(&points);
 
         let mut filter = DbscanFilter::new(6, 1.0, vec!["X".into(), "Y".into()]);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert!((0..out.len()).all(|idx| out.get_f64(idx, &DimId::ClusterID) >= 0.0));
 
         let mut filter = DbscanFilter::new(6, 1.0, vec!["X".into(), "Y".into(), "Z".into()]);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert!((0..out.len()).any(|idx| out.get_f64(idx, &DimId::ClusterID) < 0.0));
     }
 }

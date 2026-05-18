@@ -149,21 +149,37 @@ impl StatsFilter {
             }
         }
 
-        for d in enumerate.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 1, advanced));
+        for d in enumerate
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            filter
+                .summaries
+                .insert(d.to_string(), Summary::new(d.to_string(), 1, advanced));
             names.remove(d);
         }
         for d in count.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 2, advanced));
+            filter
+                .summaries
+                .insert(d.to_string(), Summary::new(d.to_string(), 2, advanced));
             names.remove(d);
         }
-        for d in global.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 3, advanced));
+        for d in global
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            filter
+                .summaries
+                .insert(d.to_string(), Summary::new(d.to_string(), 3, advanced));
             names.remove(d);
         }
 
         for d in names {
-            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 0, advanced));
+            filter
+                .summaries
+                .insert(d.to_string(), Summary::new(d.to_string(), 0, advanced));
         }
 
         filter
@@ -191,10 +207,8 @@ impl Filter for StatsFilter {
             for i in 0..layout.dim_count() {
                 if let Some((id, _ty)) = layout.dim_at(i) {
                     let name = id.name().to_string();
-                    self.summaries.insert(
-                        name.clone(),
-                        Summary::new(name, 0, self.advanced),
-                    );
+                    self.summaries
+                        .insert(name.clone(), Summary::new(name, 0, self.advanced));
                 }
             }
         }
@@ -228,10 +242,8 @@ impl Streamable for StatsFilter {
             for i in 0..layout.dim_count() {
                 if let Some((id, _ty)) = layout.dim_at(i) {
                     let name = id.name().to_string();
-                    self.summaries.insert(
-                        name.clone(),
-                        Summary::new(name, 0, self.advanced),
-                    );
+                    self.summaries
+                        .insert(name.clone(), Summary::new(name, 0, self.advanced));
                 }
             }
         }

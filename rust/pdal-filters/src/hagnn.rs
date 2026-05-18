@@ -194,7 +194,7 @@ mod tests {
     fn closest_ground_sets_height() {
         let view = view();
         let mut filter = HagNnFilter::new(1, 0.0, true, 2);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::HeightAboveGround), 0.0);
         assert_eq!(out.get_f64(3, &DimId::HeightAboveGround), 10.0);
     }
@@ -203,7 +203,7 @@ mod tests {
     fn interpolation_uses_inverse_squared_distance() {
         let view = view();
         let mut filter = HagNnFilter::new(2, 0.0, true, 2);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(3, &DimId::HeightAboveGround), 8.0);
     }
 
@@ -211,7 +211,7 @@ mod tests {
     fn no_extrapolation_returns_zero_height_outside_ground_bounds() {
         let view = view();
         let mut filter = HagNnFilter::new(2, 0.0, false, 2);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.get_f64(4, &DimId::HeightAboveGround), 0.0);
     }
 }

@@ -138,7 +138,7 @@ mod tests {
             (21.0, 21.0, 21.0),
         ]);
         let mut filter = VoxelCentroidNearestNeighborFilter::new(10.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 3);
         assert_eq!(out.source_index(0), 1);
         assert_eq!(out.source_index(1), 3);
@@ -149,7 +149,7 @@ mod tests {
     fn more_than_two_points_use_centroid() {
         let view = view(&[(0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (5.0, 0.0, 0.0)]);
         let mut filter = VoxelCentroidNearestNeighborFilter::new(10.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 1);
         assert_eq!(out.source_index(0), 1);
     }

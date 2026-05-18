@@ -122,7 +122,7 @@ mod tests {
     fn marks_other_when_no_ground_break_is_found() {
         let view = view(&[0.0, 0.0, 0.0, 0.0]);
         let mut filter = SkewnessBalancingFilter::new(2, 1, false);
-        let output = filter.run(&view).unwrap().remove(0);
+        let output = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..output.len() {
             assert_eq!(output.get_f64(idx, &DimId::Classification), 1.0);
         }
@@ -132,7 +132,7 @@ mod tests {
     fn leaves_other_points_when_only_ground_is_set() {
         let view = view(&[0.0, 0.0, 0.0, 100.0]);
         let mut filter = SkewnessBalancingFilter::new(2, 1, true);
-        let output = filter.run(&view).unwrap().remove(0);
+        let output = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(output.get_f64(3, &DimId::Classification), 0.0);
     }
 }

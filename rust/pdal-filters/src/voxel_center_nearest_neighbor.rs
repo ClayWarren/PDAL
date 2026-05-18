@@ -109,7 +109,7 @@ mod tests {
             (4.0, 4.0, 0.0),
         ]);
         let mut filter = VoxelCenterNearestNeighborFilter::new(2.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 3);
         assert_eq!(out.get_f64(0, &DimId::X), 1.0);
         assert_eq!(out.get_f64(1, &DimId::X), 2.0);
@@ -120,7 +120,7 @@ mod tests {
     fn preserves_source_index_on_selected_points() {
         let view = view(&[(0.0, 0.0, 0.0), (1.0, 1.0, 0.0)]);
         let mut filter = VoxelCenterNearestNeighborFilter::new(2.0);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 1);
         assert_eq!(out.source_index(0), 1);
     }

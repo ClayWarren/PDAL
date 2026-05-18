@@ -145,7 +145,7 @@ mod tests {
 
         let mut filter =
             ExpressionStatsFilter::new("X", &["X < 3".to_string(), "X >= 3".to_string()]).unwrap();
-        filter.run(&view).unwrap();
+        filter.run(std::slice::from_ref(&view)).unwrap();
         let metadata = filter.metadata();
 
         assert_eq!(

@@ -81,7 +81,7 @@ mod tests {
         }
 
         let mut filter = MadFilter::new(2.0, DimId::X, 1.4862);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         assert_eq!(out.len(), 4);
     }
 }

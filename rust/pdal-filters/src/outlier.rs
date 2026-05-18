@@ -167,7 +167,7 @@ mod tests {
     fn radius_mode_labels_noise_class() {
         let view = grid_with_outlier();
         let mut filter = OutlierFilter::new("radius".to_string(), 2, 1.0, 8, 2.0, 18);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         for idx in 0..25 {
             assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);
@@ -179,7 +179,7 @@ mod tests {
     fn unknown_method_leaves_classification_unchanged() {
         let view = grid_with_outlier();
         let mut filter = OutlierFilter::new("wat".to_string(), 2, 1.0, 8, 2.0, 18);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
 
         for idx in 0..out.len() {
             assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);

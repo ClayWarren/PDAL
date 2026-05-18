@@ -104,7 +104,7 @@ mod tests {
         }
 
         let mut filter = OptimalNeighborhoodFilter::new(5, 8);
-        let out = filter.run(&view).unwrap().remove(0);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
         for idx in 0..out.len() {
             let k = out.get_f64(idx, &DimId::OptimalKNN);
             assert!((5.0..=8.0).contains(&k));

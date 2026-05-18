@@ -49,6 +49,13 @@ pub enum DimId {
     NormalX,
     NormalY,
     NormalZ,
+    StartPulse,
+    ReflectedPulse,
+    Azimuth,
+    Pitch,
+    Roll,
+    Pdop,
+    PulseWidth,
     Other(String),
 }
 
@@ -86,6 +93,13 @@ impl DimId {
             DimId::NormalX => "NormalX",
             DimId::NormalY => "NormalY",
             DimId::NormalZ => "NormalZ",
+            DimId::StartPulse => "StartPulse",
+            DimId::ReflectedPulse => "ReflectedPulse",
+            DimId::Azimuth => "Azimuth",
+            DimId::Pitch => "Pitch",
+            DimId::Roll => "Roll",
+            DimId::Pdop => "Pdop",
+            DimId::PulseWidth => "PulseWidth",
             DimId::Other(s) => s,
         }
     }
@@ -123,6 +137,13 @@ impl DimId {
             "NormalX" => DimId::NormalX,
             "NormalY" => DimId::NormalY,
             "NormalZ" => DimId::NormalZ,
+            "StartPulse" => DimId::StartPulse,
+            "ReflectedPulse" => DimId::ReflectedPulse,
+            "Azimuth" => DimId::Azimuth,
+            "Pitch" => DimId::Pitch,
+            "Roll" => DimId::Roll,
+            "Pdop" => DimId::Pdop,
+            "PulseWidth" => DimId::PulseWidth,
             other => DimId::Other(other.to_string()),
         }
     }
