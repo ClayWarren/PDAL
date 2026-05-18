@@ -79,14 +79,18 @@ Current Rust core primitives:
 - Spatial index: exact brute-force neighbor queries behind an API that can be
   replaced by a real KD-tree without changing filters.
 - Metadata: named tree nodes with typed scalar values.
+- Metadata bridge: C++ copies Rust metadata trees into PDAL `MetadataNode`
+  through `filters/private/RustMetadata.hpp`; ownership stays explicit on both
+  sides of the C ABI.
 - Spatial reference: text plus coordinate epoch, with metadata export.
 
 Current deliberate gaps:
 
 - No GDAL/PROJ-backed SRS normalization, reprojection, authority lookup,
   WKT1/WKT2 conversion, axis ordering, or unit handling yet.
-- No C++ `MetadataNode` bridge yet; the Rust metadata ABI is a foundation for
-  future stage metadata parity, not a full replacement.
+- The metadata bridge covers typed scalar tree copying, but not every C++
+  `MetadataNode` feature such as descriptions, array/list kind preservation,
+  JSON/base64 typed nodes, or full pipeline serialization parity.
 - No geometry ABI yet for polygons, OGR geometries, point-in-polygon, or bounds
   reprojection.
 
@@ -120,8 +124,8 @@ tests:
 
 - GDAL/PROJ/SRS filters: colorization, overlay, DEM, HagDem, reprojection,
   ProjPipeline, H3, GeomDistance, Crop, Georeference.
-- Metadata-heavy filters: ExpressionStats and similar filters that publish
-  structured metadata.
+- Metadata-heavy filters beyond ExpressionStats that require richer
+  `MetadataNode` features or pipeline serialization parity.
 - Private-algorithm filters: CSF, Delaunay, FaceRaster, HexBin, Poisson, SMR,
   PMF, Supervoxel, and similar specialized implementations.
 - Framework or shell filters that depend on process execution or PDAL pipeline

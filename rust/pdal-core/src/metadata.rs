@@ -15,6 +15,16 @@ pub enum MetadataValue {
 }
 
 impl MetadataValue {
+    pub fn kind_id(&self) -> u8 {
+        match self {
+            MetadataValue::String(_) => 0,
+            MetadataValue::I64(_) => 1,
+            MetadataValue::U64(_) => 2,
+            MetadataValue::F64(_) => 3,
+            MetadataValue::Bool(_) => 4,
+        }
+    }
+
     pub fn as_string(&self) -> String {
         match self {
             MetadataValue::String(value) => value.clone(),
@@ -22,6 +32,52 @@ impl MetadataValue {
             MetadataValue::U64(value) => value.to_string(),
             MetadataValue::F64(value) => value.to_string(),
             MetadataValue::Bool(value) => value.to_string(),
+        }
+    }
+
+    pub fn as_i64(&self) -> i64 {
+        match self {
+            MetadataValue::I64(value) => *value,
+            MetadataValue::U64(value) => *value as i64,
+            MetadataValue::F64(value) => *value as i64,
+            MetadataValue::Bool(value) => i64::from(*value),
+            MetadataValue::String(value) => value.parse().unwrap_or_default(),
+        }
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            MetadataValue::I64(value) => *value as u64,
+            MetadataValue::U64(value) => *value,
+            MetadataValue::F64(value) => *value as u64,
+            MetadataValue::Bool(value) => u64::from(*value),
+            MetadataValue::String(value) => value.parse().unwrap_or_default(),
+        }
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            MetadataValue::I64(value) => *value as f64,
+            MetadataValue::U64(value) => *value as f64,
+            MetadataValue::F64(value) => *value,
+            MetadataValue::Bool(value) => {
+                if *value {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            MetadataValue::String(value) => value.parse().unwrap_or_default(),
+        }
+    }
+
+    pub fn as_bool(&self) -> bool {
+        match self {
+            MetadataValue::I64(value) => *value != 0,
+            MetadataValue::U64(value) => *value != 0,
+            MetadataValue::F64(value) => *value != 0.0,
+            MetadataValue::Bool(value) => *value,
+            MetadataValue::String(value) => matches!(value.as_str(), "true" | "1"),
         }
     }
 }

@@ -34,9 +34,12 @@
 
 #include "ExpressionStatsFilter.hpp"
 
+#include "private/RustMetadata.hpp"
+#include "private/RustViewConverter.hpp"
 #include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 #include <cctype>
 #include <limits>
@@ -124,17 +127,34 @@ bool ExpressionStatsFilter::processOne(PointRef& point)
 
 void ExpressionStatsFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
-    for (PointId id = 0; id < view.size(); ++id)
-    {
-        point.setPointId(id);
-        processOne(point);
-    }
+    pdal_point_view_t* rustView = rust_view_converter::toRust(view);
+
+    std::vector<std::string> expressionStrings;
+    std::vector<const char*> expressionPtrs;
+    expressionStrings.reserve(m_args->m_expressions.size());
+    expressionPtrs.reserve(m_args->m_expressions.size());
+    for (const auto& expression : m_args->m_expressions)
+        expressionStrings.push_back(expression.print());
+    for (const auto& expression : expressionStrings)
+        expressionPtrs.push_back(expression.c_str());
+
+    pdal_metadata_node_t* rustMetadata = pdal_expressionstats_metadata(
+        rustView, m_dimName.c_str(), expressionPtrs.data(),
+        expressionPtrs.size());
+    pdal_point_view_destroy(rustView);
+
+    if (!rustMetadata)
+        rust_view_converter::throwLastError("Rust expressionstats failed.");
+
+    rust_metadata::addChildrenTo(m_metadata, rustMetadata);
+    pdal_metadata_node_destroy(rustMetadata);
+    m_metadataExtracted = true;
 }
 
 void ExpressionStatsFilter::done(PointTableRef table)
 {
-    extractMetadata(table);
+    if (!m_metadataExtracted)
+        extractMetadata(table);
 }
 
 void ExpressionStatsFilter::extractMetadata(PointTableRef table)

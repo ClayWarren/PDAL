@@ -55,7 +55,16 @@ void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);
 pdal_metadata_node_t* pdal_metadata_node_create(const char* name);
 char* pdal_metadata_node_name(const pdal_metadata_node_t* node);
 void pdal_metadata_node_set_string(pdal_metadata_node_t* node, const char* value);
+void pdal_metadata_node_set_i64(pdal_metadata_node_t* node, int64_t value);
+void pdal_metadata_node_set_u64(pdal_metadata_node_t* node, uint64_t value);
+void pdal_metadata_node_set_f64(pdal_metadata_node_t* node, double value);
+void pdal_metadata_node_set_bool(pdal_metadata_node_t* node, bool value);
+uint8_t pdal_metadata_node_value_kind(const pdal_metadata_node_t* node);
 char* pdal_metadata_node_value(const pdal_metadata_node_t* node);
+int64_t pdal_metadata_node_value_i64(const pdal_metadata_node_t* node);
+uint64_t pdal_metadata_node_value_u64(const pdal_metadata_node_t* node);
+double pdal_metadata_node_value_f64(const pdal_metadata_node_t* node);
+bool pdal_metadata_node_value_bool(const pdal_metadata_node_t* node);
 void pdal_metadata_node_add_child(pdal_metadata_node_t* node, pdal_metadata_node_t* child);
 uint64_t pdal_metadata_node_child_count(const pdal_metadata_node_t* node);
 pdal_metadata_node_t* pdal_metadata_node_child(const pdal_metadata_node_t* node, uint64_t idx);
@@ -183,6 +192,13 @@ void pdal_stats_compute(
 );
 
 void pdal_free_stats_arrays(pdal_dim_stats_t* ptr, uint64_t dims_count);
+
+pdal_metadata_node_t* pdal_expressionstats_metadata(
+    pdal_point_view_t* view,
+    const char* dim_name,
+    const char* const* expressions,
+    uint64_t count
+);
 
 
 #ifdef __cplusplus

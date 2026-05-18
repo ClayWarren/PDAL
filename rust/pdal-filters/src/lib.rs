@@ -8,6 +8,7 @@ pub mod eigenvalues;
 pub mod elm;
 pub mod estimate_rank;
 pub mod expression;
+pub mod expressionstats;
 pub mod farthestpointsampling;
 pub mod ferry;
 pub mod griddecimation;

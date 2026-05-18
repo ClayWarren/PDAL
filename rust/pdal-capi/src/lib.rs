@@ -16,6 +16,7 @@ use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
+use pdal_filters::expressionstats::ExpressionStatsFilter as ExpressionStatsMetadataFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::griddecimation;
@@ -610,6 +611,69 @@ pub unsafe extern "C" fn pdal_metadata_node_set_string(
     }
 }
 
+/// Set a metadata node's signed integer value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_i64(node: *mut MetadataNode, value: i64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::I64(value));
+    }
+}
+
+/// Set a metadata node's unsigned integer value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_u64(node: *mut MetadataNode, value: u64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::U64(value));
+    }
+}
+
+/// Set a metadata node's floating-point value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_f64(node: *mut MetadataNode, value: f64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::F64(value));
+    }
+}
+
+/// Set a metadata node's boolean value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_bool(node: *mut MetadataNode, value: bool) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::Bool(value));
+    }
+}
+
+/// Return the metadata scalar value kind: 0 string, 1 i64, 2 u64, 3 f64,
+/// 4 bool, 255 no value.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_kind(node: *const MetadataNode) -> u8 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::kind_id)
+        .unwrap_or(255)
+}
+
 /// Return a node's scalar value as a string. Caller must free with
 /// `pdal_string_free`.
 ///
@@ -625,6 +689,62 @@ pub unsafe extern "C" fn pdal_metadata_node_value(node: *const MetadataNode) -> 
             .map(MetadataValue::as_string)
             .unwrap_or_default(),
     )
+}
+
+/// Return a node's scalar value as a signed integer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_i64(node: *const MetadataNode) -> i64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_i64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as an unsigned integer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_u64(node: *const MetadataNode) -> u64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_u64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as a floating-point value.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_f64(node: *const MetadataNode) -> f64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_f64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as a boolean.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode) -> bool {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_bool)
+        .unwrap_or_default()
 }
 
 /// Add `child` to `node`, transferring ownership of `child`.
@@ -1886,6 +2006,54 @@ pub unsafe extern "C" fn pdal_free_stats_arrays(ptr: *mut pdal_dim_stats_t, dims
     }
 }
 
+/// Compute expression statistics metadata.
+///
+/// # Safety
+///
+/// `view` must be a valid point view. `dim_name` must be a valid
+/// NUL-terminated C string. `expressions` must point to `count`
+/// NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_expressionstats_metadata(
+    view: *mut PointView,
+    dim_name: *const c_char,
+    expressions: *const *const c_char,
+    count: u64,
+) -> *mut MetadataNode {
+    ffi_catch(std::ptr::null_mut(), || {
+        clear_last_error();
+        if view.is_null() || dim_name.is_null() || (count > 0 && expressions.is_null()) {
+            set_last_error("null expressionstats input");
+            return std::ptr::null_mut();
+        }
+
+        let Some(view) = view.as_ref() else {
+            set_last_error("null point view");
+            return std::ptr::null_mut();
+        };
+        let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+        let mut sources = Vec::new();
+        for i in 0..count {
+            let ptr = *expressions.offset(i as isize);
+            if ptr.is_null() {
+                set_last_error("null expression string");
+                return std::ptr::null_mut();
+            }
+            sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+
+        match ExpressionStatsMetadataFilter::new(&dim_name, &sources)
+            .and_then(|mut filter| filter.metadata(view, &dim_name))
+        {
+            Ok(metadata) => Box::into_raw(Box::new(metadata)),
+            Err(err) => {
+                set_last_error(err.to_string());
+                std::ptr::null_mut()
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1956,6 +2124,21 @@ mod tests {
 
             pdal_metadata_node_destroy(copied);
             pdal_metadata_node_destroy(root);
+        }
+    }
+
+    #[test]
+    fn metadata_numeric_values_roundtrip_through_c_abi() {
+        unsafe {
+            let node_name = CString::new("count").unwrap();
+            let node = pdal_metadata_node_create(node_name.as_ptr());
+            pdal_metadata_node_set_u64(node, 42);
+
+            assert_eq!(pdal_metadata_node_value_kind(node), 2);
+            assert_eq!(pdal_metadata_node_value_u64(node), 42);
+            assert_eq!(take_string(pdal_metadata_node_value(node)), "42");
+
+            pdal_metadata_node_destroy(node);
         }
     }
 

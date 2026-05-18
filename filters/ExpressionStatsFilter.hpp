@@ -66,6 +66,7 @@ private:
     Dimension::Id m_dimId;
     std::string m_dimName;
     std::map<std::string, std::map<double, point_count_t>> m_stats;
+    bool m_metadataExtracted = false;
 
     void extractMetadata(PointTableRef table);
     ExpressionStatsFilter& operator=(const ExpressionStatsFilter&) = delete;
