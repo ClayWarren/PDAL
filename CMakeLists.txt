@@ -190,6 +190,16 @@ add_subdirectory(vendor/utfcpp)
 add_subdirectory(vendor/lepcc)
 add_subdirectory(vendor/h3)
 add_subdirectory(tools)
+
+#
+# Rust C ABI integration - define early so apps/CMakeLists.txt can use it.
+#
+set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
+set(RUST_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+if(APPLE AND NOT RUST_MACOSX_DEPLOYMENT_TARGET)
+    set(RUST_MACOSX_DEPLOYMENT_TARGET "16.0")
+endif()
+
 add_subdirectory(apps)
 
 file(GLOB BASE_SRCS
@@ -249,19 +259,15 @@ add_library(PDAL::PDAL ALIAS ${PDAL_LIB_NAME})
 #
 # Rust C ABI integration (spike: filters.decimation)
 #
-set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
 set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
-set(RUST_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-if(APPLE AND NOT RUST_MACOSX_DEPLOYMENT_TARGET)
-    set(RUST_MACOSX_DEPLOYMENT_TARGET "16.0")
-endif()
 file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
     "${RUST_CAPI_DIR}/Cargo.toml"
     "${RUST_CAPI_DIR}/Cargo.lock"
     "${RUST_CAPI_DIR}/pdal-capi/*"
     "${RUST_CAPI_DIR}/pdal-core/*"
     "${RUST_CAPI_DIR}/pdal-filters/*"
+    "${RUST_CAPI_DIR}/pdal-cli/*"
 )
 
 find_program(CARGO_EXECUTABLE cargo)
@@ -281,6 +287,9 @@ add_custom_command(
 add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
 add_dependencies(${PDAL_LIB_NAME} pdal_rust_capi)
 
+#
+# Rust kernel dispatch C ABI wrapper (compiled into the PDAL library).
+#
 target_include_directories(${PDAL_LIB_NAME}
     PRIVATE
         ${RUST_CAPI_HEADER_DIR}

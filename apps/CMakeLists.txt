@@ -32,6 +32,46 @@ IF(MSVC)
     target_link_options(${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
 endif(MSVC)
 
+#
+# Rust CLI binary (pdal-rs)
+#
+set(PDAL_RS_APP pdal-rs)
+set(PDAL_RS_BIN "${RUST_CAPI_DIR}/target/release/pdal-rs")
+
+# Build kernel C ABI wrapper as a static library for the Rust binary.
+add_library(pdal_kernel_capi STATIC
+    "${RUST_CAPI_DIR}/pdal-capi/src/pdal_kernel_capi.cpp"
+)
+target_include_directories(pdal_kernel_capi PRIVATE
+    ${RUST_CAPI_HEADER_DIR}
+    ${PDAL_INCLUDE_DIR}
+    ${PROJECT_BINARY_DIR}/include
+    ${NLOHMANN_INCLUDE_DIR}
+)
+target_link_libraries(pdal_kernel_capi PRIVATE ${PDAL_LIB_NAME})
+set_target_properties(pdal_kernel_capi PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+)
+
+add_custom_command(
+    OUTPUT ${PDAL_RS_BIN}
+    COMMAND ${CMAKE_COMMAND} -E env
+        MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
+        PDAL_LIB_DIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+        PDAL_KERNEL_CAPI_LIB=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpdal_kernel_capi.a
+        ${CARGO_EXECUTABLE} build -p pdal-cli --release
+    DEPENDS ${RUST_CAPI_SOURCES} ${PDAL_LIB_NAME} pdal_kernel_capi
+    WORKING_DIRECTORY ${RUST_CAPI_DIR}
+    COMMENT "Building Rust PDAL CLI (pdal-rs) with cargo"
+)
+add_custom_target(${PDAL_RS_APP} ALL DEPENDS ${PDAL_RS_BIN})
+
+add_custom_command(
+    TARGET ${PDAL_RS_APP} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${PDAL_RS_BIN} ${PDAL_OUTPUT_BIN_DIR}/pdal-rs
+    COMMENT "Copying pdal-rs to output directory"
+)
+
 #------------------------------------------------------------------------------
 # Targets installation
 #------------------------------------------------------------------------------

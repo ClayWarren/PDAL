@@ -1,0 +1,11 @@
+[target.aarch64-apple-darwin]
+rustflags = ["-L", "native=@PDAL_LIB_DIR@", "-l", "pdalcpp"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-L", "native=@PDAL_LIB_DIR@", "-l", "pdalcpp"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-L", "native=@PDAL_LIB_DIR@", "-l", "pdalcpp"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-L", "native=@PDAL_LIB_DIR@", "-l", "pdalcpp"]

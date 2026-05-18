@@ -9,6 +9,7 @@ pub mod gdal;
 pub mod geometry;
 pub mod metadata;
 pub mod options;
+pub mod pipeline;
 pub mod point;
 pub mod spatial;
 pub mod srs;

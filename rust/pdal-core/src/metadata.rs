@@ -123,6 +123,10 @@ impl MetadataNode {
         &self.children
     }
 
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
     pub fn set_value(&mut self, value: MetadataValue) {
         self.value = Some(value);
     }

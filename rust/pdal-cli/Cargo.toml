@@ -1,0 +1,12 @@
+[package]
+name = "pdal-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "pdal-rs"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"

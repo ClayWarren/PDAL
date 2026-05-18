@@ -13,6 +13,9 @@ typedef struct pdal_point_view pdal_point_view_t;
 typedef struct pdal_spatial_reference pdal_spatial_reference_t;
 typedef struct pdal_metadata_node pdal_metadata_node_t;
 typedef struct pdal_stage pdal_stage_t;
+typedef struct pdal_pipeline pdal_pipeline_t;
+typedef struct pdal_reader pdal_reader_t;
+typedef struct pdal_writer pdal_writer_t;
 
 const char* pdal_last_error();
 void pdal_clear_error();
@@ -245,6 +248,36 @@ typedef struct {
 } pdal_point3d_t;
 
 pdal_stage_t* pdal_stage_create_crop(bool outside, const pdal_box3d_t* bounds, uint64_t bounds_count, const char* const* polygons, uint64_t poly_count, const pdal_point3d_t* centers, uint64_t center_count, double distance);
+
+// Reader
+pdal_reader_t* pdal_reader_create_faux(const pdal_options_t* ops);
+void pdal_reader_destroy(pdal_reader_t* reader);
+
+// Writer
+pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
+void pdal_writer_destroy(pdal_writer_t* writer);
+
+// Pipeline
+pdal_pipeline_t* pdal_pipeline_create();
+void pdal_pipeline_destroy(pdal_pipeline_t* pipeline);
+int64_t pdal_pipeline_add_stage(pdal_pipeline_t* pipeline, pdal_stage_t* stage);
+int64_t pdal_pipeline_add_stage_tagged(pdal_pipeline_t* pipeline, pdal_stage_t* stage, const char* tag);
+int64_t pdal_pipeline_add_reader(pdal_pipeline_t* pipeline, pdal_reader_t* reader);
+int64_t pdal_pipeline_add_writer(pdal_pipeline_t* pipeline, pdal_writer_t* writer);
+int64_t pdal_pipeline_add_dependency(pdal_pipeline_t* pipeline, uint64_t target, uint64_t input);
+pdal_point_view_t* pdal_pipeline_execute(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
+int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
+uint64_t pdal_pipeline_stage_count(const pdal_pipeline_t* pipeline);
+pdal_metadata_node_t* pdal_pipeline_metadata(const pdal_pipeline_t* pipeline);
+int64_t pdal_pipeline_find_by_tag(const pdal_pipeline_t* pipeline, const char* tag);
+
+// CLI / Kernel dispatch
+const char* pdal_version_string(void);
+char* pdal_kernel_list_json(void);
+char* pdal_stage_list_json(void);
+char* pdal_stage_options_json(const char* stage_name);
+int pdal_kernel_run(const char* kernel_name, int argc, const char* const* argv);
+void pdal_capi_free(void* ptr);
 
 #ifdef __cplusplus
 }

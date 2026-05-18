@@ -506,6 +506,14 @@ PDAL_ADD_TEST(pdal_filters_voxel_center_nearest_neighbor_test FILES filters/Voxe
 PDAL_ADD_TEST(pdal_filters_voxel_centroid_nearest_neighbor_test FILES filters/VoxelCentroidNearestNeighborFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_voxel_downsize_test FILES filters/VoxelDownsizeFilterTest.cpp)
 
+PDAL_ADD_TEST(pdal_filters_rust_pipeline_test
+    FILES
+        filters/RustPipelineTest.cpp
+    INCLUDES
+        ${PDAL_ROOT_DIR}
+        ${ROOT_DIR}/rust/pdal-capi/include
+)
+
 PDAL_ADD_TEST(pdal_app_test FILES apps/AppTest.cpp)
 PDAL_ADD_TEST(pdal_app_plugin_test FILES apps/AppPluginTest.cpp)
 PDAL_ADD_TEST(pdal_eval_test
