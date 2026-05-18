@@ -258,16 +258,24 @@ pdal_reader_t* pdal_reader_create_text(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_pcd(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_pts(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_ptx(const pdal_options_t* ops);
+pdal_reader_t* pdal_reader_create_ilvis2(const pdal_options_t* ops);
+pdal_reader_t* pdal_reader_create_ply(const pdal_options_t* ops);
 void pdal_reader_destroy(pdal_reader_t* reader);
+
+// Stage registry: construct implemented stages from PDAL driver names.
+pdal_reader_t* pdal_create_reader(const char* name, const pdal_options_t* ops);
+pdal_writer_t* pdal_create_writer(const char* name, const pdal_options_t* ops);
 
 // Writer
 pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_pcd(const pdal_options_t* ops);
+pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);
 void pdal_writer_destroy(pdal_writer_t* writer);
 
 // Pipeline
 pdal_pipeline_t* pdal_pipeline_create();
+pdal_pipeline_t* pdal_pipeline_create_json(const char* json);
 void pdal_pipeline_destroy(pdal_pipeline_t* pipeline);
 int64_t pdal_pipeline_add_stage(pdal_pipeline_t* pipeline, pdal_stage_t* stage);
 int64_t pdal_pipeline_add_stage_tagged(pdal_pipeline_t* pipeline, pdal_stage_t* stage, const char* tag);

@@ -14,7 +14,7 @@ use std::os::raw::c_char;
 
 /// Opaque pipeline handle.
 pub struct PipelineHandle {
-    pipeline: Pipeline,
+    pub(crate) pipeline: Pipeline,
 }
 
 /// Create a new empty pipeline.

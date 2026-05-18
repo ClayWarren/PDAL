@@ -384,6 +384,30 @@ Current status:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pts_regression -- --ignored`
   and
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ptx_regression -- --ignored`.
+- `readers.ilvis2` has a Rust implementation for the deterministic ILVIS2
+  ASCII point path, including `low`, `high`, and `all` mapping behavior,
+  longitude normalization, skipped two-line headers, malformed-row rejection,
+  and reader -> decimation -> PCD writer installed-PDAL regression coverage.
+  The optional XML metadata sidecar is intentionally deferred.
+- `readers.ply` and `writers.ply` have Rust ASCII-only implementations for
+  local PLY fixtures, including vertex properties, extra dimensions, list
+  properties on non-vertex elements, `dims`, `sized_types`, and precision.
+  Binary PLY and mesh faces remain intentionally deferred.
+- Installed-PDAL regressions for these readers/writers are available with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
+  and
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`.
+- `pdal-core::driver` can infer PDAL reader/writer driver names from filenames
+  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
+  construct only currently implemented Rust local readers/writers by driver
+  name. Inference may return unported PDAL drivers; construction must still
+  fail cleanly until the stage is actually ported.
+- `pdal-capi` can now build a Rust `Pipeline` from a narrow PDAL-style JSON
+  array: stage objects, scalar options, first/last filename inference, linear
+  dependencies by default, and optional `tag` / `inputs` wiring. This is a
+  command-readiness bridge for local reader -> filter -> writer regressions,
+  not a full replacement for C++ `PipelineManager` yet.
 - Local I/O performance comparison is available as an ignored, reporting-only
   harness with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`.

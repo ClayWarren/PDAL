@@ -401,6 +401,7 @@ dependencies = [
  "pdal-core",
  "pdal-filters",
  "pdal-io",
+ "serde_json",
 ]
 
 [[package]]

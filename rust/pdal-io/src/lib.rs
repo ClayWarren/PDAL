@@ -4,8 +4,10 @@
 //! fixtures and C++ behavior.
 
 pub mod faux;
+pub mod ilvis2;
 pub mod nullwriter;
 pub mod pcd;
+pub mod ply;
 pub mod pts;
 pub mod ptx;
 pub mod text;

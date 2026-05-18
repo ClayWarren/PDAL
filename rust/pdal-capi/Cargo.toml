@@ -12,3 +12,4 @@ crate-type = ["cdylib", "staticlib"]
 pdal-core = { path = "../pdal-core" }
 pdal-filters = { path = "../pdal-filters" }
 pdal-io = { path = "../pdal-io" }
+serde_json = "1"
