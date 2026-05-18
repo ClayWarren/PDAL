@@ -407,6 +407,7 @@ dependencies = [
 name = "pdal-cli"
 version = "0.0.0"
 dependencies = [
+ "pdal-kernels",
  "serde_json",
 ]
 

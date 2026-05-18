@@ -9,4 +9,5 @@ name = "pdal-rs"
 path = "src/main.rs"
 
 [dependencies]
+pdal-kernels = { path = "../pdal-kernels" }
 serde_json = "1"

@@ -65,7 +65,7 @@ impl ChipperFilter {
 
     fn partition(&mut self, size: usize) {
         let mut num_partitions = size / self.threshold as usize;
-        if size % self.threshold as usize != 0 {
+        if !size.is_multiple_of(self.threshold as usize) {
             num_partitions += 1;
         }
         let partition_size = size as f64 / num_partitions as f64;

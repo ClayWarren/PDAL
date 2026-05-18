@@ -2,6 +2,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::process;
 
+use pdal_kernels::word_wrap;
+
 extern "C" {
     fn pdal_version_string() -> *const c_char;
     fn pdal_kernel_list_json() -> *mut c_char;
@@ -320,33 +322,6 @@ impl App {
 
         0
     }
-}
-
-fn word_wrap(text: &str, width: usize) -> Vec<String> {
-    if text.len() <= width {
-        return vec![text.to_string()];
-    }
-
-    let mut lines = Vec::new();
-    let mut current = String::new();
-
-    for word in text.split_whitespace() {
-        if current.is_empty() {
-            current.push_str(word);
-        } else if current.len() + 1 + word.len() <= width {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(current.clone());
-            current = word.to_string();
-        }
-    }
-
-    if !current.is_empty() {
-        lines.push(current);
-    }
-
-    lines
 }
 
 fn main() {
