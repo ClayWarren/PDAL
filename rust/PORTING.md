@@ -138,7 +138,10 @@ foundations are not permission to skip ahead to broad top-layer ports.
    concerns, so they should not be the next frontier until the ABI and point
    model are proven.
 4. `apps/` and `tools/` after the library surface is stable enough to run real
-   pipelines through the C ABI.
+   pipelines through the C ABI. This is small by LOC but high in dependency
+   density: `apps/pdal.cpp` owns CLI dispatch and driver/option introspection,
+   while `tools/lasdump` and `tools/nitfwrap` are tied to LAS/LAZ and NITF
+   strategy decisions.
 5. `kernels/` last. Kernels are CLI subcommands above the pipeline/stage
    system; porting them before the core, filters, and I/O layers are stable
    creates top-down churn instead of proving behavior.
@@ -163,6 +166,17 @@ When those gates are true, start with `pipeline`, then `info`, then simple
 pipeline-shaped commands such as `translate`, `merge`, `sort`, and `split`.
 Keep `tile`, `tindex`, `ground`, and other GDAL/remote/spatially complex
 commands deferred until their lower-layer dependencies are Rust-backed.
+
+Apps/tools work is allowed when it directly supports a command-readiness gate:
+
+- `apps/pdal.cpp` can be touched when Rust has enough pipeline JSON, stage
+  registry, driver listing, option introspection, logging/error, and output
+  behavior to compare a `pdal` command against the installed C++ binary.
+- `tools/lasdump` waits for the LAS/LAZ reader/writer and compression strategy.
+- `tools/nitfwrap` waits for the NITF/plugin or specialized I/O strategy.
+
+Do not mark apps/tools complete because the LOC is small. They close only when
+their underlying command or format strategy has parity coverage.
 
 ## Checkpoint Roadmap
 
@@ -327,6 +341,10 @@ Required shape:
 - `apps/` and `tools/` move before `kernels/`.
 - `kernels/` remain last because they sit above pipeline, stage, options, I/O,
   logging, and error behavior.
+- `apps/pdal.cpp` is treated as the CLI dispatch surface for command parity,
+  not as an independent early port.
+- `tools/lasdump` and `tools/nitfwrap` remain deferred until their LAS/LAZ and
+  NITF lower-layer strategies are explicit.
 - Concrete kernel work does not start until the command readiness gates in
   `Migration Order` are satisfied.
 - `pdal pipeline` is the first command candidate because it proves the library
