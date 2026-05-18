@@ -392,6 +392,12 @@ Current status:
   compare installed `pdal pipeline` process execution against in-process Rust
   pipeline execution, so use them to catch large regressions and guide followup
   investigation rather than to claim end-user CLI speedups.
+- Runtime memory and build cost visibility is available with:
+  `rust/scripts/measure_guardrails.sh`. On macOS it uses `/usr/bin/time -l` to
+  report wall time and peak RSS for installed local I/O pipelines, the Rust
+  local I/O perf harness, and an incremental Rust workspace build. Use
+  `--cold-build` only when intentionally measuring a clean build because it
+  runs `cargo clean`.
 - The next I/O target should still be local and deterministic. Avoid binary,
   compression-backed, GDAL-backed, LAS/LAZ, or remote reader/writer work.
 
