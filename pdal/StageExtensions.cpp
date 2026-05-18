@@ -82,29 +82,26 @@ StageExtensions::StageExtensions(LogPtr log) : m_log(log) {}
 
 void StageExtensions::load()
 {
-    static bool loaded(false);
-
-    if (loaded)
-        return;
-    loaded = true;
-
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_loaded)
+        return;
+
     for (auto& p : readerExtensions)
     {
         const std::string& stage = p.first;
         for (auto& ext : p.second)
-            m_readers[ext] = stage;
+            m_readers.insert({ext, stage});
     }
     for (auto& p : writerExtensions)
     {
         const std::string& stage = p.first;
         for (auto& ext : p.second)
-            m_writers[ext] = stage;
+            m_writers.insert({ext, stage});
     }
+    m_loaded = true;
 }
 
-PDAL_EXPORT void StageExtensions::set(const std::string& stage,
-                                      const StringList& exts)
+void StageExtensions::set(const std::string& stage, const StringList& exts)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (Utils::startsWith(stage, "readers."))

@@ -34,7 +34,9 @@
 
 #include <pdal/pdal_test_main.hpp>
 
+#include <pdal/Log.hpp>
 #include <pdal/PluginManager.hpp>
+#include <pdal/StageExtensions.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/Algorithm.hpp>
 
@@ -70,6 +72,28 @@ TEST(StageFactoryTest, extensionTest)
     EXPECT_EQ(StageFactory::inferReaderDriver("foo.ntf"), "readers.nitf");
     EXPECT_EQ(StageFactory::inferWriterDriver("foo.ntf"), "writers.nitf");
     EXPECT_EQ(StageFactory::inferWriterDriver("junk.junk"), "");
+}
+
+TEST(StageFactoryTest, stageExtensionsLoadPerInstance)
+{
+    StageExtensions first{LogPtr()};
+    EXPECT_EQ(first.defaultReader("pcd"), "readers.pcd");
+
+    StageExtensions second{LogPtr()};
+    EXPECT_EQ(second.defaultReader("pcd"), "readers.pcd");
+    EXPECT_EQ(second.defaultWriter("pcd"), "writers.pcd");
+}
+
+TEST(StageFactoryTest, stageExtensionsCustomMappingsOverrideDefaults)
+{
+    StageExtensions extensions{LogPtr()};
+    extensions.set("readers.custom", {"pcd", "customreader"});
+    extensions.set("writers.custom", {"pcd", "customwriter"});
+
+    EXPECT_EQ(extensions.defaultReader("pcd"), "readers.custom");
+    EXPECT_EQ(extensions.defaultReader("customreader"), "readers.custom");
+    EXPECT_EQ(extensions.defaultWriter("pcd"), "writers.custom");
+    EXPECT_EQ(extensions.defaultWriter("customwriter"), "writers.custom");
 }
 
 } // namespace pdal

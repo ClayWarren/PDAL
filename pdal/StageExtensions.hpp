@@ -32,6 +32,8 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
+#pragma once
+
 #include <map>
 #include <mutex>
 
@@ -41,21 +43,22 @@
 namespace pdal
 {
 
-class StageExtensions
+class PDAL_EXPORT StageExtensions
 {
 public:
     StageExtensions(LogPtr log);
 
-    PDAL_EXPORT void set(const std::string& stage, const StringList& exts);
-    PDAL_EXPORT std::string defaultReader(const std::string& filename);
+    void set(const std::string& stage, const StringList& exts);
+    std::string defaultReader(const std::string& filename);
     std::string defaultWriter(const std::string& filename);
-    PDAL_EXPORT StringList extensions(const std::string& stage);
+    StringList extensions(const std::string& stage);
 
 private:
     void load();
 
     LogPtr m_log;
     std::mutex m_mutex;
+    bool m_loaded = false;
     std::map<std::string, std::string> m_readers;
     std::map<std::string, std::string> m_writers;
 };
