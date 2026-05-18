@@ -113,4 +113,40 @@ TEST(MemoryViewReaderTest, rejectsMalformedShape)
     EXPECT_THROW(tooLong >> shape, pdal_error);
 }
 
+TEST(MemoryViewReaderTest, synthesizesRowMajorShapeCoordinates)
+{
+    std::vector<uint16_t> values{10, 20, 30, 40, 50, 60};
+
+    MemoryViewReader reader;
+    Options options;
+    options.add("shape", "1, 2, 3");
+    reader.setOptions(options);
+    reader.pushField({"Intensity", Dimension::Type::Unsigned16, 0});
+    reader.setIncrementer(
+        [&values](PointId id) -> char*
+        {
+            if (id >= values.size())
+                return nullptr;
+            return reinterpret_cast<char*>(&values[id]);
+        });
+
+    PointTable table;
+    reader.prepare(table);
+    PointViewSet views = reader.execute(table);
+
+    ASSERT_EQ(views.size(), 1u);
+    PointViewPtr view = *views.begin();
+    ASSERT_EQ(view->size(), values.size());
+    for (PointId id = 0; id < values.size(); ++id)
+    {
+        EXPECT_DOUBLE_EQ(view->getFieldAs<double>(Dimension::Id::X, id),
+                         id % 3);
+        EXPECT_DOUBLE_EQ(view->getFieldAs<double>(Dimension::Id::Y, id),
+                         id / 3);
+        EXPECT_DOUBLE_EQ(view->getFieldAs<double>(Dimension::Id::Z, id), 0.0);
+        EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::Intensity, id),
+                  values[id]);
+    }
+}
+
 } // namespace pdal

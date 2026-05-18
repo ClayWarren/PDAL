@@ -103,8 +103,23 @@ void MemoryViewReader::pushField(const Field& f)
 
 void MemoryViewReader::addDimensions(PointLayoutPtr layout)
 {
+    int xyz = 0;
     for (auto& f : m_fields)
+    {
+        if (f.m_name == "X")
+            xyz |= 1;
+        else if (f.m_name == "Y")
+            xyz |= 2;
+        else if (f.m_name == "Z")
+            xyz |= 4;
         f.m_id = layout->registerOrAssignDim(f.m_name, f.m_type);
+    }
+    if (xyz == 0 && m_shape.valid())
+    {
+        layout->registerDim(Dimension::Id::X);
+        layout->registerDim(Dimension::Id::Y);
+        layout->registerDim(Dimension::Id::Z);
+    }
 }
 
 void MemoryViewReader::initialize()
