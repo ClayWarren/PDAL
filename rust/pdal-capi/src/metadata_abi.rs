@@ -1,0 +1,255 @@
+use crate::error::string_to_c_ptr;
+use pdal_core::metadata::{MetadataNode, MetadataValue};
+use std::ffi::CStr;
+use std::os::raw::c_char;
+
+// ---------------------------------------------------------------------------
+// Metadata ABI
+// ---------------------------------------------------------------------------
+
+/// Create a metadata node. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `name` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_create(name: *const c_char) -> *mut MetadataNode {
+    let name = if name.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(name).to_string_lossy().into_owned()
+    };
+    Box::into_raw(Box::new(MetadataNode::new(name)))
+}
+
+/// Return a node's name. Caller must free with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_name(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .map(|node| node.name().to_string())
+            .unwrap_or_default(),
+    )
+}
+
+/// Set a metadata node's string value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+/// `value` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_string(
+    node: *mut MetadataNode,
+    value: *const c_char,
+) {
+    if let Some(node) = node.as_mut() {
+        let value = if value.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(value).to_string_lossy().into_owned()
+        };
+        node.set_value(MetadataValue::String(value));
+    }
+}
+
+/// Set a metadata node's signed integer value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_i64(node: *mut MetadataNode, value: i64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::I64(value));
+    }
+}
+
+/// Set a metadata node's unsigned integer value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_u64(node: *mut MetadataNode, value: u64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::U64(value));
+    }
+}
+
+/// Set a metadata node's floating-point value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_f64(node: *mut MetadataNode, value: f64) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::F64(value));
+    }
+}
+
+/// Set a metadata node's boolean value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_bool(node: *mut MetadataNode, value: bool) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::Bool(value));
+    }
+}
+
+/// Return the metadata scalar value kind: 0 string, 1 i64, 2 u64, 3 f64,
+/// 4 bool, 255 no value.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_kind(node: *const MetadataNode) -> u8 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::kind_id)
+        .unwrap_or(255)
+}
+
+/// Return a node's scalar value as a string. Caller must free with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .and_then(MetadataNode::value)
+            .map(MetadataValue::as_string)
+            .unwrap_or_default(),
+    )
+}
+
+/// Return a node's scalar value as a signed integer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_i64(node: *const MetadataNode) -> i64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_i64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as an unsigned integer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_u64(node: *const MetadataNode) -> u64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_u64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as a floating-point value.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_f64(node: *const MetadataNode) -> f64 {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_f64)
+        .unwrap_or_default()
+}
+
+/// Return a node's scalar value as a boolean.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode) -> bool {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_bool)
+        .unwrap_or_default()
+}
+
+/// Add `child` to `node`, transferring ownership of `child`.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+/// `child` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. If non-null, it must not be used after this
+/// call.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_add_child(
+    node: *mut MetadataNode,
+    child: *mut MetadataNode,
+) {
+    if let (Some(node), false) = (node.as_mut(), child.is_null()) {
+        node.add_child(*Box::from_raw(child));
+    }
+}
+
+/// Return the number of child nodes.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_child_count(node: *const MetadataNode) -> u64 {
+    node.as_ref()
+        .map(|node| node.children().len() as u64)
+        .unwrap_or(0)
+}
+
+/// Return a copy of a child node. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_child(
+    node: *const MetadataNode,
+    idx: u64,
+) -> *mut MetadataNode {
+    node.as_ref()
+        .and_then(|node| node.children().get(idx as usize))
+        .map(|child| Box::into_raw(Box::new(child.clone())))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// Destroy a metadata node.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`, or
+/// null. Must not be called twice on the same pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
+    if !node.is_null() {
+        drop(Box::from_raw(node));
+    }
+}
