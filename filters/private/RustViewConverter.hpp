@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pdal/PointView.hpp>
+#include <pdal/SpatialReference.hpp>
 #include <pdal/pdal_types.hpp>
 #include <pdal_capi.h>
 
@@ -26,6 +27,38 @@ inline bool hasLastError()
     return message && message[0];
 }
 
+inline std::string takeString(char* value)
+{
+    if (!value)
+        return std::string();
+    std::string result(value);
+    pdal_string_free(value);
+    return result;
+}
+
+inline void setSpatialReference(pdal_point_view_t* rustView,
+                                const SpatialReference& srs)
+{
+    pdal_spatial_reference_t* rustSrs =
+        pdal_spatial_reference_create_with_epoch(srs.getWKT().c_str(),
+                                                 srs.getEpoch());
+    pdal_point_view_set_spatial_reference(rustView, rustSrs);
+    pdal_spatial_reference_destroy(rustSrs);
+}
+
+inline SpatialReference spatialReference(pdal_point_view_t* rustView)
+{
+    pdal_spatial_reference_t* rustSrs =
+        pdal_point_view_spatial_reference(rustView);
+    if (!rustSrs)
+        return SpatialReference();
+
+    SpatialReference srs(takeString(pdal_spatial_reference_text(rustSrs)));
+    srs.setEpoch(pdal_spatial_reference_epoch(rustSrs));
+    pdal_spatial_reference_destroy(rustSrs);
+    return srs;
+}
+
 inline pdal_point_view_t* toRust(PointView& inView)
 {
     pdal_point_layout_t* layout = pdal_point_layout_create();
@@ -35,6 +68,7 @@ inline pdal_point_view_t* toRust(PointView& inView)
             layout, inView.layout()->dimName(dim).c_str(), 9);
     }
     pdal_point_view_t* rust_in_view = pdal_point_view_create(layout);
+    setSpatialReference(rust_in_view, inView.spatialReference());
     for (PointId idx = 0; idx < inView.size(); ++idx)
     {
         pdal_point_view_add_point(rust_in_view);
@@ -102,7 +136,8 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointViewPtr baseView,
 inline PointViewPtr fromRust(pdal_point_view_t* rust_out_view,
                              PointViewPtr baseView)
 {
-    PointViewPtr outView = baseView->makeNew();
+    PointViewPtr outView(
+        new PointView(baseView->table(), spatialReference(rust_out_view)));
     fromRust(rust_out_view, baseView, *outView);
     return outView;
 }

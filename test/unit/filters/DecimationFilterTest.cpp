@@ -36,8 +36,10 @@
 
 #include <filters/DecimationFilter.hpp>
 #include <filters/StreamCallbackFilter.hpp>
+#include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/SpatialReference.hpp>
 #include <pdal/StageFactory.hpp>
 
 using namespace pdal;
@@ -82,6 +84,38 @@ TEST(DecimationFilterTest, test1)
     EXPECT_EQ(t0, 0u);
     EXPECT_EQ(t1, 10u);
     EXPECT_EQ(t2, 20u);
+}
+
+TEST(DecimationFilterTest, preservesSpatialReference)
+{
+    PointTable table;
+    table.layout()->registerDim(Dimension::Id::X);
+
+    SpatialReference srs("EPSG:4326");
+    srs.setEpoch(2020.0);
+    PointViewPtr input(new PointView(table, srs));
+    for (PointId idx = 0; idx < 4; ++idx)
+        input->setField(Dimension::Id::X, idx, idx);
+
+    BufferReader reader;
+    reader.addView(input);
+
+    Options decimationOps;
+    decimationOps.add("step", 2);
+
+    DecimationFilter filter;
+    filter.setOptions(decimationOps);
+    filter.setInput(reader);
+
+    PointTable outTable;
+    filter.prepare(outTable);
+    PointViewSet viewSet = filter.execute(outTable);
+    ASSERT_EQ(viewSet.size(), 1u);
+
+    PointViewPtr output = *viewSet.begin();
+    EXPECT_EQ(output->size(), 2u);
+    EXPECT_EQ(output->spatialReference().getWKT(), srs.getWKT());
+    EXPECT_DOUBLE_EQ(output->spatialReference().getEpoch(), srs.getEpoch());
 }
 
 TEST(DecimationFilterTest, fpstep)
