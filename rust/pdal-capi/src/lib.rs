@@ -16,6 +16,7 @@ use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
+use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::expressionstats::ExpressionStatsFilter as ExpressionStatsMetadataFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
@@ -1368,6 +1369,44 @@ pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
     }
     let filter = Box::new(LabelDuplicatesFilter::new(vec_dims));
     Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a `filters.expression` stage from a list of expression strings.
+///
+/// Returns null and sets the last error if `exprs` is null, contains a null
+/// entry, or any expression fails to parse.
+///
+/// # Safety
+///
+/// `exprs` must be a valid pointer to a C-array of `count` C-strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_expression(
+    exprs: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    clear_last_error();
+    if exprs.is_null() {
+        set_last_error("null expression array");
+        return std::ptr::null_mut();
+    }
+    let mut sources = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let ptr = *exprs.offset(i as isize);
+        if ptr.is_null() {
+            set_last_error("null expression string");
+            return std::ptr::null_mut();
+        }
+        sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+    match ExpressionFilter::new(&sources) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Create a merge filter stage.

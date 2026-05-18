@@ -104,6 +104,7 @@ pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage, pdal_point_view_t* input)
 uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input, pdal_point_view_t** outputs, uint64_t max_outputs);
 
 pdal_stage_t* pdal_stage_create_sort(const char* const* dims, uint64_t count, const char* order, const char* algorithm);
+pdal_stage_t* pdal_stage_create_expression(const char* const* exprs, uint64_t count);
 pdal_stage_t* pdal_stage_create_returns(const char* const* groups, uint64_t count);
 pdal_stage_t* pdal_stage_create_separatescanline(uint64_t groupby);
 pdal_stage_t* pdal_stage_create_groupby(const char* dim_name);
