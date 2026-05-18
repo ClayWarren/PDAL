@@ -35,7 +35,7 @@ impl Filter for GeoreferenceFilter {
         "filters.georeference"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let source_srs = input.spatial_reference().clone();
         if source_srs.is_empty() {
             return Err(StageError(

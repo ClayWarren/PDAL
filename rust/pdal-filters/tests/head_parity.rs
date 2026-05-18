@@ -27,7 +27,7 @@ fn make_ramp_view(count: u64) -> PointView {
 fn test_head_no_invert() {
     let view = make_ramp_view(10);
     let mut filter = HeadFilter::new(4, false);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -42,7 +42,7 @@ fn test_head_no_invert() {
 fn test_head_invert() {
     let view = make_ramp_view(10);
     let mut filter = HeadFilter::new(4, true);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];

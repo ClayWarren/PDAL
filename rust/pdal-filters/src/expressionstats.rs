@@ -68,7 +68,7 @@ impl Filter for ExpressionStatsFilter {
         "filters.expressionstats"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_prepared(input.layout().as_ref())?;
 
         // Process every point in the view.

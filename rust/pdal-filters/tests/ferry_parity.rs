@@ -30,7 +30,7 @@ fn make_test_view() -> PointView {
 fn test_ferry_copy_single() {
     let view = make_test_view();
     let mut filter = FerryFilter::new(vec![("X".to_string(), "Z".to_string())]);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -51,7 +51,7 @@ fn test_ferry_copy_multiple() {
         ("X".to_string(), "Z".to_string()),
         ("Y".to_string(), "TargetDim".to_string()),
     ]);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];

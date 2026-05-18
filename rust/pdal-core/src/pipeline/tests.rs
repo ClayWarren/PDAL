@@ -20,7 +20,7 @@ impl Filter for PassThroughFilter {
         "filters.passthrough"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.run_count += 1;
         let mut out = input.make_new();
         for i in 0..input.len() {
@@ -55,7 +55,7 @@ impl Filter for DuplicateFilter {
         "filters.duplicate"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.run_count += 1;
         let mut out1 = input.make_new();
         let mut out2 = input.make_new();
@@ -84,7 +84,7 @@ impl Filter for ErrorFilter {
         "filters.error"
     }
 
-    fn run(&mut self, _input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, _input: &PointView) -> Result<Vec<PointView>, StageError> {
         Err(StageError("filter failed".to_string()))
     }
 
@@ -523,7 +523,7 @@ fn test_reset_before_execute() {
             "filters.counting"
         }
 
-        fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
             let mut out = input.make_new();
             for i in 0..input.len() {
                 out.append_point(input, i);

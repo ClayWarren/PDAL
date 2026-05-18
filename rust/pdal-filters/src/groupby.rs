@@ -21,7 +21,7 @@ impl Filter for GroupByFilter {
         "filters.groupby"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let dim_id = DimId::from_name(&self.dim_name);
 
         let mut groups: BTreeMap<i64, PointView> = BTreeMap::new();

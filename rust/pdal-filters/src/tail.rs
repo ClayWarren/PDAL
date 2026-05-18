@@ -22,7 +22,7 @@ impl Filter for TailFilter {
         "filters.tail"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut out = input.make_new();
         let len = input.len();
 

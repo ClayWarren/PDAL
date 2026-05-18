@@ -344,7 +344,7 @@ pub unsafe extern "C" fn pdal_stage_run(
     ffi_catch(std::ptr::null_mut(), || {
         clear_last_error();
         if let (Some(stage), Some(input)) = (stage.as_mut(), input.as_mut()) {
-            match stage.filter.run(input) {
+            match stage.filter.run(std::slice::from_ref(input)) {
                 Ok(mut outputs) => {
                     if !outputs.is_empty() {
                         return Box::into_raw(Box::new(outputs.remove(0)));
@@ -459,7 +459,7 @@ pub unsafe extern "C" fn pdal_stage_run_multi(
         if let (Some(stage), Some(input), false) =
             (stage.as_mut(), input.as_mut(), outputs.is_null())
         {
-            match stage.filter.run(input) {
+            match stage.filter.run(std::slice::from_ref(input)) {
                 Ok(mut results) => {
                     let count = std::cmp::min(results.len() as u64, max_outputs);
                     for i in 0..count {

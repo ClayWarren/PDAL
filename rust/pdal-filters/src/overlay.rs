@@ -45,7 +45,7 @@ impl Filter for OverlayFilter {
         "filters.overlay"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_polygons()?;
         let mut output = input.clone();
         for idx in 0..output.len() {

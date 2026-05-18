@@ -4,35 +4,33 @@ use crate::point::{PointId, PointView};
 use crate::stage::{Filter, StageError, Streamable};
 
 /// Adapter that wraps a `Reader` as a `StageWrapper`.
-pub(super) struct ReaderAdapter {
-    reader: Box<dyn Reader>,
-}
+pub struct ReaderAdapter(pub Box<dyn Reader>);
 
 impl ReaderAdapter {
-    pub(super) fn new(reader: Box<dyn Reader>) -> Self {
-        Self { reader }
+    pub fn new(reader: Box<dyn Reader>) -> Self {
+        Self(reader)
     }
 }
 
 impl StageWrapper for ReaderAdapter {
-    fn run(&mut self, _input: &PointView) -> Result<Vec<PointView>, StageError> {
-        self.reader.read()
+    fn run(&mut self, _inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        self.0.read()
     }
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
-        self.reader.read()
+        self.0.read()
     }
     fn write(&mut self, _views: &[PointView]) -> Result<(), StageError> {
-        Ok(())
+        Err(StageError("cannot write to a reader".into()))
     }
     fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
     fn reset(&mut self) {}
     fn metadata(&self) -> MetadataNode {
-        self.reader.metadata()
+        self.0.metadata()
     }
     fn name(&self) -> &str {
-        self.reader.name()
+        self.0.name()
     }
     fn kind(&self) -> StageKind {
         StageKind::Reader
@@ -40,59 +38,57 @@ impl StageWrapper for ReaderAdapter {
 }
 
 /// Adapter that wraps a `Writer` as a `StageWrapper`.
-pub(super) struct WriterAdapter {
-    writer: Box<dyn Writer>,
-}
+pub struct WriterAdapter(pub Box<dyn Writer>);
 
 impl WriterAdapter {
-    pub(super) fn new(writer: Box<dyn Writer>) -> Self {
-        Self { writer }
+    pub fn new(writer: Box<dyn Writer>) -> Self {
+        Self(writer)
     }
 }
 
 impl StageWrapper for WriterAdapter {
-    fn run(&mut self, _input: &PointView) -> Result<Vec<PointView>, StageError> {
-        Ok(Vec::new())
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        self.0.write(inputs).map(|_| Vec::new())
     }
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
-        Ok(Vec::new())
+        Err(StageError("cannot read from a writer".into()))
     }
     fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
-        self.writer.write(views)
+        self.0.write(views)
     }
     fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
-        true
+        false
     }
     fn reset(&mut self) {}
     fn metadata(&self) -> MetadataNode {
-        self.writer.metadata()
+        self.0.metadata()
     }
     fn name(&self) -> &str {
-        self.writer.name()
+        self.0.name()
     }
     fn kind(&self) -> StageKind {
         StageKind::Writer
     }
 }
 
-/// A filter wrapper that also implements `StageWrapper` for pipeline use.
-pub struct FilterWrapper<F: Filter + Streamable>(F);
+/// Wrapper that holds a filter and implements `StageWrapper`.
+pub struct FilterWrapper<T: Filter + Streamable>(pub T);
 
-impl<F: Filter + Streamable> FilterWrapper<F> {
-    pub fn new(filter: F) -> Self {
+impl<T: Filter + Streamable> FilterWrapper<T> {
+    pub fn new(filter: T) -> Self {
         Self(filter)
     }
 }
 
-impl<F: Filter + Streamable> StageWrapper for FilterWrapper<F> {
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
-        self.0.run(input)
+impl<T: Filter + Streamable> StageWrapper for FilterWrapper<T> {
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        self.0.run(inputs)
     }
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
-        Ok(Vec::new())
+        Err(StageError("cannot read from a filter".into()))
     }
     fn write(&mut self, _views: &[PointView]) -> Result<(), StageError> {
-        Ok(())
+        Err(StageError("cannot write to a filter".into()))
     }
     fn process_one(&mut self, view: &mut PointView, idx: PointId) -> bool {
         self.0.process_one(view, idx)

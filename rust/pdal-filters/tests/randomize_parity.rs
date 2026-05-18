@@ -22,7 +22,7 @@ fn make_test_view() -> PointView {
 fn test_randomize_shuffled_elements() {
     let view = make_test_view();
     let mut filter = RandomizeFilter::new(Some(12345));
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -49,10 +49,10 @@ fn test_randomize_seeded_reproducibility() {
     let view = make_test_view();
 
     let mut filter1 = RandomizeFilter::new(Some(999));
-    let out1 = &filter1.run(&view).unwrap()[0];
+    let out1 = &filter1.run(std::slice::from_ref(&view)).unwrap()[0];
 
     let mut filter2 = RandomizeFilter::new(Some(999));
-    let out2 = &filter2.run(&view).unwrap()[0];
+    let out2 = &filter2.run(std::slice::from_ref(&view)).unwrap()[0];
 
     let vals1: Vec<f64> = (0..10).map(|i| out1.get_f64(i, &DimId::Z)).collect();
     let vals2: Vec<f64> = (0..10).map(|i| out2.get_f64(i, &DimId::Z)).collect();

@@ -38,7 +38,7 @@ impl Filter for SortFilter {
         "filters.sort"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut indices: Vec<u64> = (0..input.len()).collect();
 
         for (i, name) in self.dim_names.iter().enumerate() {

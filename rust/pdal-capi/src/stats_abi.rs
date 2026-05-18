@@ -210,7 +210,7 @@ pub unsafe extern "C" fn pdal_expressionstats_metadata(
 
         match ExpressionStatsMetadataFilter::new(&dim_name, &sources) {
             Ok(mut filter) => {
-                if let Err(e) = Filter::run(&mut filter, view) {
+                if let Err(e) = Filter::run(&mut filter, std::slice::from_ref(view)) {
                     set_last_error(e.to_string());
                     std::ptr::null_mut()
                 } else {

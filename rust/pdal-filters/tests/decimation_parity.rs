@@ -59,7 +59,7 @@ fn test1_step10_count30() {
     opts.add("step", 10);
 
     let mut filter = DecimationFilter::new(&opts);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -80,7 +80,7 @@ fn fpstep_step4_2_count30() {
     opts.add("step", 4.2);
 
     let mut filter = DecimationFilter::new(&opts);
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];

@@ -28,7 +28,7 @@ impl Filter for GeomDistanceFilter {
         "filters.geomdistance"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut output = input.clone();
         for idx in 0..output.len() {
             self.process_one(&mut output, idx);

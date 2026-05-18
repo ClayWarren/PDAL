@@ -39,7 +39,7 @@ impl Filter for FerryFilter {
         "filters.ferry"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut out = input.make_new();
 
         for idx in 0..input.len() {

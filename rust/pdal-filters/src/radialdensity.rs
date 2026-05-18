@@ -20,7 +20,7 @@ impl Filter for RadialDensityFilter {
         "filters.radialdensity"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut output = view.make_new();
         for idx in 0..view.len() {
             output.append_point(view, idx);

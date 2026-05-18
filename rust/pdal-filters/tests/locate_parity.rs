@@ -27,7 +27,7 @@ fn make_custom_view(values: &[f64]) -> PointView {
 fn test_locate_max() {
     let view = make_custom_view(&[10.0, 50.0, 20.0, 30.0]);
     let mut filter = LocateFilter::new("Z".to_string(), "max".to_string());
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -39,7 +39,7 @@ fn test_locate_max() {
 fn test_locate_min() {
     let view = make_custom_view(&[10.0, 50.0, 5.0, 30.0]);
     let mut filter = LocateFilter::new("Z".to_string(), "min".to_string());
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
 
     let out = &outputs[0];
@@ -51,7 +51,7 @@ fn test_locate_min() {
 fn test_locate_empty() {
     let view = make_custom_view(&[]);
     let mut filter = LocateFilter::new("Z".to_string(), "max".to_string());
-    let outputs = filter.run(&view).unwrap();
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs.len(), 1);
     assert_eq!(outputs[0].len(), 0);
 }

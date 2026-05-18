@@ -22,7 +22,7 @@ impl Filter for MadFilter {
         "filters.mad"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut values = Vec::with_capacity(view.len() as usize);
         for idx in 0..view.len() {
             values.push(view.get_f64(idx, &self.dim));

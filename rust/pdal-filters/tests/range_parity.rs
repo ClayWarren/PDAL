@@ -34,7 +34,7 @@ fn test_range_filter_simple_inclusive() {
         negate: false,
     };
     let mut filter = RangeFilter::new(vec![limit]);
-    let out = &filter.run(&view).unwrap()[0];
+    let out = &filter.run(std::slice::from_ref(&view)).unwrap()[0];
 
     assert_eq!(out.len(), 5);
     assert_eq!(out.get_f64(0, &DimId::X), 3.0);
@@ -54,7 +54,7 @@ fn test_range_filter_exclusive() {
         negate: false,
     };
     let mut filter = RangeFilter::new(vec![limit]);
-    let out = &filter.run(&view).unwrap()[0];
+    let out = &filter.run(std::slice::from_ref(&view)).unwrap()[0];
 
     assert_eq!(out.len(), 3);
     assert_eq!(out.get_f64(0, &DimId::X), 4.0);
@@ -74,7 +74,7 @@ fn test_range_filter_negated() {
         negate: true,
     };
     let mut filter = RangeFilter::new(vec![limit]);
-    let out = &filter.run(&view).unwrap()[0];
+    let out = &filter.run(std::slice::from_ref(&view)).unwrap()[0];
 
     assert_eq!(out.len(), 4);
     assert_eq!(out.get_f64(0, &DimId::X), 1.0);
@@ -104,7 +104,7 @@ fn test_range_filter_multiple_dimensions_and() {
         negate: false,
     };
     let mut filter = RangeFilter::new(vec![limit_x, limit_y]);
-    let out = &filter.run(&view).unwrap()[0];
+    let out = &filter.run(std::slice::from_ref(&view)).unwrap()[0];
 
     // Intersection is X in [4, 6] (since Y is X * 10)
     assert_eq!(out.len(), 3);
@@ -133,7 +133,7 @@ fn test_range_filter_same_dimension_or() {
         negate: false,
     };
     let mut filter = RangeFilter::new(vec![limit1, limit2]);
-    let out = &filter.run(&view).unwrap()[0];
+    let out = &filter.run(std::slice::from_ref(&view)).unwrap()[0];
 
     assert_eq!(out.len(), 4);
     assert_eq!(out.get_f64(0, &DimId::X), 1.0);

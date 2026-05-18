@@ -151,7 +151,7 @@ impl Filter for SampleFilter {
         "filters.sample"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
         self.prepare_runtime();
 
         let mut output = PointView::new(view.layout().clone());

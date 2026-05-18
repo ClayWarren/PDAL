@@ -96,7 +96,7 @@ impl Filter for AssignFilter {
         "filters.assign"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
         let size = view.len();
         let mut output = PointView::new(view.layout().clone());
         for i in 0..size {

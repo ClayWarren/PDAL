@@ -154,7 +154,7 @@ impl Filter for ChipperFilter {
         "filters.chipper"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         if input.is_empty() {
             return Ok(Vec::new());
         }

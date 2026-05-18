@@ -16,7 +16,7 @@ pub struct StageWrapper {
 pub(crate) trait FilterWrapper {
     fn process_one(&mut self, view: &mut PointView, idx: u64) -> bool;
     fn reset(&mut self);
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError>;
     fn metadata(&self) -> MetadataNode;
     fn as_any(&self) -> &dyn std::any::Any;
     fn name(&self) -> &str;
@@ -29,8 +29,8 @@ impl<T: Filter + Streamable> FilterWrapper for T {
     fn reset(&mut self) {
         Streamable::reset(self)
     }
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
-        Filter::run(self, input)
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        Filter::run(self, inputs)
     }
     fn metadata(&self) -> MetadataNode {
         Filter::metadata(self)
@@ -44,8 +44,8 @@ impl<T: Filter + Streamable> FilterWrapper for T {
 }
 
 impl PipelineStageWrapper for StageWrapper {
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
-        self.filter.run(input)
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        self.filter.run(inputs)
     }
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
         Ok(Vec::new())

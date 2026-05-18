@@ -120,13 +120,53 @@ impl Summary {
 
 pub struct StatsFilter {
     pub summaries: HashMap<String, Summary>,
+    pub advanced: bool,
 }
 
 impl StatsFilter {
     pub fn new() -> Self {
         Self {
             summaries: HashMap::new(),
+            advanced: false,
         }
+    }
+
+    pub fn from_options(options: &pdal_core::options::Options) -> Self {
+        let advanced = options.get_bool("advanced", false);
+        let mut filter = Self {
+            summaries: HashMap::new(),
+            advanced,
+        };
+        let dims = options.get_str("dimensions", "");
+        let enumerate = options.get_str("enumerate", "");
+        let count = options.get_str("count", "");
+        let global = options.get_str("global", "");
+
+        let mut names = std::collections::HashSet::new();
+        if !dims.is_empty() {
+            for d in dims.split(',').map(|s| s.trim()) {
+                names.insert(d.to_string());
+            }
+        }
+
+        for d in enumerate.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 1, advanced));
+            names.remove(d);
+        }
+        for d in count.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 2, advanced));
+            names.remove(d);
+        }
+        for d in global.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 3, advanced));
+            names.remove(d);
+        }
+
+        for d in names {
+            filter.summaries.insert(d.to_string(), Summary::new(d.to_string(), 0, advanced));
+        }
+
+        filter
     }
 }
 
@@ -145,11 +185,24 @@ impl Filter for StatsFilter {
         "filters.stats"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+        if self.summaries.is_empty() {
+            let layout = view.layout();
+            for i in 0..layout.dim_count() {
+                if let Some((id, _ty)) = layout.dim_at(i) {
+                    let name = id.name().to_string();
+                    self.summaries.insert(
+                        name.clone(),
+                        Summary::new(name, 0, self.advanced),
+                    );
+                }
+            }
+        }
+
         let size = view.len();
         for i in 0..size {
-            for (name, summary) in self.summaries.iter_mut() {
-                let dim = DimId::from_name(name);
+            for summary in self.summaries.values_mut() {
+                let dim = DimId::from_name(&summary.name);
                 let val = view.get_f64(i, &dim);
                 summary.insert(val);
             }
@@ -159,7 +212,8 @@ impl Filter for StatsFilter {
                 summary.compute_global_stats();
             }
         }
-        let mut out = PointView::new(view.layout().clone());
+        // Stats filter returns the same points
+        let mut out = view.make_new();
         for i in 0..size {
             out.append_point(view, i);
         }
@@ -168,8 +222,25 @@ impl Filter for StatsFilter {
 }
 
 impl Streamable for StatsFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
-        false
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
+        if self.summaries.is_empty() {
+            let layout = view.layout();
+            for i in 0..layout.dim_count() {
+                if let Some((id, _ty)) = layout.dim_at(i) {
+                    let name = id.name().to_string();
+                    self.summaries.insert(
+                        name.clone(),
+                        Summary::new(name, 0, self.advanced),
+                    );
+                }
+            }
+        }
+        for summary in self.summaries.values_mut() {
+            let dim = DimId::from_name(&summary.name);
+            let val = view.get_f64(idx, &dim);
+            summary.insert(val);
+        }
+        true
     }
 
     fn reset(&mut self) {

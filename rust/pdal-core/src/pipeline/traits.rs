@@ -12,7 +12,9 @@ pub enum StageKind {
 
 /// Unified stage wrapper that can be a reader, filter, or writer.
 pub trait StageWrapper {
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+    /// Run the filter over `inputs`.
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError>;
+
     fn read(&mut self) -> Result<Vec<PointView>, StageError>;
     fn write(&mut self, views: &[PointView]) -> Result<(), StageError>;
     fn process_one(&mut self, view: &mut PointView, idx: crate::point::PointId) -> bool;

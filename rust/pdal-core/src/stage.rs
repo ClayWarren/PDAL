@@ -21,8 +21,23 @@ pub trait Filter {
     /// The stage name, e.g. `"filters.decimation"`.
     fn name(&self) -> &str;
 
-    /// Run the filter over `input`, producing the output view(s).
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+    /// Run the filter over `inputs`, producing the output view(s).
+    ///
+    /// The default implementation loops over all input views and calls
+    /// `run_one` for each. Specialized filters like `filters.merge`
+    /// should override this to process all inputs at once.
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        let mut outputs = Vec::new();
+        for input in inputs {
+            outputs.extend(self.run_one(input)?);
+        }
+        Ok(outputs)
+    }
+
+    /// Run the filter over a single input view.
+    ///
+    /// This is the primary implementation point for most filters.
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
 
     /// Export the stage's accumulated metadata, if any.
     fn metadata(&self) -> crate::metadata::MetadataNode {

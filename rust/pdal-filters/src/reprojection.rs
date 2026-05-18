@@ -45,7 +45,7 @@ impl Filter for ReprojectionFilter {
         "filters.reprojection"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let source_srs = input.spatial_reference();
         self.ensure_transform(source_srs)?;
 

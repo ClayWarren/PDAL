@@ -25,7 +25,7 @@ impl Filter for ReturnsFilter {
         "filters.returns"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut output_types = 0u32;
         for g in &self.groups {
             let trimmed = g.trim();

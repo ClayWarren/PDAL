@@ -38,7 +38,7 @@ impl Filter for ProjPipelineFilter {
         "filters.projpipeline"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_transform()?;
         let mut output = input.make_new();
         output.set_spatial_reference(self.out_srs.clone());

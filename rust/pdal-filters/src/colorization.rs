@@ -43,7 +43,7 @@ impl Filter for ColorizationFilter {
         "filters.colorization"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_raster()?;
         let mut output = input.clone();
         for idx in 0..output.len() {

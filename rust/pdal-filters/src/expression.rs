@@ -56,7 +56,7 @@ impl Filter for ExpressionFilter {
         "filters.expression"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         // Empty input yields no views (PDAL returns an empty set).
         if input.is_empty() {
             return Ok(Vec::new());

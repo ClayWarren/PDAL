@@ -42,7 +42,7 @@ impl Filter for VoxelDownsizeFilter {
         "filters.voxeldownsize"
     }
 
-    fn run(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
         self.populated_voxels.clear();
         self.origin = None;
 

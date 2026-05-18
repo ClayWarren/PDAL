@@ -56,7 +56,7 @@ impl Filter for RandomizeFilter {
         "filters.randomize"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let n = input.len();
         if n == 0 {
             return Ok(vec![input.make_new()]);

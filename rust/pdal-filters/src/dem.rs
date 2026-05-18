@@ -49,7 +49,7 @@ impl Filter for DEMFilter {
         "filters.dem"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_raster()?;
         let mut output = input.make_new();
         for idx in 0..input.len() {

@@ -39,8 +39,13 @@ impl Filter for MergeFilter {
         "filters.merge"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
-        self.merge_view(input);
+    fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
+        if inputs.is_empty() {
+            return Ok(Vec::new());
+        }
+        for view in inputs {
+            self.merge_view(view);
+        }
         let acc_ref = self.accumulated.borrow();
         if let Some(acc) = &*acc_ref {
             let mut out = acc.make_new();
@@ -49,8 +54,12 @@ impl Filter for MergeFilter {
             }
             Ok(vec![out])
         } else {
-            Ok(vec![input.make_new()])
+            Ok(Vec::new())
         }
+    }
+
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        self.run(std::slice::from_ref(input))
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -274,11 +274,7 @@ impl Pipeline {
                         continue;
                     }
 
-                    let mut node_outputs = Vec::new();
-                    for view in &inputs_for_node {
-                        let out = node.stage.run(view)?;
-                        node_outputs.extend(out);
-                    }
+                    let node_outputs = node.stage.run(&inputs_for_node)?;
                     outputs.insert(node_idx, node_outputs);
                 }
                 StageKind::Writer => {

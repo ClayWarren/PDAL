@@ -20,7 +20,7 @@ impl Filter for SeparateScanLineFilter {
         "filters.separatescanline"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let edge_dim = DimId::from_name("EdgeOfFlightLine");
         let mut results = Vec::new();
         let mut v = input.make_new();

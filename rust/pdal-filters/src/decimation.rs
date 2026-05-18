@@ -31,7 +31,7 @@ impl Filter for DecimationFilter {
         "filters.decimation"
     }
 
-    fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         let mut out = input.make_new();
 
         if self.step < 1.0 {
