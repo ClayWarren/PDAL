@@ -113,15 +113,21 @@ void RangeFilter::prepared(PointTableRef table)
 // common case.
 bool RangeFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
     return DimRange::pointPasses(m_ranges, point);
 }
 
 PointViewSet RangeFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
+    PointViewPtr outView = inView->makeNew();
+    PointRef point(*inView, 0);
+    for (PointId idx = 0; idx < inView->size(); ++idx)
+    {
+        point.setPointId(idx);
+        if (processOne(point))
+            outView->appendPoint(*inView, idx);
+    }
+    viewSet.insert(outView);
     return viewSet;
 }
 

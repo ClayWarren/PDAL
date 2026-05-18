@@ -70,7 +70,7 @@ impl Filter for VoxelCenterNearestNeighborFilter {
 }
 
 impl Streamable for VoxelCenterNearestNeighborFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 }

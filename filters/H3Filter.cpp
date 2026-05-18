@@ -38,15 +38,14 @@
 #include <pdal/util/Utils.hpp>
 
 #include <pdal/private/SrsTransform.hpp>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 #include <cctype>
 #include <limits>
 #include <map>
 #include <string>
 #include <vector>
+
+#include <h3api.h>
 
 namespace pdal
 {
@@ -69,11 +68,7 @@ struct H3Filter::Args
 
 H3Filter::H3Filter() : m_args(new Args) {}
 
-H3Filter::~H3Filter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+H3Filter::~H3Filter() {}
 
 void H3Filter::addArgs(ProgramArgs& args)
 {
@@ -87,43 +82,67 @@ void H3Filter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Dimension::Id::H3);
 }
 
-void H3Filter::initialize()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-    m_rust_stage = pdal_stage_create_h3(m_args->m_resolution);
-}
-
-void H3Filter::ready(PointTableRef table)
-{
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
-}
-
 bool H3Filter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
+
+    double x(point.getFieldAs<double>(Dimension::Id::X));
+    double y(point.getFieldAs<double>(Dimension::Id::Y));
+    double z(0.0);
+
+    LatLng ll;
+    H3Index index(0);
+    bool ok = m_transform->transform(x, y, z);
+    if (ok)
     {
-        pdal_point_view_set_spatial_reference((pdal_point_view_t*)point.view(), point.view()->spatialReference().getWKT().c_str());
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        // x is longitude
+        double xrad = PDALH3degsToRads(x);
+        double yrad = PDALH3degsToRads(y);
+        ll.lat = yrad;
+        ll.lng = xrad;
+
+        H3Error err = PDALH3latLngToCell(&ll, m_args->m_resolution, &index);
+        if (err == E_SUCCESS)
+        {
+            point.setField(Dimension::Id::H3, index);
+        }
+        else
+        {
+            throwError("Unable to compute H3 cell id for point!");
+        }
     }
-    return false;
+    else
+        throwError(
+            "Couldn't reproject point with X/Y/Z coordinates of (" +
+            std::to_string(point.getFieldAs<double>(Dimension::Id::X)) + ", " +
+            std::to_string(point.getFieldAs<double>(Dimension::Id::Y)) + ").");
+    return ok;
 }
 
 void H3Filter::spatialReferenceChanged(const SpatialReference& srs)
 {
+    createTransform(srs);
 }
 
 void H3Filter::createTransform(const SpatialReference& srsSRS)
 {
+    if (srsSRS.empty())
+        throwError("source data has no spatial reference");
+
+    m_transform.reset(new SrsTransform(srsSRS, "EPSG:4326"));
 }
 
 void H3Filter::filter(PointView& view)
 {
-    if (m_rust_stage)
+    if (!m_transform)
     {
-        pdal_point_view_set_spatial_reference((pdal_point_view_t*)&view, view.spatialReference().getWKT().c_str());
-        rust_view_converter::runInPlace(m_rust_stage, view);
+        createTransform(view.spatialReference());
+    }
+
+    PointRef point = view.point(0);
+    for (PointId idx = 0; idx < view.size(); ++idx)
+    {
+        point.setPointId(idx);
+        processOne(point);
     }
 }
 

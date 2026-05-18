@@ -60,7 +60,6 @@ fn test_locate_empty() {
 fn test_locate_stream() {
     let mut filter = LocateFilter::new("Z".to_string(), "max".to_string());
     filter.reset();
-    let mut view = make_custom_view(&[1.0]);
     // Streamable::process_one should always return false for LocateFilter as it does not stream
-    assert!(!filter.process_one(&mut view, 0));
+    assert!(!filter.process_one());
 }

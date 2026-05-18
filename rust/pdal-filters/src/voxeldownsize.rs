@@ -1,5 +1,5 @@
 use pdal_core::options::Options;
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::collections::HashSet;
 
@@ -87,7 +87,7 @@ impl Filter for VoxelDownsizeFilter {
 }
 
 impl Streamable for VoxelDownsizeFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 

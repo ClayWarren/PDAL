@@ -30,10 +30,6 @@ pub enum DimId {
     LocalReachabilityDistance,
     RadialDensity,
     NNDistance,
-    NormalX,
-    NormalY,
-    NormalZ,
-    Curvature,
     Reciprocity,
     Rank,
     Coplanar,
@@ -43,19 +39,6 @@ pub enum DimId {
     Eigenvalue2,
     OptimalKNN,
     OptimalRadius,
-    Linearity,
-    Planarity,
-    Scattering,
-    Verticality,
-    Omnivariance,
-    Anisotropy,
-    Eigenentropy,
-    EigenvalueSum,
-    SurfaceVariation,
-    DemantkeVerticality,
-    Density,
-    Miniball,
-    H3,
     Other(String),
 }
 
@@ -75,10 +58,6 @@ impl DimId {
             DimId::LocalReachabilityDistance => "LocalReachabilityDistance",
             DimId::RadialDensity => "RadialDensity",
             DimId::NNDistance => "NNDistance",
-            DimId::NormalX => "NormalX",
-            DimId::NormalY => "NormalY",
-            DimId::NormalZ => "NormalZ",
-            DimId::Curvature => "Curvature",
             DimId::Reciprocity => "Reciprocity",
             DimId::Rank => "Rank",
             DimId::Coplanar => "Coplanar",
@@ -88,19 +67,6 @@ impl DimId {
             DimId::Eigenvalue2 => "Eigenvalue2",
             DimId::OptimalKNN => "OptimalKNN",
             DimId::OptimalRadius => "OptimalRadius",
-            DimId::Linearity => "Linearity",
-            DimId::Planarity => "Planarity",
-            DimId::Scattering => "Scattering",
-            DimId::Verticality => "Verticality",
-            DimId::Omnivariance => "Omnivariance",
-            DimId::Anisotropy => "Anisotropy",
-            DimId::Eigenentropy => "Eigenentropy",
-            DimId::EigenvalueSum => "EigenvalueSum",
-            DimId::SurfaceVariation => "SurfaceVariation",
-            DimId::DemantkeVerticality => "DemantkeVerticality",
-            DimId::Density => "Density",
-            DimId::Miniball => "Miniball",
-            DimId::H3 => "H3",
             DimId::Other(s) => s,
         }
     }
@@ -120,10 +86,6 @@ impl DimId {
             "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
             "RadialDensity" => DimId::RadialDensity,
             "NNDistance" => DimId::NNDistance,
-            "NormalX" => DimId::NormalX,
-            "NormalY" => DimId::NormalY,
-            "NormalZ" => DimId::NormalZ,
-            "Curvature" => DimId::Curvature,
             "Reciprocity" => DimId::Reciprocity,
             "Rank" => DimId::Rank,
             "Coplanar" => DimId::Coplanar,
@@ -133,19 +95,6 @@ impl DimId {
             "Eigenvalue2" => DimId::Eigenvalue2,
             "OptimalKNN" => DimId::OptimalKNN,
             "OptimalRadius" => DimId::OptimalRadius,
-            "Linearity" => DimId::Linearity,
-            "Planarity" => DimId::Planarity,
-            "Scattering" => DimId::Scattering,
-            "Verticality" => DimId::Verticality,
-            "Omnivariance" => DimId::Omnivariance,
-            "Anisotropy" => DimId::Anisotropy,
-            "Eigenentropy" => DimId::Eigenentropy,
-            "EigenvalueSum" => DimId::EigenvalueSum,
-            "SurfaceVariation" => DimId::SurfaceVariation,
-            "DemantkeVerticality" => DimId::DemantkeVerticality,
-            "Density" => DimId::Density,
-            "Miniball" => DimId::Miniball,
-            "H3" => DimId::H3,
             other => DimId::Other(other.to_string()),
         }
     }
@@ -225,12 +174,10 @@ impl PointLayout {
 }
 
 /// A buffer of points sharing one layout.
-#[derive(Clone)]
 pub struct PointView {
     layout: Rc<PointLayout>,
     data: Vec<u8>,
     source_indices: Vec<PointId>,
-    spatial_reference: Option<crate::srs::SpatialReference>,
 }
 
 impl PointView {
@@ -240,16 +187,7 @@ impl PointView {
             layout,
             data: Vec::new(),
             source_indices: Vec::new(),
-            spatial_reference: None,
         }
-    }
-
-    pub fn set_spatial_reference(&mut self, srs: crate::srs::SpatialReference) {
-        self.spatial_reference = Some(srs);
-    }
-
-    pub fn spatial_reference(&self) -> Option<&crate::srs::SpatialReference> {
-        self.spatial_reference.as_ref()
     }
 
     /// A new empty view sharing this view's layout (PDAL's `makeNew`).
@@ -258,7 +196,6 @@ impl PointView {
             layout: Rc::clone(&self.layout),
             data: Vec::new(),
             source_indices: Vec::new(),
-            spatial_reference: self.spatial_reference.clone(),
         }
     }
 

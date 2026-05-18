@@ -80,7 +80,7 @@ impl Filter for EigenvaluesFilter {
 }
 
 impl Streamable for EigenvaluesFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 }

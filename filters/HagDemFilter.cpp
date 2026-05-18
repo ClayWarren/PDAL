@@ -36,9 +36,6 @@
 
 #include <algorithm>
 #include <pdal/private/gdal/Raster.hpp>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -55,12 +52,6 @@ std::string HagDemFilter::getName() const
 }
 
 HagDemFilter::HagDemFilter() {}
-
-HagDemFilter::~HagDemFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
 
 void HagDemFilter::addArgs(ProgramArgs& args)
 {
@@ -89,53 +80,100 @@ void HagDemFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Dimension::Id::HeightAboveGround);
 }
 
-void HagDemFilter::initialize()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-    
-    m_rust_stage = pdal_stage_create_hag_dem(
-        m_rasterName.c_str(),
-        m_band,
-        m_zeroGround,
-        m_minClamp,
-        m_maxClamp,
-        m_noDataHeight,
-        m_class);
-    
-    if (!m_rust_stage)
-    {
-        std::string err = pdal_last_error();
-        if (!err.empty())
-            throwError(err);
-    }
-}
-
 void HagDemFilter::ready(PointTableRef table)
 {
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
+    m_raster.reset(new gdal::Raster(m_rasterName));
+
+    log()->get(LogLevel::Debug)
+        << "Nodata HAG override was set to " << m_noDataHeight << '\n';
+
+    if (m_zeroGround)
+        log()->get(LogLevel::Debug)
+            << "Setting ground-classified points to 0 HAG" << '\n';
+
+    if (m_minClamp != (std::numeric_limits<double>::min)())
+        log()->get(LogLevel::Debug)
+            << "min_clamp set to " << m_minClamp << '\n';
+
+    if (m_maxClamp != (std::numeric_limits<double>::max)())
+        log()->get(LogLevel::Debug)
+            << "max_clamp set to " << m_maxClamp << '\n';
+
+    gdal::GDALError response = m_raster->open();
+    if (response == gdal::GDALError::NotOpen)
+    {
+        log()->get(LogLevel::Error)
+            << "Unable to open raster " << m_rasterName << '\n';
+        throwError(m_raster->errorMsg());
+    }
 }
 
 void HagDemFilter::prepared(PointTableRef table)
 {
+    if (m_band <= 0)
+        throwError("Band must be greater than 0");
 }
 
 void HagDemFilter::filter(PointView& view)
 {
-    if (m_rust_stage)
+    PointRef point(view, 0);
+    for (PointId i = 0; i < view.size(); ++i)
     {
-        rust_view_converter::runInPlace(m_rust_stage, view);
+        point.setPointId(i);
+        processOne(point);
     }
 }
 
 bool HagDemFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
+    using namespace pdal::Dimension;
+    static std::vector<double> data;
+    static std::array<double, 2> pix;
+
+    double x = point.getFieldAs<double>(Id::X);
+    double y = point.getFieldAs<double>(Id::Y);
+    double val;
+    double hag;
+
+    if (m_zeroGround)
     {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        if (point.getFieldAs<uint8_t>(Id::Classification) == m_class)
+        {
+            point.setField(Dimension::Id::HeightAboveGround, 0);
+            return true;
+        }
     }
-    return false;
+
+    // If raster has a point at X, Y of pointcloud point, use it.
+    // Otherwise the HAG value is not set.
+    gdal::GDALError readStatus = m_raster->read(x, y, data, pix);
+    if (readStatus == gdal::GDALError::None)
+    {
+        double z = point.getFieldAs<double>(Id::Z);
+        val = data[m_band - 1];
+        hag = z - val;
+
+        if (val == m_bandNoData)
+            hag = m_noDataHeight;
+
+        else if (hag < m_minClamp)
+            hag = m_minClamp;
+
+        else if (hag > m_maxClamp)
+            hag = m_maxClamp;
+    }
+    else if (readStatus == gdal::GDALError::NoData)
+    {
+        hag = m_noDataHeight;
+    }
+    else
+    {
+        // skip any other errors
+        return true;
+    }
+
+    point.setField(Dimension::Id::HeightAboveGround, hag);
+    return true;
 }
 
 } // namespace pdal

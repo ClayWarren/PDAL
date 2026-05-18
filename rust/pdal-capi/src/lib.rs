@@ -8,14 +8,11 @@ use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
-use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
-use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, CovarianceFeaturesMode};
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
-use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
@@ -23,37 +20,25 @@ use pdal_filters::griddecimation;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
-use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
-use pdal_filters::litree::LiTreeFilter;
-use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
-use pdal_filters::m3c2;
-use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
-use pdal_filters::miniball::MiniballFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
-use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
-use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
-use pdal_filters::radiusassign;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
-use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
-use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats;
-use pdal_filters::straighten;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::TransformationFilter;
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
@@ -90,10 +75,6 @@ fn dim_id_from_name(name: &str) -> DimId {
         "LocalReachabilityDistance" => DimId::LocalReachabilityDistance,
         "RadialDensity" => DimId::RadialDensity,
         "NNDistance" => DimId::NNDistance,
-        "NormalX" => DimId::NormalX,
-        "NormalY" => DimId::NormalY,
-        "NormalZ" => DimId::NormalZ,
-        "Curvature" => DimId::Curvature,
         "Reciprocity" => DimId::Reciprocity,
         "Rank" => DimId::Rank,
         "Coplanar" => DimId::Coplanar,
@@ -103,18 +84,6 @@ fn dim_id_from_name(name: &str) -> DimId {
         "Eigenvalue2" => DimId::Eigenvalue2,
         "OptimalKNN" => DimId::OptimalKNN,
         "OptimalRadius" => DimId::OptimalRadius,
-        "Linearity" => DimId::Linearity,
-        "Planarity" => DimId::Planarity,
-        "Scattering" => DimId::Scattering,
-        "Verticality" => DimId::Verticality,
-        "Omnivariance" => DimId::Omnivariance,
-        "Anisotropy" => DimId::Anisotropy,
-        "Eigenentropy" => DimId::Eigenentropy,
-        "EigenvalueSum" => DimId::EigenvalueSum,
-        "SurfaceVariation" => DimId::SurfaceVariation,
-        "DemantkeVerticality" => DimId::DemantkeVerticality,
-        "Density" => DimId::Density,
-        "Miniball" => DimId::Miniball,
         other => DimId::Other(other.to_string()),
     }
 }
@@ -366,22 +335,6 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
     }
 }
 
-/// Set the spatial reference of a point view.
-///
-/// # Safety
-///
-/// `view` must be valid. `wkt` must be a valid NUL-terminated C-string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_point_view_set_spatial_reference(
-    view: *mut PointView,
-    wkt: *const c_char,
-) {
-    if let (Some(view), false) = (view.as_mut(), wkt.is_null()) {
-        let wkt_str = CStr::from_ptr(wkt).to_string_lossy();
-        view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&wkt_str));
-    }
-}
-
 /// Return the number of points in the view.
 ///
 /// # Safety
@@ -436,15 +389,15 @@ pub struct StageWrapper {
 }
 
 trait FilterWrapper {
-    fn process_one(&mut self, view: &mut PointView, idx: u64) -> bool;
+    fn process_one(&mut self) -> bool;
     fn reset(&mut self);
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T: Filter + Streamable> FilterWrapper for T {
-    fn process_one(&mut self, view: &mut PointView, idx: u64) -> bool {
-        Streamable::process_one(self, view, idx)
+    fn process_one(&mut self) -> bool {
+        Streamable::process_one(self)
     }
     fn reset(&mut self) {
         Streamable::reset(self)
@@ -456,445 +409,6 @@ impl<T: Filter + Streamable> FilterWrapper for T {
         Filter::as_any(self)
     }
 }
-
-/// Create an expression filter stage from options.
-///
-/// # Safety
-///
-/// `sources` must be a valid pointer to a C-array of C-strings of length `count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_expression(
-    sources: *const *const c_char,
-    count: u64,
-) -> *mut StageWrapper {
-    if sources.is_null() {
-        return std::ptr::null_mut();
-    }
-    let mut vec_sources = Vec::new();
-    for i in 0..count {
-        let ptr = *sources.offset(i as isize);
-        if ptr.is_null() {
-            return std::ptr::null_mut();
-        }
-        vec_sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
-    }
-    match pdal_filters::expression::ExpressionFilter::new(&vec_sources) {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create an expression stats filter stage from options.
-///
-/// # Safety
-///
-/// `dim_name` must be a valid NUL-terminated C-string.
-/// `sources` must be a valid pointer to a C-array of C-strings of length `count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_expressionstats(
-    dim_name: *const c_char,
-    sources: *const *const c_char,
-    count: u64,
-) -> *mut StageWrapper {
-    if dim_name.is_null() || sources.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim = CStr::from_ptr(dim_name).to_string_lossy();
-    let mut vec_sources = Vec::new();
-    for i in 0..count {
-        let ptr = *sources.offset(i as isize);
-        if ptr.is_null() {
-            return std::ptr::null_mut();
-        }
-        vec_sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
-    }
-    match pdal_filters::expression_stats::ExpressionStatsFilter::new(&dim, &vec_sources) {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create an H3 filter stage.
-///
-/// # Safety
-///
-/// Always safe to call.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_h3(resolution: u64) -> *mut StageWrapper {
-    let filter = Box::new(pdal_filters::h3::H3Filter::new(resolution as u8));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a mongoexpression filter stage.
-///
-/// # Safety
-///
-/// `json` must be a valid NUL-terminated C-string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
-    json: *const c_char,
-) -> *mut StageWrapper {
-    if json.is_null() {
-        return std::ptr::null_mut();
-    }
-    let json_str = CStr::from_ptr(json).to_string_lossy();
-    match pdal_filters::mongo_expression::MongoExpressionFilter::new(&json_str) {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create a reprojection filter stage.
-///
-/// # Safety
-///
-/// `out_srs`, `in_srs` must be valid NUL-terminated C-strings (in_srs can be null).
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_reprojection(
-    out_srs: *const c_char,
-    in_srs: *const c_char,
-    error_on_failure: bool,
-) -> *mut StageWrapper {
-    if out_srs.is_null() {
-        return std::ptr::null_mut();
-    }
-    let out_srs_wkt = CStr::from_ptr(out_srs).to_string_lossy();
-    let in_srs_wkt = if in_srs.is_null() {
-        None
-    } else {
-        Some(CStr::from_ptr(in_srs).to_string_lossy().into_owned())
-    };
-
-    let filter = Box::new(pdal_filters::reprojection::ReprojectionFilter::new(
-        &out_srs_wkt,
-        in_srs_wkt,
-        error_on_failure,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a geomdistance filter stage.
-///
-/// # Safety
-///
-/// `wkt`, `dim_name` must be valid NUL-terminated C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_geomdistance(
-    wkt: *const c_char,
-    dim_name: *const c_char,
-) -> *mut StageWrapper {
-    if wkt.is_null() || dim_name.is_null() {
-        return std::ptr::null_mut();
-    }
-    let wkt_str = CStr::from_ptr(wkt).to_string_lossy();
-    let dim_str = CStr::from_ptr(dim_name).to_string_lossy();
-
-    match pdal_filters::geom_distance::GeomDistanceFilter::new(&wkt_str, &dim_str) {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create a projpipeline filter stage.
-///
-/// # Safety
-///
-/// `out_srs`, `coord_op` must be valid NUL-terminated C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_projpipeline(
-    out_srs: *const c_char,
-    coord_op: *const c_char,
-    reverse: bool,
-) -> *mut StageWrapper {
-    if out_srs.is_null() || coord_op.is_null() {
-        return std::ptr::null_mut();
-    }
-    let out_srs_wkt = CStr::from_ptr(out_srs).to_string_lossy();
-    let coord_op_str = CStr::from_ptr(coord_op).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::proj_pipeline::ProjPipelineFilter::new(
-        &out_srs_wkt,
-        &coord_op_str,
-        reverse,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a colorinterp filter stage.
-///
-/// # Safety
-///
-/// `dim_name`, `ramp` must be valid NUL-terminated C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_colorinterp(
-    dim_name: *const c_char,
-    ramp: *const c_char,
-    min: f64,
-    max: f64,
-    clamp: bool,
-    invert: bool,
-) -> *mut StageWrapper {
-    if dim_name.is_null() || ramp.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim_str = CStr::from_ptr(dim_name).to_string_lossy();
-    let ramp_str = CStr::from_ptr(ramp).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::colorinterp::ColorinterpFilter::new(
-        &dim_str, &ramp_str, min, max, clamp, invert,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-#[repr(C)]
-pub struct pdal_band_info_t {
-    pub name: *const c_char,
-    pub band: u32,
-    pub scale: f64,
-}
-
-/// Create a colorization filter stage.
-///
-/// # Safety
-///
-/// `raster_path` must be a valid NUL-terminated C-string.
-/// `bands` must be a valid pointer to a C-array of `pdal_band_info_t` of length `count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_colorization(
-    raster_path: *const c_char,
-    bands: *const pdal_band_info_t,
-    count: u64,
-) -> *mut StageWrapper {
-    if raster_path.is_null() || (bands.is_null() && count > 0) {
-        return std::ptr::null_mut();
-    }
-    let raster_str = CStr::from_ptr(raster_path).to_string_lossy();
-    let mut vec_bands = Vec::new();
-    for i in 0..count {
-        let b = &*bands.offset(i as isize);
-        if b.name.is_null() {
-            return std::ptr::null_mut();
-        }
-        vec_bands.push(pdal_filters::colorization::BandInfo {
-            name: CStr::from_ptr(b.name).to_string_lossy().into_owned(),
-            band: b.band,
-            scale: b.scale,
-        });
-    }
-
-    let filter = Box::new(pdal_filters::colorization::ColorizationFilter::new(
-        &raster_str,
-        vec_bands,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a dem filter stage.
-///
-/// # Safety
-///
-/// `dim_name`, `raster_path` must be valid NUL-terminated C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_dem(
-    dim_name: *const c_char,
-    raster_path: *const c_char,
-    band: i32,
-    lower_bound: f64,
-    upper_bound: f64,
-) -> *mut StageWrapper {
-    if dim_name.is_null() || raster_path.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim_str = CStr::from_ptr(dim_name).to_string_lossy();
-    let raster_str = CStr::from_ptr(raster_path).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::dem::DEMFilter::new(
-        &dim_str,
-        &raster_str,
-        band,
-        lower_bound,
-        upper_bound,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create an overlay filter stage.
-///
-/// # Safety
-///
-/// `dim_name`, `datasource`, `column` must be valid NUL-terminated C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_overlay(
-    dim_name: *const c_char,
-    datasource: *const c_char,
-    column: *const c_char,
-) -> *mut StageWrapper {
-    if dim_name.is_null() || datasource.is_null() || column.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim_str = CStr::from_ptr(dim_name).to_string_lossy();
-    let ds_str = CStr::from_ptr(datasource).to_string_lossy();
-    let col_str = CStr::from_ptr(column).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::overlay::OverlayFilter::new(
-        &dim_str, &ds_str, &col_str,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a georeference filter stage.
-///
-/// # Safety
-///
-/// `out_srs` must be a valid NUL-terminated C-string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_georeference(
-    out_srs: *const c_char,
-) -> *mut StageWrapper {
-    if out_srs.is_null() {
-        return std::ptr::null_mut();
-    }
-    let out_srs_wkt = CStr::from_ptr(out_srs).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::georeference::GeoreferenceFilter::new(
-        &out_srs_wkt,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a decimation filter stage from options.
-
-/// Create a decimation filter stage from options.
-
-#[repr(C)]
-pub struct pdal_box3d_t {
-    pub minx: f64,
-    pub miny: f64,
-    pub minz: f64,
-    pub maxx: f64,
-    pub maxy: f64,
-    pub maxz: f64,
-}
-
-#[repr(C)]
-pub struct pdal_point3d_t {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-/// Create a crop filter stage.
-///
-/// # Safety
-///
-/// `bounds` must be a valid pointer to a C-array of `pdal_box3d_t` of length `bounds_count`.
-/// `polygons` must be a valid pointer to a C-array of C-strings of length `poly_count`.
-/// `centers` must be a valid pointer to a C-array of `pdal_point3d_t` of length `center_count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_crop(
-    outside: bool,
-    bounds: *const pdal_box3d_t,
-    bounds_count: u64,
-    polygons: *const *const c_char,
-    poly_count: u64,
-    centers: *const pdal_point3d_t,
-    center_count: u64,
-    distance: f64,
-) -> *mut StageWrapper {
-    let mut vec_bounds = Vec::new();
-    for i in 0..bounds_count {
-        let b = &*bounds.offset(i as isize);
-        vec_bounds.push((b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz));
-    }
-
-    let mut vec_polys = Vec::new();
-    for i in 0..poly_count {
-        let p = *polygons.offset(i as isize);
-        if p.is_null() {
-            return std::ptr::null_mut();
-        }
-        vec_polys.push(CStr::from_ptr(p).to_string_lossy().into_owned());
-    }
-
-    let mut vec_centers = Vec::new();
-    for i in 0..center_count {
-        let c = &*centers.offset(i as isize);
-        vec_centers.push((c.x, c.y, c.z));
-    }
-
-    match pdal_filters::crop::CropFilter::new(outside, vec_bounds, vec_polys, vec_centers, distance)
-    {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create a decimation filter stage from options.
-
-/// Create a hag_dem filter stage.
-///
-/// # Safety
-///
-/// `raster_path` must be a valid NUL-terminated C-string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_hag_dem(
-    raster_path: *const c_char,
-    band: i32,
-    zero_ground: bool,
-    min_clamp: f64,
-    max_clamp: f64,
-    nodata_height: f64,
-    ground_class: u8,
-) -> *mut StageWrapper {
-    if raster_path.is_null() {
-        return std::ptr::null_mut();
-    }
-    let raster_str = CStr::from_ptr(raster_path).to_string_lossy();
-
-    let filter = Box::new(pdal_filters::hag_dem::HagDemFilter::new(
-        &raster_str,
-        band,
-        zero_ground,
-        min_clamp,
-        max_clamp,
-        nodata_height,
-        ground_class,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a decimation filter stage from options.
-
-/// Create a decimation filter stage from options.
-
-/// Create a decimation filter stage from options.
-
-/// Create a decimation filter stage from options.
 
 /// Create a decimation filter stage from options.
 ///
@@ -1076,6 +590,26 @@ pub unsafe extern "C" fn pdal_stage_create_range(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Check if a point passes the RangeFilter limits.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer to a stage created with `pdal_stage_create_range`.
+/// `view` must be a valid pointer to a `PointView`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_range_point_passes(
+    stage: *mut StageWrapper,
+    view: *mut PointView,
+    idx: u64,
+) -> bool {
+    if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_ref()) {
+        if let Some(range) = stage_wrapper.filter.as_any().downcast_ref::<RangeFilter>() {
+            return range.point_passes(pt_view, idx);
+        }
+    }
+    false
+}
+
 /// Destroy a stage.
 ///
 /// # Safety
@@ -1106,19 +640,14 @@ pub unsafe extern "C" fn pdal_stage_reset(stage: *mut StageWrapper) {
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `view` must be a valid pointer to a `PointView`.
 #[no_mangle]
-pub unsafe extern "C" fn pdal_stage_process_one(
-    stage: *mut StageWrapper,
-    view: *mut PointView,
-    idx: u64,
-) -> bool {
+pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> bool {
     ffi_catch(false, || {
         clear_last_error();
-        if let (Some(stage), Some(pt_view)) = (stage.as_mut(), view.as_mut()) {
-            stage.filter.process_one(pt_view, idx)
+        if let Some(stage) = stage.as_mut() {
+            stage.filter.process_one()
         } else {
-            set_last_error("null stage or view");
+            set_last_error("null stage");
             false
         }
     })
@@ -1518,137 +1047,10 @@ pub unsafe extern "C" fn pdal_stage_create_dbscan(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
-/// Create a covariance features filter stage.
-///
-/// # Safety
-///
-/// `dims` must be a valid pointer to a C-array of C-strings of length `dim_count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_covariancefeatures(
-    knn: u64,
-    has_radius: bool,
-    radius: f64,
-    min_k: u64,
-    stride: u64,
-    mode: u8,
-    optimal: bool,
-    dims: *const *const c_char,
-    dim_count: u64,
-) -> *mut StageWrapper {
-    if dims.is_null() {
-        return std::ptr::null_mut();
-    }
-    let mut feature_dims = Vec::new();
-    for i in 0..dim_count {
-        let ptr = *dims.offset(i as isize);
-        if ptr.is_null() {
-            return std::ptr::null_mut();
-        }
-        feature_dims.push(dim_id_from_name(&CStr::from_ptr(ptr).to_string_lossy()));
-    }
-    let mode = match mode {
-        1 => CovarianceFeaturesMode::Sqrt,
-        2 => CovarianceFeaturesMode::Normalized,
-        _ => CovarianceFeaturesMode::Raw,
-    };
-    let filter = Box::new(CovarianceFeaturesFilter::new(
-        knn as usize,
-        has_radius.then_some(radius),
-        min_k as usize,
-        stride as usize,
-        mode,
-        optimal,
-        feature_dims,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
 /// Create a LOF filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_lof(minpts: u64) -> *mut StageWrapper {
     let filter = Box::new(LofFilter::new(minpts as usize));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a miniball filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_miniball(knn: u64) -> *mut StageWrapper {
-    let filter = Box::new(MiniballFilter::new(knn as usize));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create an ELM filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_elm(
-    cell: f64,
-    class_label: u8,
-    threshold: f64,
-) -> *mut StageWrapper {
-    let filter = Box::new(ElmFilter::new(cell, class_label, threshold));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a skewness balancing filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_skewnessbalancing(
-    ground_class: u8,
-    other_class: u8,
-    only_ground: bool,
-) -> *mut StageWrapper {
-    let filter = Box::new(SkewnessBalancingFilter::new(
-        ground_class,
-        other_class,
-        only_ground,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a splitter filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_splitter(
-    length: f64,
-    x_origin: f64,
-    y_origin: f64,
-    buffer: f64,
-) -> *mut StageWrapper {
-    let filter = Box::new(SplitterFilter::new(length, x_origin, y_origin, buffer));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create an IQR filter stage.
-///
-/// # Safety
-///
-/// `dim_name` must be a valid NUL-terminated C string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_iqr(
-    multiplier: f64,
-    dim_name: *const c_char,
-) -> *mut StageWrapper {
-    if dim_name.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim = dim_id_from_name(&CStr::from_ptr(dim_name).to_string_lossy());
-    let filter = Box::new(IqrFilter::new(multiplier, dim));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a MAD filter stage.
-///
-/// # Safety
-///
-/// `dim_name` must be a valid NUL-terminated C string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_mad(
-    multiplier: f64,
-    dim_name: *const c_char,
-    mad_multiplier: f64,
-) -> *mut StageWrapper {
-    if dim_name.is_null() {
-        return std::ptr::null_mut();
-    }
-    let dim = dim_id_from_name(&CStr::from_ptr(dim_name).to_string_lossy());
-    let filter = Box::new(MadFilter::new(multiplier, dim, mad_multiplier));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
@@ -1699,269 +1101,6 @@ pub extern "C" fn pdal_stage_create_sparsesurface(
         low_point_class,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a Li tree filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_litree(
-    min_size: u64,
-    min_hag: f64,
-    dummy_radius: f64,
-) -> *mut StageWrapper {
-    let filter = Box::new(LiTreeFilter::new(min_size as usize, min_hag, dummy_radius));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a neighbor classifier filter stage.
-///
-/// # Safety
-///
-/// `dim_name` must be a valid NUL-terminated C-string and `domain` must be a
-/// valid pointer to an array of length `domain_count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
-    k: u64,
-    dim_name: *const c_char,
-    domain: *const pdal_range_limit_t,
-    domain_count: u64,
-) -> *mut StageWrapper {
-    if dim_name.is_null() || (domain.is_null() && domain_count != 0) {
-        return std::ptr::null_mut();
-    }
-
-    let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
-    let mut ranges = Vec::new();
-    for i in 0..domain_count {
-        let limit = &*domain.offset(i as isize);
-        if limit.dim_name.is_null() {
-            return std::ptr::null_mut();
-        }
-        ranges.push(RangeLimit {
-            dim_name: CStr::from_ptr(limit.dim_name)
-                .to_string_lossy()
-                .into_owned(),
-            lower_bound: limit.lower_bound,
-            upper_bound: limit.upper_bound,
-            inclusive_lower: limit.inclusive_lower,
-            inclusive_upper: limit.inclusive_upper,
-            negate: limit.negate,
-        });
-    }
-
-    let filter = Box::new(NeighborClassifierFilter::new(k as usize, dim_name, ranges));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-unsafe fn range_limits_from_ffi(
-    limits: *const pdal_range_limit_t,
-    count: u64,
-) -> Option<Vec<RangeLimit>> {
-    if limits.is_null() && count != 0 {
-        return None;
-    }
-
-    let mut ranges = Vec::new();
-    for i in 0..count {
-        let limit = &*limits.offset(i as isize);
-        if limit.dim_name.is_null() {
-            return None;
-        }
-        ranges.push(RangeLimit {
-            dim_name: CStr::from_ptr(limit.dim_name)
-                .to_string_lossy()
-                .into_owned(),
-            lower_bound: limit.lower_bound,
-            upper_bound: limit.upper_bound,
-            inclusive_lower: limit.inclusive_lower,
-            inclusive_upper: limit.inclusive_upper,
-            negate: limit.negate,
-        });
-    }
-    Some(ranges)
-}
-
-/// Get the point indices that filters.radiusassign should update.
-/// Caller is responsible for freeing the returned buffer with pdal_free_u64_array.
-///
-/// # Safety
-///
-/// `view` must be valid. Range pointers must either be null with zero count or
-/// valid arrays of the matching count. `out_len` must be valid.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_radiusassign_get_update_indices(
-    view: *mut PointView,
-    src_domain: *const pdal_range_limit_t,
-    src_count: u64,
-    reference_domain: *const pdal_range_limit_t,
-    reference_count: u64,
-    radius: f64,
-    search_3d: bool,
-    max_2d_above: f64,
-    max_2d_below: f64,
-    out_len: *mut u64,
-) -> *mut u64 {
-    if view.is_null() || out_len.is_null() {
-        return std::ptr::null_mut();
-    }
-    let Some(src) = range_limits_from_ffi(src_domain, src_count) else {
-        return std::ptr::null_mut();
-    };
-    let Some(reference) = range_limits_from_ffi(reference_domain, reference_count) else {
-        return std::ptr::null_mut();
-    };
-
-    let updates = radiusassign::update_indices(
-        &*view,
-        &src,
-        &reference,
-        radius,
-        search_3d,
-        max_2d_above,
-        max_2d_below,
-    );
-    *out_len = updates.len() as u64;
-    let mut boxed = updates.into_boxed_slice();
-    let ptr = boxed.as_mut_ptr();
-    std::mem::forget(boxed);
-    ptr
-}
-
-/// Create a normal filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_normal(
-    knn: u64,
-    has_radius: bool,
-    radius: f64,
-    always_up: bool,
-    has_viewpoint: bool,
-    viewpoint_x: f64,
-    viewpoint_y: f64,
-    viewpoint_z: f64,
-    refine: bool,
-) -> *mut StageWrapper {
-    let viewpoint = has_viewpoint.then_some([viewpoint_x, viewpoint_y, viewpoint_z]);
-    let filter = Box::new(NormalFilter::new(
-        knn as usize,
-        has_radius.then_some(radius),
-        always_up,
-        viewpoint,
-        refine,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Transform one point using filters.straighten's affine math.
-///
-/// # Safety
-///
-/// `out_xyz` must point to at least three writable doubles.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_straighten_transform_point(
-    reverse: bool,
-    x: f64,
-    y: f64,
-    z: f64,
-    segment_x: f64,
-    segment_y: f64,
-    segment_z: f64,
-    segment_m: f64,
-    segment_azimuth: f64,
-    segment_offset: f64,
-    offset: f64,
-    out_xyz: *mut f64,
-) -> bool {
-    if out_xyz.is_null() {
-        return false;
-    }
-    let segment = [segment_x, segment_y, segment_z, segment_m, segment_azimuth];
-    let transformed = if reverse {
-        straighten::unstraighten_point([x, y, z], segment)
-    } else {
-        straighten::straighten_point([x, y, z], segment, segment_offset, offset)
-    };
-    std::ptr::copy_nonoverlapping(transformed.as_ptr(), out_xyz, 3);
-    true
-}
-
-#[repr(C)]
-pub struct pdal_m3c2_stats_t {
-    distance: f64,
-    uncertainty: f64,
-    significant: bool,
-    std_dev1: f64,
-    std_dev2: f64,
-    n1: u64,
-    n2: u64,
-}
-
-/// Compute M3C2 distance statistics for two candidate point sets.
-///
-/// # Safety
-///
-/// Point arrays must contain `count * 3` doubles. `out_stats` must be writable.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_m3c2_compute_stats(
-    pts1: *const f64,
-    pts1_count: u64,
-    skip_first1: bool,
-    pts2: *const f64,
-    pts2_count: u64,
-    skip_first2: bool,
-    center: *const f64,
-    normal: *const f64,
-    cyl_radius2: f64,
-    cyl_half_len: f64,
-    min_points: u64,
-    reg_error: f64,
-    out_stats: *mut pdal_m3c2_stats_t,
-) -> bool {
-    if pts1.is_null()
-        || pts2.is_null()
-        || center.is_null()
-        || normal.is_null()
-        || out_stats.is_null()
-    {
-        return false;
-    }
-
-    let pts1 = std::slice::from_raw_parts(pts1, pts1_count as usize * 3);
-    let pts2 = std::slice::from_raw_parts(pts2, pts2_count as usize * 3);
-    let center = std::slice::from_raw_parts(center, 3);
-    let normal = std::slice::from_raw_parts(normal, 3);
-    let to_points = |values: &[f64]| -> Vec<[f64; 3]> {
-        values
-            .chunks_exact(3)
-            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
-            .collect()
-    };
-
-    let Some(stats) = m3c2::compute_stats(
-        &to_points(pts1),
-        &to_points(pts2),
-        m3c2::M3c2Config {
-            skip_first1,
-            skip_first2,
-            center: [center[0], center[1], center[2]],
-            normal: [normal[0], normal[1], normal[2]],
-            cyl_radius2,
-            cyl_half_len,
-            min_points: min_points as usize,
-            reg_error,
-        },
-    ) else {
-        return false;
-    };
-
-    *out_stats = pdal_m3c2_stats_t {
-        distance: stats.distance,
-        uncertainty: stats.uncertainty,
-        significant: stats.significant,
-        std_dev1: stats.std_dev1,
-        std_dev2: stats.std_dev2,
-        n1: stats.n1,
-        n2: stats.n2,
-    };
-    true
 }
 
 /// Create a voxel center nearest neighbor filter stage.
@@ -2120,44 +1259,6 @@ pub unsafe extern "C" fn pdal_stage_create_divider(
         size_mode_enum,
         size,
         vec_evals,
-    ));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a chipper filter stage.
-#[no_mangle]
-pub extern "C" fn pdal_stage_create_chipper(capacity: u64) -> *mut StageWrapper {
-    let filter = Box::new(ChipperFilter::new(capacity));
-    Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Create a Lloyd K-means filter stage.
-///
-/// # Safety
-///
-/// `dims` must be a valid pointer to a C-array of C-strings of length `dim_count`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_lloydkmeans(
-    k: u64,
-    maxiters: u64,
-    dims: *const *const c_char,
-    dim_count: u64,
-) -> *mut StageWrapper {
-    if dims.is_null() {
-        return std::ptr::null_mut();
-    }
-    let mut dimensions = Vec::new();
-    for i in 0..dim_count {
-        let ptr = *dims.offset(i as isize);
-        if ptr.is_null() {
-            return std::ptr::null_mut();
-        }
-        dimensions.push(dim_id_from_name(&CStr::from_ptr(ptr).to_string_lossy()));
-    }
-    let filter = Box::new(LloydKMeansFilter::new(
-        k as usize,
-        dimensions,
-        maxiters as usize,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::collections::BTreeMap;
 
@@ -39,7 +39,7 @@ impl Filter for GroupByFilter {
 }
 
 impl Streamable for GroupByFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 

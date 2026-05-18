@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct LabelDuplicatesFilter {
@@ -56,7 +56,7 @@ impl Filter for LabelDuplicatesFilter {
 }
 
 impl Streamable for LabelDuplicatesFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 

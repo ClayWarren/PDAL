@@ -37,5 +37,5 @@ pub trait Streamable {
     fn reset(&mut self) {}
 
     /// Decide whether to keep the next point. Returns `true` to keep it.
-    fn process_one(&mut self, view: &mut PointView, idx: crate::point::PointId) -> bool;
+    fn process_one(&mut self) -> bool;
 }

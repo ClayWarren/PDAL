@@ -57,6 +57,8 @@ private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
     void filter(PointView& view) override;
+
+    void setMiniball(PointView& view, const PointId& i);
 };
 
 } // namespace pdal

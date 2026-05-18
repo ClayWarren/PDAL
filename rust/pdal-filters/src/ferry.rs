@@ -1,6 +1,6 @@
 //! FerryFilter: Copy data from one dimension to another.
 
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct FerryFilter {
@@ -57,7 +57,7 @@ impl Filter for FerryFilter {
 }
 
 impl Streamable for FerryFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         // FerryFilter processes/modifies points inline rather than keeping/dropping,
         // so its streaming behavior is driven via the FFI pdal_stage_ferry_point.
         false

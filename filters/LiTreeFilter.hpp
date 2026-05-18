@@ -49,6 +49,7 @@ public:
     std::string getName() const override;
 
 private:
+    std::vector<int> m_localMax;
     point_count_t m_minSize;
     double m_minHag;
     double m_dummyRadius;
@@ -57,6 +58,15 @@ private:
     void addDimensions(PointLayoutPtr layout) override;
     void prepared(PointTableRef table) override;
     void filter(PointView& view) override;
+
+    PointId locateHighestPoint(PointView& view, PointIdList const& Ui);
+    PointId locateDummyPoint(PointView& view, PointIdList const& Ui,
+                             PointId t0);
+    void segmentTree(PointView& view, PointIdList& Ui, int64_t& tree_id,
+                     PointId t0);
+    void classifyPoint(PointId ui, PointView& view, PointIdList& Ni,
+                       PointIdList& Pi);
+    void computeLocalMax(PointView& view);
 };
 
 } // namespace pdal

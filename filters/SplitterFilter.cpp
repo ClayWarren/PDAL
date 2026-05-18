@@ -34,10 +34,6 @@
 
 #include "SplitterFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
-
-#include <pdal_capi.h>
-
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -136,20 +132,36 @@ void SplitterFilter::setOrigin(double xOrigin, double yOrigin)
 
 PointViewSet SplitterFilter::run(PointViewPtr inView)
 {
+    PointViewSet viewSet;
+    auto addPoint = [this, &inView](PointRef& point, int xpos, int ypos)
+    {
+        Coord loc(xpos, ypos);
+        PointViewPtr& outView = m_viewMap[loc];
+        if (!outView)
+            outView = inView->makeNew();
+        outView->appendPoint(*inView.get(), point.pointId());
+    };
+
+    // Use the location of the first point as the origin, unless specified.
+    // (!= test == isnan(), which doesn't exist on windows)
     if (m_xOrigin != m_xOrigin)
         setOrigin(inView->getFieldAs<double>(Dimension::Id::X, 0), m_yOrigin);
     if (m_yOrigin != m_yOrigin)
         setOrigin(m_xOrigin, inView->getFieldAs<double>(Dimension::Id::Y, 0));
+    // Overlay a grid of squares on the points (m_length sides).  Each square
+    // corresponds to a new point buffer.  Place the points falling in the
+    // each square in the corresponding point buffer.
+    PointRef point(*inView, 0);
+    for (PointId idx = 0; idx < inView->size(); idx++)
+    {
+        point.setPointId(idx);
+        processPoint(point, addPoint);
+    }
 
-    pdal_stage_t* stage =
-        pdal_stage_create_splitter(m_length, m_xOrigin, m_yOrigin, m_buffer);
-    if (!stage)
-        throwError("Failed to create Rust splitter stage.");
-
-    uint64_t maxOutputs = std::max<uint64_t>(1, inView->size() * 4);
-    PointViewSet viewSet =
-        rust_view_converter::runMulti(stage, inView, maxOutputs);
-    pdal_stage_destroy(stage);
+    // Pull the buffers out of the map and stick them in the standard
+    // output set.
+    for (auto bi = m_viewMap.begin(); bi != m_viewMap.end(); ++bi)
+        viewSet.insert(bi->second);
     return viewSet;
 }
 

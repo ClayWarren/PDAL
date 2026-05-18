@@ -41,9 +41,6 @@
 #include <memory>
 #include <string>
 
-struct pdal_stage;
-typedef struct pdal_stage pdal_stage_t;
-
 namespace pdal
 {
 
@@ -59,7 +56,6 @@ class PDAL_EXPORT HagDemFilter : public Filter, public Streamable
 {
 public:
     HagDemFilter();
-    ~HagDemFilter() override;
     HagDemFilter& operator=(const HagDemFilter&) = delete;
     HagDemFilter(const HagDemFilter&) = delete;
 
@@ -68,7 +64,6 @@ public:
 private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
-    void initialize() override;
     void prepared(PointTableRef table) override;
     void ready(PointTableRef table) override;
     void filter(PointView& view) override;
@@ -83,9 +78,6 @@ private:
     double m_noDataHeight;
     double m_bandNoData;
     uint8_t m_class;
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

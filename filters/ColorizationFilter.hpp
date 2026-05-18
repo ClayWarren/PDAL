@@ -39,11 +39,6 @@
 
 #include <map>
 
-extern "C" {
-struct pdal_stage;
-typedef struct pdal_stage pdal_stage_t;
-}
-
 namespace pdal
 {
 
@@ -96,9 +91,6 @@ private:
     std::vector<BandInfo> m_bands;
 
     std::unique_ptr<gdal::Raster> m_raster;
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

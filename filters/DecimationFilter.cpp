@@ -104,7 +104,7 @@ PointViewSet DecimationFilter::run(PointViewPtr inView)
 bool DecimationFilter::processOne(PointRef& point)
 {
     if (m_rust_stage)
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        return pdal_stage_process_one(m_rust_stage);
     return false;
 }
 

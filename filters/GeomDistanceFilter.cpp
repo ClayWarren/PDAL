@@ -45,9 +45,6 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include <nlohmann/json.hpp>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -70,11 +67,7 @@ struct GeomDistanceArgs
 
 GeomDistanceFilter::GeomDistanceFilter() : m_args(new GeomDistanceArgs) {}
 
-GeomDistanceFilter::~GeomDistanceFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+GeomDistanceFilter::~GeomDistanceFilter() {}
 
 std::string GeomDistanceFilter::getName() const
 {
@@ -106,6 +99,11 @@ void GeomDistanceFilter::addArgs(ProgramArgs& args)
 
 void GeomDistanceFilter::prepared(PointTableRef table)
 {
+    const PointLayoutPtr layout(table.layout());
+    m_args->m_dim = layout->findDim(m_args->m_dimName);
+    if (m_args->m_dim == Dimension::Id::Unknown)
+        throwError("Missing dimension with name '" + m_args->m_dimName +
+                   "'in input PointView.");
 }
 
 void GeomDistanceFilter::ready(PointTableRef table)
@@ -118,37 +116,30 @@ void GeomDistanceFilter::ready(PointTableRef table)
 
     if (!m_args->m_geometry.getOGRHandle())
         throwError("Candidate polygon in filters.geomdistance was NULL!");
-
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-    
-    m_rust_stage = pdal_stage_create_geomdistance(
-        m_args->m_geometry.wkt().c_str(),
-        m_args->m_dimName.c_str());
-    
-    if (!m_rust_stage)
-    {
-        std::string err = pdal_last_error();
-        if (!err.empty())
-            throwError(err);
-    }
 }
 
 void GeomDistanceFilter::filter(PointView& view)
 {
-    if (m_rust_stage)
+    PointRef point = view.point(0);
+    for (PointId idx = 0; idx < view.size(); ++idx)
     {
-        rust_view_converter::runInPlace(m_rust_stage, view);
+        point.setPointId(idx);
+        processOne(point);
     }
 }
 
 bool GeomDistanceFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
-    {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
-    }
-    return false;
+    static std::vector<double> data;
+
+    double x = point.getFieldAs<double>(Dimension::Id::X);
+    double y = point.getFieldAs<double>(Dimension::Id::Y);
+    double z = point.getFieldAs<double>(Dimension::Id::Z);
+
+    double distance = m_args->m_geometry.distance(x, y, z);
+    point.setField(m_args->m_dim, distance);
+
+    return true;
 }
 
 } // namespace pdal

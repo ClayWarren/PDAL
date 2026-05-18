@@ -39,9 +39,6 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include <array>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -130,11 +127,7 @@ ColorizationFilter::BandInfo parseDim(const std::string& dim,
 
 ColorizationFilter::ColorizationFilter() {}
 
-ColorizationFilter::~ColorizationFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+ColorizationFilter::~ColorizationFilter() {}
 
 void ColorizationFilter::addArgs(ProgramArgs& args)
 {
@@ -173,27 +166,6 @@ void ColorizationFilter::initialize()
             throwError(msg);
         }
     }
-
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-
-    std::vector<pdal_band_info_t> bands;
-    for (auto const& b : m_bands)
-    {
-        bands.push_back({b.m_name.c_str(), b.m_band, b.m_scale});
-    }
-
-    m_rust_stage = pdal_stage_create_colorization(
-        m_rasterFilename.c_str(),
-        bands.data(),
-        bands.size());
-    
-    if (!m_rust_stage)
-    {
-        std::string err = pdal_last_error();
-        if (!err.empty())
-            throwError(err);
-    }
 }
 
 void ColorizationFilter::addDimensions(PointLayoutPtr layout)
@@ -204,24 +176,57 @@ void ColorizationFilter::addDimensions(PointLayoutPtr layout)
 
 void ColorizationFilter::ready(PointTableRef table)
 {
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
+    using namespace gdal;
+
+    m_raster.reset(new gdal::Raster(m_rasterFilename));
+
+    GDALError error = m_raster->open();
+    if (error != GDALError::None)
+    {
+        if (error == GDALError::NoTransform ||
+            error == GDALError::NotInvertible)
+        {
+            log()->get(LogLevel::Warning)
+                << getName() << ": " << m_raster->errorMsg() << '\n';
+        }
+        else
+        {
+            throwError(m_raster->errorMsg());
+        }
+    }
 }
 
 bool ColorizationFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
+    static std::vector<double> data;
+    static std::array<double, 2> pix;
+
+    double x = point.getFieldAs<double>(Dimension::Id::X);
+    double y = point.getFieldAs<double>(Dimension::Id::Y);
+
+    if (m_raster->read(x, y, data, pix) == gdal::GDALError::None)
     {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        int i(0);
+        for (auto bi = m_bands.begin(); bi != m_bands.end(); ++bi)
+        {
+            BandInfo& b = *bi;
+            point.setField(b.m_dim, data[i] * b.m_scale);
+            ++i;
+        }
     }
-    return false;
+
+    // always return true to retain all points inside OR outside the raster. the
+    // output bands of any points outside the raster are ignored.
+    return true;
 }
 
 void ColorizationFilter::filter(PointView& view)
 {
-    if (m_rust_stage)
+    PointRef point = view.point(0);
+    for (PointId idx = 0; idx < view.size(); ++idx)
     {
-        rust_view_converter::runInPlace(m_rust_stage, view);
+        point.setPointId(idx);
+        processOne(point);
     }
 }
 

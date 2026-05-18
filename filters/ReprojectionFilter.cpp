@@ -37,9 +37,8 @@
 #include <pdal/PointView.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal_capi.h>
 
-#include "private/RustViewConverter.hpp"
+// #include <memory>
 
 namespace pdal
 {
@@ -58,11 +57,7 @@ std::string ReprojectionFilter::getName() const
 
 ReprojectionFilter::ReprojectionFilter() : m_inferInputSRS(true) {}
 
-ReprojectionFilter::~ReprojectionFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+ReprojectionFilter::~ReprojectionFilter() {}
 
 void ReprojectionFilter::addArgs(ProgramArgs& args)
 {
@@ -85,53 +80,134 @@ void ReprojectionFilter::initialize()
 {
     m_inferInputSRS = m_inSRS.empty();
     setSpatialReference(m_outSRS);
-
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-
-    m_rust_stage = pdal_stage_create_reprojection(
-        m_outSRS.getWKT().c_str(),
-        m_inSRS.empty() ? nullptr : m_inSRS.getWKT().c_str(),
-        m_errorOnFailure);
-}
-
-void ReprojectionFilter::ready(PointTableRef table)
-{
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
 }
 
 void ReprojectionFilter::spatialReferenceChanged(const SpatialReference& srs)
 {
+    createTransform(srs);
 }
 
 void ReprojectionFilter::prepared(PointTableRef table)
 {
+
+    // convert string args to integers and throw if
+    // we can't
+    auto convert = [](const std::vector<std::string>& in)
+    {
+        std::vector<int> output;
+        for (auto& str : in)
+        {
+            try
+            {
+                output.push_back(std::stoi(str));
+            }
+            catch (std::invalid_argument&)
+            {
+                throw pdal_error("Unable to convert axis ordering to integer");
+            }
+        }
+        return output;
+    };
+
+    // Check that the sorted vector is 1,2 or 1,2,3
+    auto check = [this](const std::vector<int>& in)
+    {
+        auto test = in;
+        std::sort(test.begin(), test.end());
+        if (test.size() > 3)
+            throwError("Axis ordering vector is too long");
+        if (test.at(0) != 1 && test.at(1) != 2)
+            throwError("Axis ordering is invalid");
+        if (test.size() > 2)
+            if (test.at(2) != 3)
+                throwError("Axis ordering for 3rd dimension is invalid");
+    };
+
+    if (m_inAxisOrderingArg.size())
+    {
+        m_inAxisOrdering = convert(m_inAxisOrderingArg);
+        check(m_inAxisOrdering);
+    }
+
+    if (m_outAxisOrderingArg.size())
+    {
+        m_outAxisOrdering = convert(m_outAxisOrderingArg);
+        check(m_outAxisOrdering);
+    }
 }
 
 void ReprojectionFilter::createTransform(const SpatialReference& srsSRS)
 {
+    if (m_inferInputSRS)
+    {
+        m_inSRS = srsSRS;
+        if (m_inSRS.empty())
+            throwError("source data has no spatial reference and "
+                       "none is specified with the 'in_srs' option.");
+    }
+
+    // If either vector is empty, GDAL's default ordering is used.
+    if (m_inAxisOrdering.size() || m_outAxisOrdering.size())
+    {
+
+        m_transform.reset(new SrsTransform(m_inSRS, m_inAxisOrdering, m_outSRS,
+                                           m_outAxisOrdering));
+    }
+    else
+    {
+        m_transform.reset(new SrsTransform(m_inSRS, m_outSRS));
+    }
+
+    if (!pdal::Utils::compare_approx(m_inCoordEpochArg, 0.0f, 0.00f))
+    {
+        m_transform->setSrcEpoch(m_inCoordEpochArg);
+    }
+
+    if (!pdal::Utils::compare_approx(m_outCoordEpochArg, 0.0f, 0.00f))
+    {
+        m_transform->setDstEpoch(m_outCoordEpochArg);
+    }
 }
 
 PointViewSet ReprojectionFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
-    if (m_rust_stage)
+    PointViewPtr outView = view->makeNew();
+
+    createTransform(view->spatialReference());
+
+    PointRef point(*view, 0);
+    for (PointId id = 0; id < view->size(); ++id)
     {
-        pdal_point_view_set_spatial_reference((pdal_point_view_t*)view.get(), view->spatialReference().getWKT().c_str());
-        viewSet.insert(rust_view_converter::runSingle(m_rust_stage, view));
+        point.setPointId(id);
+        if (processOne(point))
+            outView->appendPoint(*view, id);
     }
+
+    viewSet.insert(outView);
     return viewSet;
 }
 
 bool ReprojectionFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
+    double x(point.getFieldAs<double>(Dimension::Id::X));
+    double y(point.getFieldAs<double>(Dimension::Id::Y));
+    double z(point.getFieldAs<double>(Dimension::Id::Z));
+
+    bool ok = m_transform->transform(x, y, z);
+    if (ok)
     {
-        pdal_point_view_set_spatial_reference((pdal_point_view_t*)point.view(), point.view()->spatialReference().getWKT().c_str());
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        point.setField(Dimension::Id::X, x);
+        point.setField(Dimension::Id::Y, y);
+        point.setField(Dimension::Id::Z, z);
     }
-    return false;
+    else if (m_errorOnFailure)
+        throwError(
+            "Couldn't reproject point with X/Y/Z coordinates of (" +
+            std::to_string(point.getFieldAs<double>(Dimension::Id::X)) + ", " +
+            std::to_string(point.getFieldAs<double>(Dimension::Id::Y)) + ", " +
+            std::to_string(point.getFieldAs<double>(Dimension::Id::Z)) + ").");
+    return ok;
 }
 
 } // namespace pdal

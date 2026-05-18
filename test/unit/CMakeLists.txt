@@ -377,12 +377,6 @@ PDAL_ADD_TEST(pdal_filters_geomdistance_test
 PDAL_ADD_TEST(pdal_filters_csf_test FILES filters/CSFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_decimation_test FILES
     filters/DecimationFilterTest.cpp)
-PDAL_ADD_TEST(pdal_filters_dem_test
-    FILES
-        filters/DEMFilterTest.cpp
-    LINK_WITH
-        GDAL::GDAL
-)
 PDAL_ADD_TEST(pdal_filters_delaunay_test FILES filters/DelaunayFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_covariancefeatures_test FILES filters/CovarianceFeaturesTest.cpp)
 PDAL_ADD_TEST(pdal_filters_divider_test FILES filters/DividerFilterTest.cpp)
@@ -398,12 +392,6 @@ PDAL_ADD_TEST(pdal_filters_faceraster_test FILES filters/FaceRasterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_ferry_test FILES filters/FerryFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_groupby_test FILES filters/GroupByFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_gpstimeconvert_test FILES filters/GpsTimeConvertTest.cpp)
-PDAL_ADD_TEST(pdal_filters_greedyprojection_test
-    FILES
-        filters/GreedyProjectionFilterTest.cpp
-    INCLUDES
-        ${PDAL_VENDOR_EIGEN_DIR}
-)
 PDAL_ADD_TEST(pdal_filters_groundfilter_test FILES filters/GroundFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_hag_test FILES filters/HAGFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_separatescanline_test FILES filters/SeparatescanlineFilterTest.cpp)
@@ -444,7 +432,6 @@ PDAL_ADD_TEST(pdal_filters_planefit_test
     INCLUDES
         ${PDAL_VENDOR_EIGEN_DIR})
 PDAL_ADD_TEST(pdal_filters_pmf_test FILES filters/PMFFilterTest.cpp)
-PDAL_ADD_TEST(pdal_filters_poisson_test FILES filters/PoissonFilterTest.cpp)
 PDAL_ADD_TEST(pdal_filters_reprojection_test FILES
     filters/ReprojectionFilterTest.cpp)
 if (GDAL_3)

@@ -33,10 +33,6 @@
 
 #include "ChipperFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
-
-#include <pdal_capi.h>
-
 #include <iostream>
 #include <limits>
 
@@ -92,15 +88,21 @@ void ChipperFilter::addArgs(ProgramArgs& args)
 
 PointViewSet ChipperFilter::run(PointViewPtr view)
 {
-    pdal_stage_t* stage = pdal_stage_create_chipper(m_threshold);
-    if (!stage)
-        throwError("Failed to create Rust chipper stage.");
 
-    uint64_t maxOutputs = view->size() + 1;
-    PointViewSet viewSet =
-        rust_view_converter::runMulti(stage, view, maxOutputs);
-    pdal_stage_destroy(stage);
-    return viewSet;
+    m_inView = view;
+    m_partitions.resize(0);
+    m_xvec.resize(0);
+    m_yvec.resize(0);
+    m_spare.resize(view->size());
+    m_outViews.clear();
+
+    m_xvec.reserve(view->size());
+    m_yvec.reserve(view->size());
+
+    load(*view.get(), m_xvec, m_yvec, m_spare);
+    partition(m_xvec.size());
+    decideSplit(m_xvec, m_yvec, m_spare, 0, m_partitions.size() - 1);
+    return m_outViews;
 }
 
 void ChipperFilter::load(PointView& view, ChipRefList& xvec, ChipRefList& yvec,

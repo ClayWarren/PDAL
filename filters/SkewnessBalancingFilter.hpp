@@ -54,6 +54,7 @@ private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
     void prepared(PointTableRef table) override;
+    void processGround(PointViewPtr view);
     PointViewSet run(PointViewPtr view) override;
 
     SkewnessBalancingFilter&

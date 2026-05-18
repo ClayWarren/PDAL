@@ -37,12 +37,9 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+#include <map>
 #include <memory>
 #include <string>
-#include <map>
-
-struct pdal_stage; // forward declaration for Rust stage
-typedef struct pdal_stage pdal_stage_t;
 
 namespace pdal
 {
@@ -59,20 +56,16 @@ public:
 
 private:
     std::unique_ptr<Args> m_args;
-    Dimension::Id m_dimId;
-    std::string m_dimName;
-    std::map<std::string, std::map<double, uint64_t>> m_stats;
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 
     void addArgs(ProgramArgs& args) override;
-    void initialize() override;
-    void ready(PointTableRef table) override;
     void prepared(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     void filter(PointView& view) override;
     void done(PointTableRef table) override;
+
+    Dimension::Id m_dimId;
+    std::string m_dimName;
+    std::map<std::string, std::map<double, point_count_t>> m_stats;
 
     void extractMetadata(PointTableRef table);
     ExpressionStatsFilter& operator=(const ExpressionStatsFilter&) = delete;

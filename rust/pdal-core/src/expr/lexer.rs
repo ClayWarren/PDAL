@@ -217,7 +217,8 @@ impl Lexer {
             let c = self.get_char();
             if !(c.is_ascii_alphanumeric() || c == b'_') {
                 self.put_char();
-                let sval = String::from_utf8_lossy(&self.buf[self.tok_pos..self.pos]).into_owned();
+                let sval =
+                    String::from_utf8_lossy(&self.buf[self.tok_pos..self.pos]).into_owned();
                 return Token::new(TokenType::Identifier, self.tok_pos, self.pos, sval, 0.0);
             }
         }
@@ -257,21 +258,8 @@ mod tests {
         assert_eq!(
             kinds("X >= 0 || Y <= 10 && !(Z != 1)"),
             vec![
-                Identifier,
-                GreaterEqual,
-                Number,
-                Or,
-                Identifier,
-                LessEqual,
-                Number,
-                And,
-                Not,
-                Lparen,
-                Identifier,
-                NotEqual,
-                Number,
-                Rparen,
-                Eof,
+                Identifier, GreaterEqual, Number, Or, Identifier, LessEqual, Number, And,
+                Not, Lparen, Identifier, NotEqual, Number, Rparen, Eof,
             ]
         );
     }
@@ -281,7 +269,9 @@ mod tests {
         use TokenType::*;
         assert_eq!(
             kinds("Intensity * 2 + 1 / 3 - 4"),
-            vec![Identifier, Asterisk, Number, Plus, Number, Slash, Number, Dash, Number, Eof,]
+            vec![
+                Identifier, Asterisk, Number, Plus, Number, Slash, Number, Dash, Number, Eof,
+            ]
         );
     }
 
@@ -305,24 +295,13 @@ mod tests {
 
     #[test]
     fn stray_character_is_an_error() {
-        assert_eq!(
-            kinds("X @ Y"),
-            vec![TokenType::Identifier, TokenType::Error]
-        );
+        assert_eq!(kinds("X @ Y"), vec![TokenType::Identifier, TokenType::Error]);
     }
 
     #[test]
     fn double_dash_is_rejected() {
         // A single dash lexes; consecutive dashes are disallowed by PDAL.
-        assert_eq!(
-            kinds("1 - 2"),
-            vec![
-                TokenType::Number,
-                TokenType::Dash,
-                TokenType::Number,
-                TokenType::Eof
-            ]
-        );
+        assert_eq!(kinds("1 - 2"), vec![TokenType::Number, TokenType::Dash, TokenType::Number, TokenType::Eof]);
         assert_eq!(kinds("1 -- 2"), vec![TokenType::Number, TokenType::Error]);
     }
 

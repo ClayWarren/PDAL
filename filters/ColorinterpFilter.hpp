@@ -40,11 +40,6 @@
 
 #include <map>
 
-extern "C" {
-struct pdal_stage;
-typedef struct pdal_stage pdal_stage_t;
-}
-
 namespace pdal
 {
 
@@ -67,7 +62,6 @@ public:
           m_madMultiplier(1.4862)
     {
     }
-    ~ColorinterpFilter() override;
     ColorinterpFilter& operator=(const ColorinterpFilter&) = delete;
     ColorinterpFilter(const ColorinterpFilter&) = delete;
     std::string getName() const override;
@@ -97,9 +91,6 @@ private:
     double m_stdDevThreshold;
     bool m_useMAD;
     double m_madMultiplier;
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

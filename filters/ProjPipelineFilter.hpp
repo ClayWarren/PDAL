@@ -39,9 +39,6 @@
 
 #include <memory>
 
-struct pdal_stage;
-typedef struct pdal_stage pdal_stage_t;
-
 class OGRCoordinateTransformation;
 
 namespace pdal
@@ -63,7 +60,6 @@ private:
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
-    void ready(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
     bool processOne(PointRef& point) override;
 
@@ -73,9 +69,6 @@ private:
     bool m_reverseTransfo;
     std::string m_coordOperation;
     std::unique_ptr<CoordTransform> m_coordTransform;
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 class ProjPipelineFilter::CoordTransform

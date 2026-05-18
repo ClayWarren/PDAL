@@ -34,9 +34,9 @@
 
 #include "StraightenFilter.hpp"
 #include "private/straighten/Polyline.hpp"
+#include "private/straighten/Utils.hpp"
 
 #include <pdal/pdal_internal.hpp>
-#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -95,19 +95,20 @@ bool StraightenFilter::processOne(PointRef& point)
         m_args->m_polyline.interpolate(point, segmentX, segmentY, segmentZ,
                                        segmentM, segmentAzimuth, segmentOffset);
 
-        double out[3];
-        const bool ok = pdal_straighten_transform_point(
-            true, point.getFieldAs<double>(Dimension::Id::X),
-            point.getFieldAs<double>(Dimension::Id::Y),
-            point.getFieldAs<double>(Dimension::Id::Z), segmentX, segmentY,
-            segmentZ, segmentM, segmentAzimuth, segmentOffset, m_args->m_offset,
-            out);
-        if (!ok)
-            throwError("Failed to run Rust straighten transform.");
+        const Eigen::Vector3d straight(
+            0.0, point.getFieldAs<double>(Dimension::Id::Y),
+            point.getFieldAs<double>(Dimension::Id::Z));
 
-        point.setField(Dimension::Id::X, out[0]);
-        point.setField(Dimension::Id::Y, out[1]);
-        point.setField(Dimension::Id::Z, out[2]);
+        Eigen::Affine3d t;
+        straighten::Utils::getTransformation(segmentX, segmentY, segmentZ,
+                                             segmentM, 0.0,
+                                             M_PI_2 - segmentAzimuth, t);
+
+        const Eigen::Vector3d world = t * straight;
+
+        point.setField(Dimension::Id::X, world.x());
+        point.setField(Dimension::Id::Y, world.y());
+        point.setField(Dimension::Id::Z, world.z());
         return true;
     }
     else
@@ -117,19 +118,22 @@ bool StraightenFilter::processOne(PointRef& point)
                 point, segmentX, segmentY, segmentZ, segmentM, segmentAzimuth,
                 segmentOffset) >= 0.0)
         {
-            double out[3];
-            const bool ok = pdal_straighten_transform_point(
-                false, point.getFieldAs<double>(Dimension::Id::X),
+            const Eigen::Vector3d world(
+                point.getFieldAs<double>(Dimension::Id::X),
                 point.getFieldAs<double>(Dimension::Id::Y),
-                point.getFieldAs<double>(Dimension::Id::Z), segmentX, segmentY,
-                segmentZ, segmentM, segmentAzimuth, segmentOffset,
-                m_args->m_offset, out);
-            if (!ok)
-                throwError("Failed to run Rust straighten transform.");
+                point.getFieldAs<double>(Dimension::Id::Z));
 
-            point.setField(Dimension::Id::X, out[0]);
-            point.setField(Dimension::Id::Y, out[1]);
-            point.setField(Dimension::Id::Z, out[2]);
+            Eigen::Affine3d t;
+            straighten::Utils::getTransformation(segmentX, segmentY, segmentZ,
+                                                 segmentM, 0.0,
+                                                 M_PI_2 - segmentAzimuth, t);
+
+            const Eigen::Vector3d straight = t.inverse() * world;
+
+            point.setField(Dimension::Id::X,
+                           straight.x() + segmentOffset + m_args->m_offset);
+            point.setField(Dimension::Id::Y, straight.y());
+            point.setField(Dimension::Id::Z, straight.z());
             return true;
         }
     }

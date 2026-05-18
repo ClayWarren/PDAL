@@ -32,30 +32,24 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include "MongoExpressionFilter.hpp"
-
 #include <nlohmann/json.hpp>
 
-#include <pdal/PointView.hpp>
-#include <pdal/util/ProgramArgs.hpp>
+#include "MongoExpressionFilter.hpp"
 
 #include "private/mongoexpression/Expression.hpp"
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
 
-static StaticPluginInfo const s_info{
-    "filters.mongoexpression", "Filter points using a MongoDB-style query.",
-    "https://pdal.org/stages/filters.mongoexpression.html"};
+static const StaticPluginInfo s_info{
+    "filters.mongo", "Pass only points that pass a logic filter.",
+    "https://pdal.org/stages/filters.mongo.html"};
 
-CREATE_STATIC_STAGE(MongoExpressionFilter, s_info)
+CREATE_STATIC_STAGE(MongoExpressionFilter, s_info);
 
 struct MongoExpressionFilter::Args
 {
-    std::string m_expression;
+    NL::json m_json;
 };
 
 struct MongoExpressionFilter::Private
@@ -63,74 +57,56 @@ struct MongoExpressionFilter::Private
     Expression m_expression;
 };
 
-MongoExpressionFilter::MongoExpressionFilter()
-    : m_args(new Args()), m_p(new Private())
-{
-}
-
-MongoExpressionFilter::~MongoExpressionFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
-
 std::string MongoExpressionFilter::getName() const
 {
     return s_info.name;
 }
 
+MongoExpressionFilter::MongoExpressionFilter()
+    : m_args(new Args()), m_p(new Private())
+{
+}
+
+MongoExpressionFilter::~MongoExpressionFilter() {}
+
 void MongoExpressionFilter::addArgs(ProgramArgs& args)
 {
-    args.add("expression", "Expression to evaluate", m_args->m_expression)
+    args.add("expression", "Logical query expression", m_args->m_json)
         .setPositional();
-}
-
-void MongoExpressionFilter::initialize()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-    m_rust_stage = pdal_stage_create_mongoexpression(m_args->m_expression.c_str());
-    if (!m_rust_stage)
-    {
-        std::string err = pdal_last_error();
-        if (!err.empty())
-            throwError(err);
-    }
-}
-
-void MongoExpressionFilter::ready(PointTableRef table)
-{
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
 }
 
 void MongoExpressionFilter::prepared(PointTableRef table)
 {
-    try
-    {
-        m_p->m_expression = Expression(table.layout(), NL::json::parse(m_args->m_expression));
-    }
-    catch (const std::exception& e)
-    {
-        throwError(std::string("Error parsing expression: ") + e.what());
-    }
+    log()->get(LogLevel::Debug)
+        << "Building expression from: " << m_args->m_json << '\n';
+
+    m_p->m_expression = Expression(table.layout(), m_args->m_json);
+
+    log()->get(LogLevel::Debug)
+        << "Built expression: " << m_p->m_expression << '\n';
 }
 
 PointViewSet MongoExpressionFilter::run(PointViewPtr inView)
 {
-    PointViewSet viewSet;
-    if (m_rust_stage)
+    PointViewSet views;
+    PointViewPtr view(inView->makeNew());
+
+    for (PointId i(0); i < inView->size(); ++i)
     {
-        viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
+        PointRef pr(inView->point(i));
+        if (processOne(pr))
+        {
+            view->appendPoint(*inView, i);
+        }
     }
-    return viewSet;
+
+    views.insert(view);
+    return views;
 }
-bool MongoExpressionFilter::processOne(PointRef& point)
+
+bool MongoExpressionFilter::processOne(PointRef& pr)
 {
-    if (m_rust_stage)
-    {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
-    }
-    return false;
+    return m_p->m_expression.check(pr);
 }
+
 } // namespace pdal

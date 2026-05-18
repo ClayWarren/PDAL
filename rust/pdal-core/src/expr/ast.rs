@@ -53,7 +53,10 @@ impl EvalValue {
 
     /// A boolean result.
     pub fn boolean(b: bool) -> Self {
-        EvalValue { dval: 0.0, bval: b }
+        EvalValue {
+            dval: 0.0,
+            bval: b,
+        }
     }
 }
 
@@ -535,7 +538,10 @@ impl Node for VarNode {
     }
     fn prepare(&mut self, layout: &PointLayout) -> Result<(), String> {
         if layout.dim(&self.id).is_none() {
-            return Err(format!("Unknown dimension '{}' in assignment.", self.name));
+            return Err(format!(
+                "Unknown dimension '{}' in assignment.",
+                self.name
+            ));
         }
         Ok(())
     }

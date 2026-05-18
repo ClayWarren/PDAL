@@ -41,9 +41,6 @@
 #include <memory>
 #include <string>
 
-struct pdal_stage;
-typedef struct pdal_stage pdal_stage_t;
-
 namespace pdal
 {
 
@@ -69,7 +66,6 @@ private:
     std::unique_ptr<DEMArgs> m_args;
     std::unique_ptr<gdal::Raster> m_raster;
 
-    void initialize() override;
     void ready(PointTableRef table) override;
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
@@ -79,9 +75,6 @@ private:
 
     DEMFilter& operator=(const DEMFilter&); // not implemented
     DEMFilter(const DEMFilter&);            // not implemented
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

@@ -64,7 +64,7 @@ impl Filter for HagNnFilter {
                 z0
             } else {
                 interpolate_ground(view, &neighbors, self.max_distance * self.max_distance, z0)
-                    .unwrap_or(if nearest_dist == 0.0 { z } else { z0 })
+                    .unwrap_or_else(|| if nearest_dist == 0.0 { z } else { z0 })
             };
             output.set_f64(idx, &DimId::HeightAboveGround, z0 - ground_z);
         }
@@ -78,7 +78,7 @@ impl Filter for HagNnFilter {
 }
 
 impl Streamable for HagNnFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 }

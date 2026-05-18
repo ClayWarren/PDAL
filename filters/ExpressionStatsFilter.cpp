@@ -37,9 +37,6 @@
 #include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 #include <cctype>
 #include <limits>
@@ -66,49 +63,25 @@ std::string ExpressionStatsFilter::getName() const
 struct ExpressionStatsFilter::Args
 {
     std::vector<expr::ConditionalExpression> m_expressions;
+    std::string m_dimName;
+    Arg* m_whereArg;
 };
 
 ExpressionStatsFilter::ExpressionStatsFilter() : m_args(new Args) {}
 
-ExpressionStatsFilter::~ExpressionStatsFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+ExpressionStatsFilter::~ExpressionStatsFilter() {}
 
 void ExpressionStatsFilter::addArgs(ProgramArgs& args)
 {
-    args.add("expressions",
-             "Conditional expressions describing points "
-             "to be passed to this filter",
-             m_args->m_expressions)
-        .setPositional();
+    m_args->m_whereArg = &args.add("expressions",
+                                   "Conditional expressions describing points "
+                                   "to be passed to this filter",
+                                   m_args->m_expressions)
+                              .setPositional();
     args.add("dimension",
              "Dimension on which apply expression to calculate statistics",
              m_dimName)
         .setPositional();
-}
-
-void ExpressionStatsFilter::initialize()
-{
-    std::vector<std::string> exprs;
-    for (auto const& e : m_args->m_expressions)
-        exprs.push_back(e.print());
-
-    std::vector<const char*> sources;
-    for (auto const& s : exprs)
-        sources.push_back(s.c_str());
-
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-
-    m_rust_stage = pdal_stage_create_expressionstats(m_dimName.c_str(), sources.data(), sources.size());
-}
-
-void ExpressionStatsFilter::ready(PointTableRef table)
-{
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
 }
 
 void ExpressionStatsFilter::prepared(PointTableRef table)
@@ -137,11 +110,16 @@ void ExpressionStatsFilter::prepared(PointTableRef table)
 
 bool ExpressionStatsFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
+    double value = point.getFieldAs<double>(m_dimId);
+
+    for (const auto& expr : m_args->m_expressions)
     {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
+        bool status = expr.eval(point);
+        auto& stat = m_stats[expr.print()];
+        if (status)
+            stat[value]++;
     }
-    return false;
+    return true;
 }
 
 void ExpressionStatsFilter::filter(PointView& view)
@@ -176,11 +154,12 @@ void ExpressionStatsFilter::extractMetadata(PointTableRef table)
 
         for (auto& bin : bin_map)
         {
+
             auto& value = bin.first;
             auto& count = bin.second;
 
             MetadataNode n = t.addList("bins");
-            n.add("count", (uint64_t)count);
+            n.add("count", count);
             n.add("value", value);
         }
 

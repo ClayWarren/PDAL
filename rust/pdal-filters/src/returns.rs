@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 const RETURN_FIRST: u32 = 1;
@@ -83,7 +83,7 @@ impl Filter for ReturnsFilter {
 }
 
 impl Streamable for ReturnsFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 

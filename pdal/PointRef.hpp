@@ -230,11 +230,6 @@ public:
         return m_view ? m_viewIdx : m_idx;
     }
 
-    PointView* view() const
-    {
-        return m_view;
-    }
-
     inline void getField(char* val, Dimension::Id d,
                          Dimension::Type type) const;
     inline void setField(Dimension::Id dim, Dimension::Type type,

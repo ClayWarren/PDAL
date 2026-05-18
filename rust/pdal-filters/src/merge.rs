@@ -1,4 +1,4 @@
-use pdal_core::point::{PointId, PointView};
+use pdal_core::point::PointView;
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::cell::RefCell;
 
@@ -59,7 +59,7 @@ impl Filter for MergeFilter {
 }
 
 impl Streamable for MergeFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         true
     }
 

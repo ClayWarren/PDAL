@@ -292,7 +292,8 @@ mod tests {
             (DimId::X, 4.0),
             (DimId::Z, 0.0),
         ]);
-        let mut stmt = AssignStatement::parse("Z = X * 2 WHERE Classification == 2").unwrap();
+        let mut stmt =
+            AssignStatement::parse("Z = X * 2 WHERE Classification == 2").unwrap();
         stmt.prepare(view.layout().as_ref()).unwrap();
 
         assert_eq!(stmt.ident().dim(), Some(DimId::Z));

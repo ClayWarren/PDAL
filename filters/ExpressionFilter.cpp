@@ -37,9 +37,6 @@
 #include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
-#include <pdal_capi.h>
-
-#include "private/RustViewConverter.hpp"
 
 #include <cctype>
 #include <limits>
@@ -51,7 +48,7 @@ namespace pdal
 {
 
 static StaticPluginInfo const s_info{
-    "filters.expression", "Filter points satisfy a conditional expression.",
+    "filters.expression", "Pass only points given an expression",
     "https://pdal.org/stages/filters.expression.html"};
 
 CREATE_STATIC_STAGE(ExpressionFilter, s_info)
@@ -64,50 +61,22 @@ std::string ExpressionFilter::getName() const
 struct ExpressionFilter::Args
 {
     std::vector<expr::ConditionalExpression> m_expressions;
+    Arg* m_whereArg;
 };
 
 ExpressionFilter::ExpressionFilter() : m_args(new Args) {}
 
-ExpressionFilter::~ExpressionFilter()
-{
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-}
+ExpressionFilter::~ExpressionFilter() {}
 
 void ExpressionFilter::addArgs(ProgramArgs& args)
 {
-    args.add("expression", "Conditional expression describing points to keep",
-             m_args->m_expressions)
-        .setPositional();
+    m_args->m_whereArg = &args.add("expression",
+                                   "Conditional expression describing points "
+                                   "to be passed to this filter",
+                                   m_args->m_expressions)
+                              .setPositional();
+
     args.addSynonym("expression", "limits");
-}
-
-void ExpressionFilter::initialize()
-{
-    std::vector<std::string> exprs;
-    for (auto const& e : m_args->m_expressions)
-        exprs.push_back(e.print());
-
-    std::vector<const char*> sources;
-    for (auto const& s : exprs)
-        sources.push_back(s.c_str());
-
-    if (m_rust_stage)
-        pdal_stage_destroy(m_rust_stage);
-
-    m_rust_stage = pdal_stage_create_expression(sources.data(), sources.size());
-    if (!m_rust_stage)
-    {
-        std::string err = pdal_last_error();
-        if (!err.empty())
-            throwError(err);
-    }
-}
-
-void ExpressionFilter::ready(PointTableRef table)
-{
-    if (m_rust_stage)
-        pdal_stage_reset(m_rust_stage);
 }
 
 void ExpressionFilter::prepared(PointTableRef table)
@@ -116,34 +85,60 @@ void ExpressionFilter::prepared(PointTableRef table)
     {
         if (!expression.valid())
         {
-            Utils::StatusWithReason status = expression.prepare(table.layout());
-            if (!status)
-                throwError(status.what());
+            std::stringstream oss;
+            oss << "The expression '" << expression << "' is invalid";
+            throwError(oss.str());
         }
+
+        auto status = expression.prepare(table.layout());
+        if (!status)
+            throwError(status.what());
     }
 }
 
 bool ExpressionFilter::processOne(PointRef& point)
 {
-    if (m_rust_stage)
-    {
-        return pdal_stage_process_one(m_rust_stage, (pdal_point_view_t*)point.view(), point.pointId());
-    }
-    return false;
+    if (m_args->m_expressions.size() != 1)
+        throwError(
+            "Streaming of expressions only works with a single expression");
+
+    bool status = m_args->m_expressions[0].eval(point);
+    return status;
 }
 
 PointViewSet ExpressionFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-    if (m_rust_stage)
+    if (!inView->size())
+        return viewSet;
+
+    // make a view for each one of our expressions
+
+    std::vector<PointViewPtr> views;
+    for (expr::ConditionalExpression& expr : m_args->m_expressions)
     {
-        pdal_point_view_t* outputs[100];
-        uint64_t num_outputs = pdal_stage_run_multi(m_rust_stage, (pdal_point_view_t*)inView.get(), outputs, 100);
-        for (uint64_t i = 0; i < num_outputs; ++i)
+        PointViewPtr outView = inView->makeNew();
+        views.push_back(outView);
+    }
+
+    // eval our expression across each point for each view.
+    // TODO: make this threaded
+    for (PointRef point : *inView)
+    {
+        for (size_t i = 0; i < views.size(); i++)
         {
-            viewSet.insert(PointViewPtr((PointView*)outputs[i]));
+            auto& view = views[i];
+            auto& expr = m_args->m_expressions[i];
+
+            bool status = expr.eval(point);
+            if (status)
+                view->appendPoint(*inView.get(), point.pointId());
         }
     }
+
+    for (auto& v : views)
+        viewSet.insert(v);
+
     return viewSet;
 }
 

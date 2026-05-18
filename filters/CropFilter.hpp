@@ -41,9 +41,6 @@
 #include <pdal/Polygon.hpp>
 #include <pdal/Streamable.hpp>
 
-struct pdal_stage; // forward declaration for Rust stage
-typedef struct pdal_stage pdal_stage_t;
-
 namespace pdal
 {
 
@@ -101,9 +98,6 @@ private:
 
     CropFilter& operator=(const CropFilter&); // not implemented
     CropFilter(const CropFilter&);            // not implemented
-
-    // Rust stage instance
-    pdal_stage_t* m_rust_stage = nullptr;
 };
 
 } // namespace pdal

@@ -39,12 +39,15 @@
 
 #include "MiniballFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
-
+#include <pdal/KDIndex.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal_capi.h>
 
+#include "private/miniball/Seb.h"
+
+#include <cmath>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace pdal
 {
@@ -76,12 +79,73 @@ void MiniballFilter::addDimensions(PointLayoutPtr layout)
 
 void MiniballFilter::filter(PointView& view)
 {
-    pdal_stage_t* stage = pdal_stage_create_miniball(m_knn);
-    if (!stage)
-        throwError("Failed to create Rust miniball stage.");
+    point_count_t npoints = view.size();
+    point_count_t chunk_size = npoints / m_threads;
+    if (npoints % m_threads)
+        chunk_size++;
+    std::vector<std::thread> threadList(m_threads);
 
-    rust_view_converter::runInPlace(stage, view);
-    pdal_stage_destroy(stage);
+    for (int t = 0; t < m_threads; t++)
+    {
+        threadList[t] = std::thread(
+            [&](const PointId start, const PointId end)
+            {
+                for (PointId i = start; i < end; i++)
+                    setMiniball(view, i);
+            },
+            t * chunk_size,
+            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size);
+    }
+
+    for (auto& t : threadList)
+        t.join();
+}
+
+void MiniballFilter::setMiniball(PointView& view, const PointId& i)
+{
+    typedef double FT;
+    typedef Seb::Point<FT> Point;
+    typedef std::vector<Point> PointVector;
+    typedef Seb::Smallest_enclosing_ball<FT> Miniball;
+
+    double X = view.getFieldAs<double>(Dimension::Id::X, i);
+    double Y = view.getFieldAs<double>(Dimension::Id::Y, i);
+    double Z = view.getFieldAs<double>(Dimension::Id::Z, i);
+
+    // Find k-nearest neighbors of i.
+    const KD3Index& kdi = view.build3dIndex();
+    PointIdList ni = kdi.neighbors(i, m_knn + 1);
+
+    PointVector S;
+    std::vector<double> coords(3);
+    for (PointId const& j : ni)
+    {
+        if (j == i)
+            continue;
+        coords[0] = view.getFieldAs<double>(Dimension::Id::X, j);
+        coords[1] = view.getFieldAs<double>(Dimension::Id::Y, j);
+        coords[2] = view.getFieldAs<double>(Dimension::Id::Z, j);
+        S.push_back(Point(3, coords.begin()));
+    }
+
+    // add neighbors to Miniball mb(3, S)
+    Miniball mb(3, S);
+
+    // obtain radius r = mb.radius();
+    FT radius = mb.radius();
+
+    // obtain center = mb.center_begin()
+    Miniball::Coordinate_iterator center_it = mb.center_begin();
+    double x = center_it[0];
+    double y = center_it[1];
+    double z = center_it[2];
+
+    // compute distance d from p to center
+    double d =
+        std::sqrt((X - x) * (X - x) + (Y - y) * (Y - y) + (Z - z) * (Z - z));
+
+    double miniball = d / (d + 2 * radius / (std::sqrt(3)));
+    view.setField(Id::Miniball, i, miniball);
 }
 
 } // namespace pdal

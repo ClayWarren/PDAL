@@ -1,6 +1,6 @@
 //! RandomizeFilter: Randomize points in a view.
 
-use pdal_core::point::{PointId, PointView};
+use pdal_core::point::PointView;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 struct Lcg {
@@ -95,7 +95,7 @@ impl Filter for RandomizeFilter {
 }
 
 impl Streamable for RandomizeFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         // Shuffling points is inherently batch-only and not streamable
         false
     }

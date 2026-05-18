@@ -43,16 +43,20 @@
 
 #include "NormalFilter.hpp"
 #include "private/Point.hpp"
-#include "private/RustViewConverter.hpp"
 
+#include <pdal/KDIndex.hpp>
+#include <pdal/private/MathUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal_capi.h>
+
+#include <Eigen/Dense>
 
 #include <string>
+#include <vector>
 
 namespace pdal
 {
 
+using namespace Eigen;
 using namespace Dimension;
 
 static StaticPluginInfo const s_info{
@@ -70,7 +74,7 @@ struct NormalArgs
     bool m_refine;
 };
 
-NormalFilter::NormalFilter() : m_args(new NormalArgs) {}
+NormalFilter::NormalFilter() : m_args(new NormalArgs), m_count(0) {}
 
 NormalFilter::~NormalFilter() {}
 
@@ -133,17 +137,167 @@ void NormalFilter::prepared(PointTableRef table)
     }
 }
 
+void NormalFilter::compute(PointView& view, KD3Index& kdi)
+{
+    log()->get(LogLevel::Debug) << "Computing normal vectors\n";
+    for (auto&& p : view)
+    {
+        math::NormalResult result;
+
+        // Perform eigen decomposition of covariance matrix computed from
+        // neighborhood composed of k-nearest neighbors, or within radius.
+        if (m_radiusArg->set())
+            result = math::findNormal(
+                view, kdi.radius(p.pointId(), m_args->m_radius));
+        else
+            result = math::findNormal(
+                view, kdi.neighbors(p.pointId(), m_args->m_knn));
+
+        if (result.normal.isZero())
+        {
+            log()->get(LogLevel::Info) << "Skipping point " << p.pointId()
+                                       << ": " << result.msg << "\n";
+            continue;
+        }
+
+        if (m_viewpointArg->set())
+        {
+            // If a viewpoint has been specified, orient the normals to face the
+            // viewpoint by taking the dot product of the vector connecting the
+            // point with the viewpoint and the normal. Flip the normal, where
+            // the dot product is negative.
+            double dx = m_args->m_viewpoint.x() - p.getFieldAs<double>(Id::X);
+            double dy = m_args->m_viewpoint.y() - p.getFieldAs<double>(Id::Y);
+            double dz = m_args->m_viewpoint.z() - p.getFieldAs<double>(Id::Z);
+            result.normal =
+                math::orientToViewpoint({dx, dy, dz}, result.normal);
+        }
+        else if (m_args->m_up)
+            result.normal = math::orientUp(result.normal);
+
+        // Set the computed normal and curvature dimensions.
+        p.setField(Id::NormalX, result.normal[0]);
+        p.setField(Id::NormalY, result.normal[1]);
+        p.setField(Id::NormalZ, result.normal[2]);
+        p.setField(Id::Curvature, result.curvature);
+    }
+}
+
+void NormalFilter::update(
+    PointView& view, KD3Index& kdi, std::vector<bool> inMST,
+    std::priority_queue<Edge, EdgeList, CompareEdgeWeight> edge_queue,
+    PointId updateIdx)
+{
+    // Add the current PointId to the minimum spanning tree.
+    inMST[updateIdx] = true;
+    ++m_count;
+
+    // Consider neighbors of the newly added PointId, adding them to
+    // the edge queue if they are not already part of the minimum
+    // spanning tree. The first neighbor is the query point which is
+    // already part of the minimum spanning tree and can safely be
+    // skipped.
+    PointIdList neighbors;
+    if (m_radiusArg->set())
+        neighbors = kdi.radius(updateIdx, m_args->m_radius);
+    else
+        neighbors = kdi.neighbors(updateIdx, m_args->m_knn);
+
+    neighbors.erase(neighbors.begin());
+    PointRef p = view.point(updateIdx);
+    Vector3d N0(p.getFieldAs<double>(Id::NormalX),
+                p.getFieldAs<double>(Id::NormalY),
+                p.getFieldAs<double>(Id::NormalZ));
+    for (PointId const& neighborIdx : neighbors)
+    {
+        if (!inMST[neighborIdx])
+        {
+            PointRef q = view.point(neighborIdx);
+            Vector3d N1(q.getFieldAs<double>(Id::NormalX),
+                        q.getFieldAs<double>(Id::NormalY),
+                        q.getFieldAs<double>(Id::NormalZ));
+            double weight = 1.0 - std::fabs(N0.dot(N1));
+            edge_queue.emplace(updateIdx, neighborIdx, weight);
+        }
+    }
+}
+
+void NormalFilter::refine(PointView& view, KD3Index& kdi)
+{
+    log()->get(LogLevel::Debug)
+        << "Refining normals using minimum spanning tree\n";
+
+    std::priority_queue<Edge, EdgeList, CompareEdgeWeight> edge_queue;
+    std::vector<bool> inMST(view.size(), false);
+    PointId nextIdx(0);
+    while (m_count < view.size())
+    {
+        // Find the PointId of the next point not currently part of the minimum
+        // spanning tree.
+        while (inMST[nextIdx])
+            ++nextIdx;
+
+        update(view, kdi, inMST, edge_queue, nextIdx);
+
+        // Iterate on the edge queue until empty (or all points have been added
+        // to the minimum spanning tree).
+        while (!edge_queue.empty() && (m_count < view.size()))
+        {
+            // Retrieve the edge with the smallest weight.
+            Edge edge(edge_queue.top());
+            edge_queue.pop();
+
+            // Record the PointId and normal of the PointId (if one exists)
+            // that is not already in the minimum spanning tree.
+            PointId newIdx(0);
+            Vector3d normal;
+            PointRef p = view.point(edge.m_v0);
+            Vector3d N0(p.getFieldAs<double>(Id::NormalX),
+                        p.getFieldAs<double>(Id::NormalY),
+                        p.getFieldAs<double>(Id::NormalZ));
+            PointRef q = view.point(edge.m_v1);
+            Vector3d N1(q.getFieldAs<double>(Id::NormalX),
+                        q.getFieldAs<double>(Id::NormalY),
+                        q.getFieldAs<double>(Id::NormalZ));
+            if (!inMST[edge.m_v0])
+            {
+                newIdx = edge.m_v0;
+                normal = N0;
+            }
+            else if (!inMST[edge.m_v1])
+            {
+                newIdx = edge.m_v1;
+                normal = N1;
+            }
+            else
+                continue;
+
+            // Where the dot product of the normals is less than 0, invert the
+            // normal of the selected PointId.
+            if (N0.dot(N1) < 0)
+            {
+                normal *= -1;
+                view.setField(Id::NormalX, newIdx, normal(0));
+                view.setField(Id::NormalY, newIdx, normal(1));
+                view.setField(Id::NormalZ, newIdx, normal(2));
+            }
+
+            update(view, kdi, inMST, edge_queue, newIdx);
+        }
+    }
+}
+
 void NormalFilter::filter(PointView& view)
 {
-    pdal_stage_t* stage = pdal_stage_create_normal(
-        m_args->m_knn, m_radiusArg->set(), m_args->m_radius, m_args->m_up,
-        m_viewpointArg->set(), m_args->m_viewpoint.x(), m_args->m_viewpoint.y(),
-        m_args->m_viewpoint.z(), m_args->m_refine);
-    if (!stage)
-        throwError("Failed to create Rust normal stage.");
+    KD3Index& kdi = view.build3dIndex();
 
-    rust_view_converter::runInPlace(stage, view);
-    pdal_stage_destroy(stage);
+    // Compute the normal/curvature and optionally orient toward viewpoint or
+    // positive Z.
+    compute(view, kdi);
+
+    // If requested, refine normals through minimum spanning tree propagation.
+    if (m_args->m_refine)
+        refine(view, kdi);
 }
 
 } // namespace pdal

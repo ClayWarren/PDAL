@@ -38,7 +38,7 @@ impl Filter for ReciprocityFilter {
 }
 
 impl Streamable for ReciprocityFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 }

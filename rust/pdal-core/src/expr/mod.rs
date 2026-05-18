@@ -10,10 +10,10 @@
 pub mod ast;
 pub mod expression;
 pub mod lexer;
-pub mod mongo;
 pub mod parser;
 pub mod token;
 
-pub use expression::{AssignStatement, ConditionalExpression, IdentExpression, MathExpression};
-pub use mongo::MongoExpression;
+pub use expression::{
+    AssignStatement, ConditionalExpression, IdentExpression, MathExpression,
+};
 pub use parser::{parse_conditional, parse_math};

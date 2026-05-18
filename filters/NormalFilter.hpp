@@ -37,6 +37,7 @@
 #include <pdal/Filter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+#include <memory>
 #include <string>
 
 namespace pdal
@@ -46,6 +47,28 @@ class Options;
 class PointLayout;
 class PointView;
 struct NormalArgs;
+
+struct Edge
+{
+    PointId m_v0;
+    PointId m_v1;
+    double m_weight;
+
+    Edge(PointId i, PointId j, double weight)
+        : m_v0(i), m_v1(j), m_weight(weight)
+    {
+    }
+};
+
+struct CompareEdgeWeight
+{
+    bool operator()(Edge const& lhs, Edge const& rhs)
+    {
+        return lhs.m_weight > rhs.m_weight;
+    }
+};
+
+typedef std::vector<Edge> EdgeList;
 
 class PDAL_EXPORT NormalFilter : public Filter
 {
@@ -62,9 +85,17 @@ public:
 
 private:
     std::unique_ptr<NormalArgs> m_args;
+    point_count_t m_count;
     Arg* m_viewpointArg;
     Arg* m_radiusArg;
     Arg* m_knnArg;
+
+    void compute(PointView& view, KD3Index& kdi);
+    void refine(PointView& view, KD3Index& kdi);
+    void
+    update(PointView& view, KD3Index& kdi, std::vector<bool> inMST,
+           std::priority_queue<Edge, EdgeList, CompareEdgeWeight> edge_queue,
+           PointId updateIdx);
 
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;

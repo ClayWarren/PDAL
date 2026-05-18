@@ -34,6 +34,8 @@
 
 #pragma once
 
+#include <thread>
+
 #include <pdal/Filter.hpp>
 
 namespace pdal
@@ -72,6 +74,9 @@ private:
     void addArgs(ProgramArgs& args) override;
     void filter(PointView& view) override;
     void prepared(PointTableRef table) override;
+
+    void setDimensionality(PointView& view, const PointId& id,
+                           const KD3Index& kid);
 
     friend std::istream& operator>>(std::istream& in,
                                     CovarianceFeaturesFilter::Mode& mode);

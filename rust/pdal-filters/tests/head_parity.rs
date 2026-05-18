@@ -58,10 +58,9 @@ fn test_head_stream_no_invert() {
     let mut filter = HeadFilter::new(4, false);
     filter.reset();
 
-    let mut view = make_ramp_view(10);
     let mut kept = Vec::new();
     for i in 1..=10 {
-        if filter.process_one(&mut view, i - 1) {
+        if filter.process_one() {
             kept.push(i);
         }
     }
@@ -73,10 +72,9 @@ fn test_head_stream_invert() {
     let mut filter = HeadFilter::new(4, true);
     filter.reset();
 
-    let mut view = make_ramp_view(10);
     let mut kept = Vec::new();
     for i in 1..=10 {
-        if filter.process_one(&mut view, i - 1) {
+        if filter.process_one() {
             kept.push(i);
         }
     }

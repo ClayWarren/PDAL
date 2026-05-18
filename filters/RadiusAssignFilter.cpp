@@ -1,11 +1,8 @@
 #include "RadiusAssignFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
-
 #include <pdal/PipelineManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 
@@ -180,40 +177,33 @@ void RadiusAssignFilter::filter(PointView& view)
 {
     PointRef pointTemp(view, 0);
 
-    auto makeLimits = [&view](std::vector<DimRange>& ranges)
+    // Create reference domain view
+    refView = view.makeNew();
+    if (m_referenceDomain.empty())
+        for (PointId id = 0; id < view.size(); ++id)
+            refView->appendPoint(view, id);
+    else
     {
-        std::vector<std::string> names;
-        std::vector<pdal_range_limit_t> limits;
-        names.reserve(ranges.size());
-        limits.reserve(ranges.size());
-        for (DimRange& range : ranges)
+        for (PointId id = 0; id < view.size(); ++id)
         {
-            names.push_back(view.layout()->dimName(range.m_id));
-            limits.push_back({names.back().c_str(), range.m_lower_bound,
-                              range.m_upper_bound,
-                              range.m_inclusive_lower_bound,
-                              range.m_inclusive_upper_bound, range.m_negate});
+            for (DimRange& r : m_referenceDomain)
+            {
+                pointTemp.setPointId(id);
+                if (r.valuePasses(pointTemp.getFieldAs<double>(r.m_id)))
+                {
+                    refView->appendPoint(view, id);
+                    break;
+                }
+            }
         }
-        return std::make_pair(std::move(names), std::move(limits));
-    };
+    }
 
-    auto src = makeLimits(m_srcDomain);
-    auto reference = makeLimits(m_referenceDomain);
-    pdal_point_view_t* rustView = rust_view_converter::toRust(view);
-    uint64_t updateCount = 0;
-    uint64_t* updates = pdal_radiusassign_get_update_indices(
-        rustView, src.second.data(), src.second.size(), reference.second.data(),
-        reference.second.size(), m_radius, m_search3d, m_max2dAbove,
-        m_max2dBelow, &updateCount);
-    pdal_point_view_destroy(rustView);
-    if (!updates && updateCount != 0)
-        rust_view_converter::throwLastError(
-            "Rust radiusassign selection failed.");
-
-    m_ptsToUpdate.clear();
-    if (updates)
-        m_ptsToUpdate.assign(updates, updates + updateCount);
-    pdal_free_u64_array(updates, updateCount);
+    // Process all points (mark them if they need to be updated)
+    for (PointId id = 0; id < view.size(); ++id)
+    {
+        pointTemp.setPointId(id);
+        doOne(pointTemp);
+    }
 
     for (auto id : m_ptsToUpdate)
     {

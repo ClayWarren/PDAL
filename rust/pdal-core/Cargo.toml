@@ -4,12 +4,3 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Minimal PDAL core (point model, stages, options) -- Rust port spike."
-
-[dependencies]
-gdal-sys = { version = "0.12", features = ["bindgen"] }
-# gdal = { version = "0.19", features = ["bindgen"] }
-geos = "11.1"
-h3o = "0.9"
-proj = "0.31"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"

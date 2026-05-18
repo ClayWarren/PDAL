@@ -1,4 +1,4 @@
-use pdal_core::point::{PointId, PointView};
+use pdal_core::point::PointView;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,7 +110,7 @@ impl Filter for DividerFilter {
 }
 
 impl Streamable for DividerFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+    fn process_one(&mut self) -> bool {
         false
     }
 
