@@ -384,6 +384,14 @@ Current status:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pts_regression -- --ignored`
   and
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ptx_regression -- --ignored`.
+- Local I/O performance comparison is available as an ignored, reporting-only
+  harness with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`.
+  Set `PDAL_RUST_PERF_ITERS=<n>` to change the per-case iteration count. This
+  is for regression visibility, not a hard performance gate. Current results
+  compare installed `pdal pipeline` process execution against in-process Rust
+  pipeline execution, so use them to catch large regressions and guide followup
+  investigation rather than to claim end-user CLI speedups.
 - The next I/O target should still be local and deterministic. Avoid binary,
   compression-backed, GDAL-backed, LAS/LAZ, or remote reader/writer work.
 
