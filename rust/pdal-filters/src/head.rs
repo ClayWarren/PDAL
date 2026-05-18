@@ -51,7 +51,7 @@ impl Filter for HeadFilter {
 }
 
 impl Streamable for HeadFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
         let mut keep = false;
         if self.index < self.count {
             keep = true;

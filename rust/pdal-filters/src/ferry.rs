@@ -57,7 +57,7 @@ impl Filter for FerryFilter {
 }
 
 impl Streamable for FerryFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
         // FerryFilter processes/modifies points inline rather than keeping/dropping,
         // so its streaming behavior is driven via the FFI pdal_stage_ferry_point.
         false

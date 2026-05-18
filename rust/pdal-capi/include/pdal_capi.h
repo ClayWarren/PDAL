@@ -99,6 +99,7 @@ bool pdal_stage_range_point_passes(pdal_stage_t* stage, pdal_point_view_t* view,
 void pdal_stage_destroy(pdal_stage_t* stage);
 void pdal_stage_reset(pdal_stage_t* stage);
 bool pdal_stage_process_one(pdal_stage_t* stage);
+bool pdal_stage_process_one_at(pdal_stage_t* stage, const pdal_point_view_t* view, uint64_t idx);
 pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage, pdal_point_view_t* input);
 uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input, pdal_point_view_t** outputs, uint64_t max_outputs);
 

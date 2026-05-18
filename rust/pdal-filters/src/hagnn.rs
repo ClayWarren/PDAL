@@ -78,7 +78,7 @@ impl Filter for HagNnFilter {
 }
 
 impl Streamable for HagNnFilter {
-    fn process_one(&mut self) -> bool {
+    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
         false
     }
 }

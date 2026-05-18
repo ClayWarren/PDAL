@@ -58,5 +58,8 @@ fn test_tail_stream() {
     let mut filter = TailFilter::new(4, false);
     filter.reset();
     // Streamable::process_one should always return false for TailFilter as it does not stream
-    assert!(!filter.process_one());
+    let scratch = pdal_core::point::PointView::new(std::rc::Rc::new(
+        pdal_core::point::PointLayout::new(),
+    ));
+    assert!(!filter.process_one(&scratch, 0));
 }

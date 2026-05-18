@@ -1,6 +1,6 @@
 //! Stage traits -- the Rust analog of PDAL's `Stage` / `Filter` / `Streamable`.
 
-use crate::point::PointView;
+use crate::point::{PointId, PointView};
 
 /// An error raised while constructing or running a stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,13 +29,14 @@ pub trait Filter {
 }
 
 /// A stage that can also process points one at a time (PDAL's `Streamable`).
-///
-/// The implementer keeps its own running point counter, exactly as PDAL's
-/// streaming stages do; `reset` clears it before a run.
 pub trait Streamable {
     /// Reset streaming state before a run (PDAL's `ready`).
     fn reset(&mut self) {}
 
-    /// Decide whether to keep the next point. Returns `true` to keep it.
-    fn process_one(&mut self) -> bool;
+    /// Decide whether to keep point `idx` of `view`; `true` keeps it.
+    ///
+    /// Mirrors PDAL's `Streamable::processOne(PointRef&)`: the point is always
+    /// passed. Counter-based filters (decimation, head, tail) ignore it, just
+    /// as `DecimationFilter::processOne` ignores its `PointRef&` in C++.
+    fn process_one(&mut self, view: &PointView, idx: PointId) -> bool;
 }

@@ -109,10 +109,14 @@ fn stream_step10_offset10_limit90() {
     let mut filter = DecimationFilter::new(&opts);
     filter.reset();
 
+    // Decimation streams on a counter; the point is ignored.
+    let scratch = pdal_core::point::PointView::new(std::rc::Rc::new(
+        pdal_core::point::PointLayout::new(),
+    ));
     let mut kept_count = 0u32;
     let mut kept_indices: Vec<u64> = Vec::new();
     for i in 0u64..100 {
-        if filter.process_one() {
+        if filter.process_one(&scratch, i) {
             kept_count += 1;
             kept_indices.push(i);
         }
@@ -136,9 +140,13 @@ fn stream_fpstep_step2_6_offset10_limit90() {
     let mut filter = DecimationFilter::new(&opts);
     filter.reset();
 
+    // Decimation streams on a counter; the point is ignored.
+    let scratch = pdal_core::point::PointView::new(std::rc::Rc::new(
+        pdal_core::point::PointLayout::new(),
+    ));
     let mut kept: Vec<u64> = Vec::new();
     for i in 0u64..100 {
-        if filter.process_one() {
+        if filter.process_one(&scratch, i) {
             kept.push(i);
         }
     }

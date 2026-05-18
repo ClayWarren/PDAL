@@ -885,15 +885,15 @@ pub struct StageWrapper {
 }
 
 trait FilterWrapper {
-    fn process_one(&mut self) -> bool;
+    fn process_one(&mut self, view: &PointView, idx: u64) -> bool;
     fn reset(&mut self);
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T: Filter + Streamable> FilterWrapper for T {
-    fn process_one(&mut self) -> bool {
-        Streamable::process_one(self)
+    fn process_one(&mut self, view: &PointView, idx: u64) -> bool {
+        Streamable::process_one(self, view, idx)
     }
     fn reset(&mut self) {
         Streamable::reset(self)
@@ -1141,9 +1141,42 @@ pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> boo
     ffi_catch(false, || {
         clear_last_error();
         if let Some(stage) = stage.as_mut() {
-            stage.filter.process_one()
+            // Counter-based filters (decimation, head, tail) ignore the point;
+            // pass an empty view. Data-dependent filters must instead stream
+            // through `pdal_stage_process_one_at`.
+            let empty = PointView::new(std::rc::Rc::new(PointLayout::new()));
+            stage.filter.process_one(&empty, 0)
         } else {
             set_last_error("null stage");
+            false
+        }
+    })
+}
+
+/// Decide whether to keep point `idx` of `view` in streaming mode, passing the
+/// point so the filter can inspect its data.
+///
+/// This is the faithful streaming entry point, mirroring PDAL's
+/// `Streamable::processOne(PointRef&)`. Use it for any filter whose streaming
+/// decision depends on point values (e.g. `filters.expression`).
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+/// `view` must be a valid pointer returned by `pdal_point_view_create` or
+/// `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_process_one_at(
+    stage: *mut StageWrapper,
+    view: *const PointView,
+    idx: u64,
+) -> bool {
+    ffi_catch(false, || {
+        clear_last_error();
+        if let (Some(stage), Some(view)) = (stage.as_mut(), view.as_ref()) {
+            stage.filter.process_one(view, idx)
+        } else {
+            set_last_error("null stage or view");
             false
         }
     })
