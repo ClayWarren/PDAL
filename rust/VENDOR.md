@@ -11,6 +11,26 @@ into Rust crates as a way to make progress. Treat it as one of three things:
 This file exists so agents do not have to infer the vendor plan from scattered
 includes.
 
+## When To Touch Vendor Compatibility
+
+Vendor compatibility is not a standalone milestone. Work on it only when the
+current Rust milestone reaches a user-visible behavior that depends on a
+vendored or external library boundary.
+
+- During filter work, make a vendor decision only for the filter family being
+  ported, such as linear algebra, H3, GDAL/PROJ/SRS, GEOS geometry, or a
+  private reconstruction/segmentation algorithm.
+- During I/O work, make a vendor decision only when the selected reader/writer
+  needs it, such as LAS/LAZ compression, LEPCC, remote/object-store access, or
+  JSON schema validation.
+- During app/kernel work, use only vendor decisions already proven by the
+  lower-layer pipeline, reader, writer, and stage parity tests.
+
+Every vendor decision must name the stage, reader, writer, or core behavior it
+unlocks. It should also name the parity gate that will compare Rust behavior to
+the existing C++ implementation. Do not create broad compatibility crates or
+copy vendor source just to reduce the apparent amount of remaining work.
+
 ## Current Mapping
 
 | Vendor path | Current C++ role | Rust-port stance |

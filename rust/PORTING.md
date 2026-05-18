@@ -178,6 +178,25 @@ Apps/tools work is allowed when it directly supports a command-readiness gate:
 Do not mark apps/tools complete because the LOC is small. They close only when
 their underlying command or format strategy has parity coverage.
 
+Vendor compatibility work is allowed only when a concrete Rust port reaches the
+stage, reader, writer, or core behavior that depends on that vendor boundary:
+
+- Linear algebra choices happen with broader linear/statistical filters, behind
+  shared Rust math APIs, not by porting `vendor/eigen`.
+- GDAL/PROJ/GEOS choices happen with SRS, raster/vector, geometry, crop,
+  overlay, reprojection, DEM, and related filters or readers.
+- LASzip/lazperf and other compression choices happen when the I/O milestone
+  reaches LAS/LAZ or another compressed binary format.
+- Remote/object-store compatibility happens only after local deterministic I/O
+  and pipeline execution are stable.
+- JSON-schema compatibility happens when Rust owns pipeline JSON validation.
+- Private algorithm vendors such as Kazhdan are decided per stage: port to
+  Rust, bind through explicit FFI, or leave the C++ stage in place.
+
+Do not start a broad `vendor/` compatibility pass. Each vendor decision should
+name the user-visible stage or core behavior it unlocks, cite the parity test
+that will hold it honest, and follow `rust/VENDOR.md`.
+
 ## Checkpoint Roadmap
 
 Treat these as ordered checkpoints on the way to a complete Rust-backed PDAL.
