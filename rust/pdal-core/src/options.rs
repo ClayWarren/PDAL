@@ -65,3 +65,59 @@ impl Options {
             .unwrap_or(default)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typed_getters_parse_text_and_fall_back_to_defaults() {
+        let mut options = Options::new();
+        options
+            .add("float", " 12.5 ")
+            .add("uint", "42")
+            .add("bad_float", "nope")
+            .add("bad_uint", "-1")
+            .add("text", "value");
+
+        assert!(options.has("float"));
+        assert!(!options.has("missing"));
+        assert_eq!(options.get_f64("float", 0.0), 12.5);
+        assert_eq!(options.get_f64("bad_float", 9.0), 9.0);
+        assert_eq!(options.get_u64("uint", 0), 42);
+        assert_eq!(options.get_u64("bad_uint", 9), 9);
+        assert_eq!(options.get_str("text", "fallback"), "value");
+        assert_eq!(options.get_str("missing", "fallback"), "fallback");
+    }
+
+    #[test]
+    fn bool_getter_accepts_pdal_style_boolean_spellings() {
+        let truthy = ["true", "TRUE", "1", "yes", "on"];
+        let falsy = ["false", "FALSE", "0", "no", "off"];
+
+        for value in truthy {
+            let mut options = Options::new();
+            options.add("flag", value);
+            assert!(options.get_bool("flag", false));
+        }
+
+        for value in falsy {
+            let mut options = Options::new();
+            options.add("flag", value);
+            assert!(!options.get_bool("flag", true));
+        }
+
+        let mut options = Options::new();
+        options.add("flag", "not-bool");
+        assert!(options.get_bool("flag", true));
+        assert!(!options.get_bool("missing", false));
+    }
+
+    #[test]
+    fn adding_same_key_replaces_previous_value() {
+        let mut options = Options::new();
+        options.add("count", "1").add("count", "2");
+
+        assert_eq!(options.get_u64("count", 0), 2);
+    }
+}

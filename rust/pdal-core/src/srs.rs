@@ -82,3 +82,39 @@ impl SrsTransform {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metadata::MetadataValue;
+
+    #[test]
+    fn empty_spatial_reference_matches_pdal_empty_contract() {
+        let srs = SpatialReference::default();
+
+        assert!(srs.is_empty());
+        assert_eq!(srs.wkt(), "");
+        assert_eq!(srs.epoch(), 0.0);
+    }
+
+    #[test]
+    fn spatial_reference_metadata_includes_epoch_only_when_set() {
+        let srs = SpatialReference::new("EPSG:4326");
+        let metadata = srs.to_metadata();
+
+        assert_eq!(metadata.name(), "srs");
+        assert_eq!(
+            metadata.find_child("wkt").and_then(|node| node.value()),
+            Some(&MetadataValue::String("EPSG:4326".into()))
+        );
+        assert!(metadata.find_child("epoch").is_none());
+
+        let srs = SpatialReference::with_epoch("EPSG:4326", 2020.5);
+        let metadata = srs.to_metadata();
+
+        assert_eq!(
+            metadata.find_child("epoch").and_then(|node| node.value()),
+            Some(&MetadataValue::F64(2020.5))
+        );
+    }
+}

@@ -208,4 +208,35 @@ mod tests {
             Some("new".into())
         );
     }
+
+    #[test]
+    fn typed_values_convert_like_pdal_metadata_scalars() {
+        assert_eq!(MetadataValue::String("42".into()).as_i64(), 42);
+        assert_eq!(MetadataValue::String("42".into()).as_u64(), 42);
+        assert_eq!(MetadataValue::String("2.5".into()).as_f64(), 2.5);
+        assert!(MetadataValue::String("true".into()).as_bool());
+        assert!(MetadataValue::String("1".into()).as_bool());
+        assert!(!MetadataValue::String("false".into()).as_bool());
+
+        assert_eq!(MetadataValue::I64(-7).as_string(), "-7");
+        assert_eq!(MetadataValue::U64(7).as_i64(), 7);
+        assert_eq!(MetadataValue::F64(3.9).as_u64(), 3);
+        assert_eq!(MetadataValue::Bool(true).as_f64(), 1.0);
+        assert_eq!(MetadataValue::Bool(false).as_i64(), 0);
+    }
+
+    #[test]
+    fn node_preserves_type_name_description_and_child_order() {
+        let mut root = MetadataNode::new("root");
+        let first = root.add_value("first", MetadataValue::String("one".into()));
+        first.set_type_name("string");
+        first.set_description("first child");
+        root.add_value("second", MetadataValue::U64(2));
+
+        assert_eq!(root.child_count(), 2);
+        assert_eq!(root.children()[0].name(), "first");
+        assert_eq!(root.children()[0].type_name(), Some("string"));
+        assert_eq!(root.children()[0].description(), Some("first child"));
+        assert_eq!(root.children()[1].name(), "second");
+    }
 }
