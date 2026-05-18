@@ -42,6 +42,45 @@ The migration order is intentionally vertical-slice driven: build only the
 core pieces needed by the next stage family, prove parity through the C ABI,
 then move outward. A broad rewrite by directory is not the plan.
 
+## Target Rust Layout
+
+The Rust tree is not intended to be a 1:1 mirror of the C++ source tree. C++
+directories are migration source areas and behavioral references; Rust crates
+are organized around contracts that should remain stable as the implementation
+changes.
+
+Current target crates:
+
+- `pdal-core`: point model, dimensions, metadata, options, pipeline, SRS,
+  spatial/geometry helpers, and shared stage traits.
+- `pdal-capi`: stable C ABI. This is the real cross-language contract.
+- `pdal-filters`: first-party filters.
+- `pdal-io`: first-party readers and writers. Placeholder until the I/O
+  vertical slice begins.
+- `pdal-kernels`: CLI subcommands. Placeholder and intentionally last.
+- `pdal-cli`: thin executable surface.
+- `pdal-plugins`: future plugin SDK placeholder. Do not use until a versioned
+  plugin boundary is designed.
+
+What should stay 1:1 with C++:
+
+- Stage names such as `filters.decimation`.
+- User-visible options, metadata, dimensions, and error behavior.
+- Test inputs and expected outputs.
+- C ABI symbols where C++ wrappers already call Rust.
+
+What should not be 1:1 with C++:
+
+- Header/source file split.
+- Class inheritance shape.
+- Historical private helper boundaries.
+- Optional plugin layout.
+- Directory names when Rust module families are clearer.
+
+Do not fill placeholder crates with broad skeleton code. Add modules only when
+starting a real milestone, and include the parity tests or C++ behavior link
+that justifies the module.
+
 ## Migration Order
 
 Follow this order unless the plan is deliberately revised:
@@ -220,6 +259,8 @@ Current Rust core primitives:
 - Point model: `PointLayout`, `PointView`, dimension IDs/types, source index
   tracking, and per-view spatial reference storage.
 - Stage model: filter and streamable traits for Rust-backed stages.
+- Pipeline model: minimal reader/filter/writer DAG execution, tags,
+  dependencies, metadata aggregation, and error propagation.
 - Options: string-keyed typed getters matching PDAL's option flow.
 - Expressions: conditional/math/assignment parser and evaluator used by the
   Rust-backed expression/assign work.
@@ -230,6 +271,21 @@ Current Rust core primitives:
   through `filters/private/RustMetadata.hpp`; ownership stays explicit on both
   sides of the C ABI.
 - Spatial reference: text plus coordinate epoch, with metadata export.
+
+Recent stabilization checkpoint:
+
+- `pdal-capi` was split into ABI-focused modules. `lib.rs` is now only the
+  module root and C ABI smoke tests.
+- `pdal-core::pipeline` was split into graph execution, traits/adapters, and
+  tests.
+- Rust core guard tests now cover pipeline tag/dependency/error behavior,
+  point source-index and typed-storage behavior, metadata/options/SRS scalar
+  behavior, and spatial/geometry wrapper behavior.
+- This was a stabilization pass, not a new broad porting phase. Do not keep
+  adding incidental tests here unless they protect a behavior needed by the
+  next concrete porting milestone.
+- Latest validation for this checkpoint: Rust workspace tests passed and the
+  full `pdal_filters_*` CTest slice passed.
 
 Current deliberate gaps:
 

@@ -1,6 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["pdal-core", "pdal-filters", "pdal-capi", "pdal-cli"]
+members = [
+    "pdal-core",
+    "pdal-capi",
+    "pdal-filters",
+    "pdal-io",
+    "pdal-kernels",
+    "pdal-cli",
+    "pdal-plugins",
+]
 default-members = ["pdal-core", "pdal-filters", "pdal-capi"]
 
 [workspace.package]

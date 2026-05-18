@@ -429,6 +429,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdal-io"
+version = "0.0.0"
+dependencies = [
+ "pdal-core",
+]
+
+[[package]]
+name = "pdal-kernels"
+version = "0.0.0"
+dependencies = [
+ "pdal-core",
+]
+
+[[package]]
+name = "pdal-plugins"
+version = "0.0.0"
+dependencies = [
+ "pdal-core",
+]
+
+[[package]]
 name = "pkg-config"
 version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
