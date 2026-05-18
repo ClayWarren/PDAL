@@ -12,6 +12,40 @@ tests remain the behavioral contract while the Rust implementation grows.
 - Existing C++ tests are the first parity gate. Rust unit tests are necessary,
   but not sufficient.
 
+## Agent Guardrails
+
+This port is intentionally incremental. If you are an AI agent continuing this
+work, do not broaden the scope just because a Rust crate exists.
+
+Off limits unless the user explicitly revises this plan:
+
+- Do not rewrite PDAL by directory or claim a directory is complete because it
+  builds.
+- Do not replace the C ABI with Rust/C++ direct object sharing.
+- Do not pass C++ object pointers across the C ABI as Rust handles.
+- Do not port optional plugins or design a Rust plugin loading SDK yet.
+- Do not copy vendored C/C++ code into Rust crates. Follow `rust/VENDOR.md`.
+- Do not start LAS/LAZ, GDAL, PROJ, compression, remote I/O, kernels, apps, or
+  broad plugin work before the current I/O text slice is complete.
+- Do not add placeholder modules, placeholder crates, or broad skeletons that
+  are not tied to a concrete parity milestone.
+- Do not weaken existing C++ validation or tests to make a Rust port pass.
+- Do not mark a stage/reader/writer "ported" without behavior coverage and the
+  relevant C++ parity gate.
+
+Current next milestone:
+
+1. Finish the deterministic text I/O slice: `readers.text` plus
+   `writers.text`, behind the C ABI, with existing text I/O behavior covered.
+2. Prove reader -> filter -> writer pipeline behavior through the Rust core
+   boundary.
+3. Only then choose the next local, deterministic I/O format. Avoid binary,
+   compressed, GDAL-backed, LAS/LAZ, and remote paths until the text slice is
+   solid.
+
+Every commit should say which checkpoint it advances. If the answer is "none",
+it probably should not be part of this port.
+
 ## Whole Repo Migration Map
 
 Approximate first-party code size, excluding comments and blanks:
@@ -56,9 +90,10 @@ Current target crates:
   spatial/geometry helpers, and shared stage traits.
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
-- `pdal-io`: first-party readers and writers. Placeholder until the I/O
-  vertical slice begins.
-- `pdal-kernels`: CLI subcommands. Placeholder and intentionally last.
+- `pdal-io`: first-party readers and writers. The deterministic text I/O
+  vertical slice has started here.
+- `pdal-kernels`: CLI subcommands. Kernel registry foundation only; concrete
+  kernel ports remain intentionally last.
 - `pdal-cli`: thin executable surface.
 - `pdal-plugins`: plugin metadata and discovery helpers. Do not port optional
   plugins or add a loading SDK until a versioned plugin boundary is designed.
@@ -84,7 +119,9 @@ that justifies the module.
 
 ## Migration Order
 
-Follow this order unless the plan is deliberately revised:
+Follow this order unless the plan is deliberately revised. Earlier checkpoint
+work may continue while later crates get small boundary foundations, but those
+foundations are not permission to skip ahead to broad top-layer ports.
 
 1. `filters/` first, backed by the minimum `pdal/` core needed for each filter
    family. Start with pure transforms, then spatial-index filters, then
@@ -103,8 +140,9 @@ Follow this order unless the plan is deliberately revised:
    system; porting them before the core, filters, and I/O layers are stable
    creates top-down churn instead of proving behavior.
 
-Do not jump to `kernels/` or broad `io/` work just because those areas are
-smaller or visible. The first milestone is filter parity through the C ABI.
+Do not jump to `kernels/`, apps/tools, plugins, vendor-heavy work, or broad
+`io/` work just because those areas are smaller or visible. The active
+post-filter milestone is the narrow deterministic text I/O slice.
 
 ## Checkpoint Roadmap
 
@@ -386,3 +424,8 @@ tests:
 3. The full `pdal_filters_*` CTest slice passes before leaving `filters/`.
 4. No unsafe reinterpret-cast crosses the C ABI.
 5. The port preserves user-visible behavior, not just compile/link success.
+
+For non-filter ports, replace item 3 with the matching focused CTest slice and
+any lower-layer regression slice the change can affect. For example, I/O work
+should run the matching `pdal_io_*` tests when C++ wrappers are involved, plus
+the Rust workspace gates.
