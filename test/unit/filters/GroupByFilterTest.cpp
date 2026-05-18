@@ -37,8 +37,52 @@
 #include "Support.hpp"
 #include <filters/GroupByFilter.hpp>
 #include <io/LasReader.hpp>
+#include <pdal/Reader.hpp>
+#include <pdal/SpatialReference.hpp>
+
+#include <map>
+#include <vector>
 
 using namespace pdal;
+
+namespace
+{
+
+class GroupBySyntheticReader : public Reader
+{
+public:
+    std::string getName() const override
+    {
+        return "readers.groupby_synthetic";
+    }
+
+private:
+    void addDimensions(PointLayoutPtr layout) override
+    {
+        layout->registerDim(Dimension::Id::Classification);
+        layout->registerDim(Dimension::Id::X);
+    }
+
+    PointViewSet run(PointViewPtr view) override
+    {
+        SpatialReference srs("EPSG:4326");
+        srs.setEpoch(2024.0);
+        PointViewPtr input(new PointView(view->table(), srs));
+
+        const std::vector<uint8_t> classes = {2, 2, 7, 7, 7};
+        for (PointId idx = 0; idx < classes.size(); ++idx)
+        {
+            input->setField(Dimension::Id::Classification, idx, classes[idx]);
+            input->setField(Dimension::Id::X, idx, idx + 10);
+        }
+
+        PointViewSet views;
+        views.insert(input);
+        return views;
+    }
+};
+
+} // unnamed namespace
 
 TEST(GroupByTest, basic_test)
 {
@@ -67,4 +111,49 @@ TEST(GroupByTest, basic_test)
 
     EXPECT_EQ(789u, views[0]->size());
     EXPECT_EQ(276u, views[1]->size());
+}
+
+TEST(GroupByTest, preservesSpatialReferenceAcrossOutputs)
+{
+    SpatialReference srs("EPSG:4326");
+    srs.setEpoch(2024.0);
+
+    GroupBySyntheticReader reader;
+
+    Options options;
+    options.add("dimension", "Classification");
+
+    GroupByFilter filter;
+    filter.setOptions(options);
+    filter.setInput(reader);
+
+    PointTable outTable;
+    filter.prepare(outTable);
+    PointViewSet viewSet = filter.execute(outTable);
+    ASSERT_EQ(viewSet.size(), 2u);
+
+    std::map<uint8_t, PointViewPtr> viewsByClass;
+    for (PointViewPtr view : viewSet)
+    {
+        ASSERT_GT(view->size(), 0u);
+        EXPECT_EQ(view->spatialReference().getWKT(), srs.getWKT());
+        EXPECT_DOUBLE_EQ(view->spatialReference().getEpoch(), srs.getEpoch());
+
+        uint8_t classification =
+            view->getFieldAs<uint8_t>(Dimension::Id::Classification, 0);
+        viewsByClass[classification] = view;
+        for (PointId idx = 0; idx < view->size(); ++idx)
+            EXPECT_EQ(
+                view->getFieldAs<uint8_t>(Dimension::Id::Classification, idx),
+                classification);
+    }
+
+    ASSERT_EQ(viewsByClass.count(2), 1u);
+    ASSERT_EQ(viewsByClass.count(7), 1u);
+    EXPECT_EQ(viewsByClass[2]->size(), 2u);
+    EXPECT_EQ(viewsByClass[7]->size(), 3u);
+    EXPECT_DOUBLE_EQ(viewsByClass[2]->getFieldAs<double>(Dimension::Id::X, 0),
+                     10.0);
+    EXPECT_DOUBLE_EQ(viewsByClass[7]->getFieldAs<double>(Dimension::Id::X, 0),
+                     12.0);
 }
