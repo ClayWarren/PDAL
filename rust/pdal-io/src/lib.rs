@@ -5,5 +5,6 @@
 
 pub mod faux;
 pub mod nullwriter;
+pub mod pcd;
 pub mod text;
 pub mod text_writer;

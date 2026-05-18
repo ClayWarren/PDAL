@@ -26,7 +26,8 @@ Off limits unless the user explicitly revises this plan:
 - Do not port optional plugins or design a Rust plugin loading SDK yet.
 - Do not copy vendored C/C++ code into Rust crates. Follow `rust/VENDOR.md`.
 - Do not start LAS/LAZ, GDAL, PROJ, compression, remote I/O, kernels, apps, or
-  broad plugin work before the current I/O text slice is complete.
+  broad plugin work before the current deterministic local I/O slices are
+  complete.
 - Do not add placeholder modules, placeholder crates, or broad skeletons that
   are not tied to a concrete parity milestone.
 - Do not weaken existing C++ validation or tests to make a Rust port pass.
@@ -35,13 +36,12 @@ Off limits unless the user explicitly revises this plan:
 
 Current next milestone:
 
-1. Finish the deterministic text I/O slice: `readers.text` plus
-   `writers.text`, behind the C ABI, with existing text I/O behavior covered.
+1. Extend deterministic local I/O one narrow format at a time, behind the C
+   ABI, with fixture behavior covered before moving on.
 2. Prove reader -> filter -> writer pipeline behavior through the Rust core
-   boundary.
-3. Only then choose the next local, deterministic I/O format. Avoid binary,
-   compressed, GDAL-backed, LAS/LAZ, and remote paths until the text slice is
-   solid.
+   boundary for each new format.
+3. Stay on text-like local formats for now. Avoid binary, compressed,
+   GDAL-backed, LAS/LAZ, and remote paths until this local I/O loop is solid.
 
 Every commit should say which checkpoint it advances. If the answer is "none",
 it probably should not be part of this port.
@@ -288,9 +288,15 @@ Current status:
   for the text slice.
 - Installed-PDAL regression for the text slice is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test text_regression -- --ignored`.
-- The next I/O target should be another local deterministic text-like format
-  only after the text C++ parity gates are wired. Avoid binary,
-  compression-backed, GDAL-backed, or remote reader/writer work.
+- `readers.pcd` and `writers.pcd` have a Rust ASCII-only implementation for
+  local PCD fixtures. The slice preserves existing whitespace parsing,
+  comma-row skipping, missing-header rejection, float32 XYZ storage behavior,
+  dimension order, per-dimension type/precision, and reader -> decimation ->
+  writer flow. Binary and compressed PCD are intentionally deferred.
+- Installed-PDAL regression for the ASCII PCD slice is available with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pcd_regression -- --ignored`.
+- The next I/O target should still be local and deterministic. Avoid binary,
+  compression-backed, GDAL-backed, LAS/LAZ, or remote reader/writer work.
 
 ### 7. Apps, Tools, Then Kernels
 

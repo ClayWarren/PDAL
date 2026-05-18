@@ -37,6 +37,20 @@ pub unsafe extern "C" fn pdal_reader_create_text(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create a PcdReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_pcd(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::pcd::PcdReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Destroy a reader handle.
 ///
 /// # Safety
@@ -80,6 +94,20 @@ pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut Wr
 pub unsafe extern "C" fn pdal_writer_create_text(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::text_writer::TextWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a PcdWriter.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_pcd(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::pcd::PcdWriter::new(options));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()
