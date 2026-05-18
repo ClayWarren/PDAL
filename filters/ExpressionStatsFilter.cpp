@@ -72,7 +72,11 @@ struct ExpressionStatsFilter::Args
 
 ExpressionStatsFilter::ExpressionStatsFilter() : m_args(new Args) {}
 
-ExpressionStatsFilter::~ExpressionStatsFilter() {}
+ExpressionStatsFilter::~ExpressionStatsFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 void ExpressionStatsFilter::addArgs(ProgramArgs& args)
 {
@@ -83,108 +87,60 @@ void ExpressionStatsFilter::addArgs(ProgramArgs& args)
                               .setPositional();
     args.add("dimension",
              "Dimension on which apply expression to calculate statistics",
-             m_dimName)
+             m_args->m_dimName)
         .setPositional();
+}
+
+void ExpressionStatsFilter::initialize()
+{
+    std::vector<std::string> expressionStrings;
+    expressionStrings.reserve(m_args->m_expressions.size());
+    for (const auto& expression : m_args->m_expressions)
+        expressionStrings.push_back(expression.print());
+
+    std::vector<const char*> exprs;
+    exprs.reserve(expressionStrings.size());
+    for (const auto& s : expressionStrings)
+        exprs.push_back(s.c_str());
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+    m_rust_stage = pdal_stage_create_expressionstats(m_args->m_dimName.c_str(),
+                                                     exprs.data(), exprs.size());
+    if (!m_rust_stage)
+        throwError(pdal_last_error());
 }
 
 void ExpressionStatsFilter::prepared(PointTableRef table)
 {
-    const PointLayoutPtr layout(table.layout());
-
-    m_dimId = layout->findDim(m_dimName);
-    if (m_dimId == Dimension::Id::Unknown)
-        throwError("Invalid dimension name in 'dimension' option: '" +
-                   m_dimName + "'.");
-
-    for (auto& expression : m_args->m_expressions)
-    {
-        if (!expression.valid())
-        {
-            std::stringstream oss;
-            oss << "The expression '" << expression << "' is invalid";
-            throwError(oss.str());
-        }
-
-        auto status = expression.prepare(table.layout());
-        if (!status)
-            throwError("Invalid expression: " + status.what());
-    }
+    m_layout = table.layout();
 }
 
 bool ExpressionStatsFilter::processOne(PointRef& point)
 {
-    double value = point.getFieldAs<double>(m_dimId);
-
-    for (const auto& expr : m_args->m_expressions)
-    {
-        bool status = expr.eval(point);
-        auto& stat = m_stats[expr.print()];
-        if (status)
-            stat[value]++;
-    }
-    return true;
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rust_stage, rustPoint, 0);
+    pdal_point_view_destroy(rustPoint);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError(
+            "Rust expressionstats streaming failed.");
+    return keep;
 }
 
 void ExpressionStatsFilter::filter(PointView& view)
 {
-    pdal_point_view_t* rustView = rust_view_converter::toRust(view);
-
-    std::vector<std::string> expressionStrings;
-    std::vector<const char*> expressionPtrs;
-    expressionStrings.reserve(m_args->m_expressions.size());
-    expressionPtrs.reserve(m_args->m_expressions.size());
-    for (const auto& expression : m_args->m_expressions)
-        expressionStrings.push_back(expression.print());
-    for (const auto& expression : expressionStrings)
-        expressionPtrs.push_back(expression.c_str());
-
-    pdal_metadata_node_t* rustMetadata = pdal_expressionstats_metadata(
-        rustView, m_dimName.c_str(), expressionPtrs.data(),
-        expressionPtrs.size());
-    pdal_point_view_destroy(rustView);
-
-    if (!rustMetadata)
-        rust_view_converter::throwLastError("Rust expressionstats failed.");
-
-    rust_metadata::addChildrenTo(m_metadata, rustMetadata);
-    pdal_metadata_node_destroy(rustMetadata);
-    m_metadataExtracted = true;
+    rust_view_converter::runInPlace(m_rust_stage, view);
 }
 
 void ExpressionStatsFilter::done(PointTableRef table)
 {
-    if (!m_metadataExtracted)
-        extractMetadata(table);
-}
+    pdal_metadata_node_t* rustMetadata = pdal_stage_metadata(m_rust_stage);
+    if (!rustMetadata)
+        rust_view_converter::throwLastError("Rust expressionstats metadata failed.");
 
-void ExpressionStatsFilter::extractMetadata(PointTableRef table)
-{
-    uint32_t position(0);
-
-    MetadataNode c =
-        m_metadata.add("dimension", table.layout()->dimName(m_dimId));
-    for (auto& stat : m_stats)
-    {
-        auto& expression_str = stat.first;
-        auto& bin_map = stat.second;
-
-        MetadataNode t = m_metadata.addList("statistic");
-        t.add("expression", expression_str);
-        t.add("position", position);
-
-        for (auto& bin : bin_map)
-        {
-
-            auto& value = bin.first;
-            auto& count = bin.second;
-
-            MetadataNode n = t.addList("bins");
-            n.add("count", count);
-            n.add("value", value);
-        }
-
-        position++;
-    }
+    rust_metadata::addChildrenTo(m_metadata, rustMetadata);
+    pdal_metadata_node_destroy(rustMetadata);
 }
 
 } // namespace pdal

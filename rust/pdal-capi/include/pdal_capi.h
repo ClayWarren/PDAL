@@ -98,13 +98,16 @@ bool pdal_stage_range_point_passes(pdal_stage_t* stage, pdal_point_view_t* view,
 
 void pdal_stage_destroy(pdal_stage_t* stage);
 void pdal_stage_reset(pdal_stage_t* stage);
+pdal_metadata_node_t* pdal_stage_metadata(const pdal_stage_t* stage);
 bool pdal_stage_process_one(pdal_stage_t* stage);
 bool pdal_stage_process_one_at(pdal_stage_t* stage, const pdal_point_view_t* view, uint64_t idx);
 pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage, pdal_point_view_t* input);
 uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input, pdal_point_view_t** outputs, uint64_t max_outputs);
 
 pdal_stage_t* pdal_stage_create_sort(const char* const* dims, uint64_t count, const char* order, const char* algorithm);
+pdal_stage_t* pdal_stage_create_mongoexpression(const char* expr);
 pdal_stage_t* pdal_stage_create_expression(const char* const* exprs, uint64_t count);
+pdal_stage_t* pdal_stage_create_expressionstats(const char* dim_name, const char* const* sources, uint64_t count);
 pdal_stage_t* pdal_stage_create_returns(const char* const* groups, uint64_t count);
 pdal_stage_t* pdal_stage_create_separatescanline(uint64_t groupby);
 pdal_stage_t* pdal_stage_create_groupby(const char* dim_name);
@@ -122,6 +125,7 @@ pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);
 pdal_stage_t* pdal_stage_create_zsmooth(double radius, double position, const char* dim_name);
 pdal_stage_t* pdal_stage_create_outlier(const char* method, uint64_t min_k, double radius, uint64_t mean_k, double multiplier, uint8_t class_label);
 pdal_stage_t* pdal_stage_create_dbscan(uint64_t min_points, double eps, const char* const* dims, uint64_t count);
+pdal_stage_t* pdal_stage_create_covariancefeatures(uint64_t knn, bool has_radius, double radius, uint64_t min_k, uint64_t stride, uint8_t mode, bool optimal, const char* const* dims, uint64_t dim_count);
 pdal_stage_t* pdal_stage_create_lof(uint64_t minpts);
 pdal_stage_t* pdal_stage_create_elm(double cell, uint8_t class_label, double threshold);
 pdal_stage_t* pdal_stage_create_skewnessbalancing(uint8_t ground_class, uint8_t other_class, bool only_ground);

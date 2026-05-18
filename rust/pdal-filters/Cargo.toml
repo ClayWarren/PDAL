@@ -7,3 +7,4 @@ description = "Rust port of PDAL filters."
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }
+serde_json = "1"

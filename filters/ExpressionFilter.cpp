@@ -83,11 +83,18 @@ void ExpressionFilter::addArgs(ProgramArgs& args)
 
 void ExpressionFilter::initialize()
 {
-    // The Rust stage parses and owns the expressions; a parse failure
-    // (invalid expression) surfaces here as a null stage.
+    if (m_args->m_expressions.empty())
+        throwError("No expressions provided.");
+
+    std::vector<std::string> expressionStrings;
+    expressionStrings.reserve(m_args->m_expressions.size());
+    for (const auto& expression : m_args->m_expressions)
+        expressionStrings.push_back(expression);
+
     std::vector<const char*> exprs;
-    for (const std::string& expression : m_args->m_expressions)
-        exprs.push_back(expression.c_str());
+    exprs.reserve(expressionStrings.size());
+    for (const auto& s : expressionStrings)
+        exprs.push_back(s.c_str());
 
     if (m_rust_stage)
         pdal_stage_destroy(m_rust_stage);

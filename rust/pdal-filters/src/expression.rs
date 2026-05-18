@@ -20,6 +20,9 @@ impl ExpressionFilter {
     /// invalid expression is rejected here, mirroring PDAL, where option
     /// parsing rejects it.
     pub fn new(sources: &[String]) -> Result<Self, StageError> {
+        if sources.is_empty() {
+            return Err(StageError("No expressions provided".to_string()));
+        }
         let mut expressions = Vec::with_capacity(sources.len());
         for src in sources {
             let expr = ConditionalExpression::parse(src)

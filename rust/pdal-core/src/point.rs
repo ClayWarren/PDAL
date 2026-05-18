@@ -185,6 +185,7 @@ impl PointLayout {
 }
 
 /// A buffer of points sharing one layout.
+#[derive(Clone)]
 pub struct PointView {
     layout: Rc<PointLayout>,
     data: Vec<u8>,

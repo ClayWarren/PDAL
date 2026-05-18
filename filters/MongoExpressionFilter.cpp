@@ -32,11 +32,12 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <nlohmann/json.hpp>
-
 #include "MongoExpressionFilter.hpp"
 
-#include "private/mongoexpression/Expression.hpp"
+#include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -49,12 +50,7 @@ CREATE_STATIC_STAGE(MongoExpressionFilter, s_info);
 
 struct MongoExpressionFilter::Args
 {
-    NL::json m_json;
-};
-
-struct MongoExpressionFilter::Private
-{
-    Expression m_expression;
+    std::string m_json;
 };
 
 std::string MongoExpressionFilter::getName() const
@@ -63,11 +59,15 @@ std::string MongoExpressionFilter::getName() const
 }
 
 MongoExpressionFilter::MongoExpressionFilter()
-    : m_args(new Args()), m_p(new Private())
+    : m_args(new Args())
 {
 }
 
-MongoExpressionFilter::~MongoExpressionFilter() {}
+MongoExpressionFilter::~MongoExpressionFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 void MongoExpressionFilter::addArgs(ProgramArgs& args)
 {
@@ -75,38 +75,36 @@ void MongoExpressionFilter::addArgs(ProgramArgs& args)
         .setPositional();
 }
 
+void MongoExpressionFilter::initialize()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+    m_rust_stage = pdal_stage_create_mongoexpression(m_args->m_json.c_str());
+    if (!m_rust_stage)
+        throwError(pdal_last_error());
+}
+
 void MongoExpressionFilter::prepared(PointTableRef table)
 {
-    log()->get(LogLevel::Debug)
-        << "Building expression from: " << m_args->m_json << '\n';
-
-    m_p->m_expression = Expression(table.layout(), m_args->m_json);
-
-    log()->get(LogLevel::Debug)
-        << "Built expression: " << m_p->m_expression << '\n';
+    // Captured so streaming processOne can convert a single point.
+    m_layout = table.layout();
 }
 
 PointViewSet MongoExpressionFilter::run(PointViewPtr inView)
 {
-    PointViewSet views;
-    PointViewPtr view(inView->makeNew());
-
-    for (PointId i(0); i < inView->size(); ++i)
-    {
-        PointRef pr(inView->point(i));
-        if (processOne(pr))
-        {
-            view->appendPoint(*inView, i);
-        }
-    }
-
-    views.insert(view);
-    return views;
+    return rust_view_converter::runMulti(m_rust_stage, inView, 1);
 }
 
 bool MongoExpressionFilter::processOne(PointRef& pr)
 {
-    return m_p->m_expression.check(pr);
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(pr, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rust_stage, rustPoint, 0);
+    pdal_point_view_destroy(rustPoint);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError(
+            "Rust mongo expression streaming failed.");
+    return keep;
 }
 
 } // namespace pdal

@@ -22,6 +22,7 @@ pub mod lof;
 pub mod mad;
 pub mod math;
 pub mod merge;
+pub mod mongo;
 pub mod mortonorder;
 pub mod nndistance;
 pub mod optimal_neighborhood;

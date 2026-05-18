@@ -37,10 +37,10 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage; // forward declaration for the Rust-backed stage
+
 namespace pdal
 {
-
-class Expression;
 
 class PDAL_EXPORT MongoExpressionFilter : public Filter, public Streamable
 {
@@ -53,14 +53,16 @@ public:
 
 private:
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     void prepared(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
 
     struct Args;
     std::unique_ptr<Args> m_args;
 
-    struct Private;
-    std::unique_ptr<Private> m_p;
+    // Rust-backed stage and the layout captured for streaming.
+    pdal_stage* m_rust_stage = nullptr;
+    PointLayoutPtr m_layout = nullptr;
 };
 
 } // namespace pdal

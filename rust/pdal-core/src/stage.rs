@@ -24,6 +24,11 @@ pub trait Filter {
     /// Run the filter over `input`, producing the output view(s).
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
 
+    /// Export the stage's accumulated metadata, if any.
+    fn metadata(&self) -> crate::metadata::MetadataNode {
+        crate::metadata::MetadataNode::new("metadata")
+    }
+
     /// Support downcasting to concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 }

@@ -889,6 +889,7 @@ trait FilterWrapper {
     fn process_one(&mut self, view: &PointView, idx: u64) -> bool;
     fn reset(&mut self);
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+    fn metadata(&self) -> MetadataNode;
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
@@ -901,6 +902,9 @@ impl<T: Filter + Streamable> FilterWrapper for T {
     }
     fn run(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         Filter::run(self, input)
+    }
+    fn metadata(&self) -> MetadataNode {
+        Filter::metadata(self)
     }
     fn as_any(&self) -> &dyn std::any::Any {
         Filter::as_any(self)
@@ -1369,6 +1373,82 @@ pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
     }
     let filter = Box::new(LabelDuplicatesFilter::new(vec_dims));
     Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Export a stage's accumulated metadata.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_metadata(stage: *const StageWrapper) -> *mut MetadataNode {
+if let Some(stage) = stage.as_ref() {
+    Box::into_raw(Box::new(stage.filter.metadata()))
+} else {
+    std::ptr::null_mut()
+}
+}
+
+/// Create a `filters.expressionstats` stage.
+///
+/// # Safety
+///
+/// `dim_name` must be a valid NUL-terminated C-string.
+/// `exprs` must be a valid pointer to a C-array of `count` C-strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_expressionstats(
+dim_name: *const c_char,
+exprs: *const *const c_char,
+count: u64,
+) -> *mut StageWrapper {
+clear_last_error();
+if dim_name.is_null() || (count > 0 && exprs.is_null()) {
+    set_last_error("null expressionstats input");
+    return std::ptr::null_mut();
+}
+let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+let mut sources = Vec::with_capacity(count as usize);
+for i in 0..count {
+    let ptr = *exprs.offset(i as isize);
+    if ptr.is_null() {
+        set_last_error("null expression string");
+        return std::ptr::null_mut();
+    }
+    sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+}
+match pdal_filters::expressionstats::ExpressionStatsFilter::new(&dim_name, &sources) {
+    Ok(f) => Box::into_raw(Box::new(StageWrapper { filter: Box::new(f) })),
+    Err(e) => {
+        set_last_error(&e.to_string());
+        std::ptr::null_mut()
+    }
+}
+}
+
+/// Create a `filters.mongo` stage from a JSON expression string.
+
+/// Returns null and sets the last error if `expr` is null or invalid JSON.
+///
+/// # Safety
+///
+/// `expr` must be a valid null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
+    expr: *const c_char,
+) -> *mut StageWrapper {
+    clear_last_error();
+    if expr.is_null() {
+        set_last_error("null expression string");
+        return std::ptr::null_mut();
+    }
+    let json_str = CStr::from_ptr(expr).to_string_lossy();
+    match pdal_filters::mongo::MongoExpressionFilter::new(&json_str) {
+        Ok(f) => Box::into_raw(Box::new(StageWrapper { filter: Box::new(f) })),
+        Err(e) => {
+            set_last_error(&e.to_string());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Create a `filters.expression` stage from a list of expression strings.
@@ -2181,12 +2261,17 @@ pub unsafe extern "C" fn pdal_expressionstats_metadata(
             sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
         }
 
-        match ExpressionStatsMetadataFilter::new(&dim_name, &sources)
-            .and_then(|mut filter| filter.metadata(view, &dim_name))
-        {
-            Ok(metadata) => Box::into_raw(Box::new(metadata)),
-            Err(err) => {
-                set_last_error(err.to_string());
+        match ExpressionStatsMetadataFilter::new(&dim_name, &sources) {
+            Ok(mut filter) => {
+                if let Err(e) = Filter::run(&mut filter, view) {
+                    set_last_error(&e.to_string());
+                    std::ptr::null_mut()
+                } else {
+                    Box::into_raw(Box::new(Filter::metadata(&filter)))
+                }
+            }
+            Err(e) => {
+                set_last_error(&e.to_string());
                 std::ptr::null_mut()
             }
         }
