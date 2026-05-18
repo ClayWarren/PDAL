@@ -87,7 +87,11 @@ impl Filter for VoxelDownsizeFilter {
 }
 
 impl Streamable for VoxelDownsizeFilter {
-    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
+    fn process_one(
+        &mut self,
+        _view: &pdal_core::point::PointView,
+        _idx: pdal_core::point::PointId,
+    ) -> bool {
         false
     }
 

@@ -48,7 +48,11 @@ impl Filter for IqrFilter {
 }
 
 impl Streamable for IqrFilter {
-    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
+    fn process_one(
+        &mut self,
+        _view: &pdal_core::point::PointView,
+        _idx: pdal_core::point::PointId,
+    ) -> bool {
         false
     }
 }

@@ -106,7 +106,11 @@ impl Filter for RangeFilter {
 }
 
 impl Streamable for RangeFilter {
-    fn process_one(&mut self, _view: &pdal_core::point::PointView, _idx: pdal_core::point::PointId) -> bool {
+    fn process_one(
+        &mut self,
+        _view: &pdal_core::point::PointView,
+        _idx: pdal_core::point::PointId,
+    ) -> bool {
         // Stateful point-by-point filtering is supported via point_passes in the C ABI
         false
     }
