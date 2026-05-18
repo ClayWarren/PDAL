@@ -36,6 +36,8 @@
 
 #include "Support.hpp"
 
+#include <io/FauxReader.hpp>
+#include <io/NullWriter.hpp>
 #include <io/TextReader.hpp>
 #include <pdal/FlexWriter.hpp>
 #include <pdal/util/FileUtils.hpp>
@@ -89,6 +91,28 @@ TEST(WriterTest, issue4261)
 
     w.prepare(t);
     w.execute(t);
+}
+
+TEST(WriterTest, nullWriterConsumesInput)
+{
+    Options ro;
+    ro.add("count", 3);
+    ro.add("mode", "constant");
+
+    FauxReader reader;
+    reader.setOptions(ro);
+
+    NullWriter writer;
+    writer.setInput(reader);
+
+    PointTable table;
+    writer.prepare(table);
+    PointViewSet views = writer.execute(table);
+
+    ASSERT_EQ(views.size(), 1u);
+    EXPECT_EQ((*views.begin())->size(), 3u);
+    EXPECT_TRUE(writer.pipelineStreamable());
+    EXPECT_TRUE(writer.filename().empty());
 }
 
 } // namespace pdal
