@@ -32,7 +32,8 @@ Approximate first-party code size, excluding comments and blanks:
 Non-porting scope:
 
 - `vendor/`: about 252k LOC. Do not port. Treat these dependencies as external
-  libraries reached through Rust crates or explicit FFI.
+  libraries reached through Rust crates or explicit FFI. See `rust/VENDOR.md`
+  for the current vendor mapping and rules.
 - `test/`: about 26k LOC. Keep the existing C++ tests as the behavioral
   contract while Rust grows underneath the ABI.
 - Plugins: about 34k LOC. Leave optional plugin drivers in C++ until the core
