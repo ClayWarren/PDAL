@@ -29,3 +29,28 @@ impl Geometry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_wkt_is_rejected() {
+        assert!(Geometry::from_wkt("not wkt").is_err());
+    }
+
+    #[test]
+    fn polygon_contains_interior_point_but_not_exterior_point() {
+        let geometry = Geometry::from_wkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+
+        assert!(geometry.contains(5.0, 5.0));
+        assert!(!geometry.contains(15.0, 5.0));
+    }
+
+    #[test]
+    fn distance_to_point_uses_geos_distance() {
+        let geometry = Geometry::from_wkt("POINT(0 0 0)").unwrap();
+
+        assert_eq!(geometry.distance(3.0, 4.0, 0.0).unwrap(), 5.0);
+    }
+}

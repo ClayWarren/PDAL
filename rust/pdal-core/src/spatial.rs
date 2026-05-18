@@ -135,6 +135,47 @@ mod tests {
     }
 
     #[test]
+    fn knn_truncates_to_available_points_and_allows_zero_neighbors() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+
+        for (x, y, z) in [(0.0, 0.0, 0.0), (3.0, 0.0, 0.0)] {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+        }
+
+        let index = SpatialIndex3d::new(&view);
+        assert!(index.knn(0, 0).is_empty());
+        assert_eq!(index.knn(0, 10), vec![(0, 0.0), (1, 9.0)]);
+    }
+
+    #[test]
+    fn radius_xyz_queries_an_arbitrary_coordinate() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+
+        for (x, y, z) in [(10.0, 0.0, 0.0), (11.0, 0.0, 0.0), (12.1, 0.0, 0.0)] {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+        }
+
+        let index = SpatialIndex3d::new(&view);
+        assert_eq!(index.radius_xyz(10.5, 0.0, 0.0, 0.5), vec![0, 1]);
+    }
+
+    #[test]
     fn radius_2d_excluding_ignores_z_and_query_point() {
         let mut layout = PointLayout::new();
         layout.register(DimId::X, DimType::F64);
