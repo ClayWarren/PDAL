@@ -73,8 +73,10 @@ Non-porting scope:
   for the current vendor mapping and rules.
 - `test/`: about 26k LOC. Keep the existing C++ tests as the behavioral
   contract while Rust grows underneath the ABI.
-- Plugins: about 34k LOC. Leave optional plugin drivers in C++ until the core
-  and first-party stage surface are stable.
+- Plugins: about 34k LOC. Leave optional plugin drivers in C++ until the core,
+  first-party stage surface, I/O, apps/tools, and command strategy are stable.
+  Treat Rust plugin loading or a Rust plugin SDK as a final compatibility
+  phase, not a way to make early progress.
 
 The migration order is intentionally vertical-slice driven: build only the
 core pieces needed by the next stage family, prove parity through the C ABI,
@@ -145,6 +147,9 @@ foundations are not permission to skip ahead to broad top-layer ports.
 5. `kernels/` last. Kernels are CLI subcommands above the pipeline/stage
    system; porting them before the core, filters, and I/O layers are stable
    creates top-down churn instead of proving behavior.
+6. Optional plugins after the first-party library and command surface are
+   stable. Until then, plugins stay in C++ or are handled only as metadata and
+   discovery compatibility helpers.
 
 Do not jump to `kernels/`, apps/tools, plugins, vendor-heavy work, or broad
 `io/` work just because those areas are smaller or visible. The active
@@ -196,6 +201,25 @@ stage, reader, writer, or core behavior that depends on that vendor boundary:
 Do not start a broad `vendor/` compatibility pass. Each vendor decision should
 name the user-visible stage or core behavior it unlocks, cite the parity test
 that will hold it honest, and follow `rust/VENDOR.md`.
+
+Plugin implementation work is allowed only after the first-party Rust surface
+can run real command and pipeline workflows:
+
+- `pdal-plugins` may keep metadata and filename-discovery helpers that mirror
+  stable parts of the existing C++ plugin convention.
+- Do not port optional plugin readers, writers, filters, or kernels until the
+  equivalent first-party reader/writer/filter/kernel family is already proven.
+- Do not design a Rust plugin loading SDK until the C ABI, stage registry,
+  ownership/lifetime rules, metadata, errors, versioning, and dynamic library
+  compatibility story are stable.
+- Plugin-by-plugin ports should be driven by demand and parity tests, not by
+  sweeping the `plugins/` directory.
+
+In practice, plugins are after first-party filters, core, I/O, apps/tools, and
+commands. The likely first plugin work is compatibility/discovery validation,
+then a single low-risk plugin port if it proves the SDK boundary. Heavy
+database, HDF/E57/NITF/TileDB, registration, trajectory, and format-specific
+plugins remain later or stay C++ behind the ABI.
 
 ## Checkpoint Roadmap
 
