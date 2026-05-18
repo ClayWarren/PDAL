@@ -28,6 +28,7 @@ pub(crate) fn dim_id_from_name(name: &str) -> DimId {
         "Eigenvalue2" => DimId::Eigenvalue2,
         "OptimalKNN" => DimId::OptimalKNN,
         "OptimalRadius" => DimId::OptimalRadius,
+        "H3" => DimId::H3,
         "GpsTime" => DimId::GpsTime,
         other => DimId::Other(other.to_string()),
     }

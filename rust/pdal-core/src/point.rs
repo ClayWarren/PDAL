@@ -365,4 +365,71 @@ mod tests {
         assert_eq!(dst.len(), 1);
         assert_eq!(dst.get_f64(0, &DimId::OffsetTime), 42.0);
     }
+
+    #[test]
+    fn append_point_preserves_source_index() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let layout = Rc::new(layout);
+
+        let mut src = PointView::new(Rc::clone(&layout));
+        for i in 0..3 {
+            let point = src.add_point();
+            src.set_f64(point, &DimId::X, i as f64);
+        }
+
+        let mut dst = src.make_new();
+        dst.append_point(&src, 2);
+        dst.append_point(&src, 0);
+
+        assert_eq!(dst.len(), 2);
+        assert_eq!(dst.source_index(0), 2);
+        assert_eq!(dst.source_index(1), 0);
+        assert_eq!(dst.get_f64(0, &DimId::X), 2.0);
+        assert_eq!(dst.get_f64(1, &DimId::X), 0.0);
+    }
+
+    #[test]
+    fn all_dimension_storage_types_roundtrip_through_f64_accessors() {
+        let cases = [
+            (DimType::U8, 255.0, 255.0),
+            (DimType::U16, 65_535.0, 65_535.0),
+            (DimType::U32, 1_000_000.0, 1_000_000.0),
+            (DimType::U64, 1_000_000.0, 1_000_000.0),
+            (DimType::I8, -12.0, -12.0),
+            (DimType::I16, -1234.0, -1234.0),
+            (DimType::I32, -123_456.0, -123_456.0),
+            (DimType::I64, -123_456.0, -123_456.0),
+            (DimType::F32, 12.25, 12.25),
+            (DimType::F64, -99.5, -99.5),
+        ];
+
+        for (idx, (ty, value, expected)) in cases.into_iter().enumerate() {
+            let dim = DimId::Other(format!("dim{idx}"));
+            let mut layout = PointLayout::new();
+            layout.register(dim.clone(), ty);
+            let mut view = PointView::new(Rc::new(layout));
+
+            let point = view.add_point();
+            view.set_f64(point, &dim, value);
+
+            assert_eq!(view.get_f64(point, &dim), expected);
+        }
+    }
+
+    #[test]
+    fn make_new_keeps_layout_and_spatial_reference_without_points() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        view.set_spatial_reference(SpatialReference::with_epoch("EPSG:4326", 2020.0));
+        view.add_point();
+
+        let new_view = view.make_new();
+
+        assert!(new_view.is_empty());
+        assert_eq!(new_view.layout().point_size(), view.layout().point_size());
+        assert_eq!(new_view.spatial_reference().wkt(), "EPSG:4326");
+        assert_eq!(new_view.spatial_reference().epoch(), 2020.0);
+    }
 }
