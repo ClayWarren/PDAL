@@ -34,13 +34,11 @@
 
 #include "ExpressionFilter.hpp"
 
-#include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
-#include <cctype>
-#include <limits>
-#include <map>
+#include "private/RustViewConverter.hpp"
+
 #include <string>
 #include <vector>
 
@@ -60,13 +58,17 @@ std::string ExpressionFilter::getName() const
 
 struct ExpressionFilter::Args
 {
-    std::vector<expr::ConditionalExpression> m_expressions;
+    std::vector<std::string> m_expressions;
     Arg* m_whereArg;
 };
 
 ExpressionFilter::ExpressionFilter() : m_args(new Args) {}
 
-ExpressionFilter::~ExpressionFilter() {}
+ExpressionFilter::~ExpressionFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+}
 
 void ExpressionFilter::addArgs(ProgramArgs& args)
 {
@@ -79,21 +81,25 @@ void ExpressionFilter::addArgs(ProgramArgs& args)
     args.addSynonym("expression", "limits");
 }
 
+void ExpressionFilter::initialize()
+{
+    // The Rust stage parses and owns the expressions; a parse failure
+    // (invalid expression) surfaces here as a null stage.
+    std::vector<const char*> exprs;
+    for (const std::string& expression : m_args->m_expressions)
+        exprs.push_back(expression.c_str());
+
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+    m_rust_stage = pdal_stage_create_expression(exprs.data(), exprs.size());
+    if (!m_rust_stage)
+        throwError(pdal_last_error());
+}
+
 void ExpressionFilter::prepared(PointTableRef table)
 {
-    for (auto& expression : m_args->m_expressions)
-    {
-        if (!expression.valid())
-        {
-            std::stringstream oss;
-            oss << "The expression '" << expression << "' is invalid";
-            throwError(oss.str());
-        }
-
-        auto status = expression.prepare(table.layout());
-        if (!status)
-            throwError(status.what());
-    }
+    // Captured so streaming processOne can convert a single point.
+    m_layout = table.layout();
 }
 
 bool ExpressionFilter::processOne(PointRef& point)
@@ -102,44 +108,21 @@ bool ExpressionFilter::processOne(PointRef& point)
         throwError(
             "Streaming of expressions only works with a single expression");
 
-    bool status = m_args->m_expressions[0].eval(point);
-    return status;
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rust_stage, rustPoint, 0);
+    pdal_point_view_destroy(rustPoint);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError(
+            "Rust expression streaming failed.");
+    return keep;
 }
 
 PointViewSet ExpressionFilter::run(PointViewPtr inView)
 {
-    PointViewSet viewSet;
-    if (!inView->size())
-        return viewSet;
-
-    // make a view for each one of our expressions
-
-    std::vector<PointViewPtr> views;
-    for (expr::ConditionalExpression& expr : m_args->m_expressions)
-    {
-        PointViewPtr outView = inView->makeNew();
-        views.push_back(outView);
-    }
-
-    // eval our expression across each point for each view.
-    // TODO: make this threaded
-    for (PointRef point : *inView)
-    {
-        for (size_t i = 0; i < views.size(); i++)
-        {
-            auto& view = views[i];
-            auto& expr = m_args->m_expressions[i];
-
-            bool status = expr.eval(point);
-            if (status)
-                view->appendPoint(*inView.get(), point.pointId());
-        }
-    }
-
-    for (auto& v : views)
-        viewSet.insert(v);
-
-    return viewSet;
+    // One output view per expression.
+    return rust_view_converter::runMulti(m_rust_stage, inView,
+                                         m_args->m_expressions.size());
 }
 
 } // namespace pdal

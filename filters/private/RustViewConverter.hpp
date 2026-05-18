@@ -134,6 +134,27 @@ inline pdal_point_view_t* toRust(PointViewPtr inView)
     return toRust(*inView);
 }
 
+// Convert a single streaming PointRef into a one-point Rust view, so a
+// data-dependent filter can be streamed through pdal_stage_process_one_at.
+inline pdal_point_view_t* toRustPoint(PointRef& point, PointLayoutPtr layout)
+{
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto dim : layout->dims())
+    {
+        pdal_point_layout_register_dim(rustLayout,
+                                       layout->dimName(dim).c_str(),
+                                       typeId(layout->dimType(dim)));
+    }
+    pdal_point_view_t* rustView = pdal_point_view_create(rustLayout);
+    pdal_point_view_add_point(rustView);
+    for (auto dim : layout->dims())
+    {
+        double v = point.getFieldAs<double>(dim);
+        pdal_point_view_set_f64(rustView, 0, layout->dimName(dim).c_str(), v);
+    }
+    return rustView;
+}
+
 inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
 {
     if (rust_out_view)

@@ -41,6 +41,8 @@
 #include <memory>
 #include <string>
 
+struct pdal_stage; // forward declaration for the Rust-backed stage
+
 namespace pdal
 {
 
@@ -57,7 +59,12 @@ public:
 private:
     std::unique_ptr<Args> m_args;
 
+    // Rust-backed stage and the layout captured for streaming.
+    pdal_stage* m_rust_stage = nullptr;
+    PointLayoutPtr m_layout = nullptr;
+
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     void prepared(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     PointViewSet run(PointViewPtr view) override;
