@@ -227,7 +227,7 @@ inline std::istream& operator>>(std::istream& in,
 {
     std::string s(std::istreambuf_iterator<char>(in), {});
     StringList values = Utils::split2(s, ',');
-    if (!values.size())
+    if (values.size() != 3)
         throw pdal_error("Shape must be specified as three integers: "
                          "'depth, rows, columns'.");
     Utils::trim(values[0]);

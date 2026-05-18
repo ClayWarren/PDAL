@@ -224,6 +224,7 @@ PDAL_ADD_TEST(pdal_io_copc_writer_test
         ${NLOHMANN_INCLUDE_DIR}
 )
 PDAL_ADD_TEST(pdal_io_faux_test FILES io/FauxReaderTest.cpp)
+PDAL_ADD_TEST(pdal_io_memoryview_reader_test FILES io/MemoryViewReaderTest.cpp)
 PDAL_ADD_TEST(pdal_io_gdal_reader_test
     FILES
         io/GDALReaderTest.cpp
