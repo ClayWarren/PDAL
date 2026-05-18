@@ -126,6 +126,11 @@ option(WITH_GCS
 add_feature_info("Google Cloud Storage" WITH_GCS
     "build with OpenSSL and others for Google storage IO support")
 
+option(BUILD_RUST_CLI
+    "Build the experimental Rust PDAL CLI" FALSE)
+add_feature_info("Rust CLI" BUILD_RUST_CLI
+    "build the experimental Rust PDAL CLI")
+
 #
 # Choose dependent options
 #

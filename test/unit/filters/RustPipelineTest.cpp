@@ -34,19 +34,14 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/HeadFilter.hpp>
-#include <filters/TailFilter.hpp>
 #include <io/FauxReader.hpp>
-#include <pdal/StageFactory.hpp>
 
 #include <filters/private/RustPipeline.hpp>
-#include <filters/private/RustViewConverter.hpp>
 
 using namespace pdal;
 
 TEST(RustPipelineTest, singleStagePipeline)
 {
-    // Build input: 10 points with Z ramping 1..10
     BOX3D srcBounds(0.0, 0.0, 1.0, 0.0, 0.0, 10.0);
     Options readerOps;
     readerOps.add("bounds", srcBounds);
@@ -62,7 +57,6 @@ TEST(RustPipelineTest, singleStagePipeline)
     PointViewPtr inputView = *readSet.begin();
     EXPECT_EQ(inputView->size(), 10u);
 
-    // Create a Rust-backed head filter (take first 5)
     pdal_options_t* ops = pdal_options_create();
     pdal_options_add_u64(ops, "count", 5);
     pdal_options_add_str(ops, "invert", "false");
@@ -70,7 +64,6 @@ TEST(RustPipelineTest, singleStagePipeline)
     pdal_options_destroy(ops);
     ASSERT_NE(headStage, nullptr);
 
-    // Build and execute the Rust pipeline
     RustPipeline pipeline;
     int64_t idx = pipeline.addStage(headStage);
     EXPECT_GE(idx, 0);
@@ -79,7 +72,6 @@ TEST(RustPipelineTest, singleStagePipeline)
     PointViewPtr output = pipeline.execute(inputView);
     EXPECT_EQ(output->size(), 5u);
 
-    // Verify Z values are 1..5
     for (PointId i = 0; i < output->size(); ++i)
     {
         double z = output->getFieldAs<double>(Dimension::Id::Z, i);
@@ -89,7 +81,6 @@ TEST(RustPipelineTest, singleStagePipeline)
 
 TEST(RustPipelineTest, linearPipelineTwoStages)
 {
-    // Build input: 30 points
     BOX3D srcBounds(0.0, 0.0, 1.0, 0.0, 0.0, 30.0);
     Options readerOps;
     readerOps.add("bounds", srcBounds);
@@ -269,16 +260,11 @@ TEST(RustPipelineTest, metadataAggregation)
 
     MetadataNode meta = pipeline.metadata();
     EXPECT_EQ(meta.name(), "pipeline");
-    // Should have child nodes for each stage
     EXPECT_GE(meta.children().size(), 2u);
 }
 
-// Checkpoint 6: I/O Vertical Slice tests
-// These test the full reader -> filter -> writer pipeline through the Rust C ABI.
-
 TEST(RustPipelineTest, fauxReaderThroughPipeline)
 {
-    // Create a Rust FauxReader
     pdal_options_t* fauxOps = pdal_options_create();
     pdal_options_add_u64(fauxOps, "count", 20);
     pdal_options_add_str(fauxOps, "mode", "ramp");
@@ -292,41 +278,24 @@ TEST(RustPipelineTest, fauxReaderThroughPipeline)
     pdal_options_destroy(fauxOps);
     ASSERT_NE(fauxReader, nullptr);
 
-    // Create a Rust pipeline with the FauxReader
     RustPipeline pipeline;
     int64_t readerIdx = pipeline.addReader(fauxReader);
     EXPECT_GE(readerIdx, 0);
 
-    // Execute the pipeline with a C++ FauxReader input view
-    // (reader-driven pipeline through the Rust C ABI)
-    BOX3D srcBounds(0.0, 0.0, 1.0, 0.0, 0.0, 1.0);
-    Options readerOps;
-    readerOps.add("bounds", srcBounds);
-    readerOps.add("mode", "ramp");
-    readerOps.add("count", 1);
-
-    FauxReader cppReader;
-    cppReader.setOptions(readerOps);
-
-    PointTable table;
-    cppReader.prepare(table);
-    PointViewSet readSet = cppReader.execute(table);
-    PointViewPtr dummyView = *readSet.begin();
-
-    PointViewPtr output = pipeline.execute(dummyView);
-    // The Rust reader produces 20 points, ignoring the dummy input
+    PointViewPtr output = pipeline.execute(PointViewPtr());
     ASSERT_NE(output, nullptr);
     EXPECT_EQ(output->size(), 20u);
 
-    // Verify the output has X, Y, Z dimensions
     EXPECT_TRUE(output->hasDim(Dimension::Id::X));
     EXPECT_TRUE(output->hasDim(Dimension::Id::Y));
     EXPECT_TRUE(output->hasDim(Dimension::Id::Z));
+    EXPECT_DOUBLE_EQ(output->getFieldAs<double>(Dimension::Id::X, 19), 19.0);
+    EXPECT_DOUBLE_EQ(output->getFieldAs<double>(Dimension::Id::Y, 19), 19.0);
+    EXPECT_DOUBLE_EQ(output->getFieldAs<double>(Dimension::Id::Z, 19), 20.0);
 }
 
 TEST(RustPipelineTest, fauxReaderFilterWriterPipeline)
 {
-    // Create a Rust FauxReader (30 points)
     pdal_options_t* fauxOps = pdal_options_create();
     pdal_options_add_u64(fauxOps, "count", 30);
     pdal_options_add_str(fauxOps, "mode", "ramp");
@@ -336,7 +305,6 @@ TEST(RustPipelineTest, fauxReaderFilterWriterPipeline)
     pdal_options_destroy(fauxOps);
     ASSERT_NE(fauxReader, nullptr);
 
-    // Create a Rust head filter (take first 10)
     pdal_options_t* headOps = pdal_options_create();
     pdal_options_add_u64(headOps, "count", 10);
     pdal_options_add_str(headOps, "invert", "false");
@@ -344,11 +312,9 @@ TEST(RustPipelineTest, fauxReaderFilterWriterPipeline)
     pdal_options_destroy(headOps);
     ASSERT_NE(headStage, nullptr);
 
-    // Create a Rust NullWriter
     pdal_writer_t* nullWriter = pdal_writer_create_null(nullptr);
     ASSERT_NE(nullWriter, nullptr);
 
-    // Build the pipeline: FauxReader -> HeadFilter -> NullWriter
     RustPipeline pipeline;
     int64_t readerIdx = pipeline.addReader(fauxReader);
     int64_t filterIdx = pipeline.addStage(headStage);
@@ -357,26 +323,9 @@ TEST(RustPipelineTest, fauxReaderFilterWriterPipeline)
     pipeline.addDependency(filterIdx, readerIdx);
     pipeline.addDependency(writerIdx, filterIdx);
 
-    // Execute the pipeline with a dummy input view
-    BOX3D srcBounds(0.0, 0.0, 1.0, 0.0, 0.0, 1.0);
-    Options readerOps;
-    readerOps.add("bounds", srcBounds);
-    readerOps.add("mode", "ramp");
-    readerOps.add("count", 1);
-
-    FauxReader cppReader;
-    cppReader.setOptions(readerOps);
-
-    PointTable table;
-    cppReader.prepare(table);
-    PointViewSet readSet = cppReader.execute(table);
-    PointViewPtr dummyView = *readSet.begin();
-
-    PointViewPtr output = pipeline.execute(dummyView);
-    // Writer consumes all output, so result is empty
+    PointViewPtr output = pipeline.execute(PointViewPtr());
     EXPECT_EQ(output, nullptr);
 
-    // Verify the pipeline ran correctly by checking metadata
     MetadataNode meta = pipeline.metadata();
     EXPECT_EQ(meta.name(), "pipeline");
     EXPECT_GE(meta.children().size(), 3u);

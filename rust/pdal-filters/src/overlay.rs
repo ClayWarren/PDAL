@@ -8,7 +8,7 @@ use pdal_core::stage::{Filter, StageError, Streamable};
 pub struct OverlayFilter {
     dim_name: String,
     datasource: String,
-    _column: String,
+    column: String,
     polygons: Vec<(Geometry, i32)>,
 }
 
@@ -17,7 +17,7 @@ impl OverlayFilter {
         Self {
             dim_name: dim_name.to_string(),
             datasource: datasource.to_string(),
-            _column: column.to_string(),
+            column: column.to_string(),
             polygons: Vec::new(),
         }
     }
@@ -26,7 +26,7 @@ impl OverlayFilter {
         if self.polygons.is_empty() {
             gdal::register_drivers();
             let ds = Vector::open(&self.datasource).map_err(StageError)?;
-            let features = ds.get_features(0).map_err(StageError)?;
+            let features = ds.get_features(0, &self.column).map_err(StageError)?;
             for (wkt, val) in features {
                 let geom = Geometry::from_wkt(&wkt).map_err(StageError)?;
                 self.polygons.push((geom, val));

@@ -6,7 +6,9 @@
 #include <pdal/pdal_types.hpp>
 #include <pdal_capi.h>
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace pdal
@@ -15,9 +17,7 @@ namespace pdal
 class RustPipeline
 {
 public:
-    RustPipeline()
-        : m_pipeline(pdal_pipeline_create())
-    {}
+    RustPipeline() : m_pipeline(pdal_pipeline_create()) {}
 
     ~RustPipeline()
     {
@@ -118,7 +118,9 @@ public:
     /// Note: the input view is consumed by the pipeline.
     uint64_t executeCount(PointViewPtr inView)
     {
-        pdal_point_view_t* rustIn = toRust(*inView);
+        pdal_point_view_t* rustIn = nullptr;
+        if (inView)
+            rustIn = toRust(*inView);
         int64_t count = pdal_pipeline_execute_count(m_pipeline, rustIn);
         // rustIn is consumed by pdal_pipeline_execute_count, do not destroy
 
@@ -157,6 +159,7 @@ public:
 
 private:
     pdal_pipeline_t* m_pipeline;
+    std::vector<std::unique_ptr<PointTable>> m_ownedTables;
 
     // PointView conversion helpers (mirrors RustViewConverter pattern)
 
@@ -224,9 +227,8 @@ private:
             for (auto dim : inView.layout()->dims())
             {
                 double v = inView.getFieldAs<double>(dim, idx);
-                pdal_point_view_set_f64(rustInView, idx,
-                                        inView.layout()->dimName(dim).c_str(),
-                                        v);
+                pdal_point_view_set_f64(
+                    rustInView, idx, inView.layout()->dimName(dim).c_str(), v);
             }
         }
         return rustInView;
@@ -262,8 +264,7 @@ private:
         return srs;
     }
 
-    static PointViewPtr fromRust(pdal_point_view_t* rustOutView,
-                                 PointViewPtr baseView)
+    PointViewPtr fromRust(pdal_point_view_t* rustOutView, PointViewPtr baseView)
     {
         uint64_t outLen = pdal_point_view_length(rustOutView);
         if (outLen == 0)
@@ -276,7 +277,8 @@ private:
             verifyRustDims(rustOutView, outView->layout());
             for (PointId idx = 0; idx < outLen; ++idx)
             {
-                PointId sourceIdx = pdal_point_view_source_index(rustOutView, idx);
+                PointId sourceIdx =
+                    pdal_point_view_source_index(rustOutView, idx);
                 outView->appendPoint(*baseView, sourceIdx);
                 PointId outIdx = outView->size() - 1;
                 for (auto dim : outView->layout()->dims())
@@ -291,37 +293,37 @@ private:
         }
         else
         {
-            // Reader-driven pipeline: build layout from Rust output and
-            // create a standalone view.
-            auto table = std::make_shared<PointTable>();
-            PointLayoutPtr layout = table->layout();
+            m_ownedTables.emplace_back(new PointTable());
+            PointTable& table = *m_ownedTables.back();
+            PointLayoutPtr layout = table.layout();
 
             uint64_t dimCount = pdal_point_view_dim_count(rustOutView);
+            std::vector<std::pair<std::string, Dimension::Id>> dims;
             for (uint64_t i = 0; i < dimCount; ++i)
             {
                 std::string name =
                     takeString(pdal_point_view_dim_name(rustOutView, i));
                 if (!name.empty())
-                    layout->registerDim(Dimension::id(name));
+                {
+                    Dimension::Id id = layout->registerOrAssignDim(
+                        name, Dimension::Type::Double);
+                    if (id != Dimension::Id::Unknown)
+                        dims.push_back(std::make_pair(name, id));
+                }
             }
 
-            table->finalize();
+            table.finalize();
 
-            PointViewPtr outView(new PointView(*table, spatialReference(rustOutView)));
+            PointViewPtr outView(
+                new PointView(table, spatialReference(rustOutView)));
             for (PointId idx = 0; idx < outLen; ++idx)
             {
-                for (uint64_t i = 0; i < dimCount; ++i)
+                outView->point(idx);
+                for (auto dim : dims)
                 {
-                    std::string dimName =
-                        takeString(pdal_point_view_dim_name(rustOutView, i));
-                    if (!dimName.empty())
-                    {
-                        double v = pdal_point_view_get_f64(rustOutView, idx,
-                                                           dimName.c_str());
-                        Dimension::Id id = Dimension::id(dimName);
-                        if (id != Dimension::Id::Unknown)
-                            outView->setField(id, idx, v);
-                    }
+                    double v = pdal_point_view_get_f64(rustOutView, idx,
+                                                       dim.first.c_str());
+                    outView->setField(dim.second, idx, v);
                 }
             }
             return outView;
@@ -338,7 +340,8 @@ private:
             switch (kind)
             {
             case 0: // String
-                node.add("value", takeString(pdal_metadata_node_value(rustNode)));
+                node.add("value",
+                         takeString(pdal_metadata_node_value(rustNode)));
                 break;
             case 1: // I64
                 node.add("value", pdal_metadata_node_value_i64(rustNode));

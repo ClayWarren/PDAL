@@ -195,9 +195,23 @@ add_subdirectory(tools)
 # Rust C ABI integration - define early so apps/CMakeLists.txt can use it.
 #
 set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
+set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
+set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
+file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
+    "${RUST_CAPI_DIR}/Cargo.toml"
+    "${RUST_CAPI_DIR}/Cargo.lock"
+    "${RUST_CAPI_DIR}/pdal-capi/*"
+    "${RUST_CAPI_DIR}/pdal-core/*"
+    "${RUST_CAPI_DIR}/pdal-filters/*"
+    "${RUST_CAPI_DIR}/pdal-cli/*"
+)
 set(RUST_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
 if(APPLE AND NOT RUST_MACOSX_DEPLOYMENT_TARGET)
     set(RUST_MACOSX_DEPLOYMENT_TARGET "16.0")
+endif()
+find_program(CARGO_EXECUTABLE cargo)
+if(NOT CARGO_EXECUTABLE)
+    message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
 endif()
 
 add_subdirectory(apps)
@@ -259,22 +273,6 @@ add_library(PDAL::PDAL ALIAS ${PDAL_LIB_NAME})
 #
 # Rust C ABI integration (spike: filters.decimation)
 #
-set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
-set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
-file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
-    "${RUST_CAPI_DIR}/Cargo.toml"
-    "${RUST_CAPI_DIR}/Cargo.lock"
-    "${RUST_CAPI_DIR}/pdal-capi/*"
-    "${RUST_CAPI_DIR}/pdal-core/*"
-    "${RUST_CAPI_DIR}/pdal-filters/*"
-    "${RUST_CAPI_DIR}/pdal-cli/*"
-)
-
-find_program(CARGO_EXECUTABLE cargo)
-if(NOT CARGO_EXECUTABLE)
-    message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
-endif()
-
 add_custom_command(
     OUTPUT ${RUST_CAPI_LIB}
     COMMAND ${CMAKE_COMMAND} -E env
@@ -287,9 +285,6 @@ add_custom_command(
 add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
 add_dependencies(${PDAL_LIB_NAME} pdal_rust_capi)
 
-#
-# Rust kernel dispatch C ABI wrapper (compiled into the PDAL library).
-#
 target_include_directories(${PDAL_LIB_NAME}
     PRIVATE
         ${RUST_CAPI_HEADER_DIR}
@@ -336,7 +331,6 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${PDAL_LAZPERF_LIB_NAME}
         ${UTFCPP_LIB_NAME}
         ${BACKTRACE_LIBRARIES}
-        ${RUST_CAPI_LIB}
         ${GEOS_C_LIBRARY}
        "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     PUBLIC
@@ -344,6 +338,11 @@ target_link_libraries(${PDAL_LIB_NAME}
     INTERFACE
         ${PDAL_LIBDIR}
         ${WINSOCK_LIBRARY}
+)
+
+target_link_libraries(${PDAL_LIB_NAME}
+    PRIVATE
+        ${RUST_CAPI_LIB}
 )
 
 if (ZSTD_FOUND)

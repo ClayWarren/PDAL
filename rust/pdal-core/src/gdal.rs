@@ -133,19 +133,32 @@ impl Vector {
         }
     }
 
-    pub fn get_features(&self, layer_idx: i32) -> Result<Vec<(String, i32)>, String> {
+    pub fn get_features(&self, layer_idx: i32, column: &str) -> Result<Vec<(String, i32)>, String> {
         unsafe {
             let mut result = Vec::new();
             let layer = gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx);
             if layer.is_null() {
                 return Err("Failed to get layer".to_string());
             }
+            gdal_sys::OGR_L_ResetReading(layer);
 
             loop {
                 let feature = gdal_sys::OGR_L_GetNextFeature(layer);
                 if feature.is_null() {
                     break;
                 }
+
+                let field_idx = if column.is_empty() {
+                    1
+                } else {
+                    let column_c = CString::new(column).map_err(|e| e.to_string())?;
+                    let idx = gdal_sys::OGR_F_GetFieldIndex(feature, column_c.as_ptr());
+                    if idx < 0 {
+                        gdal_sys::OGR_F_Destroy(feature);
+                        return Err(format!("No column name '{}' was found.", column));
+                    }
+                    idx
+                };
 
                 let geom = gdal_sys::OGR_F_GetGeometryRef(feature);
                 if !geom.is_null() {
@@ -156,8 +169,7 @@ impl Vector {
                             .into_owned();
                         gdal_sys::VSIFree(wkt_ptr as *mut _);
 
-                        // Default to first field for now
-                        let val = gdal_sys::OGR_F_GetFieldAsInteger(feature, 1);
+                        let val = gdal_sys::OGR_F_GetFieldAsInteger(feature, field_idx);
                         result.push((wkt, val));
                     }
                 }
