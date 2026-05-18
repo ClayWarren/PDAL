@@ -372,6 +372,18 @@ Current status:
   writer flow. Binary and compressed PCD are intentionally deferred.
 - Installed-PDAL regression for the ASCII PCD slice is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pcd_regression -- --ignored`.
+- `readers.pts` has a Rust implementation for Leica PTS ASCII fixtures,
+  including declared point counts, 3/4/7-field layouts, intensity offset
+  mapping, skipped malformed rows, and reader -> decimation -> PCD writer
+  installed-PDAL regression coverage.
+- `readers.ptx` has a Rust implementation for Leica PTX ASCII fixtures,
+  including single/multiple clouds, optional RGB, missing-point discard,
+  transform application, intensity scaling, and reader -> decimation -> PCD
+  writer installed-PDAL regression coverage.
+- Installed-PDAL regressions for these readers are available with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pts_regression -- --ignored`
+  and
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ptx_regression -- --ignored`.
 - The next I/O target should still be local and deterministic. Avoid binary,
   compression-backed, GDAL-backed, LAS/LAZ, or remote reader/writer work.
 
