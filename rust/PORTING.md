@@ -518,7 +518,8 @@ Current Rust core primitives:
   bounds calculation.
 - Stage model: filter and streamable traits for Rust-backed stages.
 - Pipeline model: minimal reader/filter/writer DAG execution, tags,
-  dependencies, metadata aggregation, and error propagation.
+  dependencies, metadata aggregation, execution summaries, and error
+  propagation.
 - Options: string-keyed typed getters matching PDAL's option flow.
 - Expressions: conditional/math/assignment parser and evaluator used by the
   Rust-backed expression/assign work.

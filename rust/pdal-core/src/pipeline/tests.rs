@@ -185,6 +185,24 @@ fn make_test_view(count: u64) -> PointView {
     view
 }
 
+fn make_xyz_view(points: &[(f64, f64, f64)]) -> PointView {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    let layout = Rc::new(layout);
+    let mut view = PointView::new(layout);
+
+    for &(x, y, z) in points {
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, x);
+        view.set_f64(point, &DimId::Y, y);
+        view.set_f64(point, &DimId::Z, z);
+    }
+
+    view
+}
+
 #[test]
 fn test_empty_pipeline_returns_input() {
     let mut pipeline = Pipeline::new();
@@ -465,6 +483,62 @@ fn test_execute_result() {
     let result = pipeline.execute_with_result(views).unwrap();
     assert_eq!(result.point_count, 42);
     assert_eq!(result.view_count, 1);
+    assert_eq!(
+        result.bounds_2d,
+        Some(crate::point::Bounds2D {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+        })
+    );
+    assert_eq!(
+        result.bounds_3d,
+        Some(crate::point::Bounds3D {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+            minz: 0.0,
+            maxz: 0.0,
+        })
+    );
+}
+
+#[test]
+fn test_execute_result_aggregates_bounds_across_views() {
+    let mut pipeline = Pipeline::new();
+    pipeline.add_stage(
+        "filters.duplicate",
+        Box::new(FilterWrapper::new(DuplicateFilter::new())),
+        Options::new(),
+    );
+
+    let views = vec![make_xyz_view(&[(-10.0, 5.0, 100.0), (20.0, -15.0, -50.0)])];
+    let result = pipeline.execute_with_result(views).unwrap();
+
+    assert_eq!(result.point_count, 4);
+    assert_eq!(result.view_count, 2);
+    assert_eq!(
+        result.bounds_2d,
+        Some(crate::point::Bounds2D {
+            minx: -10.0,
+            maxx: 20.0,
+            miny: -15.0,
+            maxy: 5.0,
+        })
+    );
+    assert_eq!(
+        result.bounds_3d,
+        Some(crate::point::Bounds3D {
+            minx: -10.0,
+            maxx: 20.0,
+            miny: -15.0,
+            maxy: 5.0,
+            minz: -50.0,
+            maxz: 100.0,
+        })
+    );
 }
 
 #[test]

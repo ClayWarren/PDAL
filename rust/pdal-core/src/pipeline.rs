@@ -14,7 +14,7 @@ pub use traits::{Reader, StageKind, StageWrapper, Writer};
 
 use crate::metadata::MetadataNode;
 use crate::options::Options;
-use crate::point::PointView;
+use crate::point::{Bounds2D, Bounds3D, PointView};
 use crate::stage::StageError;
 use adapters::{ReaderAdapter, WriterAdapter};
 use std::collections::{HashMap, HashSet};
@@ -33,6 +33,8 @@ pub struct StageNode {
 pub struct ExecResult {
     pub point_count: u64,
     pub view_count: usize,
+    pub bounds_2d: Option<Bounds2D>,
+    pub bounds_3d: Option<Bounds3D>,
 }
 
 /// A pipeline of stages represented as a DAG.
@@ -317,6 +319,8 @@ impl Pipeline {
         Ok(ExecResult {
             point_count,
             view_count: views.len(),
+            bounds_2d: aggregate_bounds_2d(&views),
+            bounds_3d: aggregate_bounds_3d(&views),
         })
     }
 
@@ -345,4 +349,40 @@ impl Pipeline {
     pub fn stage_mut(&mut self, idx: usize) -> Option<&mut StageNode> {
         self.nodes.get_mut(idx)
     }
+}
+
+fn aggregate_bounds_2d(views: &[PointView]) -> Option<Bounds2D> {
+    views
+        .iter()
+        .filter_map(PointView::calculate_bounds_2d)
+        .fold(None, |acc, bounds| {
+            Some(match acc {
+                Some(existing) => Bounds2D {
+                    minx: existing.minx.min(bounds.minx),
+                    maxx: existing.maxx.max(bounds.maxx),
+                    miny: existing.miny.min(bounds.miny),
+                    maxy: existing.maxy.max(bounds.maxy),
+                },
+                None => bounds,
+            })
+        })
+}
+
+fn aggregate_bounds_3d(views: &[PointView]) -> Option<Bounds3D> {
+    views
+        .iter()
+        .filter_map(PointView::calculate_bounds_3d)
+        .fold(None, |acc, bounds| {
+            Some(match acc {
+                Some(existing) => Bounds3D {
+                    minx: existing.minx.min(bounds.minx),
+                    maxx: existing.maxx.max(bounds.maxx),
+                    miny: existing.miny.min(bounds.miny),
+                    maxy: existing.maxy.max(bounds.maxy),
+                    minz: existing.minz.min(bounds.minz),
+                    maxz: existing.maxz.max(bounds.maxz),
+                },
+                None => bounds,
+            })
+        })
 }
