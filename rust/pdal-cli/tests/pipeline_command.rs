@@ -1,0 +1,69 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+#[test]
+fn pipeline_command_runs_text_pipeline() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-command");
+    let output = temp.join("out.txt");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.text","filename":"{}"}},
+  {{"type":"filters.decimation","step":2}},
+  {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
+]
+"#,
+            escape_json_path(&input),
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg(&pipeline)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let text = fs::read_to_string(output).unwrap();
+    assert!(text.starts_with("X,Y,Z\n"));
+    assert!(text.lines().count() > 1);
+}
+
+#[test]
+fn unknown_command_fails_cleanly() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("info")
+        .output()
+        .unwrap();
+
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("Unknown Rust command 'info'"));
+}
+
+fn make_temp_dir(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn escape_json_path(path: &Path) -> String {
+    path.display()
+        .to_string()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+}
