@@ -208,6 +208,39 @@ mod tests {
     }
 
     #[test]
+    fn point_view_dimension_summaries_serialize_through_c_abi() {
+        unsafe {
+            let layout = pdal_point_layout_create();
+            let x = CString::new("X").unwrap();
+            let intensity = CString::new("Intensity").unwrap();
+            pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+            pdal_point_layout_register_dim(layout, intensity.as_ptr(), 1);
+            let view = pdal_point_view_create(layout);
+
+            for (x_value, intensity_value) in [(-10.0, 7.0), (20.0, 3.0), (2.0, 5.0)] {
+                let point = pdal_point_view_add_point(view);
+                pdal_point_view_set_f64(view, point, x.as_ptr(), x_value);
+                pdal_point_view_set_f64(view, point, intensity.as_ptr(), intensity_value);
+            }
+
+            let json: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_point_view_dimension_summaries_json(view)))
+                    .unwrap();
+            assert_eq!(json[0]["name"], "X");
+            assert_eq!(json[0]["count"], 3);
+            assert_eq!(json[0]["minimum"], -10.0);
+            assert_eq!(json[0]["maximum"], 20.0);
+            assert_eq!(json[0]["mean"], 4.0);
+            assert_eq!(json[1]["name"], "Intensity");
+            assert_eq!(json[1]["minimum"], 3.0);
+            assert_eq!(json[1]["maximum"], 7.0);
+            assert_eq!(json[1]["mean"], 5.0);
+
+            pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
     fn pipeline_result_roundtrips_through_c_abi() {
         unsafe {
             let json = CString::new(

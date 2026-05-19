@@ -1,5 +1,7 @@
-use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use crate::error::string_to_c_ptr;
+use pdal_core::point::{DimId, DimType, DimensionSummary, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
+use serde_json::json;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::rc::Rc;
@@ -388,6 +390,31 @@ pub unsafe extern "C" fn pdal_point_view_calculate_bounds_3d(
     true
 }
 
+/// Return per-dimension summaries for a view as JSON. Caller must free with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `view` must be null or a valid pointer returned by
+/// `pdal_point_view_create`, or returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_dimension_summaries_json(
+    view: *const PointView,
+) -> *mut c_char {
+    let summaries = view
+        .as_ref()
+        .map(|view| {
+            serde_json::Value::Array(
+                view.summarize_dimensions()
+                    .iter()
+                    .map(dimension_summary_json)
+                    .collect(),
+            )
+        })
+        .unwrap_or_else(|| json!([]));
+    string_to_c_ptr(serde_json::to_string(&summaries).unwrap_or_else(|_| "[]".to_string()))
+}
+
 /// Destroy a point view.
 ///
 /// # Safety
@@ -399,4 +426,14 @@ pub unsafe extern "C" fn pdal_point_view_destroy(view: *mut PointView) {
     if !view.is_null() {
         drop(Box::from_raw(view));
     }
+}
+
+fn dimension_summary_json(summary: &DimensionSummary) -> serde_json::Value {
+    json!({
+        "name": summary.name,
+        "count": summary.count,
+        "minimum": summary.minimum,
+        "maximum": summary.maximum,
+        "mean": summary.mean,
+    })
 }

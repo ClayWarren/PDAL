@@ -518,7 +518,8 @@ Current Rust core primitives:
   tracking, per-view spatial reference storage, mesh face storage, and 2D/3D
   bounds calculation.
 - Point summaries: basic per-dimension count/min/max/mean over a view, for
-  later `info`-style reporting without running a filter as a side effect.
+  later `info`-style reporting without running a filter as a side effect. The
+  C ABI exposes these summaries as Rust-owned JSON.
 - Stage model: filter and streamable traits for Rust-backed stages.
 - Pipeline model: minimal reader/filter/writer DAG execution, tags,
   dependencies, metadata aggregation, execution summaries, and error
