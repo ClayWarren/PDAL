@@ -94,7 +94,11 @@ struct SMRArgs
     Arg* m_windowArg;
 };
 
-SMRFilter::SMRFilter() : m_args(new SMRArgs) {}
+SMRFilter::SMRFilter()
+    : m_rows(0), m_cols(0), m_args(new SMRArgs),
+      m_groundClass(ClassLabel::Ground),
+      m_otherClass(ClassLabel::Unclassified), m_onlyGround(false)
+{}
 
 SMRFilter::~SMRFilter() {}
 

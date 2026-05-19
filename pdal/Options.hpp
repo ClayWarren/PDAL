@@ -42,6 +42,9 @@
 #include <memory>
 #include <vector>
 
+struct pdal_options;
+typedef struct pdal_options pdal_options_t;
+
 namespace pdal
 {
 
@@ -130,9 +133,20 @@ class PDAL_EXPORT Options
                                                 const Options&);
 
 public:
-    Options() {}
+    Options();
+
+    Options(const Options& other);
+
+    Options(Options&& other) noexcept;
+
+    Options& operator=(const Options& other);
+
+    Options& operator=(Options&& other) noexcept;
+
+    ~Options();
 
     explicit Options(const Option& opt)
+        : Options()
     {
         add(opt);
     }
@@ -219,11 +233,15 @@ public:
 
 private:
     std::multimap<std::string, Option> m_options;
+    pdal_options_t* m_rustOptions;
 
     static Options fromJsonFile(const std::string& filename,
                                 const std::string& s);
     static Options fromCmdlineFile(const std::string& filename,
                                    const std::string& s);
+
+    void resetRustOptions();
+    void syncRustOption(const Option& option);
 };
 typedef std::map<std::string, Options> OptionsMap;
 

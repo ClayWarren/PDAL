@@ -5,7 +5,7 @@ namespace pdal
 namespace expr
 {
 
-Node::Node(NodeType type) : m_type(type) {}
+Node::Node(NodeType type) : m_type(type), m_pos(0), m_level(0) {}
 
 Node::~Node() {}
 

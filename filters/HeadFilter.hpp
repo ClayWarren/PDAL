@@ -53,9 +53,9 @@ public:
     std::string getName() const override;
 
 private:
-    point_count_t m_count;
-    point_count_t m_index;
-    bool m_invert;
+    point_count_t m_count = 10;
+    point_count_t m_index = 0;
+    bool m_invert = false;
 
     pdal_stage* m_rust_stage = nullptr;
 

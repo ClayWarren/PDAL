@@ -66,7 +66,8 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     Config()
         : m_trajectoryFile(""), m_coordinateSystem("NED"), m_timeOffset(0.0),
-          m_reverse(false), m_transformBeam(false), m_trajectory(nullptr)
+          m_reverse(false), m_transformBeam(false), m_trajectory(nullptr),
+          m_ned(false)
     {
     }
     void init()

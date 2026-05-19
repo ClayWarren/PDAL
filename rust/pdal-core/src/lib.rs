@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod options;
 pub mod pipeline;
 pub mod point;
+pub mod scaling;
 pub mod spatial;
 pub mod srs;
 pub mod stage;

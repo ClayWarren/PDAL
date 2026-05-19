@@ -26,6 +26,12 @@ pdal_options_t* pdal_options_create();
 void pdal_options_add_f64(pdal_options_t* ops, const char* key, double value);
 void pdal_options_add_u64(pdal_options_t* ops, const char* key, uint64_t value);
 void pdal_options_add_str(pdal_options_t* ops, const char* key, const char* value);
+bool pdal_options_has(const pdal_options_t* ops, const char* key);
+uint64_t pdal_options_count(const pdal_options_t* ops);
+char* pdal_options_key(const pdal_options_t* ops, uint64_t index);
+char* pdal_options_entry_value(const pdal_options_t* ops, uint64_t index);
+char* pdal_options_value(const pdal_options_t* ops, const char* key);
+char* pdal_options_command_line_json(const pdal_options_t* ops);
 void pdal_options_destroy(pdal_options_t* ops);
 
 // PointLayout
@@ -75,6 +81,25 @@ double pdal_spatial_reference_epoch(const pdal_spatial_reference_t* srs);
 void pdal_spatial_reference_set_epoch(pdal_spatial_reference_t* srs, double epoch);
 pdal_metadata_node_t* pdal_spatial_reference_to_metadata(const pdal_spatial_reference_t* srs);
 void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);
+
+// Scaling
+typedef struct {
+    bool is_auto;
+    double value;
+} pdal_xform_component_t;
+
+typedef struct {
+    pdal_xform_component_t offset;
+    pdal_xform_component_t scale;
+} pdal_xform_t;
+
+typedef struct {
+    pdal_xform_t x;
+    pdal_xform_t y;
+    pdal_xform_t z;
+} pdal_scaling_t;
+
+bool pdal_scaling_set_auto_xform(const double* xs, const double* ys, const double* zs, uint64_t count, pdal_scaling_t* scaling);
 
 // Metadata
 pdal_metadata_node_t* pdal_metadata_node_create(const char* name);

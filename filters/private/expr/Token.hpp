@@ -60,6 +60,8 @@ public:
           std::string::size_type end)
         : m_type(type), m_start(start), m_end(end)
     {
+        m_val.s = "";
+        m_val.d = 0;
     }
 
     Token(TokenType type, const std::string& sval)
@@ -69,9 +71,17 @@ public:
         m_val.d = 0;
     }
 
-    Token(TokenType type) : m_type(type), m_start(0), m_end(0) {}
+    Token(TokenType type) : m_type(type), m_start(0), m_end(0)
+    {
+        m_val.s = "";
+        m_val.d = 0;
+    }
 
-    Token() : m_type(TokenType::Error), m_start(0), m_end(0) {}
+    Token() : m_type(TokenType::Error), m_start(0), m_end(0)
+    {
+        m_val.s = "";
+        m_val.d = 0;
+    }
 
     TokenType type() const
     {

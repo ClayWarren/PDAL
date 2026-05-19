@@ -74,7 +74,10 @@ struct NormalArgs
     bool m_refine;
 };
 
-NormalFilter::NormalFilter() : m_args(new NormalArgs), m_count(0) {}
+NormalFilter::NormalFilter()
+    : m_args(new NormalArgs), m_count(0), m_viewpointArg(nullptr),
+      m_radiusArg(nullptr), m_knnArg(nullptr)
+{}
 
 NormalFilter::~NormalFilter() {}
 

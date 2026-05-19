@@ -314,6 +314,9 @@ target_include_directories(${PDAL_LIB_NAME}
 )
 
 find_library(GEOS_C_LIBRARY NAMES geos_c)
+if (APPLE)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+endif()
 
 target_link_libraries(${PDAL_LIB_NAME}
     PRIVATE
@@ -332,6 +335,7 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${UTFCPP_LIB_NAME}
         ${BACKTRACE_LIBRARIES}
         ${GEOS_C_LIBRARY}
+        ${COREFOUNDATION_FRAMEWORK}
        "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     PUBLIC
         ${WINSOCK_LIBRARY}

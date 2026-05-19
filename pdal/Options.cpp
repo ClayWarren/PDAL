@@ -37,6 +37,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/private/JsonSupport.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <iostream>
 #include <sstream>
@@ -71,22 +72,83 @@ bool Option::nameValid(const std::string& name, bool reportError)
 
 //---------------------------------------------------------------------------
 
+Options::Options() : m_rustOptions(pdal_options_create())
+{}
+
+Options::Options(const Options& other) : m_options(other.m_options), m_rustOptions(nullptr)
+{
+    resetRustOptions();
+}
+
+Options::Options(Options&& other) noexcept
+    : m_options(std::move(other.m_options)), m_rustOptions(other.m_rustOptions)
+{
+    other.m_rustOptions = nullptr;
+}
+
+Options& Options::operator=(const Options& other)
+{
+    if (this != &other)
+    {
+        m_options = other.m_options;
+        resetRustOptions();
+    }
+    return *this;
+}
+
+Options& Options::operator=(Options&& other) noexcept
+{
+    if (this != &other)
+    {
+        pdal_options_destroy(m_rustOptions);
+        m_options = std::move(other.m_options);
+        m_rustOptions = other.m_rustOptions;
+        other.m_rustOptions = nullptr;
+    }
+    return *this;
+}
+
+Options::~Options()
+{
+    pdal_options_destroy(m_rustOptions);
+}
+
+void Options::syncRustOption(const Option& option)
+{
+    if (m_rustOptions)
+        pdal_options_add_str(m_rustOptions, option.getName().c_str(),
+                             option.getValue().c_str());
+}
+
+void Options::resetRustOptions()
+{
+    pdal_options_destroy(m_rustOptions);
+    m_rustOptions = pdal_options_create();
+    for (const auto& op : m_options)
+        syncRustOption(op.second);
+}
+
 void Options::add(const Option& option)
 {
     assert(Option::nameValid(option.getName(), true));
     m_options.insert({option.getName(), option});
+    syncRustOption(option);
 }
 
 void Options::add(const Options& o)
 {
-    m_options.insert(o.m_options.begin(), o.m_options.end());
+    for (const auto& op : o.m_options)
+        add(op.second);
 }
 
 void Options::addConditional(const Option& option)
 {
     assert(Option::nameValid(option.getName(), true));
     if (m_options.find(option.getName()) == m_options.end())
+    {
         m_options.insert({option.getName(), option});
+        syncRustOption(option);
+    }
 }
 
 void Options::addConditional(const Options& other)
@@ -98,7 +160,9 @@ void Options::addConditional(const Options& other)
         {
             do
             {
+                const Option option = oi->second;
                 m_options.insert(*oi++);
+                syncRustOption(option);
             } while (oi != other.m_options.end() && name == oi->first);
         }
         else
@@ -109,6 +173,7 @@ void Options::addConditional(const Options& other)
 void Options::remove(const Option& option)
 {
     m_options.erase(option.getName());
+    resetRustOptions();
 }
 
 void Options::toMetadata(MetadataNode& parent) const
@@ -125,22 +190,9 @@ std::vector<Option> Options::getOptions(std::string const& name) const
 {
     std::vector<Option> output;
 
-    // If we have an empty name, return them all
-    if (name.empty())
-    {
-        for (auto it = m_options.begin(); it != m_options.end(); ++it)
-        {
+    for (auto it = m_options.begin(); it != m_options.end(); ++it)
+        if (name.empty() || it->first == name)
             output.push_back(it->second);
-        }
-    }
-    else
-    {
-        auto ret = m_options.equal_range(name);
-        for (auto it = ret.first; it != ret.second; ++it)
-        {
-            output.push_back(it->second);
-        }
-    }
     return output;
 }
 
@@ -152,6 +204,24 @@ std::vector<Option> Options::getOptions(std::string const& name) const
 StringList Options::toCommandLine() const
 {
     StringList s;
+
+    if (m_rustOptions)
+    {
+        char* json = pdal_options_command_line_json(m_rustOptions);
+        if (json)
+        {
+            try
+            {
+                NL::json args = NL::json::parse(json);
+                pdal_string_free(json);
+                return args.get<StringList>();
+            }
+            catch (NL::json::exception&)
+            {
+                pdal_string_free(json);
+            }
+        }
+    }
 
     for (const auto& op : m_options)
     {

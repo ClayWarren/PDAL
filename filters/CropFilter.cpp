@@ -81,7 +81,7 @@ std::string CropFilter::getName() const
     return s_info.name;
 }
 
-CropFilter::CropFilter() : m_args(new CropArgs) {}
+CropFilter::CropFilter() : m_args(new CropArgs), m_distance2(0.0) {}
 
 CropFilter::~CropFilter() {}
 

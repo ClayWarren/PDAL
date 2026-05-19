@@ -43,12 +43,14 @@ struct Result
     {
         m_dval = d;
         m_bval = false;
+        m_type = Type::Val;
     }
 
     Result(bool b)
     {
         m_bval = b;
         m_dval = 0;
+        m_type = Type::Bool;
     }
 
     enum class Type

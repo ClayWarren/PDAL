@@ -32,9 +32,40 @@
  ****************************************************************************/
 
 #include <pdal/Scaling.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
+
+namespace
+{
+
+pdal_xform_component_t toRustComponent(const XForm::XFormComponent& component)
+{
+    return {component.m_auto, component.m_val};
+}
+
+pdal_xform_t toRustXForm(const XForm& xform)
+{
+    return {toRustComponent(xform.m_offset), toRustComponent(xform.m_scale)};
+}
+
+void fromRustComponent(const pdal_xform_component_t& rustComponent,
+                       XForm::XFormComponent& component)
+{
+    component.m_auto = rustComponent.is_auto;
+    component.m_val = rustComponent.value;
+}
+
+void fromRustXForm(const pdal_xform_t& rustXForm, XForm& xform)
+{
+    fromRustComponent(rustXForm.offset, xform.m_offset);
+    fromRustComponent(rustXForm.scale, xform.m_scale);
+}
+
+} // unnamed namespace
 
 void Scaling::addArgs(ProgramArgs& args)
 {
@@ -58,65 +89,28 @@ void Scaling::setAutoXForm(const PointViewSet& pvSet)
     if (!xmod && !ymod && !zmod)
         return;
 
-    double xmin = (std::numeric_limits<double>::max)();
-    double xmax = (std::numeric_limits<double>::lowest)();
-    double ymin = (std::numeric_limits<double>::max)();
-    double ymax = (std::numeric_limits<double>::lowest)();
-    double zmin = (std::numeric_limits<double>::max)();
-    double zmax = (std::numeric_limits<double>::lowest)();
+    std::vector<double> xs;
+    std::vector<double> ys;
+    std::vector<double> zs;
 
     for (const PointViewPtr& view : pvSet)
     {
-        if (xmod)
-            for (PointId idx = 0; idx < view->size(); idx++)
-            {
-                double x = view->getFieldAs<double>(Dimension::Id::X, idx);
-                xmin = (std::min)(x, xmin);
-                xmax = (std::max)(x, xmax);
-            }
-        if (ymod)
-            for (PointId idx = 0; idx < view->size(); idx++)
-            {
-                double y = view->getFieldAs<double>(Dimension::Id::Y, idx);
-                ymin = (std::min)(y, ymin);
-                ymax = (std::max)(y, ymax);
-            }
-        if (zmod)
-            for (PointId idx = 0; idx < view->size(); idx++)
-            {
-                double z = view->getFieldAs<double>(Dimension::Id::Z, idx);
-                zmin = (std::min)(z, zmin);
-                zmax = (std::max)(z, zmax);
-            }
+        for (PointId idx = 0; idx < view->size(); idx++)
+        {
+            xs.push_back(view->getFieldAs<double>(Dimension::Id::X, idx));
+            ys.push_back(view->getFieldAs<double>(Dimension::Id::Y, idx));
+            zs.push_back(view->getFieldAs<double>(Dimension::Id::Z, idx));
+        }
     }
 
-    if (m_xXform.m_offset.m_auto)
-        m_xXform.m_offset.m_val = 0.5 * xmin + 0.5 * xmax;
-    if (m_yXform.m_offset.m_auto)
-        m_yXform.m_offset.m_val = 0.5 * ymin + 0.5 * ymax;
-    if (m_zXform.m_offset.m_auto)
-        m_zXform.m_offset.m_val = 0.5 * zmin + 0.5 * zmax;
-
-    if (m_xXform.m_scale.m_auto)
+    pdal_scaling_t rustScaling = {toRustXForm(m_xXform), toRustXForm(m_yXform),
+                                  toRustXForm(m_zXform)};
+    if (pdal_scaling_set_auto_xform(xs.data(), ys.data(), zs.data(), xs.size(),
+                                    &rustScaling))
     {
-        xmax = (std::max)(std::abs(xmax - m_xXform.m_offset.m_val),
-                          std::abs(xmin - m_xXform.m_offset.m_val));
-        m_xXform.m_scale.m_val =
-            xmax ? xmax / (std::numeric_limits<int>::max)() : 1.;
-    }
-    if (m_yXform.m_scale.m_auto)
-    {
-        ymax = (std::max)(std::abs(ymax - m_yXform.m_offset.m_val),
-                          std::abs(ymin - m_yXform.m_offset.m_val));
-        m_yXform.m_scale.m_val =
-            ymax ? ymax / (std::numeric_limits<int>::max)() : 1.;
-    }
-    if (m_zXform.m_scale.m_auto)
-    {
-        zmax = (std::max)(std::abs(zmax - m_zXform.m_offset.m_val),
-                          std::abs(zmin - m_zXform.m_offset.m_val));
-        m_zXform.m_scale.m_val =
-            zmax ? zmax / (std::numeric_limits<int>::max)() : 1.;
+        fromRustXForm(rustScaling.x, m_xXform);
+        fromRustXForm(rustScaling.y, m_yXform);
+        fromRustXForm(rustScaling.z, m_zXform);
     }
 }
 

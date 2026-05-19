@@ -94,7 +94,8 @@ private:
     {
     public:
         Cell()
-            : m_point({std::numeric_limits<double>::quiet_NaN(),
+            : m_inside(false),
+              m_point({std::numeric_limits<double>::quiet_NaN(),
                        std::numeric_limits<double>::quiet_NaN()})
         {
         }

@@ -84,7 +84,10 @@ struct CSArgs
     std::string m_dir;
 };
 
-CSFilter::CSFilter() : m_args(new CSArgs) {}
+CSFilter::CSFilter()
+    : m_args(new CSArgs), m_groundClass(ClassLabel::Ground),
+      m_otherClass(ClassLabel::Unclassified), m_onlyGround(false)
+{}
 
 CSFilter::~CSFilter() {}
 

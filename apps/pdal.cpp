@@ -62,7 +62,11 @@ std::string headline(Utils::screenWidth(), '-');
 class App
 {
 public:
-    App() : m_out(std::cout) {}
+    App()
+        : m_out(std::cout), m_debug(false), m_logLevel(LogLevel::Error),
+          m_showDrivers(false), m_help(false), m_showCommands(false),
+          m_showVersion(false), m_showJSON(false), m_logtiming(false)
+    {}
 
     int execute(StringList& cmdArgs, LogPtr& log);
 
