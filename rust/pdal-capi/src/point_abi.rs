@@ -4,6 +4,26 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::rc::Rc;
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct pdal_bounds2d_t {
+    pub minx: f64,
+    pub maxx: f64,
+    pub miny: f64,
+    pub maxy: f64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct pdal_bounds3d_t {
+    pub minx: f64,
+    pub maxx: f64,
+    pub miny: f64,
+    pub maxy: f64,
+    pub minz: f64,
+    pub maxz: f64,
+}
+
 /// Map a C string dimension name to the Rust `DimId` enum.
 pub(crate) fn dim_id_from_name(name: &str) -> DimId {
     match name {
@@ -298,6 +318,74 @@ pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx:
     } else {
         idx
     }
+}
+
+/// Calculate 2D bounds for X/Y dimensions.
+///
+/// Returns false when `view` or `out_bounds` is null, the view is empty, or X/Y
+/// are not registered in the view's layout.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`. `out_bounds` must point to writable memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_calculate_bounds_2d(
+    view: *const PointView,
+    out_bounds: *mut pdal_bounds2d_t,
+) -> bool {
+    let Some(view) = view.as_ref() else {
+        return false;
+    };
+    let Some(bounds) = view.calculate_bounds_2d() else {
+        return false;
+    };
+    let Some(out_bounds) = out_bounds.as_mut() else {
+        return false;
+    };
+
+    *out_bounds = pdal_bounds2d_t {
+        minx: bounds.minx,
+        maxx: bounds.maxx,
+        miny: bounds.miny,
+        maxy: bounds.maxy,
+    };
+    true
+}
+
+/// Calculate 3D bounds for X/Y/Z dimensions.
+///
+/// Returns false when `view` or `out_bounds` is null, the view is empty, or
+/// X/Y/Z are not registered in the view's layout.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`. `out_bounds` must point to writable memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_calculate_bounds_3d(
+    view: *const PointView,
+    out_bounds: *mut pdal_bounds3d_t,
+) -> bool {
+    let Some(view) = view.as_ref() else {
+        return false;
+    };
+    let Some(bounds) = view.calculate_bounds_3d() else {
+        return false;
+    };
+    let Some(out_bounds) = out_bounds.as_mut() else {
+        return false;
+    };
+
+    *out_bounds = pdal_bounds3d_t {
+        minx: bounds.minx,
+        maxx: bounds.maxx,
+        miny: bounds.miny,
+        maxy: bounds.maxy,
+        minz: bounds.minz,
+        maxz: bounds.maxz,
+    };
+    true
 }
 
 /// Destroy a point view.

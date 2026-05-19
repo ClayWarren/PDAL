@@ -103,6 +103,111 @@ mod tests {
     }
 
     #[test]
+    fn point_view_bounds_roundtrip_through_c_abi() {
+        unsafe {
+            let layout = pdal_point_layout_create();
+            for dim in ["X", "Y", "Z"] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+            }
+            let view = pdal_point_view_create(layout);
+
+            for (x, y, z) in [(-10.0, 5.0, 100.0), (20.0, -15.0, -50.0), (3.0, 7.0, 25.0)] {
+                let point = pdal_point_view_add_point(view);
+                for (dim, value) in [("X", x), ("Y", y), ("Z", z)] {
+                    let name = CString::new(dim).unwrap();
+                    pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+                }
+            }
+
+            let mut bounds2d = pdal_bounds2d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+            };
+            assert!(pdal_point_view_calculate_bounds_2d(view, &mut bounds2d));
+            assert_eq!(
+                bounds2d,
+                pdal_bounds2d_t {
+                    minx: -10.0,
+                    maxx: 20.0,
+                    miny: -15.0,
+                    maxy: 7.0,
+                }
+            );
+
+            let mut bounds3d = pdal_bounds3d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+                minz: 0.0,
+                maxz: 0.0,
+            };
+            assert!(pdal_point_view_calculate_bounds_3d(view, &mut bounds3d));
+            assert_eq!(
+                bounds3d,
+                pdal_bounds3d_t {
+                    minx: -10.0,
+                    maxx: 20.0,
+                    miny: -15.0,
+                    maxy: 7.0,
+                    minz: -50.0,
+                    maxz: 100.0,
+                }
+            );
+
+            pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
+    fn point_view_bounds_c_abi_reports_unavailable_bounds() {
+        unsafe {
+            let layout = pdal_point_layout_create();
+            let x = CString::new("X").unwrap();
+            let y = CString::new("Y").unwrap();
+            pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+            pdal_point_layout_register_dim(layout, y.as_ptr(), 9);
+            let view = pdal_point_view_create(layout);
+
+            let mut bounds2d = pdal_bounds2d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+            };
+            assert!(!pdal_point_view_calculate_bounds_2d(view, &mut bounds2d));
+
+            let point = pdal_point_view_add_point(view);
+            pdal_point_view_set_f64(view, point, x.as_ptr(), 1.0);
+            pdal_point_view_set_f64(view, point, y.as_ptr(), 2.0);
+            assert!(pdal_point_view_calculate_bounds_2d(view, &mut bounds2d));
+
+            let mut bounds3d = pdal_bounds3d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+                minz: 0.0,
+                maxz: 0.0,
+            };
+            assert!(!pdal_point_view_calculate_bounds_3d(view, &mut bounds3d));
+            assert!(!pdal_point_view_calculate_bounds_2d(
+                std::ptr::null(),
+                &mut bounds2d
+            ));
+            assert!(!pdal_point_view_calculate_bounds_2d(
+                view,
+                std::ptr::null_mut()
+            ));
+
+            pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
     fn metadata_tree_roundtrips_through_c_abi() {
         unsafe {
             let root_name = CString::new("root").unwrap();
