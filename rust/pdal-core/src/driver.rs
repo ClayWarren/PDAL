@@ -38,6 +38,7 @@ const READER_EXTENSIONS: &[(&str, &str)] = &[
     ("drc", "readers.draco"),
     ("h5", "readers.icebridge"),
     ("icebridge", "readers.icebridge"),
+    ("csd", "readers.optech"),
     ("mat", "readers.matlab"),
     ("nitf", "readers.nitf"),
     ("nsf", "readers.nitf"),

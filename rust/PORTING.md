@@ -398,25 +398,38 @@ Current status:
   triangulation for VTN de-duplication, and de-duplication logic matching
   PDAL's C++ behavior. Mesh face storage is intentionally deferred.
 - `readers.qfit` has a Rust implementation for the deterministic NASA ATM QFIT
-  binary path, including 10, 12, and 14-word formats, big-endian word parsing,
+  binary path, including 10, 12, and 14-word formats, endian probing,
   dimension mapping matching PDAL's C++ reader, and regression coverage
   against installed PDAL.
-  - `readers.sbet` and `writers.sbet` have a Rust implementation for the
+- `readers.sbet` and `writers.sbet` have a Rust implementation for the
   deterministic Applanix SBET trajectory format, including all 17 dimensions,
   little-endian double parsing/writing, angular conversion logic (radians
   to degrees and back), and bit-parity coverage (when conversion is disabled).
-  - `readers.smrmsg` has a Rust implementation for the SBET RMS message format,
+- `readers.smrmsg` has a Rust implementation for the SBET RMS message format,
   covering 10 RMS error dimensions with bit-parity matching PDAL's behavior.
-  - Installed-PDAL regressions for these readers/writers are available with:
+- `readers.fbi` and `writers.fbi` have a Rust implementation for the TerraScan
+  Fast Binary local path, including separate dimension streams, header offsets,
+  color stream ordering, and byte-for-byte installed-PDAL read/write parity.
+- `readers.terrasolid` has a Rust implementation for the deterministic
+  TerraSolid format 2 fixture, including time/color fields and C++ dimension
+  mapping. The `.bin` extension is not inferred because it conflicts with FBI.
+- `readers.optech` has a Rust implementation for the deterministic Optech CSD
+  fixture, including the localized WGS84 georeference math and `EPSG:4326`
+  spatial reference behavior.
+- Installed-PDAL regressions for these readers/writers are available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test qfit_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test sbet_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test fbi_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test terrasolid_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test optech_regression -- --ignored`,
   and
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test smrmsg_regression -- --ignored`.
-  - `pdal_core::driver` can infer PDAL reader/writer driver names from filenames  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
+- `pdal_core::driver` can infer PDAL reader/writer driver names from filenames
+  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
   construct only currently implemented Rust local readers/writers by driver
   name. Inference may return unported PDAL drivers; construction must still
   fail cleanly until the stage is actually ported.
