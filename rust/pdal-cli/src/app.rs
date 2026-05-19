@@ -1,4 +1,5 @@
 use std::ffi::{CStr, CString};
+use std::path::{Path, PathBuf};
 
 use crate::stage_metadata::{kernel_list, stage_list, stage_options};
 use pdal_kernels::word_wrap;
@@ -625,6 +626,105 @@ impl App {
         self.execute_stage_pipeline(stages)
     }
 
+    fn run_split(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!("  pdal split <input> <output> [--length=N | --capacity=N] [--origin_x=X] [--origin_y=Y]");
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let split = match SplitArgs::parse(&self.command_args) {
+            Ok(split) => split,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+
+        let reader = match pdal_core::driver::infer_reader_driver(split.input) {
+            Some(driver) => driver,
+            None => {
+                eprintln!(
+                    "Error: unable to infer a reader driver for '{}'",
+                    split.input
+                );
+                return 1;
+            }
+        };
+        let output_name = split.output.to_string_lossy();
+        let writer = match pdal_core::driver::infer_writer_driver(&output_name) {
+            Some(driver) => driver,
+            None => {
+                eprintln!(
+                    "Error: unable to infer a writer driver for '{}'",
+                    split.output.display()
+                );
+                return 1;
+            }
+        };
+
+        let filter = if let Some(length) = split.length {
+            let mut filter = serde_json::json!({
+                "type": "filters.splitter",
+                "length": length,
+            });
+            if let Some(origin_x) = split.origin_x {
+                filter["origin_x"] = serde_json::json!(origin_x);
+            }
+            if let Some(origin_y) = split.origin_y {
+                filter["origin_y"] = serde_json::json!(origin_y);
+            }
+            filter
+        } else {
+            serde_json::json!({
+                "type": "filters.chipper",
+                "capacity": split.capacity.unwrap_or(100000),
+            })
+        };
+
+        let stages = serde_json::json!([
+            { "type": reader, "filename": split.input },
+            filter
+        ]);
+        let mut pipeline = match pdal_capi::pipeline_from_json(&stages.to_string()) {
+            Ok(pipeline) => pipeline,
+            Err(err) => {
+                eprintln!("Error: {err}");
+                return 1;
+            }
+        };
+        let views = match pipeline.execute(Vec::new()) {
+            Ok(views) => views,
+            Err(err) => {
+                eprintln!("Error: {err}");
+                return 1;
+            }
+        };
+
+        for (index, view) in views.iter().enumerate() {
+            let filename = numbered_output(&split.output, index + 1);
+            let mut options = pdal_core::options::Options::new();
+            options.add("filename", filename.display());
+            let mut output_writer = match pdal_capi::create_writer(writer, &options) {
+                Ok(writer) => writer,
+                Err(err) => {
+                    eprintln!("Error: {err}");
+                    return 1;
+                }
+            };
+            if let Err(err) = output_writer.write(std::slice::from_ref(view)) {
+                eprintln!("Error: {err}");
+                return 1;
+            }
+        }
+
+        0
+    }
+
     fn run_hausdorff(&self) -> i32 {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
@@ -806,6 +906,9 @@ impl App {
             if command == "sort" {
                 return self.run_sort();
             }
+            if command == "split" {
+                return self.run_split();
+            }
             if command == "random" {
                 return self.run_random();
             }
@@ -847,6 +950,98 @@ struct StageOption {
     stage: String,
     key: String,
     value: String,
+}
+
+struct SplitArgs<'a> {
+    input: &'a str,
+    output: PathBuf,
+    length: Option<f64>,
+    capacity: Option<u64>,
+    origin_x: Option<f64>,
+    origin_y: Option<f64>,
+}
+
+impl<'a> SplitArgs<'a> {
+    fn parse(args: &'a [String]) -> Result<Self, String> {
+        let mut positional = Vec::new();
+        let mut length = None;
+        let mut capacity = None;
+        let mut origin_x = None;
+        let mut origin_y = None;
+
+        for arg in args {
+            if let Some(value) = arg.strip_prefix("--length=") {
+                length = Some(parse_f64_option("length", value)?);
+            } else if let Some(value) = arg.strip_prefix("--capacity=") {
+                capacity = Some(parse_u64_option("capacity", value)?);
+            } else if let Some(value) = arg.strip_prefix("--origin_x=") {
+                origin_x = Some(parse_f64_option("origin_x", value)?);
+            } else if let Some(value) = arg.strip_prefix("--origin_y=") {
+                origin_y = Some(parse_f64_option("origin_y", value)?);
+            } else if arg.starts_with("--") {
+                return Err(format!("unknown option '{arg}' for split"));
+            } else {
+                positional.push(arg.as_str());
+            }
+        }
+
+        if positional.len() != 2 {
+            return Err("split expects an input path and an output path".to_string());
+        }
+        if length.is_some() && capacity.is_some() {
+            return Err("can't specify both length and capacity".to_string());
+        }
+        if length.is_none() && (origin_x.is_some() || origin_y.is_some()) {
+            return Err("origin_x and origin_y require length mode".to_string());
+        }
+
+        Ok(Self {
+            input: positional[0],
+            output: split_output_path(positional[0], positional[1]),
+            length,
+            capacity,
+            origin_x,
+            origin_y,
+        })
+    }
+}
+
+fn parse_f64_option(name: &str, value: &str) -> Result<f64, String> {
+    value
+        .parse::<f64>()
+        .map_err(|_| format!("--{name} must be numeric"))
+}
+
+fn parse_u64_option(name: &str, value: &str) -> Result<u64, String> {
+    value
+        .parse::<u64>()
+        .map_err(|_| format!("--{name} must be a non-negative integer"))
+}
+
+fn split_output_path(input: &str, output: &str) -> PathBuf {
+    let output_path = Path::new(output);
+    if output.ends_with(std::path::MAIN_SEPARATOR) || output_path.is_dir() {
+        let filename = Path::new(input)
+            .file_name()
+            .unwrap_or_else(|| std::ffi::OsStr::new(input));
+        output_path.join(filename)
+    } else {
+        output_path.to_path_buf()
+    }
+}
+
+fn numbered_output(path: &Path, index: usize) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("");
+    let suffix = format!("{stem}_{index}");
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some(extension) if !extension.is_empty() => {
+            path.with_file_name(format!("{suffix}.{extension}"))
+        }
+        _ => path.with_file_name(suffix),
+    }
 }
 
 /// Split command arguments into positional values and

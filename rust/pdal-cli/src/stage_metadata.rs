@@ -49,6 +49,11 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             description: "sort the points of a file by one or more dimensions",
         },
         KernelInfo {
+            name: "split",
+            full_name: "kernels.split",
+            description: "split one point cloud file into multiple output files",
+        },
+        KernelInfo {
             name: "translate",
             full_name: "kernels.translate",
             description: "convert a point cloud file, optionally applying filters",
@@ -375,6 +380,20 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Number of scan lines to group into each output view.",
             Some(json!(1)),
         )],
+        "filters.splitter" => vec![
+            option(
+                "length",
+                "Edge length for splitter cells.",
+                Some(json!(1000.0)),
+            ),
+            option("origin_x", "X origin for splitter cells.", None),
+            option("origin_y", "Y origin for splitter cells.", None),
+            option(
+                "buffer",
+                "Buffer distance around splitter cells.",
+                Some(json!(0.0)),
+            ),
+        ],
         "filters.sort" => vec![
             option("dimensions", "Comma-separated dimensions to sort by.", None),
             option("order", "Sort order: asc or desc.", Some(json!("asc"))),

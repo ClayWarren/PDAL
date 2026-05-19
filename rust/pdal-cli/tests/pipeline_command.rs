@@ -290,7 +290,7 @@ fn list_commands_reports_rust_commands() {
     assert!(result.status.success());
     assert_eq!(
         String::from_utf8_lossy(&result.stdout),
-        "chamfer\ndelta\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\ntranslate\n"
+        "chamfer\ndelta\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\nsplit\ntranslate\n"
     );
 }
 

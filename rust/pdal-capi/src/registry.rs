@@ -42,6 +42,7 @@ use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
+use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats::StatsFilter;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
@@ -106,6 +107,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.returns",
     "filters.sample",
     "filters.separatescanline",
+    "filters.splitter",
     "filters.sort",
     "filters.stats",
     "filters.tail",
@@ -290,6 +292,20 @@ pub fn create_filter(
         "filters.separatescanline" => Ok(Box::new(FilterWrapper::new(
             SeparateScanLineFilter::new(options.get_u64("groupby", 1)),
         ))),
+        "filters.splitter" => Ok(Box::new(FilterWrapper::new(SplitterFilter::new(
+            options.get_f64("length", 1000.0),
+            if options.has("origin_x") {
+                options.get_f64("origin_x", f64::NAN)
+            } else {
+                f64::NAN
+            },
+            if options.has("origin_y") {
+                options.get_f64("origin_y", f64::NAN)
+            } else {
+                f64::NAN
+            },
+            options.get_f64("buffer", 0.0),
+        )))),
         "filters.sort" => Ok(Box::new(FilterWrapper::new(SortFilter::new(
             comma_list(&options.get_str("dimensions", &options.get_str("dimension", ""))),
             sort_order(&options.get_str("order", "asc"))?,

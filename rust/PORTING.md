@@ -528,14 +528,14 @@ Current status:
   Rust-owned stage/command metadata for the currently implemented Rust surface.
 - Pipeline JSON can construct the command-ready Rust filter subset:
   `decimation`, `groupby`, `head`, `locate`, `merge`, `mortonorder`,
-  `randomize`, `reprojection`, `returns`, `sample`, `sort`, `stats`, `tail`, and
-  `voxeldownsize`. Other Rust filter modules may exist, but they are not
-  command-ready until they are deliberately added to the registry with option
-  parsing and coverage.
+  `randomize`, `reprojection`, `returns`, `sample`, `sort`, `splitter`,
+  `stats`, `tail`, and `voxeldownsize`. Other Rust filter modules may exist,
+  but they are not command-ready until they are deliberately added to the
+  registry with option parsing and coverage.
 - Concrete Rust commands currently enabled in `pdal-rs`: `pipeline`, `info`,
-  `translate`, `merge`, `sort`, `random`, `hausdorff`, `chamfer`, and `delta`.
-  These are intentionally limited to Rust-backed local readers/writers/filters
-  and reporting metrics.
+  `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, and
+  `delta`. These are intentionally limited to Rust-backed local
+  readers/writers/filters and reporting metrics.
 - `pipeline` accepts a pipeline JSON filename and executes implemented Rust
   stages through the same Rust C ABI pipeline parser used by lower-layer tests.
   With `--showjson`, it reports the Rust pipeline execution summary and
@@ -546,7 +546,7 @@ Current status:
   artifact written by `pdal-rs pipeline` for deterministic local text, PCD,
   and PLY reader -> decimation filter -> writer paths, including bare array,
   root `pipeline` object, and filename-string stage JSON forms.
-- Command-level regressions for `info`, `translate`, `merge`, `sort`,
+- Command-level regressions for `info`, `translate`, `merge`, `sort`, `split`,
   `random`, `hausdorff`, `chamfer`, and `delta` live in their matching
   `pdal-cli/tests/*_command.rs` files. Installed-PDAL comparisons are marked
   ignored where they require `pdal` on `PATH`.
