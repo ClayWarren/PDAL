@@ -36,6 +36,7 @@
 #include <pdal/pdal_config.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -77,45 +78,16 @@ StringList pluginSearchPaths()
 // libpdal_plugin_filter_color.dylib
 std::string validPlugin(const std::string& path, const StringList& types)
 {
-    auto typeValid = [&types](std::string& type)
-    {
-        for (const auto& t : types)
-            if (type == t)
-                return true;
-        return false;
-    };
+    std::vector<const char*> typePtrs;
+    for (const std::string& type : types)
+        typePtrs.push_back(type.c_str());
 
-    // Strip off the leader.
-    std::string file = FileUtils::getFilename(path);
-    const std::string leader("libpdal_plugin_");
-    auto pos = file.find(leader);
-    if (pos != 0)
-        return std::string();
-    file = file.substr(leader.size());
-
-    // Strip off the type.
-    std::string type;
-    pos = file.find('_');
-    if (pos != std::string::npos && pos < file.size() - 1)
-        type = file.substr(0, pos);
-    if (!typeValid(type))
-        return std::string();
-    file = file.substr(pos + 1);
-
-    // Strip the extension off of the end.
-    pos = file.rfind('.');
-    if (pos == std::string::npos ||
-        (file.substr(pos) != Utils::dynamicLibExtension))
-        return std::string();
-    file = file.substr(0, pos);
-
-    // Make sure what's left is valid.  NOTE - pos is modified by parseName().
-    pos = 0;
-    if (!Stage::parseName(file, pos) || (pos != file.size()))
-        return std::string();
-
-    // Coerce the filename to the stage name.
-    return type + "s." + file;
+    char* plugin =
+        pdal_plugin_valid_name(path.c_str(), typePtrs.data(), typePtrs.size(),
+                               Utils::dynamicLibExtension);
+    std::string output(plugin ? plugin : "");
+    pdal_string_free(plugin);
+    return output;
 }
 
 } // namespace

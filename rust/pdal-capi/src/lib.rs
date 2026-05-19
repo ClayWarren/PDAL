@@ -15,6 +15,7 @@ mod metrics_abi;
 mod native_abi;
 mod options;
 mod pipeline_abi;
+mod plugin_abi;
 mod point_abi;
 mod registry;
 mod scaling_abi;
@@ -36,6 +37,7 @@ pub use metrics_abi::*;
 pub use native_abi::*;
 pub use options::*;
 pub use pipeline_abi::*;
+pub use plugin_abi::*;
 pub use point_abi::*;
 pub use registry::*;
 pub use scaling_abi::*;
@@ -131,6 +133,38 @@ mod tests {
                     std::ptr::null_mut(),
                 ),
                 0
+            );
+        }
+    }
+
+    #[test]
+    fn plugin_name_validation_roundtrips_through_c_abi() {
+        unsafe {
+            let path = CString::new("libpdal_plugin_reader_a_b.dylib").unwrap();
+            let reader = CString::new("reader").unwrap();
+            let writer = CString::new("writer").unwrap();
+            let ext = CString::new(".dylib").unwrap();
+            let types = [reader.as_ptr(), writer.as_ptr()];
+
+            assert_eq!(
+                take_string(pdal_plugin_valid_name(
+                    path.as_ptr(),
+                    types.as_ptr(),
+                    types.len() as u64,
+                    ext.as_ptr(),
+                )),
+                "readers.a_b"
+            );
+
+            let bad = CString::new("libpdal_plugin_reader_1a_b.dylib").unwrap();
+            assert_eq!(
+                take_string(pdal_plugin_valid_name(
+                    bad.as_ptr(),
+                    types.as_ptr(),
+                    types.len() as u64,
+                    ext.as_ptr(),
+                )),
+                ""
             );
         }
     }

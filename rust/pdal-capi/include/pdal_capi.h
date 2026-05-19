@@ -39,6 +39,11 @@ void pdal_options_destroy(pdal_options_t* ops);
 int pdal_kernel_parse_stage_option(const char* input, bool allow_stage_prefix,
                                    char** stage, char** option, char** value);
 
+// Plugin
+char* pdal_plugin_valid_name(const char* path, const char** types,
+                             uint64_t type_count,
+                             const char* dynamic_lib_extension);
+
 // PointLayout
 pdal_point_layout_t* pdal_point_layout_create();
 void pdal_point_layout_register_dim(pdal_point_layout_t* layout, const char* name, int type_id);

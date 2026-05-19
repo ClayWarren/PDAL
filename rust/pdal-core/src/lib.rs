@@ -15,6 +15,7 @@ pub mod metadata;
 pub mod metrics;
 pub mod options;
 pub mod pipeline;
+pub mod plugin;
 pub mod point;
 pub mod scaling;
 pub mod spatial;
