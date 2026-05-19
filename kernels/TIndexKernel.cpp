@@ -45,6 +45,7 @@
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/private/gdal/SpatialRef.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <pdal/util/ThreadPool.hpp>
 
 #include "../io/LasWriter.hpp"
 

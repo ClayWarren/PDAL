@@ -34,9 +34,127 @@
 
 #include "KDIndex.hpp"
 #include "private/KDImpl.hpp"
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
+
+namespace
+{
+
+int typeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+pdal_point_view_t* toRustPointView(const PointView& view)
+{
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    for (auto dim : view.layout()->dims())
+    {
+        pdal_point_layout_register_dim(layout,
+                                       view.layout()->dimName(dim).c_str(),
+                                       typeId(view.layout()->dimType(dim)));
+    }
+
+    pdal_point_view_t* rustView = pdal_point_view_create(layout);
+    for (PointId idx = 0; idx < view.size(); ++idx)
+    {
+        pdal_point_view_add_point(rustView);
+        for (auto dim : view.layout()->dims())
+        {
+            const std::string name = view.layout()->dimName(dim);
+            pdal_point_view_set_f64(rustView, idx, name.c_str(),
+                                    view.getFieldAs<double>(dim, idx));
+        }
+    }
+    return rustView;
+}
+
+PointIdList knn(const PointView& view, StringList dimNames,
+                std::vector<double> query, point_count_t k, size_t stride,
+                std::vector<double>* sqrDists = nullptr)
+{
+    k = (std::min)(view.size(), k);
+    PointIdList ids(k);
+    std::vector<pdal_spatial_result_t> results(k);
+    std::vector<const char*> dimPtrs;
+    for (const std::string& name : dimNames)
+        dimPtrs.push_back(name.c_str());
+
+    pdal_point_view_t* rustView = toRustPointView(view);
+    uint64_t count = pdal_point_view_knn(rustView, dimPtrs.data(), query.data(),
+                                         dimPtrs.size(), k, stride,
+                                         results.data(), results.size());
+    pdal_point_view_destroy(rustView);
+
+    ids.resize(count);
+    if (sqrDists)
+        sqrDists->resize(count);
+    for (uint64_t i = 0; i < count; ++i)
+    {
+        ids[i] = results[i].id;
+        if (sqrDists)
+            (*sqrDists)[i] = results[i].sqr_dist;
+    }
+    return ids;
+}
+
+PointIdList
+rustRadius(const PointView& view, StringList dimNames,
+           std::vector<double> query, double r,
+           std::vector<std::pair<size_t, double>>* resultsOut = nullptr)
+{
+    std::vector<const char*> dimPtrs;
+    for (const std::string& name : dimNames)
+        dimPtrs.push_back(name.c_str());
+
+    pdal_point_view_t* rustView = toRustPointView(view);
+    uint64_t count = 0;
+    pdal_spatial_result_t* results = pdal_point_view_radius(
+        rustView, dimPtrs.data(), query.data(), dimPtrs.size(), r, &count);
+    pdal_point_view_destroy(rustView);
+
+    PointIdList ids(count);
+    if (resultsOut)
+        resultsOut->resize(count);
+    for (uint64_t i = 0; i < count; ++i)
+    {
+        ids[i] = results[i].id;
+        if (resultsOut)
+            (*resultsOut)[i] =
+                std::make_pair(results[i].id, results[i].sqr_dist);
+    }
+    pdal_spatial_results_free(results, count);
+    return ids;
+}
+
+} // unnamed namespace
 
 //
 // KD2Index
@@ -78,7 +196,7 @@ PointId KD2Index::neighbor(PointRef& point) const
 
 PointIdList KD2Index::neighbors(double x, double y, point_count_t k) const
 {
-    return m_impl->neighbors(x, y, k);
+    return knn(m_buf, {"X", "Y"}, {x, y}, k, 1);
 }
 
 PointIdList KD2Index::neighbors(PointId idx, point_count_t k) const
@@ -101,7 +219,7 @@ void KD2Index::knnSearch(double x, double y, point_count_t k,
                          PointIdList* indices,
                          std::vector<double>* sqr_dists) const
 {
-    m_impl->knnSearch(x, y, k, indices, sqr_dists);
+    *indices = knn(m_buf, {"X", "Y"}, {x, y}, k, 1, sqr_dists);
 }
 
 void KD2Index::knnSearch(PointId idx, point_count_t k, PointIdList* indices,
@@ -124,13 +242,13 @@ void KD2Index::knnSearch(PointRef& point, point_count_t k, PointIdList* indices,
 
 PointIdList KD2Index::radius(double x, double y, double r) const
 {
-    return m_impl->radius(x, y, r);
+    return rustRadius(m_buf, {"X", "Y"}, {x, y}, r);
 }
 
 void KD2Index::radius(double x, double y, double r,
                       KD2Index::RadiusResults& result) const
 {
-    return m_impl->radius(x, y, r, result);
+    rustRadius(m_buf, {"X", "Y"}, {x, y}, r, &result);
 }
 
 void KD2Index::radius(PointId idx, double r,
@@ -201,7 +319,7 @@ PointId KD3Index::neighbor(PointRef& point) const
 PointIdList KD3Index::neighbors(double x, double y, double z, point_count_t k,
                                 size_t stride) const
 {
-    return m_impl->neighbors(x, y, z, k, stride);
+    return knn(m_buf, {"X", "Y", "Z"}, {x, y, z}, k, stride);
 }
 
 PointIdList KD3Index::neighbors(PointId idx, point_count_t k,
@@ -228,7 +346,7 @@ void KD3Index::knnSearch(double x, double y, double z, point_count_t k,
                          PointIdList* indices,
                          std::vector<double>* sqr_dists) const
 {
-    m_impl->knnSearch(x, y, z, k, indices, sqr_dists);
+    *indices = knn(m_buf, {"X", "Y", "Z"}, {x, y, z}, k, 1, sqr_dists);
 }
 
 void KD3Index::knnSearch(PointId idx, point_count_t k, PointIdList* indices,
@@ -253,13 +371,13 @@ void KD3Index::knnSearch(PointRef& point, point_count_t k, PointIdList* indices,
 
 PointIdList KD3Index::radius(double x, double y, double z, double r) const
 {
-    return m_impl->radius(x, y, z, r);
+    return rustRadius(m_buf, {"X", "Y", "Z"}, {x, y, z}, r);
 }
 
 void KD3Index::radius(double x, double y, double z, double r,
                       KD3Index::RadiusResults& results) const
 {
-    m_impl->radius(x, y, z, r, results);
+    rustRadius(m_buf, {"X", "Y", "Z"}, {x, y, z}, r, &results);
 }
 
 void KD3Index::radius(PointId idx, double r,
@@ -315,12 +433,26 @@ PointId KDFlexIndex::neighbor(PointRef& point) const
 PointIdList KDFlexIndex::neighbors(PointRef& point, point_count_t k,
                                    size_t stride) const
 {
-    return m_impl->neighbors(point, k, stride);
+    StringList dimNames;
+    std::vector<double> query;
+    for (auto dim : m_dims)
+    {
+        dimNames.push_back(m_buf.layout()->dimName(dim));
+        query.push_back(point.getFieldAs<double>(dim));
+    }
+    return knn(m_buf, dimNames, query, k, stride);
 }
 
 PointIdList KDFlexIndex::radius(PointId idx, double r) const
 {
-    return m_impl->radius(idx, r);
+    StringList dimNames;
+    std::vector<double> query;
+    for (auto dim : m_dims)
+    {
+        dimNames.push_back(m_buf.layout()->dimName(dim));
+        query.push_back(m_buf.getFieldAs<double>(dim, idx));
+    }
+    return rustRadius(m_buf, dimNames, query, r);
 }
 
 } // namespace pdal

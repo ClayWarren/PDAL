@@ -314,6 +314,76 @@ impl DimType {
     }
 }
 
+pub fn resolve_pdal_dimension_type(t1: u32, t2: u32) -> u32 {
+    const NONE: u32 = 0x000;
+    const SIGNED: u32 = 0x100;
+    const UNSIGNED: u32 = 0x200;
+    const FLOATING: u32 = 0x400;
+    const SIGNED16: u32 = SIGNED | 2;
+    const SIGNED32: u32 = SIGNED | 4;
+    const SIGNED64: u32 = SIGNED | 8;
+    const DOUBLE: u32 = FLOATING | 8;
+
+    fn size(ty: u32) -> u32 {
+        ty & 0xff
+    }
+
+    fn base(ty: u32) -> u32 {
+        ty & 0xff00
+    }
+
+    if t1 == NONE && t2 != NONE {
+        return t2;
+    }
+    if t2 == NONE && t1 != NONE {
+        return t1;
+    }
+    if t1 == t2 {
+        return t1;
+    }
+    if base(t1) == base(t2) {
+        return t1.max(t2);
+    }
+    if base(t1) == FLOATING && base(t2) != FLOATING {
+        return t1;
+    }
+    if base(t2) == FLOATING && base(t1) != FLOATING {
+        return t2;
+    }
+    if base(t1) == UNSIGNED && size(t1) < size(t2) {
+        return t2;
+    }
+    if base(t2) == UNSIGNED && size(t2) < size(t1) {
+        return t1;
+    }
+
+    match size(t1).max(size(t2)) {
+        1 => SIGNED16,
+        2 => SIGNED32,
+        4 => SIGNED64,
+        _ => DOUBLE,
+    }
+}
+
+pub fn fix_dimension_name(name: &str) -> String {
+    let mut output = name.to_string();
+    if output.is_empty() {
+        return output;
+    }
+
+    let mut chars: Vec<char> = output.chars().collect();
+    if !chars[0].is_ascii_alphabetic() {
+        chars[0] = '_';
+    }
+    for c in &mut chars {
+        if !(c.is_ascii_alphabetic() || c.is_ascii_digit() || *c == '_' || *c == ' ') {
+            *c = '_';
+        }
+    }
+    output = chars.into_iter().collect();
+    output
+}
+
 #[derive(Clone)]
 struct DimEntry {
     id: DimId,
@@ -932,6 +1002,35 @@ mod tests {
 
             assert_eq!(view.get_f64(point, &dim), expected);
         }
+    }
+
+    #[test]
+    fn resolve_pdal_dimension_types_matches_cpp_contract() {
+        const NONE: u32 = 0;
+        const U8: u32 = 0x200 | 1;
+        const S8: u32 = 0x100 | 1;
+        const U16: u32 = 0x200 | 2;
+        const S16: u32 = 0x100 | 2;
+        const S32: u32 = 0x100 | 4;
+        const S64: u32 = 0x100 | 8;
+        const FLOAT: u32 = 0x400 | 4;
+        const DOUBLE: u32 = 0x400 | 8;
+
+        assert_eq!(resolve_pdal_dimension_type(U8, NONE), U8);
+        assert_eq!(resolve_pdal_dimension_type(U8, U8), U8);
+        assert_eq!(resolve_pdal_dimension_type(U8, S8), S16);
+        assert_eq!(resolve_pdal_dimension_type(U8, S16), S16);
+        assert_eq!(resolve_pdal_dimension_type(U16, S16), S32);
+        assert_eq!(resolve_pdal_dimension_type(FLOAT, S32), FLOAT);
+        assert_eq!(resolve_pdal_dimension_type(DOUBLE, S64), DOUBLE);
+    }
+
+    #[test]
+    fn fix_dimension_name_matches_cpp_contract() {
+        assert_eq!(fix_dimension_name("Pulse width"), "Pulse width");
+        assert_eq!(fix_dimension_name("DimensionName42"), "DimensionName42");
+        assert_eq!(fix_dimension_name("with#punctuation."), "with_punctuation_");
+        assert_eq!(fix_dimension_name("42DimensionName42"), "_2DimensionName42");
     }
 
     #[test]

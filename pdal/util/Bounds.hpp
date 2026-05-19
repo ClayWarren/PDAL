@@ -124,10 +124,7 @@ public:
       \return  Whether both dimensions are equal to or less than the maximum
         box values and equal to or more than the minimum box values.
     */
-    bool contains(double x, double y) const
-    {
-        return minx <= x && x <= maxx && miny <= y && y <= maxy;
-    }
+    bool contains(double x, double y) const;
 
     /**
       Determine if the bounds of this box are the same as that of another
@@ -174,19 +171,7 @@ public:
 
       \param other  Box that this box should contain.
     */
-    BOX2D& grow(const BOX2D& other)
-    {
-        if (other.minx < minx)
-            minx = other.minx;
-        if (other.maxx > maxx)
-            maxx = other.maxx;
-
-        if (other.miny < miny)
-            miny = other.miny;
-        if (other.maxy > maxy)
-            maxy = other.maxy;
-        return *this;
-    }
+    BOX2D& grow(const BOX2D& other);
 
     /**
       Clip this bounds box by another so it will be contained by the
@@ -194,13 +179,7 @@ public:
 
       \param other  Clipping box for this box.
     */
-    void clip(const BOX2D& other)
-    {
-        minx = (std::max)(minx, other.minx);
-        maxx = (std::min)(maxx, other.maxx);
-        miny = (std::max)(miny, other.miny);
-        maxy = (std::min)(maxy, other.maxy);
-    }
+    void clip(const BOX2D& other);
 
     /**
       Determine if another bounds box is contained in this bounds box.
@@ -210,11 +189,7 @@ public:
       \return  \c true if the provided box is contained in this box,
         \c false otherwise.
     **/
-    bool contains(const BOX2D& other) const
-    {
-        return minx <= other.minx && maxx >= other.maxx && miny <= other.miny &&
-               maxy >= other.maxy;
-    }
+    bool contains(const BOX2D& other) const;
 
     /**
       Determine if another box overlaps this box.
@@ -222,11 +197,7 @@ public:
       \param other  Box to test for overlap.
       \return  Whether the provided box overlaps this box.
     */
-    bool overlaps(const BOX2D& other) const
-    {
-        return minx <= other.maxx && maxx >= other.minx && miny <= other.maxy &&
-               maxy >= other.miny;
-    }
+    bool overlaps(const BOX2D& other) const;
 
     /**
       Convert this box to a string suitable for use in SQLite.
@@ -401,10 +372,7 @@ public:
       \return  Whether both dimensions are equal to or less than the maximum
         box values and equal to or more than the minimum box values.
     */
-    bool contains(double x, double y, double z) const
-    {
-        return BOX2D::contains(x, y) && minz <= z && z <= maxz;
-    }
+    bool contains(double x, double y, double z) const;
 
     /**
       Determine if another bounds box is contained in this bounds box.
@@ -414,11 +382,7 @@ public:
       \return  \c true if the provided box is contained in this box,
         \c false otherwise.
     **/
-    bool contains(const BOX3D& other) const
-    {
-        return BOX2D::contains(other) && minz <= other.minz &&
-               other.maxz <= maxz;
-    }
+    bool contains(const BOX3D& other) const;
 
     /**
       Determine if the bounds of this box are the same as that of another
@@ -464,28 +428,14 @@ public:
 
       \param other  Box that this box should contain.
     */
-    BOX3D& grow(const BOX3D& other)
-    {
-        BOX2D::grow(other);
-        if (other.minz < minz)
-            minz = other.minz;
-        if (other.maxz > maxz)
-            maxz = other.maxz;
-        return *this;
-    }
+    BOX3D& grow(const BOX3D& other);
 
     /**
       Expand this box by a specified amount.
 
       \param dist  Distance by which box should be expanded.
     */
-    BOX3D& grow(double dist)
-    {
-        BOX2D::grow(dist);
-        minz -= dist;
-        maxz += dist;
-        return *this;
-    }
+    BOX3D& grow(double dist);
 
     /**
       Clip this bounds box by another so it will be contained by the
@@ -493,14 +443,7 @@ public:
 
       \param other  Clipping box for this box.
     */
-    void clip(const BOX3D& other)
-    {
-        BOX2D::clip(other);
-        if (other.minz > minz && other.minz < maxz)
-            minz = other.minz;
-        if (other.maxz < maxz && other.maxz > minz)
-            maxz = other.maxz;
-    }
+    void clip(const BOX3D& other);
 
     /**
       Determine if another box overlaps this box.
@@ -508,11 +451,7 @@ public:
       \param other  Box to test for overlap.
       \return  Whether the provided box overlaps this box.
     */
-    bool overlaps(const BOX3D& other) const
-    {
-        return BOX2D::overlaps(other) && minz <= other.maxz &&
-               maxz >= other.minz;
-    }
+    bool overlaps(const BOX3D& other) const;
 
     /**
       Convert this box to 2-dimensional bounding box.

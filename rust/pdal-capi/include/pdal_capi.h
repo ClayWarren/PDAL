@@ -16,6 +16,7 @@ typedef struct pdal_stage pdal_stage_t;
 typedef struct pdal_pipeline pdal_pipeline_t;
 typedef struct pdal_reader pdal_reader_t;
 typedef struct pdal_writer pdal_writer_t;
+typedef struct pdal_quad_index pdal_quad_index_t;
 
 const char* pdal_last_error();
 void pdal_clear_error();
@@ -37,6 +38,8 @@ void pdal_options_destroy(pdal_options_t* ops);
 // PointLayout
 pdal_point_layout_t* pdal_point_layout_create();
 void pdal_point_layout_register_dim(pdal_point_layout_t* layout, const char* name, int type_id);
+int pdal_dimension_resolve_type(int type1, int type2);
+char* pdal_dimension_fix_name(const char* name);
 void pdal_point_layout_destroy(pdal_point_layout_t* layout);
 
 // PointView
@@ -56,6 +59,30 @@ typedef struct {
     double maxz;
 } pdal_bounds3d_t;
 
+void pdal_bounds2d_clear(pdal_bounds2d_t* bounds);
+bool pdal_bounds2d_empty(const pdal_bounds2d_t* bounds);
+void pdal_bounds2d_grow_point(pdal_bounds2d_t* bounds, double x, double y);
+void pdal_bounds2d_grow_distance(pdal_bounds2d_t* bounds, double distance);
+void pdal_bounds2d_grow_bounds(pdal_bounds2d_t* bounds, const pdal_bounds2d_t* other);
+void pdal_bounds2d_clip(pdal_bounds2d_t* bounds, const pdal_bounds2d_t* other);
+bool pdal_bounds2d_contains_point(const pdal_bounds2d_t* bounds, double x, double y);
+bool pdal_bounds2d_contains_bounds(const pdal_bounds2d_t* bounds, const pdal_bounds2d_t* other);
+bool pdal_bounds2d_overlaps(const pdal_bounds2d_t* bounds, const pdal_bounds2d_t* other);
+void pdal_bounds3d_clear(pdal_bounds3d_t* bounds);
+bool pdal_bounds3d_empty(const pdal_bounds3d_t* bounds);
+void pdal_bounds3d_grow_point(pdal_bounds3d_t* bounds, double x, double y, double z);
+void pdal_bounds3d_grow_bounds(pdal_bounds3d_t* bounds, const pdal_bounds3d_t* other);
+void pdal_bounds3d_grow_distance(pdal_bounds3d_t* bounds, double distance);
+void pdal_bounds3d_clip(pdal_bounds3d_t* bounds, const pdal_bounds3d_t* other);
+bool pdal_bounds3d_contains_point(const pdal_bounds3d_t* bounds, double x, double y, double z);
+bool pdal_bounds3d_contains_bounds(const pdal_bounds3d_t* bounds, const pdal_bounds3d_t* other);
+bool pdal_bounds3d_overlaps(const pdal_bounds3d_t* bounds, const pdal_bounds3d_t* other);
+
+typedef struct {
+    uint64_t id;
+    double sqr_dist;
+} pdal_spatial_result_t;
+
 pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
 uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
 void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name, double val);
@@ -69,8 +96,23 @@ uint64_t pdal_point_view_length(pdal_point_view_t* view);
 uint64_t pdal_point_view_source_index(pdal_point_view_t* view, uint64_t idx);
 bool pdal_point_view_calculate_bounds_2d(const pdal_point_view_t* view, pdal_bounds2d_t* out_bounds);
 bool pdal_point_view_calculate_bounds_3d(const pdal_point_view_t* view, pdal_bounds3d_t* out_bounds);
+uint64_t pdal_point_view_knn(const pdal_point_view_t* view, const char* const* dim_names, const double* query, uint64_t dim_count, uint64_t k, uint64_t stride, pdal_spatial_result_t* out_results, uint64_t max_results);
+pdal_spatial_result_t* pdal_point_view_radius(const pdal_point_view_t* view, const char* const* dim_names, const double* query, uint64_t dim_count, double radius, uint64_t* out_len);
+void pdal_spatial_results_free(pdal_spatial_result_t* ptr, uint64_t len);
 char* pdal_point_view_dimension_summaries_json(const pdal_point_view_t* view);
 void pdal_point_view_destroy(pdal_point_view_t* view);
+
+// QuadIndex
+pdal_quad_index_t* pdal_quad_index_create(const double* xs, const double* ys, const uint64_t* ids, uint64_t count, double x_min, double y_min, double x_max, double y_max, uint64_t top_level);
+void pdal_quad_index_bounds(const pdal_quad_index_t* index, pdal_bounds2d_t* out_bounds);
+uint64_t pdal_quad_index_depth(const pdal_quad_index_t* index);
+uint64_t* pdal_quad_index_fills(const pdal_quad_index_t* index, uint64_t* out_len);
+uint64_t* pdal_quad_index_points_by_depth(const pdal_quad_index_t* index, uint64_t depth_begin, uint64_t depth_end, uint64_t* out_len);
+uint64_t* pdal_quad_index_points_in_bounds(const pdal_quad_index_t* index, double x_min, double y_min, double x_max, double y_max, uint64_t depth_begin, uint64_t depth_end, uint64_t* out_len);
+uint64_t* pdal_quad_index_points_raster_level(const pdal_quad_index_t* index, uint64_t rasterize, double* x_begin, double* x_end, double* x_step, double* y_begin, double* y_end, double* y_step, uint64_t* out_len);
+uint64_t* pdal_quad_index_points_raster_bounds(const pdal_quad_index_t* index, double x_begin, double x_end, double x_step, double y_begin, double y_end, double y_step, uint64_t* out_len);
+void pdal_u64_array_free(uint64_t* ptr, uint64_t len);
+void pdal_quad_index_destroy(pdal_quad_index_t* index);
 
 // SpatialReference
 pdal_spatial_reference_t* pdal_spatial_reference_create(const char* text);
@@ -80,6 +122,7 @@ char* pdal_spatial_reference_text(const pdal_spatial_reference_t* srs);
 double pdal_spatial_reference_epoch(const pdal_spatial_reference_t* srs);
 void pdal_spatial_reference_set_epoch(pdal_spatial_reference_t* srs, double epoch);
 pdal_metadata_node_t* pdal_spatial_reference_to_metadata(const pdal_spatial_reference_t* srs);
+int32_t pdal_spatial_reference_calculate_zone(double lon, double lat);
 void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);
 
 // Scaling

@@ -4,6 +4,7 @@
 //! model, stage traits, and options -- the smallest slice of `pdal/` needed to
 //! run a single ported filter end to end. See `rust/README.md` for scope.
 
+pub mod bounds;
 pub mod driver;
 pub mod expr;
 pub mod gdal;

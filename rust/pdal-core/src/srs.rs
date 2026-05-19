@@ -51,6 +51,45 @@ impl SpatialReference {
     }
 }
 
+pub fn calculate_zone(lon: f64, lat: f64) -> i32 {
+    let lon = normalize_longitude(lon);
+
+    let zone = if (56.0..64.0).contains(&lat) && (3.0..12.0).contains(&lon) {
+        32
+    } else if (72.0..84.0).contains(&lat) {
+        if (0.0..9.0).contains(&lon) {
+            31
+        } else if (9.0..21.0).contains(&lon) {
+            33
+        } else if (21.0..33.0).contains(&lon) {
+            35
+        } else if (33.0..42.0).contains(&lon) {
+            37
+        } else {
+            0
+        }
+    } else {
+        ((lon + 180.0) / 6.0).floor() as i32 + 1
+    };
+
+    if lat < 0.0 {
+        -zone
+    } else {
+        zone
+    }
+}
+
+fn normalize_longitude(longitude: f64) -> f64 {
+    let longitude = longitude % 360.0;
+    if longitude <= -180.0 {
+        longitude + 360.0
+    } else if longitude > 180.0 {
+        longitude - 360.0
+    } else {
+        longitude
+    }
+}
+
 /// A coordinate transformation between two SRSs (PDAL's `SrsTransform`).
 pub struct SrsTransform {
     inner: pdal_native::srs::SrsTransform,
@@ -105,5 +144,26 @@ mod tests {
             metadata.find_child("epoch").and_then(|node| node.value()),
             Some(&MetadataValue::F64(2020.5))
         );
+    }
+
+    #[test]
+    fn calculate_zone_matches_pdal_special_cases() {
+        let mut zone = 1;
+        let mut lon = -537.0;
+        while lon < 537.0 {
+            assert_eq!(calculate_zone(lon, 25.0), zone);
+            assert_eq!(calculate_zone(lon, -25.0), -zone);
+            zone += 1;
+            if zone > 60 {
+                zone = 1;
+            }
+            lon += 6.0;
+        }
+
+        assert_eq!(calculate_zone(5.0, 60.0), 32);
+        assert_eq!(calculate_zone(5.0, 80.0), 31);
+        assert_eq!(calculate_zone(10.0, 80.0), 33);
+        assert_eq!(calculate_zone(25.0, 80.0), 35);
+        assert_eq!(calculate_zone(40.0, 80.0), 37);
     }
 }

@@ -38,6 +38,7 @@
 #include <pdal/KDIndex.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/Algorithm.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "private/Raster.hpp"
 
@@ -45,6 +46,65 @@ namespace pdal
 {
 
 int PointView::m_lastId = 0;
+
+namespace
+{
+
+int typeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+pdal_point_view_t* toRustPointView(const PointView& view)
+{
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    for (auto dim : view.layout()->dims())
+    {
+        pdal_point_layout_register_dim(layout,
+                                       view.layout()->dimName(dim).c_str(),
+                                       typeId(view.layout()->dimType(dim)));
+    }
+
+    pdal_point_view_t* rustView = pdal_point_view_create(layout);
+    for (PointId idx = 0; idx < view.size(); ++idx)
+    {
+        pdal_point_view_add_point(rustView);
+        for (auto dim : view.layout()->dims())
+        {
+            const std::string name = view.layout()->dimName(dim);
+            pdal_point_view_set_f64(rustView, idx, name.c_str(),
+                                    view.getFieldAs<double>(dim, idx));
+        }
+    }
+    return rustView;
+}
+
+} // unnamed namespace
 
 PointView::PointView(PointTableRef pointTable)
     : m_pointTable(pointTable), m_layout(pointTable.layout()), m_size(0),
@@ -126,25 +186,32 @@ void PointView::stableSort(Compare comp)
 
 void PointView::calculateBounds(BOX2D& output) const
 {
-    for (PointId idx = 0; idx < size(); idx++)
+    pdal_point_view_t* rustView = toRustPointView(*this);
+    pdal_bounds2d_t bounds;
+    if (pdal_point_view_calculate_bounds_2d(rustView, &bounds))
     {
-        double x = getFieldAs<double>(Dimension::Id::X, idx);
-        double y = getFieldAs<double>(Dimension::Id::Y, idx);
-
-        output.grow(x, y);
+        output.minx = bounds.minx;
+        output.maxx = bounds.maxx;
+        output.miny = bounds.miny;
+        output.maxy = bounds.maxy;
     }
+    pdal_point_view_destroy(rustView);
 }
 
 void PointView::calculateBounds(BOX3D& output) const
 {
-    for (PointId idx = 0; idx < size(); idx++)
+    pdal_point_view_t* rustView = toRustPointView(*this);
+    pdal_bounds3d_t bounds;
+    if (pdal_point_view_calculate_bounds_3d(rustView, &bounds))
     {
-        double x = getFieldAs<double>(Dimension::Id::X, idx);
-        double y = getFieldAs<double>(Dimension::Id::Y, idx);
-        double z = getFieldAs<double>(Dimension::Id::Z, idx);
-
-        output.grow(x, y, z);
+        output.minx = bounds.minx;
+        output.maxx = bounds.maxx;
+        output.miny = bounds.miny;
+        output.maxy = bounds.maxy;
+        output.minz = bounds.minz;
+        output.maxz = bounds.maxz;
     }
+    pdal_point_view_destroy(rustView);
 }
 
 MetadataNode PointView::toMetadata() const

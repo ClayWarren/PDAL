@@ -36,6 +36,7 @@
 
 #include <pdal/PointLayout.hpp>
 #include <pdal/util/Algorithm.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -263,38 +264,8 @@ bool PointLayout::update(Dimension::Detail dd, const std::string& name)
 // Given two types, find a type that can represent the values of both.
 Dimension::Type PointLayout::resolveType(Dimension::Type t1, Dimension::Type t2)
 {
-    using namespace Dimension;
-    if (t1 == Type::None && t2 != Type::None)
-        return t2;
-    if (t2 == Type::None && t1 != Type::None)
-        return t1;
-    if (t1 == t2)
-        return t1;
-    if (base(t1) == base(t2))
-        return (std::max)(t1, t2);
-    // Prefer floating to non-floating.
-    if (base(t1) == BaseType::Floating && base(t2) != BaseType::Floating)
-        return t1;
-    if (base(t2) == BaseType::Floating && base(t1) != BaseType::Floating)
-        return t2;
-    // Now we're left with cases of a signed/unsigned mix.
-    // If the unsigned type is smaller, take the signed type.
-    if (base(t1) == BaseType::Unsigned && size(t1) < size(t2))
-        return t2;
-    if (base(t2) == BaseType::Unsigned && size(t2) < size(t1))
-        return t1;
-    // Signed type is smaller or the the sizes are equal.
-    switch ((std::max)(size(t1), size(t2)))
-    {
-    case 1:
-        return Type::Signed16;
-    case 2:
-        return Type::Signed32;
-    case 4:
-        return Type::Signed64;
-    default:
-        return Type::Double;
-    }
+    return static_cast<Dimension::Type>(pdal_dimension_resolve_type(
+        static_cast<int>(t1), static_cast<int>(t2)));
 }
 
 MetadataNode PointLayout::toMetadata() const

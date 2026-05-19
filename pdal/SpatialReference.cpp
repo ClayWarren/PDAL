@@ -39,6 +39,7 @@
 #include <pdal/SpatialReference.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 // gdal
 #pragma GCC diagnostic push
@@ -404,33 +405,7 @@ std::vector<int> SpatialReference::getAxisOrdering() const
 
 int SpatialReference::calculateZone(double lon, double lat)
 {
-    int zone = 0;
-    lon = Utils::normalizeLongitude(lon);
-
-    // Special Norway processing.
-    if (lat >= 56.0 && lat < 64.0 && lon >= 3.0 && lon < 12.0)
-        zone = 32;
-    // Special Svalbard processing.
-    else if (lat >= 72.0 && lat < 84.0)
-    {
-        if (lon >= 0.0 && lon < 9.0)
-            zone = 31;
-        else if (lon >= 9.0 && lon < 21.0)
-            zone = 33;
-        else if (lon >= 21.0 && lon < 33.0)
-            zone = 35;
-        else if (lon >= 33.0 && lon < 42.0)
-            zone = 37;
-    }
-    // Everywhere else.
-    else
-    {
-        zone = (int)floor((lon + 180.0) / 6) + 1;
-        if (lat < 0)
-            zone = -zone;
-    }
-
-    return zone;
+    return pdal_spatial_reference_calculate_zone(lon, lat);
 }
 
 /**

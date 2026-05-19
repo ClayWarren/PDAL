@@ -41,6 +41,7 @@
 
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <nlohmann/json.hpp>
 
@@ -57,25 +58,32 @@ const double HIGHEST = (std::numeric_limits<double>::max)();
 
 void BOX2D::clear()
 {
-    minx = HIGHEST;
-    miny = HIGHEST;
-    maxx = LOWEST;
-    maxy = LOWEST;
+    pdal_bounds2d_t bounds;
+    pdal_bounds2d_clear(&bounds);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
     wkt = "";
 }
 
 void BOX3D::clear()
 {
-    BOX2D::clear();
-    minz = HIGHEST;
-    maxz = LOWEST;
+    pdal_bounds3d_t bounds;
+    pdal_bounds3d_clear(&bounds);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    minz = bounds.minz;
+    maxz = bounds.maxz;
     wkt = "";
 }
 
 bool BOX2D::empty() const
 {
-    return minx == HIGHEST && maxx == LOWEST && miny == HIGHEST &&
-           maxy == LOWEST;
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    return pdal_bounds2d_empty(&bounds);
 }
 
 bool BOX2D::valid() const
@@ -85,7 +93,8 @@ bool BOX2D::valid() const
 
 bool BOX3D::empty() const
 {
-    return BOX2D::empty() && minz == HIGHEST && maxz == LOWEST;
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    return pdal_bounds3d_empty(&bounds);
 }
 
 bool BOX3D::valid() const
@@ -93,38 +102,148 @@ bool BOX3D::valid() const
     return !empty();
 }
 
+bool BOX2D::contains(double x, double y) const
+{
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    return pdal_bounds2d_contains_point(&bounds, x, y);
+}
+
+bool BOX2D::contains(const BOX2D& other) const
+{
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_t rustOther{other.minx, other.maxx, other.miny, other.maxy};
+    return pdal_bounds2d_contains_bounds(&bounds, &rustOther);
+}
+
+bool BOX2D::overlaps(const BOX2D& other) const
+{
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_t rustOther{other.minx, other.maxx, other.miny, other.maxy};
+    return pdal_bounds2d_overlaps(&bounds, &rustOther);
+}
+
 BOX2D& BOX2D::grow(double dist)
 {
     assert(valid());
-    minx -= dist;
-    maxx += dist;
-    miny -= dist;
-    maxy += dist;
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_grow_distance(&bounds, dist);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
     return *this;
 }
 
 BOX2D& BOX2D::grow(double x, double y)
 {
-    if (x < minx)
-        minx = x;
-    if (x > maxx)
-        maxx = x;
-
-    if (y < miny)
-        miny = y;
-    if (y > maxy)
-        maxy = y;
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_grow_point(&bounds, x, y);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
     return *this;
+}
+
+BOX2D& BOX2D::grow(const BOX2D& other)
+{
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_t rustOther{other.minx, other.maxx, other.miny, other.maxy};
+    pdal_bounds2d_grow_bounds(&bounds, &rustOther);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    return *this;
+}
+
+void BOX2D::clip(const BOX2D& other)
+{
+    pdal_bounds2d_t bounds{minx, maxx, miny, maxy};
+    pdal_bounds2d_t rustOther{other.minx, other.maxx, other.miny, other.maxy};
+    pdal_bounds2d_clip(&bounds, &rustOther);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
 }
 
 BOX3D& BOX3D::grow(double x, double y, double z)
 {
-    BOX2D::grow(x, y);
-    if (z < minz)
-        minz = z;
-    if (z > maxz)
-        maxz = z;
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_grow_point(&bounds, x, y, z);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    minz = bounds.minz;
+    maxz = bounds.maxz;
     return *this;
+}
+
+BOX3D& BOX3D::grow(const BOX3D& other)
+{
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_t rustOther{other.minx, other.maxx, other.miny,
+                              other.maxy, other.minz, other.maxz};
+    pdal_bounds3d_grow_bounds(&bounds, &rustOther);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    minz = bounds.minz;
+    maxz = bounds.maxz;
+    return *this;
+}
+
+BOX3D& BOX3D::grow(double dist)
+{
+    assert(valid());
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_grow_distance(&bounds, dist);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    minz = bounds.minz;
+    maxz = bounds.maxz;
+    return *this;
+}
+
+void BOX3D::clip(const BOX3D& other)
+{
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_t rustOther{other.minx, other.maxx, other.miny,
+                              other.maxy, other.minz, other.maxz};
+    pdal_bounds3d_clip(&bounds, &rustOther);
+    minx = bounds.minx;
+    maxx = bounds.maxx;
+    miny = bounds.miny;
+    maxy = bounds.maxy;
+    minz = bounds.minz;
+    maxz = bounds.maxz;
+}
+
+bool BOX3D::contains(double x, double y, double z) const
+{
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    return pdal_bounds3d_contains_point(&bounds, x, y, z);
+}
+
+bool BOX3D::contains(const BOX3D& other) const
+{
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_t rustOther{other.minx, other.maxx, other.miny,
+                              other.maxy, other.minz, other.maxz};
+    return pdal_bounds3d_contains_bounds(&bounds, &rustOther);
+}
+
+bool BOX3D::overlaps(const BOX3D& other) const
+{
+    pdal_bounds3d_t bounds{minx, maxx, miny, maxy, minz, maxz};
+    pdal_bounds3d_t rustOther{other.minx, other.maxx, other.miny,
+                              other.maxy, other.minz, other.maxz};
+    return pdal_bounds3d_overlaps(&bounds, &rustOther);
 }
 
 const BOX2D& BOX2D::getDefaultSpatialExtent()

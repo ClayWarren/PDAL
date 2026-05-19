@@ -39,6 +39,7 @@
 #include <pdal/PointView.hpp>
 #include <pdal/QuadIndex.hpp>
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace
 {
@@ -382,6 +383,7 @@ struct QuadIndex::QImpl
           double yMax, std::size_t topLevel);
     QImpl(const std::vector<std::shared_ptr<QuadPointRef>>& points, double xMin,
           double yMin, double xMax, double yMax, std::size_t topLevel);
+    ~QImpl();
 
     void getBounds(double& xMin, double& yMin, double& xMax,
                    double& yMax) const;
@@ -402,123 +404,117 @@ struct QuadIndex::QImpl
     PointIdList getPoints(double xMin, double yMin, double xMax, double yMax,
                           std::size_t depthBegin, std::size_t depthEnd) const;
 
-    std::size_t m_topLevel;
-    std::vector<std::shared_ptr<QuadPointRef>> m_pointRefVec;
-    std::unique_ptr<Tree> m_tree;
-    std::size_t m_depth;
-    std::vector<std::size_t> m_fills;
+    pdal_quad_index_t* m_index;
 };
 
 QuadIndex::QImpl::QImpl(const PointView& view, std::size_t topLevel)
-    : m_topLevel(topLevel), m_pointRefVec(), m_tree(), m_depth(0), m_fills()
+    : m_index(nullptr)
 {
-    m_pointRefVec.resize(view.size());
-
     double xMin((std::numeric_limits<double>::max)());
     double yMin((std::numeric_limits<double>::max)());
-    double xMax((std::numeric_limits<double>::min)());
-    double yMax((std::numeric_limits<double>::min)());
+    double xMax((std::numeric_limits<double>::lowest)());
+    double yMax((std::numeric_limits<double>::lowest)());
+    std::vector<double> xs(view.size());
+    std::vector<double> ys(view.size());
+    std::vector<uint64_t> ids(view.size());
 
     for (PointId i(0); i < view.size(); ++i)
     {
-        m_pointRefVec[i].reset(new QuadPointRef(
-            Point(view.getFieldAs<double>(Dimension::Id::X, i),
-                  view.getFieldAs<double>(Dimension::Id::Y, i)),
-            i));
-
-        const QuadPointRef* pointRef(m_pointRefVec[i].get());
-        if (pointRef->point.x < xMin)
-            xMin = pointRef->point.x;
-        if (pointRef->point.x > xMax)
-            xMax = pointRef->point.x;
-        if (pointRef->point.y < yMin)
-            yMin = pointRef->point.y;
-        if (pointRef->point.y > yMax)
-            yMax = pointRef->point.y;
+        xs[i] = view.getFieldAs<double>(Dimension::Id::X, i);
+        ys[i] = view.getFieldAs<double>(Dimension::Id::Y, i);
+        ids[i] = i;
+        xMin = (std::min)(xMin, xs[i]);
+        yMin = (std::min)(yMin, ys[i]);
+        xMax = (std::max)(xMax, xs[i]);
+        yMax = (std::max)(yMax, ys[i]);
     }
 
-    m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
-
-    for (std::size_t i = 0; i < m_pointRefVec.size(); ++i)
-    {
-        m_depth = (std::max)(m_tree->addPoint(m_pointRefVec[i].get()), m_depth);
-    }
+    m_index =
+        pdal_quad_index_create(xs.data(), ys.data(), ids.data(), xs.size(),
+                               xMin, yMin, xMax, yMax, topLevel);
 }
 
 QuadIndex::QImpl::QImpl(const PointView& view, double xMin, double yMin,
                         double xMax, double yMax, std::size_t topLevel)
-    : m_topLevel(topLevel), m_pointRefVec(), m_tree(), m_depth(0), m_fills()
+    : m_index(nullptr)
 {
-    m_pointRefVec.resize(view.size());
+    std::vector<double> xs(view.size());
+    std::vector<double> ys(view.size());
+    std::vector<uint64_t> ids(view.size());
 
     for (PointId i(0); i < view.size(); ++i)
     {
-        m_pointRefVec[i].reset(new QuadPointRef(
-            Point(view.getFieldAs<double>(Dimension::Id::X, i),
-                  view.getFieldAs<double>(Dimension::Id::Y, i)),
-            i));
+        xs[i] = view.getFieldAs<double>(Dimension::Id::X, i);
+        ys[i] = view.getFieldAs<double>(Dimension::Id::Y, i);
+        ids[i] = i;
     }
 
-    m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
-
-    for (std::size_t i = 0; i < m_pointRefVec.size(); ++i)
-    {
-        m_depth = (std::max)(m_tree->addPoint(m_pointRefVec[i].get()), m_depth);
-    }
+    m_index =
+        pdal_quad_index_create(xs.data(), ys.data(), ids.data(), xs.size(),
+                               xMin, yMin, xMax, yMax, topLevel);
 }
 
 QuadIndex::QImpl::QImpl(
     const std::vector<std::shared_ptr<QuadPointRef>>& points, double xMin,
     double yMin, double xMax, double yMax, std::size_t topLevel)
-    : m_topLevel(topLevel), m_pointRefVec(points.size()), m_tree(), m_depth(0),
-      m_fills()
+    : m_index(nullptr)
 {
-    m_tree.reset(new Tree(BBox(Point(xMin, yMin), Point(xMax, yMax))));
+    std::vector<double> xs(points.size());
+    std::vector<double> ys(points.size());
+    std::vector<uint64_t> ids(points.size());
 
     for (std::size_t i = 0; i < points.size(); ++i)
     {
-        m_pointRefVec[i] = points[i];
-        m_depth = (std::max)(m_tree->addPoint(m_pointRefVec[i].get()), m_depth);
+        xs[i] = points[i]->point.x;
+        ys[i] = points[i]->point.y;
+        ids[i] = points[i]->pbIndex;
     }
+
+    m_index =
+        pdal_quad_index_create(xs.data(), ys.data(), ids.data(), xs.size(),
+                               xMin, yMin, xMax, yMax, topLevel);
+}
+
+QuadIndex::QImpl::~QImpl()
+{
+    pdal_quad_index_destroy(m_index);
 }
 
 void QuadIndex::QImpl::getBounds(double& xMin, double& yMin, double& xMax,
                                  double& yMax) const
 {
-    if (m_tree)
-    {
-        xMin = m_tree->bbox.minimum.x;
-        yMin = m_tree->bbox.minimum.y;
-        xMax = m_tree->bbox.maximum.x;
-        yMax = m_tree->bbox.maximum.y;
-    }
+    pdal_bounds2d_t bounds;
+    pdal_quad_index_bounds(m_index, &bounds);
+    xMin = bounds.minx;
+    yMin = bounds.miny;
+    xMax = bounds.maxx;
+    yMax = bounds.maxy;
 }
 
 std::size_t QuadIndex::QImpl::getDepth() const
 {
-    return m_depth;
+    return pdal_quad_index_depth(m_index);
 }
 
 std::vector<std::size_t> QuadIndex::QImpl::getFills()
 {
-    if (m_tree && !m_fills.size())
-    {
-        m_tree->getFills(m_fills);
-    }
-
-    return m_fills;
+    uint64_t len = 0;
+    uint64_t* fills = pdal_quad_index_fills(m_index, &len);
+    std::vector<std::size_t> output(len);
+    for (uint64_t i = 0; i < len; ++i)
+        output[i] = fills[i];
+    pdal_u64_array_free(fills, len);
+    return output;
 }
 
 PointIdList QuadIndex::QImpl::getPoints(const std::size_t minDepth,
                                         const std::size_t maxDepth) const
 {
-    PointIdList results;
-
-    if (m_tree)
-    {
-        m_tree->getPoints(results, minDepth, maxDepth, m_topLevel);
-    }
-
+    uint64_t len = 0;
+    uint64_t* ids =
+        pdal_quad_index_points_by_depth(m_index, minDepth, maxDepth, &len);
+    PointIdList results(ids, ids + len);
+    pdal_u64_array_free(ids, len);
     return results;
 }
 
@@ -527,28 +523,12 @@ PointIdList QuadIndex::QImpl::getPoints(const std::size_t rasterize,
                                         double& xStep, double& yBegin,
                                         double& yEnd, double& yStep) const
 {
-    PointIdList results;
-
-    if (m_tree)
-    {
-        const size_t exp(static_cast<size_t>(std::pow(2, rasterize)));
-        const double xWidth(m_tree->bbox.maximum.x - m_tree->bbox.minimum.x);
-        const double yWidth(m_tree->bbox.maximum.y - m_tree->bbox.minimum.y);
-
-        xStep = xWidth / exp;
-        yStep = yWidth / exp;
-        xBegin = m_tree->bbox.minimum.x + (xStep / 2);
-        yBegin = m_tree->bbox.minimum.y + (yStep / 2);
-        // One tick past the end.
-        xEnd = m_tree->bbox.maximum.x + (xStep / 2);
-        yEnd = m_tree->bbox.maximum.y + (yStep / 2);
-
-        results.resize(exp * exp, (std::numeric_limits<PointId>::max)());
-
-        m_tree->getPoints(results, rasterize, xBegin, xEnd, xStep, yBegin, yEnd,
-                          yStep, m_topLevel);
-    }
-
+    uint64_t len = 0;
+    uint64_t* ids = pdal_quad_index_points_raster_level(
+        m_index, rasterize, &xBegin, &xEnd, &xStep, &yBegin, &yEnd, &yStep,
+        &len);
+    PointIdList results(ids, ids + len);
+    pdal_u64_array_free(ids, len);
     return results;
 }
 
@@ -557,19 +537,11 @@ PointIdList QuadIndex::QImpl::getPoints(const double xBegin, const double xEnd,
                                         const double yEnd,
                                         const double yStep) const
 {
-    PointIdList results;
-
-    if (m_tree)
-    {
-        size_t width(
-            static_cast<size_t>(Utils::sround((xEnd - xBegin) / xStep)));
-        std::size_t height(
-            static_cast<size_t>(Utils::sround((yEnd - yBegin) / yStep)));
-        results.resize(width * height, (std::numeric_limits<PointId>::max)());
-
-        m_tree->getPoints(results, xBegin, xEnd, xStep, yBegin, yEnd, yStep);
-    }
-
+    uint64_t len = 0;
+    uint64_t* ids = pdal_quad_index_points_raster_bounds(
+        m_index, xBegin, xEnd, xStep, yBegin, yEnd, yStep, &len);
+    PointIdList results(ids, ids + len);
+    pdal_u64_array_free(ids, len);
     return results;
 }
 
@@ -577,18 +549,11 @@ PointIdList QuadIndex::QImpl::getPoints(double xMin, double yMin, double xMax,
                                         double yMax, std::size_t minDepth,
                                         std::size_t maxDepth) const
 {
-    PointIdList results;
-
-    // Making BBox from external parameters here, so do some light validation.
-    if (m_tree)
-    {
-        m_tree->getPoints(
-            results,
-            BBox(Point((std::min)(xMin, xMax), (std::min)(yMin, yMax)),
-                 Point((std::max)(xMin, xMax), (std::max)(yMin, yMax))),
-            minDepth, maxDepth, m_topLevel);
-    }
-
+    uint64_t len = 0;
+    uint64_t* ids = pdal_quad_index_points_in_bounds(
+        m_index, xMin, yMin, xMax, yMax, minDepth, maxDepth, &len);
+    PointIdList results(ids, ids + len);
+    pdal_u64_array_free(ids, len);
     return results;
 }
 
