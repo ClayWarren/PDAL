@@ -60,6 +60,24 @@ fn installed_pdal_matches_rust_las_pipeline() {
         installed_info["stats"]["bbox"]["native"]["bbox"],
         rust_info["stats"]["bbox"]["native"]["bbox"]
     );
+
+    // Verify SRS (if present in fixture)
+    if let Some(installed_wkt) = installed_info["metadata"]["srs"]["wkt"].as_str() {
+        let rust_wkt = rust_info["metadata"]["srs"]["wkt"]
+            .as_str()
+            .expect("rust output missing SRS");
+        assert_eq!(installed_wkt, rust_wkt);
+    }
+
+    // Verify some metadata
+    assert_eq!(
+        installed_info["metadata"]["major_version"],
+        rust_info["metadata"]["major_version"]
+    );
+    assert_eq!(
+        installed_info["metadata"]["minor_version"],
+        rust_info["metadata"]["minor_version"]
+    );
 }
 
 #[test]
@@ -111,6 +129,24 @@ fn installed_pdal_matches_rust_laz_pipeline() {
     assert_eq!(
         installed_info["stats"]["bbox"]["native"]["bbox"],
         rust_info["stats"]["bbox"]["native"]["bbox"]
+    );
+
+    // Verify SRS (if present in fixture)
+    if let Some(installed_wkt) = installed_info["metadata"]["srs"]["wkt"].as_str() {
+        let rust_wkt = rust_info["metadata"]["srs"]["wkt"]
+            .as_str()
+            .expect("rust output missing SRS");
+        assert_eq!(installed_wkt, rust_wkt);
+    }
+
+    // Verify some metadata
+    assert_eq!(
+        installed_info["metadata"]["major_version"],
+        rust_info["metadata"]["major_version"]
+    );
+    assert_eq!(
+        installed_info["metadata"]["minor_version"],
+        rust_info["metadata"]["minor_version"]
     );
 }
 

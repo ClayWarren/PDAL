@@ -17,6 +17,7 @@ use pdal_filters::locate::LocateFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::randomize::RandomizeFilter;
+use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
@@ -57,6 +58,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.merge",
     "filters.mortonorder",
     "filters.randomize",
+    "filters.reprojection",
     "filters.returns",
     "filters.sample",
     "filters.sort",
@@ -137,6 +139,11 @@ pub fn create_filter(
                 .then(|| options.get_u64("seed", 0) as u32);
             Ok(Box::new(FilterWrapper::new(RandomizeFilter::new(seed))))
         }
+        "filters.reprojection" => Ok(Box::new(FilterWrapper::new(ReprojectionFilter::new(
+            &options.get_str("out_srs", ""),
+            options.has("in_srs").then(|| options.get_str("in_srs", "")),
+            options.get_bool("error_on_failure", false),
+        )))),
         "filters.returns" => Ok(Box::new(FilterWrapper::new(ReturnsFilter::new(
             comma_list(&options.get_str("groups", "last")),
         )))),

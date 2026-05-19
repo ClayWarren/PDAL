@@ -295,6 +295,20 @@ pub(crate) fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
     serde_json::Value::Object(object)
 }
 
+pub(crate) fn metadata_node_to_json_flat(node: &MetadataNode) -> serde_json::Value {
+    if node.children().is_empty() {
+        if let Some(value) = node.value() {
+            return metadata_value_to_json(value);
+        }
+    }
+
+    let mut object = serde_json::Map::new();
+    for child in node.children() {
+        object.insert(child.name().to_string(), metadata_node_to_json_flat(child));
+    }
+    serde_json::Value::Object(object)
+}
+
 fn metadata_value_to_json(value: &MetadataValue) -> serde_json::Value {
     match value {
         MetadataValue::String(value) => json!(value),

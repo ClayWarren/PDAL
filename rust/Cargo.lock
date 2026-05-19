@@ -485,6 +485,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "las-crs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b25b1e192564ebf5b563e821c4924ce97bd703f445e851117db2e656499c21c"
+dependencies = [
+ "las",
+ "log",
+ "thiserror",
+]
+
+[[package]]
 name = "laz"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -639,6 +650,7 @@ version = "0.0.0"
 dependencies = [
  "h3o",
  "pdal-core",
+ "pdal-io",
  "serde_json",
 ]
 
@@ -648,6 +660,7 @@ version = "0.0.0"
 dependencies = [
  "byteorder",
  "las",
+ "las-crs",
  "pdal-core",
  "pdal-filters",
  "roxmltree",

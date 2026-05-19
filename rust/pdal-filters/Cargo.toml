@@ -9,3 +9,6 @@ description = "Rust port of PDAL filters."
 h3o = "0.9"
 pdal-core = { path = "../pdal-core" }
 serde_json = "1"
+
+[dev-dependencies]
+pdal-io = { path = "../pdal-io" }

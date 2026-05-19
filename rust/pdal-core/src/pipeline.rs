@@ -329,8 +329,13 @@ impl Pipeline {
     /// Aggregate metadata from all stages.
     pub fn metadata(&self) -> MetadataNode {
         let mut root = MetadataNode::new("pipeline");
-        for node in &self.nodes {
-            let stage_meta = node.stage.metadata();
+        for (i, node) in self.nodes.iter().enumerate() {
+            let mut stage_meta = node.stage.metadata();
+            if let Some(ref tag) = node.tag {
+                stage_meta.set_name(tag.clone());
+            } else {
+                stage_meta.set_name(format!("stage_{}", i));
+            }
             root.add_child(stage_meta);
         }
         root

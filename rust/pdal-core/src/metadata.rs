@@ -107,6 +107,10 @@ impl MetadataNode {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
     pub fn value(&self) -> Option<&MetadataValue> {
         self.value.as_ref()
     }

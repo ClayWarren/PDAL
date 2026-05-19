@@ -982,7 +982,7 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
-        | "readers.terrasolid" => vec![filename()],
+        | "readers.terrasolid" | "readers.las" | "readers.laz" => vec![filename()],
         "readers.ilvis2" => vec![
             filename(),
             option(
@@ -1029,6 +1029,15 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             Some(json!(false)),
         )],
         "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
+        "filters.reprojection" => vec![
+            option("out_srs", "Spatial reference for output data.", None),
+            option("in_srs", "Override spatial reference for input data.", None),
+            option(
+                "error_on_failure",
+                "Error if a point cannot be reprojected.",
+                Some(json!(false)),
+            ),
+        ],
         "filters.returns" => vec![option(
             "groups",
             "Comma-separated return groups to keep.",
@@ -1058,7 +1067,16 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "filters.voxeldownsize" => vec![option("cell", "Voxel cell size.", Some(json!(1.0)))],
         "writers.null" => Vec::new(),
-        "writers.bpf" | "writers.fbi" | "writers.gltf" | "writers.sbet" => vec![filename()],
+        "writers.bpf"
+        | "writers.fbi"
+        | "writers.gltf"
+        | "writers.sbet"
+        | "writers.las"
+        | "writers.laz" => vec![
+            filename(),
+            option("compression", "Compress output data.", Some(json!(false))),
+            option("point_format", "LAS point format ID.", Some(json!(3))),
+        ],
         "writers.text" => vec![
             filename(),
             option("order", "Comma-separated output dimension order.", None),

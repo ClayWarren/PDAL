@@ -2,12 +2,13 @@
 //!
 //! Port of `io/LasWriter.cpp` using the `las` Rust crate.
 
+use byteorder::{LittleEndian, WriteBytesExt};
 use las::point::{Classification, Format, ScanDirection};
-use las::{Builder, Header, Point};
+use las::{Builder, Header, Point, Vlr};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::StageError;
 use std::path::Path;
 
@@ -15,6 +16,12 @@ pub struct LasWriter {
     filename: String,
     _compression: bool,
     point_format: u8,
+}
+
+struct ExtraDim {
+    id: DimId,
+    ty: DimType,
+    size: usize,
 }
 
 impl LasWriter {
@@ -34,14 +41,17 @@ impl Writer for LasWriter {
 
     fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
         if self.filename.is_empty() {
-            return Err(StageError(
-                "LasWriter requires a filename option.".to_string(),
-            ));
+            return Err(StageError("LasWriter requires a filename option.".to_string()));
         }
 
         let mut builder = Builder::from(Header::default());
         builder.point_format = Format::new(self.point_format)
             .map_err(|e| StageError(format!("Invalid point format: {}", e)))?;
+
+        // If an SRS is present, we must use LAS 1.4 for WKT support
+        if !views.is_empty() && !views[0].spatial_reference().is_empty() {
+            builder.version = las::Version { major: 1, minor: 4 };
+        }
 
         let path = Path::new(&self.filename);
 
@@ -86,11 +96,79 @@ impl Writer for LasWriter {
             };
         }
 
-        let header = builder
+        // Identify extra dimensions
+        let mut extra_dims = Vec::new();
+        if !views.is_empty() {
+            let layout = views[0].layout();
+            let standard_dims = pdrf_dims(self.point_format);
+            for i in 0..layout.dim_count() {
+                let (dim_id, dim_ty) = layout.dim_at(i).unwrap();
+                if !standard_dims.contains(dim_id) {
+                    extra_dims.push(ExtraDim {
+                        id: dim_id.clone(),
+                        ty: dim_ty,
+                        size: dim_ty.size(),
+                    });
+                }
+            }
+        }
+
+        // Create Extra Bytes VLR
+        if !extra_dims.is_empty() {
+            let mut vlr_data = Vec::new();
+            for ed in &extra_dims {
+                vlr_data.write_u16::<LittleEndian>(0).unwrap(); // reserved
+                vlr_data.write_u8(pdal_to_las_type(ed.ty)).unwrap();
+                vlr_data.write_u8(0).unwrap(); // options
+                let mut name_buf = [0u8; 32];
+                let name = ed.id.name();
+                let bytes = name.as_bytes();
+                let len = bytes.len().min(32);
+                name_buf[..len].copy_from_slice(&bytes[..len]);
+                vlr_data.extend_from_slice(&name_buf);
+                vlr_data.write_u32::<LittleEndian>(0).unwrap(); // reserved2
+                for _ in 0..24 {
+                    vlr_data.write_u8(0).unwrap();
+                } // no_data
+                for _ in 0..24 {
+                    vlr_data.write_u8(0).unwrap();
+                } // min
+                for _ in 0..24 {
+                    vlr_data.write_u8(0).unwrap();
+                } // max
+                for _ in 0..3 {
+                    vlr_data.write_f64::<LittleEndian>(0.0).unwrap();
+                } // scales
+                for _ in 0..3 {
+                    vlr_data.write_f64::<LittleEndian>(0.0).unwrap();
+                } // offsets
+                let desc_buf = [0u8; 32];
+                vlr_data.extend_from_slice(&desc_buf);
+            }
+            builder.vlrs.push(Vlr {
+                user_id: "LASF_Spec".to_string(),
+                record_id: 4,
+                description: "Extra Bytes Record".to_string(),
+                data: vlr_data,
+            });
+            builder.point_format.extra_bytes =
+                extra_dims.iter().map(|ed| ed.size).sum::<usize>() as u16;
+        }
+
+        let mut header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
 
-        // las::Writer::from_path automatically handles .laz extension if 'laz' feature is enabled
+        // Set SRS on header
+        if !views.is_empty() {
+            let srs = views[0].spatial_reference();
+            if !srs.is_empty() && header.version().major == 1 && header.version().minor == 4 {
+                header
+                    .set_wkt_crs(srs.wkt().as_bytes().to_vec())
+                    .unwrap_or(());
+            }
+        }
+
         let mut writer = las::Writer::from_path(path, header)
             .map_err(|e| StageError(format!("Failed to create LAS/LAZ writer: {}", e)))?;
 
@@ -135,6 +213,8 @@ impl Writer for LasWriter {
 
                 if view.layout().dim(&DimId::GpsTime).is_some() {
                     point.gps_time = Some(view.get_f64(i, &DimId::GpsTime));
+                } else if writer.header().point_format().has_gps_time {
+                    point.gps_time = Some(0.0);
                 }
                 if view.layout().dim(&DimId::Red).is_some() {
                     point.color = Some(las::Color {
@@ -142,6 +222,21 @@ impl Writer for LasWriter {
                         green: view.get_f64(i, &DimId::Green) as u16,
                         blue: view.get_f64(i, &DimId::Blue) as u16,
                     });
+                } else if writer.header().point_format().has_color {
+                    point.color = Some(las::Color {
+                        red: 0,
+                        green: 0,
+                        blue: 0,
+                    });
+                }
+
+                // Pack extra bytes
+                if !extra_dims.is_empty() {
+                    let mut eb = Vec::new();
+                    for ed in &extra_dims {
+                        write_pdal_val(&mut eb, view.get_f64(i, &ed.id), ed.ty).unwrap();
+                    }
+                    point.extra_bytes = eb;
                 }
 
                 writer
@@ -159,5 +254,68 @@ impl Writer for LasWriter {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("writers.las")
+    }
+}
+
+fn pdrf_dims(pdrf: u8) -> Vec<DimId> {
+    let mut dims = vec![
+        DimId::X,
+        DimId::Y,
+        DimId::Z,
+        DimId::Intensity,
+        DimId::ReturnNumber,
+        DimId::NumberOfReturns,
+        DimId::ScanDirectionFlag,
+        DimId::EdgeOfFlightLine,
+        DimId::Classification,
+        DimId::ScanAngleRank,
+        DimId::UserData,
+        DimId::PointSourceId,
+    ];
+    if pdrf == 1 || pdrf == 3 || pdrf >= 6 {
+        dims.push(DimId::GpsTime);
+    }
+    if pdrf == 2 || pdrf == 3 || pdrf == 7 || pdrf == 8 {
+        dims.push(DimId::Red);
+        dims.push(DimId::Green);
+        dims.push(DimId::Blue);
+    }
+    if pdrf == 8 {
+        dims.push(DimId::Infrared);
+    }
+    dims
+}
+
+fn pdal_to_las_type(ty: DimType) -> u8 {
+    match ty {
+        DimType::U8 => 1,
+        DimType::I8 => 2,
+        DimType::U16 => 3,
+        DimType::I16 => 4,
+        DimType::U32 => 5,
+        DimType::I32 => 6,
+        DimType::U64 => 7,
+        DimType::I64 => 8,
+        DimType::F32 => 9,
+        DimType::F64 => 10,
+    }
+}
+
+fn write_pdal_val(
+    writer: &mut dyn std::io::Write,
+    val: f64,
+    ty: DimType,
+) -> Result<(), std::io::Error> {
+    match ty {
+        DimType::U8 => writer.write_u8(val as u8),
+        DimType::I8 => writer.write_i8(val as i8),
+        DimType::U16 => writer.write_u16::<LittleEndian>(val as u16),
+        DimType::I16 => writer.write_i16::<LittleEndian>(val as i16),
+        DimType::U32 => writer.write_u32::<LittleEndian>(val as u32),
+        DimType::I32 => writer.write_i32::<LittleEndian>(val as i32),
+        DimType::U64 => writer.write_u64::<LittleEndian>(val as u64),
+        DimType::I64 => writer.write_i64::<LittleEndian>(val as i64),
+        DimType::F32 => writer.write_f32::<LittleEndian>(val as f32),
+        DimType::F64 => writer.write_f64::<LittleEndian>(val),
     }
 }
