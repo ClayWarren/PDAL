@@ -51,6 +51,9 @@ const char* pdal_log_level_string(int32_t level);
 // FileSpec
 char* pdal_file_spec_parse_json(const char* input);
 
+// OGRSpec
+char* pdal_ogr_spec_parse_json(const char* input);
+
 // Kernel
 int pdal_kernel_parse_stage_option(const char* input, bool allow_stage_prefix,
                                    char** stage, char** option, char** value);

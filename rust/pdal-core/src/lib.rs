@@ -16,6 +16,7 @@ pub mod kernel;
 pub mod log;
 pub mod metadata;
 pub mod metrics;
+pub mod ogr_spec;
 pub mod options;
 pub mod pipeline;
 pub mod plugin;

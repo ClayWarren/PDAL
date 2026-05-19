@@ -17,6 +17,7 @@ mod log_abi;
 mod metadata_abi;
 mod metrics_abi;
 mod native_abi;
+mod ogr_spec_abi;
 mod options;
 mod pipeline_abi;
 mod plugin_abi;
@@ -43,6 +44,7 @@ pub use log_abi::*;
 pub use metadata_abi::*;
 pub use metrics_abi::*;
 pub use native_abi::*;
+pub use ogr_spec_abi::*;
 pub use options::*;
 pub use pipeline_abi::*;
 pub use plugin_abi::*;
@@ -270,6 +272,24 @@ mod tests {
                 CStr::from_ptr(pdal_log_level_string(7)).to_string_lossy(),
                 "Debug"
             );
+        }
+    }
+
+    #[test]
+    fn ogr_spec_roundtrips_through_c_abi() {
+        unsafe {
+            let input = CString::new(
+                r#"{"type":"OGR","datasource":"attributes.json","drivers":["GeoJSON"],"options":{"dialect":"OGRSQL"}}"#,
+            )
+            .unwrap();
+            let json: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_ogr_spec_parse_json(input.as_ptr())))
+                    .unwrap();
+
+            assert_eq!(json["ok"], true);
+            assert_eq!(json["datasource"], "attributes.json");
+            assert_eq!(json["drivers"][0], "GeoJSON");
+            assert_eq!(json["dialect"], "OGRSQL");
         }
     }
 
