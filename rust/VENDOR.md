@@ -71,7 +71,7 @@ copy vendor source just to reduce the apparent amount of remaining work.
 
 - H3: `h3o`
 - GEOS geometry operations: `geos` through `pdal-native`
-- PROJ transformations: `proj`
+- PROJ transformations: `proj` through `pdal-native`
 - GDAL raster/vector access: `gdal-sys` through `pdal-native`
 - JSON parsing: `serde_json`
 

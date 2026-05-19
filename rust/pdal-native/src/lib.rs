@@ -6,13 +6,19 @@
 
 pub mod gdal;
 pub mod geometry;
+pub mod srs;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeCapability {
     Gdal,
     Geos,
+    Proj,
 }
 
 pub fn built_capabilities() -> &'static [NativeCapability] {
-    &[NativeCapability::Gdal, NativeCapability::Geos]
+    &[
+        NativeCapability::Gdal,
+        NativeCapability::Geos,
+        NativeCapability::Proj,
+    ]
 }

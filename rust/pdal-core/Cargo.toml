@@ -7,4 +7,3 @@ description = "Minimal PDAL core (point model, stages, options) -- Rust port spi
 
 [dependencies]
 pdal-native = { path = "../pdal-native" }
-proj = "0.31"

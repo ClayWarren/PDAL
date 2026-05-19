@@ -97,10 +97,10 @@ Current target crates:
 
 - `pdal-core`: point model, dimensions, metadata, options, pipeline, SRS,
   spatial helpers, and shared stage traits.
-- `pdal-native`: explicit native-library adapter boundary. GDAL/OGR and GEOS
-  are already routed through this crate; future PROJ, LASzip/laz-perf, and
-  other native integrations should land here or behind an equally explicit
-  adapter before higher-level crates depend on them.
+- `pdal-native`: explicit native-library adapter boundary. GDAL/OGR, GEOS, and
+  PROJ are already routed through this crate; future LASzip/laz-perf and other
+  native integrations should land here or behind an equally explicit adapter
+  before higher-level crates depend on them.
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
 - `pdal-io`: first-party readers and writers. The deterministic local I/O

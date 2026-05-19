@@ -1,7 +1,5 @@
 //! Spatial Reference Systems and transformations.
 
-use proj::Proj;
-
 /// A spatial reference system (PDAL's `SpatialReference`).
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct SpatialReference {
@@ -55,31 +53,22 @@ impl SpatialReference {
 
 /// A coordinate transformation between two SRSs (PDAL's `SrsTransform`).
 pub struct SrsTransform {
-    proj: Proj,
+    inner: pdal_native::srs::SrsTransform,
 }
 
 impl SrsTransform {
     pub fn new(src: &SpatialReference, dst: &SpatialReference) -> Result<Self, String> {
-        let proj = Proj::new_known_crs(src.wkt(), dst.wkt(), None)
-            .map_err(|e| format!("Failed to create projection: {}", e))?;
-        Ok(Self { proj })
+        let inner = pdal_native::srs::SrsTransform::new(src.wkt(), dst.wkt())?;
+        Ok(Self { inner })
     }
 
     pub fn new_pipeline(coord_op: &str) -> Result<Self, String> {
-        let proj = Proj::new(coord_op).map_err(|e| format!("Failed to create pipeline: {}", e))?;
-        Ok(Self { proj })
+        let inner = pdal_native::srs::SrsTransform::new_pipeline(coord_op)?;
+        Ok(Self { inner })
     }
 
-    pub fn transform(&self, x: &mut f64, y: &mut f64, _z: &mut f64) -> bool {
-        // Only 2D tuple (f64, f64) implements Coord in proj 0.31 for now
-        match self.proj.convert((*x, *y)) {
-            Ok((nx, ny)) => {
-                *x = nx;
-                *y = ny;
-                true
-            }
-            Err(_) => false,
-        }
+    pub fn transform(&self, x: &mut f64, y: &mut f64, z: &mut f64) -> bool {
+        self.inner.transform(x, y, z)
     }
 }
 
