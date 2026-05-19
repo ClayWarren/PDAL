@@ -54,6 +54,31 @@ fn unknown_command_fails_cleanly() {
     assert!(String::from_utf8_lossy(&result.stderr).contains("Unknown Rust command 'info'"));
 }
 
+#[test]
+fn list_commands_reports_rust_commands() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--list-commands")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    assert_eq!(String::from_utf8_lossy(&result.stdout), "pipeline\n");
+}
+
+#[test]
+fn list_commands_supports_json() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--list-commands")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(json[0]["name"], "pipeline");
+    assert_eq!(json[0]["full_name"], "kernels.pipeline");
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

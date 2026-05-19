@@ -152,8 +152,13 @@ impl App {
     }
 
     fn output_commands(&self, leader: &str) {
-        for kernel in kernel_list() {
-            println!("{}{}", leader, kernel.name);
+        let kernels = kernel_list();
+        if self.show_json {
+            println!("{}", serde_json::to_string(&kernels).unwrap());
+        } else {
+            for kernel in kernels {
+                println!("{}{}", leader, kernel.name);
+            }
         }
     }
 
@@ -245,6 +250,8 @@ impl App {
             self.output_version();
         } else if self.show_drivers {
             self.output_drivers();
+        } else if self.show_commands {
+            self.output_commands("");
         } else if let Some(ref stage) = self.show_options {
             if stage == "all" {
                 eprintln!("Showing options for all stages is not yet implemented");
