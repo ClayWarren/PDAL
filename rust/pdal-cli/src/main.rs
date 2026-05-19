@@ -167,7 +167,8 @@ impl App {
             eprintln!("Unable to create stage {}", stage_name);
             return;
         }
-        let json_str = "[]";
+        let options = stage_options(stage_name);
+        let json_str = serde_json::to_string(&options).unwrap();
 
         if self.show_json {
             println!("{}", json_str);
@@ -176,7 +177,22 @@ impl App {
 
         println!("{}", stage_name);
         println!("{}", "-".repeat(80));
-        println!("  No Rust option metadata is available for this stage yet.");
+        if options.is_empty() {
+            println!("  No options");
+            return;
+        }
+        for opt in &options {
+            let name = opt["arg"].as_str().unwrap_or("");
+            let desc = opt["description"].as_str().unwrap_or("");
+            let default = opt.get("default").map(|value| {
+                if let Some(text) = value.as_str() {
+                    format!(" (default: '{}')", text)
+                } else {
+                    format!(" (default: {})", value)
+                }
+            });
+            println!("  {:<20} {}{}", name, desc, default.unwrap_or_default());
+        }
     }
 
     fn output_last_error(&self) {
@@ -299,6 +315,142 @@ fn stage_list() -> Vec<StageInfo> {
             link: "",
         })
         .collect()
+}
+
+fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
+    use serde_json::json;
+
+    fn filename() -> serde_json::Value {
+        json!({"arg": "filename", "description": "Input or output filename."})
+    }
+    fn option(
+        arg: &str,
+        description: &str,
+        default: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut value = json!({"arg": arg, "description": description});
+        if let Some(default) = default {
+            value["default"] = default;
+        }
+        value
+    }
+
+    match stage_name {
+        "readers.faux" => vec![
+            option(
+                "count",
+                "Number of synthetic points to create.",
+                Some(json!(10)),
+            ),
+            option(
+                "mode",
+                "Synthetic point generation mode.",
+                Some(json!("constant")),
+            ),
+        ],
+        "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
+        | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
+        | "readers.terrasolid" => vec![filename()],
+        "readers.ilvis2" => vec![
+            filename(),
+            option(
+                "mapping",
+                "Point mapping to read: low, high, or all.",
+                Some(json!("low")),
+            ),
+            option("metadata", "Optional ILVIS2 XML metadata sidecar.", None),
+        ],
+        "readers.sbet" => vec![
+            filename(),
+            option(
+                "angles_as_degrees",
+                "Convert stored angular values from radians to degrees.",
+                Some(json!(true)),
+            ),
+        ],
+        "filters.decimation" => vec![
+            option("step", "Keep every Nth point.", Some(json!(1))),
+            option("offset", "Starting point offset.", Some(json!(0))),
+            option(
+                "limit",
+                "Maximum number of points to consider.",
+                Some(json!(0)),
+            ),
+        ],
+        "filters.head" | "filters.tail" => vec![
+            option("count", "Number of points to keep.", Some(json!(10))),
+            option(
+                "invert",
+                "Invert the selected point range.",
+                Some(json!(false)),
+            ),
+        ],
+        "filters.locate" => vec![
+            option("dimension", "Dimension to inspect.", None),
+            option("minmax", "Select the min or max point.", Some(json!("max"))),
+        ],
+        "filters.merge" => Vec::new(),
+        "filters.mortonorder" => vec![option(
+            "reverse",
+            "Sort in reverse Morton order.",
+            Some(json!(false)),
+        )],
+        "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
+        "filters.sample" => vec![option("radius", "Sample radius.", Some(json!(1.0)))],
+        "filters.stats" => vec![
+            option(
+                "dimensions",
+                "Comma-separated dimensions to summarize.",
+                None,
+            ),
+            option(
+                "advanced",
+                "Compute advanced statistics.",
+                Some(json!(false)),
+            ),
+        ],
+        "filters.voxeldownsize" => vec![option("cell", "Voxel cell size.", Some(json!(1.0)))],
+        "writers.null" => Vec::new(),
+        "writers.bpf" | "writers.fbi" | "writers.gltf" | "writers.sbet" => vec![filename()],
+        "writers.text" => vec![
+            filename(),
+            option("order", "Comma-separated output dimension order.", None),
+            option(
+                "precision",
+                "Floating-point output precision.",
+                Some(json!(6)),
+            ),
+            option("delimiter", "Output delimiter.", Some(json!(","))),
+            option(
+                "quote_header",
+                "Quote output header fields.",
+                Some(json!(true)),
+            ),
+        ],
+        "writers.pcd" => vec![
+            filename(),
+            option("order", "Comma-separated output dimension order.", None),
+            option(
+                "precision",
+                "Floating-point output precision.",
+                Some(json!(2)),
+            ),
+            option("compression", "PCD storage mode.", Some(json!("ascii"))),
+        ],
+        "writers.ply" => vec![
+            filename(),
+            option("storage_mode", "PLY storage mode.", Some(json!("ascii"))),
+            option("dims", "Comma-separated dimension list.", None),
+            option(
+                "sized_types",
+                "Use sized PLY type names.",
+                Some(json!(true)),
+            ),
+            option("precision", "Floating-point output precision.", None),
+            option("faces", "Write triangular mesh faces.", Some(json!(false))),
+        ],
+        _ => Vec::new(),
+    }
 }
 
 fn main() {

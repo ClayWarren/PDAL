@@ -79,6 +79,39 @@ fn list_commands_supports_json() {
     assert_eq!(json[0]["full_name"], "kernels.pipeline");
 }
 
+#[test]
+fn stage_options_reports_rust_metadata() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--options")
+        .arg("filters.decimation")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("filters.decimation"));
+    assert!(stdout.contains("step"));
+    assert!(stdout.contains("Keep every Nth point."));
+}
+
+#[test]
+fn stage_options_supports_json() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("writers.ply")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|option| option["arg"] == "faces"));
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

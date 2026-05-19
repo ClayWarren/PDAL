@@ -495,6 +495,8 @@ Current status:
 
 - `pdal-rs` is a Rust-native command shell for the port spike. It lists only
   Rust-backed stages/commands and no longer links the C++ helper dispatch shim.
+- `--drivers`, `--list-commands`, and `--options <stage>` are backed by
+  Rust-owned stage/command metadata for the currently implemented Rust surface.
 - `pipeline` is the only concrete Rust command currently enabled. It accepts a
   pipeline JSON filename and executes implemented Rust stages through the same
   Rust C ABI pipeline parser used by lower-layer tests.
