@@ -144,6 +144,14 @@ typedef struct {
 
 bool pdal_scaling_set_auto_xform(const double* xs, const double* ys, const double* zs, uint64_t count, pdal_scaling_t* scaling);
 
+// Geometry
+bool pdal_geometry_wkt_is_valid(const char* wkt, bool* out_value);
+bool pdal_geometry_wkt_distance_to_point(const char* wkt, double x, double y, double z, double* out_value);
+bool pdal_geometry_wkt_contains_point(const char* wkt, double x, double y, bool* out_value);
+
+// XML schema
+char* pdal_xml_schema_remap_old_name(const char* name);
+
 // Metadata
 pdal_metadata_node_t* pdal_metadata_node_create(const char* name);
 pdal_metadata_node_t* pdal_metadata_node_clone(const pdal_metadata_node_t* node);

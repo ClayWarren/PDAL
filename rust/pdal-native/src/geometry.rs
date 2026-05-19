@@ -14,6 +14,10 @@ impl Geometry {
         Ok(Self { geos_geom })
     }
 
+    pub fn is_valid(&self) -> Result<bool, String> {
+        self.geos_geom.is_valid().map_err(|e| e.to_string())
+    }
+
     pub fn distance(&self, x: f64, y: f64, z: f64) -> Result<f64, String> {
         let point = GeosGeometry::new_from_wkt(&format!("POINT({} {} {})", x, y, z))
             .map_err(|e| e.to_string())?;
@@ -41,6 +45,15 @@ mod tests {
     #[test]
     fn invalid_wkt_is_rejected() {
         assert!(Geometry::from_wkt("not wkt").is_err());
+    }
+
+    #[test]
+    fn validity_reports_geos_result() {
+        let valid = Geometry::from_wkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+        let invalid = Geometry::from_wkt("POLYGON((0 0, 10 10, 10 0, 0 10, 0 0))").unwrap();
+
+        assert!(valid.is_valid().unwrap());
+        assert!(!invalid.is_valid().unwrap());
     }
 
     #[test]

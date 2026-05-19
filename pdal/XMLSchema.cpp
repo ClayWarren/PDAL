@@ -34,6 +34,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PipelineWriter.hpp>
 #include <pdal/XMLSchema.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -275,15 +276,10 @@ bool XMLSchema::validate(xmlDocPtr doc, const std::string& xsd)
 
 std::string XMLSchema::remapOldNames(const std::string& input)
 {
-    if (Utils::iequals(input, "Unnamed field 512") ||
-        Utils::iequals(input, "Chipper Point ID"))
-        return std::string("Chipper:PointID");
-
-    if (Utils::iequals(input, "Unnamed field 513") ||
-        Utils::iequals(input, "Chipper Block ID"))
-        return std::string("Chipper:BlockID");
-
-    return input;
+    char* remapped = pdal_xml_schema_remap_old_name(input.c_str());
+    std::string output(remapped ? remapped : "");
+    pdal_string_free(remapped);
+    return output;
 }
 
 bool XMLSchema::loadMetadata(xmlNode* startNode, MetadataNode& input)

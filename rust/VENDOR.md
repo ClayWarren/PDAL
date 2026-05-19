@@ -68,6 +68,16 @@ copy vendor source just to reduce the apparent amount of remaining work.
   enough to validate a Rust replacement.
 - Every vendor decision should name the stage or core behavior that needs it.
 
+## Native Adapter Caveat
+
+Do not call Rust `geos` operations from legacy C++ `Geometry`/`Polygon` methods
+inside the same process until the native-library interaction is isolated and
+regression-tested. A stateless Rust GEOS C ABI exists for the Rust stack, but a
+direct C++ hook through `Geometry::valid()`/`Geometry::distance()` caused
+segfaults in `pdal_filters_crop_test`, `pdal_filters_geomdistance_test`, and
+`pdal_filters_overlay_test` on macOS. Keep C++ geometry on its existing
+GDAL/OGR path unless a future milestone proves a safe boundary.
+
 ## Already Chosen Rust Replacements
 
 - H3: `h3o`

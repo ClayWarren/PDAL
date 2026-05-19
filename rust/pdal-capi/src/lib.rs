@@ -21,6 +21,7 @@ mod srs;
 mod stage_abi;
 mod stats_abi;
 mod tile_abi;
+mod xml_schema_abi;
 
 pub use error::*;
 pub use filter_abi::*;
@@ -40,6 +41,7 @@ pub use srs::*;
 pub use stage_abi::*;
 pub use stats_abi::*;
 pub use tile_abi::*;
+pub use xml_schema_abi::*;
 
 #[cfg(test)]
 mod tests {
@@ -87,6 +89,73 @@ mod tests {
                 .all(|dependency| dependency["version"]
                     .as_str()
                     .is_some_and(|v| !v.is_empty())));
+        }
+    }
+
+    #[test]
+    fn geometry_predicates_roundtrip_through_c_abi() {
+        unsafe {
+            let polygon = CString::new("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+
+            let mut valid = false;
+            assert!(pdal_geometry_wkt_is_valid(polygon.as_ptr(), &mut valid));
+            assert!(valid);
+
+            let mut contains = false;
+            assert!(pdal_geometry_wkt_contains_point(
+                polygon.as_ptr(),
+                5.0,
+                5.0,
+                &mut contains
+            ));
+            assert!(contains);
+
+            assert!(pdal_geometry_wkt_contains_point(
+                polygon.as_ptr(),
+                15.0,
+                5.0,
+                &mut contains
+            ));
+            assert!(!contains);
+        }
+    }
+
+    #[test]
+    fn geometry_distance_roundtrips_through_c_abi() {
+        unsafe {
+            let point = CString::new("POINT(0 0 0)").unwrap();
+            let mut distance = 0.0;
+
+            assert!(pdal_geometry_wkt_distance_to_point(
+                point.as_ptr(),
+                3.0,
+                4.0,
+                0.0,
+                &mut distance
+            ));
+            assert_eq!(distance, 5.0);
+        }
+    }
+
+    #[test]
+    fn xml_schema_legacy_names_roundtrip_through_c_abi() {
+        unsafe {
+            let point_id = CString::new("Chipper Point ID").unwrap();
+            let block_id = CString::new("Unnamed field 513").unwrap();
+            let unchanged = CString::new("Intensity").unwrap();
+
+            assert_eq!(
+                take_string(pdal_xml_schema_remap_old_name(point_id.as_ptr())),
+                "Chipper:PointID"
+            );
+            assert_eq!(
+                take_string(pdal_xml_schema_remap_old_name(block_id.as_ptr())),
+                "Chipper:BlockID"
+            );
+            assert_eq!(
+                take_string(pdal_xml_schema_remap_old_name(unchanged.as_ptr())),
+                "Intensity"
+            );
         }
     }
 
