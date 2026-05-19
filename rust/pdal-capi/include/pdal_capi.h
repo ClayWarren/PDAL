@@ -40,6 +40,11 @@ void pdal_options_destroy(pdal_options_t* ops);
 char* pdal_infer_reader_driver(const char* filename);
 char* pdal_infer_writer_driver(const char* filename);
 
+// Config
+int32_t pdal_config_version_integer(int32_t major, int32_t minor,
+                                    int32_t patch);
+char* pdal_config_full_version_string(const char* version, const char* sha);
+
 // FileSpec
 char* pdal_file_spec_parse_json(const char* input);
 

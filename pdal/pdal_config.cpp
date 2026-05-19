@@ -50,6 +50,7 @@
 #endif
 
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -112,7 +113,8 @@ std::string versionString()
 
 int versionInteger()
 {
-    return versionMajor() * 100 * 100 + versionMinor() * 100 + versionPatch();
+    return pdal_config_version_integer(versionMajor(), versionMinor(),
+                                       versionPatch());
 }
 
 std::string sha1()
@@ -123,15 +125,13 @@ std::string sha1()
 /// Tell the user a bit about PDAL's compilation
 std::string fullVersionString()
 {
-    std::ostringstream os;
-
+    std::string version = versionString();
     std::string sha = sha1();
-    if (!Utils::iequals(sha, "Release"))
-        sha = sha.substr(0, 6);
-
-    os << pdalVersion << " (git-version: " << sha << ")";
-
-    return os.str();
+    char* rustVersion =
+        pdal_config_full_version_string(version.c_str(), sha.c_str());
+    std::string output(rustVersion ? rustVersion : "");
+    pdal_string_free(rustVersion);
+    return output;
 }
 
 std::string debugInformation()

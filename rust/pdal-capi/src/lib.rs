@@ -3,6 +3,7 @@
 //! Every function in this crate is `extern "C"` and intended to be called from
 //! C or C++ through the header `include/pdal_capi.h`.
 
+mod config_abi;
 mod driver_abi;
 mod error;
 mod file_spec_abi;
@@ -27,6 +28,7 @@ mod stats_abi;
 mod tile_abi;
 mod xml_schema_abi;
 
+pub use config_abi::*;
 pub use driver_abi::*;
 pub use error::*;
 pub use file_spec_abi::*;
@@ -227,6 +229,23 @@ mod tests {
                 "writers.gdal"
             );
             assert_eq!(take_string(pdal_infer_reader_driver(unknown.as_ptr())), "");
+        }
+    }
+
+    #[test]
+    fn config_helpers_roundtrip_through_c_abi() {
+        unsafe {
+            assert_eq!(pdal_config_version_integer(2, 10, 1), 21001);
+
+            let version = CString::new("2.10.1").unwrap();
+            let sha = CString::new("abcdef123456").unwrap();
+            assert_eq!(
+                take_string(pdal_config_full_version_string(
+                    version.as_ptr(),
+                    sha.as_ptr()
+                )),
+                "2.10.1 (git-version: abcdef)"
+            );
         }
     }
 

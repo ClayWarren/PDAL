@@ -5,6 +5,7 @@
 //! run a single ported filter end to end. See `rust/README.md` for scope.
 
 pub mod bounds;
+pub mod config;
 pub mod driver;
 pub mod expr;
 pub mod file_spec;
