@@ -503,10 +503,16 @@ fn test_execute_result() {
             maxz: 0.0,
         })
     );
+    assert_eq!(result.dimension_summaries.len(), 3);
+    assert_eq!(result.dimension_summaries[0].name, "X");
+    assert_eq!(result.dimension_summaries[0].count, 42);
+    assert_eq!(result.dimension_summaries[0].minimum, 0.0);
+    assert_eq!(result.dimension_summaries[0].maximum, 0.0);
+    assert_eq!(result.dimension_summaries[0].mean, 0.0);
 }
 
 #[test]
-fn test_execute_result_aggregates_bounds_across_views() {
+fn test_execute_result_aggregates_bounds_and_dimension_summaries_across_views() {
     let mut pipeline = Pipeline::new();
     pipeline.add_stage(
         "filters.duplicate",
@@ -539,6 +545,20 @@ fn test_execute_result_aggregates_bounds_across_views() {
             maxz: 100.0,
         })
     );
+    assert_eq!(result.dimension_summaries.len(), 3);
+    assert_eq!(result.dimension_summaries[0].name, "X");
+    assert_eq!(result.dimension_summaries[0].count, 4);
+    assert_eq!(result.dimension_summaries[0].minimum, -10.0);
+    assert_eq!(result.dimension_summaries[0].maximum, 20.0);
+    assert_eq!(result.dimension_summaries[0].mean, 5.0);
+    assert_eq!(result.dimension_summaries[1].name, "Y");
+    assert_eq!(result.dimension_summaries[1].minimum, -15.0);
+    assert_eq!(result.dimension_summaries[1].maximum, 5.0);
+    assert_eq!(result.dimension_summaries[1].mean, -5.0);
+    assert_eq!(result.dimension_summaries[2].name, "Z");
+    assert_eq!(result.dimension_summaries[2].minimum, -50.0);
+    assert_eq!(result.dimension_summaries[2].maximum, 100.0);
+    assert_eq!(result.dimension_summaries[2].mean, 25.0);
 }
 
 #[test]

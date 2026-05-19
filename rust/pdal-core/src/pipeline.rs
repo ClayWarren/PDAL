@@ -14,7 +14,7 @@ pub use traits::{Reader, StageKind, StageWrapper, Writer};
 
 use crate::metadata::MetadataNode;
 use crate::options::Options;
-use crate::point::{Bounds2D, Bounds3D, PointView};
+use crate::point::{Bounds2D, Bounds3D, DimensionSummary, PointView};
 use crate::stage::StageError;
 use adapters::{ReaderAdapter, WriterAdapter};
 use std::collections::{HashMap, HashSet};
@@ -35,6 +35,7 @@ pub struct ExecResult {
     pub view_count: usize,
     pub bounds_2d: Option<Bounds2D>,
     pub bounds_3d: Option<Bounds3D>,
+    pub dimension_summaries: Vec<DimensionSummary>,
 }
 
 /// A pipeline of stages represented as a DAG.
@@ -321,6 +322,7 @@ impl Pipeline {
             view_count: views.len(),
             bounds_2d: aggregate_bounds_2d(&views),
             bounds_3d: aggregate_bounds_3d(&views),
+            dimension_summaries: aggregate_dimension_summaries(&views),
         })
     }
 
@@ -385,4 +387,36 @@ fn aggregate_bounds_3d(views: &[PointView]) -> Option<Bounds3D> {
                 None => bounds,
             })
         })
+}
+
+fn aggregate_dimension_summaries(views: &[PointView]) -> Vec<DimensionSummary> {
+    let mut summaries = Vec::new();
+    let mut by_name = HashMap::new();
+
+    for view in views {
+        for summary in view.summarize_dimensions() {
+            if let Some(&idx) = by_name.get(&summary.name) {
+                merge_dimension_summary(&mut summaries[idx], summary);
+            } else {
+                by_name.insert(summary.name.clone(), summaries.len());
+                summaries.push(summary);
+            }
+        }
+    }
+
+    summaries
+}
+
+fn merge_dimension_summary(existing: &mut DimensionSummary, incoming: DimensionSummary) {
+    let total_count = existing.count + incoming.count;
+    if total_count == 0 {
+        return;
+    }
+
+    existing.minimum = existing.minimum.min(incoming.minimum);
+    existing.maximum = existing.maximum.max(incoming.maximum);
+    existing.mean = ((existing.mean * existing.count as f64)
+        + (incoming.mean * incoming.count as f64))
+        / total_count as f64;
+    existing.count = total_count;
 }
