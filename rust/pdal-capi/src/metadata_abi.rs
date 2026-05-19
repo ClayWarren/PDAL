@@ -271,7 +271,7 @@ pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
     }
 }
 
-fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
+pub(crate) fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
     let mut object = serde_json::Map::new();
     object.insert("name".to_string(), json!(node.name()));
 

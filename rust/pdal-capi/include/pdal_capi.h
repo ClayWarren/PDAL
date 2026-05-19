@@ -284,6 +284,7 @@ int64_t pdal_pipeline_add_writer(pdal_pipeline_t* pipeline, pdal_writer_t* write
 int64_t pdal_pipeline_add_dependency(pdal_pipeline_t* pipeline, uint64_t target, uint64_t input);
 pdal_point_view_t* pdal_pipeline_execute(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
 int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
+char* pdal_pipeline_execute_summary_json(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
 uint64_t pdal_pipeline_stage_count(const pdal_pipeline_t* pipeline);
 pdal_metadata_node_t* pdal_pipeline_metadata(const pdal_pipeline_t* pipeline);
 int64_t pdal_pipeline_find_by_tag(const pdal_pipeline_t* pipeline, const char* tag);

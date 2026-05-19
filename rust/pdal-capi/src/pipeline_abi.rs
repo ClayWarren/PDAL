@@ -1,11 +1,13 @@
-use crate::error::{clear_last_error, set_last_error};
+use crate::error::{clear_last_error, set_last_error, string_to_c_ptr};
 use crate::io_abi::{ReaderHandle, WriterHandle};
+use crate::metadata_abi::metadata_node_to_json;
 use crate::point_abi::{pdal_bounds2d_t, pdal_bounds3d_t};
 use crate::stage_abi::StageWrapper;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Pipeline, StageWrapper as PipelineStageWrapper};
-use pdal_core::point::PointView;
+use pdal_core::point::{DimensionSummary, PointView};
+use serde_json::json;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
@@ -290,6 +292,43 @@ pub unsafe extern "C" fn pdal_pipeline_execute_result(
     }
 }
 
+/// Execute the pipeline and return a summary result as JSON.
+///
+/// The returned string must be freed with `pdal_string_free`.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+/// `input_view` must be null or a valid point view handle.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_execute_summary_json(
+    pipeline: *mut PipelineHandle,
+    input_view: *mut PointView,
+) -> *mut c_char {
+    if pipeline.is_null() {
+        return std::ptr::null_mut();
+    }
+    clear_last_error();
+    let p = &mut (*pipeline).pipeline;
+
+    let input_views = if input_view.is_null() {
+        Vec::new()
+    } else {
+        let input = Box::from_raw(input_view);
+        vec![*input]
+    };
+
+    match p.execute_with_result(input_views) {
+        Ok(result) => string_to_c_ptr(
+            serde_json::to_string(&pipeline_result_to_json(result, Some(p.metadata())))
+                .unwrap_or_else(|_| "null".to_string()),
+        ),
+        Err(e) => {
+            set_last_error(&e.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Return the number of stages in the pipeline.
 ///
 /// # Safety
@@ -377,6 +416,50 @@ fn pipeline_result_to_abi(result: pdal_core::pipeline::ExecResult) -> pdal_pipel
         has_bounds_3d,
         bounds_3d,
     }
+}
+
+fn pipeline_result_to_json(
+    result: pdal_core::pipeline::ExecResult,
+    metadata: Option<MetadataNode>,
+) -> serde_json::Value {
+    json!({
+        "point_count": result.point_count,
+        "view_count": result.view_count,
+        "bounds_2d": result.bounds_2d.map(|bounds| {
+            json!({
+                "minx": bounds.minx,
+                "maxx": bounds.maxx,
+                "miny": bounds.miny,
+                "maxy": bounds.maxy,
+            })
+        }),
+        "bounds_3d": result.bounds_3d.map(|bounds| {
+            json!({
+                "minx": bounds.minx,
+                "maxx": bounds.maxx,
+                "miny": bounds.miny,
+                "maxy": bounds.maxy,
+                "minz": bounds.minz,
+                "maxz": bounds.maxz,
+            })
+        }),
+        "dimension_summaries": result
+            .dimension_summaries
+            .iter()
+            .map(dimension_summary_json)
+            .collect::<Vec<_>>(),
+        "metadata": metadata.as_ref().map(metadata_node_to_json),
+    })
+}
+
+fn dimension_summary_json(summary: &DimensionSummary) -> serde_json::Value {
+    json!({
+        "name": summary.name,
+        "count": summary.count,
+        "minimum": summary.minimum,
+        "maximum": summary.maximum,
+        "mean": summary.mean,
+    })
 }
 
 fn zero_bounds_2d() -> pdal_bounds2d_t {

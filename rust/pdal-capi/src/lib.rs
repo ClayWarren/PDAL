@@ -293,6 +293,19 @@ mod tests {
                 }
             );
 
+            let summary: serde_json::Value = serde_json::from_str(&take_string(
+                pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut()),
+            ))
+            .unwrap();
+            assert_eq!(summary["point_count"], 3);
+            assert_eq!(summary["view_count"], 1);
+            assert_eq!(summary["dimension_summaries"][0]["name"], "X");
+            assert_eq!(summary["dimension_summaries"][0]["count"], 3);
+            assert_eq!(summary["dimension_summaries"][0]["minimum"], -10.0);
+            assert_eq!(summary["dimension_summaries"][0]["maximum"], 20.0);
+            assert_eq!(summary["dimension_summaries"][0]["mean"], 5.0);
+            assert_eq!(summary["metadata"]["name"], "pipeline");
+
             pdal_pipeline_destroy(pipeline);
         }
     }

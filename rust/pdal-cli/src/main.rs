@@ -241,6 +241,25 @@ impl App {
             return 1;
         }
 
+        if self.show_json {
+            let json_ptr = unsafe {
+                pdal_capi::pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut())
+            };
+            if json_ptr.is_null() {
+                self.output_last_error();
+                unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+                return 1;
+            }
+            if let Some(json) = safe_cstr(json_ptr) {
+                println!("{}", json);
+            }
+            unsafe {
+                pdal_capi::pdal_string_free(json_ptr);
+                pdal_capi::pdal_pipeline_destroy(pipeline);
+            }
+            return 0;
+        }
+
         let mut result = empty_pipeline_result();
         let status = unsafe {
             pdal_capi::pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result)
@@ -249,16 +268,6 @@ impl App {
             self.output_last_error();
             unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
             return 1;
-        }
-        let metadata = self
-            .show_json
-            .then(|| unsafe { pipeline_metadata_json(pipeline) })
-            .flatten();
-        if self.show_json {
-            println!(
-                "{}",
-                serde_json::to_string(&pipeline_result_json(result, metadata)).unwrap()
-            );
         }
         unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
         0
@@ -500,49 +509,6 @@ fn empty_pipeline_result() -> pdal_capi::pdal_pipeline_result_t {
             maxz: 0.0,
         },
     }
-}
-
-unsafe fn pipeline_metadata_json(
-    pipeline: *const pdal_capi::PipelineHandle,
-) -> Option<serde_json::Value> {
-    let metadata = pdal_capi::pdal_pipeline_metadata(pipeline);
-    if metadata.is_null() {
-        return None;
-    }
-    let json_ptr = pdal_capi::pdal_metadata_node_to_json(metadata);
-    pdal_capi::pdal_metadata_node_destroy(metadata);
-    let json = safe_cstr(json_ptr).and_then(|text| serde_json::from_str(&text).ok());
-    pdal_capi::pdal_string_free(json_ptr);
-    json
-}
-
-fn pipeline_result_json(
-    result: pdal_capi::pdal_pipeline_result_t,
-    metadata: Option<serde_json::Value>,
-) -> serde_json::Value {
-    serde_json::json!({
-        "point_count": result.point_count,
-        "view_count": result.view_count,
-        "bounds_2d": result.has_bounds_2d.then(|| {
-            serde_json::json!({
-                "minx": result.bounds_2d.minx,
-                "maxx": result.bounds_2d.maxx,
-                "miny": result.bounds_2d.miny,
-                "maxy": result.bounds_2d.maxy,
-            })
-        }),
-        "bounds_3d": result.has_bounds_3d.then(|| {
-            serde_json::json!({
-                "minx": result.bounds_3d.minx,
-                "maxx": result.bounds_3d.maxx,
-                "miny": result.bounds_3d.miny,
-                "maxy": result.bounds_3d.maxy,
-                "minz": result.bounds_3d.minz,
-                "maxz": result.bounds_3d.maxz,
-            })
-        }),
-        "metadata": metadata,
-    })
 }
 
 #[cfg(test)]

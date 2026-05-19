@@ -78,6 +78,11 @@ fn pipeline_command_supports_json_summary() {
     assert_eq!(json["bounds_2d"]["maxx"], 20.0);
     assert_eq!(json["bounds_3d"]["minz"], -50.0);
     assert_eq!(json["bounds_3d"]["maxz"], 100.0);
+    assert_eq!(json["dimension_summaries"][0]["name"], "X");
+    assert_eq!(json["dimension_summaries"][0]["count"], 3);
+    assert_eq!(json["dimension_summaries"][0]["minimum"], -10.0);
+    assert_eq!(json["dimension_summaries"][0]["maximum"], 20.0);
+    assert_eq!(json["dimension_summaries"][0]["mean"], 5.0);
     assert_eq!(json["metadata"]["name"], "pipeline");
     assert_eq!(json["metadata"]["children"][0]["name"], "readers.faux");
     assert_eq!(
