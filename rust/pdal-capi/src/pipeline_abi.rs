@@ -1,5 +1,6 @@
 use crate::error::{clear_last_error, set_last_error};
 use crate::io_abi::{ReaderHandle, WriterHandle};
+use crate::point_abi::{pdal_bounds2d_t, pdal_bounds3d_t};
 use crate::stage_abi::StageWrapper;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
@@ -15,6 +16,17 @@ use std::os::raw::c_char;
 /// Opaque pipeline handle.
 pub struct PipelineHandle {
     pub(crate) pipeline: Pipeline,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct pdal_pipeline_result_t {
+    pub point_count: u64,
+    pub view_count: u64,
+    pub has_bounds_2d: bool,
+    pub bounds_2d: pdal_bounds2d_t,
+    pub has_bounds_3d: bool,
+    pub bounds_3d: pdal_bounds3d_t,
 }
 
 /// Create a new empty pipeline.
@@ -239,6 +251,45 @@ pub unsafe extern "C" fn pdal_pipeline_execute_count(
     }
 }
 
+/// Execute the pipeline and return a summary result.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+/// `input_view` must be null or a valid point view handle.
+/// `out_result` must point to writable memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_execute_result(
+    pipeline: *mut PipelineHandle,
+    input_view: *mut PointView,
+    out_result: *mut pdal_pipeline_result_t,
+) -> i64 {
+    if pipeline.is_null() || out_result.is_null() {
+        return -1;
+    }
+    clear_last_error();
+    let p = &mut (*pipeline).pipeline;
+
+    let input_views = if input_view.is_null() {
+        Vec::new()
+    } else {
+        let input = Box::from_raw(input_view);
+        vec![*input]
+    };
+
+    match p.execute_with_result(input_views) {
+        Ok(result) => {
+            *out_result = pipeline_result_to_abi(result);
+            0
+        }
+        Err(e) => {
+            set_last_error(&e.0);
+            -1
+        }
+    }
+}
+
 /// Return the number of stages in the pipeline.
 ///
 /// # Safety
@@ -287,5 +338,63 @@ pub unsafe extern "C" fn pdal_pipeline_find_by_tag(
     match (*pipeline).pipeline.find_by_tag(&tag_str) {
         Some(idx) => idx as i64,
         None => -1,
+    }
+}
+
+fn pipeline_result_to_abi(result: pdal_core::pipeline::ExecResult) -> pdal_pipeline_result_t {
+    let (has_bounds_2d, bounds_2d) = match result.bounds_2d {
+        Some(bounds) => (
+            true,
+            pdal_bounds2d_t {
+                minx: bounds.minx,
+                maxx: bounds.maxx,
+                miny: bounds.miny,
+                maxy: bounds.maxy,
+            },
+        ),
+        None => (false, zero_bounds_2d()),
+    };
+    let (has_bounds_3d, bounds_3d) = match result.bounds_3d {
+        Some(bounds) => (
+            true,
+            pdal_bounds3d_t {
+                minx: bounds.minx,
+                maxx: bounds.maxx,
+                miny: bounds.miny,
+                maxy: bounds.maxy,
+                minz: bounds.minz,
+                maxz: bounds.maxz,
+            },
+        ),
+        None => (false, zero_bounds_3d()),
+    };
+
+    pdal_pipeline_result_t {
+        point_count: result.point_count,
+        view_count: result.view_count as u64,
+        has_bounds_2d,
+        bounds_2d,
+        has_bounds_3d,
+        bounds_3d,
+    }
+}
+
+fn zero_bounds_2d() -> pdal_bounds2d_t {
+    pdal_bounds2d_t {
+        minx: 0.0,
+        maxx: 0.0,
+        miny: 0.0,
+        maxy: 0.0,
+    }
+}
+
+fn zero_bounds_3d() -> pdal_bounds3d_t {
+    pdal_bounds3d_t {
+        minx: 0.0,
+        maxx: 0.0,
+        miny: 0.0,
+        maxy: 0.0,
+        minz: 0.0,
+        maxz: 0.0,
     }
 }

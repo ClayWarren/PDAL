@@ -530,8 +530,8 @@ Current Rust core primitives:
   through `filters/private/RustMetadata.hpp`; ownership stays explicit on both
   sides of the C ABI.
 - Spatial reference: text plus coordinate epoch, with metadata export.
-- Bounds ABI: C-repr 2D/3D bounds structs plus point-view calculation calls for
-  later command summaries.
+- Bounds ABI: C-repr 2D/3D bounds structs plus point-view and pipeline-summary
+  calculation calls for later command summaries.
 
 Recent stabilization checkpoint:
 

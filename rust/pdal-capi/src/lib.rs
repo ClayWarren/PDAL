@@ -208,6 +208,75 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_result_roundtrips_through_c_abi() {
+        unsafe {
+            let json = CString::new(
+                r#"[
+                    {
+                        "type":"readers.faux",
+                        "count":3,
+                        "mode":"ramp",
+                        "minx":-10,
+                        "maxx":20,
+                        "miny":-15,
+                        "maxy":7,
+                        "minz":-50,
+                        "maxz":100
+                    }
+                ]"#,
+            )
+            .unwrap();
+            let pipeline = pdal_pipeline_create_json(json.as_ptr());
+            assert!(!pipeline.is_null());
+
+            let mut result = empty_pipeline_result();
+            assert_eq!(
+                pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result),
+                0
+            );
+
+            assert_eq!(result.point_count, 3);
+            assert_eq!(result.view_count, 1);
+            assert!(result.has_bounds_2d);
+            assert_eq!(
+                result.bounds_2d,
+                pdal_bounds2d_t {
+                    minx: -10.0,
+                    maxx: 20.0,
+                    miny: -15.0,
+                    maxy: 7.0,
+                }
+            );
+            assert!(result.has_bounds_3d);
+            assert_eq!(
+                result.bounds_3d,
+                pdal_bounds3d_t {
+                    minx: -10.0,
+                    maxx: 20.0,
+                    miny: -15.0,
+                    maxy: 7.0,
+                    minz: -50.0,
+                    maxz: 100.0,
+                }
+            );
+
+            pdal_pipeline_destroy(pipeline);
+        }
+    }
+
+    #[test]
+    fn pipeline_result_c_abi_rejects_missing_output() {
+        unsafe {
+            let pipeline = pdal_pipeline_create();
+            assert_eq!(
+                pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), std::ptr::null_mut()),
+                -1
+            );
+            pdal_pipeline_destroy(pipeline);
+        }
+    }
+
+    #[test]
     fn metadata_tree_roundtrips_through_c_abi() {
         unsafe {
             let root_name = CString::new("root").unwrap();
@@ -261,6 +330,29 @@ mod tests {
             pdal_metadata_node_destroy(wkt);
             pdal_metadata_node_destroy(metadata);
             pdal_spatial_reference_destroy(srs);
+        }
+    }
+
+    fn empty_pipeline_result() -> pdal_pipeline_result_t {
+        pdal_pipeline_result_t {
+            point_count: 0,
+            view_count: 0,
+            has_bounds_2d: false,
+            bounds_2d: pdal_bounds2d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+            },
+            has_bounds_3d: false,
+            bounds_3d: pdal_bounds3d_t {
+                minx: 0.0,
+                maxx: 0.0,
+                miny: 0.0,
+                maxy: 0.0,
+                minz: 0.0,
+                maxz: 0.0,
+            },
         }
     }
 }
