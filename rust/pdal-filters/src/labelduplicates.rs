@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct LabelDuplicatesFilter {
@@ -52,6 +52,10 @@ impl Filter for LabelDuplicatesFilter {
         }
 
         Ok(vec![out])
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![(DimId::from_name("Duplicate"), DimType::F64)]
     }
 }
 

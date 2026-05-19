@@ -1,6 +1,6 @@
 //! Stage traits -- the Rust analog of PDAL's `Stage` / `Filter` / `Streamable`.
 
-use crate::point::{PointId, PointView};
+use crate::point::{DimId, DimType, PointId, PointView};
 
 /// An error raised while constructing or running a stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +38,12 @@ pub trait Filter {
     ///
     /// This is the primary implementation point for most filters.
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError>;
+
+    /// Dimensions this filter writes and therefore needs prepared on its
+    /// input layout before execution.
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Vec::new()
+    }
 
     /// Export the stage's accumulated metadata, if any.
     fn metadata(&self) -> crate::metadata::MetadataNode {

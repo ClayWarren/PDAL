@@ -1,6 +1,6 @@
 use super::{Reader, StageKind, StageWrapper, Writer};
 use crate::metadata::MetadataNode;
-use crate::point::{PointId, PointView};
+use crate::point::{DimId, DimType, PointId, PointView};
 use crate::stage::{Filter, StageError, Streamable};
 
 /// Adapter that wraps a `Reader` as a `StageWrapper`.
@@ -35,6 +35,9 @@ impl StageWrapper for ReaderAdapter {
     fn kind(&self) -> StageKind {
         StageKind::Reader
     }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Vec::new()
+    }
 }
 
 /// Adapter that wraps a `Writer` as a `StageWrapper`.
@@ -68,6 +71,9 @@ impl StageWrapper for WriterAdapter {
     }
     fn kind(&self) -> StageKind {
         StageKind::Writer
+    }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Vec::new()
     }
 }
 
@@ -104,5 +110,8 @@ impl<T: Filter + Streamable> StageWrapper for FilterWrapper<T> {
     }
     fn kind(&self) -> StageKind {
         StageKind::Filter
+    }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        self.0.output_dimensions()
     }
 }

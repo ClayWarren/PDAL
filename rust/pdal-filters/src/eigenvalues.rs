@@ -1,5 +1,5 @@
 use crate::math;
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, DimType, PointId, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -76,6 +76,14 @@ impl Filter for EigenvaluesFilter {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![
+            (DimId::Eigenvalue0, DimType::F64),
+            (DimId::Eigenvalue1, DimType::F64),
+            (DimId::Eigenvalue2, DimType::F64),
+        ]
     }
 }
 

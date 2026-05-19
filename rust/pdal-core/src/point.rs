@@ -500,6 +500,37 @@ impl PointView {
         }
     }
 
+    /// Return a copy of this view whose layout includes the requested
+    /// dimensions. Existing values are copied through typed accessors.
+    pub fn with_dimensions(&self, dims: &[(DimId, DimType)]) -> PointView {
+        if dims.iter().all(|(dim, _)| self.layout.dim(dim).is_some()) {
+            return self.clone();
+        }
+
+        let mut layout = (*self.layout).clone();
+        for (dim, ty) in dims {
+            layout.register(dim.clone(), *ty);
+        }
+
+        let mut output = PointView::new(Rc::new(layout));
+        output.spatial_reference = self.spatial_reference.clone();
+        output.mesh = self.mesh.clone();
+
+        for idx in 0..self.len() {
+            let out_idx = output.add_point();
+            for dim_idx in 0..self.layout.dim_count() {
+                if let Some((dim, _)) = self.layout.dim_at(dim_idx) {
+                    output.set_f64(out_idx, dim, self.get_f64(idx, dim));
+                }
+            }
+            if let Some(source_index) = self.source_indices.get(idx as usize) {
+                output.source_indices[out_idx as usize] = *source_index;
+            }
+        }
+
+        output
+    }
+
     /// The view's layout.
     pub fn layout(&self) -> &Rc<PointLayout> {
         &self.layout

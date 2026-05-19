@@ -277,7 +277,9 @@ impl Pipeline {
                         continue;
                     }
 
-                    let node_outputs = node.stage.run(&inputs_for_node)?;
+                    let output_dims = node.stage.output_dimensions();
+                    let prepared_inputs = prepare_filter_inputs(inputs_for_node, &output_dims);
+                    let node_outputs = node.stage.run(&prepared_inputs)?;
                     outputs.insert(node_idx, node_outputs);
                 }
                 StageKind::Writer => {
@@ -373,6 +375,20 @@ fn aggregate_bounds_2d(views: &[PointView]) -> Option<Bounds2D> {
                 None => bounds,
             })
         })
+}
+
+fn prepare_filter_inputs(
+    inputs: Vec<PointView>,
+    output_dims: &[(crate::point::DimId, crate::point::DimType)],
+) -> Vec<PointView> {
+    if output_dims.is_empty() {
+        inputs
+    } else {
+        inputs
+            .into_iter()
+            .map(|view| view.with_dimensions(output_dims))
+            .collect()
+    }
 }
 
 fn aggregate_bounds_3d(views: &[PointView]) -> Option<Bounds3D> {

@@ -1,5 +1,5 @@
 use crate::metadata::MetadataNode;
-use crate::point::PointView;
+use crate::point::{DimId, DimType, PointView};
 use crate::stage::StageError;
 
 /// The kind of stage in a pipeline.
@@ -22,6 +22,7 @@ pub trait StageWrapper {
     fn metadata(&self) -> MetadataNode;
     fn name(&self) -> &str;
     fn kind(&self) -> StageKind;
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)>;
 }
 
 /// A reader produces point views from a source.

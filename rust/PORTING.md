@@ -635,12 +635,27 @@ Current C++ stage inventory:
 - 84 first-party filter/static stage files in `filters/`.
 - 49 are Rust-backed through the C ABI.
 - 35 intentionally remain C++ for now.
+- 37 filters are currently visible through the Rust pipeline registry.
 
-The latest pure filters moved behind the C ABI are:
+The latest registry work made the existing Rust implementations pipeline
+creatable for representative spatial, linear/statistical, voxel, ground, and
+partition filters. This is registry exposure, not a claim that every exposed
+filter has full pipeline-layout parity.
 
-- `filters.chipper`
-- `filters.gpstimeconvert`
-- `filters.splitter`
+Important active gap:
+
+- The Rust pipeline now has an initial prepare/layout-mutation hook:
+  Rust-backed filters can declare output dimensions, and the pipeline prepares
+  input views before running them. This is currently implemented for the
+  registry-visible derived-dimension filters such as `NNDistance`,
+  `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`,
+  `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions.
+- This hook is intentionally narrow. Do not count a newly registry-visible
+  filter as behaviorally complete unless a parity test proves its output
+  dimensions are prepared and asserted through the same path users will run.
+- More complex layout mutation, such as ferry-style dimension copies,
+  expression assignment outputs, metadata-rich dimensions, and C++ wrapper
+  prepare parity, still needs dedicated work.
 
 The remaining C++ filters are not "missed easy ports"; they are holdouts whose
 Rust port should start with an ABI/algorithm decision, not a direct rewrite:

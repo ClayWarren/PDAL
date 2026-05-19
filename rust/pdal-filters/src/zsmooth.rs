@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -61,6 +61,10 @@ impl Filter for ZsmoothFilter {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![(self.dim.clone(), DimType::F64)]
     }
 }
 

@@ -1,6 +1,6 @@
 use pdal_core::metadata::MetadataNode;
 use pdal_core::pipeline::StageWrapper as PipelineStageWrapper;
-use pdal_core::point::PointView;
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,7 @@ pub(crate) trait FilterWrapper {
     fn metadata(&self) -> MetadataNode;
     fn as_any(&self) -> &dyn std::any::Any;
     fn name(&self) -> &str;
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)>;
 }
 
 impl<T: Filter + Streamable> FilterWrapper for T {
@@ -40,6 +41,9 @@ impl<T: Filter + Streamable> FilterWrapper for T {
     }
     fn name(&self) -> &str {
         Filter::name(self)
+    }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Filter::output_dimensions(self)
     }
 }
 
@@ -67,5 +71,8 @@ impl PipelineStageWrapper for StageWrapper {
     }
     fn kind(&self) -> pdal_core::pipeline::StageKind {
         pdal_core::pipeline::StageKind::Filter
+    }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        self.filter.output_dimensions()
     }
 }

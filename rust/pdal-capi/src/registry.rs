@@ -792,6 +792,54 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_json_runs_newly_registry_visible_filter_families() {
+        let cases = [
+            (
+                "filters.nndistance",
+                r#"{"type":"filters.nndistance", "knn":1, "mode":"kth"}"#,
+                DimId::NNDistance,
+            ),
+            (
+                "filters.radialdensity",
+                r#"{"type":"filters.radialdensity", "radius":2.0}"#,
+                DimId::RadialDensity,
+            ),
+            (
+                "filters.eigenvalues",
+                r#"{"type":"filters.eigenvalues", "knn":4}"#,
+                DimId::Eigenvalue0,
+            ),
+            (
+                "filters.cluster",
+                r#"{"type":"filters.cluster", "tolerance":10.0, "min_points":1}"#,
+                DimId::ClusterID,
+            ),
+            (
+                "filters.zsmooth",
+                r#"{"type":"filters.zsmooth", "radius":10.0, "dimension":"Zsmoothed"}"#,
+                DimId::from_name("Zsmoothed"),
+            ),
+        ];
+
+        for (name, filter_json, dim) in cases {
+            let json = format!(
+                r#"[
+                    {{"type":"readers.faux", "count":5, "mode":"ramp", "minx":0, "maxx":4, "miny":0, "maxy":4, "minz":0, "maxz":4}},
+                    {filter_json}
+                ]"#
+            );
+            let mut pipeline = pipeline_from_json(&json).unwrap();
+            let views = pipeline.execute(Vec::new()).unwrap();
+            assert_eq!(views.len(), 1, "{name} should produce one view");
+            assert_eq!(views[0].len(), 5, "{name} should preserve point count");
+            assert!(
+                views[0].layout().dim(&dim).is_some(),
+                "{name} should prepare its output dimension"
+            );
+        }
+    }
+
+    #[test]
     fn sort_rejects_unknown_order() {
         let mut options = Options::new();
         options.add("dimensions", "X").add("order", "sideways");

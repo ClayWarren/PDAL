@@ -1,5 +1,5 @@
 use crate::math;
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -52,6 +52,10 @@ impl Filter for ApproximateCoplanarFilter {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![(DimId::Coplanar, DimType::F64)]
     }
 }
 
