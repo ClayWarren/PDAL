@@ -285,6 +285,11 @@ void pdal_reader_destroy(pdal_reader_t* reader);
 pdal_reader_t* pdal_create_reader(const char* name, const pdal_options_t* ops);
 pdal_writer_t* pdal_create_writer(const char* name, const pdal_options_t* ops);
 
+// Metrics: compare two point cloud files.
+int pdal_hausdorff(const char* path_a, const char* path_b, double* hausdorff, double* modified_hausdorff);
+int pdal_chamfer(const char* path_a, const char* path_b, double* chamfer);
+char* pdal_delta(const char* path_a, const char* path_b);
+
 // Writer
 pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);

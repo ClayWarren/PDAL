@@ -275,12 +275,14 @@ fn pipeline_command_supports_json_summary() {
 #[test]
 fn unknown_command_fails_cleanly() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
-        .arg("info")
+        .arg("bogus-command")
         .output()
         .unwrap();
 
     assert!(!result.status.success());
-    assert!(String::from_utf8_lossy(&result.stderr).contains("Unknown Rust command 'info'"));
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("Unknown Rust command 'bogus-command'")
+    );
 }
 
 #[test]
@@ -291,7 +293,10 @@ fn list_commands_reports_rust_commands() {
         .unwrap();
 
     assert!(result.status.success());
-    assert_eq!(String::from_utf8_lossy(&result.stdout), "pipeline\n");
+    assert_eq!(
+        String::from_utf8_lossy(&result.stdout),
+        "chamfer\ndelta\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\ntranslate\n"
+    );
 }
 
 #[test]
@@ -304,8 +309,10 @@ fn list_commands_supports_json() {
 
     assert!(result.status.success());
     let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert_eq!(json[0]["name"], "pipeline");
-    assert_eq!(json[0]["full_name"], "kernels.pipeline");
+    assert_eq!(json[0]["name"], "chamfer");
+    assert_eq!(json[0]["full_name"], "kernels.chamfer");
+    assert_eq!(json[1]["name"], "delta");
+    assert_eq!(json[1]["full_name"], "kernels.delta");
 }
 
 #[test]

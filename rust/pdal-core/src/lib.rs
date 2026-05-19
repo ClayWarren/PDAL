@@ -10,6 +10,7 @@ pub mod gdal;
 pub mod geometry;
 pub mod georeference;
 pub mod metadata;
+pub mod metrics;
 pub mod options;
 pub mod pipeline;
 pub mod point;

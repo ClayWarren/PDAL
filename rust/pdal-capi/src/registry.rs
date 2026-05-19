@@ -44,6 +44,8 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.sbet",
     "readers.smrmsg",
     "readers.terrasolid",
+    "readers.las",
+    "readers.laz",
     "readers.ply",
 ];
 
@@ -71,6 +73,8 @@ pub const WRITER_DRIVERS: &[&str] = &[
     "writers.text",
     "writers.pcd",
     "writers.sbet",
+    "writers.las",
+    "writers.laz",
     "writers.ply",
 ];
 
@@ -98,6 +102,7 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.terrasolid" => Ok(Box::new(pdal_io::terrasolid::TerrasolidReader::new(
             options,
         ))),
+        "readers.las" | "readers.laz" => Ok(Box::new(pdal_io::las::LasReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
         _ => Err(StageError(format!(
             "Reader driver '{name}' is not available in the Rust port."
@@ -195,6 +200,7 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.text" => Ok(Box::new(pdal_io::text_writer::TextWriter::new(options))),
         "writers.pcd" => Ok(Box::new(pdal_io::pcd::PcdWriter::new(options))),
         "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
+        "writers.las" | "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options))),
         _ => Err(StageError(format!(
             "Writer driver '{name}' is not available in the Rust port."

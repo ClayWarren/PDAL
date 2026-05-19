@@ -412,6 +412,9 @@ Done when:
   to degrees and back), and bit-parity coverage (when conversion is disabled).
 - `readers.smrmsg` has a Rust implementation for the SBET RMS message format,
   covering 10 RMS error dimensions with bit-parity matching PDAL's behavior.
+- `readers.las` and `writers.las` have a Rust implementation for ASPRS LAS
+  and LAZ formats, using the `las` and `laz` crates. They support standard
+  dimensions, V1.0-1.4 point formats, and compression/decompression.
 - `readers.fbi` and `writers.fbi` have a Rust implementation for the TerraScan
   Fast Binary local path, including separate dimension streams, header offsets,
   color stream ordering, and byte-for-byte installed-PDAL read/write parity.
@@ -431,6 +434,7 @@ Done when:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test fbi_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test terrasolid_regression -- --ignored`,
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test optech_regression -- --ignored`,
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test las_regression -- --ignored`,
   and
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test smrmsg_regression -- --ignored`.
 - `pdal_core::driver` can infer PDAL reader/writer driver names from filenames
