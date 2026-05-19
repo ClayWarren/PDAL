@@ -4,6 +4,7 @@
 //! C or C++ through the header `include/pdal_capi.h`.
 
 mod error;
+mod file_spec_abi;
 mod filter_abi;
 mod filter_expression_abi;
 mod filter_grid_abi;
@@ -26,6 +27,7 @@ mod tile_abi;
 mod xml_schema_abi;
 
 pub use error::*;
+pub use file_spec_abi::*;
 pub use filter_abi::*;
 pub use filter_expression_abi::*;
 pub use filter_grid_abi::*;
@@ -165,6 +167,32 @@ mod tests {
                     ext.as_ptr(),
                 )),
                 ""
+            );
+        }
+    }
+
+    #[test]
+    fn file_spec_parser_roundtrips_through_c_abi() {
+        unsafe {
+            let input = CString::new(r#"{"path":"foo.laz","headers":{"h":"v"},"query":{"q":"v"}}"#)
+                .unwrap();
+            let parsed: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_file_spec_parse_json(input.as_ptr())))
+                    .unwrap();
+
+            assert_eq!(parsed["ok"], true);
+            assert_eq!(parsed["path"], "foo.laz");
+            assert_eq!(parsed["headers"]["h"], "v");
+            assert_eq!(parsed["query"]["q"], "v");
+
+            let input = CString::new(r#"{"query":[]}"#).unwrap();
+            let parsed: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_file_spec_parse_json(input.as_ptr())))
+                    .unwrap();
+            assert_eq!(parsed["ok"], false);
+            assert_eq!(
+                parsed["error"],
+                "'filename' object must contain 'path' member."
             );
         }
     }

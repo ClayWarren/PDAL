@@ -39,6 +39,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/private/FileSpecHelper.hpp>
 #include <pdal/util/private/JsonSupport.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -50,30 +51,8 @@ struct FileSpec::Private
     StringMap m_query;
 
     Utils::StatusWithReason parse(NL::json& node);
-    Utils::StatusWithReason extractPath(NL::json& node);
-    Utils::StatusWithReason extractHeaders(NL::json& node);
-    Utils::StatusWithReason extractQuery(NL::json& node);
     void setFilePath(const std::string& u8path);
 };
-
-namespace
-{
-
-bool extractStringMap(NL::json& node, StringMap& map)
-{
-    if (!node.is_object())
-        return false;
-    for (auto& [key, val] : node.items())
-    {
-        if (val.is_string())
-            map.insert({key, val});
-        else
-            return false;
-    }
-    return true;
-}
-
-} // unnamed namespace
 
 FileSpec::FileSpec() : m_p(new Private) {}
 
@@ -174,77 +153,24 @@ void FileSpec::Private::setFilePath(const std::string& u8path)
 
 Utils::StatusWithReason FileSpec::Private::parse(NL::json& node)
 {
-    if (node.is_null())
-        return {-1, "'filename' argument contains no data"};
-    if (node.is_string())
-        setFilePath(node.get<std::string>());
-    else if (node.is_object())
-    {
-        auto status = extractPath(node);
-        if (!status)
-            return {-1, status.what()};
-        status = extractHeaders(node);
-        if (!status)
-            return {-1, status.what()};
-        status = extractQuery(node);
-        if (!status)
-            return {-1, status.what()};
-        if (!node.empty())
-            return {-1, "Invalid item in filename object: " + node.dump()};
-    }
-    else
-        return {-1, "'filename' must be specified as a string."};
-    return true;
-}
+    const bool wasObject = node.is_object();
+    std::string dumped = node.dump();
+    char* parsed = pdal_file_spec_parse_json(dumped.c_str());
+    NL::json result = NL::json::parse(parsed ? parsed : "{}");
+    pdal_string_free(parsed);
 
-Utils::StatusWithReason FileSpec::Private::extractPath(NL::json& node)
-{
-    auto it = node.find("path");
-    if (it == node.end())
-        return {-1, "'filename' object must contain 'path' member."};
-    NL::json& val = *it;
-    if (!val.is_null())
-    {
-        if (val.is_string())
-            setFilePath(val.get<std::string>());
-        else
-            return {-1, "'filename' object 'path' member must be specified as "
-                        "a string."};
-        node.erase(it);
-    }
-    return true;
-}
+    if (!result.value("ok", false))
+        return {-1, result.value("error", "")};
 
-Utils::StatusWithReason FileSpec::Private::extractHeaders(NL::json& node)
-{
-    auto it = node.find("headers");
-    if (it == node.end())
-        return true;
-    NL::json& val = *it;
-    if (!val.is_null())
-    {
-        if (!extractStringMap(val, m_headers))
-            return {-1,
-                    "'filename' sub-argument 'headers' must be an object of "
-                    "string key-value pairs."};
-    }
-    node.erase(it);
-    return true;
-}
-
-Utils::StatusWithReason FileSpec::Private::extractQuery(NL::json& node)
-{
-    auto it = node.find("query");
-    if (it == node.end())
-        return true;
-    NL::json& val = *it;
-    if (!val.is_null())
-    {
-        if (!extractStringMap(val, m_query))
-            return {-1, "'filename' sub-argument 'query' must be an object of "
-                        "string key-value pairs."};
-    }
-    node.erase(it);
+    setFilePath(result.value("path", ""));
+    m_headers.clear();
+    m_query.clear();
+    if (result.contains("headers"))
+        m_headers = result["headers"].get<StringMap>();
+    if (result.contains("query"))
+        m_query = result["query"].get<StringMap>();
+    if (wasObject)
+        node = NL::json::object();
     return true;
 }
 

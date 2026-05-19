@@ -7,6 +7,7 @@
 pub mod bounds;
 pub mod driver;
 pub mod expr;
+pub mod file_spec;
 pub mod gdal;
 pub mod geometry;
 pub mod georeference;

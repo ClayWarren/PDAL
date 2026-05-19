@@ -35,6 +35,9 @@ char* pdal_options_value(const pdal_options_t* ops, const char* key);
 char* pdal_options_command_line_json(const pdal_options_t* ops);
 void pdal_options_destroy(pdal_options_t* ops);
 
+// FileSpec
+char* pdal_file_spec_parse_json(const char* input);
+
 // Kernel
 int pdal_kernel_parse_stage_option(const char* input, bool allow_stage_prefix,
                                    char** stage, char** option, char** value);
