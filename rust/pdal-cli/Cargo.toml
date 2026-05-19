@@ -13,3 +13,7 @@ pdal-capi = { path = "../pdal-capi" }
 pdal-kernels = { path = "../pdal-kernels" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[dev-dependencies]
+pdal-core = { path = "../pdal-core" }
+pdal-io = { path = "../pdal-io" }

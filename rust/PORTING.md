@@ -509,8 +509,8 @@ Current status:
 - Command-level regression for `pipeline` is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test pipeline_command -- --ignored`.
   It compares the artifact written by installed `pdal pipeline` with the
-  artifact written by `pdal-rs pipeline` for the deterministic local text
-  reader -> decimation filter -> text writer path.
+  artifact written by `pdal-rs pipeline` for deterministic local text, PCD,
+  and PLY reader -> decimation filter -> writer paths.
 - Do not add `info`, `translate`, or other kernels yet; they need richer
   metadata, bounds, option, and I/O parity first.
 

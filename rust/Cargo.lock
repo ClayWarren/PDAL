@@ -497,6 +497,8 @@ name = "pdal-cli"
 version = "0.0.0"
 dependencies = [
  "pdal-capi",
+ "pdal-core",
+ "pdal-io",
  "pdal-kernels",
  "serde",
  "serde_json",
