@@ -15,10 +15,57 @@ pub enum NativeCapability {
     Proj,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NativeDependency {
+    pub capability: NativeCapability,
+    pub name: &'static str,
+    pub version: String,
+}
+
 pub fn built_capabilities() -> &'static [NativeCapability] {
     &[
         NativeCapability::Gdal,
         NativeCapability::Geos,
         NativeCapability::Proj,
     ]
+}
+
+pub fn built_dependencies() -> Vec<NativeDependency> {
+    vec![
+        NativeDependency {
+            capability: NativeCapability::Gdal,
+            name: "GDAL",
+            version: gdal::version(),
+        },
+        NativeDependency {
+            capability: NativeCapability::Geos,
+            name: "GEOS",
+            version: geometry::version(),
+        },
+        NativeDependency {
+            capability: NativeCapability::Proj,
+            name: "PROJ",
+            version: srs::version(),
+        },
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn built_dependencies_report_each_native_capability() {
+        let dependencies = built_dependencies();
+
+        assert_eq!(dependencies.len(), built_capabilities().len());
+        for capability in built_capabilities() {
+            let dependency = dependencies
+                .iter()
+                .find(|dependency| dependency.capability == *capability)
+                .expect("dependency is listed for every capability");
+            assert!(!dependency.name.is_empty());
+            assert!(!dependency.version.is_empty());
+        }
+    }
 }

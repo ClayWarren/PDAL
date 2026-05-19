@@ -30,3 +30,10 @@ impl SrsTransform {
         }
     }
 }
+
+pub fn version() -> String {
+    match Proj::new("EPSG:4326") {
+        Ok(proj) => proj.lib_info().map(|info| info.version).unwrap_or_default(),
+        Err(_) => String::new(),
+    }
+}

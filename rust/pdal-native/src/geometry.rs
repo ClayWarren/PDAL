@@ -30,6 +30,10 @@ impl Geometry {
     }
 }
 
+pub fn version() -> String {
+    geos::version().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,5 +56,10 @@ mod tests {
         let geometry = Geometry::from_wkt("POINT(0 0 0)").unwrap();
 
         assert_eq!(geometry.distance(3.0, 4.0, 0.0).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn version_reports_geos() {
+        assert!(!version().is_empty());
     }
 }

@@ -4,7 +4,7 @@ use gdal_sys::OGRDataSourceH;
 use gdal_sys::{
     CPLErr, GDALAccess, GDALDataType, GDALDatasetH, GDALGetRasterBand, GDALRWFlag, GDALRasterIO,
 };
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 pub struct Raster {
     ds: GDALDatasetH,
@@ -225,5 +225,23 @@ pub fn register_drivers() {
     unsafe {
         gdal_sys::GDALAllRegister();
         gdal_sys::OGRRegisterAll();
+    }
+}
+
+pub fn version() -> String {
+    version_info("RELEASE_NAME")
+}
+
+pub fn version_info(key: &str) -> String {
+    let Ok(key) = CString::new(key) else {
+        return String::new();
+    };
+    unsafe {
+        let value = gdal_sys::GDALVersionInfo(key.as_ptr());
+        if value.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(value).to_string_lossy().into_owned()
+        }
     }
 }
