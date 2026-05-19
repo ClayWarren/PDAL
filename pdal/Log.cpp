@@ -34,6 +34,7 @@
 
 #include <pdal/Log.hpp>
 #include <pdal/PDALUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <fstream>
 #include <ostream>
@@ -132,20 +133,7 @@ std::ostream& Log::get(LogLevel level)
 
 std::string Log::getLevelString(LogLevel level) const
 {
-    switch (level)
-    {
-    case LogLevel::Error:
-        return "Error";
-        break;
-    case LogLevel::Warning:
-        return "Warning";
-        break;
-    case LogLevel::Info:
-        return "Info";
-        break;
-    default:
-        return "Debug";
-    }
+    return pdal_log_level_string(Utils::toNative(level));
 }
 
 std::string Log::now() const

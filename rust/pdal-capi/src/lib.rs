@@ -13,6 +13,7 @@ mod filter_grid_abi;
 mod filter_runtime;
 mod io_abi;
 mod kernel_abi;
+mod log_abi;
 mod metadata_abi;
 mod metrics_abi;
 mod native_abi;
@@ -38,6 +39,7 @@ pub use filter_grid_abi::*;
 pub use filter_runtime::*;
 pub use io_abi::*;
 pub use kernel_abi::*;
+pub use log_abi::*;
 pub use metadata_abi::*;
 pub use metrics_abi::*;
 pub use native_abi::*;
@@ -245,6 +247,28 @@ mod tests {
                     sha.as_ptr()
                 )),
                 "2.10.1 (git-version: abcdef)"
+            );
+        }
+    }
+
+    #[test]
+    fn log_level_strings_roundtrip_through_c_abi() {
+        unsafe {
+            assert_eq!(
+                CStr::from_ptr(pdal_log_level_string(0)).to_string_lossy(),
+                "Error"
+            );
+            assert_eq!(
+                CStr::from_ptr(pdal_log_level_string(1)).to_string_lossy(),
+                "Warning"
+            );
+            assert_eq!(
+                CStr::from_ptr(pdal_log_level_string(2)).to_string_lossy(),
+                "Info"
+            );
+            assert_eq!(
+                CStr::from_ptr(pdal_log_level_string(7)).to_string_lossy(),
+                "Debug"
             );
         }
     }

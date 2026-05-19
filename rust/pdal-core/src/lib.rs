@@ -13,6 +13,7 @@ pub mod gdal;
 pub mod geometry;
 pub mod georeference;
 pub mod kernel;
+pub mod log;
 pub mod metadata;
 pub mod metrics;
 pub mod options;

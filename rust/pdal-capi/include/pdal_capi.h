@@ -45,6 +45,9 @@ int32_t pdal_config_version_integer(int32_t major, int32_t minor,
                                     int32_t patch);
 char* pdal_config_full_version_string(const char* version, const char* sha);
 
+// Log
+const char* pdal_log_level_string(int32_t level);
+
 // FileSpec
 char* pdal_file_spec_parse_json(const char* input);
 
