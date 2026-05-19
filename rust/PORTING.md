@@ -514,7 +514,8 @@ Done when:
 Current Rust core primitives:
 
 - Point model: `PointLayout`, `PointView`, dimension IDs/types, source index
-  tracking, and per-view spatial reference storage.
+  tracking, per-view spatial reference storage, mesh face storage, and 2D/3D
+  bounds calculation.
 - Stage model: filter and streamable traits for Rust-backed stages.
 - Pipeline model: minimal reader/filter/writer DAG execution, tags,
   dependencies, metadata aggregation, and error propagation.

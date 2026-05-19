@@ -395,6 +395,64 @@ impl TriangularMesh {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Bounds2D {
+    pub minx: f64,
+    pub maxx: f64,
+    pub miny: f64,
+    pub maxy: f64,
+}
+
+impl Bounds2D {
+    fn new(x: f64, y: f64) -> Self {
+        Self {
+            minx: x,
+            maxx: x,
+            miny: y,
+            maxy: y,
+        }
+    }
+
+    fn grow(&mut self, x: f64, y: f64) {
+        self.minx = self.minx.min(x);
+        self.maxx = self.maxx.max(x);
+        self.miny = self.miny.min(y);
+        self.maxy = self.maxy.max(y);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Bounds3D {
+    pub minx: f64,
+    pub maxx: f64,
+    pub miny: f64,
+    pub maxy: f64,
+    pub minz: f64,
+    pub maxz: f64,
+}
+
+impl Bounds3D {
+    fn new(x: f64, y: f64, z: f64) -> Self {
+        Self {
+            minx: x,
+            maxx: x,
+            miny: y,
+            maxy: y,
+            minz: z,
+            maxz: z,
+        }
+    }
+
+    fn grow(&mut self, x: f64, y: f64, z: f64) {
+        self.minx = self.minx.min(x);
+        self.maxx = self.maxx.max(x);
+        self.miny = self.miny.min(y);
+        self.maxy = self.maxy.max(y);
+        self.minz = self.minz.min(z);
+        self.maxz = self.maxz.max(z);
+    }
+}
+
 #[derive(Clone)]
 pub struct PointView {
     layout: Rc<PointLayout>,
@@ -448,6 +506,45 @@ impl PointView {
 
     pub fn mesh(&self) -> Option<&TriangularMesh> {
         self.mesh.as_ref()
+    }
+
+    pub fn calculate_bounds_2d(&self) -> Option<Bounds2D> {
+        if self.is_empty()
+            || self.layout.dim(&DimId::X).is_none()
+            || self.layout.dim(&DimId::Y).is_none()
+        {
+            return None;
+        }
+
+        let mut bounds = Bounds2D::new(self.get_f64(0, &DimId::X), self.get_f64(0, &DimId::Y));
+        for idx in 1..self.len() {
+            bounds.grow(self.get_f64(idx, &DimId::X), self.get_f64(idx, &DimId::Y));
+        }
+        Some(bounds)
+    }
+
+    pub fn calculate_bounds_3d(&self) -> Option<Bounds3D> {
+        if self.is_empty()
+            || self.layout.dim(&DimId::X).is_none()
+            || self.layout.dim(&DimId::Y).is_none()
+            || self.layout.dim(&DimId::Z).is_none()
+        {
+            return None;
+        }
+
+        let mut bounds = Bounds3D::new(
+            self.get_f64(0, &DimId::X),
+            self.get_f64(0, &DimId::Y),
+            self.get_f64(0, &DimId::Z),
+        );
+        for idx in 1..self.len() {
+            bounds.grow(
+                self.get_f64(idx, &DimId::X),
+                self.get_f64(idx, &DimId::Y),
+                self.get_f64(idx, &DimId::Z),
+            );
+        }
+        Some(bounds)
     }
 
     /// Number of points in the view.
@@ -609,6 +706,69 @@ mod tests {
         assert_eq!(dst.source_index(1), 0);
         assert_eq!(dst.get_f64(0, &DimId::X), 2.0);
         assert_eq!(dst.get_f64(1, &DimId::X), 0.0);
+    }
+
+    #[test]
+    fn calculate_bounds_matches_point_view_contract() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for (x, y, z) in [(-10.0, 5.0, 100.0), (20.0, -15.0, -50.0), (3.0, 7.0, 25.0)] {
+            let point = view.add_point();
+            view.set_f64(point, &DimId::X, x);
+            view.set_f64(point, &DimId::Y, y);
+            view.set_f64(point, &DimId::Z, z);
+        }
+
+        assert_eq!(
+            view.calculate_bounds_2d(),
+            Some(Bounds2D {
+                minx: -10.0,
+                maxx: 20.0,
+                miny: -15.0,
+                maxy: 7.0,
+            })
+        );
+        assert_eq!(
+            view.calculate_bounds_3d(),
+            Some(Bounds3D {
+                minx: -10.0,
+                maxx: 20.0,
+                miny: -15.0,
+                maxy: 7.0,
+                minz: -50.0,
+                maxz: 100.0,
+            })
+        );
+    }
+
+    #[test]
+    fn calculate_bounds_requires_points_and_coordinate_dimensions() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        assert_eq!(view.calculate_bounds_2d(), None);
+        assert_eq!(view.calculate_bounds_3d(), None);
+
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, 1.0);
+        view.set_f64(point, &DimId::Y, 2.0);
+
+        assert_eq!(
+            view.calculate_bounds_2d(),
+            Some(Bounds2D {
+                minx: 1.0,
+                maxx: 1.0,
+                miny: 2.0,
+                maxy: 2.0,
+            })
+        );
+        assert_eq!(view.calculate_bounds_3d(), None);
     }
 
     #[test]
