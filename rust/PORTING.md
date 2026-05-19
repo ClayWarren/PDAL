@@ -38,7 +38,57 @@ Off limits unless the user explicitly revises this plan:
 - Do not mark a stage/reader/writer "ported" without behavior coverage and the
   relevant C++ parity gate.
 
-Current next milestone:
+## Finish-Line Milestones
+
+Work toward these milestones in order. A later milestone may receive a small
+boundary probe only when it directly unblocks an earlier one. Do not use this
+roadmap as permission to sweep a directory.
+
+0. Guard the contract continuously.
+   Keep the existing C++ tests as the behavioral contract, keep Rust tests
+   green, and keep every Rust-backed path behind the C ABI. No work counts if
+   it weakens C++ validation, bypasses the C ABI, or lacks parity coverage.
+1. Stabilize the active Rust vertical slice.
+   The current slice is Rust core -> C ABI -> local readers/writers ->
+   command-ready filters -> `pdal-rs` commands. Close correctness gaps in
+   option parsing, metadata, bounds, dimensions, errors, and output artifacts
+   before broadening the surface.
+2. Finish simple command parity.
+   Commands are motivators for the lower layers, not an independent rewrite.
+   Add a command only when its reader/filter/writer dependencies are already
+   Rust-backed and it can be regression-tested against installed PDAL for exit
+   status, stdout/stderr shape, and produced artifacts.
+3. Complete deterministic first-party local I/O.
+   Continue one local reader/writer family at a time. Each family needs fixture
+   coverage, installed-PDAL regression where possible, option parity, metadata
+   and bounds behavior, and an explicit compression/native-dependency story.
+4. Close the core behaviors exposed by real pipelines.
+   Expand `pdal-core` only as needed by stages, I/O, and commands: pipeline
+   JSON, stage registry, layout mutation, dimensions, metadata, SRS, options,
+   bounds, scaling, and error/reporting behavior. Avoid a standalone rewrite of
+   `pdal/` by source directory.
+5. Finish first-party filters by family.
+   Pure filters, spatial filters, and the first linear/statistical filters are
+   already represented. Remaining filters must start with the missing decision:
+   Rust implementation, native/FFI adapter, or intentional C++ holdout. Do not
+   revive broad pointer-sharing attempts across the C ABI.
+6. Close apps/tools and broad kernels.
+   `pdal-rs` can keep proving command parity, but the top-layer C++ app/tool
+   migration closes only after the lower library surface is stable. `lasdump`
+   waits on LAS/LAZ strategy; `nitfwrap` waits on NITF/plugin strategy; broad
+   kernels stay late.
+7. Define plugin compatibility last.
+   Keep optional plugins in C++ until the first-party library, command surface,
+   C ABI versioning, ownership/lifetime rules, dynamic loading, and metadata
+   behavior are stable. `pdal-plugins` may hold discovery metadata earlier, but
+   not a new plugin SDK.
+8. Prove final replacement readiness.
+   The port is not "done" until the Rust-backed stack can run the agreed
+   first-party PDAL workflows with C++ tests green, Rust tests green,
+   installed-PDAL regression deltas explained, stable/versioned C ABI symbols,
+   and recorded performance, memory, binary-size, and startup-time comparisons.
+
+Current active milestone:
 
 1. Keep hardening the Rust-backed local I/O and command surface that already
    exists: regression coverage, option parity, metadata/bounds behavior, and
@@ -239,8 +289,10 @@ plugins remain later or stay C++ behind the ABI.
 ## Checkpoint Roadmap
 
 Treat these as ordered checkpoints on the way to a complete Rust-backed PDAL.
+They are the detailed work breakdown for the finish-line milestones above.
 Each checkpoint should end in a commit with the listed gates passing. Do not
-advance by claiming a directory is "done" only because it builds.
+advance by claiming a directory is "done" only because it builds, and do not
+skip a checkpoint because a placeholder crate or command stub exists.
 
 ### 1. Filter ABI And Pure Filter Parity
 
@@ -716,3 +768,23 @@ For non-filter ports, replace item 3 with the matching focused CTest slice and
 any lower-layer regression slice the change can affect. For example, I/O work
 should run the matching `pdal_io_*` tests when C++ wrappers are involved, plus
 the Rust workspace gates.
+
+## Whole-Port Completion Criteria
+
+The Rust port is ready to replace first-party PDAL behavior only when all of
+these are true:
+
+1. The agreed first-party reader, writer, filter, pipeline, and command surface
+   runs through Rust-owned implementations behind the C ABI.
+2. Existing C++ tests, Rust workspace tests, and command-level installed-PDAL
+   regressions pass, or every remaining delta is explicit and accepted.
+3. The C ABI is documented, versioned, and stable enough for C++, Python, and
+   CLI layers to be peers above it.
+4. CLI output, exit status, error shape, metadata, dimensions, bounds, SRS, and
+   output artifact behavior match installed PDAL for covered workflows.
+5. Native dependencies and vendor replacements are documented in
+   `rust/VENDOR.md`, with no vendored C/C++ code copied into Rust crates.
+6. Performance, memory usage, binary size, startup time, and compile time have
+   comparison harnesses and no unexplained major regression.
+7. Optional plugins either remain supported through the C++ compatibility path
+   or have a deliberately versioned Rust plugin boundary with parity coverage.
