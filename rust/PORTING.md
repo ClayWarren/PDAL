@@ -393,8 +393,8 @@ Current status:
   decimation -> PCD writer installed-PDAL regression coverage.
 - `readers.ply` and `writers.ply` have Rust ASCII-only implementations for
   local PLY fixtures, including vertex properties, extra dimensions, list
-  properties on non-vertex elements, `dims`, `sized_types`, and precision.
-  Binary PLY and mesh faces remain intentionally deferred.
+  properties on non-vertex elements, mesh faces, `dims`, `sized_types`, and
+  precision. Binary PLY remains intentionally deferred.
 - `readers.obj` has a Rust implementation for the deterministic Wavefront OBJ
   ASCII path, including vertex properties, normals, texture coordinates,
   triangulation for VTN de-duplication, mesh face storage, and de-duplication

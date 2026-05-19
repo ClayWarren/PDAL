@@ -4,7 +4,7 @@
 //! (`ply`, `format`, `element`/`property` declarations, `end_header`) followed
 //! by a data section. The reader emits the `vertex` element's instances as
 //! points; elements declared before `vertex` are consumed to reach it, and
-//! later elements (e.g. `face`) are ignored.
+//! face lists can be stored in the view mesh.
 //!
 //! Binary PLY (`binary_little_endian` / `binary_big_endian`) is intentionally
 //! deferred -- this slice covers the deterministic ASCII path only.
@@ -23,7 +23,7 @@ enum PlyProp {
     /// A scalar value: one ASCII token.
     Simple { dim: DimId, ty: DimType },
     /// A list value: a count token followed by that many value tokens.
-    List,
+    List { name: String },
 }
 
 /// One declared PLY element (`vertex`, `face`, ...).
@@ -110,8 +110,7 @@ impl Reader for PlyReader {
                                 view.set_f64(point, dim, value);
                             }
                         }
-                        PlyProp::List => {
-                            // ASCII list: a count token, then that many values.
+                        PlyProp::List { name } => {
                             let count = tokens
                                 .next()
                                 .and_then(|token| token.parse::<usize>().ok())
@@ -121,21 +120,30 @@ impl Reader for PlyReader {
                                         element.name
                                     ))
                                 })?;
+                            let mut values = Vec::with_capacity(count);
                             for _ in 0..count {
-                                tokens.next().ok_or_else(|| {
+                                let value = tokens.next().ok_or_else(|| {
                                     StageError(format!(
                                         "Error reading list data for the '{}' element.",
                                         element.name
                                     ))
                                 })?;
+                                values.push(value.parse::<u64>().map_err(|_| {
+                                    StageError(format!(
+                                        "Invalid list value '{value}' in '{}' data.",
+                                        element.name
+                                    ))
+                                })?);
+                            }
+                            if element.name == "face" && name == "vertex_indices" && count >= 3 {
+                                let mesh = view.create_mesh();
+                                for idx in 1..(values.len() - 1) {
+                                    mesh.add(values[0], values[idx], values[idx + 1]);
+                                }
                             }
                         }
                     }
                 }
-            }
-            // PDAL reads up to and including the vertex element, then stops.
-            if is_vertex {
-                break;
             }
         }
 
@@ -247,12 +255,17 @@ fn parse_property(words: &[&str], element_name: &str) -> Result<PlyProp, StageEr
                     "Invalid list property for element '{element_name}'."
                 )));
             }
-            if words.get(4).is_none() {
+            let name = words.get(4).ok_or_else(|| {
+                StageError(format!("No name for property of element '{element_name}'."))
+            })?;
+            if words.get(5).is_some() {
                 return Err(StageError(format!(
-                    "No name for property of element '{element_name}'."
+                    "Invalid list property for element '{element_name}'."
                 )));
             }
-            Ok(PlyProp::List)
+            Ok(PlyProp::List {
+                name: name.to_string(),
+            })
         }
         Some(type_name) => {
             let ty = ply_type(type_name)
@@ -298,16 +311,17 @@ fn dim_for(name: &str) -> DimId {
 
 /// Writer for the Stanford PLY format (ASCII encoding).
 ///
-/// Port of the ASCII path of `io/PlyWriter.cpp`. Binary storage modes and the
-/// `faces` option (which needs a triangular-mesh model) are intentionally
-/// deferred. When `precision` is unset, floating values use Rust's shortest
-/// round-trip formatting rather than PDAL's 6-significant-digit default.
+/// Port of the ASCII path of `io/PlyWriter.cpp`. Binary storage modes are
+/// intentionally deferred. When `precision` is unset, floating values use
+/// Rust's shortest round-trip formatting rather than PDAL's
+/// 6-significant-digit default.
 pub struct PlyWriter {
     filename: String,
     storage_mode: String,
     dim_specs: Vec<String>,
     sized_types: bool,
     precision: Option<usize>,
+    faces: bool,
     point_count: u64,
 }
 
@@ -327,6 +341,7 @@ impl PlyWriter {
             precision: options
                 .has("precision")
                 .then(|| options.get_u64("precision", 3) as usize),
+            faces: options.get_bool("faces", false),
             point_count: 0,
         }
     }
@@ -405,6 +420,20 @@ impl Writer for PlyWriter {
             })?;
             output.push_str(&format!("property {type_string} {name}\n"));
         }
+        let face_count: usize = if self.faces {
+            views
+                .iter()
+                .filter_map(PointView::mesh)
+                .map(|mesh| mesh.len())
+                .sum()
+        } else {
+            0
+        };
+        if self.faces {
+            output.push_str(&format!(
+                "element face {face_count}\nproperty list uint8 uint32 vertex_indices\n"
+            ));
+        }
         output.push_str("end_header\n");
 
         for view in views {
@@ -416,6 +445,22 @@ impl Writer for PlyWriter {
                     output.push_str(&format_value(view.get_f64(point, dim), *ty, self.precision));
                 }
                 output.push('\n');
+            }
+        }
+        if self.faces {
+            let mut point_offset = 0;
+            for view in views {
+                if let Some(mesh) = view.mesh() {
+                    for triangle in mesh.triangles() {
+                        output.push_str(&format!(
+                            "3 {} {} {}\n",
+                            triangle.a + point_offset,
+                            triangle.b + point_offset,
+                            triangle.c + point_offset
+                        ));
+                    }
+                }
+                point_offset += view.len();
             }
         }
 
@@ -535,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_extra_dimensions_and_ignores_the_face_element() {
+    fn reads_extra_dimensions_and_empty_face_element() {
         let view = read_ply("ply/text_extradim.ply");
         assert_eq!(view.len(), 1);
 
@@ -547,6 +592,21 @@ mod tests {
         assert_eq!(view.get_f64(0, &DimId::from_name("blue")), 64.0);
         assert_eq!(view.get_f64(0, &DimId::from_name("alpha")), 255.0);
         assert_eq!(view.get_f64(0, &DimId::from_name("omg")), 1234.0);
+    }
+
+    #[test]
+    fn reads_ascii_mesh_faces() {
+        let view = read_ply("ply/mesh.ply");
+        assert_eq!(view.len(), 4);
+
+        let mesh = view.mesh().unwrap();
+        assert_eq!(mesh.len(), 2);
+        assert_eq!(mesh.triangles()[0].a, 0);
+        assert_eq!(mesh.triangles()[0].b, 1);
+        assert_eq!(mesh.triangles()[0].c, 2);
+        assert_eq!(mesh.triangles()[1].a, 1);
+        assert_eq!(mesh.triangles()[1].b, 2);
+        assert_eq!(mesh.triangles()[1].c, 3);
     }
 
     #[test]
@@ -618,6 +678,53 @@ mod tests {
         assert_eq!(back.get_f64(0, &DimId::Z), 0.25);
         assert_eq!(back.get_f64(2, &DimId::X), 3.5);
         assert_eq!(back.get_f64(2, &DimId::Y), -4.25);
+    }
+
+    #[test]
+    fn writes_ascii_mesh_faces_matching_existing_fixture() {
+        let mut view = xyz_view(&[
+            (1.0, 1.0, 0.0),
+            (2.0, 1.0, 0.0),
+            (1.0, 2.0, 0.0),
+            (2.0, 2.0, 2.0),
+        ]);
+        let mesh = view.create_mesh();
+        mesh.add(0, 1, 2);
+        mesh.add(1, 2, 3);
+
+        let output = temp_path("mesh.ply");
+        let mut options = Options::new();
+        options.add("filename", &output).add("faces", true);
+        PlyWriter::new(&options).write(&[view]).unwrap();
+
+        let written = fs::read_to_string(&output).unwrap();
+        let expected = fs::read_to_string(data_path("ply/mesh.ply")).unwrap();
+        assert_eq!(written, expected);
+    }
+
+    #[test]
+    fn writes_ascii_mesh_faces_with_precision() {
+        let mut view = xyz_view(&[
+            (1.0, 1.0, 0.0),
+            (2.0, 1.0, 0.0),
+            (1.0, 2.0, 0.0),
+            (2.0, 2.0, 2.0),
+        ]);
+        let mesh = view.create_mesh();
+        mesh.add(0, 1, 2);
+        mesh.add(1, 2, 3);
+
+        let output = temp_path("mesh-fixed.ply");
+        let mut options = Options::new();
+        options
+            .add("filename", &output)
+            .add("faces", true)
+            .add("precision", 3);
+        PlyWriter::new(&options).write(&[view]).unwrap();
+
+        let written = fs::read_to_string(&output).unwrap();
+        let expected = fs::read_to_string(data_path("ply/mesh_fixed.ply")).unwrap();
+        assert_eq!(written, expected);
     }
 
     #[test]
