@@ -453,6 +453,15 @@ impl Bounds3D {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct DimensionSummary {
+    pub name: String,
+    pub count: u64,
+    pub minimum: f64,
+    pub maximum: f64,
+    pub mean: f64,
+}
+
 #[derive(Clone)]
 pub struct PointView {
     layout: Rc<PointLayout>,
@@ -545,6 +554,40 @@ impl PointView {
             );
         }
         Some(bounds)
+    }
+
+    pub fn summarize_dimension(&self, dim: &DimId) -> Option<DimensionSummary> {
+        if self.is_empty() || self.layout.dim(dim).is_none() {
+            return None;
+        }
+
+        let mut minimum = self.get_f64(0, dim);
+        let mut maximum = minimum;
+        let mut sum = minimum;
+        for idx in 1..self.len() {
+            let value = self.get_f64(idx, dim);
+            minimum = minimum.min(value);
+            maximum = maximum.max(value);
+            sum += value;
+        }
+
+        Some(DimensionSummary {
+            name: dim.name().to_string(),
+            count: self.len(),
+            minimum,
+            maximum,
+            mean: sum / self.len() as f64,
+        })
+    }
+
+    pub fn summarize_dimensions(&self) -> Vec<DimensionSummary> {
+        (0..self.layout.dim_count())
+            .filter_map(|idx| {
+                self.layout
+                    .dim_at(idx)
+                    .and_then(|(dim, _)| self.summarize_dimension(dim))
+            })
+            .collect()
     }
 
     /// Number of points in the view.
@@ -769,6 +812,61 @@ mod tests {
             })
         );
         assert_eq!(view.calculate_bounds_3d(), None);
+    }
+
+    #[test]
+    fn summarize_dimension_reports_basic_statistics() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Intensity, DimType::U16);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for (x, intensity) in [(-10.0, 7.0), (20.0, 3.0), (2.0, 5.0)] {
+            let point = view.add_point();
+            view.set_f64(point, &DimId::X, x);
+            view.set_f64(point, &DimId::Intensity, intensity);
+        }
+
+        assert_eq!(
+            view.summarize_dimension(&DimId::X),
+            Some(DimensionSummary {
+                name: "X".to_string(),
+                count: 3,
+                minimum: -10.0,
+                maximum: 20.0,
+                mean: 4.0,
+            })
+        );
+        assert_eq!(
+            view.summarize_dimension(&DimId::Intensity),
+            Some(DimensionSummary {
+                name: "Intensity".to_string(),
+                count: 3,
+                minimum: 3.0,
+                maximum: 7.0,
+                mean: 5.0,
+            })
+        );
+        assert_eq!(view.summarize_dimension(&DimId::Z), None);
+    }
+
+    #[test]
+    fn summarize_dimensions_follows_layout_order_and_requires_points() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        assert!(view.summarize_dimensions().is_empty());
+
+        let point = view.add_point();
+        view.set_f64(point, &DimId::Y, 2.0);
+        view.set_f64(point, &DimId::X, 1.0);
+
+        let summaries = view.summarize_dimensions();
+        assert_eq!(summaries.len(), 2);
+        assert_eq!(summaries[0].name, "Y");
+        assert_eq!(summaries[1].name, "X");
     }
 
     #[test]
