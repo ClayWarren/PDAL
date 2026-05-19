@@ -245,17 +245,22 @@ impl App {
         let status = unsafe {
             pdal_capi::pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result)
         };
-        unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
         if status < 0 {
             self.output_last_error();
+            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
             return 1;
         }
+        let metadata = self
+            .show_json
+            .then(|| unsafe { pipeline_metadata_json(pipeline) })
+            .flatten();
         if self.show_json {
             println!(
                 "{}",
-                serde_json::to_string(&pipeline_result_json(result)).unwrap()
+                serde_json::to_string(&pipeline_result_json(result, metadata)).unwrap()
             );
         }
+        unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
         0
     }
 
@@ -497,7 +502,24 @@ fn empty_pipeline_result() -> pdal_capi::pdal_pipeline_result_t {
     }
 }
 
-fn pipeline_result_json(result: pdal_capi::pdal_pipeline_result_t) -> serde_json::Value {
+unsafe fn pipeline_metadata_json(
+    pipeline: *const pdal_capi::PipelineHandle,
+) -> Option<serde_json::Value> {
+    let metadata = pdal_capi::pdal_pipeline_metadata(pipeline);
+    if metadata.is_null() {
+        return None;
+    }
+    let json_ptr = pdal_capi::pdal_metadata_node_to_json(metadata);
+    pdal_capi::pdal_metadata_node_destroy(metadata);
+    let json = safe_cstr(json_ptr).and_then(|text| serde_json::from_str(&text).ok());
+    pdal_capi::pdal_string_free(json_ptr);
+    json
+}
+
+fn pipeline_result_json(
+    result: pdal_capi::pdal_pipeline_result_t,
+    metadata: Option<serde_json::Value>,
+) -> serde_json::Value {
     serde_json::json!({
         "point_count": result.point_count,
         "view_count": result.view_count,
@@ -519,6 +541,7 @@ fn pipeline_result_json(result: pdal_capi::pdal_pipeline_result_t) -> serde_json
                 "maxz": result.bounds_3d.maxz,
             })
         }),
+        "metadata": metadata,
     })
 }
 

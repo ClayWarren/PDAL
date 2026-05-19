@@ -500,7 +500,7 @@ Current status:
 - `pipeline` is the only concrete Rust command currently enabled. It accepts a
   pipeline JSON filename and executes implemented Rust stages through the same
   Rust C ABI pipeline parser used by lower-layer tests. With `--showjson`, it
-  reports the Rust pipeline execution summary.
+  reports the Rust pipeline execution summary and serialized pipeline metadata.
 - Do not add `info`, `translate`, or other kernels yet; they need richer
   metadata, bounds, option, and I/O parity first.
 
