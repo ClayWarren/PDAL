@@ -165,6 +165,19 @@ impl Options {
     }
 }
 
+/// Return whether `name` is a valid PDAL option name.
+///
+/// Valid names start with a lowercase ASCII letter and then contain only
+/// lowercase ASCII letters, digits, or `_`, matching `Option::nameValid`.
+pub fn option_name_valid(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    first.is_ascii_lowercase()
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +256,14 @@ mod tests {
             options.to_command_line(),
             vec!["--alpha=first".to_string(), "--zeta=last".to_string()]
         );
+    }
+
+    #[test]
+    fn validates_option_names_like_pdal() {
+        assert!(option_name_valid("foo_123_bar_baz"));
+        assert!(!option_name_valid(""));
+        assert!(!option_name_valid("foo_123_bar-baz"));
+        assert!(!option_name_valid("Afoo_123_bar_baz"));
+        assert!(!option_name_valid("1foo_123_bar_baz"));
     }
 }

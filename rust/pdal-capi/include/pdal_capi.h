@@ -33,6 +33,7 @@ char* pdal_options_key(const pdal_options_t* ops, uint64_t index);
 char* pdal_options_entry_value(const pdal_options_t* ops, uint64_t index);
 char* pdal_options_value(const pdal_options_t* ops, const char* key);
 char* pdal_options_command_line_json(const pdal_options_t* ops);
+bool pdal_option_name_valid(const char* name);
 void pdal_options_destroy(pdal_options_t* ops);
 
 // FileSpec

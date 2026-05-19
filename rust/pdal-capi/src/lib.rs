@@ -198,6 +198,18 @@ mod tests {
     }
 
     #[test]
+    fn option_name_validation_roundtrips_through_c_abi() {
+        unsafe {
+            let valid = CString::new("foo_123_bar_baz").unwrap();
+            let bad = CString::new("foo_123_bar-baz").unwrap();
+
+            assert!(pdal_option_name_valid(valid.as_ptr()));
+            assert!(!pdal_option_name_valid(bad.as_ptr()));
+            assert!(!pdal_option_name_valid(std::ptr::null()));
+        }
+    }
+
+    #[test]
     fn native_dependencies_serialize_through_c_abi() {
         unsafe {
             let json: serde_json::Value =

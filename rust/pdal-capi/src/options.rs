@@ -1,5 +1,5 @@
 use crate::error::string_to_c_ptr;
-use pdal_core::options::Options;
+use pdal_core::options::{option_name_valid, Options};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
@@ -155,6 +155,20 @@ pub unsafe extern "C" fn pdal_options_command_line_json(ops: *const Options) -> 
         Ok(json) => string_to_c_ptr(json),
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+/// Return whether an option name is valid.
+///
+/// # Safety
+///
+/// `name` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_option_name_valid(name: *const c_char) -> bool {
+    if name.is_null() {
+        return false;
+    }
+    let name = CStr::from_ptr(name).to_string_lossy();
+    option_name_valid(&name)
 }
 
 /// Destroy an options set.

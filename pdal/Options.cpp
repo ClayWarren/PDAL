@@ -58,7 +58,7 @@ void Option::toMetadata(MetadataNode& parent) const
 
 bool Option::nameValid(const std::string& name, bool reportError)
 {
-    bool valid = (parse(name, 0) == name.size());
+    bool valid = pdal_option_name_valid(name.c_str());
     if (!valid && reportError)
     {
         std::ostringstream oss;
@@ -72,10 +72,10 @@ bool Option::nameValid(const std::string& name, bool reportError)
 
 //---------------------------------------------------------------------------
 
-Options::Options() : m_rustOptions(pdal_options_create())
-{}
+Options::Options() : m_rustOptions(pdal_options_create()) {}
 
-Options::Options(const Options& other) : m_options(other.m_options), m_rustOptions(nullptr)
+Options::Options(const Options& other)
+    : m_options(other.m_options), m_rustOptions(nullptr)
 {
     resetRustOptions();
 }
