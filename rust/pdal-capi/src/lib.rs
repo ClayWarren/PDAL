@@ -11,6 +11,7 @@ mod filter_runtime;
 mod io_abi;
 mod metadata_abi;
 mod metrics_abi;
+mod native_abi;
 mod options;
 mod pipeline_abi;
 mod point_abi;
@@ -27,6 +28,7 @@ pub use filter_runtime::*;
 pub use io_abi::*;
 pub use metadata_abi::*;
 pub use metrics_abi::*;
+pub use native_abi::*;
 pub use options::*;
 pub use pipeline_abi::*;
 pub use point_abi::*;
@@ -60,6 +62,27 @@ mod tests {
             pdal_spatial_reference_set_epoch(srs, 2021.5);
             assert_eq!(pdal_spatial_reference_epoch(srs), 2021.5);
             pdal_spatial_reference_destroy(srs);
+        }
+    }
+
+    #[test]
+    fn native_dependencies_serialize_through_c_abi() {
+        unsafe {
+            let json: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_native_dependencies_json())).unwrap();
+
+            assert!(json
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|dependency| dependency["name"] == "GDAL"));
+            assert!(json
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|dependency| dependency["version"]
+                    .as_str()
+                    .is_some_and(|v| !v.is_empty())));
         }
     }
 

@@ -619,6 +619,7 @@ dependencies = [
  "pdal-core",
  "pdal-filters",
  "pdal-io",
+ "pdal-native",
  "serde_json",
 ]
 

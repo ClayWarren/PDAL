@@ -295,6 +295,24 @@ fn list_commands_reports_rust_commands() {
 }
 
 #[test]
+fn version_supports_json_native_dependency_report() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--version")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(json["name"], "pdal-rs");
+    assert!(json["native_dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|dependency| dependency["name"] == "PROJ"));
+}
+
+#[test]
 fn list_commands_supports_json() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("--showjson")

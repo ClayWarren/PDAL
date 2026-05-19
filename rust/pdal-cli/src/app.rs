@@ -88,6 +88,26 @@ impl App {
     }
 
     fn output_version(&self) {
+        if self.show_json {
+            let native_json = pdal_capi::pdal_native_dependencies_json();
+            let native = safe_cstr(native_json)
+                .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+                .unwrap_or_else(|| serde_json::Value::Array(Vec::new()));
+            unsafe {
+                if !native_json.is_null() {
+                    pdal_capi::pdal_string_free(native_json);
+                }
+            }
+            println!(
+                "{}",
+                serde_json::json!({
+                    "name": "pdal-rs",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "native_dependencies": native,
+                })
+            );
+            return;
+        }
         let headline = "-".repeat(80);
         println!("{}", headline);
         println!("pdal-rs {}", env!("CARGO_PKG_VERSION"));
