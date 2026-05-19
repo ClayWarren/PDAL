@@ -34,6 +34,22 @@ void pdal_point_layout_register_dim(pdal_point_layout_t* layout, const char* nam
 void pdal_point_layout_destroy(pdal_point_layout_t* layout);
 
 // PointView
+typedef struct {
+    double minx;
+    double maxx;
+    double miny;
+    double maxy;
+} pdal_bounds2d_t;
+
+typedef struct {
+    double minx;
+    double maxx;
+    double miny;
+    double maxy;
+    double minz;
+    double maxz;
+} pdal_bounds3d_t;
+
 pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
 uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
 void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx, const char* dim_name, double val);
@@ -45,6 +61,9 @@ void pdal_point_view_set_spatial_reference(pdal_point_view_t* view, const pdal_s
 pdal_spatial_reference_t* pdal_point_view_spatial_reference(const pdal_point_view_t* view);
 uint64_t pdal_point_view_length(pdal_point_view_t* view);
 uint64_t pdal_point_view_source_index(pdal_point_view_t* view, uint64_t idx);
+bool pdal_point_view_calculate_bounds_2d(const pdal_point_view_t* view, pdal_bounds2d_t* out_bounds);
+bool pdal_point_view_calculate_bounds_3d(const pdal_point_view_t* view, pdal_bounds3d_t* out_bounds);
+char* pdal_point_view_dimension_summaries_json(const pdal_point_view_t* view);
 void pdal_point_view_destroy(pdal_point_view_t* view);
 
 // SpatialReference
@@ -274,6 +293,15 @@ pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);
 void pdal_writer_destroy(pdal_writer_t* writer);
 
 // Pipeline
+typedef struct {
+    uint64_t point_count;
+    uint64_t view_count;
+    bool has_bounds_2d;
+    pdal_bounds2d_t bounds_2d;
+    bool has_bounds_3d;
+    pdal_bounds3d_t bounds_3d;
+} pdal_pipeline_result_t;
+
 pdal_pipeline_t* pdal_pipeline_create();
 pdal_pipeline_t* pdal_pipeline_create_json(const char* json);
 void pdal_pipeline_destroy(pdal_pipeline_t* pipeline);
@@ -284,6 +312,7 @@ int64_t pdal_pipeline_add_writer(pdal_pipeline_t* pipeline, pdal_writer_t* write
 int64_t pdal_pipeline_add_dependency(pdal_pipeline_t* pipeline, uint64_t target, uint64_t input);
 pdal_point_view_t* pdal_pipeline_execute(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
 int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
+int64_t pdal_pipeline_execute_result(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view, pdal_pipeline_result_t* out_result);
 char* pdal_pipeline_execute_summary_json(pdal_pipeline_t* pipeline, pdal_point_view_t* input_view);
 uint64_t pdal_pipeline_stage_count(const pdal_pipeline_t* pipeline);
 pdal_metadata_node_t* pdal_pipeline_metadata(const pdal_pipeline_t* pipeline);
