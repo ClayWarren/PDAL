@@ -5,8 +5,8 @@
 //! are used in faces. Multiple faces sharing a vertex/normal/texture triple
 //! (Vtn) refer to the same point ID.
 //!
-//! Mesh face storage is intentionally deferred; this slice covers the point
-//! reading and Vtn de-duplication logic only.
+//! The reader stores triangulated OBJ faces in the view's mesh, matching the
+//! shape existing C++ tests assert.
 
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
@@ -123,14 +123,20 @@ impl Reader for ObjReader {
             // Triangulation: (v0, v1, v2), (v0, v2, v3), ...
             for i in 1..(face.len() - 1) {
                 let tri = [face[0], face[i], face[i + 1]];
-                for vtn in tri {
-                    if let std::collections::hash_map::Entry::Vacant(e) = points.entry(vtn) {
-                        let id = add_point(&mut view, vtn, &vertices, &textures, &normals)?;
-                        e.insert(id);
-                    }
+                let mut triangle = [0; 3];
+                for (next, vtn) in tri.into_iter().enumerate() {
+                    let point_id = match points.get(&vtn) {
+                        Some(id) => *id,
+                        None => {
+                            let id = add_point(&mut view, vtn, &vertices, &textures, &normals)?;
+                            points.insert(vtn, id);
+                            id
+                        }
+                    };
+                    triangle[next] = point_id;
                 }
-                // PDAL also adds the triangle to a mesh here.
-                // Mesh faces are deferred as per guardrails.
+                view.create_mesh()
+                    .add(triangle[0], triangle[1], triangle[2]);
             }
         }
 
@@ -272,6 +278,11 @@ mod tests {
         assert_eq!(view.get_f64(0, &DimId::X), -1.0);
         assert_eq!(view.get_f64(1, &DimId::X), 0.0);
         assert_eq!(view.get_f64(2, &DimId::X), 1.0);
+        let mesh = view.mesh().unwrap();
+        assert_eq!(mesh.len(), 1);
+        assert_eq!(mesh.triangles()[0].a, 0);
+        assert_eq!(mesh.triangles()[0].b, 1);
+        assert_eq!(mesh.triangles()[0].c, 2);
     }
 
     #[test]
@@ -290,6 +301,31 @@ mod tests {
         let view = &reader.read().unwrap()[0];
         // 1, 2, 3 from first face; 4 from second face (2 and 3 already exist).
         assert_eq!(view.len(), 4);
+        assert_eq!(view.mesh().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn triangulates_polygon_faces_into_mesh() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v 0 0 0").unwrap();
+        writeln!(file, "v 1 0 0").unwrap();
+        writeln!(file, "v 1 1 0").unwrap();
+        writeln!(file, "v 0 1 0").unwrap();
+        writeln!(file, "f 1 2 3 4").unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        let view = &reader.read().unwrap()[0];
+
+        let mesh = view.mesh().unwrap();
+        assert_eq!(mesh.len(), 2);
+        assert_eq!(mesh.triangles()[0].a, 0);
+        assert_eq!(mesh.triangles()[0].b, 1);
+        assert_eq!(mesh.triangles()[0].c, 2);
+        assert_eq!(mesh.triangles()[1].a, 0);
+        assert_eq!(mesh.triangles()[1].b, 2);
+        assert_eq!(mesh.triangles()[1].c, 3);
     }
 
     #[test]
@@ -305,6 +341,7 @@ mod tests {
         let mut reader = ObjReader::new(&options);
         let view = &reader.read().unwrap()[0];
         assert_eq!(view.len(), 1);
+        assert_eq!(view.mesh().unwrap().len(), 1);
         assert_eq!(view.get_f64(0, &DimId::TextureU), 0.5);
         assert_eq!(view.get_f64(0, &DimId::NormalZ), 1.0);
     }

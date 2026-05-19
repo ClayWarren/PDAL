@@ -397,8 +397,8 @@ Current status:
   Binary PLY and mesh faces remain intentionally deferred.
 - `readers.obj` has a Rust implementation for the deterministic Wavefront OBJ
   ASCII path, including vertex properties, normals, texture coordinates,
-  triangulation for VTN de-duplication, and de-duplication logic matching
-  PDAL's C++ behavior. Mesh face storage is intentionally deferred.
+  triangulation for VTN de-duplication, mesh face storage, and de-duplication
+  logic matching PDAL's C++ behavior.
 - `writers.gltf` has a Rust implementation for deterministic local GLB output
   from mesh-backed views, including vertex indices, XYZ vertices, optional
   normals/colors, and file-size parity for the existing C++ unit-test shapes.
