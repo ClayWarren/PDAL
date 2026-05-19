@@ -420,137 +420,9 @@ Done when:
 - The pipeline slice can use the ported I/O path end to end.
 - Existing filter/core tests still pass.
 
-- `readers.faux` and `writers.null` live in `pdal-io` as the in-memory pipeline
-  harness.
-- `readers.text` has a Rust implementation covering existing C++ fixture
-  behavior for simple delimited numeric text, CRLF headers, override/inserted
-  headers, quoted headers, duplicate dimensions, and skipped malformed rows.
-- `writers.text` has a Rust implementation covering existing C++ fixture
-  behavior for CSV output, dimension order, per-dimension precision, custom
-  delimiters, quoted/unquoted headers, and simple GeoJSON output.
-- The Rust pipeline has a reader -> decimation filter -> writer regression test
-  for the text slice.
-- Installed-PDAL regression for the text slice is available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test text_regression -- --ignored`.
-- `readers.pcd` and `writers.pcd` have a Rust ASCII-only implementation for
-  local PCD fixtures. The slice preserves existing whitespace parsing,
-  comma-row skipping, missing-header rejection, float32 XYZ storage behavior,
-  dimension order, per-dimension type/precision, and reader -> decimation ->
-  writer flow. Binary and compressed PCD are intentionally deferred.
-- Installed-PDAL regression for the ASCII PCD slice is available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pcd_regression -- --ignored`.
-- `readers.pts` has a Rust implementation for Leica PTS ASCII fixtures,
-  including declared point counts, 3/4/7-field layouts, intensity offset
-  mapping, skipped malformed rows, and reader -> decimation -> PCD writer
-  installed-PDAL regression coverage.
-- `readers.ptx` has a Rust implementation for Leica PTX ASCII fixtures,
-  including single/multiple clouds, optional RGB, missing-point discard,
-  transform application, intensity scaling, and reader -> decimation -> PCD
-  writer installed-PDAL regression coverage.
-- Installed-PDAL regressions for these readers are available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test pts_regression -- --ignored`
-  and
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ptx_regression -- --ignored`.
-- `readers.ilvis2` has a Rust implementation for the deterministic ILVIS2
-  ASCII point path, including `low`, `high`, and `all` mapping behavior,
-  longitude normalization, skipped two-line headers, malformed-row rejection,
-  XML metadata sidecar parsing for the existing fixture shape, and reader ->
-  decimation -> PCD writer installed-PDAL regression coverage.
-- `readers.ply` and `writers.ply` have Rust ASCII-only implementations for
-  local PLY fixtures, including vertex properties, extra dimensions, list
-  properties on non-vertex elements, mesh faces, `dims`, `sized_types`, and
-  precision. Binary PLY remains intentionally deferred.
-- `readers.obj` has a Rust implementation for the deterministic Wavefront OBJ
-  ASCII path, including vertex properties, normals, texture coordinates,
-  triangulation for VTN de-duplication, mesh face storage, and de-duplication
-  logic matching PDAL's C++ behavior.
-- `writers.gltf` has a Rust implementation for deterministic local GLB output
-  from mesh-backed views, including vertex indices, XYZ vertices, optional
-  normals/colors, and file-size parity for the existing C++ unit-test shapes.
-  This slice adds the minimal `pdal-core` triangular-mesh model needed by the
-  writer; broader mesh face parity for other readers remains deferred.
-- `readers.qfit` has a Rust implementation for the deterministic NASA ATM QFIT
-  binary path, including 10, 12, and 14-word formats, endian probing,
-  dimension mapping matching PDAL's C++ reader, and regression coverage
-  against installed PDAL.
-- `readers.sbet` and `writers.sbet` have a Rust implementation for the
-  deterministic Applanix SBET trajectory format, including all 17 dimensions,
-  little-endian double parsing/writing, angular conversion logic (radians
-  to degrees and back), and bit-parity coverage (when conversion is disabled).
-- `readers.smrmsg` has a Rust implementation for the SBET RMS message format,
-  covering 10 RMS error dimensions with bit-parity matching PDAL's behavior.
-- `readers.las` and `writers.las` have a Rust implementation for ASPRS LAS
-  and LAZ formats, using the `las` and `laz` crates. They support standard
-  dimensions, V1.0-1.4 point formats, Extra Bytes, SRS WKT/EPSG extraction,
-  and compression/decompression. Extra Bytes scale/offset and explicit
-  `compression=true` behavior have direct regression coverage.
-- `readers.fbi` and `writers.fbi` have a Rust implementation for the TerraScan
-  Fast Binary local path, including separate dimension streams, header offsets,
-  color stream ordering, and byte-for-byte installed-PDAL read/write parity.
-- `readers.terrasolid` has a Rust implementation for the deterministic
-  TerraSolid format 2 fixture, including time/color fields and C++ dimension
-  mapping. The `.bin` extension is not inferred because it conflicts with FBI.
-- `readers.optech` has a Rust implementation for the deterministic Optech CSD
-  fixture, including the localized WGS84 georeference math and `EPSG:4326`
-  spatial reference behavior.
-- Installed-PDAL regressions for these readers/writers are available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ilvis2_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test ply_writer_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test obj_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test qfit_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test sbet_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test fbi_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test terrasolid_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test optech_regression -- --ignored`,
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test las_regression -- --ignored`,
-  and
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test smrmsg_regression -- --ignored`.
-- `pdal_core::driver` can infer PDAL reader/writer driver names from filenames
-  for existing PDAL extensions. `pdal-capi` has a narrow registry that can
-  construct only currently implemented Rust local readers/writers by driver
-  name. Inference may return unported PDAL drivers; construction must still
-  fail cleanly until the stage is actually ported.
-- `pdal-capi` can now build a Rust `Pipeline` from a narrow PDAL-style JSON
-  array or root object with a `pipeline` array: stage objects, filename string
-  stages, scalar options, first/last filename inference, linear dependencies by
-  default, and optional `tag` / `inputs` wiring. This is a command-readiness
-  bridge for local reader -> filter -> writer regressions, not a full
-  replacement for C++ `PipelineManager` yet.
-- Local I/O performance comparison is available as an ignored, reporting-only
-  harness with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`.
-  Set `PDAL_RUST_PERF_ITERS=<n>` to change the per-case iteration count. This
-  is for regression visibility, not a hard performance gate. Current results
-  compare installed `pdal pipeline` process execution against in-process Rust
-  pipeline execution, so use them to catch large regressions and guide followup
-  investigation rather than to claim end-user CLI speedups.
-- Runtime memory and build cost visibility is available with:
-  `rust/scripts/measure_guardrails.sh`. On macOS it uses `/usr/bin/time -l` to
-  report wall time and peak RSS for installed local I/O pipelines, the Rust
-  local I/O perf harness, and an incremental Rust workspace build. Use
-  `--cold-build` only when intentionally measuring a clean build because it
-  runs `cargo clean`.
-- Binary-size visibility is available as an ignored, reporting-only CLI test:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`.
-  It compares the installed `pdal` executable on `PATH` with Cargo's built
-  `pdal-rs` test binary. The same harness also reports median CLI startup time
-  for `pdal --version` versus `pdal-rs --version`.
-- `readers.bpf` and `writers.bpf` have a Rust implementation for
-  deterministic local, uncompressed BPF, including v3 and v1/v2 read support,
-  point-major, dimension-major, and byte-major point layouts, XYZ transforms,
-  dimension labels, and reader -> decimation -> PCD writer installed-PDAL
-  regression coverage. Compression, remote files, bundled files, and
-  ULEM/polar metadata remain intentionally deferred.
-- Installed-PDAL regression for the BPF slice is available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test bpf_regression -- --ignored`.
-- `readers.gdal` has started as a narrow raster-to-point-cloud slice for local
-  GDAL-backed files. Treat this as a focused I/O milestone, not permission for
-  broad raster/vector/GDAL/PROJ expansion.
-- The deterministic local I/O slice is now broad enough to support command
-  readiness work. Additional I/O targets should still be narrow, local,
-  deterministic, and dependency-aware. Avoid plugin-backed or remote
-  reader/writer work until their strategies are explicit.
+Current reader/writer status and exact regression commands live in
+`rust/STATUS.md`. Keep this roadmap focused on what must be true before moving
+to broader I/O, command, vendor, or plugin work.
 
 ### 7. Apps, Tools, Then Kernels
 
@@ -574,34 +446,10 @@ Required shape:
 
 Current status:
 
-- `pdal-rs` is a Rust-native command shell for the port spike. It lists only
-  Rust-backed stages/commands and no longer links the C++ helper dispatch shim.
-- `--drivers`, `--list-commands`, and `--options <stage>` are backed by
-  Rust-owned stage/command metadata for the currently implemented Rust surface.
-- Pipeline JSON can construct the command-ready Rust filter subset:
-  `decimation`, `groupby`, `head`, `locate`, `merge`, `mortonorder`,
-  `randomize`, `reprojection`, `returns`, `sample`, `sort`, `splitter`,
-  `stats`, `tail`, and `voxeldownsize`. Other Rust filter modules may exist,
-  but they are not command-ready until they are deliberately added to the
-  registry with option parsing and coverage.
-- Concrete Rust commands currently enabled in `pdal-rs`: `pipeline`, `info`,
-  `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, and
-  `delta`. These are intentionally limited to Rust-backed local
-  readers/writers/filters and reporting metrics.
-- `pipeline` accepts a pipeline JSON filename and executes implemented Rust
-  stages through the same Rust C ABI pipeline parser used by lower-layer tests.
-  With `--showjson`, it reports the Rust pipeline execution summary and
-  serialized pipeline metadata.
-- Command-level regression for `pipeline` is available with:
-  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test pipeline_command -- --ignored`.
-  It compares the artifact written by installed `pdal pipeline` with the
-  artifact written by `pdal-rs pipeline` for deterministic local text, PCD,
-  and PLY reader -> decimation filter -> writer paths, including bare array,
-  root `pipeline` object, and filename-string stage JSON forms.
-- Command-level regressions for `info`, `translate`, `merge`, `sort`, `split`,
-  `random`, `hausdorff`, `chamfer`, and `delta` live in their matching
-  `pdal-cli/tests/*_command.rs` files. Installed-PDAL comparisons are marked
-  ignored where they require `pdal` on `PATH`.
+- `pdal-rs` is the Rust-native command shell for the port spike.
+- Simple pipeline-shaped commands exist for Rust-backed local workflows.
+- Command-ready filters, implemented commands, and exact regression commands
+  live in `rust/STATUS.md`.
 - Do not add additional kernels unless their lower-layer behavior is already
   Rust-backed and they can be tested against installed PDAL for exit status,
   stdout/stderr shape, and output artifacts.
@@ -612,63 +460,11 @@ Done when:
 - Regression comparisons against the C++ implementation are clean or explained.
 - Lower-layer core/filter/I/O tests remain green.
 
-## Core Status
+## Current Status
 
-Current Rust core primitives:
-
-- Point model: `PointLayout`, `PointView`, dimension IDs/types, source index
-  tracking, per-view spatial reference storage, mesh face storage, and 2D/3D
-  bounds calculation.
-- Point summaries: basic per-dimension count/min/max/mean over a view. The C
-  ABI exposes these summaries as Rust-owned JSON, and `pdal-rs info` now uses
-  them for its command output.
-- Stage model: filter and streamable traits for Rust-backed stages.
-- Pipeline model: minimal reader/filter/writer DAG execution, tags,
-  dependencies, metadata aggregation, execution summaries with bounds and
-  dimension summaries, and error propagation.
-- Options: string-keyed typed getters matching PDAL's option flow.
-- Expressions: conditional/math/assignment parser and evaluator used by the
-  Rust-backed expression/assign work.
-- Spatial index: exact brute-force neighbor queries behind an API that can be
-  replaced by a real KD-tree without changing filters.
-- Metadata: named tree nodes with typed scalar values.
-- Metadata bridge: C++ copies Rust metadata trees into PDAL `MetadataNode`
-  through `filters/private/RustMetadata.hpp`; ownership stays explicit on both
-  sides of the C ABI. The C ABI also exposes a Rust-owned JSON serialization
-  shape for command summaries.
-- Spatial reference: text plus coordinate epoch, with metadata export.
-- Summary ABI: C-repr 2D/3D bounds structs plus point-view and pipeline
-  summary calls for bounds, dimension summaries, metadata, and later command
-  reporting.
-
-Recent stabilization checkpoint:
-
-- `pdal-capi` was split into ABI-focused modules. `lib.rs` is now only the
-  module root and C ABI smoke tests.
-- `pdal-core::pipeline` was split into graph execution, traits/adapters, and
-  tests.
-- Rust core guard tests now cover pipeline tag/dependency/error behavior,
-  point source-index and typed-storage behavior, metadata/options/SRS scalar
-  behavior, and spatial/geometry wrapper behavior.
-- Refactored the Stage Model to support multiple input views in `run()`,
-  matching PDAL's `PointViewSet` behavior. Added a default implementation for
-  looping over inputs and calling `run_one()`, and fixed `filters.merge` to
-  correctly handle DAG pipelines without producing redundant points.
-- This was a stabilization pass, not a new broad porting phase. Do not keep
-  adding incidental tests here unless they protect a behavior needed by the
-  next concrete porting milestone.
-- Latest validation for this checkpoint: Rust workspace tests (including DAG
-  pipeline tests) passed and the full `pdal_filters_*` CTest slice passed.
-
-Current deliberate gaps:
-
-- No GDAL/PROJ-backed SRS normalization, reprojection, authority lookup,
-  WKT1/WKT2 conversion, axis ordering, or unit handling yet.
-- The metadata bridge covers typed scalar tree copying, but not every C++
-  `MetadataNode` feature such as descriptions, array/list kind preservation,
-  JSON/base64 typed nodes, or full pipeline serialization parity.
-- No geometry ABI yet for polygons, OGR geometries, point-in-polygon, or bounds
-  reprojection.
+The live implementation inventory, status definitions, command-ready filters,
+remaining C++ filter families, and useful regression commands live in
+`rust/STATUS.md`. Keep this file as the roadmap and rules document.
 
 ## Boundary Rules
 
@@ -681,60 +477,6 @@ Current deliberate gaps:
 - Preserve C++ validation, metadata, spatial reference, layout mutation,
   streaming, and multi-output behavior unless the migration explicitly replaces
   that contract with passing parity tests.
-
-## Filters Status
-
-Safe filter ports currently use Rust-owned views and existing conversion
-helpers. The accepted Rust-backed set includes the dependency-free filters,
-spatial-index filters, the first pure linear/statistical filters, and the
-remaining pure partition/time filters that pass their existing C++ test
-binaries.
-
-Current C++ stage inventory:
-
-- 84 first-party filter/static stage files in `filters/`.
-- 49 are Rust-backed through the C ABI.
-- 35 intentionally remain C++ for now.
-- 37 filters are currently visible through the Rust pipeline registry.
-
-The latest registry work made the existing Rust implementations pipeline
-creatable for representative spatial, linear/statistical, voxel, ground, and
-partition filters. This is registry exposure, not a claim that every exposed
-filter has full pipeline-layout parity.
-
-Important active gap:
-
-- The Rust pipeline now has an initial prepare/layout-mutation hook:
-  Rust-backed filters can declare output dimensions, and the pipeline prepares
-  input views before running them. This is currently implemented for the
-  registry-visible derived-dimension filters such as `NNDistance`,
-  `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`,
-  `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions.
-- This hook is intentionally narrow. Do not count a newly registry-visible
-  filter as behaviorally complete unless a parity test proves its output
-  dimensions are prepared and asserted through the same path users will run.
-- More complex layout mutation, such as ferry-style dimension copies,
-  expression assignment outputs, metadata-rich dimensions, and C++ wrapper
-  prepare parity, still needs dedicated work.
-
-The remaining C++ filters are not "missed easy ports"; they are holdouts whose
-Rust port should start with an ABI/algorithm decision, not a direct rewrite:
-
-- GDAL/PROJ/SRS/OGR-backed: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
-  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`,
-  `Reprojection`.
-- Private or specialized algorithms: `CS`, `Delaunay`, `FaceRaster`,
-  `Georeference`, `HagDelaunay`, `HexBin`, `LiTree`, `LloydKMeans`, `M3C2`,
-  `Miniball`, `Normal`, `PMF`, `Poisson`, `SMR`, `Straighten`,
-  `Supervoxel`, `GreedyProjection`, `IterativeClosestPoint`,
-  `RelaxationDartThrowing`.
-- Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
-- Expression/KD-tree hybrid behavior still needing a design pass:
-  `RadiusAssign`, `NeighborClassifier`, `CovarianceFeatures`.
-
-The rejected broad sweep in commit `a1e67b5dc` is useful only as source
-material. Its C++ wiring passed C++ object pointers across the C ABI and broke
-existing filter tests. Do not reapply it wholesale.
 
 ## Deferred Filter Families
 
