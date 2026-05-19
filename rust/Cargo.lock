@@ -638,9 +638,7 @@ dependencies = [
 name = "pdal-core"
 version = "0.0.0"
 dependencies = [
- "gdal-sys",
- "geos",
- "h3o",
+ "pdal-native",
  "proj",
 ]
 
@@ -673,6 +671,14 @@ name = "pdal-kernels"
 version = "0.0.0"
 dependencies = [
  "pdal-core",
+]
+
+[[package]]
+name = "pdal-native"
+version = "0.0.0"
+dependencies = [
+ "gdal-sys",
+ "geos",
 ]
 
 [[package]]

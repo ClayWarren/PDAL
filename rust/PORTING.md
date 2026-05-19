@@ -96,7 +96,11 @@ changes.
 Current target crates:
 
 - `pdal-core`: point model, dimensions, metadata, options, pipeline, SRS,
-  spatial/geometry helpers, and shared stage traits.
+  spatial helpers, and shared stage traits.
+- `pdal-native`: explicit native-library adapter boundary. GDAL/OGR and GEOS
+  are already routed through this crate; future PROJ, LASzip/laz-perf, and
+  other native integrations should land here or behind an equally explicit
+  adapter before higher-level crates depend on them.
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
 - `pdal-io`: first-party readers and writers. The deterministic local I/O
@@ -196,7 +200,9 @@ stage, reader, writer, or core behavior that depends on that vendor boundary:
 - Linear algebra choices happen with broader linear/statistical filters, behind
   shared Rust math APIs, not by porting `vendor/eigen`.
 - GDAL/PROJ/GEOS choices happen with SRS, raster/vector, geometry, crop,
-  overlay, reprojection, DEM, and related filters or readers.
+  overlay, reprojection, DEM, and related filters or readers. Native bindings
+  should be centralized through `pdal-native` instead of imported directly by
+  feature crates.
 - LASzip/lazperf and other compression choices happen when the I/O milestone
   reaches LAS/LAZ or another compressed binary format.
 - Remote/object-store compatibility happens only after local deterministic I/O

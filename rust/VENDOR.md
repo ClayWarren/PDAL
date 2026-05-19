@@ -11,6 +11,12 @@ into Rust crates as a way to make progress. Treat it as one of three things:
 This file exists so agents do not have to infer the vendor plan from scattered
 includes.
 
+Rust native-library bindings should be centralized through `pdal-native` or an
+equally explicit adapter crate. Feature crates such as `pdal-core`,
+`pdal-filters`, and `pdal-io` should depend on PDAL-level wrappers, not raw
+vendor APIs, unless a focused migration step explicitly proves that boundary is
+too coarse.
+
 ## When To Touch Vendor Compatibility
 
 Vendor compatibility is not a standalone milestone. Work on it only when the
@@ -51,6 +57,8 @@ copy vendor source just to reduce the apparent amount of remaining work.
 
 - Do not add vendored source under `rust/`.
 - Do not create a `pdal-vendor` crate just to mirror `vendor/`.
+- Use `pdal-native` as the default home for GDAL/OGR, GEOS, PROJ,
+  LASzip/laz-perf, and similar native adapter work.
 - Prefer dependency crates for stable external libraries when they match PDAL
   behavior.
 - Use explicit FFI when the external library is the behavior contract or the
@@ -62,9 +70,9 @@ copy vendor source just to reduce the apparent amount of remaining work.
 ## Already Chosen Rust Replacements
 
 - H3: `h3o`
-- GEOS geometry operations: `geos`
+- GEOS geometry operations: `geos` through `pdal-native`
 - PROJ transformations: `proj`
-- GDAL raster/vector access: `gdal-sys`
+- GDAL raster/vector access: `gdal-sys` through `pdal-native`
 - JSON parsing: `serde_json`
 
 These are choices made for the current spike, not a permanent promise. If a

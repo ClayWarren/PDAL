@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "pdal-core",
+    "pdal-native",
     "pdal-capi",
     "pdal-filters",
     "pdal-io",
