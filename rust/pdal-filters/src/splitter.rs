@@ -2,6 +2,10 @@ use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 use std::collections::BTreeMap;
 
+/// `((xpos, ypos), view)` tiles keyed by grid cell, as produced by
+/// [`SplitterFilter::split`].
+pub type Tiles = Vec<((i64, i64), PointView)>;
+
 pub struct SplitterFilter {
     length: f64,
     origin_x: f64,
@@ -56,18 +60,11 @@ impl SplitterFilter {
             .or_insert_with(|| template.make_new())
             .append_point(template, idx);
     }
-}
 
-impl Filter for SplitterFilter {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn name(&self) -> &str {
-        "filters.splitter"
-    }
-
-    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+    /// Partition the input into `((xpos, ypos), view)` tiles keyed by grid
+    /// cell. The `tile` kernel uses the cell coordinates to name output files;
+    /// the `Filter` interface discards them.
+    pub fn split(&mut self, input: &PointView) -> Result<Tiles, StageError> {
         if input.is_empty() {
             return Ok(Vec::new());
         }
@@ -118,7 +115,25 @@ impl Filter for SplitterFilter {
             }
         }
 
-        Ok(views.into_values().collect())
+        Ok(views.into_iter().collect())
+    }
+}
+
+impl Filter for SplitterFilter {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "filters.splitter"
+    }
+
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        Ok(self
+            .split(input)?
+            .into_iter()
+            .map(|(_, view)| view)
+            .collect())
     }
 }
 

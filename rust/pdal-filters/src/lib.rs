@@ -25,6 +25,7 @@ pub mod h3;
 pub mod hag_dem;
 pub mod hagnn;
 pub mod head;
+pub mod hexbin;
 pub mod iqr;
 pub mod labelduplicates;
 pub mod locate;

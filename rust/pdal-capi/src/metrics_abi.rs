@@ -3,14 +3,14 @@
 use crate::error::{clear_last_error, set_last_error, string_to_c_ptr};
 use crate::registry::create_reader;
 use pdal_core::options::Options;
-use pdal_core::point::PointView;
+use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::StageError;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
 /// Read a file's point views into one cloud, inferring the reader driver from
 /// the path.
-fn read_cloud(path: &str) -> Result<PointView, StageError> {
+pub(crate) fn read_cloud(path: &str) -> Result<PointView, StageError> {
     let driver = pdal_core::driver::infer_reader_driver(path)
         .ok_or_else(|| StageError(format!("unable to infer a reader driver for '{path}'")))?;
     let mut options = Options::new();
@@ -202,4 +202,129 @@ pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char
         "Z": dim_json(&stats[2]),
     });
     string_to_c_ptr(report.to_string())
+}
+
+/// Evaluate predicted classification labels against truth labels.
+///
+/// For each point of the predicted file, the nearest point of the truth file
+/// is found, and the two labels are tallied into a confusion matrix over the
+/// comma-separated `labels`. Returns a newly allocated JSON string (free with
+/// `pdal_string_free`) reporting per-label and aggregate metrics, or null on
+/// error with the message available via `pdal_last_error`.
+///
+/// # Safety
+///
+/// All pointer arguments must be valid NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_eval(
+    predicted_path: *const c_char,
+    truth_path: *const c_char,
+    labels: *const c_char,
+    predicted_dim: *const c_char,
+    truth_dim: *const c_char,
+) -> *mut c_char {
+    clear_last_error();
+    if predicted_path.is_null()
+        || truth_path.is_null()
+        || labels.is_null()
+        || predicted_dim.is_null()
+        || truth_dim.is_null()
+    {
+        set_last_error("null argument to pdal_eval");
+        return std::ptr::null_mut();
+    }
+    let predicted_path = CStr::from_ptr(predicted_path)
+        .to_string_lossy()
+        .into_owned();
+    let truth_path = CStr::from_ptr(truth_path).to_string_lossy().into_owned();
+    let labels_str = CStr::from_ptr(labels).to_string_lossy().into_owned();
+    let predicted_dim_name = CStr::from_ptr(predicted_dim).to_string_lossy().into_owned();
+    let truth_dim_name = CStr::from_ptr(truth_dim).to_string_lossy().into_owned();
+
+    let mut label_list = Vec::new();
+    for token in labels_str
+        .split(',')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
+        match token.parse::<i64>() {
+            Ok(value) => label_list.push(value),
+            Err(_) => {
+                set_last_error(format!("eval: '{token}' is not a valid integer label"));
+                return std::ptr::null_mut();
+            }
+        }
+    }
+    if label_list.is_empty() {
+        set_last_error("eval: must specify a comma-separated list of labels to evaluate");
+        return std::ptr::null_mut();
+    }
+
+    let predicted = match read_cloud(&predicted_path) {
+        Ok(view) => view,
+        Err(err) => {
+            set_last_error(err.to_string());
+            return std::ptr::null_mut();
+        }
+    };
+    let truth = match read_cloud(&truth_path) {
+        Ok(view) => view,
+        Err(err) => {
+            set_last_error(err.to_string());
+            return std::ptr::null_mut();
+        }
+    };
+    if predicted.is_empty() || truth.is_empty() {
+        set_last_error("eval requires non-empty point clouds");
+        return std::ptr::null_mut();
+    }
+
+    let predicted_dim_id = DimId::from_name(&predicted_dim_name);
+    if predicted.layout().dim(&predicted_dim_id).is_none() {
+        set_last_error(format!(
+            "eval: predicted dimension '{predicted_dim_name}' does not exist"
+        ));
+        return std::ptr::null_mut();
+    }
+    let truth_dim_id = DimId::from_name(&truth_dim_name);
+    if truth.layout().dim(&truth_dim_id).is_none() {
+        set_last_error(format!(
+            "eval: truth dimension '{truth_dim_name}' does not exist"
+        ));
+        return std::ptr::null_mut();
+    }
+
+    let report = pdal_core::metrics::evaluate(
+        &predicted,
+        &truth,
+        &predicted_dim_id,
+        &truth_dim_id,
+        &label_list,
+    );
+    let labels_json: Vec<serde_json::Value> = report
+        .labels
+        .iter()
+        .map(|metrics| {
+            serde_json::json!({
+                "label": metrics.label,
+                "support": metrics.support,
+                "intersection_over_union": metrics.intersection_over_union,
+                "f1_score": metrics.f1_score,
+                "sensitivity": metrics.sensitivity,
+                "specificity": metrics.specificity,
+                "precision": metrics.precision,
+                "accuracy": metrics.accuracy,
+            })
+        })
+        .collect();
+    let report_json = serde_json::json!({
+        "predicted_file": predicted_path,
+        "truth_file": truth_path,
+        "labels": labels_json,
+        "mean_intersection_over_union": report.mean_intersection_over_union,
+        "overall_accuracy": report.overall_accuracy,
+        "f1_score": report.f1_score,
+        "confusion_matrix": report.confusion_matrix,
+    });
+    string_to_c_ptr(report_json.to_string())
 }

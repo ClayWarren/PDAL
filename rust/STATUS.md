@@ -51,7 +51,7 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, and `delta` exist for Rust-backed local workflows. |
+| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `ground`, `density`, `eval`, `tile`, and `tindex` exist for Rust-backed local workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
 | Vendor/native strategy | in progress | `rust/VENDOR.md` is the source of truth. Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | not ready | `pdal-plugins` may hold discovery metadata. Optional plugin ports and a Rust plugin SDK wait until the first-party surface and C ABI are stable. |
@@ -133,6 +133,11 @@ existing filter tests. Do not reapply it wholesale.
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test hausdorff_command -- --ignored`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test chamfer_command -- --ignored`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test delta_command -- --ignored`
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test ground_command -- --ignored`
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test density_command -- --ignored`
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test eval_command -- --ignored`
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test tile_command -- --ignored`
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test tindex_command -- --ignored`
 - Performance and guardrail visibility:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`

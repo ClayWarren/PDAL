@@ -18,6 +18,16 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             description: "report per-dimension deltas between two point cloud files",
         },
         KernelInfo {
+            name: "density",
+            full_name: "kernels.density",
+            description: "write a hexagonal point-density tessellation as GeoJSON",
+        },
+        KernelInfo {
+            name: "eval",
+            full_name: "kernels.eval",
+            description: "score predicted classification labels against a truth file",
+        },
+        KernelInfo {
             name: "ground",
             full_name: "kernels.ground",
             description: "classify ground points with the simple morphological filter",
@@ -57,6 +67,16 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             name: "split",
             full_name: "kernels.split",
             description: "split one point cloud file into multiple output files",
+        },
+        KernelInfo {
+            name: "tile",
+            full_name: "kernels.tile",
+            description: "tile a point cloud into a regular grid of output files",
+        },
+        KernelInfo {
+            name: "tindex",
+            full_name: "kernels.tindex",
+            description: "create a tile index of point cloud files",
         },
         KernelInfo {
             name: "translate",

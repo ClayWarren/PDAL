@@ -23,6 +23,7 @@ use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
+use pdal_filters::hexbin::HexBinFilter;
 use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
@@ -90,6 +91,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.groupby",
     "filters.hag_nn",
     "filters.head",
+    "filters.hexbin",
     "filters.iqr",
     "filters.label_duplicates",
     "filters.locate",
@@ -226,6 +228,22 @@ pub fn create_filter(
             options.get_u64("count", 10),
             options.get_bool("invert", false),
         )))),
+        "filters.hexbin" => {
+            let edge = if options.has("edge_length") {
+                Some(options.get_f64("edge_length", 0.0))
+            } else if options.has("edge_size") {
+                Some(options.get_f64("edge_size", 0.0))
+            } else {
+                None
+            };
+            let density = options.get_str("density", "");
+            Ok(Box::new(FilterWrapper::new(HexBinFilter::new(
+                edge,
+                options.get_u64("threshold", 15) as u32,
+                options.get_u64("sample_size", 5000) as usize,
+                (!density.is_empty()).then_some(density),
+            ))))
+        }
         "filters.iqr" => Ok(Box::new(FilterWrapper::new(IqrFilter::new(
             options.get_f64("multiplier", 1.5),
             DimId::from_name(&options.get_str("dimension", "Z")),

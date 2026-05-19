@@ -618,6 +618,55 @@ impl App {
         self.execute_stage_pipeline(stages)
     }
 
+    fn run_density(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!("  pdal density <input> <output.geojson> [--<stage>.<key>=<value> ...]");
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let (positional, stage_options) = match parse_stage_args(&self.command_args) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+        if positional.len() != 2 {
+            eprintln!("Error: density expects an input path and an output path");
+            return 1;
+        }
+        let input = positional[0];
+        let output = positional[1];
+
+        let reader = match pdal_core::driver::infer_reader_driver(input) {
+            Some(driver) => driver,
+            None => {
+                eprintln!("Error: unable to infer a reader driver for '{input}'");
+                return 1;
+            }
+        };
+
+        // reader -> filters.hexbin: the hexbin filter tessellates the X/Y
+        // domain and writes the dense-cell density grid as GeoJSON. The
+        // density output is a vector file, so no point-cloud writer is added;
+        // `--filters.hexbin.*` options override the hexbin defaults.
+        let mut stages: Vec<serde_json::Value> = vec![
+            serde_json::json!({ "type": reader, "filename": input }),
+            serde_json::json!({ "type": "filters.hexbin", "density": output }),
+        ];
+
+        if let Err(message) = apply_stage_options(&mut stages, &stage_options) {
+            eprintln!("Error: {message}");
+            return 1;
+        }
+        self.execute_stage_pipeline(stages)
+    }
+
     fn run_random(&self) -> i32 {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
@@ -780,6 +829,88 @@ impl App {
         0
     }
 
+    fn run_tile(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!(
+                "  pdal tile <input> <output-template> \
+                 [--length=N] [--origin_x=X] [--origin_y=Y] [--buffer=N]"
+            );
+            println!("  the output template must contain a single '#' placeholder");
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let mut positional: Vec<&str> = Vec::new();
+        let mut length = 1000.0_f64;
+        let mut origin_x = f64::NAN;
+        let mut origin_y = f64::NAN;
+        let mut buffer = 0.0_f64;
+        for arg in &self.command_args {
+            if let Some(rest) = arg.strip_prefix("--") {
+                let (key, value) = match rest.split_once('=') {
+                    Some(pair) => pair,
+                    None => {
+                        eprintln!("Error: option '{arg}' must be in --key=value form");
+                        return 1;
+                    }
+                };
+                let target = match key {
+                    "length" => &mut length,
+                    "origin_x" => &mut origin_x,
+                    "origin_y" => &mut origin_y,
+                    "buffer" => &mut buffer,
+                    _ => {
+                        eprintln!("Error: unknown tile option '--{key}'");
+                        return 1;
+                    }
+                };
+                match value.parse::<f64>() {
+                    Ok(parsed) => *target = parsed,
+                    Err(_) => {
+                        eprintln!("Error: tile option '--{key}' expects a number");
+                        return 1;
+                    }
+                }
+            } else {
+                positional.push(arg);
+            }
+        }
+        if positional.len() != 2 {
+            eprintln!("Error: tile expects an input path and an output template");
+            return 1;
+        }
+
+        let (c_input, c_template) = match (CString::new(positional[0]), CString::new(positional[1]))
+        {
+            (Ok(input), Ok(template)) => (input, template),
+            _ => {
+                eprintln!("Error: a path contains an interior NUL byte");
+                return 1;
+            }
+        };
+
+        let count = unsafe {
+            pdal_capi::pdal_tile(
+                c_input.as_ptr(),
+                c_template.as_ptr(),
+                length,
+                origin_x,
+                origin_y,
+                buffer,
+            )
+        };
+        if count < 0 {
+            self.output_last_error();
+            return 1;
+        }
+        println!("Wrote {count} tile(s).");
+        0
+    }
+
     fn run_hausdorff(&self) -> i32 {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
@@ -914,6 +1045,229 @@ impl App {
         0
     }
 
+    fn run_tindex(&self) -> i32 {
+        if self.help || self.command_args.len() < 3 {
+            println!("Usage:");
+            println!("  pdal tindex create <tindex> <files...> [-f <driver>]");
+            println!("  pdal tindex merge <tindex> <filespec>");
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let subcommand = &self.command_args[0];
+        if subcommand == "merge" {
+            eprintln!("Error: merge is not yet supported in the Rust tindex kernel");
+            return 1;
+        } else if subcommand != "create" {
+            eprintln!("Error: expected 'create' or 'merge' subcommand");
+            return 1;
+        }
+
+        let tindex_file = &self.command_args[1];
+        let mut files = Vec::new();
+        let mut driver_name = "ESRI Shapefile";
+
+        let mut args_iter = self.command_args[2..].iter();
+        while let Some(arg) = args_iter.next() {
+            if arg == "-f" || arg == "--ogrdriver" {
+                if let Some(d) = args_iter.next() {
+                    driver_name = d;
+                }
+            } else {
+                files.push(arg);
+            }
+        }
+
+        // Register drivers
+        pdal_core::gdal::register_drivers();
+
+        // Create OGR dataset
+        let dataset = match pdal_core::gdal::Vector::create(tindex_file, driver_name) {
+            Ok(ds) => ds,
+            Err(e) => {
+                eprintln!("Error creating tindex dataset: {}", e);
+                return 1;
+            }
+        };
+
+        // For first file, we get its SRS to define the layer
+        let mut first_srs = String::new();
+        let mut valid_files = Vec::new();
+
+        for file in files {
+            let driver = match pdal_core::driver::infer_reader_driver(file) {
+                Some(driver) => driver,
+                None => continue,
+            };
+
+            let pipeline_json =
+                serde_json::json!([{ "type": driver, "filename": file }]).to_string();
+            let c_json = match CString::new(pipeline_json) {
+                Ok(json) => json,
+                Err(_) => continue,
+            };
+
+            let pipeline = unsafe { pdal_capi::pdal_pipeline_create_json(c_json.as_ptr()) };
+            if pipeline.is_null() {
+                continue;
+            }
+
+            let json_ptr = unsafe {
+                pdal_capi::pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut())
+            };
+            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+
+            if json_ptr.is_null() {
+                continue;
+            }
+
+            let summary_str = safe_cstr(json_ptr).unwrap_or_default();
+            unsafe { pdal_capi::pdal_string_free(json_ptr) };
+
+            if let Ok(summary) = serde_json::from_str::<serde_json::Value>(&summary_str) {
+                let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let minx = summary["bounds_2d"]["minx"].as_f64().unwrap_or(0.0);
+                let maxx = summary["bounds_2d"]["maxx"].as_f64().unwrap_or(0.0);
+                let miny = summary["bounds_2d"]["miny"].as_f64().unwrap_or(0.0);
+                let maxy = summary["bounds_2d"]["maxy"].as_f64().unwrap_or(0.0);
+
+                if first_srs.is_empty() && !wkt.is_empty() {
+                    first_srs = wkt.clone();
+                }
+                valid_files.push((file.clone(), wkt, minx, miny, maxx, maxy));
+            }
+        }
+
+        if valid_files.is_empty() {
+            eprintln!("Error: no valid files to index");
+            return 1;
+        }
+
+        let layer = match dataset.open_or_create_layer("pdal", &first_srs) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Error creating layer: {}", e);
+                return 1;
+            }
+        };
+
+        unsafe {
+            pdal_core::gdal::Vector::create_string_field(layer, "location").unwrap();
+            pdal_core::gdal::Vector::create_string_field(layer, "srs").unwrap();
+            pdal_core::gdal::Vector::create_datetime_field(layer, "created").unwrap();
+            pdal_core::gdal::Vector::create_datetime_field(layer, "modified").unwrap();
+        }
+
+        for (file, wkt, minx, miny, maxx, maxy) in valid_files {
+            // WKT for POLYGON
+            let poly_wkt = format!(
+                "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
+                minx, miny, maxx, miny, maxx, maxy, minx, maxy, minx, miny
+            );
+
+            let fields = vec![("location", file.as_str()), ("srs", wkt.as_str())];
+
+            unsafe {
+                if let Err(e) = pdal_core::gdal::Vector::add_feature(layer, &poly_wkt, &fields) {
+                    eprintln!("Error adding feature for {}: {}", file, e);
+                } else {
+                    println!("Indexed file {}", file);
+                }
+            }
+        }
+
+        0
+    }
+
+    fn run_eval(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!(
+                "  pdal eval <predicted> <truth> --labels=<l1,l2,...> \
+                 [--prediction_dim=Classification] [--truth_dim=Classification]"
+            );
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let mut positional: Vec<&str> = Vec::new();
+        let mut labels = String::new();
+        let mut prediction_dim = String::from("Classification");
+        let mut truth_dim = String::from("Classification");
+        for arg in &self.command_args {
+            if let Some(rest) = arg.strip_prefix("--") {
+                let (key, value) = match rest.split_once('=') {
+                    Some(pair) => pair,
+                    None => {
+                        eprintln!("Error: option '{arg}' must be in --key=value form");
+                        return 1;
+                    }
+                };
+                match key {
+                    "labels" => labels = value.to_string(),
+                    "prediction_dim" => prediction_dim = value.to_string(),
+                    "truth_dim" => truth_dim = value.to_string(),
+                    _ => {
+                        eprintln!("Error: unknown eval option '--{key}'");
+                        return 1;
+                    }
+                }
+            } else {
+                positional.push(arg);
+            }
+        }
+        if positional.len() != 2 {
+            eprintln!("Error: eval expects a predicted path and a truth path");
+            return 1;
+        }
+        if labels.is_empty() {
+            eprintln!("Error: eval requires --labels=<comma-separated classification labels>");
+            return 1;
+        }
+
+        let (c_predicted, c_truth, c_labels, c_prediction_dim, c_truth_dim) = match (
+            CString::new(positional[0]),
+            CString::new(positional[1]),
+            CString::new(labels.as_str()),
+            CString::new(prediction_dim.as_str()),
+            CString::new(truth_dim.as_str()),
+        ) {
+            (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e)) => (a, b, c, d, e),
+            _ => {
+                eprintln!("Error: an argument contains an interior NUL byte");
+                return 1;
+            }
+        };
+
+        let json_ptr = unsafe {
+            pdal_capi::pdal_eval(
+                c_predicted.as_ptr(),
+                c_truth.as_ptr(),
+                c_labels.as_ptr(),
+                c_prediction_dim.as_ptr(),
+                c_truth_dim.as_ptr(),
+            )
+        };
+        if json_ptr.is_null() {
+            self.output_last_error();
+            return 1;
+        }
+        if let Some(json) = safe_cstr(json_ptr) {
+            println!("{}", json);
+        }
+        unsafe { pdal_capi::pdal_string_free(json_ptr) };
+        0
+    }
+
     /// Build a pipeline from assembled stage objects and execute it.
     fn execute_stage_pipeline(&self, stages: Vec<serde_json::Value>) -> i32 {
         let pipeline_json = serde_json::Value::Array(stages).to_string();
@@ -964,8 +1318,14 @@ impl App {
             if command == "ground" {
                 return self.run_ground();
             }
+            if command == "density" {
+                return self.run_density();
+            }
             if command == "split" {
                 return self.run_split();
+            }
+            if command == "tile" {
+                return self.run_tile();
             }
             if command == "random" {
                 return self.run_random();
@@ -978,6 +1338,12 @@ impl App {
             }
             if command == "delta" {
                 return self.run_delta();
+            }
+            if command == "eval" {
+                return self.run_eval();
+            }
+            if command == "tindex" {
+                return self.run_tindex();
             }
             eprintln!("Unknown Rust command '{}'", command);
             return 1;

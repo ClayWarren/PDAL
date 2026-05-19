@@ -1,7 +1,7 @@
 //! Point-cloud comparison metrics.
 //!
-//! Port of the comparison logic behind PDAL's `hausdorff`, `chamfer`, and
-//! `delta` kernels.
+//! Port of the comparison logic behind PDAL's `hausdorff`, `chamfer`,
+//! `delta`, and `eval` kernels.
 
 use crate::point::{DimId, PointId, PointView};
 
@@ -123,6 +123,123 @@ pub fn delta_summary(source: &PointView, candidate: &PointView) -> [DeltaStat; 3
     })
 }
 
+/// Classification metrics for a single label (PDAL's `LabelStats`).
+pub struct LabelMetrics {
+    pub label: i64,
+    pub support: u64,
+    pub intersection_over_union: f64,
+    pub f1_score: f64,
+    pub sensitivity: f64,
+    pub specificity: f64,
+    pub precision: f64,
+    pub accuracy: f64,
+}
+
+/// The full result of comparing predicted labels against truth labels.
+pub struct EvalReport {
+    pub labels: Vec<LabelMetrics>,
+    pub mean_intersection_over_union: f64,
+    pub overall_accuracy: f64,
+    pub f1_score: f64,
+    /// `(dim + 1) x (dim + 1)` confusion matrix, indexed `[truth][predicted]`;
+    /// the trailing row/column collects labels outside the evaluated set.
+    pub confusion_matrix: Vec<Vec<u64>>,
+}
+
+/// Evaluate predicted classification labels against truth labels (PDAL's
+/// `eval` kernel).
+///
+/// For each `predicted` point the nearest `truth` point is found, and the
+/// pair of labels is tallied into a confusion matrix over `labels` (sorted
+/// ascending). Both views must be non-empty and must carry the named
+/// dimensions; this is checked by the caller.
+pub fn evaluate(
+    predicted: &PointView,
+    truth: &PointView,
+    predicted_dim: &DimId,
+    truth_dim: &DimId,
+    labels: &[i64],
+) -> EvalReport {
+    let mut labels: Vec<i64> = labels.to_vec();
+    labels.sort_unstable();
+    labels.dedup();
+    let dim = labels.len();
+
+    // Confusion matrix indexed [truth][predicted]; index `dim` collects any
+    // label that is not in the evaluated set.
+    let mut matrix = vec![vec![0u64; dim + 1]; dim + 1];
+    let class_index = |value: i64| labels.iter().position(|&l| l == value).unwrap_or(dim);
+
+    for (predicted_id, &(truth_id, _)) in nearest_neighbors(predicted, truth).iter().enumerate() {
+        let pc = predicted.get_f64(predicted_id as PointId, predicted_dim) as i64;
+        let qc = truth.get_f64(truth_id, truth_dim) as i64;
+        matrix[class_index(qc)][class_index(pc)] += 1;
+    }
+
+    // `top_sum` and `trace` cover only the rows for evaluated truth labels.
+    let top_sum: u64 = matrix[..dim].iter().flatten().sum();
+    let trace: u64 = (0..dim).map(|i| matrix[i][i]).sum();
+
+    let metrics = |label: usize| -> LabelMetrics {
+        let tp = matrix[label][label];
+        let support: u64 = matrix[label].iter().sum();
+        let col: u64 = matrix[..dim].iter().map(|row| row[label]).sum();
+        let fp = col - tp;
+        let fn_ = support - tp;
+        let tn = top_sum - tp - fp - fn_;
+
+        let iou = if tn == top_sum {
+            0.0
+        } else {
+            tp as f64 / (tp + fp + fn_) as f64
+        };
+        let ratio = |num: u64, den: u64| -> f64 {
+            if den == 0 {
+                0.0
+            } else {
+                num as f64 / den as f64
+            }
+        };
+        LabelMetrics {
+            label: labels[label],
+            support,
+            intersection_over_union: iou,
+            f1_score: 2.0 * iou / (1.0 + iou),
+            sensitivity: ratio(tp, tp + fn_),
+            specificity: ratio(tn, fp + tn),
+            precision: ratio(tp, tp + fp),
+            accuracy: if top_sum == 0 {
+                0.0
+            } else {
+                (tp + tn) as f64 / top_sum as f64
+            },
+        }
+    };
+
+    let label_metrics: Vec<LabelMetrics> = (0..dim).map(metrics).collect();
+    let mean_iou = if dim == 0 {
+        0.0
+    } else {
+        label_metrics
+            .iter()
+            .map(|m| m.intersection_over_union)
+            .sum::<f64>()
+            / dim as f64
+    };
+
+    EvalReport {
+        labels: label_metrics,
+        mean_intersection_over_union: mean_iou,
+        overall_accuracy: if top_sum == 0 {
+            0.0
+        } else {
+            trace as f64 / top_sum as f64
+        },
+        f1_score: 2.0 * mean_iou / (1.0 + mean_iou),
+        confusion_matrix: matrix,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +318,66 @@ mod tests {
             (stats[2].min, stats[2].mean, stats[2].max),
             (-1.0, 1.0, 3.0)
         );
+    }
+
+    /// Build a cloud whose points carry an extra `Classification` label.
+    fn labeled_cloud(points: &[(f64, f64, f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Classification, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for &(x, y, z, c) in points {
+            let p = view.add_point();
+            view.set_f64(p, &DimId::X, x);
+            view.set_f64(p, &DimId::Y, y);
+            view.set_f64(p, &DimId::Z, z);
+            view.set_f64(p, &DimId::Classification, c);
+        }
+        view
+    }
+
+    #[test]
+    fn perfect_prediction_scores_one() {
+        let truth = labeled_cloud(&[(0.0, 0.0, 0.0, 1.0), (1.0, 0.0, 0.0, 2.0)]);
+        let report = evaluate(
+            &truth,
+            &truth,
+            &DimId::Classification,
+            &DimId::Classification,
+            &[1, 2],
+        );
+        assert_eq!(report.overall_accuracy, 1.0);
+        assert_eq!(report.mean_intersection_over_union, 1.0);
+        for label in &report.labels {
+            assert_eq!(label.intersection_over_union, 1.0);
+            assert_eq!(label.precision, 1.0);
+            assert_eq!(label.sensitivity, 1.0);
+            assert_eq!(label.support, 1);
+        }
+        assert_eq!(
+            report.confusion_matrix,
+            vec![vec![1, 0, 0], vec![0, 1, 0], vec![0, 0, 0],]
+        );
+    }
+
+    #[test]
+    fn one_swapped_label_halves_the_accuracy() {
+        // Truth labels two co-located points 1 and 2; the prediction swaps
+        // the second point's label.
+        let truth = labeled_cloud(&[(0.0, 0.0, 0.0, 1.0), (10.0, 0.0, 0.0, 2.0)]);
+        let predicted = labeled_cloud(&[(0.0, 0.0, 0.0, 1.0), (10.0, 0.0, 0.0, 1.0)]);
+        let report = evaluate(
+            &predicted,
+            &truth,
+            &DimId::Classification,
+            &DimId::Classification,
+            &[1, 2],
+        );
+        // Confusion matrix: truth 1 -> predicted 1; truth 2 -> predicted 1.
+        assert_eq!(report.confusion_matrix[0][0], 1);
+        assert_eq!(report.confusion_matrix[1][0], 1);
+        assert_eq!(report.overall_accuracy, 0.5);
     }
 }

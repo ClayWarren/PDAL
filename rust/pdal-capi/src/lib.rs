@@ -19,6 +19,7 @@ mod registry;
 mod srs;
 mod stage_abi;
 mod stats_abi;
+mod tile_abi;
 
 pub use error::*;
 pub use filter_abi::*;
@@ -36,6 +37,7 @@ pub use registry::*;
 pub use srs::*;
 pub use stage_abi::*;
 pub use stats_abi::*;
+pub use tile_abi::*;
 
 #[cfg(test)]
 mod tests {
