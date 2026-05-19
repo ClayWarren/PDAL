@@ -8,6 +8,7 @@ pub mod faux;
 pub mod fbi;
 pub mod fbi_writer;
 pub mod ilvis2;
+pub mod ilvis2_metadata;
 pub mod nullwriter;
 pub mod obj;
 pub mod optech;

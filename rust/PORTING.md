@@ -389,8 +389,8 @@ Current status:
 - `readers.ilvis2` has a Rust implementation for the deterministic ILVIS2
   ASCII point path, including `low`, `high`, and `all` mapping behavior,
   longitude normalization, skipped two-line headers, malformed-row rejection,
-  and reader -> decimation -> PCD writer installed-PDAL regression coverage.
-  The optional XML metadata sidecar is intentionally deferred.
+  XML metadata sidecar parsing for the existing fixture shape, and reader ->
+  decimation -> PCD writer installed-PDAL regression coverage.
 - `readers.ply` and `writers.ply` have Rust ASCII-only implementations for
   local PLY fixtures, including vertex properties, extra dimensions, list
   properties on non-vertex elements, `dims`, `sized_types`, and precision.

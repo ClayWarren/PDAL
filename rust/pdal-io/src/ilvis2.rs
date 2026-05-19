@@ -16,9 +16,6 @@
 //! `X`/`Y`/`Z` are set from the chosen mapping's longitude/latitude/elevation;
 //! longitudes are normalized to `(-180, 180]`.
 //!
-//! The optional XML metadata sidecar (`metadata` option) is intentionally
-//! deferred -- this slice covers the deterministic ASCII point path only.
-
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -56,7 +53,9 @@ const COLUMNS: [&str; 12] = [
 /// Reader for the NASA LVIS Level-2 (ILVIS2) ASCII format.
 pub struct Ilvis2Reader {
     filename: String,
+    metadata_filename: String,
     mapping: Mapping,
+    metadata: MetadataNode,
 }
 
 impl Ilvis2Reader {
@@ -74,7 +73,9 @@ impl Ilvis2Reader {
         };
         Self {
             filename: options.get_str("filename", ""),
+            metadata_filename: options.get_str("metadata", ""),
             mapping,
+            metadata: MetadataNode::new("readers.ilvis2"),
         }
     }
 }
@@ -145,11 +146,16 @@ impl Reader for Ilvis2Reader {
             }
         }
 
+        if !self.metadata_filename.is_empty() {
+            self.metadata =
+                crate::ilvis2_metadata::read_metadata_file(Path::new(&self.metadata_filename))?;
+        }
+
         Ok(vec![view])
     }
 
     fn metadata(&self) -> MetadataNode {
-        MetadataNode::new("readers.ilvis2")
+        self.metadata.clone()
     }
 }
 
@@ -215,6 +221,16 @@ mod tests {
         (a - b).abs() <= 1e-9
     }
 
+    fn metadata_value<'a>(
+        metadata: &'a MetadataNode,
+        name: &str,
+    ) -> &'a pdal_core::metadata::MetadataValue {
+        metadata
+            .find_child(name)
+            .and_then(MetadataNode::value)
+            .unwrap()
+    }
+
     #[test]
     fn reads_all_mapping_with_resampled_high_point() {
         let view = read_ilvis2("ilvis2/ILVIS2_TEST_FILE.TXT", None);
@@ -259,6 +275,27 @@ mod tests {
         let view = read_ilvis2("ilvis2/ILVIS2_GL2009_0414_R1401_042504.TXT", None);
         // 998 data lines, each emitting at least one point.
         assert!(view.len() >= 998);
+    }
+
+    #[test]
+    fn reads_metadata_sidecar_when_requested() {
+        let mut options = Options::new();
+        options.add("filename", data_path("ilvis2/ILVIS2_TEST_FILE.TXT"));
+        options.add("metadata", data_path("ilvis2/ILVIS2_TEST_FILE.TXT.xml"));
+        let mut reader = Ilvis2Reader::new(&options);
+
+        let views = reader.read().unwrap();
+        let metadata = reader.metadata();
+
+        assert_eq!(views[0].len(), 4);
+        assert_eq!(
+            metadata_value(&metadata, "GranuleUR").as_string(),
+            "SC:ILVIS2.001:51203496"
+        );
+        assert_eq!(metadata_value(&metadata, "DbID").as_i64(), 51203496);
+        assert!(metadata_value(&metadata, "ConvexHull")
+            .as_string()
+            .starts_with("POLYGON"));
     }
 
     #[test]
