@@ -114,6 +114,49 @@ fn installed_pdal_matches_rust_pipeline_command() {
 
 #[test]
 #[ignore = "requires installed pdal on PATH"]
+fn installed_pdal_matches_rust_root_object_pipeline_command() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-root-object-pipeline-command-regression");
+    let installed_output = temp.join("installed.txt");
+    let rust_output = temp.join("rust.txt");
+    let installed_pipeline = temp.join("installed-pipeline.json");
+    let rust_pipeline = temp.join("rust-pipeline.json");
+
+    write_text_pipeline_object(&installed_pipeline, &input, &installed_output);
+    write_text_pipeline_object(&rust_pipeline, &input, &rust_output);
+
+    run_installed_pipeline(&installed_pipeline);
+    run_rust_pipeline(&rust_pipeline);
+
+    assert_eq!(
+        fs::read_to_string(installed_output).unwrap(),
+        fs::read_to_string(rust_output).unwrap()
+    );
+}
+
+#[test]
+#[ignore = "requires installed pdal on PATH"]
+fn installed_pdal_matches_rust_filename_string_pipeline_command() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-string-pipeline-command-regression");
+    let installed_output = temp.join("installed.pcd");
+    let rust_output = temp.join("rust.pcd");
+    let installed_pipeline = temp.join("installed-pipeline.json");
+    let rust_pipeline = temp.join("rust-pipeline.json");
+
+    write_text_pipeline_strings(&installed_pipeline, &input, &installed_output);
+    write_text_pipeline_strings(&rust_pipeline, &input, &rust_output);
+
+    run_installed_pipeline(&installed_pipeline);
+    run_rust_pipeline(&rust_pipeline);
+
+    assert_views_match_xyz(read_pcd(&installed_output), read_pcd(&rust_output));
+}
+
+#[test]
+#[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pcd_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/pcd/utm17_space.pcd");

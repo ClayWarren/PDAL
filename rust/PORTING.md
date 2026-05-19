@@ -511,7 +511,8 @@ Current status:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test pipeline_command -- --ignored`.
   It compares the artifact written by installed `pdal pipeline` with the
   artifact written by `pdal-rs pipeline` for deterministic local text, PCD,
-  and PLY reader -> decimation filter -> writer paths.
+  and PLY reader -> decimation filter -> writer paths, including bare array,
+  root `pipeline` object, and filename-string stage JSON forms.
 - Do not add `info`, `translate`, or other kernels yet; they need richer
   metadata, bounds, option, and I/O parity first.
 
