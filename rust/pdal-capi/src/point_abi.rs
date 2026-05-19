@@ -1,8 +1,10 @@
 use crate::error::string_to_c_ptr;
 use pdal_core::bounds::{Bounds2D, Bounds3D};
 use pdal_core::point::{
-    fix_dimension_name, resolve_pdal_dimension_type, DimId, DimType, DimensionSummary, PointLayout,
-    PointView,
+    fix_dimension_name, pdal_dimension_interpretation_name as core_dimension_interpretation_name,
+    pdal_dimension_type_from_base_and_size as core_dimension_type_from_base_and_size,
+    pdal_dimension_type_from_name as core_dimension_type_from_name, resolve_pdal_dimension_type,
+    DimId, DimType, DimensionSummary, PointLayout, PointView,
 };
 use pdal_core::srs::SpatialReference;
 use serde_json::json;
@@ -387,6 +389,35 @@ pub extern "C" fn pdal_dimension_resolve_type(type1: i32, type2: i32) -> i32 {
         return 0;
     }
     resolve_pdal_dimension_type(type1 as u32, type2 as u32) as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_dimension_interpretation_name(type_id: i32) -> *mut c_char {
+    if type_id < 0 {
+        return string_to_c_ptr("unknown".to_string());
+    }
+    string_to_c_ptr(core_dimension_interpretation_name(type_id as u32).to_string())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_dimension_type_from_name(name: *const c_char) -> i32 {
+    if name.is_null() {
+        return 0;
+    }
+    let name = CStr::from_ptr(name).to_string_lossy();
+    core_dimension_type_from_name(&name) as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_dimension_type_from_base_and_size(
+    base: *const c_char,
+    size: u64,
+) -> i32 {
+    if base.is_null() {
+        return 0;
+    }
+    let base = CStr::from_ptr(base).to_string_lossy();
+    core_dimension_type_from_base_and_size(&base, size as usize) as i32
 }
 
 #[no_mangle]

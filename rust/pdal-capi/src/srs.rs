@@ -1,7 +1,7 @@
 use crate::error::string_to_c_ptr;
 use pdal_core::{
     metadata::MetadataNode,
-    srs::{calculate_zone, SpatialReference},
+    srs::{calculate_zone, wgs84_code_from_zone, SpatialReference},
 };
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -114,6 +114,11 @@ pub unsafe extern "C" fn pdal_spatial_reference_to_metadata(
 #[no_mangle]
 pub extern "C" fn pdal_spatial_reference_calculate_zone(lon: f64, lat: f64) -> i32 {
     calculate_zone(lon, lat)
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_spatial_reference_wgs84_code_from_zone(zone: i32) -> *mut c_char {
+    string_to_c_ptr(wgs84_code_from_zone(zone).unwrap_or_default())
 }
 
 /// Destroy a spatial reference.

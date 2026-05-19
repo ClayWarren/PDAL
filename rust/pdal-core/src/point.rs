@@ -365,6 +365,56 @@ pub fn resolve_pdal_dimension_type(t1: u32, t2: u32) -> u32 {
     }
 }
 
+pub fn pdal_dimension_interpretation_name(ty: u32) -> &'static str {
+    match ty {
+        0x000 => "unknown",
+        0x101 => "int8_t",
+        0x102 => "int16_t",
+        0x104 => "int32_t",
+        0x108 => "int64_t",
+        0x201 => "uint8_t",
+        0x202 => "uint16_t",
+        0x204 => "uint32_t",
+        0x208 => "uint64_t",
+        0x404 => "float",
+        0x408 => "double",
+        _ => "unknown",
+    }
+}
+
+pub fn pdal_dimension_type_from_name(name: &str) -> u32 {
+    match name.to_ascii_lowercase().as_str() {
+        "int8_t" | "int8" | "char" => 0x100 | 1,
+        "int16_t" | "int16" | "short" => 0x100 | 2,
+        "int32_t" | "int32" | "int" => 0x100 | 4,
+        "int64_t" | "int64" | "long" => 0x100 | 8,
+        "uint8_t" | "uint8" | "uchar" => 0x200 | 1,
+        "uint16_t" | "uint16" | "ushort" => 0x200 | 2,
+        "uint32_t" | "uint32" | "uint" => 0x200 | 4,
+        "uint64_t" | "uint64" | "ulong" => 0x200 | 8,
+        "float" | "float32" => 0x400 | 4,
+        "double" | "float64" => 0x400 | 8,
+        _ => 0x000,
+    }
+}
+
+pub fn pdal_dimension_type_from_base_and_size(base: &str, size: usize) -> u32 {
+    let base = match base {
+        "signed" => 0x100,
+        "unsigned" => 0x200,
+        "floating" | "float" => 0x400,
+        _ => return 0x000,
+    };
+    if !matches!(size, 1 | 2 | 4 | 8) {
+        return 0x000;
+    }
+    if matches!(size, 1 | 2) && base == 0x400 {
+        return 0x000;
+    }
+
+    base | size as u32
+}
+
 pub fn fix_dimension_name(name: &str) -> String {
     let mut output = name.to_string();
     if output.is_empty() {
@@ -1023,6 +1073,45 @@ mod tests {
         assert_eq!(resolve_pdal_dimension_type(U16, S16), S32);
         assert_eq!(resolve_pdal_dimension_type(FLOAT, S32), FLOAT);
         assert_eq!(resolve_pdal_dimension_type(DOUBLE, S64), DOUBLE);
+    }
+
+    #[test]
+    fn dimension_type_names_match_cpp_contract() {
+        assert_eq!(pdal_dimension_interpretation_name(0x000), "unknown");
+        assert_eq!(pdal_dimension_interpretation_name(0x100 | 1), "int8_t");
+        assert_eq!(pdal_dimension_interpretation_name(0x200 | 2), "uint16_t");
+        assert_eq!(pdal_dimension_interpretation_name(0x100 | 4), "int32_t");
+        assert_eq!(pdal_dimension_interpretation_name(0x200 | 8), "uint64_t");
+        assert_eq!(pdal_dimension_interpretation_name(0x400 | 4), "float");
+        assert_eq!(pdal_dimension_interpretation_name(0x400 | 8), "double");
+        assert_eq!(pdal_dimension_interpretation_name(999), "unknown");
+    }
+
+    #[test]
+    fn dimension_type_parsing_matches_cpp_contract() {
+        assert_eq!(pdal_dimension_type_from_name("char"), 0x100 | 1);
+        assert_eq!(pdal_dimension_type_from_name("int16"), 0x100 | 2);
+        assert_eq!(pdal_dimension_type_from_name("INT32_T"), 0x100 | 4);
+        assert_eq!(pdal_dimension_type_from_name("ulong"), 0x200 | 8);
+        assert_eq!(pdal_dimension_type_from_name("float32"), 0x400 | 4);
+        assert_eq!(pdal_dimension_type_from_name("float64"), 0x400 | 8);
+        assert_eq!(pdal_dimension_type_from_name("nonsense"), 0);
+
+        assert_eq!(
+            pdal_dimension_type_from_base_and_size("signed", 1),
+            0x100 | 1
+        );
+        assert_eq!(
+            pdal_dimension_type_from_base_and_size("unsigned", 2),
+            0x200 | 2
+        );
+        assert_eq!(
+            pdal_dimension_type_from_base_and_size("floating", 4),
+            0x400 | 4
+        );
+        assert_eq!(pdal_dimension_type_from_base_and_size("floating", 2), 0);
+        assert_eq!(pdal_dimension_type_from_base_and_size("unknown", 4), 0);
+        assert_eq!(pdal_dimension_type_from_base_and_size("signed", 3), 0);
     }
 
     #[test]

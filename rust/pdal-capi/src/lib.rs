@@ -72,6 +72,24 @@ mod tests {
     }
 
     #[test]
+    fn spatial_reference_wgs84_zone_code_roundtrips_through_c_abi() {
+        unsafe {
+            assert_eq!(
+                take_string(pdal_spatial_reference_wgs84_code_from_zone(17)),
+                "EPSG:32617"
+            );
+            assert_eq!(
+                take_string(pdal_spatial_reference_wgs84_code_from_zone(-17)),
+                "EPSG:32717"
+            );
+            assert_eq!(
+                take_string(pdal_spatial_reference_wgs84_code_from_zone(0)),
+                ""
+            );
+        }
+    }
+
+    #[test]
     fn native_dependencies_serialize_through_c_abi() {
         unsafe {
             let json: serde_json::Value =
@@ -308,6 +326,30 @@ mod tests {
             ));
 
             pdal_point_view_destroy(view);
+        }
+    }
+
+    #[test]
+    fn dimension_type_helpers_roundtrip_through_c_abi() {
+        unsafe {
+            let signed = CString::new("signed").unwrap();
+            let int32 = CString::new("INT32_T").unwrap();
+            let bad = CString::new("unknown").unwrap();
+
+            assert_eq!(
+                take_string(pdal_dimension_interpretation_name(0x200 | 2)),
+                "uint16_t"
+            );
+            assert_eq!(pdal_dimension_type_from_name(int32.as_ptr()), 0x100 | 4);
+            assert_eq!(
+                pdal_dimension_type_from_base_and_size(signed.as_ptr(), 8),
+                0x100 | 8
+            );
+            assert_eq!(pdal_dimension_type_from_name(bad.as_ptr()), 0);
+            assert_eq!(
+                pdal_dimension_type_from_base_and_size(std::ptr::null(), 8),
+                0
+            );
         }
     }
 

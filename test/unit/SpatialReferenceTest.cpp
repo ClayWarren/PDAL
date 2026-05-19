@@ -149,6 +149,17 @@ TEST(SpatialReferenceTest, calcZone)
     EXPECT_EQ(37, SpatialReference::calculateZone(40, 80));
 }
 
+TEST(SpatialReferenceTest, wgs84FromZone)
+{
+    EXPECT_EQ(SpatialReference::wgs84FromZone(17).identifyHorizontalEPSG(),
+              "32617");
+    EXPECT_EQ(SpatialReference::wgs84FromZone(-17).identifyHorizontalEPSG(),
+              "32717");
+    EXPECT_TRUE(SpatialReference::wgs84FromZone(0).empty());
+    EXPECT_TRUE(SpatialReference::wgs84FromZone(61).empty());
+    EXPECT_TRUE(SpatialReference::wgs84FromZone(-61).empty());
+}
+
 // Test fetching SRS from an existing file
 TEST(SpatialReferenceTest, test_read_srs)
 {

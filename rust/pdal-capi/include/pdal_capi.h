@@ -39,6 +39,9 @@ void pdal_options_destroy(pdal_options_t* ops);
 pdal_point_layout_t* pdal_point_layout_create();
 void pdal_point_layout_register_dim(pdal_point_layout_t* layout, const char* name, int type_id);
 int pdal_dimension_resolve_type(int type1, int type2);
+char* pdal_dimension_interpretation_name(int type_id);
+int pdal_dimension_type_from_name(const char* name);
+int pdal_dimension_type_from_base_and_size(const char* base, uint64_t size);
 char* pdal_dimension_fix_name(const char* name);
 void pdal_point_layout_destroy(pdal_point_layout_t* layout);
 
@@ -123,6 +126,7 @@ double pdal_spatial_reference_epoch(const pdal_spatial_reference_t* srs);
 void pdal_spatial_reference_set_epoch(pdal_spatial_reference_t* srs, double epoch);
 pdal_metadata_node_t* pdal_spatial_reference_to_metadata(const pdal_spatial_reference_t* srs);
 int32_t pdal_spatial_reference_calculate_zone(double lon, double lat);
+char* pdal_spatial_reference_wgs84_code_from_zone(int32_t zone);
 void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);
 
 // Scaling

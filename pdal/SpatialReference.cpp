@@ -417,19 +417,12 @@ int SpatialReference::calculateZone(double lon, double lat)
 */
 SpatialReference SpatialReference::wgs84FromZone(int zone)
 {
-    uint32_t abszone(std::abs(zone));
-
-    if (abszone == 0 || abszone > 60)
+    char* code = pdal_spatial_reference_wgs84_code_from_zone(zone);
+    std::string output(code ? code : "");
+    pdal_string_free(code);
+    if (output.empty())
         return SpatialReference();
-
-    std::string code;
-    if (zone > 0)
-        code = "EPSG:326";
-    else
-        code = "EPSG:327";
-
-    code += ((abszone < 10) ? "0" : "") + Utils::toString(abszone);
-    return SpatialReference(code);
+    return SpatialReference(output);
 }
 
 bool SpatialReference::isWKT2(const std::string& wkt)

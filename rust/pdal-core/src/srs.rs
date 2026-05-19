@@ -79,6 +79,16 @@ pub fn calculate_zone(lon: f64, lat: f64) -> i32 {
     }
 }
 
+pub fn wgs84_code_from_zone(zone: i32) -> Option<String> {
+    let abs_zone = zone.unsigned_abs();
+    if abs_zone == 0 || abs_zone > 60 {
+        return None;
+    }
+
+    let prefix = if zone > 0 { "EPSG:326" } else { "EPSG:327" };
+    Some(format!("{prefix}{abs_zone:02}"))
+}
+
 fn normalize_longitude(longitude: f64) -> f64 {
     let longitude = longitude % 360.0;
     if longitude <= -180.0 {
@@ -165,5 +175,16 @@ mod tests {
         assert_eq!(calculate_zone(10.0, 80.0), 33);
         assert_eq!(calculate_zone(25.0, 80.0), 35);
         assert_eq!(calculate_zone(40.0, 80.0), 37);
+    }
+
+    #[test]
+    fn wgs84_code_from_zone_matches_pdal_contract() {
+        assert_eq!(wgs84_code_from_zone(1), Some("EPSG:32601".into()));
+        assert_eq!(wgs84_code_from_zone(17), Some("EPSG:32617".into()));
+        assert_eq!(wgs84_code_from_zone(-17), Some("EPSG:32717".into()));
+        assert_eq!(wgs84_code_from_zone(60), Some("EPSG:32660".into()));
+        assert_eq!(wgs84_code_from_zone(0), None);
+        assert_eq!(wgs84_code_from_zone(61), None);
+        assert_eq!(wgs84_code_from_zone(-61), None);
     }
 }
