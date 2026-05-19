@@ -26,6 +26,7 @@ const READER_EXTENSIONS: &[(&str, &str)] = &[
     ("copc", "readers.copc"),
     ("ept", "readers.ept"),
     ("bin", "readers.fbi"),
+    ("bpf", "readers.bpf"),
     ("fbi", "readers.fbi"),
     ("fbx", "readers.fbx"),
     ("tif", "readers.gdal"),
@@ -67,6 +68,7 @@ const WRITER_EXTENSIONS: &[(&str, &str)] = &[
     ("ply", "writers.ply"),
     ("las", "writers.las"),
     ("laz", "writers.las"),
+    ("bpf", "writers.bpf"),
     ("fbi", "writers.fbi"),
     ("feather", "writers.arrow"),
     ("parquet", "writers.arrow"),
@@ -144,6 +146,7 @@ mod tests {
         assert_eq!(infer_reader_driver("scan.ptx"), Some("readers.ptx"));
         assert_eq!(infer_reader_driver("points.pts"), Some("readers.pts"));
         assert_eq!(infer_reader_driver("grid.pcd"), Some("readers.pcd"));
+        assert_eq!(infer_reader_driver("cloud.bpf"), Some("readers.bpf"));
         assert_eq!(infer_reader_driver("table.txt"), Some("readers.text"));
         assert_eq!(infer_reader_driver("table.csv"), Some("readers.text"));
     }
@@ -190,6 +193,7 @@ mod tests {
     fn infers_writer_drivers_by_extension() {
         assert_eq!(infer_writer_driver("out.ply"), Some("writers.ply"));
         assert_eq!(infer_writer_driver("out.pcd"), Some("writers.pcd"));
+        assert_eq!(infer_writer_driver("out.bpf"), Some("writers.bpf"));
         assert_eq!(infer_writer_driver("out.csv"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.txt"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.las"), Some("writers.las"));

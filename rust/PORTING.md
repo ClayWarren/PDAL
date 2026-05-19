@@ -43,8 +43,10 @@ Current next milestone:
    ABI, with fixture behavior covered before moving on.
 2. Prove reader -> filter -> writer pipeline behavior through the Rust core
    boundary for each new format.
-3. Stay on text-like local formats for now. Avoid binary, compressed,
-   GDAL-backed, LAS/LAZ, and remote paths until this local I/O loop is solid.
+3. Stay on deterministic local formats for now. Narrow binary formats are
+   acceptable when fixture-scoped and dependency-light, but compressed,
+   GDAL-backed, LAS/LAZ, plugin-backed, and remote paths remain deferred until
+   this local I/O loop is solid.
 
 Every commit should say which checkpoint it advances. If the answer is "none",
 it probably should not be part of this port.
@@ -452,8 +454,18 @@ Current status:
   local I/O perf harness, and an incremental Rust workspace build. Use
   `--cold-build` only when intentionally measuring a clean build because it
   runs `cargo clean`.
-- The next I/O target should still be local and deterministic. Avoid binary,
-  compression-backed, GDAL-backed, LAS/LAZ, or remote reader/writer work.
+- `readers.bpf` and `writers.bpf` have a Rust implementation for
+  deterministic local, uncompressed BPF, including v3 and v1/v2 read support,
+  point-major, dimension-major, and byte-major point layouts, XYZ transforms,
+  dimension labels, and reader -> decimation -> PCD writer installed-PDAL
+  regression coverage. Compression, remote files, bundled files, and
+  ULEM/polar metadata remain intentionally deferred.
+- Installed-PDAL regression for the BPF slice is available with:
+  `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test bpf_regression -- --ignored`.
+- The next I/O target should still be local and deterministic. Narrow binary
+  formats are allowed when dependency-light and fixture-scoped. Avoid
+  compression-backed, GDAL-backed, LAS/LAZ, plugin-backed, or remote
+  reader/writer work.
 
 ### 7. Apps, Tools, Then Kernels
 

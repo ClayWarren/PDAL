@@ -28,6 +28,7 @@ use std::os::raw::c_char;
 
 pub const READER_DRIVERS: &[&str] = &[
     "readers.faux",
+    "readers.bpf",
     "readers.fbi",
     "readers.text",
     "readers.pcd",
@@ -58,6 +59,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
 
 pub const WRITER_DRIVERS: &[&str] = &[
     "writers.null",
+    "writers.bpf",
     "writers.fbi",
     "writers.text",
     "writers.pcd",
@@ -74,6 +76,7 @@ pub enum CreatedStage {
 pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, StageError> {
     match name {
         "readers.faux" => Ok(Box::new(pdal_io::faux::FauxReader::new(options))),
+        "readers.bpf" => Ok(Box::new(pdal_io::bpf::BpfReader::new(options))),
         "readers.fbi" => Ok(Box::new(pdal_io::fbi::FbiReader::new(options))),
         "readers.text" => Ok(Box::new(pdal_io::text::TextReader::new(options))),
         "readers.pcd" => Ok(Box::new(pdal_io::pcd::PcdReader::new(options))),
@@ -139,6 +142,7 @@ pub fn create_filter(
 pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, StageError> {
     match name {
         "writers.null" => Ok(Box::new(pdal_io::nullwriter::NullWriter::new(options))),
+        "writers.bpf" => Ok(Box::new(pdal_io::bpf::BpfWriter::new(options))),
         "writers.fbi" => Ok(Box::new(pdal_io::fbi_writer::FbiWriter::new(options))),
         "writers.text" => Ok(Box::new(pdal_io::text_writer::TextWriter::new(options))),
         "writers.pcd" => Ok(Box::new(pdal_io::pcd::PcdWriter::new(options))),

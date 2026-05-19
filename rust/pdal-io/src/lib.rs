@@ -3,6 +3,7 @@
 //! Keep real reader/writer ports behind parity tests against existing PDAL
 //! fixtures and C++ behavior.
 
+pub mod bpf;
 pub mod faux;
 pub mod fbi;
 pub mod fbi_writer;
