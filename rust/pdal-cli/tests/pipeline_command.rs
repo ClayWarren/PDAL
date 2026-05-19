@@ -54,6 +54,21 @@ fn pipeline_command_accepts_root_pipeline_object() {
 }
 
 #[test]
+fn pipeline_command_accepts_filename_string_stages() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-command-string");
+    let output = temp.join("out.pcd");
+    let pipeline = temp.join("pipeline.json");
+
+    write_text_pipeline_strings(&pipeline, &input, &output);
+
+    run_rust_pipeline(&pipeline);
+
+    assert_eq!(read_pcd(&output).len(), 5);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -290,6 +305,23 @@ fn write_text_pipeline_object(pipeline: &Path, input: &Path, output: &Path) {
     {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
   ]
 }}
+"#,
+            escape_json_path(input),
+            escape_json_path(output)
+        ),
+    )
+    .unwrap();
+}
+
+fn write_text_pipeline_strings(pipeline: &Path, input: &Path, output: &Path) {
+    fs::write(
+        pipeline,
+        format!(
+            r#"[
+  "{}",
+  {{"type":"filters.decimation","step":2}},
+  "{}"
+]
 "#,
             escape_json_path(input),
             escape_json_path(output)

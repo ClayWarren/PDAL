@@ -180,9 +180,17 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     let mut previous: Option<usize> = None;
 
     for (position, stage_val) in stages.iter().enumerate() {
-        let object = stage_val.as_object().ok_or_else(|| {
-            StageError(format!("Pipeline stage {position} must be a JSON object."))
-        })?;
+        let string_stage;
+        let object = if let Some(object) = stage_val.as_object() {
+            object
+        } else if let Some(filename) = stage_val.as_str() {
+            string_stage = filename_stage_object(filename);
+            &string_stage
+        } else {
+            return Err(StageError(format!(
+                "Pipeline stage {position} must be a JSON object or filename string."
+            )));
+        };
 
         let options = options_from_object(object)?;
         let driver_name = stage_name(object, position, stages.len(), &options)?;
@@ -209,6 +217,12 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     }
 
     Ok(pipeline)
+}
+
+fn filename_stage_object(filename: &str) -> serde_json::Map<String, Value> {
+    let mut object = serde_json::Map::new();
+    object.insert("filename".to_string(), Value::String(filename.to_string()));
+    object
 }
 
 fn pipeline_stages(value: &Value) -> Result<&Vec<Value>, StageError> {
@@ -474,6 +488,32 @@ mod tests {
         let result = pipeline.execute_with_result(Vec::new()).unwrap();
         assert_eq!(result.point_count, 2);
         assert_eq!(result.view_count, 1);
+    }
+
+    #[test]
+    fn pipeline_json_accepts_filename_string_stages() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/text/utm17_1.txt");
+        let output =
+            std::env::temp_dir().join(format!("pdal-rust-string-stage-{}.pcd", std::process::id()));
+        let _ = std::fs::remove_file(&output);
+
+        let json = format!(
+            r#"[
+                "{}",
+                {{"type":"filters.decimation", "step":2}},
+                "{}"
+            ]"#,
+            escape_json_path(&input),
+            escape_json_path(&output)
+        );
+
+        let mut pipeline = pipeline_from_json(&json).unwrap();
+        let result = pipeline.execute_with_result(Vec::new()).unwrap();
+        assert_eq!(result.point_count, 0);
+        assert_eq!(result.view_count, 0);
+        assert!(output.exists());
+        let _ = std::fs::remove_file(&output);
     }
 
     #[test]

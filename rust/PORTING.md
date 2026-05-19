@@ -439,11 +439,11 @@ Done when:
   name. Inference may return unported PDAL drivers; construction must still
   fail cleanly until the stage is actually ported.
 - `pdal-capi` can now build a Rust `Pipeline` from a narrow PDAL-style JSON
-  array or root object with a `pipeline` array: stage objects, scalar options,
-  first/last filename inference, linear dependencies by default, and optional
-  `tag` / `inputs` wiring. This is a command-readiness bridge for local reader
-  -> filter -> writer regressions, not a full replacement for C++
-  `PipelineManager` yet.
+  array or root object with a `pipeline` array: stage objects, filename string
+  stages, scalar options, first/last filename inference, linear dependencies by
+  default, and optional `tag` / `inputs` wiring. This is a command-readiness
+  bridge for local reader -> filter -> writer regressions, not a full
+  replacement for C++ `PipelineManager` yet.
 - Local I/O performance comparison is available as an ignored, reporting-only
   harness with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`.
