@@ -6,7 +6,7 @@ license.workspace = true
 description = "C ABI for PDAL Rust port spike."
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }

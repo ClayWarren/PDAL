@@ -1,23 +1,9 @@
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int};
 use std::process;
 
 use pdal_kernels::word_wrap;
 
-extern "C" {
-    fn pdal_version_string() -> *const c_char;
-    fn pdal_kernel_list_json() -> *mut c_char;
-    fn pdal_stage_list_json() -> *mut c_char;
-    fn pdal_stage_options_json(stage_name: *const c_char) -> *mut c_char;
-    fn pdal_kernel_run(
-        kernel_name: *const c_char,
-        argc: c_int,
-        argv: *const *const c_char,
-    ) -> c_int;
-    fn pdal_capi_free(ptr: *mut c_char);
-}
-
-fn safe_cstr(ptr: *const c_char) -> Option<String> {
+fn safe_cstr(ptr: *const std::os::raw::c_char) -> Option<String> {
     if ptr.is_null() {
         None
     } else {
@@ -25,17 +11,9 @@ fn safe_cstr(ptr: *const c_char) -> Option<String> {
     }
 }
 
-fn safe_cstr_free(ptr: *mut c_char) -> Option<String> {
-    if ptr.is_null() {
-        return None;
-    }
-    let result = unsafe { CStr::from_ptr(ptr).to_str().ok().map(|s| s.to_string()) };
-    unsafe { pdal_capi_free(ptr as *mut _) };
-    result
-}
-
 struct App {
     command: String,
+    command_args: Vec<String>,
     help: bool,
     show_version: bool,
     show_drivers: bool,
@@ -51,6 +29,7 @@ impl App {
     fn new() -> Self {
         Self {
             command: String::new(),
+            command_args: Vec::new(),
             help: false,
             show_version: false,
             show_drivers: false,
@@ -67,6 +46,11 @@ impl App {
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
+            if !self.command.is_empty() {
+                self.command_args.push(arg.clone());
+                i += 1;
+                continue;
+            }
             match arg.as_str() {
                 "--help" | "-h" => self.help = true,
                 "--version" => self.show_version = true,
@@ -106,11 +90,7 @@ impl App {
     fn output_version(&self) {
         let headline = "-".repeat(80);
         println!("{}", headline);
-        if let Some(version) = safe_cstr(unsafe { pdal_version_string() }) {
-            println!("pdal {}", version);
-        } else {
-            println!("pdal (version unavailable)");
-        }
+        println!("pdal-rs {}", env!("CARGO_PKG_VERSION"));
         println!("{}", headline);
     }
 
@@ -137,27 +117,13 @@ impl App {
     }
 
     fn output_drivers(&self) {
-        let json_ptr = unsafe { pdal_stage_list_json() };
-        let json_str = match safe_cstr_free(json_ptr) {
-            Some(s) => s,
-            None => {
-                eprintln!("Failed to retrieve stage list");
-                return;
-            }
-        };
+        let stages = stage_list();
+        let json_str = serde_json::to_string(&stages).unwrap();
 
         if self.show_json {
             println!("{}", json_str);
             return;
         }
-
-        let stages: Vec<serde_json::Value> = match serde_json::from_str(&json_str) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("Failed to parse stage list: {}", e);
-                return;
-            }
-        };
 
         let name_col = 28;
         let descrip_col = 80 - name_col - 1;
@@ -169,8 +135,8 @@ impl App {
         println!("{}", tablehead);
 
         for stage in &stages {
-            let name = stage["name"].as_str().unwrap_or("");
-            let descrip = stage["description"].as_str().unwrap_or("");
+            let name = stage.name;
+            let descrip = stage.description;
             let lines = word_wrap(descrip, descrip_col - 1);
             for (i, line) in lines.iter().enumerate() {
                 if i == 0 {
@@ -186,124 +152,93 @@ impl App {
     }
 
     fn output_commands(&self, leader: &str) {
-        let json_ptr = unsafe { pdal_kernel_list_json() };
-        let json_str = match safe_cstr_free(json_ptr) {
-            Some(s) => s,
-            None => {
-                eprintln!("Failed to retrieve kernel list");
-                return;
-            }
-        };
-
-        let kernels: Vec<serde_json::Value> = match serde_json::from_str(&json_str) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("Failed to parse kernel list: {}", e);
-                return;
-            }
-        };
-
-        for kernel in &kernels {
-            let name = kernel["name"].as_str().unwrap_or("");
-            println!("{}{}", leader, name);
+        for kernel in kernel_list() {
+            println!("{}{}", leader, kernel.name);
         }
     }
 
     fn output_options(&self, stage_name: &str) {
-        let c_name = match CString::new(stage_name) {
-            Ok(n) => n,
-            Err(_) => {
-                eprintln!("Invalid stage name: {}", stage_name);
-                return;
-            }
-        };
-
-        let json_ptr = unsafe { pdal_stage_options_json(c_name.as_ptr()) };
-        if json_ptr.is_null() {
+        if !stage_list().iter().any(|stage| stage.name == stage_name) {
             eprintln!("Unable to create stage {}", stage_name);
             return;
         }
-
-        let json_str = match safe_cstr_free(json_ptr) {
-            Some(s) => s,
-            None => return,
-        };
+        let json_str = "[]";
 
         if self.show_json {
             println!("{}", json_str);
             return;
         }
 
-        let link_ptr = unsafe { pdal_stage_list_json() };
-        let link = if let Some(json_str) = safe_cstr_free(link_ptr) {
-            if let Ok(stages) = serde_json::from_str::<Vec<serde_json::Value>>(&json_str) {
-                stages
-                    .iter()
-                    .find(|s| s["name"].as_str() == Some(stage_name))
-                    .and_then(|s| s["link"].as_str())
-                    .unwrap_or("")
-                    .to_string()
+        println!("{}", stage_name);
+        println!("{}", "-".repeat(80));
+        println!("  No Rust option metadata is available for this stage yet.");
+    }
+
+    fn output_last_error(&self) {
+        match safe_cstr(pdal_capi::pdal_last_error()) {
+            Some(message) if !message.is_empty() => eprintln!("{}", message),
+            _ => eprintln!("Rust pipeline execution failed"),
+        }
+    }
+
+    fn run_pipeline(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!("  pdal pipeline <pipeline.json>");
+            return if self.command_args.is_empty() && !self.help {
+                1
             } else {
-                String::new()
+                0
+            };
+        }
+        if self.command_args.len() != 1 {
+            eprintln!("Error: pipeline expects exactly one JSON filename");
+            return 1;
+        }
+
+        let json = match std::fs::read_to_string(&self.command_args[0]) {
+            Ok(json) => json,
+            Err(err) => {
+                eprintln!(
+                    "Error: unable to read pipeline '{}': {}",
+                    self.command_args[0], err
+                );
+                return 1;
             }
-        } else {
-            String::new()
+        };
+        let c_json = match CString::new(json) {
+            Ok(json) => json,
+            Err(_) => {
+                eprintln!("Error: pipeline JSON contains an interior NUL byte");
+                return 1;
+            }
         };
 
-        println!("{} -- {}", stage_name, link);
-        println!("{}", "-".repeat(80));
-
-        if let Ok(options) = serde_json::from_str::<Vec<serde_json::Value>>(&json_str) {
-            for opt in &options {
-                let name = opt["arg"].as_str().unwrap_or("");
-                let desc = opt["description"].as_str().unwrap_or("");
-                let default = opt.get("default").and_then(|v| {
-                    if v.is_string() {
-                        v.as_str().map(|s| format!("'{}'", s))
-                    } else {
-                        v.as_str().map(|s| s.to_string())
-                    }
-                });
-
-                let default_str = default
-                    .map(|d| format!(" (default: {})", d))
-                    .unwrap_or_default();
-                println!("  {:<20} {}{}", name, desc, default_str);
-            }
+        let pipeline = unsafe { pdal_capi::pdal_pipeline_create_json(c_json.as_ptr()) };
+        if pipeline.is_null() {
+            self.output_last_error();
+            return 1;
         }
+
+        let count =
+            unsafe { pdal_capi::pdal_pipeline_execute_count(pipeline, std::ptr::null_mut()) };
+        unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+        if count < 0 {
+            self.output_last_error();
+            return 1;
+        }
+        0
     }
 
     fn run(&self) -> i32 {
         let command = self.command.to_lowercase();
 
         if !command.is_empty() {
-            let kernel_name = match CString::new(command.as_str()) {
-                Ok(n) => n,
-                Err(_) => return 1,
-            };
-
-            let mut c_args: Vec<*const c_char> = Vec::new();
-            if self.help {
-                c_args.push(CString::new("--help").unwrap().into_raw());
+            if command == "pipeline" {
+                return self.run_pipeline();
             }
-
-            let result = unsafe {
-                let argc = c_args.len() as c_int;
-                let argv = if c_args.is_empty() {
-                    std::ptr::null()
-                } else {
-                    c_args.as_ptr()
-                };
-                pdal_kernel_run(kernel_name.as_ptr(), argc, argv)
-            };
-
-            for ptr in c_args {
-                unsafe {
-                    let _ = CString::from_raw(ptr as *mut c_char);
-                }
-            }
-
-            return result;
+            eprintln!("Unknown Rust command '{}'", command);
+            return 1;
         }
 
         if self.show_version {
@@ -324,6 +259,41 @@ impl App {
     }
 }
 
+#[derive(serde::Serialize)]
+struct KernelInfo {
+    name: &'static str,
+    full_name: &'static str,
+    description: &'static str,
+}
+
+fn kernel_list() -> Vec<KernelInfo> {
+    vec![KernelInfo {
+        name: "pipeline",
+        full_name: "kernels.pipeline",
+        description: "execute a PDAL pipeline JSON file through the Rust port",
+    }]
+}
+
+#[derive(serde::Serialize)]
+struct StageInfo {
+    name: &'static str,
+    description: &'static str,
+    link: &'static str,
+}
+
+fn stage_list() -> Vec<StageInfo> {
+    pdal_capi::READER_DRIVERS
+        .iter()
+        .chain(pdal_capi::FILTER_DRIVERS.iter())
+        .chain(pdal_capi::WRITER_DRIVERS.iter())
+        .map(|name| StageInfo {
+            name,
+            description: "Rust-backed stage",
+            link: "",
+        })
+        .collect()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
@@ -335,4 +305,46 @@ fn main() {
 
     let result = app.run();
     process::exit(result);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_preserves_command_arguments() {
+        let mut app = App::new();
+        app.parse_args(&[
+            "pipeline".to_string(),
+            "pipeline.json".to_string(),
+            "--not-a-root-option".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(app.command, "pipeline");
+        assert_eq!(
+            app.command_args,
+            vec![
+                "pipeline.json".to_string(),
+                "--not-a-root-option".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_keeps_root_options_before_command() {
+        let mut app = App::new();
+        app.parse_args(&[
+            "--verbose".to_string(),
+            "--showjson".to_string(),
+            "pipeline".to_string(),
+            "pipeline.json".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(app.verbose, 1);
+        assert!(app.show_json);
+        assert_eq!(app.command, "pipeline");
+        assert_eq!(app.command_args, vec!["pipeline.json".to_string()]);
+    }
 }

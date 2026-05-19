@@ -353,8 +353,6 @@ Done when:
 - The pipeline slice can use the ported I/O path end to end.
 - Existing filter/core tests still pass.
 
-Current status:
-
 - `readers.faux` and `writers.null` live in `pdal-io` as the in-memory pipeline
   harness.
 - `readers.text` has a Rust implementation covering existing C++ fixture
@@ -467,10 +465,11 @@ Current status:
   ULEM/polar metadata remain intentionally deferred.
 - Installed-PDAL regression for the BPF slice is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test bpf_regression -- --ignored`.
-- The next I/O target should still be local and deterministic. Narrow binary
-  formats are allowed when dependency-light and fixture-scoped. Avoid
-  compression-backed, GDAL-backed, LAS/LAZ, plugin-backed, or remote
-  reader/writer work.
+- The deterministic local I/O slice is now broad enough to support the first
+  command-readiness work. Additional I/O targets should still be narrow, local,
+  deterministic, and dependency-light. Avoid compression-backed, GDAL-backed,
+  LAS/LAZ, plugin-backed, or remote reader/writer work until their strategies
+  are explicit.
 
 ### 7. Apps, Tools, Then Kernels
 
@@ -491,6 +490,16 @@ Required shape:
   surface directly. `pdal info` follows only after metadata, stats, bounds, and
   reader behavior are ready.
 - CLI output and exit behavior are regression-tested against existing commands.
+
+Current status:
+
+- `pdal-rs` is a Rust-native command shell for the port spike. It lists only
+  Rust-backed stages/commands and no longer links the C++ helper dispatch shim.
+- `pipeline` is the only concrete Rust command currently enabled. It accepts a
+  pipeline JSON filename and executes implemented Rust stages through the same
+  Rust C ABI pipeline parser used by lower-layer tests.
+- Do not add `info`, `translate`, or other kernels yet; they need richer
+  metadata, bounds, option, and I/O parity first.
 
 Done when:
 
