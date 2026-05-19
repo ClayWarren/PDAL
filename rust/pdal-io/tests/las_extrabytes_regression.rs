@@ -5,7 +5,7 @@ use pdal_io::faux::FauxReader;
 use pdal_io::las::LasReader;
 use pdal_io::las_writer::LasWriter;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[test]
 fn rust_las_preserves_extra_bytes() {
@@ -18,7 +18,7 @@ fn rust_las_preserves_extra_bytes() {
     reader_options.add("bounds", "([0,0],[1,1],[0,1])");
 
     let mut pipeline = Pipeline::new();
-    let reader = pipeline.add_reader(
+    let _reader = pipeline.add_reader(
         "readers.faux",
         Box::new(FauxReader::new(&reader_options)),
         reader_options,
@@ -30,7 +30,7 @@ fn rust_las_preserves_extra_bytes() {
     // Let's just run the pipeline and then modify the output view.
     let mut views = pipeline.execute(Vec::new()).unwrap();
     assert_eq!(views.len(), 1);
-    let mut view = views.remove(0);
+    let view = views.remove(0);
 
     // PointLayout is shared and immutable once built, so we can't easily add a dimension
     // to an existing view's layout in this spike.

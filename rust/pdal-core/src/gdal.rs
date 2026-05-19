@@ -22,6 +22,39 @@ impl Raster {
         }
     }
 
+    pub fn width(&self) -> i32 {
+        unsafe { gdal_sys::GDALGetRasterXSize(self.ds) }
+    }
+
+    pub fn height(&self) -> i32 {
+        unsafe { gdal_sys::GDALGetRasterYSize(self.ds) }
+    }
+
+    pub fn band_count(&self) -> i32 {
+        unsafe { gdal_sys::GDALGetRasterCount(self.ds) }
+    }
+
+    pub fn get_geo_transform(&self) -> Result<[f64; 6], String> {
+        unsafe {
+            let mut transform = [0.0f64; 6];
+            if gdal_sys::GDALGetGeoTransform(self.ds, transform.as_mut_ptr()) != CPLErr::CE_None {
+                return Err("Failed to get geo transform".to_string());
+            }
+            Ok(transform)
+        }
+    }
+
+    pub fn get_wkt_srs(&self) -> String {
+        unsafe {
+            let srs = gdal_sys::GDALGetProjectionRef(self.ds);
+            if srs.is_null() {
+                String::new()
+            } else {
+                std::ffi::CStr::from_ptr(srs).to_string_lossy().into_owned()
+            }
+        }
+    }
+
     pub fn read_band(
         &self,
         band_idx: i32,

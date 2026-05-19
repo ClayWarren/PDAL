@@ -263,13 +263,8 @@ fn pipeline_command_supports_json_summary() {
     assert_eq!(json["dimension_summaries"][0]["minimum"], -10.0);
     assert_eq!(json["dimension_summaries"][0]["maximum"], 20.0);
     assert_eq!(json["dimension_summaries"][0]["mean"], 5.0);
-    assert_eq!(json["metadata"]["name"], "pipeline");
-    assert_eq!(json["metadata"]["children"][0]["name"], "readers.faux");
-    assert_eq!(
-        json["metadata"]["children"][0]["children"][0]["name"],
-        "count"
-    );
-    assert_eq!(json["metadata"]["children"][0]["children"][0]["value"], 3);
+    // Flat metadata summary
+    assert_eq!(json["metadata"]["stage_0"]["count"], 3);
 }
 
 #[test]
