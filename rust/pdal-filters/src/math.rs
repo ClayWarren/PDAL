@@ -129,6 +129,103 @@ fn largest_off_diagonal(matrix: [[f64; 3]; 3]) -> (usize, usize) {
         .unwrap()
 }
 
+/// Compute the numerical gradient in the X direction (column major).
+pub fn grad_x(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
+    let mut out = vec![0.0; data.len()];
+    if cols < 2 {
+        return out;
+    }
+
+    for r in 0..rows {
+        // Edge column 0
+        out[r] = data[rows + r] - data[r];
+        // Interior columns
+        for c in 1..(cols - 1) {
+            out[c * rows + r] = 0.5 * (data[(c + 1) * rows + r] - data[(c - 1) * rows + r]);
+        }
+        // Edge column last
+        out[(cols - 1) * rows + r] = data[(cols - 1) * rows + r] - data[(cols - 2) * rows + r];
+    }
+    out
+}
+
+/// Compute the numerical gradient in the Y direction (column major).
+pub fn grad_y(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
+    let mut out = vec![0.0; data.len()];
+    if rows < 2 {
+        return out;
+    }
+
+    for c in 0..cols {
+        let offset = c * rows;
+        // Edge row 0
+        out[offset] = data[offset + 1] - data[offset];
+        // Interior rows
+        for r in 1..(rows - 1) {
+            out[offset + r] = 0.5 * (data[offset + r + 1] - data[offset + r - 1]);
+        }
+        // Edge row last
+        out[offset + rows - 1] = data[offset + rows - 1] - data[offset + rows - 2];
+    }
+    out
+}
+
+pub fn dilate_diamond(data: &mut [f64], rows: usize, cols: usize, iterations: usize) {
+    let mut out = vec![f64::NEG_INFINITY; data.len()];
+    for _ in 0..iterations {
+        for c in 0..cols {
+            let offset = c * rows;
+            for r in 0..rows {
+                let idx = offset + r;
+                let mut max_val = data[idx];
+                if r > 0 {
+                    max_val = max_val.max(data[idx - 1]);
+                }
+                if r < rows - 1 {
+                    max_val = max_val.max(data[idx + 1]);
+                }
+                if c > 0 {
+                    max_val = max_val.max(data[idx - rows]);
+                }
+                if c < cols - 1 {
+                    max_val = max_val.max(data[idx + rows]);
+                }
+                out[idx] = max_val;
+            }
+        }
+        data.copy_from_slice(&out);
+        out.fill(f64::NEG_INFINITY);
+    }
+}
+
+pub fn erode_diamond(data: &mut [f64], rows: usize, cols: usize, iterations: usize) {
+    let mut out = vec![f64::INFINITY; data.len()];
+    for _ in 0..iterations {
+        for c in 0..cols {
+            let offset = c * rows;
+            for r in 0..rows {
+                let idx = offset + r;
+                let mut min_val = data[idx];
+                if r > 0 {
+                    min_val = min_val.min(data[idx - 1]);
+                }
+                if r < rows - 1 {
+                    min_val = min_val.min(data[idx + 1]);
+                }
+                if c > 0 {
+                    min_val = min_val.min(data[idx - rows]);
+                }
+                if c < cols - 1 {
+                    min_val = min_val.min(data[idx + rows]);
+                }
+                out[idx] = min_val;
+            }
+        }
+        data.copy_from_slice(&out);
+        out.fill(f64::INFINITY);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

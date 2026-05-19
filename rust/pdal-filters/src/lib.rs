@@ -49,6 +49,7 @@ pub mod returns;
 pub mod sample;
 pub mod separatescanline;
 pub mod skewnessbalancing;
+pub mod smrf;
 pub mod sort;
 pub mod sparse_surface;
 pub mod splitter;

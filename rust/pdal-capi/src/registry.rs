@@ -41,6 +41,7 @@ use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
+use pdal_filters::smrf::SmrfFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats::StatsFilter;
@@ -105,6 +106,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.reciprocity",
     "filters.reprojection",
     "filters.returns",
+    "filters.smrf",
     "filters.sample",
     "filters.separatescanline",
     "filters.splitter",
@@ -287,6 +289,19 @@ pub fn create_filter(
         )))),
         "filters.returns" => Ok(Box::new(FilterWrapper::new(ReturnsFilter::new(
             comma_list(&options.get_str("groups", "last")),
+        )))),
+        "filters.smrf" => Ok(Box::new(FilterWrapper::new(SmrfFilter::new(
+            options.get_f64("cell", 1.0),
+            options.get_f64("slope", 0.15),
+            options
+                .has("window")
+                .then(|| options.get_f64("window", 18.0)),
+            options.get_f64("scalar", 1.25),
+            options.get_f64("threshold", 0.5),
+            options.get_u64("ground_class", 2) as u8,
+            options.get_u64("other_class", 1) as u8,
+            options.get_bool("only_ground", true),
+            comma_list(&options.get_str("returns", "last,only")),
         )))),
         "filters.sample" => Ok(Box::new(FilterWrapper::new(SampleFilter::new(options)))),
         "filters.separatescanline" => Ok(Box::new(FilterWrapper::new(

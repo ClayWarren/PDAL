@@ -563,6 +563,61 @@ impl App {
         self.execute_stage_pipeline(stages)
     }
 
+    fn run_ground(&self) -> i32 {
+        if self.help || self.command_args.is_empty() {
+            println!("Usage:");
+            println!("  pdal ground <input> <output> [--<stage>.<key>=<value> ...]");
+            return if self.command_args.is_empty() && !self.help {
+                1
+            } else {
+                0
+            };
+        }
+
+        let (positional, stage_options) = match parse_stage_args(&self.command_args) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+        if positional.len() != 2 {
+            eprintln!("Error: ground expects an input path and an output path");
+            return 1;
+        }
+        let input = positional[0];
+        let output = positional[1];
+
+        let reader = match pdal_core::driver::infer_reader_driver(input) {
+            Some(driver) => driver,
+            None => {
+                eprintln!("Error: unable to infer a reader driver for '{input}'");
+                return 1;
+            }
+        };
+        let writer = match pdal_core::driver::infer_writer_driver(output) {
+            Some(driver) => driver,
+            None => {
+                eprintln!("Error: unable to infer a writer driver for '{output}'");
+                return 1;
+            }
+        };
+
+        // reader -> filters.smrf -> writer, classifying ground points;
+        // `--filters.smrf.*` options override the SMRF defaults.
+        let mut stages: Vec<serde_json::Value> = vec![
+            serde_json::json!({ "type": reader, "filename": input }),
+            serde_json::json!({ "type": "filters.smrf" }),
+            serde_json::json!({ "type": writer, "filename": output }),
+        ];
+
+        if let Err(message) = apply_stage_options(&mut stages, &stage_options) {
+            eprintln!("Error: {message}");
+            return 1;
+        }
+        self.execute_stage_pipeline(stages)
+    }
+
     fn run_random(&self) -> i32 {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
@@ -905,6 +960,9 @@ impl App {
             }
             if command == "sort" {
                 return self.run_sort();
+            }
+            if command == "ground" {
+                return self.run_ground();
             }
             if command == "split" {
                 return self.run_split();

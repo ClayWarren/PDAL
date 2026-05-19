@@ -18,6 +18,11 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             description: "report per-dimension deltas between two point cloud files",
         },
         KernelInfo {
+            name: "ground",
+            full_name: "kernels.ground",
+            description: "classify ground points with the simple morphological filter",
+        },
+        KernelInfo {
             name: "hausdorff",
             full_name: "kernels.hausdorff",
             description: "report the Hausdorff distance between two point cloud files",
