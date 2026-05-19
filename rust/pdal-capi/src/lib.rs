@@ -3,6 +3,7 @@
 //! Every function in this crate is `extern "C"` and intended to be called from
 //! C or C++ through the header `include/pdal_capi.h`.
 
+mod driver_abi;
 mod error;
 mod file_spec_abi;
 mod filter_abi;
@@ -26,6 +27,7 @@ mod stats_abi;
 mod tile_abi;
 mod xml_schema_abi;
 
+pub use driver_abi::*;
 pub use error::*;
 pub use file_spec_abi::*;
 pub use filter_abi::*;
@@ -206,6 +208,25 @@ mod tests {
             assert!(pdal_option_name_valid(valid.as_ptr()));
             assert!(!pdal_option_name_valid(bad.as_ptr()));
             assert!(!pdal_option_name_valid(std::ptr::null()));
+        }
+    }
+
+    #[test]
+    fn driver_inference_roundtrips_through_c_abi() {
+        unsafe {
+            let reader = CString::new("foo.laz").unwrap();
+            let writer = CString::new("foo.tif").unwrap();
+            let unknown = CString::new("foo.unknown").unwrap();
+
+            assert_eq!(
+                take_string(pdal_infer_reader_driver(reader.as_ptr())),
+                "readers.las"
+            );
+            assert_eq!(
+                take_string(pdal_infer_writer_driver(writer.as_ptr())),
+                "writers.gdal"
+            );
+            assert_eq!(take_string(pdal_infer_reader_driver(unknown.as_ptr())), "");
         }
     }
 

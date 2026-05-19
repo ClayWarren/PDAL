@@ -36,6 +36,10 @@ char* pdal_options_command_line_json(const pdal_options_t* ops);
 bool pdal_option_name_valid(const char* name);
 void pdal_options_destroy(pdal_options_t* ops);
 
+// Driver inference
+char* pdal_infer_reader_driver(const char* filename);
+char* pdal_infer_writer_driver(const char* filename);
+
 // FileSpec
 char* pdal_file_spec_parse_json(const char* input);
 

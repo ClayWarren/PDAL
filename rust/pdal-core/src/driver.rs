@@ -70,6 +70,9 @@ const WRITER_EXTENSIONS: &[(&str, &str)] = &[
     ("laz", "writers.las"),
     ("bpf", "writers.bpf"),
     ("fbi", "writers.fbi"),
+    ("tif", "writers.gdal"),
+    ("tiff", "writers.gdal"),
+    ("vrt", "writers.gdal"),
     ("glb", "writers.gltf"),
     ("gltf", "writers.gltf"),
     ("feather", "writers.arrow"),
@@ -200,6 +203,9 @@ mod tests {
         assert_eq!(infer_writer_driver("out.csv"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.txt"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.las"), Some("writers.las"));
+        assert_eq!(infer_writer_driver("out.tif"), Some("writers.gdal"));
+        assert_eq!(infer_writer_driver("out.tiff"), Some("writers.gdal"));
+        assert_eq!(infer_writer_driver("out.vrt"), Some("writers.gdal"));
     }
 
     #[test]

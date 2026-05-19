@@ -35,6 +35,7 @@
 #include <pdal/PluginManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <algorithm>
 #include <sstream>
@@ -42,6 +43,18 @@
 
 namespace pdal
 {
+
+namespace
+{
+
+std::string takeRustString(char* value)
+{
+    std::string output(value ? value : "");
+    pdal_string_free(value);
+    return output;
+}
+
+} // unnamed namespace
 
 /**
   Find the default reader for a file.
@@ -51,6 +64,11 @@ namespace pdal
 */
 std::string StageFactory::inferReaderDriver(const std::string& filename)
 {
+    std::string driver =
+        takeRustString(pdal_infer_reader_driver(filename.c_str()));
+    if (!driver.empty())
+        return driver;
+
     std::string ext;
 
     if (Utils::endsWith(filename, "ept.json") ||
@@ -77,6 +95,11 @@ std::string StageFactory::inferReaderDriver(const std::string& filename)
 */
 std::string StageFactory::inferWriterDriver(const std::string& filename)
 {
+    std::string driver =
+        takeRustString(pdal_infer_writer_driver(filename.c_str()));
+    if (!driver.empty())
+        return driver;
+
     std::string lFilename = Utils::tolower(filename);
     if (lFilename == "devnull" || lFilename == "/dev/null")
         return "writers.null";
