@@ -120,6 +120,34 @@ impl Filter for SmrfFilter {
     }
 
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        if self.cell <= 0.0 || !self.cell.is_finite() {
+            return Err(StageError(
+                "filters.smrf: 'cell' must be a positive finite value.".to_string(),
+            ));
+        }
+        if self.slope < 0.0 || !self.slope.is_finite() {
+            return Err(StageError(
+                "filters.smrf: 'slope' must be a non-negative finite value.".to_string(),
+            ));
+        }
+        if self.scalar < 0.0 || !self.scalar.is_finite() {
+            return Err(StageError(
+                "filters.smrf: 'scalar' must be a non-negative finite value.".to_string(),
+            ));
+        }
+        if self.threshold < 0.0 || !self.threshold.is_finite() {
+            return Err(StageError(
+                "filters.smrf: 'threshold' must be a non-negative finite value.".to_string(),
+            ));
+        }
+        if let Some(window) = self.window {
+            if window <= 0.0 || !window.is_finite() {
+                return Err(StageError(
+                    "filters.smrf: 'window' must be a positive finite value.".to_string(),
+                ));
+            }
+        }
+
         // Honor the 'returns' selection when return dimensions are present.
         let has_returns = input.layout().dim(&DimId::ReturnNumber).is_some()
             && input.layout().dim(&DimId::NumberOfReturns).is_some();
@@ -240,5 +268,36 @@ impl Streamable for SmrfFilter {
     /// so a streamed point is passed through unchanged.
     fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn single_point_view() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, 1.0);
+        view.set_f64(point, &DimId::Y, 2.0);
+        view.set_f64(point, &DimId::Z, 3.0);
+        view
+    }
+
+    #[test]
+    fn rejects_non_positive_cell_size() {
+        let mut filter = SmrfFilter::new(0.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+
+        let err = match filter.run_one(&single_point_view()) {
+            Ok(_) => panic!("expected non-positive cell size to fail"),
+            Err(err) => err,
+        };
+        assert!(err.to_string().contains("cell"));
     }
 }

@@ -55,3 +55,39 @@ fn tindex_creates_geojson_index() {
     assert!(geojson.contains("\"location\""));
     assert!(geojson.contains("\"srs\""));
 }
+
+#[test]
+fn tindex_rejects_unknown_options() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("tindex_unknown_option");
+    let output = temp.join("index.geojson");
+
+    let result = run_tindex(&[
+        "create",
+        output.to_str().unwrap(),
+        input.to_str().unwrap(),
+        "--bogus",
+    ]);
+
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("--bogus"));
+}
+
+#[test]
+fn tindex_rejects_unrecognized_input_files() {
+    let temp = make_temp_dir("tindex_bad_input");
+    let output = temp.join("index.geojson");
+    let unknown = temp.join("points.unknown");
+    std::fs::write(&unknown, "not a point cloud").unwrap();
+
+    let result = run_tindex(&[
+        "create",
+        output.to_str().unwrap(),
+        unknown.to_str().unwrap(),
+        "-f",
+        "GeoJSON",
+    ]);
+
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("unable to infer"));
+}

@@ -29,7 +29,7 @@ Status definitions:
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
-| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 49 are Rust-backed through the C ABI, 35 intentionally remain C++ for now, and 37 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
+| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 40 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | `readers.text` and `writers.text` cover the deterministic local text slice and installed-PDAL regression coverage. |
@@ -51,7 +51,7 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `ground`, `density`, `eval`, `tile`, and `tindex` exist for Rust-backed local workflows. |
+| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
 | Vendor/native strategy | in progress | `rust/VENDOR.md` is the source of truth. Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | not ready | `pdal-plugins` may hold discovery metadata. Optional plugin ports and a Rust plugin SDK wait until the first-party surface and C ABI are stable. |
@@ -62,21 +62,46 @@ Status definitions:
 
 Pipeline JSON can currently construct this command-ready filter subset:
 
+- `approximatecoplanar`
+- `chipper`
+- `cluster`
+- `dbscan`
 - `decimation`
+- `eigenvalues`
+- `elm`
+- `estimaterank`
+- `gpstimeconvert`
 - `groupby`
+- `hag_nn`
 - `head`
+- `hexbin`
+- `iqr`
+- `label_duplicates`
 - `locate`
+- `lof`
+- `mad`
 - `merge`
 - `mortonorder`
+- `nndistance`
+- `optimalneighborhood`
+- `outlier`
+- `planefit`
+- `radialdensity`
 - `randomize`
+- `reciprocity`
 - `reprojection`
 - `returns`
 - `sample`
+- `separatescanline`
+- `smrf`
 - `sort`
 - `splitter`
 - `stats`
 - `tail`
 - `voxeldownsize`
+- `voxelcenternearestneighbor`
+- `voxelcentroidnearestneighbor`
+- `zsmooth`
 
 Other Rust filter modules may exist, but they are not command-ready until they
 are deliberately added to the registry with option parsing and coverage.
@@ -87,11 +112,10 @@ These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
 - GDAL/PROJ/SRS/OGR-backed: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
-  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`,
-  `Reprojection`.
+  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`.
 - Private or specialized algorithms: `CS`, `Delaunay`, `FaceRaster`,
-  `Georeference`, `HagDelaunay`, `HexBin`, `LiTree`, `LloydKMeans`, `M3C2`,
-  `Miniball`, `Normal`, `PMF`, `Poisson`, `SMR`, `Straighten`, `Supervoxel`,
+  `Georeference`, `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`,
+  `Miniball`, `Normal`, `PMF`, `Poisson`, `Straighten`, `Supervoxel`,
   `GreedyProjection`, `IterativeClosestPoint`, `RelaxationDartThrowing`.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,

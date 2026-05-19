@@ -1073,12 +1073,21 @@ impl App {
         let mut args_iter = self.command_args[2..].iter();
         while let Some(arg) = args_iter.next() {
             if arg == "-f" || arg == "--ogrdriver" {
-                if let Some(d) = args_iter.next() {
-                    driver_name = d;
-                }
+                let Some(d) = args_iter.next() else {
+                    eprintln!("Error: {arg} requires an OGR driver name");
+                    return 1;
+                };
+                driver_name = d;
+            } else if arg.starts_with('-') {
+                eprintln!("Error: unknown tindex option '{arg}'");
+                return 1;
             } else {
                 files.push(arg);
             }
+        }
+        if files.is_empty() {
+            eprintln!("Error: tindex create needs at least one input file");
+            return 1;
         }
 
         // Register drivers
@@ -1100,19 +1109,26 @@ impl App {
         for file in files {
             let driver = match pdal_core::driver::infer_reader_driver(file) {
                 Some(driver) => driver,
-                None => continue,
+                None => {
+                    eprintln!("Error: unable to infer a reader driver for '{file}'");
+                    return 1;
+                }
             };
 
             let pipeline_json =
                 serde_json::json!([{ "type": driver, "filename": file }]).to_string();
             let c_json = match CString::new(pipeline_json) {
                 Ok(json) => json,
-                Err(_) => continue,
+                Err(_) => {
+                    eprintln!("Error: input path '{file}' contains an interior NUL byte");
+                    return 1;
+                }
             };
 
             let pipeline = unsafe { pdal_capi::pdal_pipeline_create_json(c_json.as_ptr()) };
             if pipeline.is_null() {
-                continue;
+                self.output_last_error();
+                return 1;
             }
 
             let json_ptr = unsafe {
@@ -1121,27 +1137,49 @@ impl App {
             unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
 
             if json_ptr.is_null() {
-                continue;
+                self.output_last_error();
+                return 1;
             }
 
             let summary_str = safe_cstr(json_ptr).unwrap_or_default();
             unsafe { pdal_capi::pdal_string_free(json_ptr) };
 
-            if let Ok(summary) = serde_json::from_str::<serde_json::Value>(&summary_str) {
-                let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-                let minx = summary["bounds_2d"]["minx"].as_f64().unwrap_or(0.0);
-                let maxx = summary["bounds_2d"]["maxx"].as_f64().unwrap_or(0.0);
-                let miny = summary["bounds_2d"]["miny"].as_f64().unwrap_or(0.0);
-                let maxy = summary["bounds_2d"]["maxy"].as_f64().unwrap_or(0.0);
-
-                if first_srs.is_empty() && !wkt.is_empty() {
-                    first_srs = wkt.clone();
+            let summary = match serde_json::from_str::<serde_json::Value>(&summary_str) {
+                Ok(summary) => summary,
+                Err(err) => {
+                    eprintln!("Error: unable to parse pipeline summary for '{file}': {err}");
+                    return 1;
                 }
-                valid_files.push((file.clone(), wkt, minx, miny, maxx, maxy));
+            };
+            let Some(bounds) = summary.get("bounds_2d") else {
+                eprintln!("Error: '{file}' produced no 2D bounds");
+                return 1;
+            };
+            let Some(minx) = bounds["minx"].as_f64() else {
+                eprintln!("Error: '{file}' produced invalid minx bounds");
+                return 1;
+            };
+            let Some(maxx) = bounds["maxx"].as_f64() else {
+                eprintln!("Error: '{file}' produced invalid maxx bounds");
+                return 1;
+            };
+            let Some(miny) = bounds["miny"].as_f64() else {
+                eprintln!("Error: '{file}' produced invalid miny bounds");
+                return 1;
+            };
+            let Some(maxy) = bounds["maxy"].as_f64() else {
+                eprintln!("Error: '{file}' produced invalid maxy bounds");
+                return 1;
+            };
+            let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+
+            if first_srs.is_empty() && !wkt.is_empty() {
+                first_srs = wkt.clone();
             }
+            valid_files.push((file.clone(), wkt, minx, miny, maxx, maxy));
         }
 
         if valid_files.is_empty() {
@@ -1158,10 +1196,17 @@ impl App {
         };
 
         unsafe {
-            pdal_core::gdal::Vector::create_string_field(layer, "location").unwrap();
-            pdal_core::gdal::Vector::create_string_field(layer, "srs").unwrap();
-            pdal_core::gdal::Vector::create_datetime_field(layer, "created").unwrap();
-            pdal_core::gdal::Vector::create_datetime_field(layer, "modified").unwrap();
+            for result in [
+                pdal_core::gdal::Vector::create_string_field(layer, "location"),
+                pdal_core::gdal::Vector::create_string_field(layer, "srs"),
+                pdal_core::gdal::Vector::create_datetime_field(layer, "created"),
+                pdal_core::gdal::Vector::create_datetime_field(layer, "modified"),
+            ] {
+                if let Err(err) = result {
+                    eprintln!("Error creating tindex field: {err}");
+                    return 1;
+                }
+            }
         }
 
         for (file, wkt, minx, miny, maxx, maxy) in valid_files {
@@ -1176,6 +1221,7 @@ impl App {
             unsafe {
                 if let Err(e) = pdal_core::gdal::Vector::add_feature(layer, &poly_wkt, &fields) {
                     eprintln!("Error adding feature for {}: {}", file, e);
+                    return 1;
                 } else {
                     println!("Indexed file {}", file);
                 }
