@@ -146,8 +146,13 @@ bool pdal_scaling_set_auto_xform(const double* xs, const double* ys, const doubl
 
 // Metadata
 pdal_metadata_node_t* pdal_metadata_node_create(const char* name);
+pdal_metadata_node_t* pdal_metadata_node_clone(const pdal_metadata_node_t* node);
 char* pdal_metadata_node_name(const pdal_metadata_node_t* node);
+char* pdal_metadata_node_type(const pdal_metadata_node_t* node);
+char* pdal_metadata_node_description(const pdal_metadata_node_t* node);
 void pdal_metadata_node_set_string(pdal_metadata_node_t* node, const char* value);
+void pdal_metadata_node_set_type(pdal_metadata_node_t* node, const char* type_name);
+void pdal_metadata_node_set_description(pdal_metadata_node_t* node, const char* description);
 void pdal_metadata_node_set_i64(pdal_metadata_node_t* node, int64_t value);
 void pdal_metadata_node_set_u64(pdal_metadata_node_t* node, uint64_t value);
 void pdal_metadata_node_set_f64(pdal_metadata_node_t* node, double value);
@@ -158,9 +163,19 @@ int64_t pdal_metadata_node_value_i64(const pdal_metadata_node_t* node);
 uint64_t pdal_metadata_node_value_u64(const pdal_metadata_node_t* node);
 double pdal_metadata_node_value_f64(const pdal_metadata_node_t* node);
 bool pdal_metadata_node_value_bool(const pdal_metadata_node_t* node);
+char* pdal_metadata_json_value(const char* type_name, const char* value);
+bool pdal_metadata_value_as_i64(const char* type_name, const char* value, int64_t* out_value);
+bool pdal_metadata_value_as_u64(const char* type_name, const char* value, uint64_t* out_value);
+bool pdal_metadata_value_as_f64(const char* type_name, const char* value, double* out_value);
+bool pdal_metadata_value_as_bool(const char* type_name, const char* value, bool* out_value);
 void pdal_metadata_node_add_child(pdal_metadata_node_t* node, pdal_metadata_node_t* child);
+void pdal_metadata_node_add_child_clone(pdal_metadata_node_t* node, const pdal_metadata_node_t* child);
+void pdal_metadata_node_add_or_update_child(pdal_metadata_node_t* node, pdal_metadata_node_t* child);
+void pdal_metadata_node_add_or_update_child_clone(pdal_metadata_node_t* node, const pdal_metadata_node_t* child);
 uint64_t pdal_metadata_node_child_count(const pdal_metadata_node_t* node);
 pdal_metadata_node_t* pdal_metadata_node_child(const pdal_metadata_node_t* node, uint64_t idx);
+uint64_t pdal_metadata_node_child_named_count(const pdal_metadata_node_t* node, const char* name);
+pdal_metadata_node_t* pdal_metadata_node_child_named(const pdal_metadata_node_t* node, const char* name, uint64_t idx);
 void pdal_metadata_node_destroy(pdal_metadata_node_t* node);
 
 // Stage

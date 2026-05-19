@@ -40,10 +40,26 @@
 #include <pdal/util/Utils.hpp>
 #include <pdal/util/Uuid.hpp>
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <stdint.h>
+#include <type_traits>
 #include <vector>
+
+extern "C"
+{
+    char* pdal_metadata_json_value(const char* typeName, const char* value);
+    bool pdal_metadata_value_as_bool(const char* typeName, const char* value,
+                                     bool* outValue);
+    bool pdal_metadata_value_as_f64(const char* typeName, const char* value,
+                                    double* outValue);
+    bool pdal_metadata_value_as_i64(const char* typeName, const char* value,
+                                    int64_t* outValue);
+    bool pdal_metadata_value_as_u64(const char* typeName, const char* value,
+                                    uint64_t* outValue);
+    void pdal_string_free(char* ptr);
+}
 
 namespace pdal
 {
@@ -151,7 +167,7 @@ private:
             if (mi->first != mi2->first)
                 return false;
             const MetadataImplList& ml = mi->second;
-            const MetadataImplList& ml2 = mi->second;
+            const MetadataImplList& ml2 = mi2->second;
             if (ml.size() != ml2.size())
                 return false;
             auto li2 = ml2.begin();
@@ -361,26 +377,42 @@ template <typename T> T value(const std::string& type, const std::string& value)
         return *(reinterpret_cast<T*>(encVal.data()));
     }
 
+    if constexpr (std::is_same_v<T, bool>)
+    {
+        bool out = false;
+        if (pdal_metadata_value_as_bool(type.c_str(), value.c_str(), &out))
+            return out;
+        throw value_error();
+    }
+    else if constexpr (std::is_floating_point_v<T>)
+    {
+        double out = 0.0;
+        if (pdal_metadata_value_as_f64(type.c_str(), value.c_str(), &out))
+            return static_cast<T>(out);
+        throw value_error();
+    }
+    else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
+    {
+        int64_t out = 0;
+        if (pdal_metadata_value_as_i64(type.c_str(), value.c_str(), &out) &&
+            out >= (std::numeric_limits<T>::min)() &&
+            out <= (std::numeric_limits<T>::max)())
+            return static_cast<T>(out);
+        throw value_error();
+    }
+    else if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>)
+    {
+        uint64_t out = 0;
+        if (pdal_metadata_value_as_u64(type.c_str(), value.c_str(), &out) &&
+            out <= (std::numeric_limits<T>::max)())
+            return static_cast<T>(out);
+        throw value_error();
+    }
+
     T t{};
     if (!Utils::fromString(value, t))
         throw value_error();
     return t;
-}
-
-template <> inline bool value(const std::string& type, const std::string& value)
-{
-    if (type == "boolean")
-    {
-        if (value == "true")
-            return true;
-        else if (value == "false")
-            return false;
-    }
-
-    bool b;
-    if (!Utils::fromString(value, b))
-        throw value_error();
-    return b;
 }
 
 template <>
@@ -597,23 +629,11 @@ public:
 
     std::string jsonValue() const
     {
-        if (m_impl->m_type == "json")
-            return value();
-
-        std::string v(Utils::escapeJSON(value()));
-        if (m_impl->m_type == "double")
-            if (v == "NaN" || v == "Infinity" || v == "-Infinity")
-                v = "\"" + v + "\"";
-        if (m_impl->m_type == "string" || m_impl->m_type == "base64Binary" ||
-            m_impl->m_type == "uuid" || m_impl->m_type == "matrix" ||
-            m_impl->m_type == "spatialreference" || m_impl->m_type == "bounds")
-        {
-            std::string val("\"");
-            val += escapeQuotes(v) + "\"";
-            return val;
-        }
-
-        return v;
+        char* json =
+            pdal_metadata_json_value(m_impl->m_type.c_str(), value().c_str());
+        std::string result(json ? json : "");
+        pdal_string_free(json);
+        return result;
     }
 
     std::string description() const

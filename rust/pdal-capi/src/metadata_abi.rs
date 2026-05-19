@@ -1,5 +1,8 @@
 use crate::error::string_to_c_ptr;
-use pdal_core::metadata::{MetadataNode, MetadataValue};
+use pdal_core::metadata::{
+    json_scalar_value, scalar_as_bool, scalar_as_f64, scalar_as_i64, scalar_as_u64, MetadataNode,
+    MetadataValue,
+};
 use serde_json::json;
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -23,6 +26,19 @@ pub unsafe extern "C" fn pdal_metadata_node_create(name: *const c_char) -> *mut 
     Box::into_raw(Box::new(MetadataNode::new(name)))
 }
 
+#[no_mangle]
+/// Return a deep copy of a metadata node. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+pub unsafe extern "C" fn pdal_metadata_node_clone(node: *const MetadataNode) -> *mut MetadataNode {
+    node.as_ref()
+        .map(|node| Box::into_raw(Box::new(node.clone())))
+        .unwrap_or(std::ptr::null_mut())
+}
+
 /// Return a node's name. Caller must free with `pdal_string_free`.
 ///
 /// # Safety
@@ -35,6 +51,38 @@ pub unsafe extern "C" fn pdal_metadata_node_name(node: *const MetadataNode) -> *
         node.as_ref()
             .map(|node| node.name().to_string())
             .unwrap_or_default(),
+    )
+}
+
+#[no_mangle]
+/// Return a node's type name. Caller must free with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+pub unsafe extern "C" fn pdal_metadata_node_type(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .and_then(MetadataNode::type_name)
+            .unwrap_or_default()
+            .to_string(),
+    )
+}
+
+#[no_mangle]
+/// Return a node's description. Caller must free with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+pub unsafe extern "C" fn pdal_metadata_node_description(node: *const MetadataNode) -> *mut c_char {
+    string_to_c_ptr(
+        node.as_ref()
+            .and_then(MetadataNode::description)
+            .unwrap_or_default()
+            .to_string(),
     )
 }
 
@@ -56,6 +104,40 @@ pub unsafe extern "C" fn pdal_metadata_node_set_string(
             CStr::from_ptr(value).to_string_lossy().into_owned()
         };
         node.set_value(MetadataValue::String(value));
+    }
+}
+
+#[no_mangle]
+/// Set a metadata node's type name.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `type_name` must be null or a valid
+/// NUL-terminated C string.
+pub unsafe extern "C" fn pdal_metadata_node_set_type(
+    node: *mut MetadataNode,
+    type_name: *const c_char,
+) {
+    if let Some(node) = node.as_mut() {
+        node.set_type_name(c_string_lossy(type_name));
+    }
+}
+
+#[no_mangle]
+/// Set a metadata node's description.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `description` must be null or a valid
+/// NUL-terminated C string.
+pub unsafe extern "C" fn pdal_metadata_node_set_description(
+    node: *mut MetadataNode,
+    description: *const c_char,
+) {
+    if let Some(node) = node.as_mut() {
+        node.set_description(c_string_lossy(description));
     }
 }
 
@@ -195,6 +277,110 @@ pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode
         .unwrap_or_default()
 }
 
+/// Format a PDAL metadata scalar value as JSON text. Caller must free with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `type_name` and `value` must be null or valid NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_json_value(
+    type_name: *const c_char,
+    value: *const c_char,
+) -> *mut c_char {
+    let type_name = c_string_lossy(type_name);
+    let value = c_string_lossy(value);
+    string_to_c_ptr(json_scalar_value(&type_name, &value))
+}
+
+#[no_mangle]
+/// Convert a scalar metadata value to a signed integer.
+///
+/// # Safety
+///
+/// `type_name` and `value` must be null or valid NUL-terminated C strings.
+/// `out_value` must be null or valid for writes.
+pub unsafe extern "C" fn pdal_metadata_value_as_i64(
+    type_name: *const c_char,
+    value: *const c_char,
+    out_value: *mut i64,
+) -> bool {
+    if let Some(converted) = scalar_as_i64(&c_string_lossy(type_name), &c_string_lossy(value)) {
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = converted;
+        }
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+/// Convert a scalar metadata value to an unsigned integer.
+///
+/// # Safety
+///
+/// `type_name` and `value` must be null or valid NUL-terminated C strings.
+/// `out_value` must be null or valid for writes.
+pub unsafe extern "C" fn pdal_metadata_value_as_u64(
+    type_name: *const c_char,
+    value: *const c_char,
+    out_value: *mut u64,
+) -> bool {
+    if let Some(converted) = scalar_as_u64(&c_string_lossy(type_name), &c_string_lossy(value)) {
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = converted;
+        }
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+/// Convert a scalar metadata value to a double.
+///
+/// # Safety
+///
+/// `type_name` and `value` must be null or valid NUL-terminated C strings.
+/// `out_value` must be null or valid for writes.
+pub unsafe extern "C" fn pdal_metadata_value_as_f64(
+    type_name: *const c_char,
+    value: *const c_char,
+    out_value: *mut f64,
+) -> bool {
+    if let Some(converted) = scalar_as_f64(&c_string_lossy(type_name), &c_string_lossy(value)) {
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = converted;
+        }
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+/// Convert a scalar metadata value to a bool.
+///
+/// # Safety
+///
+/// `type_name` and `value` must be null or valid NUL-terminated C strings.
+/// `out_value` must be null or valid for writes.
+pub unsafe extern "C" fn pdal_metadata_value_as_bool(
+    type_name: *const c_char,
+    value: *const c_char,
+    out_value: *mut bool,
+) -> bool {
+    if let Some(converted) = scalar_as_bool(&c_string_lossy(type_name), &c_string_lossy(value)) {
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = converted;
+        }
+        true
+    } else {
+        false
+    }
+}
+
 /// Add `child` to `node`, transferring ownership of `child`.
 ///
 /// # Safety
@@ -210,6 +396,58 @@ pub unsafe extern "C" fn pdal_metadata_node_add_child(
 ) {
     if let (Some(node), false) = (node.as_mut(), child.is_null()) {
         node.add_child(*Box::from_raw(child));
+    }
+}
+
+#[no_mangle]
+/// Add a cloned child to a node without transferring ownership.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `child` must be null or a valid metadata node
+/// pointer.
+pub unsafe extern "C" fn pdal_metadata_node_add_child_clone(
+    node: *mut MetadataNode,
+    child: *const MetadataNode,
+) {
+    if let (Some(node), Some(child)) = (node.as_mut(), child.as_ref()) {
+        node.add_child(child.clone());
+    }
+}
+
+#[no_mangle]
+/// Add or replace a child, transferring ownership of `child`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `child` must be null or a valid pointer
+/// returned by `pdal_metadata_node_create`; if non-null, it must not be used
+/// after this call.
+pub unsafe extern "C" fn pdal_metadata_node_add_or_update_child(
+    node: *mut MetadataNode,
+    child: *mut MetadataNode,
+) {
+    if let (Some(node), false) = (node.as_mut(), child.is_null()) {
+        node.add_or_update(*Box::from_raw(child));
+    }
+}
+
+#[no_mangle]
+/// Add or replace a cloned child without transferring ownership.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `child` must be null or a valid metadata node
+/// pointer.
+pub unsafe extern "C" fn pdal_metadata_node_add_or_update_child_clone(
+    node: *mut MetadataNode,
+    child: *const MetadataNode,
+) {
+    if let (Some(node), Some(child)) = (node.as_mut(), child.as_ref()) {
+        node.add_or_update(child.clone());
     }
 }
 
@@ -238,6 +476,44 @@ pub unsafe extern "C" fn pdal_metadata_node_child(
 ) -> *mut MetadataNode {
     node.as_ref()
         .and_then(|node| node.children().get(idx as usize))
+        .map(|child| Box::into_raw(Box::new(child.clone())))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+/// Return the count of child nodes with `name`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `name` must be null or a valid NUL-terminated
+/// C string.
+pub unsafe extern "C" fn pdal_metadata_node_child_named_count(
+    node: *const MetadataNode,
+    name: *const c_char,
+) -> u64 {
+    let name = c_string_lossy(name);
+    node.as_ref()
+        .map(|node| node.children_named(&name).len() as u64)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+/// Return a copy of the named child at `idx`. Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `name` must be null or a valid NUL-terminated
+/// C string.
+pub unsafe extern "C" fn pdal_metadata_node_child_named(
+    node: *const MetadataNode,
+    name: *const c_char,
+    idx: u64,
+) -> *mut MetadataNode {
+    let name = c_string_lossy(name);
+    node.as_ref()
+        .and_then(|node| node.children_named(&name).get(idx as usize).copied())
         .map(|child| Box::into_raw(Box::new(child.clone())))
         .unwrap_or(std::ptr::null_mut())
 }
@@ -326,5 +602,13 @@ fn metadata_value_type(value: &MetadataValue) -> &'static str {
         MetadataValue::U64(_) => "u64",
         MetadataValue::F64(_) => "f64",
         MetadataValue::Bool(_) => "bool",
+    }
+}
+
+unsafe fn c_string_lossy(ptr: *const c_char) -> String {
+    if ptr.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
     }
 }

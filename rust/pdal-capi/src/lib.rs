@@ -364,18 +364,78 @@ mod tests {
             let root_name = CString::new("root").unwrap();
             let child_name = CString::new("child").unwrap();
             let child_value = CString::new("value").unwrap();
+            let child_type = CString::new("string").unwrap();
+            let child_description = CString::new("child description").unwrap();
 
             let root = pdal_metadata_node_create(root_name.as_ptr());
             let child = pdal_metadata_node_create(child_name.as_ptr());
             pdal_metadata_node_set_string(child, child_value.as_ptr());
+            pdal_metadata_node_set_type(child, child_type.as_ptr());
+            pdal_metadata_node_set_description(child, child_description.as_ptr());
             pdal_metadata_node_add_child(root, child);
 
             assert_eq!(pdal_metadata_node_child_count(root), 1);
+            assert_eq!(
+                pdal_metadata_node_child_named_count(root, child_name.as_ptr()),
+                1
+            );
             let copied = pdal_metadata_node_child(root, 0);
             assert_eq!(take_string(pdal_metadata_node_name(copied)), "child");
+            assert_eq!(take_string(pdal_metadata_node_type(copied)), "string");
+            assert_eq!(
+                take_string(pdal_metadata_node_description(copied)),
+                "child description"
+            );
             assert_eq!(take_string(pdal_metadata_node_value(copied)), "value");
 
             pdal_metadata_node_destroy(copied);
+
+            let cloned_root = pdal_metadata_node_clone(root);
+            let cloned_child = pdal_metadata_node_child(cloned_root, 0);
+            assert_eq!(take_string(pdal_metadata_node_name(cloned_child)), "child");
+            pdal_metadata_node_destroy(cloned_child);
+            pdal_metadata_node_destroy(cloned_root);
+
+            let named = pdal_metadata_node_child_named(root, child_name.as_ptr(), 0);
+            assert_eq!(take_string(pdal_metadata_node_name(named)), "child");
+            pdal_metadata_node_destroy(named);
+
+            pdal_metadata_node_destroy(root);
+        }
+    }
+
+    #[test]
+    fn metadata_add_or_update_replaces_child_subtree_through_c_abi() {
+        unsafe {
+            let root_name = CString::new("root").unwrap();
+            let child_name = CString::new("child").unwrap();
+            let old_name = CString::new("old").unwrap();
+            let new_name = CString::new("new").unwrap();
+
+            let root = pdal_metadata_node_create(root_name.as_ptr());
+            let child = pdal_metadata_node_create(child_name.as_ptr());
+            let old = pdal_metadata_node_create(old_name.as_ptr());
+            pdal_metadata_node_set_u64(old, 1);
+            pdal_metadata_node_add_child(child, old);
+            pdal_metadata_node_add_child_clone(root, child);
+
+            let replacement = pdal_metadata_node_create(child_name.as_ptr());
+            let new_child = pdal_metadata_node_create(new_name.as_ptr());
+            pdal_metadata_node_set_u64(new_child, 2);
+            pdal_metadata_node_add_child(replacement, new_child);
+            pdal_metadata_node_add_or_update_child_clone(root, replacement);
+
+            assert_eq!(pdal_metadata_node_child_count(root), 1);
+            let copied = pdal_metadata_node_child_named(root, child_name.as_ptr(), 0);
+            assert_eq!(pdal_metadata_node_child_count(copied), 1);
+            let grandchild = pdal_metadata_node_child(copied, 0);
+            assert_eq!(take_string(pdal_metadata_node_name(grandchild)), "new");
+            assert_eq!(pdal_metadata_node_value_u64(grandchild), 2);
+
+            pdal_metadata_node_destroy(grandchild);
+            pdal_metadata_node_destroy(copied);
+            pdal_metadata_node_destroy(replacement);
+            pdal_metadata_node_destroy(child);
             pdal_metadata_node_destroy(root);
         }
     }

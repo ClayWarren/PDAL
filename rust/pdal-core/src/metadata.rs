@@ -82,6 +82,127 @@ impl MetadataValue {
     }
 }
 
+pub fn json_scalar_value(type_name: &str, value: &str) -> String {
+    if type_name == "json" {
+        return value.to_string();
+    }
+
+    if type_name == "double" && matches!(value, "NaN" | "Infinity" | "-Infinity") {
+        return quote_json_string(value);
+    }
+
+    if matches!(
+        type_name,
+        "string" | "base64Binary" | "uuid" | "matrix" | "spatialreference" | "bounds"
+    ) {
+        return quote_json_string(value);
+    }
+
+    escape_json(value)
+}
+
+pub fn scalar_as_i64(type_name: &str, value: &str) -> Option<i64> {
+    if type_name == "base64Binary" {
+        let bytes = decode_base64(value)?;
+        let array: [u8; 8] = bytes.get(..8)?.try_into().ok()?;
+        return Some(i64::from_ne_bytes(array));
+    }
+    value.parse().ok()
+}
+
+pub fn scalar_as_u64(type_name: &str, value: &str) -> Option<u64> {
+    if type_name == "base64Binary" {
+        let bytes = decode_base64(value)?;
+        let array: [u8; 8] = bytes.get(..8)?.try_into().ok()?;
+        return Some(u64::from_ne_bytes(array));
+    }
+    value.parse().ok()
+}
+
+pub fn scalar_as_f64(type_name: &str, value: &str) -> Option<f64> {
+    if type_name == "base64Binary" {
+        let bytes = decode_base64(value)?;
+        let array: [u8; 8] = bytes.get(..8)?.try_into().ok()?;
+        return Some(f64::from_ne_bytes(array));
+    }
+    value.parse().ok()
+}
+
+pub fn scalar_as_bool(type_name: &str, value: &str) -> Option<bool> {
+    if type_name == "boolean" {
+        return match value {
+            "true" => Some(true),
+            "false" => Some(false),
+            _ => None,
+        };
+    }
+    match value {
+        "true" | "1" => Some(true),
+        "false" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+fn quote_json_string(value: &str) -> String {
+    format!("\"{}\"", escape_json(value).replace('"', "\\\""))
+}
+
+fn escape_json(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0c}' => out.push_str("\\f"),
+            ch if ch < ' ' => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
+
+fn decode_base64(value: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(value.len() * 3 / 4);
+    let mut chunk = [0_u8; 4];
+    let mut len = 0_usize;
+
+    for byte in value.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+        chunk[len] = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => 64,
+            _ => return None,
+        };
+        len += 1;
+
+        if len == 4 {
+            if chunk[0] == 64 || chunk[1] == 64 {
+                return None;
+            }
+            out.push((chunk[0] << 2) | (chunk[1] >> 4));
+            if chunk[2] != 64 {
+                out.push((chunk[1] << 4) | (chunk[2] >> 2));
+            }
+            if chunk[3] != 64 {
+                out.push((chunk[2] << 6) | chunk[3]);
+            }
+            len = 0;
+        }
+    }
+
+    if len == 0 {
+        Some(out)
+    } else {
+        None
+    }
+}
+
 /// A named metadata node.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MetadataNode {
@@ -173,6 +294,17 @@ impl MetadataNode {
             self.add_child(child);
         }
     }
+
+    pub fn child(&self, index: usize) -> Option<&MetadataNode> {
+        self.children.get(index)
+    }
+
+    pub fn children_named(&self, name: &str) -> Vec<&MetadataNode> {
+        self.children
+            .iter()
+            .filter(|child| child.name() == name)
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -242,5 +374,47 @@ mod tests {
         assert_eq!(root.children()[0].type_name(), Some("string"));
         assert_eq!(root.children()[0].description(), Some("first child"));
         assert_eq!(root.children()[1].name(), "second");
+    }
+
+    #[test]
+    fn add_or_update_preserves_replacement_subtree() {
+        let mut root = MetadataNode::new("root");
+        let mut child = MetadataNode::new("child");
+        child.add_value("old", MetadataValue::U64(1));
+        root.add_child(child);
+
+        let mut replacement = MetadataNode::new("child");
+        replacement.add_value("new", MetadataValue::U64(2));
+        replacement.add_value("newer", MetadataValue::U64(3));
+        root.add_or_update(replacement);
+
+        assert_eq!(root.child_count(), 1);
+        let child = root.child(0).expect("replacement child");
+        assert_eq!(child.children().len(), 2);
+        assert_eq!(child.children()[0].name(), "new");
+        assert_eq!(child.children()[1].name(), "newer");
+        assert_eq!(root.children_named("child").len(), 1);
+    }
+
+    #[test]
+    fn json_scalar_value_matches_cpp_metadata_contract() {
+        assert_eq!(json_scalar_value("json", "{\"key\":42}"), "{\"key\":42}");
+        assert_eq!(json_scalar_value("double", "NaN"), "\"NaN\"");
+        assert_eq!(json_scalar_value("double", "Infinity"), "\"Infinity\"");
+        assert_eq!(json_scalar_value("string", "a\"b"), "\"a\\\"b\"");
+        assert_eq!(json_scalar_value("integer", "-7"), "-7");
+        assert_eq!(json_scalar_value("boolean", "true"), "true");
+    }
+
+    #[test]
+    fn scalar_values_convert_from_text_and_base64() {
+        assert_eq!(scalar_as_i64("integer", "-7"), Some(-7));
+        assert_eq!(scalar_as_u64("nonNegativeInteger", "7"), Some(7));
+        assert_eq!(scalar_as_f64("double", "1.25"), Some(1.25));
+        assert_eq!(scalar_as_bool("boolean", "true"), Some(true));
+        assert_eq!(scalar_as_bool("boolean", "maybe"), None);
+
+        let encoded = "zczMzMzcXkA=";
+        assert_eq!(scalar_as_f64("base64Binary", encoded), Some(123.45));
     }
 }
