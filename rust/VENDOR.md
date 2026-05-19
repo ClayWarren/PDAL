@@ -46,7 +46,7 @@ copy vendor source just to reduce the apparent amount of remaining work.
 | `vendor/gtest` | C++ test framework | No Rust-port role. Existing C++ tests remain the behavioral contract. Rust uses Cargo tests. |
 | `vendor/h3` | H3 indexing support | Already replaced on the Rust side by the `h3o` crate. Do not bind to the vendored C H3 library unless parity requires behavior `h3o` cannot provide. |
 | `vendor/kazhdan` | Poisson reconstruction private algorithm | Defer. For Poisson-related stages, make a stage-level decision: port the algorithm, bind the C++ implementation through FFI, or leave the stage in C++. Do not begin with a broad Kazhdan rewrite. |
-| `vendor/lazperf` | LAS/LAZ compression and LAS point stream helpers | Defer until the I/O vertical slice reaches LAS/LAZ. Prefer a maintained Rust crate or explicit FFI; do not hand-port compression code casually. |
+| `vendor/lazperf` | LAS/LAZ compression and LAS point stream helpers | Already replaced for the current Rust LAS/LAZ path by the `las` crate with its `laz` feature. Do not port or bind lazperf unless parity testing proves the Rust replacement cannot match required PDAL behavior. |
 | `vendor/lepcc` | Esri LEPCC compression support | Defer until the relevant I/O path is selected. Likely FFI or leave C++ unless a mature Rust alternative exists. |
 | `vendor/nanoflann` | KD-tree nearest-neighbor support | Do not port directly. Rust spatial filters already use a shared `pdal-core::spatial` API that can swap internals later. If performance requires it, choose a Rust spatial index crate behind that API. |
 | `vendor/nlohmann` | JSON support in C++ code | No direct Rust-port role. Rust code should use `serde_json` where JSON is part of the contract. |
@@ -57,8 +57,9 @@ copy vendor source just to reduce the apparent amount of remaining work.
 
 - Do not add vendored source under `rust/`.
 - Do not create a `pdal-vendor` crate just to mirror `vendor/`.
-- Use `pdal-native` as the default home for GDAL/OGR, GEOS, PROJ,
-  LASzip/laz-perf, and similar native adapter work.
+- Use `pdal-native` as the default home for GDAL/OGR, GEOS, PROJ, and similar
+  native adapter work. Pure Rust replacements do not need to route through
+  `pdal-native`.
 - Prefer dependency crates for stable external libraries when they match PDAL
   behavior.
 - Use explicit FFI when the external library is the behavior contract or the
@@ -70,6 +71,7 @@ copy vendor source just to reduce the apparent amount of remaining work.
 ## Already Chosen Rust Replacements
 
 - H3: `h3o`
+- LAS/LAZ: `las` with its `laz` feature
 - GEOS geometry operations: `geos` through `pdal-native`
 - PROJ transformations: `proj` through `pdal-native`
 - GDAL raster/vector access: `gdal-sys` through `pdal-native`

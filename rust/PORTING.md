@@ -98,9 +98,10 @@ Current target crates:
 - `pdal-core`: point model, dimensions, metadata, options, pipeline, SRS,
   spatial helpers, and shared stage traits.
 - `pdal-native`: explicit native-library adapter boundary. GDAL/OGR, GEOS, and
-  PROJ are already routed through this crate; future LASzip/laz-perf and other
-  native integrations should land here or behind an equally explicit adapter
-  before higher-level crates depend on them.
+  PROJ are already routed through this crate. Future native integrations should
+  land here or behind an equally explicit adapter before higher-level crates
+  depend on them. Pure Rust replacements, such as the current LAS/LAZ path, do
+  not need to move through `pdal-native`.
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
 - `pdal-io`: first-party readers and writers. The deterministic local I/O
@@ -203,8 +204,9 @@ stage, reader, writer, or core behavior that depends on that vendor boundary:
   overlay, reprojection, DEM, and related filters or readers. Native bindings
   should be centralized through `pdal-native` instead of imported directly by
   feature crates.
-- LASzip/lazperf and other compression choices happen when the I/O milestone
-  reaches LAS/LAZ or another compressed binary format.
+- LAS/LAZ compression is already covered by the `las` crate with its `laz`
+  feature. Do not port or bind `vendor/lazperf` unless parity testing later
+  proves the Rust replacement cannot match a required PDAL behavior.
 - Remote/object-store compatibility happens only after local deterministic I/O
   and pipeline execution are stable.
 - JSON-schema compatibility happens when Rust owns pipeline JSON validation.
