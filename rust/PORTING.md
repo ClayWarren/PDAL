@@ -460,7 +460,8 @@ Done when:
 - Binary-size visibility is available as an ignored, reporting-only CLI test:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`.
   It compares the installed `pdal` executable on `PATH` with Cargo's built
-  `pdal-rs` test binary.
+  `pdal-rs` test binary. The same harness also reports median CLI startup time
+  for `pdal --version` versus `pdal-rs --version`.
 - `readers.bpf` and `writers.bpf` have a Rust implementation for
   deterministic local, uncompressed BPF, including v3 and v1/v2 read support,
   point-major, dimension-major, and byte-major point layouts, XYZ transforms,
