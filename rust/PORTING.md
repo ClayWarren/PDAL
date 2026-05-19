@@ -529,7 +529,8 @@ Current Rust core primitives:
 - Metadata: named tree nodes with typed scalar values.
 - Metadata bridge: C++ copies Rust metadata trees into PDAL `MetadataNode`
   through `filters/private/RustMetadata.hpp`; ownership stays explicit on both
-  sides of the C ABI.
+  sides of the C ABI. The C ABI also exposes a Rust-owned JSON serialization
+  shape for command summaries.
 - Spatial reference: text plus coordinate epoch, with metadata export.
 - Bounds ABI: C-repr 2D/3D bounds structs plus point-view and pipeline-summary
   calculation calls for later command summaries.

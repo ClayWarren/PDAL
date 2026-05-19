@@ -314,6 +314,36 @@ mod tests {
     }
 
     #[test]
+    fn metadata_tree_serializes_to_json_through_c_abi() {
+        unsafe {
+            let root_name = CString::new("root").unwrap();
+            let child_name = CString::new("count").unwrap();
+            let valid_name = CString::new("valid").unwrap();
+
+            let root = pdal_metadata_node_create(root_name.as_ptr());
+            let child = pdal_metadata_node_create(child_name.as_ptr());
+            pdal_metadata_node_set_u64(child, 42);
+            pdal_metadata_node_add_child(root, child);
+
+            let valid = pdal_metadata_node_create(valid_name.as_ptr());
+            pdal_metadata_node_set_bool(valid, true);
+            pdal_metadata_node_add_child(root, valid);
+
+            let json: serde_json::Value =
+                serde_json::from_str(&take_string(pdal_metadata_node_to_json(root))).unwrap();
+            assert_eq!(json["name"], "root");
+            assert_eq!(json["children"][0]["name"], "count");
+            assert_eq!(json["children"][0]["value"], 42);
+            assert_eq!(json["children"][0]["value_type"], "u64");
+            assert_eq!(json["children"][1]["name"], "valid");
+            assert_eq!(json["children"][1]["value"], true);
+            assert_eq!(json["children"][1]["value_type"], "bool");
+
+            pdal_metadata_node_destroy(root);
+        }
+    }
+
+    #[test]
     fn spatial_reference_exports_metadata() {
         unsafe {
             let text = CString::new("EPSG:4326").unwrap();

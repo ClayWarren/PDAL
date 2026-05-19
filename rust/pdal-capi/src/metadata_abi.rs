@@ -1,5 +1,6 @@
 use crate::error::string_to_c_ptr;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
+use serde_json::json;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
@@ -241,6 +242,22 @@ pub unsafe extern "C" fn pdal_metadata_node_child(
         .unwrap_or(std::ptr::null_mut())
 }
 
+/// Serialize a metadata node tree as JSON. Caller must free with
+/// `pdal_string_free`.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_to_json(node: *const MetadataNode) -> *mut c_char {
+    let value = node
+        .as_ref()
+        .map(metadata_node_to_json)
+        .unwrap_or_else(|| json!(null));
+    string_to_c_ptr(serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()))
+}
+
 /// Destroy a metadata node.
 ///
 /// # Safety
@@ -251,5 +268,49 @@ pub unsafe extern "C" fn pdal_metadata_node_child(
 pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
     if !node.is_null() {
         drop(Box::from_raw(node));
+    }
+}
+
+fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    object.insert("name".to_string(), json!(node.name()));
+
+    if let Some(value) = node.value() {
+        object.insert("value".to_string(), metadata_value_to_json(value));
+        object.insert("value_type".to_string(), json!(metadata_value_type(value)));
+    }
+    if let Some(type_name) = node.type_name() {
+        object.insert("type".to_string(), json!(type_name));
+    }
+    if let Some(description) = node.description() {
+        object.insert("description".to_string(), json!(description));
+    }
+    if !node.children().is_empty() {
+        object.insert(
+            "children".to_string(),
+            serde_json::Value::Array(node.children().iter().map(metadata_node_to_json).collect()),
+        );
+    }
+
+    serde_json::Value::Object(object)
+}
+
+fn metadata_value_to_json(value: &MetadataValue) -> serde_json::Value {
+    match value {
+        MetadataValue::String(value) => json!(value),
+        MetadataValue::I64(value) => json!(value),
+        MetadataValue::U64(value) => json!(value),
+        MetadataValue::F64(value) => json!(value),
+        MetadataValue::Bool(value) => json!(value),
+    }
+}
+
+fn metadata_value_type(value: &MetadataValue) -> &'static str {
+    match value {
+        MetadataValue::String(_) => "string",
+        MetadataValue::I64(_) => "i64",
+        MetadataValue::U64(_) => "u64",
+        MetadataValue::F64(_) => "f64",
+        MetadataValue::Bool(_) => "bool",
     }
 }
