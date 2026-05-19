@@ -41,6 +41,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <utf8.h>
 
@@ -187,18 +188,7 @@ void toJSON(const MetadataNode& m, std::ostream& o)
 
 bool isJSON(const std::string& value)
 {
-    static constexpr std::array<std::pair<char, char>, 3> delims{
-        {{'{', '}'}, {'[', ']'}, {'"', '"'}}};
-
-    std::string t = value;
-    Utils::trim(t);
-
-    if (t.size() < 2)
-        return false;
-    for (const std::pair<char, char>& d : delims)
-        if (t.front() == d.first && t.back() == d.second)
-            return true;
-    return false;
+    return pdal_utils_is_json(value.c_str());
 }
 
 std::string tempFilename(const std::string& path)

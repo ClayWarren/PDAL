@@ -28,6 +28,7 @@ mod srs;
 mod stage_abi;
 mod stats_abi;
 mod tile_abi;
+mod utils_abi;
 mod xml_schema_abi;
 
 pub use config_abi::*;
@@ -55,6 +56,7 @@ pub use srs::*;
 pub use stage_abi::*;
 pub use stats_abi::*;
 pub use tile_abi::*;
+pub use utils_abi::*;
 pub use xml_schema_abi::*;
 
 #[cfg(test)]
@@ -318,6 +320,18 @@ mod tests {
                 )),
                 "readers_las2"
             );
+        }
+    }
+
+    #[test]
+    fn utility_json_detection_roundtrips_through_c_abi() {
+        unsafe {
+            let object = CString::new(r#" {"path":"file.laz"} "#).unwrap();
+            let plain = CString::new("file.laz").unwrap();
+
+            assert!(pdal_utils_is_json(object.as_ptr()));
+            assert!(!pdal_utils_is_json(plain.as_ptr()));
+            assert!(!pdal_utils_is_json(std::ptr::null()));
         }
     }
 

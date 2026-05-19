@@ -51,6 +51,9 @@ const char* pdal_log_level_string(int32_t level);
 // FileSpec
 char* pdal_file_spec_parse_json(const char* input);
 
+// Utilities
+bool pdal_utils_is_json(const char* value);
+
 // OGRSpec
 char* pdal_ogr_spec_parse_json(const char* input);
 

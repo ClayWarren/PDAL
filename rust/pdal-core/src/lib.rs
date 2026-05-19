@@ -25,4 +25,5 @@ pub mod scaling;
 pub mod spatial;
 pub mod srs;
 pub mod stage;
+pub mod utils;
 pub mod xml_schema;
