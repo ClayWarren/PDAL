@@ -9,6 +9,7 @@ mod filter_expression_abi;
 mod filter_grid_abi;
 mod filter_runtime;
 mod io_abi;
+mod kernel_abi;
 mod metadata_abi;
 mod metrics_abi;
 mod native_abi;
@@ -29,6 +30,7 @@ pub use filter_expression_abi::*;
 pub use filter_grid_abi::*;
 pub use filter_runtime::*;
 pub use io_abi::*;
+pub use kernel_abi::*;
 pub use metadata_abi::*;
 pub use metrics_abi::*;
 pub use native_abi::*;
@@ -85,6 +87,50 @@ mod tests {
             assert_eq!(
                 take_string(pdal_spatial_reference_wgs84_code_from_zone(0)),
                 ""
+            );
+        }
+    }
+
+    #[test]
+    fn kernel_stage_option_parser_roundtrips_through_c_abi() {
+        unsafe {
+            let input = CString::new("--readers.p2g.foobar=baz").unwrap();
+            let mut stage = std::ptr::null_mut();
+            let mut option = std::ptr::null_mut();
+            let mut value = std::ptr::null_mut();
+
+            let result = pdal_kernel_parse_stage_option(
+                input.as_ptr(),
+                false,
+                &mut stage,
+                &mut option,
+                &mut value,
+            );
+            assert_eq!(result, 0);
+            assert_eq!(take_string(stage), "readers.p2g");
+            assert_eq!(take_string(option), "foobar");
+            assert_eq!(take_string(value), "baz");
+
+            let input = CString::new("--stage.tag.option=value").unwrap();
+            assert_eq!(
+                pdal_kernel_parse_stage_option(
+                    input.as_ptr(),
+                    false,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                ),
+                2
+            );
+            assert_eq!(
+                pdal_kernel_parse_stage_option(
+                    input.as_ptr(),
+                    true,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                ),
+                0
             );
         }
     }

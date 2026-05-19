@@ -32,7 +32,6 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <cctype>
 #include <iostream>
 
 #include <pdal/Kernel.hpp>
@@ -42,6 +41,7 @@
 #include <pdal/pdal_config.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <pdal/pdal_config.hpp>
 
@@ -66,61 +66,25 @@ Kernel::ParseStageResult Kernel::parseStageOption(std::string o,
                                                   std::string& value)
 {
     value.clear();
-    if ((o.size() < 2) || (o[0] != '-') || (o[1] != '-'))
-        return ParseStageResult::Unknown;
+    char* parsedStage = nullptr;
+    char* parsedOption = nullptr;
+    char* parsedValue = nullptr;
+    const bool allowStagePrefix = isStagePrefix("stage");
+    int result = pdal_kernel_parse_stage_option(
+        o.c_str(), allowStagePrefix, &parsedStage, &parsedOption, &parsedValue);
 
-    o = o.substr(2);
-
-    // Options are stage_type.stage_name.option_name
-    // stage_type is always lowercase stage_names start with lowercase and
-    // then are lowercase or digits.  Option names start with lowercase and
-    // then contain lowercase, digits or underscore.
-
-    // This awfulness is to work around the multiply-defined islower.  Seems
-    // a bit better than the cast solution.
-    auto islc = [](char c) { return std::islower(c); };
-
-    std::string::size_type pos = 0;
-    std::string::size_type count = 0;
-
-    // Get stage_type.
-    count = Utils::extract(o, pos, islc);
-    pos += count;
-    std::string stageType = o.substr(0, pos);
-    if (!isStagePrefix(stageType) || pos >= o.length() || o[pos++] != '.')
-        return ParseStageResult::Unknown;
-
-    // Get stage_name.
-    bool ok;
-    if (stageType == "stage")
-        ok = Stage::parseTagName(o, pos);
-    else
-        ok = Stage::parseName(o, pos);
-    if (!ok)
-        return ParseStageResult::Unknown;
-
-    stage = o.substr(0, pos);
-    if (pos >= o.length() || o[pos++] != '.')
-        return ParseStageResult::Unknown;
-
-    // Get option name.
-    std::string::size_type optionStart = pos;
-    count = Option::parse(o, pos);
-    pos += count;
-    option = o.substr(optionStart, count);
-
-    // We've gotten a good option name, so return true, even if the value
-    // is missing.  The caller can handle the missing value if desired.
-    if (pos >= o.length())
-        return ParseStageResult::Ok;
-
-    if (o[pos++] == '=')
+    auto parsedResult = static_cast<ParseStageResult>(result);
+    if (parsedResult != ParseStageResult::Unknown)
     {
-        value = o.substr(pos);
-        if (value.size())
-            return ParseStageResult::Ok;
+        stage = parsedStage ? parsedStage : "";
+        option = parsedOption ? parsedOption : "";
     }
-    return ParseStageResult::Invalid;
+    value = parsedValue ? parsedValue : "";
+
+    pdal_string_free(parsedStage);
+    pdal_string_free(parsedOption);
+    pdal_string_free(parsedValue);
+    return parsedResult;
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Kernel& kernel)

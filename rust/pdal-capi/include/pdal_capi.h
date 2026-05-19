@@ -35,6 +35,10 @@ char* pdal_options_value(const pdal_options_t* ops, const char* key);
 char* pdal_options_command_line_json(const pdal_options_t* ops);
 void pdal_options_destroy(pdal_options_t* ops);
 
+// Kernel
+int pdal_kernel_parse_stage_option(const char* input, bool allow_stage_prefix,
+                                   char** stage, char** option, char** value);
+
 // PointLayout
 pdal_point_layout_t* pdal_point_layout_create();
 void pdal_point_layout_register_dim(pdal_point_layout_t* layout, const char* name, int type_id);
