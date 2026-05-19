@@ -241,12 +241,20 @@ impl App {
             return 1;
         }
 
-        let count =
-            unsafe { pdal_capi::pdal_pipeline_execute_count(pipeline, std::ptr::null_mut()) };
+        let mut result = empty_pipeline_result();
+        let status = unsafe {
+            pdal_capi::pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result)
+        };
         unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
-        if count < 0 {
+        if status < 0 {
             self.output_last_error();
             return 1;
+        }
+        if self.show_json {
+            println!(
+                "{}",
+                serde_json::to_string(&pipeline_result_json(result)).unwrap()
+            );
         }
         0
     }
@@ -464,6 +472,54 @@ fn main() {
 
     let result = app.run();
     process::exit(result);
+}
+
+fn empty_pipeline_result() -> pdal_capi::pdal_pipeline_result_t {
+    pdal_capi::pdal_pipeline_result_t {
+        point_count: 0,
+        view_count: 0,
+        has_bounds_2d: false,
+        bounds_2d: pdal_capi::pdal_bounds2d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+        },
+        has_bounds_3d: false,
+        bounds_3d: pdal_capi::pdal_bounds3d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+            minz: 0.0,
+            maxz: 0.0,
+        },
+    }
+}
+
+fn pipeline_result_json(result: pdal_capi::pdal_pipeline_result_t) -> serde_json::Value {
+    serde_json::json!({
+        "point_count": result.point_count,
+        "view_count": result.view_count,
+        "bounds_2d": result.has_bounds_2d.then(|| {
+            serde_json::json!({
+                "minx": result.bounds_2d.minx,
+                "maxx": result.bounds_2d.maxx,
+                "miny": result.bounds_2d.miny,
+                "maxy": result.bounds_2d.maxy,
+            })
+        }),
+        "bounds_3d": result.has_bounds_3d.then(|| {
+            serde_json::json!({
+                "minx": result.bounds_3d.minx,
+                "maxx": result.bounds_3d.maxx,
+                "miny": result.bounds_3d.miny,
+                "maxy": result.bounds_3d.maxy,
+                "minz": result.bounds_3d.minz,
+                "maxz": result.bounds_3d.maxz,
+            })
+        }),
+    })
 }
 
 #[cfg(test)]

@@ -44,6 +44,43 @@ fn pipeline_command_runs_text_pipeline() {
 }
 
 #[test]
+fn pipeline_command_supports_json_summary() {
+    let temp = make_temp_dir("pdal-rs-pipeline-summary");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        r#"[
+  {"type":"readers.faux","count":3,"mode":"ramp","minx":-10,"maxx":20,"miny":-15,"maxy":7,"minz":-50,"maxz":100}
+]
+"#,
+    )
+    .unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("pipeline")
+        .arg(&pipeline)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(json["point_count"], 3);
+    assert_eq!(json["view_count"], 1);
+    assert_eq!(json["bounds_2d"]["minx"], -10.0);
+    assert_eq!(json["bounds_2d"]["maxx"], 20.0);
+    assert_eq!(json["bounds_3d"]["minz"], -50.0);
+    assert_eq!(json["bounds_3d"]["maxz"], 100.0);
+}
+
+#[test]
 fn unknown_command_fails_cleanly() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("info")
