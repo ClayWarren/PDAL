@@ -58,6 +58,12 @@ char* pdal_ogr_spec_parse_json(const char* input);
 int pdal_kernel_parse_stage_option(const char* input, bool allow_stage_prefix,
                                    char** stage, char** option, char** value);
 
+// Pipeline
+char* pdal_pipeline_generate_stage_tag(const char* stage_name,
+                                       const char* explicit_tag,
+                                       const char* const* existing_tags,
+                                       uint64_t existing_count);
+
 // Plugin
 char* pdal_plugin_valid_name(const char* path, const char** types,
                              uint64_t type_count,

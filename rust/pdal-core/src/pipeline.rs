@@ -44,6 +44,20 @@ pub struct Pipeline {
     tags: HashMap<String, usize>,
 }
 
+pub fn generate_stage_tag(stage_name: &str, explicit_tag: &str, existing_tags: &[&str]) -> String {
+    if !explicit_tag.is_empty() {
+        return explicit_tag.to_string();
+    }
+
+    for index in 1.. {
+        let tag = format!("{stage_name}{index}").replace('.', "_");
+        if !existing_tags.contains(&tag.as_str()) {
+            return tag;
+        }
+    }
+    unreachable!()
+}
+
 impl Default for Pipeline {
     fn default() -> Self {
         Self::new()
@@ -440,4 +454,22 @@ fn merge_dimension_summary(existing: &mut DimensionSummary, incoming: DimensionS
         + (incoming.mean * incoming.count as f64))
         / total_count as f64;
     existing.count = total_count;
+}
+
+#[cfg(test)]
+mod tag_tests {
+    use super::*;
+
+    #[test]
+    fn generates_unique_stage_tags() {
+        assert_eq!(generate_stage_tag("readers.las", "", &[]), "readers_las1");
+        assert_eq!(
+            generate_stage_tag("readers.las", "", &["readers_las1"]),
+            "readers_las2"
+        );
+        assert_eq!(
+            generate_stage_tag("readers.las", "input", &["input"]),
+            "input"
+        );
+    }
 }

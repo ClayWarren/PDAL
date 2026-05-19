@@ -4,7 +4,7 @@ use crate::point_abi::{pdal_bounds2d_t, pdal_bounds3d_t};
 use crate::stage_abi::StageWrapper;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
-use pdal_core::pipeline::{Pipeline, StageWrapper as PipelineStageWrapper};
+use pdal_core::pipeline::{generate_stage_tag, Pipeline, StageWrapper as PipelineStageWrapper};
 use pdal_core::point::{DimensionSummary, PointView};
 use serde_json::json;
 use std::ffi::CStr;
@@ -17,6 +17,41 @@ use std::os::raw::c_char;
 /// Opaque pipeline handle.
 pub struct PipelineHandle {
     pub(crate) pipeline: Pipeline,
+}
+
+unsafe fn nullable_cstr_to_string(value: *const c_char) -> String {
+    if value.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(value).to_string_lossy().into_owned()
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_generate_stage_tag(
+    stage_name: *const c_char,
+    explicit_tag: *const c_char,
+    existing_tags: *const *const c_char,
+    existing_count: u64,
+) -> *mut c_char {
+    let stage_name = nullable_cstr_to_string(stage_name);
+    let explicit_tag = nullable_cstr_to_string(explicit_tag);
+    if existing_tags.is_null() && existing_count > 0 {
+        return std::ptr::null_mut();
+    }
+    let mut existing = Vec::with_capacity(existing_count as usize);
+    for idx in 0..existing_count as usize {
+        let ptr = *existing_tags.add(idx);
+        if !ptr.is_null() {
+            existing.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+    let existing_refs = existing.iter().map(String::as_str).collect::<Vec<_>>();
+    string_to_c_ptr(generate_stage_tag(
+        &stage_name,
+        &explicit_tag,
+        &existing_refs,
+    ))
 }
 
 #[repr(C)]

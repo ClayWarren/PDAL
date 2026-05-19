@@ -37,6 +37,9 @@
 #include <pdal/Metadata.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/Stage.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
@@ -46,28 +49,16 @@ namespace
 
 std::string generateTag(Stage* stage, PipelineWriter::TagMap& tags)
 {
-    auto tagExists = [tags](const std::string& tag)
-    {
-        for (auto& t : tags)
-        {
-            if (t.second == tag)
-                return true;
-        }
-        return false;
-    };
+    std::vector<const char*> existingTags;
+    for (const auto& tag : tags)
+        existingTags.push_back(tag.second.c_str());
 
-    std::string tag = stage->tag();
-    if (tag.empty())
-    {
-        for (size_t i = 1;; ++i)
-        {
-            tag = stage->getName() + std::to_string(i);
-            tag = Utils::replaceAll(tag, ".", "_");
-            if (!tagExists(tag))
-                break;
-        }
-    }
-    return tag;
+    char* tag = pdal_pipeline_generate_stage_tag(
+        stage->getName().c_str(), stage->tag().c_str(), existingTags.data(),
+        existingTags.size());
+    std::string output(tag ? tag : "");
+    pdal_string_free(tag);
+    return output;
 }
 
 void generateTags(Stage* stage, PipelineWriter::TagMap& tags)

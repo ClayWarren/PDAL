@@ -294,6 +294,34 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_stage_tag_generation_roundtrips_through_c_abi() {
+        unsafe {
+            let stage = CString::new("readers.las").unwrap();
+            assert_eq!(
+                take_string(pdal_pipeline_generate_stage_tag(
+                    stage.as_ptr(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    0,
+                )),
+                "readers_las1"
+            );
+
+            let existing = CString::new("readers_las1").unwrap();
+            let tags = [existing.as_ptr()];
+            assert_eq!(
+                take_string(pdal_pipeline_generate_stage_tag(
+                    stage.as_ptr(),
+                    std::ptr::null(),
+                    tags.as_ptr(),
+                    tags.len() as u64,
+                )),
+                "readers_las2"
+            );
+        }
+    }
+
+    #[test]
     fn native_dependencies_serialize_through_c_abi() {
         unsafe {
             let json: serde_json::Value =
