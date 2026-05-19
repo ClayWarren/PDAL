@@ -399,6 +399,11 @@ Current status:
   ASCII path, including vertex properties, normals, texture coordinates,
   triangulation for VTN de-duplication, and de-duplication logic matching
   PDAL's C++ behavior. Mesh face storage is intentionally deferred.
+- `writers.gltf` has a Rust implementation for deterministic local GLB output
+  from mesh-backed views, including vertex indices, XYZ vertices, optional
+  normals/colors, and file-size parity for the existing C++ unit-test shapes.
+  This slice adds the minimal `pdal-core` triangular-mesh model needed by the
+  writer; broader mesh face parity for other readers remains deferred.
 - `readers.qfit` has a Rust implementation for the deterministic NASA ATM QFIT
   binary path, including 10, 12, and 14-word formats, endian probing,
   dimension mapping matching PDAL's C++ reader, and regression coverage

@@ -527,6 +527,7 @@ dependencies = [
  "pdal-core",
  "pdal-filters",
  "roxmltree",
+ "serde_json",
  "tempfile",
 ]
 

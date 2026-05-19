@@ -366,11 +366,42 @@ impl PointLayout {
 
 /// A buffer of points sharing one layout.
 #[derive(Clone)]
+pub struct Triangle {
+    pub a: PointId,
+    pub b: PointId,
+    pub c: PointId,
+}
+
+#[derive(Clone, Default)]
+pub struct TriangularMesh {
+    triangles: Vec<Triangle>,
+}
+
+impl TriangularMesh {
+    pub fn add(&mut self, a: PointId, b: PointId, c: PointId) {
+        self.triangles.push(Triangle { a, b, c });
+    }
+
+    pub fn len(&self) -> usize {
+        self.triangles.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.triangles.is_empty()
+    }
+
+    pub fn triangles(&self) -> &[Triangle] {
+        &self.triangles
+    }
+}
+
+#[derive(Clone)]
 pub struct PointView {
     layout: Rc<PointLayout>,
     data: Vec<u8>,
     source_indices: Vec<PointId>,
     spatial_reference: SpatialReference,
+    mesh: Option<TriangularMesh>,
 }
 
 impl PointView {
@@ -381,6 +412,7 @@ impl PointView {
             data: Vec::new(),
             source_indices: Vec::new(),
             spatial_reference: SpatialReference::default(),
+            mesh: None,
         }
     }
 
@@ -391,6 +423,7 @@ impl PointView {
             data: Vec::new(),
             source_indices: Vec::new(),
             spatial_reference: self.spatial_reference.clone(),
+            mesh: None,
         }
     }
 
@@ -407,6 +440,14 @@ impl PointView {
     /// Set the view's spatial reference.
     pub fn set_spatial_reference(&mut self, spatial_reference: SpatialReference) {
         self.spatial_reference = spatial_reference;
+    }
+
+    pub fn create_mesh(&mut self) -> &mut TriangularMesh {
+        self.mesh.get_or_insert_with(TriangularMesh::default)
+    }
+
+    pub fn mesh(&self) -> Option<&TriangularMesh> {
+        self.mesh.as_ref()
     }
 
     /// Number of points in the view.
@@ -612,5 +653,24 @@ mod tests {
         assert_eq!(new_view.layout().point_size(), view.layout().point_size());
         assert_eq!(new_view.spatial_reference().wkt(), "EPSG:4326");
         assert_eq!(new_view.spatial_reference().epoch(), 2020.0);
+    }
+
+    #[test]
+    fn triangular_mesh_tracks_face_indices() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for _ in 0..3 {
+            view.add_point();
+        }
+
+        view.create_mesh().add(0, 1, 2);
+        let mesh = view.mesh().unwrap();
+
+        assert_eq!(mesh.len(), 1);
+        assert_eq!(mesh.triangles()[0].a, 0);
+        assert_eq!(mesh.triangles()[0].b, 1);
+        assert_eq!(mesh.triangles()[0].c, 2);
+        assert!(view.make_new().mesh().is_none());
     }
 }
