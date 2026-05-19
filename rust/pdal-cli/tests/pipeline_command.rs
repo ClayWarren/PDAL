@@ -10,20 +10,7 @@ fn pipeline_command_runs_text_pipeline() {
     let output = temp.join("out.txt");
     let pipeline = temp.join("pipeline.json");
 
-    fs::write(
-        &pipeline,
-        format!(
-            r#"[
-  {{"type":"readers.text","filename":"{}"}},
-  {{"type":"filters.decimation","step":2}},
-  {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
-]
-"#,
-            escape_json_path(&input),
-            escape_json_path(&output)
-        ),
-    )
-    .unwrap();
+    write_text_pipeline(&pipeline, &input, &output);
 
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("pipeline")
@@ -41,6 +28,50 @@ fn pipeline_command_runs_text_pipeline() {
     let text = fs::read_to_string(output).unwrap();
     assert!(text.starts_with("X,Y,Z\n"));
     assert!(text.lines().count() > 1);
+}
+
+#[test]
+#[ignore = "requires installed pdal on PATH"]
+fn installed_pdal_matches_rust_pipeline_command() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-command-regression");
+    let installed_output = temp.join("installed.txt");
+    let rust_output = temp.join("rust.txt");
+    let installed_pipeline = temp.join("installed-pipeline.json");
+    let rust_pipeline = temp.join("rust-pipeline.json");
+
+    write_text_pipeline(&installed_pipeline, &input, &installed_output);
+    write_text_pipeline(&rust_pipeline, &input, &rust_output);
+
+    let installed = Command::new("pdal")
+        .arg("pipeline")
+        .arg(&installed_pipeline)
+        .output()
+        .expect("failed to execute installed pdal");
+    assert!(
+        installed.status.success(),
+        "installed pdal pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&installed.stdout),
+        String::from_utf8_lossy(&installed.stderr)
+    );
+
+    let rust = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg(&rust_pipeline)
+        .output()
+        .expect("failed to execute pdal-rs");
+    assert!(
+        rust.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&rust.stdout),
+        String::from_utf8_lossy(&rust.stderr)
+    );
+
+    assert_eq!(
+        fs::read_to_string(installed_output).unwrap(),
+        fs::read_to_string(rust_output).unwrap()
+    );
 }
 
 #[test]
@@ -166,6 +197,23 @@ fn make_temp_dir(name: &str) -> PathBuf {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     dir
+}
+
+fn write_text_pipeline(pipeline: &Path, input: &Path, output: &Path) {
+    fs::write(
+        pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.text","filename":"{}"}},
+  {{"type":"filters.decimation","step":2}},
+  {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
+]
+"#,
+            escape_json_path(input),
+            escape_json_path(output)
+        ),
+    )
+    .unwrap();
 }
 
 fn escape_json_path(path: &Path) -> String {
