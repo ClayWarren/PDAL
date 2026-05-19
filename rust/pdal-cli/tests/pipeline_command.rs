@@ -37,6 +37,23 @@ fn pipeline_command_runs_text_pipeline() {
 }
 
 #[test]
+fn pipeline_command_accepts_root_pipeline_object() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-command-object");
+    let output = temp.join("out.txt");
+    let pipeline = temp.join("pipeline.json");
+
+    write_text_pipeline_object(&pipeline, &input, &output);
+
+    run_rust_pipeline(&pipeline);
+
+    let text = fs::read_to_string(output).unwrap();
+    assert!(text.starts_with("X,Y,Z\n"));
+    assert!(text.lines().count() > 1);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -254,6 +271,25 @@ fn write_text_pipeline(pipeline: &Path, input: &Path, output: &Path) {
   {{"type":"filters.decimation","step":2}},
   {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
 ]
+"#,
+            escape_json_path(input),
+            escape_json_path(output)
+        ),
+    )
+    .unwrap();
+}
+
+fn write_text_pipeline_object(pipeline: &Path, input: &Path, output: &Path) {
+    fs::write(
+        pipeline,
+        format!(
+            r#"{{
+  "pipeline": [
+    {{"type":"readers.text","filename":"{}"}},
+    {{"type":"filters.decimation","step":2}},
+    {{"type":"writers.text","filename":"{}","order":"X,Y,Z","quote_header":false,"precision":2}}
+  ]
+}}
 "#,
             escape_json_path(input),
             escape_json_path(output)

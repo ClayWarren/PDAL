@@ -173,9 +173,7 @@ pub fn create_stage(name: &str, options: &Options) -> Result<CreatedStage, Stage
 pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     let value: Value = serde_json::from_str(json)
         .map_err(|err| StageError(format!("Invalid pipeline JSON: {err}")))?;
-    let stages = value.as_array().ok_or_else(|| {
-        StageError("Pipeline JSON must be an array of stage objects.".to_string())
-    })?;
+    let stages = pipeline_stages(&value)?;
 
     let mut pipeline = Pipeline::new();
     let mut tags = HashMap::new();
@@ -211,6 +209,23 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     }
 
     Ok(pipeline)
+}
+
+fn pipeline_stages(value: &Value) -> Result<&Vec<Value>, StageError> {
+    if let Some(stages) = value.as_array() {
+        return Ok(stages);
+    }
+    let Some(object) = value.as_object() else {
+        return Err(StageError(
+            "Pipeline JSON must be an array or an object with a 'pipeline' array.".to_string(),
+        ));
+    };
+    object
+        .get("pipeline")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            StageError("Pipeline JSON object must contain a 'pipeline' array.".to_string())
+        })
 }
 
 fn stage_name(
@@ -445,6 +460,31 @@ mod tests {
         let written = std::fs::read_to_string(&output).unwrap();
         assert!(written.contains("POINTS 5"));
         let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn pipeline_json_accepts_root_pipeline_object() {
+        let json = r#"{
+            "pipeline": [
+                {"type":"readers.faux", "count":4},
+                {"type":"filters.decimation", "step":2}
+            ]
+        }"#;
+        let mut pipeline = pipeline_from_json(json).unwrap();
+        let result = pipeline.execute_with_result(Vec::new()).unwrap();
+        assert_eq!(result.point_count, 2);
+        assert_eq!(result.view_count, 1);
+    }
+
+    #[test]
+    fn pipeline_json_rejects_root_object_without_pipeline_array() {
+        let err = match pipeline_from_json(r#"{"type":"readers.faux"}"#) {
+            Ok(_) => panic!("expected root object without pipeline array to fail"),
+            Err(err) => err,
+        };
+        assert!(err
+            .to_string()
+            .contains("object must contain a 'pipeline' array"));
     }
 
     #[test]
