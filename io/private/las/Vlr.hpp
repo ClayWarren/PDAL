@@ -40,7 +40,6 @@
 
 #include <pdal/Metadata.hpp>
 #include <pdal/SpatialReference.hpp>
-#include <pdal/util/ThreadPool.hpp>
 
 namespace pdal
 {

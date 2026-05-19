@@ -55,6 +55,7 @@
 #include <pdal/util/Extractor.hpp>
 #include <pdal/util/IStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal/util/ThreadPool.hpp>
 
 namespace pdal
 {

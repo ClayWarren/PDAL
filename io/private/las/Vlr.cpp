@@ -374,18 +374,10 @@ VlrCatalog::VlrCatalog(uint64_t vlrOffset, uint32_t vlrCount,
 void VlrCatalog::load(uint64_t vlrOffset, uint32_t vlrCount,
                       uint64_t evlrOffset, uint32_t evlrCount)
 {
-    auto vlrWalker =
-        std::bind(&VlrCatalog::walkVlrs, this, vlrOffset, vlrCount);
-    auto evlrWalker =
-        std::bind(&VlrCatalog::walkEvlrs, this, evlrOffset, evlrCount);
-
-    ThreadPool pool(2);
-
     if (vlrCount)
-        pool.add(vlrWalker);
+        walkVlrs(vlrOffset, vlrCount);
     if (evlrCount)
-        pool.add(evlrWalker);
-    pool.await();
+        walkEvlrs(evlrOffset, evlrCount);
 }
 
 void VlrCatalog::walkVlrs(uint64_t vlrOffset, uint32_t vlrCount)
