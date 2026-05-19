@@ -503,6 +503,12 @@ Current status:
   Rust-backed stages/commands and no longer links the C++ helper dispatch shim.
 - `--drivers`, `--list-commands`, and `--options <stage>` are backed by
   Rust-owned stage/command metadata for the currently implemented Rust surface.
+- Pipeline JSON can construct the command-ready Rust filter subset:
+  `decimation`, `groupby`, `head`, `locate`, `merge`, `mortonorder`,
+  `randomize`, `returns`, `sample`, `sort`, `stats`, `tail`, and
+  `voxeldownsize`. Other Rust filter modules may exist, but they are not
+  command-ready until they are deliberately added to the registry with option
+  parsing and coverage.
 - `pipeline` is the only concrete Rust command currently enabled. It accepts a
   pipeline JSON filename and executes implemented Rust stages through the same
   Rust C ABI pipeline parser used by lower-layer tests. With `--showjson`, it

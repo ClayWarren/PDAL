@@ -11,12 +11,15 @@ use pdal_core::pipeline::{FilterWrapper, Pipeline, Reader, Writer};
 use pdal_core::stage::StageError;
 
 use pdal_filters::decimation::DecimationFilter;
+use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::randomize::RandomizeFilter;
+use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
+use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::stats::StatsFilter;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
@@ -46,12 +49,15 @@ pub const READER_DRIVERS: &[&str] = &[
 
 pub const FILTER_DRIVERS: &[&str] = &[
     "filters.decimation",
+    "filters.groupby",
     "filters.head",
     "filters.locate",
     "filters.merge",
     "filters.mortonorder",
     "filters.randomize",
+    "filters.returns",
     "filters.sample",
+    "filters.sort",
     "filters.stats",
     "filters.tail",
     "filters.voxeldownsize",
@@ -105,6 +111,9 @@ pub fn create_filter(
 ) -> Result<Box<dyn pdal_core::pipeline::StageWrapper>, StageError> {
     match name {
         "filters.decimation" => Ok(Box::new(FilterWrapper::new(DecimationFilter::new(options)))),
+        "filters.groupby" => Ok(Box::new(FilterWrapper::new(GroupByFilter::new(
+            options.get_str("dimension", ""),
+        )))),
         "filters.head" => Ok(Box::new(FilterWrapper::new(HeadFilter::new(
             options.get_u64("count", 10),
             options.get_bool("invert", false),
@@ -123,7 +132,15 @@ pub fn create_filter(
                 .then(|| options.get_u64("seed", 0) as u32);
             Ok(Box::new(FilterWrapper::new(RandomizeFilter::new(seed))))
         }
+        "filters.returns" => Ok(Box::new(FilterWrapper::new(ReturnsFilter::new(
+            comma_list(&options.get_str("groups", "last")),
+        )))),
         "filters.sample" => Ok(Box::new(FilterWrapper::new(SampleFilter::new(options)))),
+        "filters.sort" => Ok(Box::new(FilterWrapper::new(SortFilter::new(
+            comma_list(&options.get_str("dimensions", &options.get_str("dimension", ""))),
+            sort_order(&options.get_str("order", "asc"))?,
+            sort_algorithm(&options.get_str("algorithm", "normal"))?,
+        )))),
         "filters.stats" => Ok(Box::new(FilterWrapper::new(StatsFilter::from_options(
             options,
         )))),
@@ -136,6 +153,35 @@ pub fn create_filter(
         )))),
         _ => Err(StageError(format!(
             "Filter driver '{name}' is not available in the Rust port registry."
+        ))),
+    }
+}
+
+fn comma_list(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn sort_order(value: &str) -> Result<SortOrder, StageError> {
+    match value.to_ascii_lowercase().as_str() {
+        "asc" | "ascending" => Ok(SortOrder::Asc),
+        "desc" | "descending" => Ok(SortOrder::Desc),
+        _ => Err(StageError(format!(
+            "filters.sort order must be 'asc' or 'desc', got '{value}'."
+        ))),
+    }
+}
+
+fn sort_algorithm(value: &str) -> Result<SortAlgorithm, StageError> {
+    match value.to_ascii_lowercase().as_str() {
+        "normal" => Ok(SortAlgorithm::Normal),
+        "stable" => Ok(SortAlgorithm::Stable),
+        _ => Err(StageError(format!(
+            "filters.sort algorithm must be 'normal' or 'stable', got '{value}'."
         ))),
     }
 }
@@ -514,6 +560,43 @@ mod tests {
         assert_eq!(result.view_count, 0);
         assert!(output.exists());
         let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn pipeline_json_runs_sort_filter() {
+        let json = r#"[
+            {"type":"readers.faux", "count":4, "mode":"ramp", "minx":1, "maxx":4},
+            {"type":"filters.sort", "dimensions":"X", "order":"desc"}
+        ]"#;
+        let mut pipeline = pipeline_from_json(json).unwrap();
+        let views = pipeline.execute(Vec::new()).unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].get_f64(0, &pdal_core::point::DimId::X), 4.0);
+        assert_eq!(views[0].get_f64(3, &pdal_core::point::DimId::X), 1.0);
+    }
+
+    #[test]
+    fn pipeline_json_runs_groupby_filter() {
+        let json = r#"[
+            {"type":"readers.faux", "count":2, "mode":"ramp", "minx":1, "maxx":2},
+            {"type":"filters.groupby", "dimension":"X"}
+        ]"#;
+        let mut pipeline = pipeline_from_json(json).unwrap();
+        let views = pipeline.execute(Vec::new()).unwrap();
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].len(), 1);
+        assert_eq!(views[1].len(), 1);
+    }
+
+    #[test]
+    fn sort_rejects_unknown_order() {
+        let mut options = Options::new();
+        options.add("dimensions", "X").add("order", "sideways");
+        let err = match create_filter("filters.sort", &options) {
+            Ok(_) => panic!("expected invalid sort order to fail"),
+            Err(err) => err,
+        };
+        assert!(err.to_string().contains("order must be 'asc' or 'desc'"));
     }
 
     #[test]

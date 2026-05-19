@@ -69,6 +69,34 @@ fn pipeline_command_accepts_filename_string_stages() {
 }
 
 #[test]
+fn pipeline_command_runs_sort_filter() {
+    let temp = make_temp_dir("pdal-rs-pipeline-command-sort");
+    let output = temp.join("out.pcd");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.faux","count":4,"mode":"ramp","minx":1,"maxx":4}},
+  {{"type":"filters.sort","dimensions":"X","order":"desc"}},
+  {{"type":"writers.pcd","filename":"{}","order":"X,Y,Z","precision":2}}
+]
+"#,
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    run_rust_pipeline(&pipeline);
+
+    let view = read_pcd(&output);
+    assert_eq!(view.len(), 4);
+    assert_eq!(view.get_f64(0, &DimId::X), 4.0);
+    assert_eq!(view.get_f64(3, &DimId::X), 1.0);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

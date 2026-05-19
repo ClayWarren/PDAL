@@ -407,6 +407,7 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!(false)),
             ),
         ],
+        "filters.groupby" => vec![option("dimension", "Dimension used to group points.", None)],
         "filters.locate" => vec![
             option("dimension", "Dimension to inspect.", None),
             option("minmax", "Select the min or max point.", Some(json!("max"))),
@@ -418,7 +419,21 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             Some(json!(false)),
         )],
         "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
+        "filters.returns" => vec![option(
+            "groups",
+            "Comma-separated return groups to keep.",
+            Some(json!("last")),
+        )],
         "filters.sample" => vec![option("radius", "Sample radius.", Some(json!(1.0)))],
+        "filters.sort" => vec![
+            option("dimensions", "Comma-separated dimensions to sort by.", None),
+            option("order", "Sort order: asc or desc.", Some(json!("asc"))),
+            option(
+                "algorithm",
+                "Sort algorithm: normal or stable.",
+                Some(json!("normal")),
+            ),
+        ],
         "filters.stats" => vec![
             option(
                 "dimensions",
