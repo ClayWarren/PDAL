@@ -17,7 +17,14 @@ use std::path::Path;
 pub struct LasWriter {
     filename: String,
     compression: bool,
+    minor_version: Option<u8>,
     point_format: u8,
+    scale_x: Option<f64>,
+    scale_y: Option<f64>,
+    scale_z: Option<f64>,
+    offset_x: Option<f64>,
+    offset_y: Option<f64>,
+    offset_z: Option<f64>,
 }
 
 struct ExtraDim {
@@ -36,10 +43,22 @@ impl LasWriter {
     }
 
     fn new_with_compression(options: &Options, driver_requests_compression: bool) -> Self {
+        let point_format = options
+            .value("dataformat_id")
+            .and_then(|value| value.trim().parse().ok())
+            .unwrap_or_else(|| options.get_u64("point_format", 3) as u8);
+
         Self {
             filename: options.get_str("filename", ""),
             compression: driver_requests_compression || options.get_bool("compression", false),
-            point_format: options.get_u64("point_format", 3) as u8,
+            minor_version: numeric_option_u8(options, "minor_version"),
+            point_format,
+            scale_x: numeric_option_f64(options, "scale_x"),
+            scale_y: numeric_option_f64(options, "scale_y"),
+            scale_z: numeric_option_f64(options, "scale_z"),
+            offset_x: numeric_option_f64(options, "offset_x"),
+            offset_y: numeric_option_f64(options, "offset_y"),
+            offset_z: numeric_option_f64(options, "offset_z"),
         }
     }
 }
@@ -59,6 +78,9 @@ impl Writer for LasWriter {
         let mut builder = Builder::from(Header::default());
         builder.point_format = Format::new(self.point_format)
             .map_err(|e| StageError(format!("Invalid point format: {}", e)))?;
+        if let Some(minor) = self.minor_version {
+            builder.version = las::Version { major: 1, minor };
+        }
 
         // If an SRS is present, we must use LAS 1.4 for WKT support
         if !views.is_empty() && !views[0].spatial_reference().is_empty() {
@@ -99,16 +121,16 @@ impl Writer for LasWriter {
         if has_points {
             builder.transforms = las::Vector {
                 x: las::Transform {
-                    scale: 0.01,
-                    offset: min_x,
+                    scale: self.scale_x.unwrap_or(0.01),
+                    offset: self.offset_x.unwrap_or(min_x),
                 },
                 y: las::Transform {
-                    scale: 0.01,
-                    offset: min_y,
+                    scale: self.scale_y.unwrap_or(0.01),
+                    offset: self.offset_y.unwrap_or(min_y),
                 },
                 z: las::Transform {
-                    scale: 0.01,
-                    offset: min_z,
+                    scale: self.scale_z.unwrap_or(0.01),
+                    offset: self.offset_z.unwrap_or(min_z),
                 },
             };
         }
@@ -306,6 +328,18 @@ fn pdrf_dims(pdrf: u8) -> Vec<DimId> {
         dims.push(DimId::Infrared);
     }
     dims
+}
+
+fn numeric_option_f64(options: &Options, key: &str) -> Option<f64> {
+    options
+        .value(key)
+        .and_then(|value| value.trim().parse::<f64>().ok())
+}
+
+fn numeric_option_u8(options: &Options, key: &str) -> Option<u8> {
+    options
+        .value(key)
+        .and_then(|value| value.trim().parse::<u8>().ok())
 }
 
 fn pdal_to_las_type(ty: DimType) -> u8 {
