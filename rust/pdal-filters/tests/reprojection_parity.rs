@@ -1,7 +1,6 @@
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::DimId;
-use pdal_core::srs::SpatialReference;
 use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_io::faux::FauxReader;
 

@@ -127,6 +127,47 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!(true)),
             ),
         ],
+        "filters.approximatecoplanar" => vec![
+            option(
+                "knn",
+                "Number of nearest neighbors to inspect.",
+                Some(json!(8)),
+            ),
+            option("thresh1", "First coplanarity threshold.", Some(json!(25.0))),
+            option("thresh2", "Second coplanarity threshold.", Some(json!(6.0))),
+        ],
+        "filters.chipper" => vec![option(
+            "capacity",
+            "Maximum number of points per chip.",
+            Some(json!(5000)),
+        )],
+        "filters.cluster" => vec![
+            option(
+                "min_points",
+                "Minimum number of points in a cluster.",
+                Some(json!(1)),
+            ),
+            option("max_points", "Maximum number of points in a cluster.", None),
+            option(
+                "tolerance",
+                "Cluster neighbor distance tolerance.",
+                Some(json!(1.0)),
+            ),
+            option("is3d", "Use X/Y/Z instead of X/Y.", Some(json!(true))),
+        ],
+        "filters.dbscan" => vec![
+            option(
+                "min_points",
+                "Minimum points required to form a dense region.",
+                Some(json!(6)),
+            ),
+            option("eps", "Neighborhood search radius.", Some(json!(1.0))),
+            option(
+                "dimensions",
+                "Comma-separated dimensions used for distance checks.",
+                Some(json!("X,Y,Z")),
+            ),
+        ],
         "filters.decimation" => vec![
             option("step", "Keep every Nth point.", Some(json!(1))),
             option("offset", "Starting point offset.", Some(json!(0))),
@@ -134,6 +175,70 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "limit",
                 "Maximum number of points to consider.",
                 Some(json!(0)),
+            ),
+        ],
+        "filters.eigenvalues" => vec![
+            option(
+                "knn",
+                "Number of nearest neighbors to inspect.",
+                Some(json!(8)),
+            ),
+            option(
+                "normalize",
+                "Normalize eigenvalue output.",
+                Some(json!(false)),
+            ),
+            option("stride", "Point stride for calculations.", Some(json!(1))),
+            option("radius", "Optional radius search distance.", None),
+            option(
+                "min_k",
+                "Minimum neighbors required for radius mode.",
+                Some(json!(3)),
+            ),
+        ],
+        "filters.elm" => vec![
+            option(
+                "cell",
+                "Cell size for low point detection.",
+                Some(json!(10.0)),
+            ),
+            option(
+                "class",
+                "Classification value for low points.",
+                Some(json!(7)),
+            ),
+            option(
+                "threshold",
+                "Minimum vertical separation for low point detection.",
+                Some(json!(1.0)),
+            ),
+        ],
+        "filters.estimaterank" => vec![
+            option(
+                "knn",
+                "Number of nearest neighbors to inspect.",
+                Some(json!(8)),
+            ),
+            option("threshold", "Rank threshold.", Some(json!(0.01))),
+        ],
+        "filters.gpstimeconvert" => vec![
+            option(
+                "conversion",
+                "GPS time conversion in {input}2{output} form.",
+                None,
+            ),
+            option("in_time", "Input GPS time representation.", None),
+            option("out_time", "Output GPS time representation.", None),
+            option("start_date", "Start date for GWS/GDS conversions.", None),
+            option(
+                "wrap",
+                "Wrap converted week/day seconds.",
+                Some(json!(false)),
+            ),
+            option(
+                "wrapped",
+                "Treat source week/day seconds as wrapped.",
+                Some(json!(false)),
             ),
         ],
         "filters.head" | "filters.tail" => vec![
@@ -145,9 +250,54 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
         ],
         "filters.groupby" => vec![option("dimension", "Dimension used to group points.", None)],
+        "filters.hag_nn" => vec![
+            option(
+                "count",
+                "Neighbor count for ground interpolation.",
+                Some(json!(1)),
+            ),
+            option(
+                "max_distance",
+                "Maximum ground neighbor distance.",
+                Some(json!(0.0)),
+            ),
+            option(
+                "allow_extrapolation",
+                "Allow extrapolation without enough neighbors.",
+                Some(json!(false)),
+            ),
+            option("class", "Ground classification value.", Some(json!(2))),
+        ],
+        "filters.iqr" => vec![
+            option(
+                "multiplier",
+                "Interquartile range multiplier.",
+                Some(json!(1.5)),
+            ),
+            option("dimension", "Dimension to classify.", Some(json!("Z"))),
+        ],
+        "filters.label_duplicates" => vec![option(
+            "dimensions",
+            "Comma-separated dimensions used to identify adjacent duplicates.",
+            Some(json!("X,Y,Z")),
+        )],
         "filters.locate" => vec![
             option("dimension", "Dimension to inspect.", None),
             option("minmax", "Select the min or max point.", Some(json!("max"))),
+        ],
+        "filters.lof" => vec![option(
+            "minpts",
+            "Number of neighbors used for local outlier factor.",
+            Some(json!(10)),
+        )],
+        "filters.mad" => vec![
+            option("multiplier", "MAD scale multiplier.", Some(json!(1.4826))),
+            option("dimension", "Dimension to classify.", Some(json!("Z"))),
+            option(
+                "mad_multiplier",
+                "Outlier threshold multiplier.",
+                Some(json!(2.0)),
+            ),
         ],
         "filters.merge" => Vec::new(),
         "filters.mortonorder" => vec![option(
@@ -155,7 +305,56 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Sort in reverse Morton order.",
             Some(json!(false)),
         )],
+        "filters.nndistance" => vec![
+            option("knn", "Neighbor rank or count.", Some(json!(8))),
+            option("mode", "Distance mode: kth or avg.", Some(json!("kth"))),
+        ],
+        "filters.optimalneighborhood" => vec![
+            option("min_k", "Minimum neighborhood size.", Some(json!(3))),
+            option("max_k", "Maximum neighborhood size.", Some(json!(8))),
+        ],
+        "filters.outlier" => vec![
+            option(
+                "method",
+                "Outlier method: statistical or radius.",
+                Some(json!("statistical")),
+            ),
+            option(
+                "min_k",
+                "Minimum neighbors for radius mode.",
+                Some(json!(2)),
+            ),
+            option("radius", "Radius for radius mode.", Some(json!(1.0))),
+            option(
+                "mean_k",
+                "Neighbor count for statistical mode.",
+                Some(json!(8)),
+            ),
+            option(
+                "multiplier",
+                "Standard deviation multiplier for statistical mode.",
+                Some(json!(2.0)),
+            ),
+            option(
+                "class",
+                "Classification value for outliers.",
+                Some(json!(7)),
+            ),
+        ],
+        "filters.radialdensity" => {
+            vec![option("radius", "Density search radius.", Some(json!(1.0)))]
+        }
+        "filters.planefit" => vec![option(
+            "knn",
+            "Number of nearest neighbors to fit.",
+            Some(json!(8)),
+        )],
         "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
+        "filters.reciprocity" => vec![option(
+            "knn",
+            "Number of nearest neighbors to inspect.",
+            Some(json!(8)),
+        )],
         "filters.reprojection" => vec![
             option("out_srs", "Spatial reference for output data.", None),
             option("in_srs", "Override spatial reference for input data.", None),
@@ -171,6 +370,11 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             Some(json!("last")),
         )],
         "filters.sample" => vec![option("radius", "Sample radius.", Some(json!(1.0)))],
+        "filters.separatescanline" => vec![option(
+            "groupby",
+            "Number of scan lines to group into each output view.",
+            Some(json!(1)),
+        )],
         "filters.sort" => vec![
             option("dimensions", "Comma-separated dimensions to sort by.", None),
             option("order", "Sort order: asc or desc.", Some(json!("asc"))),
@@ -192,7 +396,23 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!(false)),
             ),
         ],
+        "filters.voxelcenternearestneighbor" | "filters.voxelcentroidnearestneighbor" => {
+            vec![option("cell", "Voxel cell size.", Some(json!(1.0)))]
+        }
         "filters.voxeldownsize" => vec![option("cell", "Voxel cell size.", Some(json!(1.0)))],
+        "filters.zsmooth" => vec![
+            option("radius", "2D neighbor search radius.", Some(json!(1.0))),
+            option(
+                "position",
+                "Sorted-neighbor percentile position.",
+                Some(json!(0.5)),
+            ),
+            option(
+                "dimension",
+                "Output dimension for smoothed Z values.",
+                Some(json!("Z")),
+            ),
+        ],
         "writers.null" => Vec::new(),
         "writers.bpf" | "writers.fbi" | "writers.gltf" | "writers.sbet" | "writers.las"
         | "writers.laz" => vec![
