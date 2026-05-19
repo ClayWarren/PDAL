@@ -1,9 +1,8 @@
-use crate::error::{clear_last_error, ffi_catch, set_last_error};
+use crate::error::set_last_error;
 use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
-use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
-use pdal_core::point::{PointLayout, PointView};
+use pdal_core::point::PointView;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::chipper::ChipperFilter;
@@ -14,11 +13,9 @@ use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
-use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
-use pdal_filters::griddecimation;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
@@ -253,112 +250,6 @@ pub unsafe extern "C" fn pdal_stage_range_point_passes(
     false
 }
 
-/// Destroy a stage.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`, or null.
-/// Must not be called twice on the same pointer.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_destroy(stage: *mut StageWrapper) {
-    if !stage.is_null() {
-        drop(Box::from_raw(stage));
-    }
-}
-
-/// Reset the streaming state of a stage.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_reset(stage: *mut StageWrapper) {
-    if let Some(stage) = stage.as_mut() {
-        stage.filter.reset();
-    }
-}
-
-/// Process one point in streaming mode. Returns `true` to keep the point.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> bool {
-    ffi_catch(false, || {
-        clear_last_error();
-        if let Some(stage) = stage.as_mut() {
-            // Counter-based filters (decimation, head, tail) ignore the point;
-            // pass an empty view. Data-dependent filters must instead stream
-            // through `pdal_stage_process_one_at`.
-            let mut empty = PointView::new(std::rc::Rc::new(PointLayout::new()));
-            stage.filter.process_one(&mut empty, 0)
-        } else {
-            set_last_error("null stage");
-            false
-        }
-    })
-}
-
-/// Decide whether to keep point `idx` of `view` in streaming mode, passing the
-/// point so the filter can inspect its data.
-///
-/// This is the faithful streaming entry point, mirroring PDAL's
-/// `Streamable::processOne(PointRef&)`. Use it for any filter whose streaming
-/// decision depends on point values (e.g. `filters.expression`).
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `view` must be a valid pointer returned by `pdal_point_view_create` or
-/// `pdal_stage_run`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_process_one_at(
-    stage: *mut StageWrapper,
-    view: *mut PointView,
-    idx: u64,
-) -> bool {
-    ffi_catch(false, || {
-        clear_last_error();
-        if let (Some(stage), Some(view)) = (stage.as_mut(), view.as_mut()) {
-            stage.filter.process_one(view, idx)
-        } else {
-            set_last_error("null stage or view");
-            false
-        }
-    })
-}
-
-/// Run the filter over a complete input view. Returns a new output view
-/// (caller owns it), or null on error.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `input` must be a valid pointer returned by `pdal_point_view_create`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_run(
-    stage: *mut StageWrapper,
-    input: *mut PointView,
-) -> *mut PointView {
-    ffi_catch(std::ptr::null_mut(), || {
-        clear_last_error();
-        if let (Some(stage), Some(input)) = (stage.as_mut(), input.as_mut()) {
-            match stage.filter.run(std::slice::from_ref(input)) {
-                Ok(mut outputs) => {
-                    if !outputs.is_empty() {
-                        return Box::into_raw(Box::new(outputs.remove(0)));
-                    }
-                }
-                Err(err) => set_last_error(err.to_string()),
-            }
-        } else {
-            set_last_error("null stage or input view");
-        }
-        std::ptr::null_mut()
-    })
-}
-
 /// Create a sort filter stage.
 ///
 /// # Safety
@@ -438,45 +329,6 @@ pub unsafe extern "C" fn pdal_stage_create_separatescanline(groupby: u64) -> *mu
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
-/// Run the filter over a complete input view, returning multiple output views.
-/// The returned pointers are written into the `outputs` buffer, up to `max_outputs`.
-/// Returns the actual number of output views produced.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `input` must be a valid pointer returned by `pdal_point_view_create`.
-/// `outputs` must be a valid pointer to a buffer of size `max_outputs` pointer elements.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_run_multi(
-    stage: *mut StageWrapper,
-    input: *mut PointView,
-    outputs: *mut *mut PointView,
-    max_outputs: u64,
-) -> u64 {
-    ffi_catch(0, || {
-        clear_last_error();
-        if let (Some(stage), Some(input), false) =
-            (stage.as_mut(), input.as_mut(), outputs.is_null())
-        {
-            match stage.filter.run(std::slice::from_ref(input)) {
-                Ok(mut results) => {
-                    let count = std::cmp::min(results.len() as u64, max_outputs);
-                    for i in 0..count {
-                        let view = results.remove(0);
-                        *outputs.offset(i as isize) = Box::into_raw(Box::new(view));
-                    }
-                    return count;
-                }
-                Err(err) => set_last_error(err.to_string()),
-            }
-        } else {
-            set_last_error("null stage, input view, or output buffer");
-        }
-        0
-    })
-}
-
 /// Create a groupby filter stage.
 ///
 /// # Safety
@@ -515,124 +367,6 @@ pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
     }
     let filter = Box::new(LabelDuplicatesFilter::new(vec_dims));
     Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Export a stage's accumulated metadata.
-///
-/// # Safety
-///
-/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_metadata(stage: *const StageWrapper) -> *mut MetadataNode {
-    if let Some(stage) = stage.as_ref() {
-        Box::into_raw(Box::new(stage.filter.metadata()))
-    } else {
-        std::ptr::null_mut()
-    }
-}
-
-/// Create a `filters.expressionstats` stage.
-///
-/// # Safety
-///
-/// `dim_name` must be a valid NUL-terminated C-string.
-/// `exprs` must be a valid pointer to a C-array of `count` C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_expressionstats(
-    dim_name: *const c_char,
-    exprs: *const *const c_char,
-    count: u64,
-) -> *mut StageWrapper {
-    clear_last_error();
-    if dim_name.is_null() || (count > 0 && exprs.is_null()) {
-        set_last_error("null expressionstats input");
-        return std::ptr::null_mut();
-    }
-    let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
-    let mut sources = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let ptr = *exprs.offset(i as isize);
-        if ptr.is_null() {
-            set_last_error("null expression string");
-            return std::ptr::null_mut();
-        }
-        sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
-    }
-    match pdal_filters::expressionstats::ExpressionStatsFilter::new(&dim_name, &sources) {
-        Ok(f) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(f),
-        })),
-        Err(e) => {
-            set_last_error(e.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create a `filters.mongo` stage from a JSON expression string.
-///
-/// Returns null and sets the last error if `expr` is null or invalid JSON.
-///
-/// # Safety
-///
-/// `expr` must be a valid null-terminated C string.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
-    expr: *const c_char,
-) -> *mut StageWrapper {
-    clear_last_error();
-    if expr.is_null() {
-        set_last_error("null expression string");
-        return std::ptr::null_mut();
-    }
-    let json_str = CStr::from_ptr(expr).to_string_lossy();
-    match pdal_filters::mongo::MongoExpressionFilter::new(&json_str) {
-        Ok(f) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(f),
-        })),
-        Err(e) => {
-            set_last_error(e.to_string());
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// Create a `filters.expression` stage from a list of expression strings.
-///
-/// Returns null and sets the last error if `exprs` is null, contains a null
-/// entry, or any expression fails to parse.
-///
-/// # Safety
-///
-/// `exprs` must be a valid pointer to a C-array of `count` C-strings.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_stage_create_expression(
-    exprs: *const *const c_char,
-    count: u64,
-) -> *mut StageWrapper {
-    clear_last_error();
-    if exprs.is_null() {
-        set_last_error("null expression array");
-        return std::ptr::null_mut();
-    }
-    let mut sources = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let ptr = *exprs.offset(i as isize);
-        if ptr.is_null() {
-            set_last_error("null expression string");
-            return std::ptr::null_mut();
-        }
-        sources.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
-    }
-    match ExpressionFilter::new(&sources) {
-        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
-            filter: Box::new(filter),
-        })),
-        Err(err) => {
-            set_last_error(err.to_string());
-            std::ptr::null_mut()
-        }
-    }
 }
 
 /// Create a merge filter stage.
@@ -1050,47 +784,6 @@ pub extern "C" fn pdal_stage_create_optimalneighborhood(
         max_k as usize,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
-}
-
-/// Get the indices of the kept points in grid decimation.
-/// Caller is responsible for freeing the returned buffer with pdal_free_u64_array.
-///
-/// # Safety
-///
-/// `view` and `output_type` must be valid.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_grid_decimation_get_kept_indices(
-    view: *const PointView,
-    resolution: f64,
-    output_type: *const c_char,
-    out_len: *mut u64,
-) -> *mut u64 {
-    if view.is_null() || output_type.is_null() || out_len.is_null() {
-        return std::ptr::null_mut();
-    }
-    let output_type_str = CStr::from_ptr(output_type).to_string_lossy();
-    if let Some(pt_view) = view.as_ref() {
-        let kept = griddecimation::get_kept_indices(pt_view, resolution, &output_type_str);
-        *out_len = kept.len() as u64;
-        let mut boxed_slice = kept.into_boxed_slice();
-        let ptr = boxed_slice.as_mut_ptr();
-        std::mem::forget(boxed_slice);
-        ptr
-    } else {
-        std::ptr::null_mut()
-    }
-}
-
-/// Free a u64 array allocated by Rust.
-///
-/// # Safety
-///
-/// `ptr` must be a valid pointer returned by a pdal allocator or null.
-#[no_mangle]
-pub unsafe extern "C" fn pdal_free_u64_array(ptr: *mut u64, len: u64) {
-    if !ptr.is_null() {
-        let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len as usize));
-    }
 }
 
 /// Create a divider filter stage.

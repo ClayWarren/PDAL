@@ -25,12 +25,13 @@ Off limits unless the user explicitly revises this plan:
 - Do not pass C++ object pointers across the C ABI as Rust handles.
 - Do not port optional plugins or design a Rust plugin loading SDK yet.
 - Do not copy vendored C/C++ code into Rust crates. Follow `rust/VENDOR.md`.
-- Do not start LAS/LAZ, GDAL, PROJ, compression, remote I/O, kernels, apps, or
-  broad plugin work before the current deterministic local I/O slices are
-  complete.
-- Do not port concrete CLI commands yet. `pdal-kernels` may hold registry and
-  command-contract infrastructure, but user-visible commands must wait for the
-  command readiness checkpoint below.
+- Do not start remote I/O, optional plugin work, or broad vendor-heavy work
+  without a concrete parity milestone. LAS/LAZ, the first GDAL reader slice,
+  and simple command work have started; new work in those families must stay
+  narrow and regression-backed.
+- Do not add new concrete CLI commands just because `pdal-cli` can dispatch
+  them. User-visible commands must satisfy the command readiness checkpoint
+  below and include installed-PDAL regression coverage.
 - Do not add placeholder modules, placeholder crates, or broad skeletons that
   are not tied to a concrete parity milestone.
 - Do not weaken existing C++ validation or tests to make a Rust port pass.
@@ -39,14 +40,14 @@ Off limits unless the user explicitly revises this plan:
 
 Current next milestone:
 
-1. Extend deterministic local I/O one narrow format at a time, behind the C
-   ABI, with fixture behavior covered before moving on.
+1. Keep hardening the Rust-backed local I/O and command surface that already
+   exists: regression coverage, option parity, metadata/bounds behavior, and
+   error/output shape.
 2. Prove reader -> filter -> writer pipeline behavior through the Rust core
-   boundary for each new format.
-3. Stay on deterministic local formats for now. Narrow binary formats are
-   acceptable when fixture-scoped and dependency-light, but compressed,
-   GDAL-backed, LAS/LAZ, plugin-backed, and remote paths remain deferred until
-   this local I/O loop is solid.
+   boundary for each new format or command path.
+3. New I/O should still be narrow and fixture-scoped. Remote paths,
+   plugin-backed paths, and broad GDAL/PROJ coverage remain deferred until the
+   local pipeline and command loop is reliable.
 
 Every commit should say which checkpoint it advances. If the answer is "none",
 it probably should not be part of this port.
@@ -60,11 +61,12 @@ Approximate first-party code size, excluding comments and blanks:
 - `filters/`: 21.1k LOC. Pure transforms and algorithmic stages. This is the
   current spike area because it can prove the Rust core -> C ABI -> C++ wrapper
   loop without starting with file-format or GDAL/PROJ complexity.
-- `io/`: 24.6k LOC. Readers and writers. This is the largest first-party area
-  and should wait until the core ABI and external-library FFI patterns are
-  stable.
-- `kernels/`: 3.3k LOC. CLI subcommands. These sit above the core and stage
-  graph, so they are late migration work.
+- `io/`: 24.6k LOC. Readers and writers. The Rust port has an active local
+  I/O vertical slice here now; keep additions narrow, fixture-scoped, and
+  parity-backed.
+- `kernels/`: 3.3k LOC. CLI subcommands. The first simple, pipeline-shaped
+  commands are now present in `pdal-cli`; broader kernels remain late
+  migration work.
 - `apps/` and `tools/`: 1.1k LOC. CLI entry points and small tools. These are
   also top-layer migration work.
 
@@ -97,10 +99,11 @@ Current target crates:
   spatial/geometry helpers, and shared stage traits.
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
-- `pdal-io`: first-party readers and writers. The deterministic text I/O
-  vertical slice has started here.
-- `pdal-kernels`: CLI subcommands. Kernel registry foundation only; concrete
-  kernel ports remain intentionally last.
+- `pdal-io`: first-party readers and writers. The deterministic local I/O
+  vertical slice is active here.
+- `pdal-kernels`: CLI subcommands and command-contract helpers. Keep heavy
+  kernel behavior out until the underlying core/I/O/filter capabilities have
+  parity coverage.
 - `pdal-cli`: thin executable surface.
 - `pdal-plugins`: plugin metadata and discovery helpers. Do not port optional
   plugins or add a loading SDK until a versioned plugin boundary is designed.
@@ -137,25 +140,27 @@ foundations are not permission to skip ahead to broad top-layer ports.
 2. Expand `pdal/` core as filters require it. Do not attempt a standalone
    directory-wide core rewrite; each new core capability should be justified by
    a stage parity need.
-3. `io/` after the filter/core loop is stable. Readers and writers introduce
-   file formats, byte layout, compression, GDAL, PROJ, LASzip, and similar FFI
-   concerns, so they should not be the next frontier until the ABI and point
-   model are proven.
+3. `io/` after the filter/core loop is stable. This checkpoint is now active:
+   local text/ASCII/binary formats, LAS/LAZ, and the first GDAL reader slice
+   exist. Continue one narrow reader/writer family at a time, with option,
+   metadata, and installed-PDAL regression coverage.
 4. `apps/` and `tools/` after the library surface is stable enough to run real
    pipelines through the C ABI. This is small by LOC but high in dependency
    density: `apps/pdal.cpp` owns CLI dispatch and driver/option introspection,
    while `tools/lasdump` and `tools/nitfwrap` are tied to LAS/LAZ and NITF
    strategy decisions.
-5. `kernels/` last. Kernels are CLI subcommands above the pipeline/stage
-   system; porting them before the core, filters, and I/O layers are stable
-   creates top-down churn instead of proving behavior.
+5. `kernels/` last. The first simple command surface lives in `pdal-cli`
+   because the pipeline/reader/filter/writer loop can exercise it. Do not use
+   that as permission to sweep kernels broadly; only add commands whose lower
+   layers are already Rust-backed and regression-tested.
 6. Optional plugins after the first-party library and command surface are
    stable. Until then, plugins stay in C++ or are handled only as metadata and
    discovery compatibility helpers.
 
-Do not jump to `kernels/`, apps/tools, plugins, vendor-heavy work, or broad
-`io/` work just because those areas are smaller or visible. The active
-post-filter milestone is the narrow deterministic text I/O slice.
+Do not jump to broad `kernels/`, apps/tools, plugins, vendor-heavy work, or
+broad `io/` work just because those areas are smaller or visible. The active
+post-filter milestone is the local I/O plus simple command surface, kept
+vertical-slice driven.
 
 Command work is allowed only after the library can run realistic pipelines
 without special-case test plumbing:
@@ -336,9 +341,11 @@ Done when:
 
 Goal: prove readers/writers after the core and filter ABI are stable.
 
-Start with the smallest deterministic format path that avoids unnecessary
-external FFI. Do not begin with LAS, GDAL, PROJ, compression, or remote I/O
-unless the spike explicitly requires that complexity.
+This checkpoint is active and no longer limited to the first text slice. Keep
+the same discipline: each reader/writer family should be narrow,
+fixture-scoped, option-aware, and regression-tested against installed PDAL
+where possible. LAS/LAZ and the first GDAL-backed reader slice have started;
+remote I/O, plugin-backed I/O, and broad GDAL/PROJ coverage remain deferred.
 
 Required shape:
 
@@ -414,7 +421,9 @@ Done when:
   covering 10 RMS error dimensions with bit-parity matching PDAL's behavior.
 - `readers.las` and `writers.las` have a Rust implementation for ASPRS LAS
   and LAZ formats, using the `las` and `laz` crates. They support standard
-  dimensions, V1.0-1.4 point formats, and compression/decompression.
+  dimensions, V1.0-1.4 point formats, Extra Bytes, SRS WKT/EPSG extraction,
+  and compression/decompression. Extra Bytes scale/offset and explicit
+  `compression=true` behavior have direct regression coverage.
 - `readers.fbi` and `writers.fbi` have a Rust implementation for the TerraScan
   Fast Binary local path, including separate dimension streams, header offsets,
   color stream ordering, and byte-for-byte installed-PDAL read/write parity.
@@ -475,11 +484,13 @@ Done when:
   ULEM/polar metadata remain intentionally deferred.
 - Installed-PDAL regression for the BPF slice is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test bpf_regression -- --ignored`.
-- The deterministic local I/O slice is now broad enough to support the first
-  command-readiness work. Additional I/O targets should still be narrow, local,
-  deterministic, and dependency-light. Avoid compression-backed, GDAL-backed,
-  LAS/LAZ, plugin-backed, or remote reader/writer work until their strategies
-  are explicit.
+- `readers.gdal` has started as a narrow raster-to-point-cloud slice for local
+  GDAL-backed files. Treat this as a focused I/O milestone, not permission for
+  broad raster/vector/GDAL/PROJ expansion.
+- The deterministic local I/O slice is now broad enough to support command
+  readiness work. Additional I/O targets should still be narrow, local,
+  deterministic, and dependency-aware. Avoid plugin-backed or remote
+  reader/writer work until their strategies are explicit.
 
 ### 7. Apps, Tools, Then Kernels
 
@@ -487,18 +498,18 @@ Goal: move top-layer command behavior only after the library surface is stable.
 
 Required shape:
 
-- `apps/` and `tools/` move before `kernels/`.
-- `kernels/` remain last because they sit above pipeline, stage, options, I/O,
-  logging, and error behavior.
+- `apps/`, `tools/`, and broad `kernels/` work remain above the library
+  surface. Simple `pdal-cli` command ports are allowed only when they are thin
+  wrappers over Rust-backed pipeline/I/O/filter behavior.
 - `apps/pdal.cpp` is treated as the CLI dispatch surface for command parity,
   not as an independent early port.
 - `tools/lasdump` and `tools/nitfwrap` remain deferred until their LAS/LAZ and
   NITF lower-layer strategies are explicit.
-- Concrete kernel work does not start until the command readiness gates in
-  `Migration Order` are satisfied.
-- `pdal pipeline` is the first command candidate because it proves the library
-  surface directly. `pdal info` follows only after metadata, stats, bounds, and
-  reader behavior are ready.
+- New concrete command work does not start until the command readiness gates in
+  `Migration Order` are satisfied for that command.
+- `pdal pipeline` proved the library surface directly. `pdal info` and simple
+  pipeline-shaped commands are now present; keep more complex commands
+  deferred until their lower-layer behavior is Rust-backed.
 - CLI output and exit behavior are regression-tested against existing commands.
 
 Current status:
@@ -509,22 +520,31 @@ Current status:
   Rust-owned stage/command metadata for the currently implemented Rust surface.
 - Pipeline JSON can construct the command-ready Rust filter subset:
   `decimation`, `groupby`, `head`, `locate`, `merge`, `mortonorder`,
-  `randomize`, `returns`, `sample`, `sort`, `stats`, `tail`, and
+  `randomize`, `reprojection`, `returns`, `sample`, `sort`, `stats`, `tail`, and
   `voxeldownsize`. Other Rust filter modules may exist, but they are not
   command-ready until they are deliberately added to the registry with option
   parsing and coverage.
-- `pipeline` is the only concrete Rust command currently enabled. It accepts a
-  pipeline JSON filename and executes implemented Rust stages through the same
-  Rust C ABI pipeline parser used by lower-layer tests. With `--showjson`, it
-  reports the Rust pipeline execution summary and serialized pipeline metadata.
+- Concrete Rust commands currently enabled in `pdal-rs`: `pipeline`, `info`,
+  `translate`, `merge`, `sort`, `random`, `hausdorff`, `chamfer`, and `delta`.
+  These are intentionally limited to Rust-backed local readers/writers/filters
+  and reporting metrics.
+- `pipeline` accepts a pipeline JSON filename and executes implemented Rust
+  stages through the same Rust C ABI pipeline parser used by lower-layer tests.
+  With `--showjson`, it reports the Rust pipeline execution summary and
+  serialized pipeline metadata.
 - Command-level regression for `pipeline` is available with:
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test pipeline_command -- --ignored`.
   It compares the artifact written by installed `pdal pipeline` with the
   artifact written by `pdal-rs pipeline` for deterministic local text, PCD,
   and PLY reader -> decimation filter -> writer paths, including bare array,
   root `pipeline` object, and filename-string stage JSON forms.
-- Do not add `info`, `translate`, or other kernels yet; they need richer
-  metadata, bounds, option, and I/O parity first.
+- Command-level regressions for `info`, `translate`, `merge`, `sort`,
+  `random`, `hausdorff`, `chamfer`, and `delta` live in their matching
+  `pdal-cli/tests/*_command.rs` files. Installed-PDAL comparisons are marked
+  ignored where they require `pdal` on `PATH`.
+- Do not add additional kernels unless their lower-layer behavior is already
+  Rust-backed and they can be tested against installed PDAL for exit status,
+  stdout/stderr shape, and output artifacts.
 
 Done when:
 
@@ -539,9 +559,9 @@ Current Rust core primitives:
 - Point model: `PointLayout`, `PointView`, dimension IDs/types, source index
   tracking, per-view spatial reference storage, mesh face storage, and 2D/3D
   bounds calculation.
-- Point summaries: basic per-dimension count/min/max/mean over a view, for
-  later `info`-style reporting without running a filter as a side effect. The
-  C ABI exposes these summaries as Rust-owned JSON.
+- Point summaries: basic per-dimension count/min/max/mean over a view. The C
+  ABI exposes these summaries as Rust-owned JSON, and `pdal-rs info` now uses
+  them for its command output.
 - Stage model: filter and streamable traits for Rust-backed stages.
 - Pipeline model: minimal reader/filter/writer DAG execution, tags,
   dependencies, metadata aggregation, execution summaries with bounds and

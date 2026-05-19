@@ -28,9 +28,17 @@ struct ExtraDim {
 
 impl LasWriter {
     pub fn new(options: &Options) -> Self {
+        Self::new_with_compression(options, false)
+    }
+
+    pub fn new_laz(options: &Options) -> Self {
+        Self::new_with_compression(options, true)
+    }
+
+    fn new_with_compression(options: &Options, driver_requests_compression: bool) -> Self {
         Self {
             filename: options.get_str("filename", ""),
-            compression: options.get_bool("compression", false),
+            compression: driver_requests_compression || options.get_bool("compression", false),
             point_format: options.get_u64("point_format", 3) as u8,
         }
     }

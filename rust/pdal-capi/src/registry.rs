@@ -209,7 +209,8 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.text" => Ok(Box::new(pdal_io::text_writer::TextWriter::new(options))),
         "writers.pcd" => Ok(Box::new(pdal_io::pcd::PcdWriter::new(options))),
         "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
-        "writers.las" | "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
+        "writers.las" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
+        "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new_laz(options))),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options))),
         _ => Err(StageError(format!(
             "Writer driver '{name}' is not available in the Rust port."
@@ -438,7 +439,13 @@ pub unsafe extern "C" fn pdal_pipeline_create_json(json: *const c_char) -> *mut 
 mod tests {
     use super::*;
     use pdal_core::options::Options;
+    use pdal_core::pipeline::Reader;
+    use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+    use pdal_io::las::LasReader;
+    use std::fs;
     use std::path::Path;
+    use std::path::PathBuf;
+    use std::rc::Rc;
 
     #[test]
     fn every_listed_reader_driver_constructs() {
@@ -493,6 +500,24 @@ mod tests {
         assert!(create_reader("readers.unknown", &options).is_err());
         assert!(create_filter("filters.unknown", &options).is_err());
         assert!(create_writer("writers.unknown", &options).is_err());
+    }
+
+    #[test]
+    fn laz_writer_driver_forces_compression_for_las_extension() {
+        let temp = make_temp_dir("laz-driver-compression");
+        let output = temp.join("explicit-laz-driver.las");
+        let mut options = Options::new();
+        options.add("filename", output.display());
+
+        let mut writer = create_writer("writers.laz", &options).unwrap();
+        writer.write(&[single_point_view()]).unwrap();
+
+        let mut reader_options = Options::new();
+        reader_options.add("filename", output.display());
+        let mut reader = LasReader::new(&reader_options);
+        let views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].get_f64(0, &DimId::X), 1.0);
     }
 
     #[test]
@@ -642,5 +667,25 @@ mod tests {
             .to_string()
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
+    }
+
+    fn single_point_view() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, 1.0);
+        view.set_f64(point, &DimId::Y, 2.0);
+        view.set_f64(point, &DimId::Z, 3.0);
+        view
+    }
+
+    fn make_temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
     }
 }

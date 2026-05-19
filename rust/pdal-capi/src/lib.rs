@@ -5,6 +5,9 @@
 
 mod error;
 mod filter_abi;
+mod filter_expression_abi;
+mod filter_grid_abi;
+mod filter_runtime;
 mod io_abi;
 mod metadata_abi;
 mod metrics_abi;
@@ -18,6 +21,9 @@ mod stats_abi;
 
 pub use error::*;
 pub use filter_abi::*;
+pub use filter_expression_abi::*;
+pub use filter_grid_abi::*;
+pub use filter_runtime::*;
 pub use io_abi::*;
 pub use metadata_abi::*;
 pub use metrics_abi::*;
