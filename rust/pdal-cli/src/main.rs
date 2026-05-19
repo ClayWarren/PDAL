@@ -276,18 +276,31 @@ impl App {
     fn run_info(&self) -> i32 {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
-            println!("  pdal info <file>");
+            println!("  pdal info [--summary] <file>");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
                 0
             };
         }
-        if self.command_args.len() != 1 {
+        let mut filename: Option<&str> = None;
+        for arg in &self.command_args {
+            if arg == "--summary" {
+                continue;
+            }
+            if arg.starts_with("--") {
+                eprintln!("Error: unknown option '{arg}' for info");
+                return 1;
+            }
+            if filename.replace(arg).is_some() {
+                eprintln!("Error: info expects exactly one filename");
+                return 1;
+            }
+        }
+        let Some(filename) = filename else {
             eprintln!("Error: info expects exactly one filename");
             return 1;
-        }
-        let filename = &self.command_args[0];
+        };
 
         // Resolve the reader driver from the filename, as `pdal info` does.
         let driver = match pdal_core::driver::infer_reader_driver(filename) {
@@ -1067,11 +1080,7 @@ fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "filters.voxeldownsize" => vec![option("cell", "Voxel cell size.", Some(json!(1.0)))],
         "writers.null" => Vec::new(),
-        "writers.bpf"
-        | "writers.fbi"
-        | "writers.gltf"
-        | "writers.sbet"
-        | "writers.las"
+        "writers.bpf" | "writers.fbi" | "writers.gltf" | "writers.sbet" | "writers.las"
         | "writers.laz" => vec![
             filename(),
             option("compression", "Compress output data.", Some(json!(false))),

@@ -1,8 +1,8 @@
 use pdal_core::options::Options;
 use pdal_core::pipeline::Pipeline;
+use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_io::las::LasReader;
 use pdal_io::las_writer::LasWriter;
-use pdal_filters::reprojection::ReprojectionFilter;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -51,8 +51,11 @@ fn installed_pdal_matches_rust_reprojection_pipeline() {
     let installed_info = get_pdal_info(&installed_output);
     let rust_info = get_pdal_info(&rust_output);
 
-    assert_eq!(installed_info["stats"]["total_points"], rust_info["stats"]["total_points"]);
-    
+    assert_eq!(
+        installed_info["stats"]["total_points"],
+        rust_info["stats"]["total_points"]
+    );
+
     // Check SRS WKT (installed PDAL uses 'horizontal' or 'compoundwkt', Rust uses 'wkt')
     let rust_srs = &rust_info["metadata"]["srs"];
     let rust_wkt = rust_srs["compoundwkt"]
@@ -97,7 +100,9 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     filter_options.add("out_srs", "EPSG:4326");
     let filter = pipeline.add_stage(
         "filters.reprojection",
-        Box::new(pdal_core::pipeline::FilterWrapper::new(ReprojectionFilter::new("EPSG:4326", None, true))),
+        Box::new(pdal_core::pipeline::FilterWrapper::new(
+            ReprojectionFilter::new("EPSG:4326", None, true),
+        )),
         filter_options,
     );
     let writer = pipeline.add_writer(

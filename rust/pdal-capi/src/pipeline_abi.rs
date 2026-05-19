@@ -1,6 +1,5 @@
 use crate::error::{clear_last_error, set_last_error, string_to_c_ptr};
 use crate::io_abi::{ReaderHandle, WriterHandle};
-use crate::metadata_abi::metadata_node_to_json;
 use crate::point_abi::{pdal_bounds2d_t, pdal_bounds3d_t};
 use crate::stage_abi::StageWrapper;
 use pdal_core::metadata::MetadataNode;

@@ -50,7 +50,7 @@ fn info_without_a_file_prints_usage_and_fails() {
         .unwrap();
 
     assert!(!result.status.success());
-    assert!(String::from_utf8_lossy(&result.stdout).contains("pdal info <file>"));
+    assert!(String::from_utf8_lossy(&result.stdout).contains("pdal info [--summary] <file>"));
 }
 
 #[test]
@@ -86,6 +86,7 @@ fn installed_pdal_info_matches_rust_info() {
 
     let rust = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("info")
+        .arg("--summary")
         .arg(&file)
         .output()
         .expect("failed to execute pdal-rs");

@@ -1,10 +1,27 @@
 use pdal_core::options::Options;
-use pdal_core::pipeline::Pipeline;
+use pdal_core::pipeline::{Pipeline, Writer};
+use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_io::las::LasReader;
 use pdal_io::las_writer::LasWriter;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::rc::Rc;
+
+#[test]
+fn las_writer_honors_compression_option_for_las_extension() {
+    let temp = make_temp_dir("las-compression-option");
+    let output = temp.join("compressed-with-las-extension.las");
+    let mut writer_options = Options::new();
+    writer_options.add("filename", output.display());
+    writer_options.add("compression", true);
+
+    let mut writer = LasWriter::new(&writer_options);
+    writer.write(&[single_point_view()]).unwrap();
+
+    let reader = las::Reader::from_path(&output).unwrap();
+    assert!(reader.header().point_format().is_compressed);
+}
 
 #[test]
 #[ignore = "requires installed pdal on PATH"]
@@ -228,6 +245,19 @@ fn make_temp_dir(name: &str) -> PathBuf {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     dir
+}
+
+fn single_point_view() -> PointView {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    let mut view = PointView::new(Rc::new(layout));
+    let point = view.add_point();
+    view.set_f64(point, &DimId::X, 1.0);
+    view.set_f64(point, &DimId::Y, 2.0);
+    view.set_f64(point, &DimId::Z, 3.0);
+    view
 }
 
 fn escape_json_path(path: &Path) -> String {

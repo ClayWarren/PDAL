@@ -7,6 +7,9 @@ use pdal_io::las_writer::LasWriter;
 use std::fs;
 use std::path::PathBuf;
 
+use byteorder::{LittleEndian, WriteBytesExt};
+use las::{Builder, Point, Vlr};
+
 #[test]
 fn rust_las_preserves_extra_bytes() {
     let temp = make_temp_dir("las-extrabytes");
@@ -63,6 +66,73 @@ fn rust_las_preserves_extra_bytes() {
     assert_eq!(read_view.len(), 1);
     assert_eq!(read_view.get_f64(0, &DimId::X), 1.0);
     assert_eq!(read_view.get_f64(0, &extra_dim), 42.5);
+}
+
+#[test]
+fn rust_las_applies_extra_byte_scale_and_offset() {
+    let temp = make_temp_dir("las-scaled-extrabytes");
+    let output = temp.join("scaled-extra.las");
+    let scaled_dim = DimId::Other("ScaledExtra".to_string());
+
+    let mut builder = Builder::default();
+    builder.point_format = las::point::Format::new(3).unwrap();
+    builder.point_format.extra_bytes = 2;
+    builder.vlrs.push(scaled_extra_bytes_vlr());
+    let header = builder.into_header().unwrap();
+
+    let mut writer = las::Writer::from_path(&output, header).unwrap();
+    let mut point = Point {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        gps_time: Some(0.0),
+        color: Some(las::Color {
+            red: 0,
+            green: 0,
+            blue: 0,
+        }),
+        ..Default::default()
+    };
+    point.extra_bytes = 8u16.to_le_bytes().to_vec();
+    writer.write_point(point).unwrap();
+    writer.close().unwrap();
+
+    let mut reader_options = Options::new();
+    reader_options.add("filename", output.display());
+    let mut reader = LasReader::new(&reader_options);
+    let read_views = reader.read().unwrap();
+    assert_eq!(read_views.len(), 1);
+    assert_eq!(read_views[0].get_f64(0, &scaled_dim), 14.0);
+}
+
+fn scaled_extra_bytes_vlr() -> Vlr {
+    let mut data = Vec::new();
+    data.write_u16::<LittleEndian>(0).unwrap();
+    data.write_u8(3).unwrap();
+    data.write_u8((1 << 3) | (1 << 4)).unwrap();
+
+    let mut name = [0u8; 32];
+    name[..11].copy_from_slice(b"ScaledExtra");
+    data.extend_from_slice(&name);
+
+    data.write_u32::<LittleEndian>(0).unwrap();
+    data.extend_from_slice(&[0u8; 24]);
+    data.extend_from_slice(&[0u8; 24]);
+    data.extend_from_slice(&[0u8; 24]);
+    for value in [0.5, 0.0, 0.0] {
+        data.write_f64::<LittleEndian>(value).unwrap();
+    }
+    for value in [10.0, 0.0, 0.0] {
+        data.write_f64::<LittleEndian>(value).unwrap();
+    }
+    data.extend_from_slice(&[0u8; 32]);
+
+    Vlr {
+        user_id: "LASF_Spec".to_string(),
+        record_id: 4,
+        description: "Extra Bytes Record".to_string(),
+        data,
+    }
 }
 
 fn make_temp_dir(name: &str) -> PathBuf {

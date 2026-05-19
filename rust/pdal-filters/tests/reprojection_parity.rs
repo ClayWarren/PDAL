@@ -1,9 +1,9 @@
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
-use pdal_io::faux::FauxReader;
-use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_core::point::DimId;
 use pdal_core::srs::SpatialReference;
+use pdal_filters::reprojection::ReprojectionFilter;
+use pdal_io::faux::FauxReader;
 
 #[test]
 fn test_reprojection_lat_lon_to_utm() {
@@ -29,7 +29,7 @@ fn test_reprojection_lat_lon_to_utm() {
     assert_eq!(out_view.len(), 1);
     let x = out_view.get_f64(0, &DimId::X);
     let y = out_view.get_f64(0, &DimId::Y);
-    
+
     // -122.3331, 47.6097 in EPSG:32610 is roughly 550000, 5273190
     assert!((x - 550058.0).abs() < 100.0);
     assert!((y - 5273190.0).abs() < 100.0);

@@ -47,7 +47,10 @@ fn installed_pdal_matches_rust_gdal_pipeline() {
     // Text comparison might differ in band naming (band_1 vs band 1 or something)
     // but the coordinates should match.
     assert_eq!(
-        fs::read_to_string(&installed_output).unwrap().lines().count(),
+        fs::read_to_string(&installed_output)
+            .unwrap()
+            .lines()
+            .count(),
         fs::read_to_string(&rust_output).unwrap().lines().count()
     );
 }
@@ -85,7 +88,7 @@ fn make_temp_dir(name: &str) -> PathBuf {
 
 fn escape_json_path(path: &Path) -> String {
     path.display()
-                .to_string()
-                .replace('\\', "\\\\")
-                .replace('"', "\\\"")
+        .to_string()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
 }

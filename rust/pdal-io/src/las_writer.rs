@@ -10,11 +10,13 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
 use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::StageError;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 
 pub struct LasWriter {
     filename: String,
-    _compression: bool,
+    compression: bool,
     point_format: u8,
 }
 
@@ -28,7 +30,7 @@ impl LasWriter {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
-            _compression: options.get_bool("compression", false),
+            compression: options.get_bool("compression", false),
             point_format: options.get_u64("point_format", 3) as u8,
         }
     }
@@ -41,7 +43,9 @@ impl Writer for LasWriter {
 
     fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
         if self.filename.is_empty() {
-            return Err(StageError("LasWriter requires a filename option.".to_string()));
+            return Err(StageError(
+                "LasWriter requires a filename option.".to_string(),
+            ));
         }
 
         let mut builder = Builder::from(Header::default());
@@ -54,6 +58,11 @@ impl Writer for LasWriter {
         }
 
         let path = Path::new(&self.filename);
+        let extension_requests_laz = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("laz"));
+        let should_compress = self.compression || extension_requests_laz;
 
         // Calculate bounds and offsets based on input views
         let mut min_x = f64::MAX;
@@ -155,6 +164,8 @@ impl Writer for LasWriter {
                 extra_dims.iter().map(|ed| ed.size).sum::<usize>() as u16;
         }
 
+        builder.point_format.is_compressed = should_compress;
+
         let mut header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
@@ -169,7 +180,10 @@ impl Writer for LasWriter {
             }
         }
 
-        let mut writer = las::Writer::from_path(path, header)
+        let file = File::create(path)
+            .map(BufWriter::new)
+            .map_err(|e| StageError(format!("Failed to create LAS/LAZ file: {}", e)))?;
+        let mut writer = las::Writer::new(file, header)
             .map_err(|e| StageError(format!("Failed to create LAS/LAZ writer: {}", e)))?;
 
         for view in views {

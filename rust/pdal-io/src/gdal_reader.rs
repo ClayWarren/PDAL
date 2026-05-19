@@ -32,7 +32,9 @@ impl Reader for GdalReader {
 
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
         if self.filename.is_empty() {
-            return Err(StageError("GdalReader requires a filename option.".to_string()));
+            return Err(StageError(
+                "GdalReader requires a filename option.".to_string(),
+            ));
         }
 
         pdal_core::gdal::register_drivers();
@@ -62,21 +64,23 @@ impl Reader for GdalReader {
         let mut bands_data = Vec::with_capacity(band_count as usize);
         for b in 0..band_count {
             let mut data = vec![0.0f64; (width * height) as usize];
-            raster.read_band(b + 1, width as usize, height as usize, &mut data).map_err(StageError)?;
+            raster
+                .read_band(b + 1, width as usize, height as usize, &mut data)
+                .map_err(StageError)?;
             bands_data.push(data);
         }
 
         for y in 0..height {
             for x in 0..width {
                 let id = view.add_point();
-                
+
                 // Pixel center coordinates
                 let px = x as f64 + 0.5;
                 let py = y as f64 + 0.5;
-                
+
                 let gx = transform[0] + px * transform[1] + py * transform[2];
                 let gy = transform[3] + px * transform[4] + py * transform[5];
-                
+
                 // Use first band as Z by default (PDAL behavior can be overridden but this is standard)
                 let gz = bands_data[0][(y * width + x) as usize];
 

@@ -8,18 +8,56 @@ use pdal_core::stage::StageError;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-/// Read a file's first point view, inferring the reader driver from the path.
-fn read_first_view(path: &str) -> Result<PointView, StageError> {
+/// Read a file's point views into one cloud, inferring the reader driver from
+/// the path.
+fn read_cloud(path: &str) -> Result<PointView, StageError> {
     let driver = pdal_core::driver::infer_reader_driver(path)
         .ok_or_else(|| StageError(format!("unable to infer a reader driver for '{path}'")))?;
     let mut options = Options::new();
     options.add("filename", path);
     let mut reader = create_reader(driver, &options)?;
     let views = reader.read()?;
-    views
-        .into_iter()
-        .next()
-        .ok_or_else(|| StageError(format!("'{path}' produced no point data")))
+    merge_views(views, path)
+}
+
+fn merge_views(mut views: Vec<PointView>, path: &str) -> Result<PointView, StageError> {
+    if views.is_empty() {
+        return Err(StageError(format!("'{path}' produced no point data")));
+    }
+    if views.len() == 1 {
+        return Ok(views.remove(0));
+    }
+
+    let mut merged = views[0].make_new();
+    for view in &views {
+        ensure_same_layout(&views[0], view, path)?;
+        for idx in 0..view.len() {
+            merged.append_point(view, idx);
+        }
+    }
+    Ok(merged)
+}
+
+fn ensure_same_layout(
+    reference: &PointView,
+    view: &PointView,
+    path: &str,
+) -> Result<(), StageError> {
+    if reference.layout().dim_count() != view.layout().dim_count()
+        || reference.layout().point_size() != view.layout().point_size()
+    {
+        return Err(StageError(format!(
+            "'{path}' produced point views with incompatible layouts"
+        )));
+    }
+    for idx in 0..reference.layout().dim_count() {
+        if reference.layout().dim_at(idx) != view.layout().dim_at(idx) {
+            return Err(StageError(format!(
+                "'{path}' produced point views with incompatible layouts"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Compute the Hausdorff and modified-Hausdorff distances between two files.
@@ -46,14 +84,14 @@ pub unsafe extern "C" fn pdal_hausdorff(
     let path_a = CStr::from_ptr(path_a).to_string_lossy().into_owned();
     let path_b = CStr::from_ptr(path_b).to_string_lossy().into_owned();
 
-    let view_a = match read_first_view(&path_a) {
+    let view_a = match read_cloud(&path_a) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());
             return -1;
         }
     };
-    let view_b = match read_first_view(&path_b) {
+    let view_b = match read_cloud(&path_b) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());
@@ -94,14 +132,14 @@ pub unsafe extern "C" fn pdal_chamfer(
     let path_a = CStr::from_ptr(path_a).to_string_lossy().into_owned();
     let path_b = CStr::from_ptr(path_b).to_string_lossy().into_owned();
 
-    let view_a = match read_first_view(&path_a) {
+    let view_a = match read_cloud(&path_a) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());
             return -1;
         }
     };
-    let view_b = match read_first_view(&path_b) {
+    let view_b = match read_cloud(&path_b) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());
@@ -135,14 +173,14 @@ pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char
     let path_a = CStr::from_ptr(path_a).to_string_lossy().into_owned();
     let path_b = CStr::from_ptr(path_b).to_string_lossy().into_owned();
 
-    let source = match read_first_view(&path_a) {
+    let source = match read_cloud(&path_a) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());
             return std::ptr::null_mut();
         }
     };
-    let candidate = match read_first_view(&path_b) {
+    let candidate = match read_cloud(&path_b) {
         Ok(view) => view,
         Err(err) => {
             set_last_error(err.to_string());

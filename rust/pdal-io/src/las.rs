@@ -24,6 +24,8 @@ struct ExtraDim {
     ty: DimType,
     size: usize,
     offset: usize,
+    scale: f64,
+    value_offset: f64,
 }
 
 impl LasReader {
@@ -198,18 +200,37 @@ impl Reader for LasReader {
                                 ty: pdal_ty,
                                 size: pdal_ty.size(),
                                 offset: current_offset,
+                                scale,
+                                value_offset: offset,
                             });
                             current_offset += pdal_ty.size();
                         } else {
                             for i in 0..field_cnt {
                                 let sub_name = format!("{}{}", name, i);
                                 let dim_id = DimId::from_name(&sub_name);
+                                let field_scale = if (options & (1 << 3)) != 0 {
+                                    scales[i]
+                                } else {
+                                    1.0
+                                };
+                                let field_offset = if (options & (1 << 4)) != 0 {
+                                    offsets[i]
+                                } else {
+                                    0.0
+                                };
+                                let dim_ty = if field_scale != 1.0 || field_offset != 0.0 {
+                                    DimType::F64
+                                } else {
+                                    pdal_ty
+                                };
                                 layout.register(dim_id, dim_ty);
                                 extra_dims.push(ExtraDim {
                                     name: sub_name,
                                     ty: pdal_ty,
                                     size: pdal_ty.size(),
                                     offset: current_offset,
+                                    scale: field_scale,
+                                    value_offset: field_offset,
                                 });
                                 current_offset += pdal_ty.size();
                             }
@@ -285,8 +306,9 @@ impl Reader for LasReader {
             // Decode extra bytes
             for ed in &extra_dims {
                 if ed.offset + ed.size <= point.extra_bytes.len() {
-                    let mut cursor = Cursor::new(&point.extra_bytes[ed.offset..ed.offset + ed.size]);
-                    let val = read_pdal_val(&mut cursor, ed.ty)?;
+                    let mut cursor =
+                        Cursor::new(&point.extra_bytes[ed.offset..ed.offset + ed.size]);
+                    let val = read_pdal_val(&mut cursor, ed.ty)? * ed.scale + ed.value_offset;
                     view.set_f64(id, &DimId::from_name(&ed.name), val);
                 }
             }
