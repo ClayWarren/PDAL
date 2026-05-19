@@ -8,6 +8,7 @@ pub mod driver;
 pub mod expr;
 pub mod gdal;
 pub mod geometry;
+pub mod georeference;
 pub mod metadata;
 pub mod options;
 pub mod pipeline;

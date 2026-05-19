@@ -3,6 +3,7 @@
 //! Port of `io/OptechReader.cpp` for local CSD fixtures.
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use pdal_core::georeference::{create_optech_rotation_matrix, georeference_wgs84, Xyz};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -15,26 +16,6 @@ use std::path::Path;
 use std::rc::Rc;
 
 const MAX_RETURNS: usize = 4;
-
-#[derive(Clone, Copy)]
-struct Xyz {
-    x: f64,
-    y: f64,
-    z: f64,
-}
-
-#[derive(Clone, Copy)]
-struct RotationMatrix {
-    m00: f64,
-    m01: f64,
-    m02: f64,
-    m10: f64,
-    m11: f64,
-    m12: f64,
-    m20: f64,
-    m21: f64,
-    m22: f64,
-}
 
 struct Header {
     header_size: u16,
@@ -240,64 +221,6 @@ fn read_pulse<R: Read>(reader: &mut R) -> Result<Pulse, StageError> {
         longitude,
         elevation,
     })
-}
-
-fn create_optech_rotation_matrix(roll: f64, pitch: f64, heading: f64) -> RotationMatrix {
-    RotationMatrix {
-        m00: roll.cos() * heading.cos() + pitch.sin() * roll.sin() * heading.sin(),
-        m01: pitch.cos() * heading.sin(),
-        m02: heading.cos() * roll.sin() - roll.cos() * pitch.sin() * heading.sin(),
-        m10: heading.cos() * pitch.sin() * roll.sin() - roll.cos() * heading.sin(),
-        m11: pitch.cos() * heading.cos(),
-        m12: -roll.sin() * heading.sin() - roll.cos() * heading.cos() * pitch.sin(),
-        m20: -pitch.cos() * roll.sin(),
-        m21: pitch.sin(),
-        m22: pitch.cos() * roll.cos(),
-    }
-}
-
-fn georeference_wgs84(
-    range: f64,
-    scan_angle: f64,
-    boresight: RotationMatrix,
-    imu: RotationMatrix,
-    gps_point: Xyz,
-) -> Xyz {
-    let sensor = Xyz {
-        x: range * scan_angle.sin(),
-        y: 0.0,
-        z: -range * scan_angle.cos(),
-    };
-    let aligned = rotate(sensor, boresight);
-    let local_level = rotate(aligned, imu);
-    let curvilinear = cartesian_to_curvilinear(local_level, gps_point.y);
-    Xyz {
-        x: gps_point.x + curvilinear.x,
-        y: gps_point.y + curvilinear.y,
-        z: gps_point.z + curvilinear.z,
-    }
-}
-
-fn rotate(point: Xyz, matrix: RotationMatrix) -> Xyz {
-    Xyz {
-        x: matrix.m00 * point.x + matrix.m01 * point.y + matrix.m02 * point.z,
-        y: matrix.m10 * point.x + matrix.m11 * point.y + matrix.m12 * point.z,
-        z: matrix.m20 * point.x + matrix.m21 * point.y + matrix.m22 * point.z,
-    }
-}
-
-fn cartesian_to_curvilinear(point: Xyz, latitude: f64) -> Xyz {
-    let a = 6378137.0;
-    let f = 1.0 / 298.257223563;
-    let e2 = 2.0 * f - f * f;
-    let w = (1.0 - e2 * latitude.sin() * latitude.sin()).sqrt();
-    let n = a / w;
-    let m = a * (1.0 - e2) / (w * w * w);
-    Xyz {
-        x: point.x / (n * latitude.cos()),
-        y: point.y / m,
-        z: point.z,
-    }
 }
 
 fn io_error(error: std::io::Error) -> StageError {
