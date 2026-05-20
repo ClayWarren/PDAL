@@ -38,6 +38,7 @@
 
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -48,6 +49,7 @@ public:
     std::string getName() const override;
 
     TextReader() : m_istream(nullptr) {}
+    ~TextReader() override;
 
 private:
     /**
@@ -102,36 +104,9 @@ private:
     */
     void done(PointTableRef table) override;
 
-    /**
-      Read a single point from the input.
-
-      \param point  Reference to point to fill with data.
-      \return  False if no point could be read.
-    */
     bool processOne(PointRef& point) override;
 
-    bool fillFields();
-
-    /**
-      Parse a header line into a list of dimension names.
-
-      \param header  Header line to parse.
-    */
-    void parseHeader(const std::string& header);
-
-    /**
-      Parse a header line that starts with a quote.
-
-      \param header Header line to parse.
-    */
-    void parseQuotedHeader(const std::string& header);
-
-    /**
-      Parse a header line that doesn't start with a quote.
-
-      \param header Header line to parse.
-    */
-    void parseUnquotedHeader(const std::string& header);
+    void warnIfHeaderMissing();
 
     /**
       Check a header line to see if it appears header-like.  Display a
@@ -145,12 +120,12 @@ private:
     char m_separator;
     Arg* m_separatorArg;
     std::istream* m_istream;
-    StringList m_dimNames;
     Dimension::IdList m_dims;
-    StringList m_fields;
     size_t m_line;
     std::string m_header;
     size_t m_skip;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
 };
 
 } // namespace pdal

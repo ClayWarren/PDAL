@@ -49,6 +49,36 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(TextReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, uint64_t value)
+{
+    pdal_options_add_u64(options, key.c_str(), value);
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+TextReader::~TextReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 std::string TextReader::getName() const
 {
     return s_info.name;
@@ -101,119 +131,58 @@ void TextReader::checkHeader(const std::string& header)
             << "' doesn't appear to contain a header line." << '\n';
 }
 
-void TextReader::parseHeader(const std::string& header)
-{
-    m_dimNames.clear();
-    // If the first character is a double quote, assume that we have quoted
-    // field names.
-    if (header[0] == '"')
-        parseQuotedHeader(header);
-    else
-        parseUnquotedHeader(header);
-}
-
-void TextReader::parseQuotedHeader(const std::string& header)
-{
-    // We know there's a double quote at position 0.
-    std::string::size_type pos = 1;
-    while (true)
-    {
-        size_t count = Dimension::extractName(header, pos);
-        m_dimNames.push_back(header.substr(pos, count));
-        pos += count;
-        if (header[pos] != '"')
-            throwError("Invalid character '" + std::string(1, header[pos]) +
-                       "' found while parsing quoted header line.");
-        pos++; // Skip ending quote.
-
-        // Skip everything other than a double quote.
-        count = Utils::extract(header, pos, [](char c) { return c != '"'; });
-
-        // Find a separator.
-        if (!m_separatorArg->set())
-        {
-            std::string sep = header.substr(pos, count);
-            Utils::trim(sep);
-            if (sep.size() > 1)
-                throwError("Found separator longer than a single character.");
-            if (sep.size() == 0)
-                sep = ' ';
-            m_separatorArg->setValue(sep);
-        }
-        pos += count;
-        if (header[pos++] != '"')
-            break;
-    }
-}
-
-void TextReader::parseUnquotedHeader(const std::string& header)
-{
-    auto isspecial = [](char c) { return (!std::isalnum(c)); };
-
-    // If the separator wasn't provided on the command line extract it
-    // from the header line.
-    if (!m_separatorArg->set())
-    {
-        // Scan string for some character not a number or letter.
-        for (size_t i = 0; i < header.size(); ++i)
-            // Parenthesis around special to prevent macro expansion, see #3190
-            if ((isspecial)(header[i]))
-            {
-                m_separator = header[i];
-                break;
-            }
-    }
-
-    if (m_separator != ' ')
-        m_dimNames = Utils::split(header, m_separator);
-    else
-        m_dimNames = Utils::split2(header, m_separator);
-
-    for (auto& s : m_dimNames)
-    {
-        Utils::trim(s);
-        size_t cnt = Dimension::extractName(s, 0);
-        if (cnt != s.size())
-            throwError("Invalid character '" + std::string(1, s[cnt]) +
-                       "' in dimension name.");
-    }
-}
-
 void TextReader::initialize(PointTableRef table)
 {
+    m_line = 0;
+    m_rustIndex = 0;
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
+    warnIfHeaderMissing();
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    if (m_separatorArg->set())
+        addOption(options, "separator", std::string(1, m_separator));
+    if (!m_header.empty())
+        addOption(options, "header", m_header);
+    addOption(options, "skip", static_cast<uint64_t>(m_skip));
+
+    pdal_reader_t* reader = pdal_reader_create_text(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust text reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust text reader failed.");
+}
+
+void TextReader::warnIfHeaderMissing()
+{
+    if (!m_header.empty())
+        return;
+
     m_istream = Utils::openFile(m_filename, false);
     if (!m_istream)
         throwError("Unable to open text file '" + m_filename + "'.");
 
-    m_line = 0;
-    // Skip lines requested.
-    std::string dummy;
-    for (size_t i = 0; i < m_skip; ++i)
-    {
-        std::getline(*m_istream, dummy);
-        m_line++;
-    }
+    std::string line;
+    for (size_t i = 0; i < m_skip && std::getline(*m_istream, line); ++i)
+        ;
 
-    std::string header;
-    if (m_header.size())
-        header = m_header;
-    else
-    {
-        std::getline(*m_istream, header);
-        m_line++;
-        checkHeader(header);
-    }
+    if (std::getline(*m_istream, line))
+        checkHeader(line);
 
-    try
-    {
-        parseHeader(header);
-    }
-    catch (const pdal_error&)
-    {
-        Utils::closeFile(m_istream);
-        throw;
-    }
     Utils::closeFile(m_istream);
+    m_istream = nullptr;
 }
 
 void TextReader::addArgs(ProgramArgs& args)
@@ -233,12 +202,18 @@ void TextReader::addArgs(ProgramArgs& args)
 void TextReader::addDimensions(PointLayoutPtr layout)
 {
     m_dims.clear();
-    for (auto name : m_dimNames)
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        Utils::trim(name);
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+
         Dimension::Id id =
             layout->registerOrAssignDim(name, Dimension::Type::Double);
-        if (Utils::contains(m_dims, id) && id != pdal::Dimension::Id::Unknown)
+        if (Utils::contains(m_dims, id) && id != Dimension::Id::Unknown)
             throwError("Duplicate dimension '" + name +
                        "' detected in input file '" + m_filename + "'.");
         m_dims.push_back(id);
@@ -247,90 +222,51 @@ void TextReader::addDimensions(PointLayoutPtr layout)
 
 void TextReader::ready(PointTableRef table)
 {
-    m_istream = Utils::openFile(m_filename, false);
-    if (!m_istream)
-        throwError("Unable to open text file '" + m_filename + "'.");
-
-    std::string dummy;
-    for (size_t i = 0; i < m_line; ++i)
-        std::getline(*m_istream, dummy);
+    m_rustIndex = 0;
 }
 
 point_count_t TextReader::read(PointViewPtr view, point_count_t numPts)
 {
-    PointId idx = view->size();
     point_count_t cnt = 0;
-    PointRef point(*view);
-    while (cnt < numPts)
+    while (cnt < numPts && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        point.setPointId(idx);
-        if (!processOne(point))
-            break;
+        PointId outIdx = view->size();
+        view->point(outIdx);
+        for (Dimension::Id dim : m_dims)
+        {
+            view->setField(
+                dim, outIdx,
+                pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                        view->layout()->dimName(dim).c_str()));
+        }
         cnt++;
-        idx++;
+        m_rustIndex++;
     }
     return cnt;
 }
 
 bool TextReader::processOne(PointRef& point)
 {
-    if (!fillFields())
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
         return false;
 
-    double d;
-    for (size_t i = 0; i < m_fields.size(); ++i)
+    for (Dimension::Id dim : m_dims)
     {
-        if (!Utils::fromString(m_fields[i], d))
-        {
-            log()->get(LogLevel::Error)
-                << "Can't convert "
-                   "field '"
-                << m_fields[i] << "' to numeric value on line " << m_line
-                << " in '" << m_filename << "'.  Setting to 0." << '\n';
-            d = 0;
-        }
-        point.setField(m_dims[i], d);
+        point.setField(dim,
+                       pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str()));
     }
+    m_rustIndex++;
     return true;
-}
-
-bool TextReader::fillFields()
-{
-    while (true)
-    {
-        if (!m_istream->good())
-            return false;
-
-        std::string buf;
-
-        std::getline(*m_istream, buf);
-        m_line++;
-        if (buf.empty())
-            continue;
-        if (m_separator != ' ')
-        {
-            Utils::remove(buf, ' ');
-            m_fields = Utils::split(buf, m_separator);
-        }
-        else
-            m_fields = Utils::split2(buf, m_separator);
-        if (m_fields.size() != m_dims.size())
-        {
-            log()->get(LogLevel::Error)
-                << "Line " << m_line << " in '" << m_filename << "' contains "
-                << m_fields.size() << " fields when " << m_dims.size()
-                << " were expected.  "
-                   "Ignoring."
-                << '\n';
-            continue;
-        }
-        return true;
-    }
 }
 
 void TextReader::done(PointTableRef table)
 {
-    Utils::closeFile(m_istream);
+    if (m_istream)
+    {
+        Utils::closeFile(m_istream);
+        m_istream = nullptr;
+    }
 }
 
 } // namespace pdal
