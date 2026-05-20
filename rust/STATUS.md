@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `752 / 927` individual C++ GoogleTest cases, or `81.12%`,
+Current checkpoint: `754 / 927` individual C++ GoogleTest cases, or `81.34%`,
 are validated against Rust-backed behavior.
 
 Counting rules:
@@ -92,6 +92,8 @@ Known mixed binaries:
   Rust C ABI helpers while C++ keeps the `std::streambuf` pointer mechanics.
 - `pdal_math_utils_test`: all 2 tests count; both exercise
   `barycentricInterpolation`, which routes through the Rust C ABI.
+- `pdal_scaling_test`: all 2 tests count; auto scale/offset computation routes
+  through the Rust C ABI.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.
