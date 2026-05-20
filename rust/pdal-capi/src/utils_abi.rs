@@ -1,7 +1,11 @@
-use pdal_core::utils::looks_like_json;
+use pdal_core::utils::{
+    base64_decode, base64_encode, escape_json, escape_nonprinting_bytes, looks_like_json,
+    normalize_longitude, replace_all, trim_leading, trim_trailing,
+};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
+use std::ptr;
 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_utils_is_json(value: *const c_char) -> bool {
@@ -15,11 +19,98 @@ fn string_to_c(value: String) -> *mut c_char {
     CString::new(value).unwrap_or_default().into_raw()
 }
 
+fn bytes_to_c(value: Vec<u8>) -> *mut c_char {
+    CString::new(value).unwrap_or_default().into_raw()
+}
+
 unsafe fn c_string(ptr: *const c_char) -> String {
     if ptr.is_null() {
         String::new()
     } else {
         CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+}
+
+unsafe fn c_bytes(ptr: *const c_char) -> Vec<u8> {
+    if ptr.is_null() {
+        Vec::new()
+    } else {
+        CStr::from_ptr(ptr).to_bytes().to_vec()
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_trim_leading(value: *const c_char) -> *mut c_char {
+    string_to_c(trim_leading(&c_string(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_trim_trailing(value: *const c_char) -> *mut c_char {
+    string_to_c(trim_trailing(&c_string(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_replace_all(
+    value: *const c_char,
+    replace_what: *const c_char,
+    replace_with: *const c_char,
+) -> *mut c_char {
+    string_to_c(replace_all(
+        &c_string(value),
+        &c_string(replace_what),
+        &c_string(replace_with),
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_escape_json(value: *const c_char) -> *mut c_char {
+    string_to_c(escape_json(&c_string(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_escape_nonprinting(value: *const c_char) -> *mut c_char {
+    bytes_to_c(escape_nonprinting_bytes(&c_bytes(value)))
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_utils_normalize_longitude(longitude: f64) -> f64 {
+    normalize_longitude(longitude)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_base64_encode(bytes: *const u8, len: u64) -> *mut c_char {
+    if len == 0 {
+        return string_to_c(String::new());
+    }
+    if bytes.is_null() && len != 0 {
+        return string_to_c(String::new());
+    }
+    let bytes = std::slice::from_raw_parts(bytes, len as usize);
+    string_to_c(base64_encode(bytes))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_base64_decode(
+    value: *const c_char,
+    out_len: *mut u64,
+) -> *mut u8 {
+    let decoded = base64_decode(&c_string(value));
+    if !out_len.is_null() {
+        *out_len = decoded.len() as u64;
+    }
+    if decoded.is_empty() {
+        return ptr::null_mut();
+    }
+    let mut decoded = decoded.into_boxed_slice();
+    let ptr = decoded.as_mut_ptr();
+    std::mem::forget(decoded);
+    ptr
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_u8_array_free(ptr: *mut u8, len: u64) {
+    if !ptr.is_null() {
+        drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
 }
 

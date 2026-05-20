@@ -28,6 +28,7 @@ target_include_directories(dimbuilder PRIVATE
     ${NLOHMANN_INCLUDE_DIR}
     ${UTFCPP_INCLUDE_DIR}
 )
+target_compile_definitions(dimbuilder PRIVATE PDAL_UTILS_NO_RUST_CAPI)
 PDAL_TARGET_COMPILE_SETTINGS(dimbuilder)
 target_link_libraries(dimbuilder
     PRIVATE

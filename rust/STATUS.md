@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `742 / 927` individual C++ GoogleTest cases, or `80.04%`,
+Current checkpoint: `747 / 927` individual C++ GoogleTest cases, or `80.58%`,
 are validated against Rust-backed behavior.
 
 Counting rules:
@@ -85,6 +85,9 @@ Known mixed binaries:
   remains C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: only `calculateBounds` counts. The broader point
   view/table data model is still C++.
+- `pdal_utils_test`: only `test_base64`, `blanks`, `replaceAll`,
+  `escapeNonprinting`, and `escapeJSON` count. Other utility cases still test
+  C++ templates, stream helpers, process helpers, or local formatting behavior.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.

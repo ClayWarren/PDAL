@@ -34,13 +34,17 @@
 
 #include <pdal/util/Utils.hpp>
 
-#include <array>
 #include <cassert>
 #include <cctype>
 #include <cstdlib>
+#include <iomanip>
 #include <memory>
 #include <random>
 #include <sstream>
+
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+#include <rust/pdal-capi/include/pdal_capi.h>
+#endif
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -52,10 +56,7 @@
 
 #pragma warning(disable : 4127) // conditional expression is constant
 
-#include <iomanip>
 #include <stdio.h>
-
-#include <utf8.h>
 
 #include "private/BacktraceImpl.hpp"
 
@@ -63,6 +64,22 @@ typedef std::vector<std::string> StringList;
 
 namespace pdal
 {
+
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+namespace
+{
+
+std::string takeRustString(char* value)
+{
+    if (!value)
+        return std::string();
+    std::string result(value);
+    pdal_string_free(value);
+    return result;
+}
+
+} // unnamed namespace
+#endif
 
 void Utils::random_seed(unsigned int seed)
 {
@@ -125,33 +142,36 @@ void Utils::eatwhitespace(std::istream& s)
 
 void Utils::trimLeading(std::string& s)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    s = takeRustString(pdal_utils_trim_leading(s.c_str()));
+#else
     size_t pos = 0;
-    // Note, that this should be OK in C++11, which guarantees a NULL.
-    while (isspace(s[pos]))
+    while (std::isspace(s[pos]))
         pos++;
-
-    // Iterator version of erase doesn't throw.
     s.erase(s.begin(), s.begin() + pos);
+#endif
 }
 
 void Utils::trimTrailing(std::string& s)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    s = takeRustString(pdal_utils_trim_trailing(s.c_str()));
+#else
     if (s.empty())
         return;
 
     size_t pos = s.size() - 1;
-    while (isspace(s[pos]))
+    while (std::isspace(s[pos]))
     {
         if (pos == 0)
         {
             s.clear();
             return;
         }
-        else
-            pos--;
+        pos--;
     }
-    // The iterator version of erase doesn't throw.
     s.erase(s.begin() + pos + 1, s.end());
+#endif
 }
 
 bool Utils::eatcharacter(std::istream& s, char x)
@@ -169,144 +189,87 @@ bool Utils::eatcharacter(std::istream& s, char x)
 std::string Utils::base64_encode(const unsigned char* bytes_to_encode,
                                  size_t in_len)
 {
-    /*
-        base64.cpp and base64.h
-
-        Copyright (C) 2004-2008 René Nyffenegger
-
-        This source code is provided 'as-is', without any express or implied
-        warranty. In no event will the author be held liable for any damages
-        arising from the use of this software.
-
-        Permission is granted to anyone to use this software for any purpose,
-        including commercial applications, and to alter it and redistribute it
-        freely, subject to the following restrictions:
-
-        1. The origin of this source code must not be misrepresented;
-           you must not claim that you wrote the original source code. If you
-           use this source code in a product, an acknowledgment in the product
-           documentation would be appreciated but is not required.
-
-        2. Altered source versions must be plainly marked as such, and must
-           not be misrepresented as being the original source code.
-
-        3. This notice may not be removed or altered from any source
-           distribution.
-
-        René Nyffenegger rene.nyffenegger@adp-gmbh.ch
-    */
-
-    if (in_len == 0)
-        return std::string();
-
-    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                     "abcdefghijklmnopqrstuvwxyz"
-                                     "0123456789+/";
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_base64_encode(bytes_to_encode, in_len));
+#else
+    const std::string chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string ret;
-    int i = 0;
-    int j = 0;
-    uint8_t char_array_3[3];
-    uint8_t char_array_4[4];
-
-    while (in_len--)
+    for (size_t offset = 0; offset < in_len; offset += 3)
     {
-        char_array_3[i++] = *(bytes_to_encode++);
-        if (i == 3)
-        {
-            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
-                              ((char_array_3[1] & 0xf0) >> 4);
-            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
-                              ((char_array_3[2] & 0xc0) >> 6);
-            char_array_4[3] = char_array_3[2] & 0x3f;
+        uint8_t b0 = bytes_to_encode[offset];
+        uint8_t b1 = offset + 1 < in_len ? bytes_to_encode[offset + 1] : 0;
+        uint8_t b2 = offset + 2 < in_len ? bytes_to_encode[offset + 2] : 0;
 
-            for (i = 0; (i < 4); i++)
-                ret += base64_chars[char_array_4[i]];
-            i = 0;
-        }
-    }
-
-    if (i)
-    {
-        for (j = i; j < 3; j++)
-            char_array_3[j] = '\0';
-
-        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] =
-            ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] =
-            ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-        char_array_4[3] = char_array_3[2] & 0x3f;
-
-        for (j = 0; (j < i + 1); j++)
-            ret += base64_chars[char_array_4[j]];
-
-        while ((i++ < 3))
-            ret += '=';
+        ret += chars[b0 >> 2];
+        ret += chars[((b0 & 0x03) << 4) | (b1 >> 4)];
+        ret +=
+            offset + 1 < in_len ? chars[((b1 & 0x0f) << 2) | (b2 >> 6)] : '=';
+        ret += offset + 2 < in_len ? chars[b2 & 0x3f] : '=';
     }
     return ret;
-}
-
-static inline bool is_base64(unsigned char c)
-{
-    return (isalnum(c) || (c == '+') || (c == '/'));
+#endif
 }
 
 std::vector<uint8_t> Utils::base64_decode(std::string const& encoded_string)
 {
-    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                     "abcdefghijklmnopqrstuvwxyz"
-                                     "0123456789+/";
-
-    std::string::size_type in_len = encoded_string.size();
-    int i = 0;
-    int j = 0;
-    int in_ = 0;
-    unsigned char char_array_4[4], char_array_3[3];
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    uint64_t len = 0;
+    uint8_t* decoded = pdal_utils_base64_decode(encoded_string.c_str(), &len);
     std::vector<uint8_t> ret;
-
-    while (in_len-- && (encoded_string[in_] != '=') &&
-           is_base64(encoded_string[in_]))
+    if (decoded)
     {
-        char_array_4[i++] = encoded_string[in_];
-        in_++;
-        if (i == 4)
-        {
-            for (i = 0; i < 4; i++)
-                char_array_4[i] = static_cast<unsigned char>(
-                    base64_chars.find(char_array_4[i]));
-
-            char_array_3[0] =
-                (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) +
-                              ((char_array_4[2] & 0x3c) >> 2);
-            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-
-            for (i = 0; (i < 3); i++)
-                ret.push_back(char_array_3[i]);
-            i = 0;
-        }
-    }
-
-    if (i)
-    {
-        for (j = i; j < 4; j++)
-            char_array_4[j] = 0;
-
-        for (j = 0; j < 4; j++)
-            char_array_4[j] =
-                static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
-
-        char_array_3[0] =
-            (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-        char_array_3[1] =
-            ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-
-        for (j = 0; (j < i - 1); j++)
-            ret.push_back(char_array_3[j]);
+        ret.assign(decoded, decoded + len);
+        pdal_u8_array_free(decoded, len);
     }
     return ret;
+#else
+    auto value = [](unsigned char c) -> int
+    {
+        if (c >= 'A' && c <= 'Z')
+            return c - 'A';
+        if (c >= 'a' && c <= 'z')
+            return c - 'a' + 26;
+        if (c >= '0' && c <= '9')
+            return c - '0' + 52;
+        if (c == '+')
+            return 62;
+        if (c == '/')
+            return 63;
+        return -1;
+    };
+
+    std::vector<uint8_t> ret;
+    uint8_t quartet[4]{};
+    size_t count = 0;
+    for (unsigned char c : encoded_string)
+    {
+        if (c == '=')
+            break;
+        int decoded = value(c);
+        if (decoded < 0)
+            break;
+        quartet[count++] = static_cast<uint8_t>(decoded);
+        if (count == 4)
+        {
+            ret.push_back((quartet[0] << 2) | ((quartet[1] & 0x30) >> 4));
+            ret.push_back(((quartet[1] & 0x0f) << 4) |
+                          ((quartet[2] & 0x3c) >> 2));
+            ret.push_back(((quartet[2] & 0x03) << 6) | quartet[3]);
+            count = 0;
+        }
+    }
+    if (count > 1)
+    {
+        ret.push_back((quartet[0] << 2) | ((quartet[1] & 0x30) >> 4));
+        if (count > 2)
+            ret.push_back(((quartet[1] & 0x0f) << 4) |
+                          ((quartet[2] & 0x3c) >> 2));
+        if (count > 3)
+            ret.push_back(((quartet[2] & 0x03) << 6) | quartet[3]);
+    }
+    return ret;
+#endif
 }
 
 FILE* Utils::portable_popen(const std::string& command, const std::string& mode)
@@ -373,8 +336,15 @@ std::string Utils::replaceAll(std::string result,
                               const std::string& replaceWhat,
                               const std::string& replaceWithWhat)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_replace_all(
+        result.c_str(), replaceWhat.c_str(), replaceWithWhat.c_str()));
+#else
+    if (replaceWhat.empty())
+        return result;
+
     size_t pos = 0;
-    while (1)
+    while (true)
     {
         pos = result.find(replaceWhat, pos);
         if (pos == std::string::npos)
@@ -385,41 +355,52 @@ std::string Utils::replaceAll(std::string result,
             break;
     }
     return result;
+#endif
 }
 
 std::string Utils::escapeJSON(const std::string& str)
 {
-
-    // All JSON is UTF-8. This will wipe off any non-utf-8
-    // characters
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_escape_json(str.c_str()));
+#else
     std::string s;
-    utf8::replace_invalid(str.begin(), str.end(), std::back_inserter(s));
-
-    std::array<std::string, 35> replacements{
-        {"\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004", "\\u0005",
-         "\\u0006", "\\u0007", "\\u0008", "\\t",     "\\n",     "\\b",
-         "\\f",     "\\r",     "\\u000E", "\\u000F", "\\u0010", "\\u0011",
-         "\\u0012", "\\u0013", "\\u0014", "\\u0015", "\\u0016", "\\u0017",
-         "\\u0018", "\\u0019", "\\u001A", "\\u001B", "\\u001C", "\\u001D",
-         "\\u001E", "\\u001F", " ",       "!",       "\\\""}};
-    for (std::string::size_type i = 0; i < s.size();)
+    for (char c : str)
     {
-        unsigned char val = s[i];
-        if (val < replacements.size())
+        switch (c)
         {
-            s.replace(i, 1, replacements[val]);
-            i += replacements[val].size();
+        case '\t':
+            s += "\\t";
+            break;
+        case '\n':
+            s += "\\n";
+            break;
+        case '\f':
+            s += "\\f";
+            break;
+        case '\r':
+            s += "\\r";
+            break;
+        case '"':
+            s += "\\\"";
+            break;
+        case '\\':
+            s += "\\\\";
+            break;
+        default:
+            if (static_cast<unsigned char>(c) < 32)
+            {
+                std::stringstream oss;
+                oss << "\\u" << std::uppercase << std::hex << std::setfill('0')
+                    << std::setw(4) << static_cast<int>(c);
+                s += oss.str();
+            }
+            else
+                s += c;
+            break;
         }
-        else if (val == '\\')
-        {
-            s.replace(i, 1, "\\\\");
-            i += 2;
-        }
-        else
-            i++;
     }
-
     return s;
+#endif
 }
 
 StringList Utils::wordWrap(std::string const& s, size_t lineLength,
@@ -551,40 +532,48 @@ int Utils::screenWidth()
 
 std::string Utils::escapeNonprinting(const std::string& s)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_escape_nonprinting(s.c_str()));
+#else
     std::string out;
-
-    for (size_t i = 0; i < s.size(); ++i)
+    for (char c : s)
     {
-        if (s[i] == '\n')
+        if (c == '\n')
             out += "\\n";
-        else if (s[i] == '\a')
+        else if (c == '\a')
             out += "\\a";
-        else if (s[i] == '\b')
+        else if (c == '\b')
             out += "\\b";
-        else if (s[i] == '\r')
+        else if (c == '\r')
             out += "\\r";
-        else if (s[i] == '\v')
+        else if (c == '\v')
             out += "\\v";
-        else if (s[i] < 32)
+        else if (c < 32)
         {
             std::stringstream oss;
-            oss << std::hex << std::setfill('0') << std::setw(2) << (int)s[i];
+            oss << std::hex << std::setfill('0') << std::setw(2)
+                << static_cast<int>(c);
             out += "\\x" + oss.str();
         }
         else
-            out += s[i];
+            out += c;
     }
     return out;
+#endif
 }
 
 double Utils::normalizeLongitude(double longitude)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_normalize_longitude(longitude);
+#else
     longitude = fmod(longitude, 360.0);
     if (longitude <= -180)
         longitude += 360;
     else if (longitude > 180)
         longitude -= 360;
     return longitude;
+#endif
 }
 
 std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)

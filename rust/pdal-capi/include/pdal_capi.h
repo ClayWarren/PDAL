@@ -57,6 +57,16 @@ extern "C"
 
     // Utilities
     bool pdal_utils_is_json(const char* value);
+    char* pdal_utils_trim_leading(const char* value);
+    char* pdal_utils_trim_trailing(const char* value);
+    char* pdal_utils_replace_all(const char* value, const char* replace_what,
+                                 const char* replace_with);
+    char* pdal_utils_escape_json(const char* value);
+    char* pdal_utils_escape_nonprinting(const char* value);
+    double pdal_utils_normalize_longitude(double longitude);
+    char* pdal_utils_base64_encode(const uint8_t* bytes, uint64_t len);
+    uint8_t* pdal_utils_base64_decode(const char* value, uint64_t* out_len);
+    void pdal_u8_array_free(uint8_t* ptr, uint64_t len);
     char* pdal_file_utils_getcwd();
     char* pdal_file_utils_to_absolute_path(const char* filename);
     char* pdal_file_utils_to_absolute_path_with_base(const char* filename,
