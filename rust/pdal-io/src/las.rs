@@ -16,6 +16,9 @@ use std::rc::Rc;
 
 pub struct LasReader {
     filename: String,
+    start: u64,
+    count: Option<u64>,
+    nosrs: bool,
     metadata: MetadataNode,
 }
 
@@ -32,6 +35,9 @@ impl LasReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            start: options.get_u64("start", 0),
+            count: options.has("count").then(|| options.get_u64("count", 0)),
+            nosrs: options.get_bool("nosrs", false),
             metadata: MetadataNode::new("readers.las"),
         }
     }
@@ -53,6 +59,13 @@ impl Reader for LasReader {
             .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
 
         let header = reader.header();
+        let point_count = header.number_of_points();
+        if self.start >= point_count && point_count > 0 {
+            return Err(StageError(format!(
+                "LAS start point {} is outside the file's {} points.",
+                self.start, point_count
+            )));
+        }
 
         // Extract metadata
         self.metadata = MetadataNode::new("readers.las");
@@ -246,18 +259,25 @@ impl Reader for LasReader {
         let mut view = PointView::new(Rc::new(layout));
 
         // Extract SRS
-        if let Some(wkt_bytes) = header.get_wkt_crs_bytes() {
-            if let Ok(wkt) = String::from_utf8(wkt_bytes.to_vec()) {
-                view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&wkt));
+        if !self.nosrs {
+            if let Some(wkt_bytes) = header.get_wkt_crs_bytes() {
+                if let Ok(wkt) = String::from_utf8(wkt_bytes.to_vec()) {
+                    view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&wkt));
+                }
+            } else if let Ok(Some(crs)) = header.get_epsg_crs() {
+                view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&format!(
+                    "EPSG:{}",
+                    crs.get_horizontal()
+                )));
             }
-        } else if let Ok(Some(crs)) = header.get_epsg_crs() {
-            view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&format!(
-                "EPSG:{}",
-                crs.get_horizontal()
-            )));
         }
 
-        for point in reader.points() {
+        let take_count = self.count.unwrap_or(point_count.saturating_sub(self.start));
+        for point in reader
+            .points()
+            .skip(self.start as usize)
+            .take(take_count as usize)
+        {
             let point =
                 point.map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
             let id = view.add_point();

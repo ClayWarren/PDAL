@@ -139,7 +139,21 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
-        | "readers.terrasolid" | "readers.las" | "readers.laz" => vec![filename()],
+        | "readers.terrasolid" => vec![filename()],
+        "readers.las" | "readers.laz" => vec![
+            filename(),
+            option(
+                "start",
+                "Point at which reading should start.",
+                Some(json!(0)),
+            ),
+            option("count", "Maximum number of points to read.", None),
+            option(
+                "nosrs",
+                "Skip reading file spatial reference.",
+                Some(json!(false)),
+            ),
+        ],
         "readers.text" => vec![
             filename(),
             option(

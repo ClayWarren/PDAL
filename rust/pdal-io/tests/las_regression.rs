@@ -54,6 +54,58 @@ fn las_writer_honors_format_scale_and_offset_options() {
 }
 
 #[test]
+fn las_reader_honors_start_and_count_options() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/las/1.2-with-color.las");
+
+    let mut all_options = Options::new();
+    all_options.add("filename", input.display());
+    let mut all_reader = LasReader::new(&all_options);
+    let all = all_reader.read().unwrap();
+    assert_eq!(all.len(), 1);
+
+    let mut sliced_options = Options::new();
+    sliced_options.add("filename", input.display());
+    sliced_options.add("start", 100);
+    sliced_options.add("count", 3);
+    let mut sliced_reader = LasReader::new(&sliced_options);
+    let sliced = sliced_reader.read().unwrap();
+    assert_eq!(sliced.len(), 1);
+    assert_eq!(sliced[0].len(), 3);
+
+    for (slice_id, source_id) in [100, 101, 102].into_iter().enumerate() {
+        let slice_id = slice_id as u64;
+        for dim in [DimId::X, DimId::Y, DimId::Z, DimId::GpsTime] {
+            assert_eq!(
+                sliced[0].get_f64(slice_id, &dim),
+                all[0].get_f64(source_id, &dim)
+            );
+        }
+    }
+}
+
+#[test]
+fn las_reader_honors_nosrs_option() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/las/epsg_4326.las");
+
+    let mut srs_options = Options::new();
+    srs_options.add("filename", input.display());
+    srs_options.add("count", 1);
+    let mut srs_reader = LasReader::new(&srs_options);
+    let srs_views = srs_reader.read().unwrap();
+    assert!(!srs_views[0].spatial_reference().is_empty());
+
+    let mut nosrs_options = Options::new();
+    nosrs_options.add("filename", input.display());
+    nosrs_options.add("count", 1);
+    nosrs_options.add("nosrs", true);
+    let mut nosrs_reader = LasReader::new(&nosrs_options);
+    let nosrs_views = nosrs_reader.read().unwrap();
+    assert!(nosrs_views[0].spatial_reference().is_empty());
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_las_pipeline() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

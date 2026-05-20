@@ -42,7 +42,7 @@ Status definitions:
 | OGR writer | prototype | GeoJSON point FeatureCollection output is covered. Shapefile, GeoPackage, native OGR layer creation, transactions, measure dimensions, and multipoint grouping are deferred. |
 | QFIT reader | in progress | Deterministic NASA ATM QFIT binary path is covered. |
 | SBET/SMRMSG I/O | in progress | SBET read/write and SMRMSG read coverage exist for deterministic local trajectory fixtures. |
-| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, SRS extraction, and compression/decompression. Keep parity tests honest before broad claims. |
+| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, `start`/`count`/`nosrs` reader options, SRS extraction, and compression/decompression. Keep parity tests honest before broad claims. |
 | COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles. Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered slice. |
