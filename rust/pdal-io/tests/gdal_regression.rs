@@ -68,6 +68,58 @@ fn gdal_writer_matches_existing_count_grid_fixture() {
 }
 
 #[test]
+fn gdal_writer_matches_existing_mean_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("mean", false);
+    assert_band_near(
+        &output,
+        &[
+            5.0, -9999.0, 7.0, 8.0, 8.967, 4.0, -9999.0, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 5.7, 6.7,
+            2.0, 3.0, 4.2, 4.92, 5.8, 1.0, 2.0, 3.0, 4.2, 5.2,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_max_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("max", false);
+    assert_band_near(
+        &output,
+        &[
+            5.0, -9999.0, 7.0, 8.0, 9.1, 4.0, -9999.0, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 6.0, 7.0, 2.0,
+            3.0, 4.4, 5.4, 6.4, 1.0, 2.0, 3.0, 4.4, 5.4,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_idw_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("idw", false);
+    assert_band_near(
+        &output,
+        &[
+            5.0, -9999.0, 7.0, 8.0, 9.0, 4.0, -9999.0, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 6.0, 7.0, 2.0,
+            3.0, 4.0, 5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_stdev_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("stdev", false);
+    assert_band_near(
+        &output,
+        &[
+            0.0, -9999.0, 0.0, 0.0, 0.094, 0.0, -9999.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3,
+            0.0, 0.0, 0.2, 0.449, 0.424, 0.0, 0.0, 0.0, 0.2, 0.2,
+        ],
+    );
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_gdal_pipeline() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
