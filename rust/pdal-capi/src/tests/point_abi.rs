@@ -246,3 +246,122 @@ fn point_view_dimension_summaries_serialize_through_c_abi() {
         pdal_point_view_destroy(view);
     }
 }
+
+#[test]
+fn point_view_named_mesh_roundtrips_through_c_abi() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let x = CString::new("X").unwrap();
+        pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        let view = pdal_point_view_create(layout);
+        for _ in 0..3 {
+            pdal_point_view_add_point(view);
+        }
+
+        let mesh_name = CString::new("surface").unwrap();
+        assert!(pdal_point_view_add_named_mesh_triangle(
+            view,
+            mesh_name.as_ptr(),
+            0,
+            1,
+            2
+        ));
+        assert_eq!(
+            pdal_point_view_named_mesh_triangle_count(view, mesh_name.as_ptr()),
+            1
+        );
+
+        let mut a = 99;
+        let mut b = 99;
+        let mut c = 99;
+        assert!(pdal_point_view_named_mesh_triangle(
+            view,
+            mesh_name.as_ptr(),
+            0,
+            &mut a,
+            &mut b,
+            &mut c
+        ));
+        assert_eq!((a, b, c), (0, 1, 2));
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
+fn point_view_raster_roundtrips_through_c_abi() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let view = pdal_point_view_create(layout);
+        let name = CString::new("faceraster").unwrap();
+        let limits = pdal_raster_limits_t {
+            x_origin: 10.0,
+            y_origin: 20.0,
+            width: 2,
+            height: 2,
+            edge_length: 0.5,
+        };
+
+        assert!(pdal_point_view_create_raster(
+            view,
+            name.as_ptr(),
+            &limits,
+            -9999.0
+        ));
+        assert!(!pdal_point_view_create_raster(
+            view,
+            name.as_ptr(),
+            &limits,
+            -9999.0
+        ));
+        assert_eq!(pdal_point_view_raster_count(view), 1);
+        assert_eq!(
+            take_string(pdal_point_view_raster_name(view, 0)),
+            "faceraster"
+        );
+
+        let mut copied_limits = pdal_raster_limits_t {
+            x_origin: 0.0,
+            y_origin: 0.0,
+            width: 0,
+            height: 0,
+            edge_length: 0.0,
+        };
+        assert!(pdal_point_view_raster_limits(
+            view,
+            name.as_ptr(),
+            &mut copied_limits
+        ));
+        assert_eq!(copied_limits, limits);
+        assert_eq!(
+            pdal_point_view_raster_initializer(view, name.as_ptr()),
+            -9999.0
+        );
+
+        assert!(pdal_point_view_set_raster_cell(
+            view,
+            name.as_ptr(),
+            1,
+            0,
+            42.0
+        ));
+        let mut value = 0.0;
+        assert!(pdal_point_view_raster_cell(
+            view,
+            name.as_ptr(),
+            1,
+            0,
+            &mut value
+        ));
+        assert_eq!(value, 42.0);
+        assert!(!pdal_point_view_raster_cell(
+            view,
+            name.as_ptr(),
+            2,
+            0,
+            &mut value
+        ));
+
+        pdal_point_view_destroy(view);
+    }
+}

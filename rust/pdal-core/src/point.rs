@@ -7,7 +7,7 @@
 //! the storage into the view for simplicity -- the shared table is a planned
 //! follow-up, not a behavioural difference for a single filter.
 
-use crate::raster::RasterData;
+use crate::raster::{RasterData, RasterLimits};
 use crate::srs::SpatialReference;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -697,8 +697,33 @@ impl PointView {
         })
     }
 
+    pub fn mesh_mut_named(&mut self, name: &str) -> Option<&mut TriangularMesh> {
+        if self.meshes.contains_key(name) {
+            return self.meshes.get_mut(name);
+        }
+        if name.is_empty() {
+            let key = self.meshes.keys().next()?.clone();
+            return self.meshes.get_mut(&key);
+        }
+        None
+    }
+
     pub fn add_raster(&mut self, raster: RasterData) {
         self.rasters.push(raster);
+    }
+
+    pub fn create_raster(
+        &mut self,
+        name: &str,
+        limits: RasterLimits,
+        initializer: f64,
+    ) -> Option<&mut RasterData> {
+        if self.raster(name).is_some() {
+            return None;
+        }
+        self.rasters
+            .push(RasterData::new(name.to_string(), limits, initializer));
+        self.rasters.last_mut()
     }
 
     pub fn raster(&self, name: &str) -> Option<&RasterData> {
@@ -706,6 +731,19 @@ impl PointView {
             .iter()
             .find(|raster| raster.name() == name)
             .or_else(|| name.is_empty().then(|| self.rasters.first()).flatten())
+    }
+
+    pub fn raster_mut(&mut self, name: &str) -> Option<&mut RasterData> {
+        let idx = self
+            .rasters
+            .iter()
+            .position(|raster| raster.name() == name)
+            .or_else(|| {
+                name.is_empty()
+                    .then_some(0)
+                    .filter(|_| !self.rasters.is_empty())
+            })?;
+        self.rasters.get_mut(idx)
     }
 
     pub fn rasters(&self) -> &[RasterData] {
