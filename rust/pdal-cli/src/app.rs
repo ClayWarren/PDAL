@@ -72,6 +72,10 @@ impl App {
                 i += 1;
                 continue;
             }
+            if arg.starts_with("--label=") {
+                i += 1;
+                continue;
+            }
             match arg.as_str() {
                 "--help" | "-h" => self.help = true,
                 "--version" => self.show_version = true,
@@ -647,6 +651,7 @@ mod tests {
     fn parse_ignores_standard_label_and_developer_debug_options() {
         let mut app = App::new();
         app.parse_args(&[
+            "--label=root".to_string(),
             "info".to_string(),
             "--label".to_string(),
             "smoke".to_string(),
