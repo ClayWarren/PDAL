@@ -23,6 +23,7 @@ use std::rc::Rc;
 pub struct EptReader {
     filename: String,
     bounds: String,
+    ignore_unreadable: bool,
     metadata: MetadataNode,
 }
 
@@ -31,6 +32,7 @@ impl EptReader {
         Self {
             filename: options.get_str("filename", ""),
             bounds: options.get_str("bounds", ""),
+            ignore_unreadable: options.get_bool("ignore_unreadable", false),
             metadata: MetadataNode::new("readers.ept"),
         }
     }
@@ -83,11 +85,26 @@ impl Reader for EptReader {
             let views = if data_type == "laszip" {
                 let mut options = Options::new();
                 options.add("filename", path.display());
-                crate::las::LasReader::new(&options).read()?
+                crate::las::LasReader::new(&options).read()
             } else if data_type == "zstandard" {
-                vec![read_zstandard_tile(&path, &schema, srs)?]
+                read_zstandard_tile(&path, &schema, srs).map(|view| vec![view])
             } else {
-                vec![read_binary_tile(&path, &schema, srs)?]
+                read_binary_tile(&path, &schema, srs).map(|view| vec![view])
+            };
+            let views = match views {
+                Ok(views) => views,
+                Err(err) if self.ignore_unreadable => {
+                    self.metadata.add_value(
+                        "warning",
+                        MetadataValue::String(format!(
+                            "Ignored unreadable EPT tile '{}': {}",
+                            path.display(),
+                            err.0
+                        )),
+                    );
+                    continue;
+                }
+                Err(err) => return Err(err),
             };
             validate_tile_count(&path, &views, tile.expected_points)?;
             for view in views {
@@ -497,6 +514,20 @@ mod tests {
             panic!("expected bad EPT point count to fail");
         };
         assert!(err.0.contains("hierarchy expected 1000004"));
+    }
+
+    #[test]
+    fn ignores_unreadable_tile_when_requested() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-nopoints/ept.json").display(),
+        );
+        options.add("ignore_unreadable", true);
+        let mut reader = EptReader::new(&options);
+
+        let views = reader.read().unwrap();
+        assert!(views.is_empty());
     }
 
     #[test]
