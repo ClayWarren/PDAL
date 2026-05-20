@@ -75,6 +75,33 @@ fn ground_classifies_a_las_file_and_keeps_every_point() {
 }
 
 #[test]
+fn ground_supports_driver_and_path_options() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("pdal-rs-ground-driver-override");
+    let extensionless_input = temp.join("interesting_without_extension");
+    let output = temp.join("out.pcd");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_ground(&[
+        "--driver",
+        "readers.las",
+        "--input",
+        extensionless_input.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+        "--filters.smrf.cell=10",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs ground failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert_eq!(read_pcd(&output).len(), 1065);
+}
+
+#[test]
 fn ground_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("ground")
