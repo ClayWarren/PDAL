@@ -148,6 +148,14 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!("location")),
             ),
         ],
+        "readers.stac" => vec![
+            filename(),
+            option(
+                "asset_names",
+                "STAC asset names to read.",
+                Some(json!("data")),
+            ),
+        ],
         "readers.ilvis2" => vec![
             filename(),
             option(

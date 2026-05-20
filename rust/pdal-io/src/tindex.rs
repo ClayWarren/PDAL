@@ -72,7 +72,7 @@ impl Reader for TindexReader {
     }
 }
 
-fn resolve_location(base: &Path, location: &str) -> PathBuf {
+pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
     let path = Path::new(location);
     if path.is_absolute() {
         path.to_path_buf()
@@ -81,7 +81,7 @@ fn resolve_location(base: &Path, location: &str) -> PathBuf {
     }
 }
 
-fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError> {
+pub(crate) fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError> {
     let filename = path.to_string_lossy();
     let driver = pdal_core::driver::infer_reader_driver(&filename).ok_or_else(|| {
         StageError(format!(
@@ -114,7 +114,7 @@ fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError> {
     }
 }
 
-fn append_view(
+pub(crate) fn append_view(
     merged: &mut Option<PointView>,
     view: &PointView,
     path: &Path,

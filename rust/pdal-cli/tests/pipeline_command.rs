@@ -239,6 +239,44 @@ fn pipeline_command_reads_tindex_pipeline() {
 }
 
 #[test]
+fn pipeline_command_reads_stac_pipeline() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-pipeline-stac");
+    fs::copy(&input, temp.join("simple_text.ply")).unwrap();
+    let item = temp.join("item.json");
+    let output = temp.join("out.pcd");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &item,
+        r#"{
+  "type": "Feature",
+  "assets": {
+    "data": {"href": "simple_text.ply", "type": "application/octet-stream"}
+  }
+}"#,
+    )
+    .unwrap();
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.stac","filename":"{}"}},
+  {{"type":"writers.pcd","filename":"{}"}}
+]"#,
+            escape_json_path(&item),
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    run_rust_pipeline(&pipeline);
+
+    assert_eq!(read_pcd(&output).len(), 3);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

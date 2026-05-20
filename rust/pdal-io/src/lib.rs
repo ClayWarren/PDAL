@@ -24,6 +24,7 @@ pub mod qfit;
 pub mod sbet;
 pub mod sbet_writer;
 pub mod smrmsg;
+pub mod stac;
 pub mod terrasolid;
 pub mod text;
 pub mod text_writer;

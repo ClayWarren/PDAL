@@ -36,7 +36,7 @@ Status definitions:
 | PCD I/O | in progress | ASCII PCD read/write is covered. Binary and compressed PCD are deferred. |
 | PTS/PTX readers | in progress | Deterministic Leica ASCII fixture behavior is covered, including installed-PDAL regressions. |
 | ILVIS2 reader | in progress | Deterministic ASCII point path and fixture-shaped XML sidecar metadata are covered. |
-| PLY I/O | in progress | ASCII PLY read/write is covered. Binary PLY is deferred. |
+| PLY I/O | in progress | ASCII and binary PLY read paths plus ASCII write coverage exist for deterministic local fixtures. Broader writer parity remains incomplete. |
 | OBJ reader | in progress | Deterministic Wavefront OBJ ASCII path, mesh faces, and VTN de-duplication are covered. |
 | GLTF writer | in progress | Deterministic local GLB output from mesh-backed views is covered for existing C++ unit-test shapes. |
 | QFIT reader | in progress | Deterministic NASA ATM QFIT binary path is covered. |
@@ -47,6 +47,7 @@ Status definitions:
 | Optech reader | in progress | Deterministic Optech CSD fixture and localized WGS84 georeference math are covered. |
 | BPF I/O | in progress | Deterministic local uncompressed BPF is covered. Compression, remote files, bundled files, and ULEM/polar metadata are deferred. |
 | GDAL reader | prototype | A narrow local raster-to-point-cloud slice has started. This is not broad GDAL/PROJ permission. |
+| STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
