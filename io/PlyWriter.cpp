@@ -40,6 +40,8 @@
 #include <pdal/util/OStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
 
@@ -49,6 +51,130 @@ static StaticPluginInfo const s_info{"writers.ply",
                                      {"ply"}};
 
 CREATE_STATIC_STAGE(PlyWriter, s_info)
+
+namespace
+{
+
+int rustTypeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+std::string boolString(bool value)
+{
+    return value ? "true" : "false";
+}
+
+std::string storageMode(PlyWriter::Format format)
+{
+    switch (format)
+    {
+    case PlyWriter::Format::Ascii:
+        return "ascii";
+    case PlyWriter::Format::BinaryLe:
+        return "binary_little_endian";
+    case PlyWriter::Format::BinaryBe:
+        return "binary_big_endian";
+    }
+    return "ascii";
+}
+
+std::string rustDimSpecType(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return "uint8_t";
+    case Type::Unsigned16:
+        return "uint16_t";
+    case Type::Unsigned32:
+        return "uint32_t";
+    case Type::Unsigned64:
+        return "uint64_t";
+    case Type::Signed8:
+        return "int8_t";
+    case Type::Signed16:
+        return "int16_t";
+    case Type::Signed32:
+        return "int32_t";
+    case Type::Signed64:
+        return "int64_t";
+    case Type::Float:
+        return "float";
+    case Type::Double:
+    case Type::None:
+        return "double";
+    }
+    return "double";
+}
+
+std::string rustDimSpecs(const StringList& names, const DimTypeList& dims)
+{
+    std::ostringstream out;
+    for (size_t idx = 0; idx < dims.size(); ++idx)
+    {
+        if (idx)
+            out << ',';
+        out << names[idx] << '=' << rustDimSpecType(dims[idx].m_type);
+    }
+    return out.str();
+}
+
+std::string rustStorageName(const PointLayoutPtr& layout, Dimension::Id id,
+                            const std::string& plyName)
+{
+    switch (id)
+    {
+    case Dimension::Id::X:
+    case Dimension::Id::Y:
+    case Dimension::Id::Z:
+        return layout->dimName(id);
+    default:
+        return plyName;
+    }
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
 
 std::string PlyWriter::getName() const
 {
@@ -340,38 +466,49 @@ void PlyWriter::writeTriangle(const Triangle& t, size_t offset)
 void PlyWriter::doneFile()
 {
     point_count_t pointCount = 0;
-    point_count_t faceCount = 0;
     for (auto& v : m_views)
-    {
         pointCount += v->size();
-        TriangularMesh* mesh = v->mesh();
-        if (mesh)
-            faceCount += mesh->size();
-    }
 
     if (pointCount > (std::numeric_limits<uint32_t>::max)())
         throwError("Can't write PLY file.  Only " +
                    std::to_string((std::numeric_limits<uint32_t>::max)()) +
                    " points supported.");
 
-    m_stream = Utils::createFile(m_curFilename, true);
-    if (!m_stream)
-        throwError("Couldn't open file '" + m_curFilename + "' for output.");
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    assert(m_dimNames.size() == m_dims.size());
+    auto name = m_dimNames.begin();
+    for (const auto& dim : m_dims)
+    {
+        Dimension::Type storedType = m_layout->dimType(dim.m_id);
+        std::string storageName = rustStorageName(m_layout, dim.m_id, *name);
+        pdal_point_layout_register_dim(rustLayout, storageName.c_str(),
+                                       rustTypeId(storedType));
+        ++name;
+    }
 
-    writeHeader(m_layout, pointCount, faceCount);
-    for (auto& v : m_views)
+    pdal_point_view_t* rustView = pdal_point_view_create(rustLayout);
+    for (const auto& v : m_views)
     {
         PointRef point(*v, 0);
         for (PointId idx = 0; idx < v->size(); ++idx)
         {
             point.setPointId(idx);
-            writePoint(point, m_layout);
+            PointId outIdx = pdal_point_view_add_point(rustView);
+            auto dimName = m_dimNames.begin();
+            for (const auto& dim : m_dims)
+            {
+                std::string storageName =
+                    rustStorageName(m_layout, dim.m_id, *dimName);
+                pdal_point_view_set_f64(rustView, outIdx, storageName.c_str(),
+                                        point.getFieldAs<double>(dim.m_id));
+                ++dimName;
+            }
         }
     }
     if (m_faces)
     {
         PointId offset = 0;
-        for (auto& v : m_views)
+        for (const auto& v : m_views)
         {
             TriangularMesh* mesh = v->mesh();
             if (mesh)
@@ -379,19 +516,44 @@ void PlyWriter::doneFile()
                 for (size_t id = 0; id < mesh->size(); ++id)
                 {
                     const Triangle& t = (*mesh)[id];
-                    writeTriangle(t, offset);
+                    pdal_point_view_add_mesh_triangle(rustView, t.m_a + offset,
+                                                      t.m_b + offset,
+                                                      t.m_c + offset);
                 }
             }
             offset += v->size();
         }
     }
-    Utils::closeFile(m_stream);
-    m_stream = nullptr;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_curFilename);
+    addOption(options, "storage_mode", storageMode(m_format));
+    addOption(options, "faces", boolString(m_faces));
+    addOption(options, "sized_types", boolString(m_sizedTypes));
+    addOption(options, "dims", rustDimSpecs(m_dimNames, m_dims));
+    if (m_precisionArg->set())
+        addOption(options, "precision", std::to_string(m_precision));
+
+    pdal_writer_t* writer = pdal_writer_create_ply(options);
+    if (!writer)
+    {
+        pdal_point_view_destroy(rustView);
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PLY writer.");
+    }
+
+    bool ok = pdal_writer_write_view(writer, rustView);
+    pdal_writer_destroy(writer);
+    pdal_point_view_destroy(rustView);
+    pdal_options_destroy(options);
+    if (!ok)
+        throwLastRustError("Rust PLY writer failed.");
+
     m_views.clear();
-    m_curFilename.clear();
 
     Utils::writeProgress(m_progressFd, "DONEFILE", m_curFilename);
     getMetadata().addList("filename", m_curFilename);
+    m_curFilename.clear();
 }
 
 } // namespace pdal
