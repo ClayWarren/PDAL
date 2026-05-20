@@ -12,6 +12,7 @@ use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::scaling::{set_auto_xform, Scaling, XForm, XFormComponent};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
 use std::fs::File;
@@ -32,6 +33,7 @@ impl<T: Read + Seek> ReadSeek for T {}
 #[derive(Clone, Debug)]
 struct BpfDimension {
     offset: f64,
+    scale: f64,
     min: f64,
     max: f64,
     label: String,
@@ -148,6 +150,8 @@ pub struct BpfWriter {
     format: BpfFormat,
     compression: bool,
     coord_id: i32,
+    output_dims: Vec<String>,
+    scaling: Scaling,
 }
 
 impl BpfWriter {
@@ -157,6 +161,8 @@ impl BpfWriter {
             format: parse_format(&options.get_str("format", "dimension")),
             compression: options.get_bool("compression", false),
             coord_id: parse_coord_id(&options.get_str("coord_id", "0")),
+            output_dims: parse_output_dims(&options.get_str("output_dims", "")),
+            scaling: writer_scaling(options),
         }
     }
 }
@@ -175,7 +181,16 @@ impl Writer for BpfWriter {
         let view = views
             .first()
             .ok_or_else(|| StageError("BpfWriter requires an input view.".to_string()))?;
-        let dims = writer_dimensions(view)?;
+        let scaling = resolved_writer_scaling(&self.scaling, view);
+        if scaling.x.scale.value == 0.0
+            || scaling.y.scale.value == 0.0
+            || scaling.z.scale.value == 0.0
+        {
+            return Err(StageError(
+                "BPF scale options must not be zero.".to_string(),
+            ));
+        }
+        let dims = writer_dimensions(view, &self.output_dims, &scaling)?;
         let mut header = BpfHeader {
             len: (176 + dims.len() * 56) as i32,
             num_dim: dims.len(),
@@ -186,9 +201,9 @@ impl Writer for BpfWriter {
             coord_id: self.coord_id,
             ..BpfHeader::default()
         };
-        header.xform[0] = 1.0;
-        header.xform[5] = 1.0;
-        header.xform[10] = 1.0;
+        header.xform[0] = scaling.x.scale.value;
+        header.xform[5] = scaling.y.scale.value;
+        header.xform[10] = scaling.z.scale.value;
 
         let file = File::create(Path::new(&self.filename))
             .map_err(|_| StageError(format!("Couldn't open '{}' for writing.", self.filename)))?;
@@ -473,22 +488,29 @@ fn apply_xform(xyz: &mut [f64; 3], xform: &[f64; 16]) {
     xyz[2] = (xyz[0] * xform[8] + xyz[1] * xform[9] + xyz[2] * xform[10] + xform[11]) / w;
 }
 
-fn writer_dimensions(view: &PointView) -> Result<Vec<BpfDimension>, StageError> {
+fn writer_dimensions(
+    view: &PointView,
+    output_dims: &[String],
+    scaling: &Scaling,
+) -> Result<Vec<BpfDimension>, StageError> {
     let mut dims = Vec::new();
-    for idx in 0..view.layout().dim_count() {
-        let Some((id, _ty)) = view.layout().dim_at(idx) else {
-            continue;
-        };
-        dims.push((
-            idx,
-            BpfDimension {
-                offset: 0.0,
-                min: min_max(view, id).0,
-                max: min_max(view, id).1,
-                label: id.name().to_string(),
-                id: id.clone(),
-            },
-        ));
+    if output_dims.is_empty() {
+        for idx in 0..view.layout().dim_count() {
+            let Some((id, _ty)) = view.layout().dim_at(idx) else {
+                continue;
+            };
+            dims.push((idx, bpf_dimension(view, id, scaling)?));
+        }
+    } else {
+        for (idx, name) in output_dims.iter().enumerate() {
+            let id = DimId::from_name(name);
+            if view.layout().dim(&id).is_none() {
+                return Err(StageError(format!(
+                    "Invalid dimension '{name}' specified for 'output_dims' option."
+                )));
+            }
+            dims.push((idx, bpf_dimension(view, &id, scaling)?));
+        }
     }
     if !dims.iter().any(|(_, d)| d.id == DimId::X)
         || !dims.iter().any(|(_, d)| d.id == DimId::Y)
@@ -500,6 +522,32 @@ fn writer_dimensions(view: &PointView) -> Result<Vec<BpfDimension>, StageError> 
     }
     dims.sort_by_key(|(idx, dim)| (xyz_sort_key(&dim.id), *idx));
     Ok(dims.into_iter().map(|(_, dim)| dim).collect())
+}
+
+fn bpf_dimension(
+    view: &PointView,
+    id: &DimId,
+    scaling: &Scaling,
+) -> Result<BpfDimension, StageError> {
+    let (min, max) = min_max(view, id);
+    Ok(BpfDimension {
+        offset: match id {
+            DimId::X => scaling.x.offset.value,
+            DimId::Y => scaling.y.offset.value,
+            DimId::Z => scaling.z.offset.value,
+            _ => 0.0,
+        },
+        scale: match id {
+            DimId::X => scaling.x.scale.value,
+            DimId::Y => scaling.y.scale.value,
+            DimId::Z => scaling.z.scale.value,
+            _ => 1.0,
+        },
+        min,
+        max,
+        label: id.name().to_string(),
+        id: id.clone(),
+    })
 }
 
 fn write_header<W: Write>(writer: &mut W, header: &BpfHeader) -> Result<(), StageError> {
@@ -570,7 +618,7 @@ fn write_point_major<W: Write>(
     for idx in 0..view.len() {
         for dim in dims {
             writer
-                .write_f32::<LittleEndian>(view.get_f64(idx, &dim.id) as f32)
+                .write_f32::<LittleEndian>(adjusted_value(view, idx, dim) as f32)
                 .map_err(io_error)?;
         }
     }
@@ -585,7 +633,7 @@ fn write_dim_major<W: Write>(
     for dim in dims {
         for idx in 0..view.len() {
             writer
-                .write_f32::<LittleEndian>(view.get_f64(idx, &dim.id) as f32)
+                .write_f32::<LittleEndian>(adjusted_value(view, idx, dim) as f32)
                 .map_err(io_error)?;
         }
     }
@@ -600,12 +648,16 @@ fn write_byte_major<W: Write>(
     for dim in dims {
         for byte_index in 0..4 {
             for idx in 0..view.len() {
-                let bytes = (view.get_f64(idx, &dim.id) as f32).to_le_bytes();
+                let bytes = (adjusted_value(view, idx, dim) as f32).to_le_bytes();
                 writer.write_u8(bytes[byte_index]).map_err(io_error)?;
             }
         }
     }
     Ok(())
+}
+
+fn adjusted_value(view: &PointView, idx: u64, dim: &BpfDimension) -> f64 {
+    view.get_f64(idx, &dim.id) / dim.scale - dim.offset
 }
 
 fn read_compressed_blocks<R: Read>(
@@ -716,6 +768,52 @@ fn parse_coord_id(value: &str) -> i32 {
     }
 }
 
+fn parse_output_dims(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn writer_scaling(options: &Options) -> Scaling {
+    Scaling {
+        x: writer_xform(options, "x"),
+        y: writer_xform(options, "y"),
+        z: writer_xform(options, "z"),
+    }
+}
+
+fn writer_xform(options: &Options, axis: &str) -> XForm {
+    let offset_key = format!("offset_{axis}");
+    let scale_key = format!("scale_{axis}");
+    XForm {
+        offset: XFormComponent {
+            auto: !options.has(&offset_key),
+            value: options.get_f64(&offset_key, 0.0),
+        },
+        scale: XFormComponent {
+            auto: false,
+            value: options.get_f64(&scale_key, 1.0),
+        },
+    }
+}
+
+fn resolved_writer_scaling(scaling: &Scaling, view: &PointView) -> Scaling {
+    let mut scaling = *scaling;
+    let mut xs = Vec::with_capacity(view.len() as usize);
+    let mut ys = Vec::with_capacity(view.len() as usize);
+    let mut zs = Vec::with_capacity(view.len() as usize);
+    for idx in 0..view.len() {
+        xs.push(view.get_f64(idx, &DimId::X));
+        ys.push(view.get_f64(idx, &DimId::Y));
+        zs.push(view.get_f64(idx, &DimId::Z));
+    }
+    set_auto_xform(&mut scaling, &xs, &ys, &zs);
+    scaling
+}
+
 fn fixed_label(bytes: &[u8; 32]) -> String {
     let end = bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len());
     String::from_utf8_lossy(&bytes[..end])
@@ -774,6 +872,7 @@ impl BpfDimension {
     fn new(label: &str) -> Self {
         Self {
             offset: 0.0,
+            scale: 1.0,
             min: f64::MAX,
             max: f64::MIN,
             label: label.to_string(),
@@ -866,6 +965,55 @@ mod tests {
                 std::fs::remove_file(output).ok();
             }
         }
+    }
+
+    #[test]
+    fn writer_respects_output_dims() {
+        let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+        let output = temp_path("output-dims.bpf");
+        let mut options = Options::new();
+        options.add("filename", &output);
+        options.add("output_dims", "X,Y,Z,Red,Green");
+        let mut writer = BpfWriter::new(&options);
+        writer.write(std::slice::from_ref(&input)).unwrap();
+
+        let roundtrip = read_bpf(&output);
+        assert_eq!(roundtrip.layout().dim_count(), 5);
+        assert!(roundtrip.layout().dim(&DimId::Blue).is_none());
+        assert!((roundtrip.get_f64(0, &DimId::Red) - input.get_f64(0, &DimId::Red)).abs() < 0.01);
+        assert!(
+            (roundtrip.get_f64(0, &DimId::Green) - input.get_f64(0, &DimId::Green)).abs() < 0.01
+        );
+        std::fs::remove_file(output).ok();
+    }
+
+    #[test]
+    fn writer_roundtrips_with_scale_and_offset() {
+        let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+        let output = temp_path("scaling.bpf");
+        let mut options = Options::new();
+        options.add("filename", &output);
+        options.add("format", "point");
+        options.add("offset_x", 494000.0);
+        options.add("offset_y", 4870000.0);
+        options.add("offset_z", 130.0);
+        options.add("scale_x", 0.001);
+        options.add("scale_y", 0.01);
+        options.add("scale_z", 10.0);
+        let mut writer = BpfWriter::new(&options);
+        writer.write(std::slice::from_ref(&input)).unwrap();
+
+        let roundtrip = read_bpf(&output);
+        for idx in [0, 17, 1064] {
+            for dim in [DimId::X, DimId::Y, DimId::Z] {
+                assert!(
+                    (roundtrip.get_f64(idx, &dim) - input.get_f64(idx, &dim)).abs() < 0.01,
+                    "idx {idx}, dim {}",
+                    dim.name()
+                );
+            }
+        }
+        std::fs::remove_file(output).ok();
     }
 
     #[test]
