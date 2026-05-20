@@ -133,6 +133,71 @@ fn gdal_writer_matches_existing_percentile_grid_fixture() {
 }
 
 #[test]
+fn gdal_writer_matches_existing_min_window_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_window_fixture("min");
+    assert_band_near(
+        &output,
+        &[
+            5.0, 5.457, 7.0, 8.0, 8.9, 4.0, 4.848, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 5.4, 6.4, 2.0,
+            3.0, 4.0, 4.4, 5.4, 1.0, 2.0, 3.0, 4.0, 5.0,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_max_window_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_window_fixture("max");
+    assert_band_near(
+        &output,
+        &[
+            5.0, 5.5, 7.0, 8.0, 9.1, 4.0, 4.942, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 6.0, 7.0, 2.0, 3.0,
+            4.4, 5.4, 6.4, 1.0, 2.0, 3.0, 4.4, 5.4,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_mean_window_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_window_fixture("mean");
+    assert_band_near(
+        &output,
+        &[
+            5.0, 5.478, 7.0, 8.0, 8.967, 4.0, 4.896, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 5.7, 6.7, 2.0,
+            3.0, 4.2, 4.92, 5.8, 1.0, 2.0, 3.0, 4.2, 5.2,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_idw_window_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_window_fixture("idw");
+    assert_band_near(
+        &output,
+        &[
+            5.0, 5.5, 7.0, 8.0, 9.0, 4.0, 4.905, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 6.0, 7.0, 2.0, 3.0,
+            4.0, 5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_stdev_window_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_window_fixture("stdev");
+    assert_band_near(
+        &output,
+        &[
+            0.0, 0.021, 0.0, 0.0, 0.094, 0.0, 0.045, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.0,
+            0.0, 0.2, 0.449, 0.424, 0.0, 0.0, 0.0, 0.2, 0.2,
+        ],
+    );
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_gdal_pipeline() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -206,6 +271,20 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
 }
 
 fn write_grid_fixture(output_type: &str, binmode: bool) -> PathBuf {
+    write_grid_fixture_with_options(output_type, binmode, |_| {})
+}
+
+fn write_grid_window_fixture(output_type: &str) -> PathBuf {
+    write_grid_fixture_with_options(output_type, false, |options| {
+        options.add("window_size", 2);
+    })
+}
+
+fn write_grid_fixture_with_options(
+    output_type: &str,
+    binmode: bool,
+    configure: impl FnOnce(&mut Options),
+) -> PathBuf {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/gdal/grid.txt");
     let temp = make_temp_dir(&format!("gdal-writer-{output_type}"));
@@ -222,6 +301,7 @@ fn write_grid_fixture(output_type: &str, binmode: bool) -> PathBuf {
     writer_options.add("resolution", 1.0);
     writer_options.add("radius", 7071.0 / 10000.0);
     writer_options.add("binmode", binmode);
+    configure(&mut writer_options);
     let mut writer = GdalWriter::new(&writer_options);
     writer.write(&views).unwrap();
     output

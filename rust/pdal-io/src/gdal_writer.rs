@@ -28,6 +28,7 @@ pub struct GdalWriter {
     power: f64,
     no_data: f64,
     binmode: bool,
+    window_size: usize,
     allow_empty: bool,
     fixed_grid: Option<FixedGrid>,
     fixed_grid_arg_count: usize,
@@ -73,6 +74,7 @@ impl GdalWriter {
             power: options.get_f64("power", 1.0),
             no_data: options.get_f64("nodata", -9999.0),
             binmode: options.get_bool("binmode", false),
+            window_size: options.get_u64("window_size", 0) as usize,
             allow_empty: options.get_bool("allow_empty", false),
             fixed_grid: fixed_grid(options),
             fixed_grid_arg_count: fixed_grid_arg_count(options),
@@ -327,6 +329,7 @@ fn render_stat(
     writer: &GdalWriter,
 ) -> Option<Vec<f64>> {
     let mut out = vec![writer.no_data; grid.width.checked_mul(grid.height)?];
+    let mut populated = vec![false; out.len()];
     for row in 0..grid.height {
         for col in 0..grid.width {
             let values = cell_values(grid, row, col, samples, writer);
@@ -336,6 +339,7 @@ fn render_stat(
                 }
                 continue;
             }
+            populated[row * grid.width + col] = true;
             out[row * grid.width + col] = match stat {
                 OutputStat::Min => values
                     .iter()
@@ -355,7 +359,66 @@ fn render_stat(
             };
         }
     }
+    if writer.window_size > 0 && supports_window_fill(stat) {
+        window_fill(
+            &mut out,
+            &populated,
+            grid,
+            writer.window_size,
+            writer.no_data,
+        );
+    }
     Some(out)
+}
+
+fn supports_window_fill(stat: &OutputStat) -> bool {
+    matches!(
+        stat,
+        OutputStat::Min | OutputStat::Max | OutputStat::Mean | OutputStat::Idw | OutputStat::Stdev
+    )
+}
+
+fn window_fill(
+    values: &mut [f64],
+    populated: &[bool],
+    grid: FixedGrid,
+    window_size: usize,
+    no_data: f64,
+) {
+    for row in 0..grid.height {
+        for col in 0..grid.width {
+            let dst = row * grid.width + col;
+            if populated[dst] {
+                continue;
+            }
+
+            let row_start = row.saturating_sub(window_size);
+            let row_end = (row + window_size + 1).min(grid.height);
+            let col_start = col.saturating_sub(window_size);
+            let col_end = (col + window_size + 1).min(grid.width);
+            let mut weighted_sum = 0.0;
+            let mut weight_sum = 0.0;
+
+            for src_row in row_start..row_end {
+                for src_col in col_start..col_end {
+                    let src = src_row * grid.width + src_col;
+                    if src == dst || !populated[src] {
+                        continue;
+                    }
+
+                    let distance = row.abs_diff(src_row).max(col.abs_diff(src_col)) as f64;
+                    weighted_sum += values[src] / distance;
+                    weight_sum += 1.0 / distance;
+                }
+            }
+
+            values[dst] = if weight_sum > 0.0 {
+                weighted_sum / weight_sum
+            } else {
+                no_data
+            };
+        }
+    }
 }
 
 fn cell_values(

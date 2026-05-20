@@ -717,6 +717,11 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Assign points directly to cells.",
                 Some(json!(false)),
             ),
+            option(
+                "window_size",
+                "Cell distance for fallback interpolation.",
+                Some(json!(0)),
+            ),
             option("allow_empty", "Allow empty output.", Some(json!(false))),
             option("origin_x", "Fixed grid X origin.", None),
             option("origin_y", "Fixed grid Y origin.", None),
