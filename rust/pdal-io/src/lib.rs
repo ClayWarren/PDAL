@@ -25,6 +25,7 @@ pub mod ply;
 pub mod pts;
 pub mod ptx;
 pub mod qfit;
+pub mod raster_writer;
 pub mod sbet;
 pub mod sbet_writer;
 pub mod smrmsg;

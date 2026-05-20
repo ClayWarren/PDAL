@@ -7,6 +7,7 @@
 //! the storage into the view for simplicity -- the shared table is a planned
 //! follow-up, not a behavioural difference for a single filter.
 
+use crate::raster::RasterData;
 use crate::srs::SpatialReference;
 use std::rc::Rc;
 
@@ -595,6 +596,7 @@ pub struct PointView {
     source_indices: Vec<PointId>,
     spatial_reference: SpatialReference,
     mesh: Option<TriangularMesh>,
+    rasters: Vec<RasterData>,
 }
 
 impl PointView {
@@ -606,6 +608,7 @@ impl PointView {
             source_indices: Vec::new(),
             spatial_reference: SpatialReference::default(),
             mesh: None,
+            rasters: Vec::new(),
         }
     }
 
@@ -617,6 +620,7 @@ impl PointView {
             source_indices: Vec::new(),
             spatial_reference: self.spatial_reference.clone(),
             mesh: None,
+            rasters: Vec::new(),
         }
     }
 
@@ -635,6 +639,7 @@ impl PointView {
         let mut output = PointView::new(Rc::new(layout));
         output.spatial_reference = self.spatial_reference.clone();
         output.mesh = self.mesh.clone();
+        output.rasters = self.rasters.clone();
 
         for idx in 0..self.len() {
             let out_idx = output.add_point();
@@ -672,6 +677,18 @@ impl PointView {
 
     pub fn mesh(&self) -> Option<&TriangularMesh> {
         self.mesh.as_ref()
+    }
+
+    pub fn add_raster(&mut self, raster: RasterData) {
+        self.rasters.push(raster);
+    }
+
+    pub fn raster(&self, name: &str) -> Option<&RasterData> {
+        self.rasters.iter().find(|raster| raster.name() == name)
+    }
+
+    pub fn rasters(&self) -> &[RasterData] {
+        &self.rasters
     }
 
     pub fn calculate_bounds_2d(&self) -> Option<Bounds2D> {

@@ -21,6 +21,7 @@ pub mod options;
 pub mod pipeline;
 pub mod plugin;
 pub mod point;
+pub mod raster;
 pub mod scaling;
 pub mod spatial;
 pub mod srs;

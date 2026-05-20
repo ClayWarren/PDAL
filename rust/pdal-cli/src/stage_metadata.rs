@@ -728,6 +728,16 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             option("width", "Fixed grid width in cells.", None),
             option("height", "Fixed grid height in cells.", None),
         ],
+        "writers.raster" => vec![
+            filename(),
+            option(
+                "gdaldriver",
+                "GDAL writer driver name.",
+                Some(json!("GTiff")),
+            ),
+            option("rasters", "Comma-separated raster names to write.", None),
+            option("nodata", "No-data value.", None),
+        ],
         _ => Vec::new(),
     }
 }
