@@ -504,3 +504,30 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         _ => Vec::new(),
     }
 }
+
+pub(crate) fn all_stage_options() -> serde_json::Map<String, serde_json::Value> {
+    stage_list()
+        .into_iter()
+        .map(|stage| {
+            (
+                stage.name.to_string(),
+                serde_json::Value::Array(stage_options(stage.name)),
+            )
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_stage_options_includes_every_stage() {
+        let all = all_stage_options();
+
+        assert_eq!(all.len(), stage_list().len());
+        assert!(all.contains_key("readers.las"));
+        assert!(all.contains_key("filters.decimation"));
+        assert!(all.contains_key("writers.las"));
+    }
+}

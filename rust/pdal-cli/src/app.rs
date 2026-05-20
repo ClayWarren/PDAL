@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::path::{Path, PathBuf};
 
-use crate::stage_metadata::{kernel_list, stage_list, stage_options};
+use crate::stage_metadata::{all_stage_options, kernel_list, stage_list, stage_options};
 use pdal_kernels::word_wrap;
 
 #[path = "analysis_commands.rs"]
@@ -199,6 +199,10 @@ impl App {
     }
 
     fn output_options(&self, stage_name: &str) {
+        if stage_name == "all" {
+            self.output_all_options();
+            return;
+        }
         if !stage_list().iter().any(|stage| stage.name == stage_name) {
             eprintln!("Unable to create stage {}", stage_name);
             return;
@@ -228,6 +232,18 @@ impl App {
                 }
             });
             println!("  {:<20} {}{}", name, desc, default.unwrap_or_default());
+        }
+    }
+
+    fn output_all_options(&self) {
+        let all = all_stage_options();
+        if self.show_json {
+            println!("{}", serde_json::Value::Object(all));
+            return;
+        }
+        for stage in stage_list() {
+            self.output_options(stage.name);
+            println!();
         }
     }
 
@@ -298,11 +314,7 @@ impl App {
         } else if self.show_commands {
             self.output_commands("");
         } else if let Some(ref stage) = self.show_options {
-            if stage == "all" {
-                eprintln!("Showing options for all stages is not yet implemented");
-            } else {
-                self.output_options(stage);
-            }
+            self.output_options(stage);
         } else {
             self.output_help();
         }
