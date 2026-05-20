@@ -1,4 +1,4 @@
-[project]
+[workspace]
 channels = ["conda-forge"]
 name = "pdal"
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64", "linux-aarch64"]
@@ -20,6 +20,7 @@ ceres-solver = "*"
 python = "*"
 libarrow = "*"
 libparquet = "*"
+rust = "*"
 
 [feature.doc.dependencies]
 jupyter-book = ">=1.0.3,<2"
@@ -135,6 +136,11 @@ configure = { cmd = [ "cmake",
 build = { cmd = "cd .build && ninja", depends-on = ["configure"] }
 test = { cmd = "cd .build && ctest -VV --output-on-failure", depends-on = ["build"] }
 install = { cmd = "cd .build && ninja install", depends-on = ["build"] }
+rust-fmt = { cmd = "cargo fmt --manifest-path rust/Cargo.toml --all --check" }
+rust-check = { cmd = "cargo check --manifest-path rust/Cargo.toml --workspace" }
+rust-clippy = { cmd = "cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings" }
+rust-test = { cmd = "cargo test --manifest-path rust/Cargo.toml --workspace" }
+rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test"] }
 
 [feature.doc.tasks]
 configure = { cmd = [ "cmake",

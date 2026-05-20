@@ -191,28 +191,7 @@ add_subdirectory(vendor/lepcc)
 add_subdirectory(vendor/h3)
 add_subdirectory(tools)
 
-#
-# Rust C ABI integration - define early so apps/CMakeLists.txt can use it.
-#
-set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
-set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
-set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
-file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
-    "${RUST_CAPI_DIR}/Cargo.toml"
-    "${RUST_CAPI_DIR}/Cargo.lock"
-    "${RUST_CAPI_DIR}/pdal-capi/*"
-    "${RUST_CAPI_DIR}/pdal-core/*"
-    "${RUST_CAPI_DIR}/pdal-filters/*"
-    "${RUST_CAPI_DIR}/pdal-cli/*"
-)
-set(RUST_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-if(APPLE AND NOT RUST_MACOSX_DEPLOYMENT_TARGET)
-    set(RUST_MACOSX_DEPLOYMENT_TARGET "16.0")
-endif()
-find_program(CARGO_EXECUTABLE cargo)
-if(NOT CARGO_EXECUTABLE)
-    message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
-endif()
+include(${PDAL_CMAKE_DIR}/rust.cmake)
 
 add_subdirectory(apps)
 
@@ -270,9 +249,6 @@ if (WIN32)
 endif()
 add_library(PDAL::PDAL ALIAS ${PDAL_LIB_NAME})
 
-#
-# Rust C ABI integration (spike: filters.decimation)
-#
 add_custom_command(
     OUTPUT ${RUST_CAPI_LIB}
     COMMAND ${CMAKE_COMMAND} -E env

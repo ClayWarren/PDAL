@@ -66,9 +66,9 @@ the Rust-backed shape of PDAL.
 
 | Area | Status | Notes |
 |---|---|---|
-| Root CMake | in progress | `libpdal_capi.a` is built and linked into `pdalcpp`, but the source dependency list must continue tracking every Rust crate that can affect the C ABI or linked implementation. |
-| `cmake/` modules | in progress | Rust build options, install rules, CPack/source-package behavior, platform link details, and test wiring should move here as the integration matures instead of accumulating in root `CMakeLists.txt`. |
-| `pixi.toml` | not ready | The developer environment still assumes a C++/conda-only build shape and should explicitly provide the Rust toolchain used by the port. |
+| Root CMake | done | `libpdal_capi.a` is built, linked into `pdalcpp`, and sourced from `cmake/rust.cmake` so the dependency list tracks every current Rust crate that can affect the C ABI or linked implementation. |
+| `cmake/` modules | in progress | Rust build options now live in `cmake/rust.cmake`. Install rules, CPack/source-package behavior, platform link details, and test wiring still need to move here as the integration matures. |
+| `pixi.toml` | done | The developer environment now includes the Rust toolchain and explicit `rust-fmt`, `rust-check`, `rust-clippy`, `rust-test`, and `rust-guard` tasks for the port workspace. |
 | GitHub workflows | not ready | Linux, macOS, Windows, pixi, conda, and release workflows need explicit Rust toolchain setup and Rust/C++ parity gates before the port is upstreamable. |
 | `PDALConfig.cmake.in` | not ready | Downstream `find_package(PDAL)` must keep working. Decide whether the Rust C ABI remains an internal implementation detail of `pdalcpp` or is exported as a stable target/header surface. |
 | `pdal_features.hpp.in` | not ready | Add a generated Rust-backed-build feature only if C++ wrappers or downstream code need a supported conditional. Avoid broad preprocessor branching. |
@@ -83,8 +83,12 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `927 / 927` individual C++ GoogleTest cases, or `100.00%`,
-are validated against Rust-backed behavior.
+Current checkpoint: under re-audit. The previous `927 / 927` claim was
+withdrawn after a live built-suite count found `915` tests from
+`build/bin/pdal_*_test --gtest_list_tests`; source-level scans report different
+totals depending on whether app tests and conditionally built tests are
+included. Do not cite a percentage here until the denominator and the counted
+Rust C ABI-backed test list are generated from the same source.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
