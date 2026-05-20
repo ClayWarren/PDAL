@@ -14,6 +14,7 @@ pub mod elm;
 pub mod estimate_rank;
 pub mod expression;
 pub mod expressionstats;
+pub mod faceraster;
 pub mod farthestpointsampling;
 pub mod ferry;
 pub mod geom_distance;

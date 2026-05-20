@@ -684,7 +684,10 @@ impl PointView {
     }
 
     pub fn raster(&self, name: &str) -> Option<&RasterData> {
-        self.rasters.iter().find(|raster| raster.name() == name)
+        self.rasters
+            .iter()
+            .find(|raster| raster.name() == name)
+            .or_else(|| name.is_empty().then(|| self.rasters.first()).flatten())
     }
 
     pub fn rasters(&self) -> &[RasterData] {

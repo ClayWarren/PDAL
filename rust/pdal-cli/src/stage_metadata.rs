@@ -331,6 +331,19 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
             option("threshold", "Rank threshold.", Some(json!(0.01))),
         ],
+        "filters.faceraster" => vec![
+            option("resolution", "Raster cell edge length.", Some(json!(1.0))),
+            option("origin_x", "Fixed raster X origin.", None),
+            option("origin_y", "Fixed raster Y origin.", None),
+            option("width", "Fixed raster width in cells.", None),
+            option("height", "Fixed raster height in cells.", None),
+            option("nodata", "No-data value.", None),
+            option(
+                "max_triangle_edge_length",
+                "Maximum triangle edge length to rasterize.",
+                None,
+            ),
+        ],
         "filters.gpstimeconvert" => vec![
             option(
                 "conversion",

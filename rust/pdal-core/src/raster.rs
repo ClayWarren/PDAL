@@ -90,4 +90,35 @@ impl RasterData {
         let idx = row * self.limits.width + col;
         self.data[idx] = value;
     }
+
+    pub fn get_cell(&self, x: usize, y: usize) -> f64 {
+        self.data[self.limits.index_from_bottom(x, y)]
+    }
+
+    pub fn set_cell(&mut self, x: usize, y: usize, value: f64) {
+        let idx = self.limits.index_from_bottom(x, y);
+        self.data[idx] = value;
+    }
+}
+
+impl RasterLimits {
+    pub fn x_cell(&self, x: f64) -> isize {
+        ((x - self.x_origin) / self.edge_length).floor() as isize
+    }
+
+    pub fn y_cell(&self, y: f64) -> isize {
+        ((y - self.y_origin) / self.edge_length).floor() as isize
+    }
+
+    pub fn x_cell_pos(&self, x: usize) -> f64 {
+        self.x_origin + (x as f64 + 0.5) * self.edge_length
+    }
+
+    pub fn y_cell_pos(&self, y: usize) -> f64 {
+        self.y_origin + (y as f64 + 0.5) * self.edge_length
+    }
+
+    fn index_from_bottom(&self, x: usize, y: usize) -> usize {
+        (self.height - y - 1) * self.width + x
+    }
 }

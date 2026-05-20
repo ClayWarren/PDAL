@@ -19,6 +19,7 @@ use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
+use pdal_filters::faceraster::FaceRasterFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
@@ -91,6 +92,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.eigenvalues",
     "filters.elm",
     "filters.estimaterank",
+    "filters.faceraster",
     "filters.gpstimeconvert",
     "filters.groupby",
     "filters.hag_nn",
@@ -226,6 +228,7 @@ pub fn create_filter(
             get_u64(options, "knn", 8)? as usize,
             get_f64(options, "threshold", 0.01)?,
         )))),
+        "filters.faceraster" => Ok(Box::new(FilterWrapper::new(FaceRasterFilter::new(options)))),
         "filters.gpstimeconvert" => Ok(Box::new(FilterWrapper::new(GpsTimeConvert::from_options(
             options,
         )?))),
