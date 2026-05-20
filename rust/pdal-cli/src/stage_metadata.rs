@@ -501,8 +501,41 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
         ],
         "writers.null" => Vec::new(),
-        "writers.bpf" | "writers.fbi" | "writers.gltf" | "writers.sbet" | "writers.las"
-        | "writers.laz" => vec![
+        "writers.bpf" => vec![
+            filename(),
+            option("compression", "Compress output data.", Some(json!(false))),
+            option(
+                "bundledfile",
+                "Additional file to bundle inside the BPF output.",
+                None,
+            ),
+        ],
+        "writers.fbi" => vec![filename()],
+        "writers.gltf" => vec![
+            filename(),
+            option("metallic", "Material metallic factor.", Some(json!(0.0))),
+            option("roughness", "Material roughness factor.", Some(json!(0.0))),
+            option("red", "Default material red channel.", Some(json!(0.0))),
+            option("green", "Default material green channel.", Some(json!(0.0))),
+            option("blue", "Default material blue channel.", Some(json!(0.0))),
+            option("alpha", "Default material alpha channel.", Some(json!(1.0))),
+            option(
+                "double_sided",
+                "Write double-sided mesh materials.",
+                Some(json!(false)),
+            ),
+            option("colors", "Write vertex colors.", Some(json!(false))),
+            option("normals", "Write vertex normals.", Some(json!(false))),
+        ],
+        "writers.sbet" => vec![
+            filename(),
+            option(
+                "angles_are_degrees",
+                "Convert angular fields from degrees to radians.",
+                Some(json!(true)),
+            ),
+        ],
+        "writers.las" | "writers.laz" => vec![
             filename(),
             option("compression", "Compress output data.", Some(json!(false))),
             option("point_format", "LAS point format ID.", Some(json!(3))),
@@ -530,7 +563,16 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Floating-point output precision.",
                 Some(json!(2)),
             ),
-            option("compression", "PCD storage mode.", Some(json!("ascii"))),
+            option(
+                "compression",
+                "PCD storage mode: ascii or binary.",
+                Some(json!("ascii")),
+            ),
+            option(
+                "keep_unspecified",
+                "Write dimensions not listed in the output order.",
+                Some(json!(true)),
+            ),
         ],
         "writers.ply" => vec![
             filename(),

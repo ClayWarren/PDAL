@@ -658,6 +658,49 @@ fn stage_options_reports_scoped_ept_options() {
     assert!(args.contains(&"ignore_unreadable"));
 }
 
+#[test]
+fn stage_options_reports_scoped_pcd_writer_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("writers.pcd")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"compression"));
+    assert!(args.contains(&"keep_unspecified"));
+}
+
+#[test]
+fn stage_options_do_not_leak_las_writer_options_to_other_writers() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("writers.bpf")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"compression"));
+    assert!(args.contains(&"bundledfile"));
+    assert!(!args.contains(&"point_format"));
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
