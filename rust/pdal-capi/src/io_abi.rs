@@ -1,4 +1,5 @@
 use crate::error::{clear_last_error, set_last_error};
+use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
 
@@ -149,6 +150,21 @@ pub unsafe extern "C" fn pdal_reader_read_first(reader: *mut ReaderHandle) -> *m
             std::ptr::null_mut()
         }
     }
+}
+
+/// Return a reader's metadata tree. Caller owns the returned pointer.
+///
+/// # Safety
+/// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_metadata(reader: *const ReaderHandle) -> *mut MetadataNode {
+    let Some(reader) = reader.as_ref() else {
+        set_last_error("null reader");
+        return std::ptr::null_mut();
+    };
+
+    clear_last_error();
+    Box::into_raw(Box::new(reader.reader.metadata()))
 }
 
 /// Destroy a reader handle.

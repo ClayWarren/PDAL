@@ -413,6 +413,7 @@ pdal_reader_t* pdal_reader_create_ilvis2(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_obj(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_ply(const pdal_options_t* ops);
 pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
+pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
 void pdal_reader_destroy(pdal_reader_t* reader);
 
 // Stage registry: construct implemented stages from PDAL driver names.

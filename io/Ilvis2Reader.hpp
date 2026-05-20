@@ -32,26 +32,10 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <map>
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
-#include <pdal/pdal_features.hpp> // For PDAL_HAVE_LIBXML2
-#include <pdal/util/IStream.hpp>
-
-#ifndef PDAL_HAVE_LIBXML2
-namespace pdal
-{
-class Ilvis2MetadataReader
-{
-public:
-    inline void readMetadataFile(std::string filename, pdal::MetadataNode* m) {
-    };
-};
-} // namespace pdal
-#else
-#include "Ilvis2MetadataReader.hpp"
-#endif
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -77,14 +61,11 @@ public:
     std::string getName() const override;
 
 private:
-    std::unique_ptr<std::ifstream> m_stream;
     IlvisMapping m_mapping;
-    StringList m_fields;
-    size_t m_lineNum;
-    bool m_resample;
-    PointLayoutPtr m_layout;
     std::string m_metadataFile;
-    Ilvis2MetadataReader m_mdReader;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    Dimension::IdList m_dims;
 
     void addDimensions(PointLayoutPtr layout) override;
     void addArgs(ProgramArgs& args) override;
@@ -94,7 +75,7 @@ private:
     point_count_t read(PointViewPtr view, point_count_t count) override;
     void done(PointTableRef table) override;
 
-    virtual void readPoint(PointRef& point, StringList s, std::string pointMap);
+    void copyPoint(PointRef& point);
 };
 
 std::ostream& operator<<(std::ostream& out,

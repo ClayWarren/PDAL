@@ -33,12 +33,8 @@
  ****************************************************************************/
 
 #include "Ilvis2Reader.hpp"
-#include "Ilvis2MetadataReader.hpp"
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-
-#include <algorithm>
-#include <cmath>
 
 namespace pdal
 {
@@ -48,6 +44,92 @@ static StaticPluginInfo const s_info{
     "https://pdal.org/stages/readers.ilvis2.html"};
 
 CREATE_STATIC_STAGE(Ilvis2Reader, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    if (!value.empty())
+        pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+std::string takeString(char* value)
+{
+    std::string output(value ? value : "");
+    pdal_string_free(value);
+    return output;
+}
+
+MetadataNode addMetadataChild(MetadataNode& parent,
+                              const pdal_metadata_node_t* rustNode)
+{
+    std::string name = takeString(pdal_metadata_node_name(rustNode));
+    std::string description =
+        takeString(pdal_metadata_node_description(rustNode));
+    uint8_t valueKind = pdal_metadata_node_value_kind(rustNode);
+
+    switch (valueKind)
+    {
+    case 1:
+        return parent.add(name, pdal_metadata_node_value_i64(rustNode),
+                          description);
+    case 2:
+        return parent.add(name, pdal_metadata_node_value_u64(rustNode),
+                          description);
+    case 3:
+        return parent.add(name, pdal_metadata_node_value_f64(rustNode),
+                          description);
+    case 4:
+        return parent.add(name, pdal_metadata_node_value_bool(rustNode),
+                          description);
+    case 0:
+        return parent.add(name, takeString(pdal_metadata_node_value(rustNode)),
+                          description);
+    default:
+        return parent.add(name);
+    }
+}
+
+void copyMetadataChildren(const pdal_metadata_node_t* rustNode,
+                          MetadataNode& cppNode)
+{
+    uint64_t childCount = pdal_metadata_node_child_count(rustNode);
+    for (uint64_t i = 0; i < childCount; ++i)
+    {
+        pdal_metadata_node_t* rustChild = pdal_metadata_node_child(rustNode, i);
+        MetadataNode cppChild = addMetadataChild(cppNode, rustChild);
+        copyMetadataChildren(rustChild, cppChild);
+        pdal_metadata_node_destroy(rustChild);
+    }
+}
+
+std::string mappingName(Ilvis2Reader::IlvisMapping mapping)
+{
+    switch (mapping)
+    {
+    case Ilvis2Reader::IlvisMapping::LOW:
+        return "low";
+    case Ilvis2Reader::IlvisMapping::HIGH:
+        return "high";
+    case Ilvis2Reader::IlvisMapping::ALL:
+        return "all";
+    case Ilvis2Reader::IlvisMapping::INVALID:
+        return "invalid";
+    }
+    return "invalid";
+}
+
+} // namespace
 
 std::string Ilvis2Reader::getName() const
 {
@@ -90,7 +172,11 @@ std::ostream& operator<<(std::ostream& out,
 
 Ilvis2Reader::Ilvis2Reader() {}
 
-Ilvis2Reader::~Ilvis2Reader() {}
+Ilvis2Reader::~Ilvis2Reader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 void Ilvis2Reader::addArgs(ProgramArgs& args)
 {
@@ -100,169 +186,94 @@ void Ilvis2Reader::addArgs(ProgramArgs& args)
 
 void Ilvis2Reader::addDimensions(PointLayoutPtr layout)
 {
-    layout->registerDim(Dimension::Id::LvisLfid);
-    layout->registerDim(Dimension::Id::ShotNumber);
-    layout->registerDim(Dimension::Id::GpsTime);
-    layout->registerDim(Dimension::Id::LongitudeCentroid);
-    layout->registerDim(Dimension::Id::LatitudeCentroid);
-    layout->registerDim(Dimension::Id::ElevationCentroid);
-    layout->registerDim(Dimension::Id::LongitudeLow);
-    layout->registerDim(Dimension::Id::LatitudeLow);
-    layout->registerDim(Dimension::Id::ElevationLow);
-    layout->registerDim(Dimension::Id::LongitudeHigh);
-    layout->registerDim(Dimension::Id::LatitudeHigh);
-    layout->registerDim(Dimension::Id::ElevationHigh);
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
+    m_dims = {Dimension::Id::LvisLfid,
+              Dimension::Id::ShotNumber,
+              Dimension::Id::GpsTime,
+              Dimension::Id::LongitudeCentroid,
+              Dimension::Id::LatitudeCentroid,
+              Dimension::Id::ElevationCentroid,
+              Dimension::Id::LongitudeLow,
+              Dimension::Id::LatitudeLow,
+              Dimension::Id::ElevationLow,
+              Dimension::Id::LongitudeHigh,
+              Dimension::Id::LatitudeHigh,
+              Dimension::Id::ElevationHigh,
+              Dimension::Id::X,
+              Dimension::Id::Y,
+              Dimension::Id::Z};
+
+    for (Dimension::Id dim : m_dims)
+        layout->registerDim(dim);
 }
 
 void Ilvis2Reader::initialize(PointTableRef)
 {
+    m_rustIndex = 0;
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
     if (!m_metadataFile.empty() && !FileUtils::fileExists(m_metadataFile))
         throwError("Invalid metadata file: '" + m_metadataFile + "'");
 
-    // Data are WGS84 (4326) with ITRF2000 datum (6656)
-    // See http://nsidc.org/data/docs/daac/icebridge/ilvis2/index.html for
-    // background
     setSpatialReference("EPSG:4326");
-}
 
-template <typename T>
-T convert(const StringList& s, const std::string& name, size_t fieldno)
-{
-    T output;
-    if (!Utils::fromString(s[fieldno], output))
-        throw Ilvis2Reader::error("Unable to convert " + name + ", " +
-                                  s[fieldno] + ", to double");
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "mapping", mappingName(m_mapping));
+    addOption(options, "metadata", m_metadataFile);
 
-    return output;
-}
-
-void Ilvis2Reader::readPoint(PointRef& point, StringList s,
-                             std::string pointMap)
-{
-    point.setField(pdal::Dimension::Id::LvisLfid,
-                   convert<unsigned>(s, "LVIS_LFID", 0));
-    point.setField(pdal::Dimension::Id::ShotNumber,
-                   convert<unsigned>(s, "SHOTNUMBER", 1));
-    point.setField(pdal::Dimension::Id::GpsTime,
-                   convert<double>(s, "GPSTIME", 2));
-    point.setField(
-        pdal::Dimension::Id::LongitudeCentroid,
-        Utils::normalizeLongitude(convert<double>(s, "LONGITUDE_CENTROID", 3)));
-    point.setField(pdal::Dimension::Id::LatitudeCentroid,
-                   convert<double>(s, "LATITUDE_CENTROID", 4));
-    point.setField(pdal::Dimension::Id::ElevationCentroid,
-                   convert<double>(s, "ELEVATION_CENTROID", 5));
-    point.setField(
-        pdal::Dimension::Id::LongitudeLow,
-        Utils::normalizeLongitude(convert<double>(s, "LONGITUDE_LOW", 6)));
-    point.setField(pdal::Dimension::Id::LatitudeLow,
-                   convert<double>(s, "LATITUDE_LOW", 7));
-    point.setField(pdal::Dimension::Id::ElevationLow,
-                   convert<double>(s, "ELEVATION_LOW", 8));
-    point.setField(
-        pdal::Dimension::Id::LongitudeHigh,
-        Utils::normalizeLongitude(convert<double>(s, "LONGITUDE_HIGH", 9)));
-    point.setField(pdal::Dimension::Id::LatitudeHigh,
-                   convert<double>(s, "LATITUDE_HIGH", 10));
-    point.setField(pdal::Dimension::Id::ElevationHigh,
-                   convert<double>(s, "ELEVATION_HIGH", 11));
-
-    double x, y, z;
-    pdal::Dimension::Id xd, yd, zd;
-
-    xd = m_layout->findDim("LONGITUDE_" + pointMap);
-    yd = m_layout->findDim("LATITUDE_" + pointMap);
-    zd = m_layout->findDim("ELEVATION_" + pointMap);
-
-    x = point.getFieldAs<double>(xd);
-    y = point.getFieldAs<double>(yd);
-    z = point.getFieldAs<double>(zd);
-
-    point.setField(pdal::Dimension::Id::X, x);
-    point.setField(pdal::Dimension::Id::Y, y);
-    point.setField(pdal::Dimension::Id::Z, z);
-}
-
-void Ilvis2Reader::ready(PointTableRef table)
-{
-    if (!m_metadataFile.empty())
+    pdal_reader_t* reader = pdal_reader_create_ilvis2(options);
+    if (!reader)
     {
-        try
-        {
-            m_mdReader.readMetadataFile(m_metadataFile, &m_metadata);
-        }
-        catch (const Ilvis2MetadataReader::error& err)
-        {
-            throwError(err.what());
-        }
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust ILVIS2 reader.");
     }
 
-    static const int HeaderSize = 2;
-    std::string line;
-
-    m_lineNum = 0;
-    m_stream.reset(new std::ifstream(m_filename));
-    m_layout = table.layout();
-    m_resample = false;
-    for (size_t i = 0; i < HeaderSize; ++i)
+    m_rustView = pdal_reader_read_first(reader);
+    if (!m_rustView)
     {
-        std::getline(*m_stream, line);
-        m_lineNum++;
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        throwLastRustError("Rust ILVIS2 reader failed.");
     }
+
+    pdal_metadata_node_t* metadata = pdal_reader_metadata(reader);
+    if (metadata)
+    {
+        copyMetadataChildren(metadata, m_metadata);
+        pdal_metadata_node_destroy(metadata);
+    }
+
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+}
+
+void Ilvis2Reader::ready(PointTableRef)
+{
+    m_rustIndex = 0;
 }
 
 bool Ilvis2Reader::processOne(PointRef& point)
 {
-    std::string line;
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
+        return false;
 
-    // Format:
-    // LVIS_LFID SHOTNUMBER TIME LONGITUDE_CENTROID LATITUDE_CENTROID
-    // ELEVATION_CENTROID LONGITUDE_LOW LATITUDE_LOW ELEVATION_LOW
-    // LONGITUDE_HIGH LATITUDE_HIGH ELEVATION_HIGH
-
-    try
-    {
-        // This handles the second time through for this data line when we have
-        // an "ALL" mapping and the high and low elevations are different.
-        if (m_resample)
-        {
-            readPoint(point, m_fields, "HIGH");
-            m_resample = false;
-            return true;
-        }
-
-        if (!std::getline(*m_stream, line))
-            return false;
-        m_fields = Utils::split2(line, ' ');
-        if (m_fields.size() != 12)
-            throwError("Invalid format for line " + Utils::toString(m_lineNum) +
-                       ".  Expected 12 fields, got " +
-                       Utils::toString(m_fields.size()) + ".");
-
-        double low_elev = convert<double>(m_fields, "ELEVATION_LOW", 8);
-        double high_elev = convert<double>(m_fields, "ELEVATION_HIGH", 11);
-
-        // write LOW point if specified, or for ALL
-        if (m_mapping == IlvisMapping::LOW || m_mapping == IlvisMapping::ALL)
-        {
-            readPoint(point, m_fields, "LOW");
-            // If we have ALL mapping and the high elevation is different
-            // from that of the low elevation, we'll a second point with the
-            // high elevation.
-            if (m_mapping == IlvisMapping::ALL && (low_elev != high_elev))
-                m_resample = true;
-        }
-        else if (m_mapping == IlvisMapping::HIGH)
-            readPoint(point, m_fields, "HIGH");
-    }
-    catch (const error& err)
-    {
-        throwError(err.what());
-    }
+    copyPoint(point);
+    m_rustIndex++;
     return true;
+}
+
+void Ilvis2Reader::copyPoint(PointRef& point)
+{
+    for (Dimension::Id dim : m_dims)
+    {
+        point.setField(dim,
+                       pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str()));
+    }
 }
 
 point_count_t Ilvis2Reader::read(PointViewPtr view, point_count_t count)
@@ -270,7 +281,7 @@ point_count_t Ilvis2Reader::read(PointViewPtr view, point_count_t count)
     PointId idx = view->size();
     point_count_t numRead = 0;
 
-    PointRef point = PointRef(*view, 0);
+    PointRef point(*view, 0);
     while (numRead < count)
     {
         point.setPointId(idx++);
@@ -284,9 +295,6 @@ point_count_t Ilvis2Reader::read(PointViewPtr view, point_count_t count)
     return numRead;
 }
 
-void Ilvis2Reader::done(PointTableRef table)
-{
-    m_stream.reset();
-}
+void Ilvis2Reader::done(PointTableRef) {}
 
 } // namespace pdal

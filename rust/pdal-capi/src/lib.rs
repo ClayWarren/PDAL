@@ -72,6 +72,15 @@ mod tests {
         value
     }
 
+    fn data_path(path: &str) -> String {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data")
+            .join(path)
+            .display()
+            .to_string()
+    }
+
     #[test]
     fn spatial_reference_roundtrips_through_c_abi() {
         unsafe {
@@ -664,6 +673,45 @@ mod tests {
             assert_eq!(pdal_point_view_get_f64(view, 1, y.as_ptr()), 21.0);
             assert_eq!(pdal_point_view_get_f64(view, 2, z.as_ptr()), 32.0);
 
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
+    fn reader_metadata_returns_reader_metadata_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("filename", data_path("ilvis2/ILVIS2_TEST_FILE.TXT")),
+                ("metadata", data_path("ilvis2/ILVIS2_TEST_FILE.TXT.xml")),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_ilvis2(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(!view.is_null());
+
+            let metadata = pdal_reader_metadata(reader);
+            assert!(!metadata.is_null());
+            let granule = CString::new("GranuleUR").unwrap();
+            assert_eq!(
+                pdal_metadata_node_child_named_count(metadata, granule.as_ptr()),
+                1
+            );
+            let child = pdal_metadata_node_child_named(metadata, granule.as_ptr(), 0);
+            assert_eq!(
+                take_string(pdal_metadata_node_value(child)),
+                "SC:ILVIS2.001:51203496"
+            );
+
+            pdal_metadata_node_destroy(child);
+            pdal_metadata_node_destroy(metadata);
             pdal_point_view_destroy(view);
             pdal_reader_destroy(reader);
             pdal_options_destroy(options);
