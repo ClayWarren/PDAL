@@ -42,6 +42,7 @@
 #include <pdal/FlexWriter.hpp>
 #include <pdal/pdal_export.hpp>
 #include <pdal/util/OStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <vector>
 
@@ -62,12 +63,14 @@ public:
     };
 
     std::string getName() const override;
+    ~BpfWriter() override;
 
 private:
     StringList m_outputDims; ///< List of dimensions to write
     OLeStream m_stream;
     BpfHeader m_header;
     BpfDimensionList m_dims;
+    std::vector<Dimension::Type> m_dimTypes;
     std::vector<uint8_t> m_extraData;
     std::vector<BpfUlemFile> m_bundledFiles;
     bool m_compression;
@@ -76,6 +79,8 @@ private:
     StringList m_bundledFilesSpec;
     std::string m_curFilename;
     std::string m_remoteFilename;
+    SpatialReference m_curSrs;
+    pdal_point_view_t* m_rustView = nullptr;
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
@@ -89,6 +94,8 @@ private:
     double getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
                             PointId idx);
     void loadBpfDimensions(PointLayoutPtr layout);
+    void copyViewToRust(const PointViewPtr data);
+    void writeRustView();
     void writePointMajor(const PointView* data);
     void writeDimMajor(const PointView* data);
     void writeByteMajor(const PointView* data);

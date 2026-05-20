@@ -42,6 +42,7 @@
 
 #include "BpfCompressor.hpp"
 #include <arbiter/arbiter.hpp>
+#include <pdal/PointView.hpp>
 #include <pdal/util/Utils.hpp>
 
 namespace pdal
@@ -57,9 +58,100 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(BpfWriter, s_info)
 
+namespace
+{
+
+int rustTypeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    pdal_options_add_str(options, key.c_str(), value ? "true" : "false");
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_str(options, key.c_str(), Utils::toString(value).c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+std::string formatName(BpfFormat format)
+{
+    switch (format)
+    {
+    case BpfFormat::PointMajor:
+        return "point";
+    case BpfFormat::ByteMajor:
+        return "byte";
+    case BpfFormat::DimMajor:
+        return "dimension";
+    }
+    return "dimension";
+}
+
+std::string joinStrings(const StringList& values)
+{
+    std::ostringstream oss;
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        if (i)
+            oss << ',';
+        oss << values[i];
+    }
+    return oss.str();
+}
+
+} // namespace
+
 std::string BpfWriter::getName() const
 {
     return s_info.name;
+}
+
+BpfWriter::~BpfWriter()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 std::istream& operator>>(std::istream& in, BpfWriter::CoordId& id)
@@ -160,50 +252,25 @@ void BpfWriter::readyFile(const std::string& filename,
                           const SpatialReference& srs)
 {
     m_curFilename = filename;
-    m_stream.open(filename);
-    if (!m_stream.isOpen())
-        throwError("Unable to open stream for " + filename);
-    m_header.m_version = 3;
-    m_header.m_numDim = m_dims.size();
-    m_header.m_numPts = 0;
-    m_header.setLog(log());
-
-    if (m_coordId.m_auto)
+    m_curSrs = srs;
+    if (m_rustView)
     {
-        if (!m_header.m_coordId)
-        {
-            if (m_header.trySetSpatialReference(srs))
-                m_header.m_coordType = Utils::toNative(BpfCoordType::UTM);
-        }
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
 
-    // We will re-write the header and dimensions to account for the point
-    // count and dimension min/max.
-    try
-    {
-        m_header.write(m_stream);
-    }
-    catch (const BpfHeader::error& err)
-    {
-        throwError(err.what());
-    }
-    m_header.writeDimensions(m_stream, m_dims);
-    for (auto& file : m_bundledFiles)
-        file.write(m_stream);
-    m_stream.put((const char*)m_extraData.data(), m_extraData.size());
-
-    if (m_stream.position() > (std::numeric_limits<int32_t>::max)())
-        throwError("Data too large.  BPF only supports 2^32 - 1 bytes.");
-    m_header.m_len = static_cast<int32_t>(m_stream.position());
-
-    m_header.m_xform.m_vals[0] = m_scaling.m_xXform.m_scale.m_val;
-    m_header.m_xform.m_vals[5] = m_scaling.m_yXform.m_scale.m_val;
-    m_header.m_xform.m_vals[10] = m_scaling.m_zXform.m_scale.m_val;
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (size_t i = 0; i < m_dims.size(); ++i)
+        pdal_point_layout_register_dim(rustLayout, m_dims[i].m_label.c_str(),
+                                       rustTypeId(m_dimTypes[i]));
+    m_rustView = pdal_point_view_create(rustLayout);
 }
 
 void BpfWriter::loadBpfDimensions(PointLayoutPtr layout)
 {
     Dimension::IdList dims;
+    m_dims.clear();
+    m_dimTypes.clear();
 
     if (m_outputDims.size())
     {
@@ -235,6 +302,7 @@ void BpfWriter::loadBpfDimensions(PointLayoutPtr layout)
         dim.m_id = id;
         dim.m_label = layout->dimName(id);
         m_dims.push_back(dim);
+        m_dimTypes.push_back(layout->dimType(id));
     }
 }
 
@@ -245,38 +313,62 @@ void BpfWriter::prerunFile(const PointViewSet& pvSet)
 
 void BpfWriter::writeView(const PointViewPtr dataShared)
 {
-    // Avoid reference count overhead internally.
-    const PointView* data(dataShared.get());
+    copyViewToRust(dataShared);
+}
 
-    // We know that X, Y and Z are dimensions 0, 1 and 2.
-    m_dims[0].m_offset = m_scaling.m_xXform.m_offset.m_val;
-    m_dims[1].m_offset = m_scaling.m_yXform.m_offset.m_val;
-    m_dims[2].m_offset = m_scaling.m_zXform.m_offset.m_val;
-
-    try
+void BpfWriter::copyViewToRust(const PointViewPtr data)
+{
+    for (PointId idx = 0; idx < data->size(); ++idx)
     {
-        switch (m_header.m_pointFormat)
+        PointId outIdx = pdal_point_view_add_point(m_rustView);
+        for (BpfDimension& dim : m_dims)
         {
-        case BpfFormat::PointMajor:
-            writePointMajor(data);
-            break;
-        case BpfFormat::DimMajor:
-            writeDimMajor(data);
-            break;
-        case BpfFormat::ByteMajor:
-            writeByteMajor(data);
-            break;
+            pdal_point_view_set_f64(m_rustView, outIdx, dim.m_label.c_str(),
+                                    data->getFieldAs<double>(dim.m_id, idx));
         }
     }
-    catch (const BpfCompressor::error& err)
+}
+
+void BpfWriter::writeRustView()
+{
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_curFilename);
+    addOption(options, "compression", m_compression);
+    addOption(options, "format", formatName(m_header.m_pointFormat));
+    addOption(options, "header_data", m_extraDataSpec);
+    addOption(options, "output_dims", joinStrings(m_outputDims));
+    addOption(options, "scale_x", m_scaling.m_xXform.m_scale.m_val);
+    addOption(options, "scale_y", m_scaling.m_yXform.m_scale.m_val);
+    addOption(options, "scale_z", m_scaling.m_zXform.m_scale.m_val);
+    addOption(options, "offset_x", m_scaling.m_xXform.m_offset.m_val);
+    addOption(options, "offset_y", m_scaling.m_yXform.m_offset.m_val);
+    addOption(options, "offset_z", m_scaling.m_zXform.m_offset.m_val);
+
+    int coordId = m_coordId.m_val;
+    if (m_coordId.m_auto && !coordId)
     {
-        throwError(err.what());
+        BpfHeader header;
+        header.setLog(log());
+        if (header.trySetSpatialReference(m_curSrs))
+            coordId = header.m_coordId;
+    }
+    addOption(options, "coord_id", Utils::toString(coordId));
+
+    for (const std::string& bundledFile : m_bundledFilesSpec)
+        addOption(options, "bundledfile", bundledFile);
+
+    pdal_writer_t* writer = pdal_writer_create_bpf(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust BPF writer.");
     }
 
-    size_t count = data->size() + m_header.m_numPts;
-    if (count > (size_t)(std::numeric_limits<int32_t>::max)())
-        throwError("Too many points to write to BPF output. Limit is 2^32 -1.");
-    m_header.m_numPts = static_cast<int32_t>(count);
+    bool ok = pdal_writer_write_view(writer, m_rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        throwLastRustError("Rust BPF writer failed.");
 }
 
 void BpfWriter::writePointMajor(const PointView* data)
@@ -385,19 +477,9 @@ double BpfWriter::getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
 
 void BpfWriter::doneFile()
 {
-    // Rewrite the header to update the the correct number of points and
-    // statistics.
-    m_stream.seek(0);
-    try
-    {
-        m_header.write(m_stream);
-    }
-    catch (const BpfHeader::error& err)
-    {
-        throwError(err.what());
-    }
-    m_header.writeDimensions(m_stream, m_dims);
-    m_stream.close();
+    writeRustView();
+    pdal_point_view_destroy(m_rustView);
+    m_rustView = nullptr;
     getMetadata().addList("filename", m_curFilename);
 
     if (m_remoteFilename.size())
