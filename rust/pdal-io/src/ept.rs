@@ -24,6 +24,7 @@ pub struct EptReader {
     filename: String,
     bounds: String,
     origin: String,
+    resolution: String,
     ignore_unreadable: bool,
     metadata: MetadataNode,
 }
@@ -34,6 +35,7 @@ impl EptReader {
             filename: options.get_str("filename", ""),
             bounds: options.get_str("bounds", ""),
             origin: options.get_str("origin", ""),
+            resolution: options.get_str("resolution", ""),
             ignore_unreadable: options.get_bool("ignore_unreadable", false),
             metadata: MetadataNode::new("readers.ept"),
         }
@@ -68,7 +70,8 @@ impl Reader for EptReader {
         }
 
         self.metadata = metadata_from_info(&info);
-        let tiles = hierarchy_tiles(root)?;
+        let max_depth = self.resolution_filter(&info)?;
+        let tiles = hierarchy_tiles(root, max_depth)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let schema = EptSchema::parse(&info)?;
@@ -157,6 +160,59 @@ impl EptReader {
             .map(|source| Some(source.id))
             .ok_or_else(|| StageError(format!("Invalid EPT origin '{}'.", self.origin)))
     }
+
+    fn resolution_filter(&self, info: &Value) -> Result<Option<u64>, StageError> {
+        if self.resolution.is_empty() {
+            return Ok(None);
+        }
+        let resolution = self
+            .resolution
+            .parse::<f64>()
+            .map_err(|_| StageError("EPT resolution option must be numeric.".to_string()))?;
+        if resolution <= 0.0 {
+            return Err(StageError(
+                "EPT resolution option must be positive.".to_string(),
+            ));
+        }
+        let span = info["span"]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT file is missing span.".to_string()))?;
+        if span <= 0.0 {
+            return Err(StageError("EPT span must be positive.".to_string()));
+        }
+        let bounds = info["bounds"]
+            .as_array()
+            .ok_or_else(|| StageError("EPT file is missing bounds.".to_string()))?;
+        if bounds.len() < 6 {
+            return Err(StageError(
+                "EPT bounds must contain six coordinates.".to_string(),
+            ));
+        }
+        let min_x = bounds[0]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds min X is not numeric.".to_string()))?;
+        let min_y = bounds[1]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds min Y is not numeric.".to_string()))?;
+        let min_z = bounds[2]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds min Z is not numeric.".to_string()))?;
+        let max_x = bounds[3]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds max X is not numeric.".to_string()))?;
+        let max_y = bounds[4]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds max Y is not numeric.".to_string()))?;
+        let max_z = bounds[5]
+            .as_f64()
+            .ok_or_else(|| StageError("EPT bounds max Z is not numeric.".to_string()))?;
+        let cube_width = (max_x - min_x).max(max_y - min_y).max(max_z - min_z) / span;
+        if cube_width <= 0.0 {
+            return Err(StageError("EPT bounds cube width is invalid.".to_string()));
+        }
+        let depth = (cube_width / resolution).log2().ceil().max(0.0) as u64;
+        Ok(Some(depth))
+    }
 }
 
 struct EptTile {
@@ -186,7 +242,7 @@ fn read_json(path: &Path) -> Result<Value, StageError> {
     })
 }
 
-fn hierarchy_tiles(root: &Path) -> Result<Vec<EptTile>, StageError> {
+fn hierarchy_tiles(root: &Path, max_depth: Option<u64>) -> Result<Vec<EptTile>, StageError> {
     let mut tiles = Vec::new();
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::from([String::from("0-0-0-0")]);
@@ -203,17 +259,29 @@ fn hierarchy_tiles(root: &Path) -> Result<Vec<EptTile>, StageError> {
             ))
         })?;
         for (node, count) in object {
+            let depth = key_depth(node)?;
             match count.as_i64() {
-                Some(points) if points > 0 => tiles.push(EptTile {
-                    key: node.clone(),
-                    expected_points: points as u64,
-                }),
-                Some(-1) => queue.push_back(node.clone()),
+                Some(points) if points > 0 && max_depth.is_none_or(|max| depth <= max) => tiles
+                    .push(EptTile {
+                        key: node.clone(),
+                        expected_points: points as u64,
+                    }),
+                Some(-1) if max_depth.is_none_or(|max| depth <= max) => {
+                    queue.push_back(node.clone())
+                }
                 _ => {}
             }
         }
     }
     Ok(tiles)
+}
+
+fn key_depth(key: &str) -> Result<u64, StageError> {
+    key.split('-')
+        .next()
+        .ok_or_else(|| StageError(format!("Invalid EPT hierarchy key '{key}'.")))?
+        .parse()
+        .map_err(|_| StageError(format!("Invalid EPT hierarchy key '{key}'.")))
 }
 
 fn validate_tile_count(
@@ -570,6 +638,37 @@ mod tests {
             assert!((4966506.0..=4966706.0).contains(&y));
             assert!((-50.0..=50.0).contains(&z));
         }
+    }
+
+    #[test]
+    fn applies_resolution_limit_to_hierarchy_depth() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/lone-star-laszip/ept.json").display(),
+        );
+        options.add("resolution", "0.1");
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 479269);
+    }
+
+    #[test]
+    fn rejects_non_positive_resolution() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/lone-star-laszip/ept.json").display(),
+        );
+        options.add("resolution", "0");
+        let mut reader = EptReader::new(&options);
+
+        let Err(err) = reader.read() else {
+            panic!("expected bad EPT resolution to fail");
+        };
+        assert!(err.0.contains("resolution option must be positive"));
     }
 
     #[test]
