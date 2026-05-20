@@ -27,3 +27,4 @@ pub mod smrmsg;
 pub mod terrasolid;
 pub mod text;
 pub mod text_writer;
+pub mod tindex;

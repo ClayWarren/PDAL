@@ -140,6 +140,14 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
         | "readers.terrasolid" | "readers.las" | "readers.laz" => vec![filename()],
+        "readers.tindex" => vec![
+            filename(),
+            option(
+                "tindex_name",
+                "Tile index field containing source filenames.",
+                Some(json!("location")),
+            ),
+        ],
         "readers.ilvis2" => vec![
             filename(),
             option(

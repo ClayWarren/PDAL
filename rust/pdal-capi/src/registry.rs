@@ -76,6 +76,7 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.las",
     "readers.laz",
     "readers.ply",
+    "readers.tindex",
 ];
 
 pub const FILTER_DRIVERS: &[&str] = &[
@@ -161,6 +162,7 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         ))),
         "readers.las" | "readers.laz" => Ok(Box::new(pdal_io::las::LasReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
+        "readers.tindex" => Ok(Box::new(pdal_io::tindex::TindexReader::new(options))),
         _ => Err(StageError(format!(
             "Reader driver '{name}' is not available in the Rust port."
         ))),

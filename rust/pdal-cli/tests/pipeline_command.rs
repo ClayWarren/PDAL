@@ -199,6 +199,46 @@ fn pipeline_command_runs_sort_filter() {
 }
 
 #[test]
+fn pipeline_command_reads_tindex_pipeline() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-pipeline-tindex");
+    let source_copy = temp.join("simple_text.ply");
+    fs::copy(&input, &source_copy).unwrap();
+    let index = temp.join("index.geojson");
+    let output = temp.join("out.pcd");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &index,
+        r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"location":"simple_text.ply"},"geometry":null},
+    {"type":"Feature","properties":{"location":"simple_text.ply"},"geometry":null}
+  ]
+}"#,
+    )
+    .unwrap();
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.tindex","filename":"{}"}},
+  {{"type":"writers.pcd","filename":"{}"}}
+]"#,
+            escape_json_path(&index),
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    run_rust_pipeline(&pipeline);
+
+    assert_eq!(read_pcd(&output).len(), 6);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
