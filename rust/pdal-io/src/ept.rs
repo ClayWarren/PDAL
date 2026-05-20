@@ -1,10 +1,10 @@
 //! `readers.ept` -- local LASzip EPT full-read slice.
 //!
-//! This handles local `ept.json` datasets whose `dataType` is `laszip` by
-//! walking JSON hierarchy files and merging local tiles. Bounds filtering is
-//! applied after tile reads; hierarchy pruning, reprojection, polygon/OGR
-//! filters, resolution limits, addons, remote access, and streaming are
-//! deferred.
+//! This handles local `ept.json` datasets whose `dataType` is `laszip`,
+//! `binary`, or `zstandard` by walking JSON hierarchy files and merging local
+//! tiles. Bounds queries prune hierarchy nodes before tile reads and are also
+//! applied to individual points. Reprojection, polygon/OGR filters, addons,
+//! remote access, and streaming are deferred.
 
 use crate::tindex::append_view;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
@@ -71,13 +71,15 @@ impl Reader for EptReader {
 
         self.metadata = metadata_from_info(&info);
         let max_depth = self.resolution_filter(&info)?;
-        let tiles = hierarchy_tiles(root, max_depth)?;
+        let bounds = self.bounds_filter()?;
+        let root_bounds = ept_bounds(&info)?;
+        let tiles = hierarchy_tiles(root, max_depth, bounds.as_ref(), root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let schema = EptSchema::parse(&info)?;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
-        let bounds = self.bounds_filter()?;
         let origin = self.origin_filter(root)?;
+        let tile_count = tiles.len();
         for tile in tiles {
             let extension = match data_type {
                 "laszip" => "laz",
@@ -121,6 +123,8 @@ impl Reader for EptReader {
         }
         self.metadata
             .add_value("count", MetadataValue::U64(point_count));
+        self.metadata
+            .add_value("tiles", MetadataValue::U64(tile_count as u64));
 
         Ok(merged.into_iter().collect())
     }
@@ -180,32 +184,14 @@ impl EptReader {
         if span <= 0.0 {
             return Err(StageError("EPT span must be positive.".to_string()));
         }
-        let bounds = info["bounds"]
-            .as_array()
-            .ok_or_else(|| StageError("EPT file is missing bounds.".to_string()))?;
-        if bounds.len() < 6 {
-            return Err(StageError(
-                "EPT bounds must contain six coordinates.".to_string(),
-            ));
-        }
-        let min_x = bounds[0]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds min X is not numeric.".to_string()))?;
-        let min_y = bounds[1]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds min Y is not numeric.".to_string()))?;
-        let min_z = bounds[2]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds min Z is not numeric.".to_string()))?;
-        let max_x = bounds[3]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds max X is not numeric.".to_string()))?;
-        let max_y = bounds[4]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds max Y is not numeric.".to_string()))?;
-        let max_z = bounds[5]
-            .as_f64()
-            .ok_or_else(|| StageError("EPT bounds max Z is not numeric.".to_string()))?;
+        let Bounds3D {
+            minx: min_x,
+            miny: min_y,
+            minz: min_z,
+            maxx: max_x,
+            maxy: max_y,
+            maxz: max_z,
+        } = ept_bounds(info)?;
         let cube_width = (max_x - min_x).max(max_y - min_y).max(max_z - min_z) / span;
         if cube_width <= 0.0 {
             return Err(StageError("EPT bounds cube width is invalid.".to_string()));
@@ -242,7 +228,12 @@ fn read_json(path: &Path) -> Result<Value, StageError> {
     })
 }
 
-fn hierarchy_tiles(root: &Path, max_depth: Option<u64>) -> Result<Vec<EptTile>, StageError> {
+fn hierarchy_tiles(
+    root: &Path,
+    max_depth: Option<u64>,
+    query: Option<&QueryBounds>,
+    root_bounds: Bounds3D,
+) -> Result<Vec<EptTile>, StageError> {
     let mut tiles = Vec::new();
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::from([String::from("0-0-0-0")]);
@@ -259,7 +250,11 @@ fn hierarchy_tiles(root: &Path, max_depth: Option<u64>) -> Result<Vec<EptTile>, 
             ))
         })?;
         for (node, count) in object {
-            let depth = key_depth(node)?;
+            let key = EptKey::parse(node, root_bounds)?;
+            let depth = key.depth;
+            if query.is_some_and(|query| !query.overlaps_box(&key.bounds)) {
+                continue;
+            }
             match count.as_i64() {
                 Some(points) if points > 0 && max_depth.is_none_or(|max| depth <= max) => tiles
                     .push(EptTile {
@@ -276,12 +271,77 @@ fn hierarchy_tiles(root: &Path, max_depth: Option<u64>) -> Result<Vec<EptTile>, 
     Ok(tiles)
 }
 
-fn key_depth(key: &str) -> Result<u64, StageError> {
-    key.split('-')
-        .next()
-        .ok_or_else(|| StageError(format!("Invalid EPT hierarchy key '{key}'.")))?
+struct EptKey {
+    depth: u64,
+    bounds: Bounds3D,
+}
+
+impl EptKey {
+    fn parse(key: &str, root_bounds: Bounds3D) -> Result<Self, StageError> {
+        let mut parts = key.split('-');
+        let depth = parse_key_part(parts.next(), key)?;
+        let x = parse_key_part(parts.next(), key)?;
+        let y = parse_key_part(parts.next(), key)?;
+        let z = parse_key_part(parts.next(), key)?;
+        if parts.next().is_some() {
+            return Err(StageError(format!("Invalid EPT hierarchy key '{key}'.")));
+        }
+
+        let shift = u32::try_from(depth)
+            .map_err(|_| StageError(format!("EPT hierarchy key '{key}' depth is too large.")))?;
+        let divisions = 1_u64
+            .checked_shl(shift)
+            .ok_or_else(|| StageError(format!("EPT hierarchy key '{key}' depth is too large.")))?
+            as f64;
+        let bounds = Bounds3D {
+            minx: tile_min(root_bounds.minx, root_bounds.maxx, divisions, x),
+            maxx: tile_max(root_bounds.minx, root_bounds.maxx, divisions, x),
+            miny: tile_min(root_bounds.miny, root_bounds.maxy, divisions, y),
+            maxy: tile_max(root_bounds.miny, root_bounds.maxy, divisions, y),
+            minz: tile_min(root_bounds.minz, root_bounds.maxz, divisions, z),
+            maxz: tile_max(root_bounds.minz, root_bounds.maxz, divisions, z),
+        };
+        Ok(Self { depth, bounds })
+    }
+}
+
+fn parse_key_part(part: Option<&str>, key: &str) -> Result<u64, StageError> {
+    part.ok_or_else(|| StageError(format!("Invalid EPT hierarchy key '{key}'.")))?
         .parse()
         .map_err(|_| StageError(format!("Invalid EPT hierarchy key '{key}'.")))
+}
+
+fn tile_min(min: f64, max: f64, divisions: f64, index: u64) -> f64 {
+    min + ((max - min) / divisions) * index as f64
+}
+
+fn tile_max(min: f64, max: f64, divisions: f64, index: u64) -> f64 {
+    min + ((max - min) / divisions) * (index + 1) as f64
+}
+
+fn ept_bounds(info: &Value) -> Result<Bounds3D, StageError> {
+    let bounds = info["bounds"]
+        .as_array()
+        .ok_or_else(|| StageError("EPT file is missing bounds.".to_string()))?;
+    if bounds.len() < 6 {
+        return Err(StageError(
+            "EPT bounds must contain six coordinates.".to_string(),
+        ));
+    }
+    Ok(Bounds3D {
+        minx: ept_bound_value(bounds, 0, "min X")?,
+        miny: ept_bound_value(bounds, 1, "min Y")?,
+        minz: ept_bound_value(bounds, 2, "min Z")?,
+        maxx: ept_bound_value(bounds, 3, "max X")?,
+        maxy: ept_bound_value(bounds, 4, "max Y")?,
+        maxz: ept_bound_value(bounds, 5, "max Z")?,
+    })
+}
+
+fn ept_bound_value(bounds: &[Value], index: usize, name: &str) -> Result<f64, StageError> {
+    bounds[index]
+        .as_f64()
+        .ok_or_else(|| StageError(format!("EPT bounds {name} is not numeric.")))
 }
 
 fn validate_tile_count(
@@ -371,6 +431,18 @@ impl QueryBounds {
         match self {
             QueryBounds::Two(bounds) => bounds.contains_point(x, y),
             QueryBounds::Three(bounds) => bounds.contains_point(x, y, view.get_f64(idx, &DimId::Z)),
+        }
+    }
+
+    fn overlaps_box(&self, bounds: &Bounds3D) -> bool {
+        match self {
+            QueryBounds::Two(query) => query.overlaps(&Bounds2D {
+                minx: bounds.minx,
+                maxx: bounds.maxx,
+                miny: bounds.miny,
+                maxy: bounds.maxy,
+            }),
+            QueryBounds::Three(query) => query.overlaps(bounds),
         }
     }
 }
@@ -747,6 +819,43 @@ mod tests {
             panic!("expected bad EPT origin to fail");
         };
         assert!(err.0.contains("Invalid EPT origin '4'"));
+    }
+
+    #[test]
+    fn prunes_non_overlapping_hierarchy_tiles_before_reading_data() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        let hierarchy_dir = temp.path().join("ept-hierarchy");
+        std::fs::create_dir_all(&hierarchy_dir).unwrap();
+        std::fs::write(
+            &ept,
+            r#"{
+  "dataType": "binary",
+  "hierarchyType": "json",
+  "span": 128,
+  "bounds": [0, 0, 0, 8, 8, 8],
+  "schema": [
+    {"name": "X", "type": "float", "size": 8},
+    {"name": "Y", "type": "float", "size": 8},
+    {"name": "Z", "type": "float", "size": 8}
+  ]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{"1-0-0-0":1}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        options.add("bounds", "([6,7],[6,7],[6,7])");
+        let mut reader = EptReader::new(&options);
+
+        let views = reader.read().unwrap();
+
+        assert!(views.is_empty());
+        let metadata = reader.metadata();
+        assert_eq!(
+            metadata.find_child("tiles").and_then(MetadataNode::value),
+            Some(&MetadataValue::U64(0))
+        );
     }
 
     #[test]
