@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `756 / 927` individual C++ GoogleTest cases, or `81.55%`,
+Current checkpoint: `758 / 927` individual C++ GoogleTest cases, or `81.77%`,
 are validated against Rust-backed behavior.
 
 Counting rules:
@@ -96,6 +96,10 @@ Known mixed binaries:
   through the Rust C ABI.
 - `pdal_filespec_test`: all 2 tests count; file-spec JSON ingestion and
   validation route through the Rust C ABI.
+- `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
+  through the Rust C ABI.
+- `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
+  the Rust C ABI.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.
