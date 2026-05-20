@@ -64,20 +64,22 @@ impl Reader for EptReader {
         }
 
         self.metadata = metadata_from_info(&info);
-        let keys = hierarchy_keys(root)?;
+        let tiles = hierarchy_tiles(root)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let schema = EptSchema::parse(&info)?;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
         let bounds = self.bounds_filter()?;
-        for key in keys {
+        for tile in tiles {
             let extension = match data_type {
                 "laszip" => "laz",
                 "binary" => "bin",
                 "zstandard" => "zst",
                 _ => unreachable!(),
             };
-            let path = root.join("ept-data").join(format!("{key}.{extension}"));
+            let path = root
+                .join("ept-data")
+                .join(format!("{}.{extension}", tile.key));
             let views = if data_type == "laszip" {
                 let mut options = Options::new();
                 options.add("filename", path.display());
@@ -87,6 +89,7 @@ impl Reader for EptReader {
             } else {
                 vec![read_binary_tile(&path, &schema, srs)?]
             };
+            validate_tile_count(&path, &views, tile.expected_points)?;
             for view in views {
                 let view = apply_bounds(view, bounds.as_ref());
                 point_count += view.len();
@@ -118,6 +121,11 @@ impl EptReader {
     }
 }
 
+struct EptTile {
+    key: String,
+    expected_points: u64,
+}
+
 fn read_json(path: &Path) -> Result<Value, StageError> {
     let text = std::fs::read_to_string(path)
         .map_err(|err| StageError(format!("Can't open EPT file '{}': {err}", path.display())))?;
@@ -129,8 +137,8 @@ fn read_json(path: &Path) -> Result<Value, StageError> {
     })
 }
 
-fn hierarchy_keys(root: &Path) -> Result<Vec<String>, StageError> {
-    let mut keys = Vec::new();
+fn hierarchy_tiles(root: &Path) -> Result<Vec<EptTile>, StageError> {
+    let mut tiles = Vec::new();
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::from([String::from("0-0-0-0")]);
     while let Some(key) = queue.pop_front() {
@@ -147,13 +155,31 @@ fn hierarchy_keys(root: &Path) -> Result<Vec<String>, StageError> {
         })?;
         for (node, count) in object {
             match count.as_i64() {
-                Some(points) if points > 0 => keys.push(node.clone()),
+                Some(points) if points > 0 => tiles.push(EptTile {
+                    key: node.clone(),
+                    expected_points: points as u64,
+                }),
                 Some(-1) => queue.push_back(node.clone()),
                 _ => {}
             }
         }
     }
-    Ok(keys)
+    Ok(tiles)
+}
+
+fn validate_tile_count(
+    path: &Path,
+    views: &[PointView],
+    expected_points: u64,
+) -> Result<(), StageError> {
+    let actual_points = views.iter().map(PointView::len).sum::<u64>();
+    if actual_points != expected_points {
+        return Err(StageError(format!(
+            "EPT tile '{}' has {actual_points} points but hierarchy expected {expected_points}.",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 fn metadata_from_info(info: &Value) -> MetadataNode {
@@ -441,6 +467,36 @@ mod tests {
             assert!((4966506.0..=4966706.0).contains(&y));
             assert!((-50.0..=50.0).contains(&z));
         }
+    }
+
+    #[test]
+    fn rejects_bad_laszip_point_count() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/bad-pointcount/laszip/ept.json").display(),
+        );
+        let mut reader = EptReader::new(&options);
+
+        let Err(err) = reader.read() else {
+            panic!("expected bad EPT point count to fail");
+        };
+        assert!(err.0.contains("hierarchy expected 1000"));
+    }
+
+    #[test]
+    fn rejects_bad_binary_point_count() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/bad-pointcount/binary/ept.json").display(),
+        );
+        let mut reader = EptReader::new(&options);
+
+        let Err(err) = reader.read() else {
+            panic!("expected bad EPT point count to fail");
+        };
+        assert!(err.0.contains("hierarchy expected 1000004"));
     }
 
     #[test]
