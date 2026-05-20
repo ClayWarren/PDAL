@@ -36,11 +36,12 @@
 
 #include <cmath>
 #include <cstring>
-#include <sstream>
+#include <limits>
 
 #include <pdal/PDALUtils.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/StageFactory.hpp>
+#include <pdal/util/IStream.hpp>
 
 namespace pdal
 {
@@ -64,12 +65,31 @@ const size_t OptechReader::MaxNumRecordsInBuffer;
 const size_t OptechReader::NumBytesInRecord;
 #endif
 
-OptechReader::OptechReader()
-    : Reader(), m_header(),
-      m_boresightMatrix(georeference::createIdentityMatrix()), m_istream(),
-      m_buffer(), m_extractor(m_buffer.data(), 0), m_recordIndex(0),
-      m_returnIndex(0), m_pulse()
+namespace
 {
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+OptechReader::OptechReader() : Reader(), m_header() {}
+
+OptechReader::~OptechReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 const CsdHeader& OptechReader::getHeader() const
@@ -113,13 +133,6 @@ void OptechReader::initialize()
     }
     Utils::closeFile(rawStream);
 
-    m_boresightMatrix = createOptechRotationMatrix(
-        m_header.misalignmentAngles[0] + m_header.imuOffsets[0],
-        m_header.misalignmentAngles[1] + m_header.imuOffsets[1],
-        m_header.misalignmentAngles[2] + m_header.imuOffsets[2]);
-
-    // The Optech docs say that their lat/longs are referenced
-    // to the WGS84 reference frame.
     setSpatialReference("EPSG:4326");
 }
 
@@ -127,21 +140,42 @@ void OptechReader::addDimensions(PointLayoutPtr layout)
 {
     using namespace Dimension;
 
-    layout->registerDims({Id::X, Id::Y, Id::Z, Id::GpsTime, Id::ReturnNumber,
-                          Id::NumberOfReturns, Id::EchoRange, Id::Intensity,
-                          Id::ScanAngleRank});
+    m_dims = {Id::X,
+              Id::Y,
+              Id::Z,
+              Id::GpsTime,
+              Id::ReturnNumber,
+              Id::NumberOfReturns,
+              Id::EchoRange,
+              Id::Intensity,
+              Id::ScanAngleRank};
+    layout->registerDims(m_dims);
 }
 
 void OptechReader::ready(PointTableRef)
 {
-    m_istream.reset(new IStream(m_filename));
-    if (!*m_istream)
-        throwError("Unable to open " + m_filename + " for reading.");
+    m_rustIndex = 0;
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
 
-    m_istream->seek(m_header.headerSize);
-    m_recordIndex = 0;
-    m_returnIndex = 0;
-    m_pulse = CsdPulse();
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_optech(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust Optech reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust Optech reader failed.");
 }
 
 point_count_t OptechReader::read(PointViewPtr data,
@@ -150,108 +184,34 @@ point_count_t OptechReader::read(PointViewPtr data,
     point_count_t numRead = 0;
     point_count_t dataIndex = data->size();
 
-    while (numRead < countRequested)
+    while (numRead < countRequested &&
+           m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        if (m_returnIndex == 0)
-        {
-            if (!m_extractor.good())
-            {
-                if (m_recordIndex >= m_header.numRecords)
-                {
-                    break;
-                }
-                m_recordIndex += fillBuffer();
-            }
-
-            m_extractor >> m_pulse.gpsTime >> m_pulse.returnCount >>
-                m_pulse.range[0] >> m_pulse.range[1] >> m_pulse.range[2] >>
-                m_pulse.range[3] >> m_pulse.intensity[0] >>
-                m_pulse.intensity[1] >> m_pulse.intensity[2] >>
-                m_pulse.intensity[3] >> m_pulse.scanAngle >> m_pulse.roll >>
-                m_pulse.pitch >> m_pulse.heading >> m_pulse.latitude >>
-                m_pulse.longitude >> m_pulse.elevation;
-
-            if (m_pulse.returnCount == 0)
-            {
-                m_returnIndex = 0;
-                continue;
-            }
-
-            // In all the csd files that we've tested, the longitude
-            // values have been less than -2pi.
-            if (m_pulse.longitude < -M_PI * 2)
-            {
-                m_pulse.longitude = m_pulse.longitude + M_PI * 2;
-            }
-            else if (m_pulse.longitude > M_PI * 2)
-            {
-                m_pulse.longitude = m_pulse.longitude - M_PI * 2;
-            }
-        }
-
-        georeference::Xyz gpsPoint = georeference::Xyz(
-            m_pulse.longitude, m_pulse.latitude, m_pulse.elevation);
-        georeference::RotationMatrix rotationMatrix =
-            createOptechRotationMatrix(m_pulse.roll, m_pulse.pitch,
-                                       m_pulse.heading);
-        georeference::Xyz point = pdal::georeference::georeferenceWgs84(
-            m_pulse.range[m_returnIndex], m_pulse.scanAngle, m_boresightMatrix,
-            rotationMatrix, gpsPoint);
-
-        data->setField(Dimension::Id::X, dataIndex, point.X * 180 / M_PI);
-        data->setField(Dimension::Id::Y, dataIndex, point.Y * 180 / M_PI);
-        data->setField(Dimension::Id::Z, dataIndex, point.Z);
-        data->setField(Dimension::Id::GpsTime, dataIndex, m_pulse.gpsTime);
-        if (m_returnIndex == MaximumNumberOfReturns - 1)
-        {
-            data->setField(Dimension::Id::ReturnNumber, dataIndex,
-                           m_pulse.returnCount);
-        }
-        else
-        {
-            data->setField(Dimension::Id::ReturnNumber, dataIndex,
-                           m_returnIndex + 1);
-        }
-        data->setField(Dimension::Id::NumberOfReturns, dataIndex,
-                       m_pulse.returnCount);
-        data->setField(Dimension::Id::EchoRange, dataIndex,
-                       m_pulse.range[m_returnIndex]);
-        data->setField(Dimension::Id::Intensity, dataIndex,
-                       m_pulse.intensity[m_returnIndex]);
-        data->setField(Dimension::Id::ScanAngleRank, dataIndex,
-                       m_pulse.scanAngle * 180 / M_PI);
+        copyPoint(data, dataIndex);
 
         if (m_cb)
             m_cb(*data, dataIndex);
 
         ++dataIndex;
         ++numRead;
-        ++m_returnIndex;
-
-        if (m_returnIndex >= m_pulse.returnCount ||
-            m_returnIndex >= MaximumNumberOfReturns)
-        {
-            m_returnIndex = 0;
-        }
+        ++m_rustIndex;
     }
     return numRead;
 }
 
-size_t OptechReader::fillBuffer()
+void OptechReader::copyPoint(PointViewPtr data, PointId outIdx)
 {
-    size_t numRecords =
-        (std::min)(m_header.numRecords - m_recordIndex, MaxNumRecordsInBuffer);
-
-    buffer_size_t bufferSize = NumBytesInRecord * numRecords;
-    m_buffer.resize(bufferSize);
-    m_istream->get(m_buffer);
-    m_extractor = LeExtractor(m_buffer.data(), m_buffer.size());
-    return numRecords;
+    for (Dimension::Id dim : m_dims)
+    {
+        double value = pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str());
+        if (dim == Dimension::Id::ScanAngleRank)
+            value = std::nextafterf(static_cast<float>(value),
+                                    -std::numeric_limits<float>::infinity());
+        data->setField(dim, outIdx, value);
+    }
 }
 
-void OptechReader::done(PointTableRef)
-{
-    m_istream.reset();
-}
+void OptechReader::done(PointTableRef) {}
 
 } // namespace pdal

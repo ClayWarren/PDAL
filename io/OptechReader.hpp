@@ -32,15 +32,10 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <memory>
-#include <vector>
-
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
-#include <pdal/util/Extractor.hpp>
-#include <pdal/util/Georeference.hpp>
-#include <pdal/util/IStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "OptechCommon.hpp"
 
@@ -58,27 +53,21 @@ public:
     static const size_t MaxNumRecordsInBuffer = BufferSize / NumBytesInRecord;
 
     OptechReader();
+    ~OptechReader() override;
 
     const CsdHeader& getHeader() const;
 
 private:
-    typedef std::vector<char> buffer_t;
-    typedef buffer_t::size_type buffer_size_t;
-
     void initialize() override;
     void addDimensions(PointLayoutPtr layout) override;
     void ready(PointTableRef table) override;
     point_count_t read(PointViewPtr view, point_count_t num) override;
-    size_t fillBuffer();
     void done(PointTableRef table) override;
+    void copyPoint(PointViewPtr view, PointId outIdx);
 
     CsdHeader m_header;
-    georeference::RotationMatrix m_boresightMatrix;
-    std::unique_ptr<IStream> m_istream;
-    buffer_t m_buffer;
-    LeExtractor m_extractor;
-    size_t m_recordIndex;
-    size_t m_returnIndex;
-    CsdPulse m_pulse;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    Dimension::IdList m_dims;
 };
 } // namespace pdal
