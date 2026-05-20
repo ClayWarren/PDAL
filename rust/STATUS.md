@@ -83,12 +83,12 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: under re-audit. The previous `927 / 927` claim was
-withdrawn after a live built-suite count found `915` tests from
-`build/bin/pdal_*_test --gtest_list_tests`; source-level scans report different
-totals depending on whether app tests and conditionally built tests are
-included. Do not cite a percentage here until the denominator and the counted
-Rust C ABI-backed test list are generated from the same source.
+Current checkpoint: `382 / 915` built C++ GoogleTest cases, or `41.75%`, are
+confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
+a conservative lower bound, not a final port-completion percentage: 62 built
+test binaries remain unclassified by the audit script. The previous `927 / 927`
+claim was withdrawn because it mixed a hand-maintained numerator with a
+different denominator.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
@@ -117,6 +117,12 @@ Counting rules:
 - Do not count tests where Rust is merely present elsewhere in the link graph.
 - Do not count registry exposure, Rust unit tests, or command regressions as
   C++ test-suite parity.
+
+Recompute the current built-suite parity checkpoint with:
+
+```sh
+python3 rust/scripts/audit_cpp_test_parity.py --build-dir build
+```
 
 Known mixed binaries:
 
