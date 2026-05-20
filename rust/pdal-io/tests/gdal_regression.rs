@@ -120,6 +120,19 @@ fn gdal_writer_matches_existing_stdev_grid_fixture() {
 }
 
 #[test]
+fn gdal_writer_matches_existing_percentile_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("p50", true);
+    assert_band_near(
+        &output,
+        &[
+            5.0, -9999.0, 7.0, 8.0, 8.9, 4.0, -9999.0, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 5.7, 6.7, 2.0,
+            3.0, 4.0, 4.4, 5.4, 0.5, 2.0, 3.0, 4.0, 5.0,
+        ],
+    );
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_gdal_pipeline() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
