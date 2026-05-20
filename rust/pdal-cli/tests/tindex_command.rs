@@ -15,6 +15,10 @@ fn run_tindex(args: &[&str]) -> std::process::Output {
         .unwrap()
 }
 
+fn run_installed_pdal(args: &[&str]) -> Option<std::process::Output> {
+    Command::new("pdal").args(args).output().ok()
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -54,6 +58,63 @@ fn tindex_creates_geojson_index() {
     assert!(geojson.contains("1.2-with-color.las"));
     assert!(geojson.contains("\"location\""));
     assert!(geojson.contains("\"srs\""));
+}
+
+#[test]
+#[ignore = "requires installed pdal on PATH"]
+fn installed_pdal_tindex_matches_rust_tindex_location_index() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("tindex_installed_regression");
+    let installed_output = temp.join("installed.geojson");
+    let rust_output = temp.join("rust.geojson");
+
+    let installed = run_installed_pdal(&[
+        "tindex",
+        "create",
+        "--tindex",
+        installed_output.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--fast_boundary",
+        input.to_str().unwrap(),
+    ])
+    .expect("installed pdal is required for this regression");
+    assert!(
+        installed.status.success(),
+        "installed pdal tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&installed.stdout),
+        String::from_utf8_lossy(&installed.stderr)
+    );
+
+    let rust = run_tindex(&[
+        "create",
+        rust_output.to_str().unwrap(),
+        input.to_str().unwrap(),
+        "-f",
+        "GeoJSON",
+    ]);
+    assert!(
+        rust.status.success(),
+        "rust tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&rust.stdout),
+        String::from_utf8_lossy(&rust.stderr)
+    );
+
+    let installed_json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&installed_output).unwrap()).unwrap();
+    let rust_json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&rust_output).unwrap()).unwrap();
+
+    assert_eq!(installed_json["type"], "FeatureCollection");
+    assert_eq!(rust_json["type"], "FeatureCollection");
+    let installed_features = installed_json["features"].as_array().unwrap();
+    let rust_features = rust_json["features"].as_array().unwrap();
+    assert_eq!(installed_features.len(), 1);
+    assert_eq!(rust_features.len(), 1);
+    assert_eq!(
+        installed_features[0]["properties"]["location"],
+        rust_features[0]["properties"]["location"]
+    );
 }
 
 #[test]
