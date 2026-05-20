@@ -579,20 +579,27 @@ impl App {
             };
         }
 
-        let mut positional: Vec<&str> = Vec::new();
+        let mut predicted: Option<&str> = None;
+        let mut truth: Option<&str> = None;
         let mut labels = String::new();
         let mut prediction_dim = String::from("Classification");
         let mut truth_dim = String::from("Classification");
-        for arg in &self.command_args {
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
             if let Some(rest) = arg.strip_prefix("--") {
                 let (key, value) = match rest.split_once('=') {
                     Some(pair) => pair,
                     None => {
-                        eprintln!("Error: option '{arg}' must be in --key=value form");
-                        return 1;
+                        let Some(value) = args.next() else {
+                            eprintln!("Error: option '{arg}' requires a value");
+                            return 1;
+                        };
+                        (rest, value.as_str())
                     }
                 };
                 match key {
+                    "predicted" => predicted = Some(value),
+                    "truth" => truth = Some(value),
                     "labels" => labels = value.to_string(),
                     "prediction_dim" => prediction_dim = value.to_string(),
                     "truth_dim" => truth_dim = value.to_string(),
@@ -601,22 +608,27 @@ impl App {
                         return 1;
                     }
                 }
+            } else if predicted.is_none() {
+                predicted = Some(arg);
+            } else if truth.is_none() {
+                truth = Some(arg);
             } else {
-                positional.push(arg);
+                eprintln!("Error: eval expects a predicted path and a truth path");
+                return 1;
             }
         }
-        if positional.len() != 2 {
+        let (Some(predicted), Some(truth)) = (predicted, truth) else {
             eprintln!("Error: eval expects a predicted path and a truth path");
             return 1;
-        }
+        };
         if labels.is_empty() {
             eprintln!("Error: eval requires --labels=<comma-separated classification labels>");
             return 1;
         }
 
         let (c_predicted, c_truth, c_labels, c_prediction_dim, c_truth_dim) = match (
-            CString::new(positional[0]),
-            CString::new(positional[1]),
+            CString::new(predicted),
+            CString::new(truth),
             CString::new(labels.as_str()),
             CString::new(prediction_dim.as_str()),
             CString::new(truth_dim.as_str()),

@@ -57,6 +57,33 @@ fn eval_scores_a_classified_file_against_itself() {
 }
 
 #[test]
+fn eval_supports_named_paths_and_separated_options() {
+    let input = data_path("test/data/las/interesting.las");
+    let result = run_eval(&[
+        "--predicted",
+        input.to_str().unwrap(),
+        "--truth",
+        input.to_str().unwrap(),
+        "--labels",
+        "1,2",
+        "--prediction_dim",
+        "Classification",
+        "--truth_dim",
+        "Classification",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs eval failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(report["overall_accuracy"], 1.0);
+    assert_eq!(report["confusion_matrix"][0][0], 789);
+}
+
+#[test]
 fn eval_without_labels_fails() {
     let input = data_path("test/data/las/interesting.las");
     let result = run_eval(&[input.to_str().unwrap(), input.to_str().unwrap()]);
