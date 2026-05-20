@@ -72,6 +72,9 @@ BpfReader::BpfReader() : m_args(new BpfReader::Args) {}
 
 BpfReader::~BpfReader()
 {
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+    cleanupRemoteFile();
 #ifdef PDAL_HAVE_ZLIB
     if (m_header.m_compression)
     {
@@ -83,6 +86,75 @@ BpfReader::~BpfReader()
 #endif
 }
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+std::string takeString(char* value)
+{
+    std::string output(value ? value : "");
+    pdal_string_free(value);
+    return output;
+}
+
+MetadataNode addMetadataChild(MetadataNode& parent,
+                              const pdal_metadata_node_t* rustNode)
+{
+    std::string name = takeString(pdal_metadata_node_name(rustNode));
+    std::string description =
+        takeString(pdal_metadata_node_description(rustNode));
+    uint8_t valueKind = pdal_metadata_node_value_kind(rustNode);
+
+    switch (valueKind)
+    {
+    case 1:
+        return parent.add(name, pdal_metadata_node_value_i64(rustNode),
+                          description);
+    case 2:
+        return parent.add(name, pdal_metadata_node_value_u64(rustNode),
+                          description);
+    case 3:
+        return parent.add(name, pdal_metadata_node_value_f64(rustNode),
+                          description);
+    case 4:
+        return parent.add(name, pdal_metadata_node_value_bool(rustNode),
+                          description);
+    case 0:
+        return parent.add(name, takeString(pdal_metadata_node_value(rustNode)),
+                          description);
+    default:
+        return parent.add(name);
+    }
+}
+
+void copyMetadataChildren(const pdal_metadata_node_t* rustNode,
+                          MetadataNode& cppNode)
+{
+    uint64_t childCount = pdal_metadata_node_child_count(rustNode);
+    for (uint64_t i = 0; i < childCount; ++i)
+    {
+        pdal_metadata_node_t* rustChild = pdal_metadata_node_child(rustNode, i);
+        MetadataNode cppChild = addMetadataChild(cppNode, rustChild);
+        copyMetadataChildren(rustChild, cppChild);
+        pdal_metadata_node_destroy(rustChild);
+    }
+}
+
+} // namespace
+
 void BpfReader::addArgs(ProgramArgs& args)
 {
     args.add("fix_dims",
@@ -93,11 +165,20 @@ void BpfReader::addArgs(ProgramArgs& args)
 
 void BpfReader::addDimensions(PointLayoutPtr layout)
 {
-    for (size_t i = 0; i < m_dims.size(); ++i)
+    m_rustDims.clear();
+    m_rustDimNames.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        BpfDimension& dim = m_dims[i];
-        dim.m_id =
-            layout->registerOrAssignDim(dim.m_label, Dimension::Type::Float);
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Id id =
+            layout->registerOrAssignDim(name, Dimension::Type::Float);
+        m_rustDims.push_back(id);
+        m_rustDimNames.push_back(name);
     }
 }
 
@@ -107,11 +188,39 @@ QuickInfo BpfReader::inspect()
 
     initialize();
     qi.m_valid = true;
-    qi.m_pointCount = m_header.m_numPts;
-    qi.m_srs = getSpatialReference();
-    for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
+    qi.m_pointCount = pdal_point_view_length(m_rustView);
+    pdal_spatial_reference_t* srs =
+        pdal_point_view_spatial_reference(m_rustView);
+    if (srs)
     {
-        BpfDimension& dim = *di;
+        char* text = pdal_spatial_reference_text(srs);
+        qi.m_srs.set(text ? text : "");
+        pdal_string_free(text);
+        pdal_spatial_reference_destroy(srs);
+    }
+
+    std::istream* streamPtr = Utils::openFile(m_filename);
+    if (!streamPtr)
+        throwError("Can't open file '" + m_filename + "'.");
+    ILeStream stream(streamPtr);
+    BpfHeader header;
+    header.setLog(log());
+    BpfDimensionList dims;
+    try
+    {
+        if (!header.read(stream) ||
+            !header.readDimensions(stream, dims, m_args->m_fixNames))
+            throwError("Couldn't read BPF header.");
+    }
+    catch (const BpfHeader::error& err)
+    {
+        Utils::closeFile(streamPtr);
+        throwError(err.what());
+    }
+    Utils::closeFile(streamPtr);
+
+    for (BpfDimension& dim : dims)
+    {
         qi.m_dimNames.push_back(dim.m_label);
         if (dim.m_label == "X")
         {
@@ -140,108 +249,61 @@ void BpfReader::initialize()
     if (m_filename.empty())
         throwError("Can't read BPF file without filename.");
 
-    if (Utils::isRemote(m_filename))
+    if (m_remoteFilename.empty() && Utils::isRemote(m_filename))
     {
-        // swap our filename for a tmp file
         std::string tmpname = Utils::tempFilename(m_filename);
         m_remoteFilename = m_filename;
         m_filename = tmpname;
-        arbiter::Arbiter a;
-        a.put(m_filename, a.getBinary(m_remoteFilename));
+        arbiter::Arbiter arbiter;
+        arbiter.put(m_filename, arbiter.getBinary(m_remoteFilename));
     }
 
-    // Logfile doesn't get set until options are processed.
-    m_header.setLog(log());
-
-    m_istreamPtr = Utils::openFile(m_filename);
-    if (!m_istreamPtr)
-        throwError("Can't open file '" + m_filename + "'.");
-    m_stream = ILeStream(m_istreamPtr);
-
-    // Resets the stream position in case it was already open.
-    m_stream.seek(0);
-    // In order to know the dimensions we must read the file header.
-    try
+    if (m_rustView)
     {
-        if (!m_header.read(m_stream))
-            return;
-        if (!m_header.readDimensions(m_stream, m_dims, m_args->m_fixNames))
-            return;
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
-    catch (const BpfHeader::error& err)
-    {
-        throwError(err.what());
-    }
-#ifndef PDAL_HAVE_ZLIB
-    if (m_header.m_compression)
-        throwError("Can't read compressed BPF. PDAL wasn't built with "
-                   "Zlib support.");
-#endif
+    m_rustIndex = 0;
 
-    SpatialReference srs;
-    if (m_header.m_coordType == static_cast<int>(BpfCoordType::Cartesian))
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "fix_dims", m_args->m_fixNames ? "true" : "false");
+
+    pdal_reader_t* reader = pdal_reader_create_bpf(options);
+    if (!reader)
     {
-        srs.set("EPSG:4326");
-    }
-    else if (m_header.m_coordType == static_cast<int>(BpfCoordType::UTM))
-    {
-        srs = SpatialReference::wgs84FromZone(m_header.m_coordId);
-        if (!srs.valid())
-            throwError("BPF file contains an invalid UTM zone " +
-                       Utils::toString(m_header.m_coordId));
-    }
-    else if (m_header.m_coordType == static_cast<int>(BpfCoordType::TCR))
-    {
-        // TCR is ECEF meters, or EPSG:4978
-        // According to the 1.0 spec, the m_coordId must be 1 to be
-        // valid.
-        if (m_header.m_coordId == 1)
-            srs.set("EPSG:4978");
-        else
-        {
-            std::ostringstream oss;
-            oss << "BPF has ECEF/TCR coordinate type defined, but the ID of '"
-                << m_header.m_coordId << "' is invalid";
-            throwError(oss.str());
-        }
-    }
-    else
-    {
-        // BPF also supports something East North Up (BpfCoordType::ENU)
-        // which we can figure out when we run into a file with these
-        // coordinate systems.
-        std::ostringstream oss;
-        oss << "BPF file contains unsupported coordinate system with "
-            << "coordinate type: '" << m_header.m_coordType
-            << "' and coordinate id: '" << m_header.m_coordId << "'";
-        throwError(oss.str());
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust BPF reader.");
     }
 
-    setSpatialReference(srs);
-
-    if (m_header.m_version >= 3)
+    m_rustView = pdal_reader_read_first(reader);
+    if (!m_rustView)
     {
-        readUlemData();
-        if (!m_stream)
-            return;
-        readUlemFiles();
-        if (!m_stream)
-            return;
-        readPolarData();
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        throwLastRustError("Rust BPF reader failed.");
     }
 
-    // Read thing after the standard header as metadata->
-    readHeaderExtraData();
+    pdal_spatial_reference_t* srs =
+        pdal_point_view_spatial_reference(m_rustView);
+    if (srs)
+    {
+        char* text = pdal_spatial_reference_text(srs);
+        SpatialReference spatialRef(text ? text : "");
+        setSpatialReference(spatialRef);
+        pdal_string_free(text);
+        pdal_spatial_reference_destroy(srs);
+    }
 
-    // Add the point count to metadata
-    m_metadata.add("count", m_header.m_numPts);
+    pdal_metadata_node_t* metadata = pdal_reader_metadata(reader);
+    if (metadata)
+    {
+        copyMetadataChildren(metadata, m_metadata);
+        pdal_metadata_node_destroy(metadata);
+    }
 
-    // Fast forward file to end of header as reported by base header.
-    std::streampos pos = m_stream.position();
-    if (pos > m_header.m_len)
-        throwError("BPF Header length exceeded that reported by file.");
-    m_stream.close();
-    Utils::closeFile(m_istreamPtr);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
 }
 
 bool BpfReader::readUlemData()
@@ -301,79 +363,61 @@ bool BpfReader::readPolarData()
 
 void BpfReader::ready(PointTableRef)
 {
-    m_istreamPtr = Utils::openFile(m_filename);
-    m_stream = ILeStream(m_istreamPtr);
-    m_stream.seek(m_header.m_len);
-    m_index = 0;
-    m_start = m_stream.position();
-#ifdef PDAL_HAVE_ZLIB
-    if (m_header.m_compression)
-    {
-        m_deflateBuf.resize(numPoints() * m_dims.size() * sizeof(float));
-        size_t index = 0;
-        size_t bytesRead = 0;
-        do
-        {
-            bytesRead = readBlock(m_deflateBuf, index);
-            index += bytesRead;
-        } while (bytesRead > 0 && index < m_deflateBuf.size());
-        m_charbuf.initialize(m_deflateBuf.data(), m_deflateBuf.size(), m_start);
-        m_stream.pushStream(new std::istream(&m_charbuf));
-    }
-#endif // PDAL_HAVE_ZLIB
+    m_rustIndex = 0;
 }
 
 void BpfReader::done(PointTableRef)
 {
-    if (auto s = m_stream.popStream())
-        delete s;
-    m_stream.close();
-    Utils::closeFile(m_istreamPtr);
-
-    if (Utils::isRemote(m_remoteFilename))
-    {
-        // Clean up temporary
-        FileUtils::deleteFile(m_filename);
-    }
+    cleanupRemoteFile();
 }
 
 bool BpfReader::processOne(PointRef& point)
 {
-    if (eof() || m_index >= m_count)
+    if (m_rustIndex >= pdal_point_view_length(m_rustView) ||
+        m_rustIndex >= m_count)
         return false;
 
-    switch (m_header.m_pointFormat)
-    {
-    case BpfFormat::PointMajor:
-        readPointMajor(point);
-        break;
-    case BpfFormat::DimMajor:
-        readDimMajor(point);
-        break;
-    case BpfFormat::ByteMajor:
-        readByteMajor(point);
-        break;
-    }
+    copyRustPoint(point, m_rustIndex);
+    ++m_rustIndex;
     return true;
 }
 
 point_count_t BpfReader::read(PointViewPtr data, point_count_t count)
 {
-    switch (m_header.m_pointFormat)
+    point_count_t cnt = 0;
+    while (cnt < count && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-    case BpfFormat::PointMajor:
-        return readPointMajor(data, count);
-    case BpfFormat::DimMajor:
-        return readDimMajor(data, count);
-    case BpfFormat::ByteMajor:
-        return readByteMajor(data, count);
+        PointRef point(*data, data->size());
+        copyRustPoint(point, m_rustIndex);
+        ++m_rustIndex;
+        ++cnt;
     }
-    return 0;
+    return cnt;
+}
+
+void BpfReader::copyRustPoint(PointRef& point, PointId rustIndex)
+{
+    for (size_t dimIdx = 0; dimIdx < m_rustDims.size(); ++dimIdx)
+    {
+        point.setField(m_rustDims[dimIdx],
+                       pdal_point_view_get_f64(m_rustView, rustIndex,
+                                               m_rustDimNames[dimIdx].c_str()));
+    }
 }
 
 bool BpfReader::eof()
 {
-    return m_index >= numPoints();
+    return m_rustIndex >= numPoints();
+}
+
+void BpfReader::cleanupRemoteFile()
+{
+    if (!Utils::isRemote(m_remoteFilename))
+        return;
+
+    FileUtils::deleteFile(m_filename);
+    m_filename = m_remoteFilename;
+    m_remoteFilename.clear();
 }
 
 void BpfReader::readPointMajor(PointRef& point)

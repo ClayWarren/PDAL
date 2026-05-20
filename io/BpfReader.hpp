@@ -44,6 +44,7 @@
 #include <pdal/pdal_export.hpp>
 #include <pdal/util/Charbuf.hpp>
 #include <pdal/util/IStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "BpfHeader.hpp"
 
@@ -64,11 +65,12 @@ public:
 
     virtual point_count_t numPoints() const
     {
+        if (m_rustView)
+            return (point_count_t)pdal_point_view_length(m_rustView);
         return (point_count_t)m_header.m_numPts;
     }
 
 private:
-    std::istream* m_istreamPtr;
     ILeStream m_stream;
     BpfHeader m_header;
     BpfDimensionList m_dims;
@@ -92,6 +94,10 @@ private:
     std::vector<std::unique_ptr<Charbuf>> m_charbufs;
 
     std::string m_remoteFilename;
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_rustDims;
+    StringList m_rustDimNames;
+    PointId m_rustIndex = 0;
 
     QuickInfo inspect() override;
     void initialize() override;
@@ -119,6 +125,8 @@ private:
     void seekPointMajor(PointId ptIdx);
     void seekDimMajor(size_t dimIdx, PointId ptIdx);
     void seekByteMajor(size_t dimIdx, size_t byteIdx, PointId ptIdx);
+    void copyRustPoint(PointRef& point, PointId rustIndex);
+    void cleanupRemoteFile();
 };
 
 } // namespace pdal
