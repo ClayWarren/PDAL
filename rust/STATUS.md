@@ -67,6 +67,25 @@ count.
 Current checkpoint: `758 / 927` individual C++ GoogleTest cases, or `81.77%`,
 are validated against Rust-backed behavior.
 
+Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
+the behavioral contract and should not be counted as unported implementation.
+
+Current C++ compatibility wrapper/adapter surface: `15,069` code LOC across
+`111` first-party C++ files that include or directly declare Rust C ABI entry
+points, split approximately as `pdal/` 7,126 LOC, `filters/` 5,659 LOC, and
+`io/` 2,284 LOC. This is a coarse ceiling because several files still mix real
+legacy implementation with wrapper calls; the number should shrink as wrappers
+are split from implementation.
+
+Recompute the wrapper LOC baseline with:
+
+```sh
+tmp=$(mktemp)
+{ rg -l '#include <rust/pdal-capi/include/pdal_capi.h>|#include <pdal_capi.h>|#include "rust/pdal-capi/include/pdal_capi.h"|pdal_dimension_fix_name|extern "C"' pdal io filters kernels apps tools --glob '*.{cpp,hpp,h}'; rg --files filters/private | rg 'Rust.*\.(hpp|cpp|h)$'; } | sort -u > "$tmp"
+cloc --quiet --csv --by-file --list-file="$tmp"
+rm "$tmp"
+```
+
 Counting rules:
 
 - Count a whole test binary only when the primary behavior under test is routed
