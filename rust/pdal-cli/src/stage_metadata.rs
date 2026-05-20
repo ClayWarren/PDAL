@@ -139,7 +139,7 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
-        | "readers.terrasolid" | "readers.copc" | "readers.las" | "readers.laz" => {
+        | "readers.terrasolid" | "readers.copc" | "readers.ept" | "readers.las" | "readers.laz" => {
             vec![filename()]
         }
         "readers.tindex" => vec![

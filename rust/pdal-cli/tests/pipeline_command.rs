@@ -330,6 +330,32 @@ fn pipeline_command_reads_copc_filename_stage() {
 }
 
 #[test]
+fn pipeline_command_reads_ept_filename_stage() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/ept/1.2-with-color/ept.json");
+    let temp = make_temp_dir("pdal-rs-pipeline-ept");
+    let output = temp.join("out.pcd");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  "{}",
+  {{"type":"writers.pcd","filename":"{}"}}
+]"#,
+            escape_json_path(&input),
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    run_rust_pipeline(&pipeline);
+
+    assert_eq!(read_pcd(&output).len(), 1065);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

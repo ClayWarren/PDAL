@@ -266,6 +266,20 @@ pub unsafe extern "C" fn pdal_reader_create_copc(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create an EptReader local LASzip read slice from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_ept(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::ept::EptReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Read the first point view produced by a reader.
 ///
 /// # Safety
