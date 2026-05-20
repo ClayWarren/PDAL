@@ -36,6 +36,7 @@
 
 #include <pdal/Options.hpp>
 #include <pdal/Reader.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <memory>
 #include <vector>
@@ -49,6 +50,7 @@ class PDAL_EXPORT FbiReader : public pdal::Reader
 {
 public:
     FbiReader();
+    ~FbiReader() override;
     std::string getName() const override;
 
     point_count_t getNumPoints() const
@@ -68,6 +70,9 @@ public:
 private:
     std::unique_ptr<fbi::FbiHdr> hdr;
     std::istream* m_istreamPtr;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    Dimension::IdList m_dims;
 
     void initialize() override;
     void addDimensions(PointLayoutPtr layout) override;
@@ -75,13 +80,12 @@ private:
     point_count_t read(PointViewPtr view, point_count_t count) override;
     void done(PointTableRef table) override;
     void addArgs(ProgramArgs& args) override;
+    void copyPoint(PointViewPtr view, PointId outIdx);
 
     FbiReader& operator=(const FbiReader&); // not implemented
     FbiReader(const FbiReader&);            // not implemented
 
 private:
-    int NbBytesColor; // deduce from BitsColor
-    std::vector<fbi::UINT64> indexNameImages;
 };
 
 } // namespace pdal

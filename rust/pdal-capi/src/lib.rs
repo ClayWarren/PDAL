@@ -784,6 +784,41 @@ mod tests {
     }
 
     #[test]
+    fn fbi_reader_returns_points_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [("filename", data_path("fbi/1.2-with-color.fbi"))] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_fbi(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(!view.is_null());
+            assert_eq!(pdal_point_view_length(view), 1065);
+
+            let x = CString::new("X").unwrap();
+            let intensity = CString::new("Intensity").unwrap();
+            let classification = CString::new("Classification").unwrap();
+            assert!((pdal_point_view_get_f64(view, 0, x.as_ptr()) - 635618.98).abs() < 1e-4);
+            assert_eq!(
+                pdal_point_view_get_f64(view, 0, intensity.as_ptr()),
+                55040.0
+            );
+            assert_eq!(
+                pdal_point_view_get_f64(view, 0, classification.as_ptr()),
+                20.0
+            );
+
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
     fn writer_write_view_consumes_point_view_through_c_abi() {
         unsafe {
             let mut filename = std::env::temp_dir();

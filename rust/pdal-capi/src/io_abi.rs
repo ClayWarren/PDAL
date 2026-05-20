@@ -194,6 +194,20 @@ pub unsafe extern "C" fn pdal_reader_create_terrasolid(ops: *const Options) -> *
     }
 }
 
+/// Create an FbiReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_fbi(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::fbi::FbiReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Read the first point view produced by a reader.
 ///
 /// # Safety

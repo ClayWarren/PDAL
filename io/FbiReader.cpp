@@ -36,9 +36,6 @@
 
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/util/Extractor.hpp>
-
-#include <map>
 
 namespace pdal
 {
@@ -49,6 +46,25 @@ static StaticPluginInfo const s_info{"readers.fbi",
                                      {"bin", "fbi"}};
 
 CREATE_STATIC_STAGE(FbiReader, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
 
 void readFbiHeader(fbi::FbiHdr* hdr, std::istream* m_istreamPtr)
 {
@@ -203,6 +219,12 @@ void readFbiHeader(fbi::FbiHdr* hdr, std::istream* m_istreamPtr)
 
 FbiReader::FbiReader() : pdal::Reader(), hdr(new fbi::FbiHdr()) {}
 
+FbiReader::~FbiReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 std::string FbiReader::getName() const
 {
     return s_info.name;
@@ -230,57 +252,57 @@ void FbiReader::addArgs(ProgramArgs& args)
 
 void FbiReader::addDimensions(PointLayoutPtr layout)
 {
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
+    m_dims = {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z};
 
     if (hdr->BitsEcho > 0)
-        layout->registerDim(Dimension::Id::ReturnNumber);
+        m_dims.push_back(Dimension::Id::ReturnNumber);
     if (hdr->BitsTime > 0)
-        layout->registerDim(Dimension::Id::EchoRange);
+        m_dims.push_back(Dimension::Id::EchoRange);
 
     // Fbi assumes only uint8 for ScanAngleRank
     if (hdr->BitsAngle > 0)
+    {
         layout->registerDim(Dimension::Id::ScanAngleRank,
                             Dimension::Type::Signed8);
-
+        m_dims.push_back(Dimension::Id::ScanAngleRank);
+    }
     if (hdr->BitsClass > 0)
-        layout->registerDim(Dimension::Id::Classification);
+        m_dims.push_back(Dimension::Id::Classification);
     if (hdr->BitsLine > 0)
-        layout->registerDim(Dimension::Id::PointSourceId);
+        m_dims.push_back(Dimension::Id::PointSourceId);
     if (hdr->BitsIntensity > 0)
-        layout->registerDim(Dimension::Id::Intensity);
+        m_dims.push_back(Dimension::Id::Intensity);
     if (hdr->BitsGroup > 0)
-        layout->registerDim(Dimension::Id::ClusterID);
+        m_dims.push_back(Dimension::Id::ClusterID);
     if (hdr->BitsScanner > 0)
-        layout->registerDim(Dimension::Id::UserData);
+        m_dims.push_back(Dimension::Id::UserData);
     if (hdr->BitsTime > 0)
-        layout->registerDim(Dimension::Id::OffsetTime);
+        m_dims.push_back(Dimension::Id::OffsetTime);
     if (hdr->BitsDistance > 0)
-        layout->registerDim(Dimension::Id::NNDistance);
+        m_dims.push_back(Dimension::Id::NNDistance);
     if (hdr->BitsReliab > 0)
-        layout->registerDim(Dimension::Id::Reliability);
+        m_dims.push_back(Dimension::Id::Reliability);
     if (hdr->BitsReflect > 0)
-        layout->registerDim(Dimension::Id::Reflectance);
+        m_dims.push_back(Dimension::Id::Reflectance);
     if (hdr->BitsDeviation > 0)
-        layout->registerDim(Dimension::Id::Deviation);
+        m_dims.push_back(Dimension::Id::Deviation);
     if (hdr->BitsAmplitude > 0)
-        layout->registerDim(Dimension::Id::Amplitude);
+        m_dims.push_back(Dimension::Id::Amplitude);
     if (hdr->BitsEchoPos > 0)
-        layout->registerDim(Dimension::Id::EchoPos);
+        m_dims.push_back(Dimension::Id::EchoPos);
     if (hdr->BitsEchoNorm > 0)
-        layout->registerDim(Dimension::Id::EchoNorm);
+        m_dims.push_back(Dimension::Id::EchoNorm);
     if (hdr->BitsEchoLen > 0)
-        layout->registerDim(Dimension::Id::PulseWidth);
+        m_dims.push_back(Dimension::Id::PulseWidth);
     if (hdr->BitsImage > 0)
-        layout->registerDim(Dimension::Id::Image);
+        m_dims.push_back(Dimension::Id::Image);
 
     if (hdr->BitsNormal > 0)
     {
-        layout->registerDim(Dimension::Id::NormalX);
-        layout->registerDim(Dimension::Id::NormalY);
-        layout->registerDim(Dimension::Id::NormalZ);
-        layout->registerDim(Dimension::Id::Dimension);
+        m_dims.push_back(Dimension::Id::NormalX);
+        m_dims.push_back(Dimension::Id::NormalY);
+        m_dims.push_back(Dimension::Id::NormalZ);
+        m_dims.push_back(Dimension::Id::Dimension);
     }
 
     if (hdr->BitsColor > 0)
@@ -290,368 +312,75 @@ void FbiReader::addDimensions(PointLayoutPtr layout)
         // if (hdr->BitsColor == 48) : 3*2 bytes of RGB (2 bytes by canal)
         // if (hdr->BitsColor == 64) : 3*2 bytes of RGBI (2 bytes by canal)
 
-        layout->registerDim(Dimension::Id::Red);
-        layout->registerDim(Dimension::Id::Green);
-        layout->registerDim(Dimension::Id::Blue);
+        m_dims.push_back(Dimension::Id::Red);
+        m_dims.push_back(Dimension::Id::Green);
+        m_dims.push_back(Dimension::Id::Blue);
         if (hdr->BitsColor == 64 || hdr->BitsColor == 32)
-            layout->registerDim(Dimension::Id::Infrared);
-        if (hdr->BitsColor == 24 || hdr->BitsColor == 48)
-            NbBytesColor = 8;
-        else
-            NbBytesColor = 16;
+            m_dims.push_back(Dimension::Id::Infrared);
+    }
+
+    for (Dimension::Id dim : m_dims)
+    {
+        if (dim == Dimension::Id::ScanAngleRank)
+            continue;
+        layout->registerDim(dim);
     }
 }
 
 void FbiReader::ready(PointTableRef)
 {
-    m_istreamPtr = Utils::openFile(m_filename, true);
-    m_istreamPtr->seekg(hdr->HdrSize);
-}
-
-// Normal vector lookup tables
-static int NrmTblInit = 0;
-static double NrmHcos[32768];
-static double NrmHsin[32768];
-static double NrmVsin[32768];
-static double NrmVxml[32768];
-
-// ==================================================================
-// Fill lookup tables for NrmVecGetVector() routine.
-// ==================================================================
-
-void NrmVecFillLookups(void)
-{
-    double Hml = fbi::hc_2pi / 32767.0;
-    double Vml = fbi::hc_pi / 32767.0;
-    double Ang;
-    double Xml;
-    double Zvl;
-
-    // Fill horizontal angle tables
-    for (int K(0); K < 32768; K++)
+    m_rustIndex = 0;
+    if (m_rustView)
     {
-        Ang = Hml * K;
-        NrmHcos[K] = cos(Ang);
-        NrmHsin[K] = sin(Ang);
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
 
-    // Fill vertical angle tables
-    for (int K(0); K < 32768; K++)
-    {
-        Ang = (Vml * K) - fbi::hc_piover2;
-        Zvl = sin(Ang);
-        Xml = sqrt(1.0 - (Zvl * Zvl));
-        NrmVsin[K] = Zvl;
-        NrmVxml[K] = Xml;
-    }
-}
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
 
-// ==================================================================
-// Get normalized direction vector from NrmVec structure.
-// ==================================================================
-
-void NrmVecGetVector(double& norm_x, double& norm_y, double& norm_z,
-                     const fbi::NrmVec* Vp)
-{
-    if (!NrmTblInit)
+    pdal_reader_t* reader = pdal_reader_create_fbi(options);
+    if (!reader)
     {
-        NrmTblInit = 1;
-        NrmVecFillLookups();
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust FBI reader.");
     }
 
-    int H = Vp->HorzAng;
-    int V = Vp->VertAng;
-    double Xml = NrmVxml[V];
-    norm_x = Xml * NrmHcos[H];
-    norm_y = Xml * NrmHsin[H];
-    norm_z = NrmVsin[V];
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust FBI reader failed.");
 }
 
 point_count_t FbiReader::read(PointViewPtr view, point_count_t count)
 {
-    m_istreamPtr->seekg(hdr->PosXyz);
-    double Mul = 1.0 / hdr->UnitsXyz;
-
-    for (size_t i(0); i < hdr->FastCnt; i++)
+    point_count_t numRead = 0;
+    PointId nextId = view->size();
+    while (numRead < count && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        fbi::UINT xr, yr, zr;
-        m_istreamPtr->read(reinterpret_cast<char*>(&xr), hdr->BitsX / 8);
-        m_istreamPtr->read(reinterpret_cast<char*>(&yr), hdr->BitsY / 8);
-        m_istreamPtr->read(reinterpret_cast<char*>(&zr), hdr->BitsZ / 8);
+        copyPoint(view, nextId);
+        if (m_cb)
+            m_cb(*view, nextId);
 
-        double X = xr * Mul + hdr->OrgX;
-        double Y = yr * Mul + hdr->OrgY;
-        double Z = zr * Mul + hdr->OrgZ;
-
-        view->setField(Dimension::Id::X, i, X);
-        view->setField(Dimension::Id::Y, i, Y);
-        view->setField(Dimension::Id::Z, i, Z);
+        nextId++;
+        m_rustIndex++;
+        numRead++;
     }
 
-    if (hdr->BitsTime > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosTime);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT64 timeGPS;
-            m_istreamPtr->read(reinterpret_cast<char*>(&timeGPS),
-                               hdr->BitsTime / 8);
-            view->setField(Dimension::Id::OffsetTime, i, uint32_t(timeGPS));
-        }
-    }
-
-    if (hdr->BitsDistance > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosDistance);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT distance;
-            m_istreamPtr->read(reinterpret_cast<char*>(&distance),
-                               hdr->BitsDistance / 8);
-            view->setField(Dimension::Id::NNDistance, i, uint32_t(distance));
-        }
-    }
-
-    if (hdr->BitsGroup > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosGroup);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT grpId;
-            m_istreamPtr->read(reinterpret_cast<char*>(&grpId),
-                               hdr->BitsGroup / 8);
-            view->setField(Dimension::Id::ClusterID, i, uint32_t(grpId));
-        }
-    }
-
-    if (hdr->BitsNormal > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosNormal, std::ios::beg);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::NrmVec normVec;
-            m_istreamPtr->read(reinterpret_cast<char*>(&normVec),
-                               hdr->BitsNormal / 8);
-            double norm_x, norm_y, norm_z;
-            NrmVecGetVector(norm_x, norm_y, norm_z, &normVec);
-            view->setField(Dimension::Id::Dimension, i, uint8_t(normVec.Dim));
-            view->setField(Dimension::Id::NormalX, i, norm_x);
-            view->setField(Dimension::Id::NormalY, i, norm_y);
-            view->setField(Dimension::Id::NormalZ, i, norm_z);
-        }
-    }
-
-    if (hdr->BitsColor > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosColor);
-        bool withIR = (view->layout()->hasDim(Dimension::Id::Infrared));
-
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT blue, green, red;
-            m_istreamPtr->read(reinterpret_cast<char*>(&red), NbBytesColor / 8);
-            m_istreamPtr->read(reinterpret_cast<char*>(&green),
-                               NbBytesColor / 8);
-            m_istreamPtr->read(reinterpret_cast<char*>(&blue),
-                               NbBytesColor / 8);
-
-            view->setField(Dimension::Id::Red, i, uint16_t(red));
-            view->setField(Dimension::Id::Green, i, uint16_t(green));
-            view->setField(Dimension::Id::Blue, i, uint16_t(blue));
-
-            if (withIR)
-            {
-                fbi::UINT infra;
-                m_istreamPtr->read(reinterpret_cast<char*>(&infra),
-                                   NbBytesColor / 8);
-                view->setField(Dimension::Id::Infrared, i, uint16_t(infra));
-            }
-        }
-    }
-
-    if (hdr->BitsIntensity > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosIntensity, std::ios::beg);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT intensity;
-            m_istreamPtr->read(reinterpret_cast<char*>(&intensity),
-                               hdr->BitsIntensity / 8);
-            view->setField(Dimension::Id::Intensity, i, uint16_t(intensity));
-        }
-    }
-
-    if (hdr->BitsLine > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosLine);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT line;
-            m_istreamPtr->read(reinterpret_cast<char*>(&line),
-                               hdr->BitsLine / 8);
-            view->setField(Dimension::Id::PointSourceId, i, uint8_t(line));
-        }
-    }
-
-    if (hdr->BitsEchoLen > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosEchoLen);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT echoLenght;
-            m_istreamPtr->read(reinterpret_cast<char*>(&echoLenght),
-                               hdr->BitsEchoLen / 8);
-            view->setField(Dimension::Id::PulseWidth, i, uint8_t(echoLenght));
-        }
-    }
-
-    if (hdr->BitsAmplitude > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosAmplitude);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT amplitude;
-            m_istreamPtr->read(reinterpret_cast<char*>(&amplitude),
-                               hdr->BitsAmplitude / 8);
-            view->setField(Dimension::Id::Amplitude, i, uint16_t(amplitude));
-        }
-    }
-
-    if (hdr->BitsDeviation > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosDeviation);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT deviation;
-            m_istreamPtr->read(reinterpret_cast<char*>(&deviation),
-                               hdr->BitsDeviation / 8);
-            view->setField(Dimension::Id::Deviation, i, uint16_t(deviation));
-        }
-    }
-
-    if (hdr->BitsScanner > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosScanner);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE userData;
-            m_istreamPtr->read(reinterpret_cast<char*>(&userData),
-                               hdr->BitsScanner / 8);
-            view->setField(Dimension::Id::UserData, i, uint8_t(userData));
-        }
-    }
-
-    if (hdr->BitsEcho > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosEcho);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE echo;
-            m_istreamPtr->read(reinterpret_cast<char*>(&echo),
-                               hdr->BitsEcho / 8);
-            view->setField(Dimension::Id::ReturnNumber, i, uint8_t(echo));
-        }
-    }
-
-    if (hdr->BitsAngle > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosAngle);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE angle;
-            m_istreamPtr->read(reinterpret_cast<char*>(&angle),
-                               hdr->BitsAngle / 8);
-            view->setField(Dimension::Id::ScanAngleRank, i, int8_t(angle));
-        }
-    }
-
-    if (hdr->BitsEchoNorm > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosEchoNorm);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE echoNormality;
-            m_istreamPtr->read(reinterpret_cast<char*>(&echoNormality),
-                               hdr->BitsEchoNorm / 8);
-            view->setField(Dimension::Id::EchoNorm, i, uint8_t(echoNormality));
-        }
-    }
-
-    if (hdr->BitsEchoPos > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosEchoPos);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT echoPos;
-            m_istreamPtr->read(reinterpret_cast<char*>(&echoPos),
-                               hdr->BitsEchoPos / 8);
-            view->setField(Dimension::Id::EchoPos, i, uint16_t(echoPos));
-        }
-    }
-
-    std::vector<fbi::UINT> indexImages;
-    if (hdr->BitsImage > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosImage);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::UINT id_image;
-            m_istreamPtr->read(reinterpret_cast<char*>(&id_image),
-                               hdr->BitsImage / 8);
-            indexImages.push_back(id_image);
-        }
-    }
-
-    if (hdr->BitsReliab > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosReliab);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE reliability;
-            m_istreamPtr->read(reinterpret_cast<char*>(&reliability),
-                               hdr->BitsReliab / 8);
-            view->setField(Dimension::Id::Reliability, i, uint8_t(reliability));
-        }
-    }
-
-    if (hdr->BitsClass > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosClass);
-        for (size_t i(0); i < hdr->FastCnt; i++)
-        {
-            fbi::BYTE classif;
-            m_istreamPtr->read(reinterpret_cast<char*>(&classif),
-                               hdr->BitsClass / 8);
-            view->setField(Dimension::Id::Classification, i, uint8_t(classif));
-        }
-    }
-
-    if (hdr->ImgNbrCnt > 0)
-    {
-        m_istreamPtr->seekg(hdr->PosImgNbr);
-        for (size_t i(0); i < hdr->ImgNbrCnt; i++)
-        {
-            fbi::UINT64 imageNbr;
-            m_istreamPtr->read(reinterpret_cast<char*>(&imageNbr), 64 / 8);
-            indexNameImages.push_back(imageNbr);
-        }
-
-        for (size_t i(0); i < hdr->FastCnt; i++)
-            view->setField(Dimension::Id::Image, i,
-                           uint16_t(indexNameImages[indexImages[i]]));
-    }
-
-    // ToDo : read the additional points
-    for (size_t i(0); i < hdr->RecCnt; i++)
-    {
-    }
-
-    return hdr->FastCnt;
+    return numRead;
 }
 
-void FbiReader::done(PointTableRef)
+void FbiReader::copyPoint(PointViewPtr view, PointId outIdx)
 {
-    Utils::closeFile(m_istreamPtr);
+    for (Dimension::Id dim : m_dims)
+    {
+        view->setField(dim, outIdx,
+                       pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str()));
+    }
 }
+
+void FbiReader::done(PointTableRef) {}
 
 } // namespace pdal
