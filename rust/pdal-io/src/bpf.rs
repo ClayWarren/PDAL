@@ -1,10 +1,13 @@
 //! `readers.bpf` / `writers.bpf` -- Binary Point Format.
 //!
-//! This slice covers deterministic local, uncompressed BPF files. Zlib,
-//! remote files, bundled files, and polarization/ULEM metadata remain C++
-//! territory until a later I/O checkpoint needs them.
+//! This slice covers deterministic local BPF files. Remote files, bundled
+//! files, and polarization/ULEM metadata remain C++ territory until a later
+//! I/O checkpoint needs them.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
@@ -12,7 +15,7 @@ use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -22,6 +25,9 @@ enum BpfFormat {
     Point = 1,
     Byte = 2,
 }
+
+trait ReadSeek: Read + Seek {}
+impl<T: Read + Seek> ReadSeek for T {}
 
 #[derive(Clone, Debug)]
 struct BpfDimension {
@@ -97,16 +103,19 @@ impl Reader for BpfReader {
             .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;
-        if header.compression != 0 {
-            return Err(StageError(
-                "Compressed BPF is not supported by the Rust local I/O slice.".to_string(),
-            ));
-        }
         let dims = read_dimensions(&mut reader, &header, self.fix_dims)?;
 
         reader
             .seek(SeekFrom::Start(header.len as u64))
             .map_err(io_error)?;
+        let mut decompressed;
+        let (data_reader, data_start): (&mut dyn ReadSeek, u64) = if header.compression != 0 {
+            let expected_size = header.num_pts * dims.len() * std::mem::size_of::<f32>();
+            decompressed = read_compressed_blocks(&mut reader, expected_size)?;
+            (&mut decompressed, 0)
+        } else {
+            (&mut reader, header.len as u64)
+        };
         let mut layout = PointLayout::new();
         for dim in &dims {
             layout.register(dim.id.clone(), DimType::F32);
@@ -115,9 +124,15 @@ impl Reader for BpfReader {
         view.set_spatial_reference(spatial_reference(&header));
 
         match header.format {
-            BpfFormat::Point => read_point_major(&mut reader, &header, &dims, &mut view)?,
-            BpfFormat::Dim => read_dim_major(&mut reader, &header, &dims, &mut view)?,
-            BpfFormat::Byte => read_byte_major(&mut reader, &header, &dims, &mut view)?,
+            BpfFormat::Point => {
+                read_point_major(data_reader, data_start, &header, &dims, &mut view)?;
+            }
+            BpfFormat::Dim => {
+                read_dim_major(data_reader, data_start, &header, &dims, &mut view)?;
+            }
+            BpfFormat::Byte => {
+                read_byte_major(data_reader, data_start, &header, &dims, &mut view)?;
+            }
         }
 
         Ok(vec![view])
@@ -131,6 +146,7 @@ impl Reader for BpfReader {
 pub struct BpfWriter {
     filename: String,
     format: BpfFormat,
+    compression: bool,
     coord_id: i32,
 }
 
@@ -139,6 +155,7 @@ impl BpfWriter {
         Self {
             filename: options.get_str("filename", ""),
             format: parse_format(&options.get_str("format", "dimension")),
+            compression: options.get_bool("compression", false),
             coord_id: parse_coord_id(&options.get_str("coord_id", "0")),
         }
     }
@@ -163,6 +180,7 @@ impl Writer for BpfWriter {
             len: (176 + dims.len() * 56) as i32,
             num_dim: dims.len(),
             format: self.format,
+            compression: u8::from(self.compression),
             num_pts: view.len() as usize,
             coord_type: if self.coord_id == 0 { 0 } else { 1 },
             coord_id: self.coord_id,
@@ -177,6 +195,20 @@ impl Writer for BpfWriter {
         let mut writer = BufWriter::new(file);
         write_header(&mut writer, &header)?;
         write_dimensions(&mut writer, &dims)?;
+        if self.compression {
+            let mut data = Vec::new();
+            match self.format {
+                BpfFormat::Point => write_point_major(&mut data, view, &dims)?,
+                BpfFormat::Dim => write_dim_major(&mut data, view, &dims)?,
+                BpfFormat::Byte => write_byte_major(&mut data, view, &dims)?,
+            }
+            write_compressed_blocks(
+                &mut writer,
+                &data,
+                compressed_block_size(self.format, view, &dims),
+            )?;
+            return Ok(());
+        }
         match self.format {
             BpfFormat::Point => write_point_major(&mut writer, view, &dims)?,
             BpfFormat::Dim => write_dim_major(&mut writer, view, &dims)?,
@@ -330,15 +362,14 @@ fn read_dimensions<R: Read>(
     Ok(dims)
 }
 
-fn read_point_major<R: Read + Seek>(
+fn read_point_major<R: Read + Seek + ?Sized>(
     reader: &mut R,
+    data_start: u64,
     header: &BpfHeader,
     dims: &[BpfDimension],
     view: &mut PointView,
 ) -> Result<(), StageError> {
-    reader
-        .seek(SeekFrom::Start(header.len as u64))
-        .map_err(io_error)?;
+    reader.seek(SeekFrom::Start(data_start)).map_err(io_error)?;
     for _ in 0..header.num_pts {
         let idx = view.add_point();
         let mut xyz = [0.0; 3];
@@ -351,8 +382,9 @@ fn read_point_major<R: Read + Seek>(
     Ok(())
 }
 
-fn read_dim_major<R: Read + Seek>(
+fn read_dim_major<R: Read + Seek + ?Sized>(
     reader: &mut R,
+    data_start: u64,
     header: &BpfHeader,
     dims: &[BpfDimension],
     view: &mut PointView,
@@ -361,7 +393,7 @@ fn read_dim_major<R: Read + Seek>(
         view.add_point();
     }
     for (dim_index, dim) in dims.iter().enumerate() {
-        let offset = header.len as u64 + (dim_index * header.num_pts * 4) as u64;
+        let offset = data_start + (dim_index * header.num_pts * 4) as u64;
         reader.seek(SeekFrom::Start(offset)).map_err(io_error)?;
         for idx in 0..header.num_pts {
             let value = reader.read_f32::<LittleEndian>().map_err(io_error)? as f64 + dim.offset;
@@ -372,8 +404,9 @@ fn read_dim_major<R: Read + Seek>(
     Ok(())
 }
 
-fn read_byte_major<R: Read + Seek>(
+fn read_byte_major<R: Read + Seek + ?Sized>(
     reader: &mut R,
+    data_start: u64,
     header: &BpfHeader,
     dims: &[BpfDimension],
     view: &mut PointView,
@@ -385,8 +418,7 @@ fn read_byte_major<R: Read + Seek>(
     for (dim_index, dim) in dims.iter().enumerate() {
         let mut bytes = vec![[0u8; 4]; header.num_pts];
         for byte_index in 0..4 {
-            let offset =
-                header.len as u64 + (dim_index * dim_stride + byte_index * header.num_pts) as u64;
+            let offset = data_start + (dim_index * dim_stride + byte_index * header.num_pts) as u64;
             reader.seek(SeekFrom::Start(offset)).map_err(io_error)?;
             for point_bytes in &mut bytes {
                 point_bytes[byte_index] = reader.read_u8().map_err(io_error)?;
@@ -576,6 +608,72 @@ fn write_byte_major<W: Write>(
     Ok(())
 }
 
+fn read_compressed_blocks<R: Read>(
+    reader: &mut R,
+    expected_size: usize,
+) -> Result<Cursor<Vec<u8>>, StageError> {
+    let mut out = Vec::with_capacity(expected_size);
+    while out.len() < expected_size {
+        let raw_size = reader.read_u32::<LittleEndian>().map_err(io_error)? as usize;
+        let compressed_size = reader.read_u32::<LittleEndian>().map_err(io_error)? as usize;
+        if raw_size == 0 && compressed_size == 0 {
+            break;
+        }
+
+        let mut compressed = vec![0; compressed_size];
+        reader.read_exact(&mut compressed).map_err(io_error)?;
+        let mut decoder = ZlibDecoder::new(compressed.as_slice());
+        let mut block = Vec::with_capacity(raw_size);
+        decoder.read_to_end(&mut block).map_err(io_error)?;
+        if block.len() != raw_size {
+            return Err(StageError(format!(
+                "BPF compressed block expanded to {} bytes, expected {}.",
+                block.len(),
+                raw_size
+            )));
+        }
+        out.extend_from_slice(&block);
+    }
+
+    if out.len() < expected_size {
+        return Err(StageError(format!(
+            "BPF compressed data expanded to {} bytes, expected {}.",
+            out.len(),
+            expected_size
+        )));
+    }
+    out.truncate(expected_size);
+    Ok(Cursor::new(out))
+}
+
+fn write_compressed_blocks<W: Write>(
+    writer: &mut W,
+    data: &[u8],
+    block_size: usize,
+) -> Result<(), StageError> {
+    for block in data.chunks(block_size.max(1)) {
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(block).map_err(io_error)?;
+        let compressed = encoder.finish().map_err(io_error)?;
+        writer
+            .write_u32::<LittleEndian>(block.len() as u32)
+            .map_err(io_error)?;
+        writer
+            .write_u32::<LittleEndian>(compressed.len() as u32)
+            .map_err(io_error)?;
+        writer.write_all(&compressed).map_err(io_error)?;
+    }
+    Ok(())
+}
+
+fn compressed_block_size(format: BpfFormat, view: &PointView, dims: &[BpfDimension]) -> usize {
+    match format {
+        BpfFormat::Point => std::cmp::min(10_000, view.len() as usize) * dims.len() * 4,
+        BpfFormat::Dim => view.len() as usize * 4,
+        BpfFormat::Byte => view.len() as usize * dims.len() * 4,
+    }
+}
+
 fn read_xform<R: Read>(reader: &mut R) -> Result<[f64; 16], StageError> {
     let mut xform = [0.0; 16];
     for value in &mut xform {
@@ -745,41 +843,37 @@ mod tests {
         let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
 
         for format in ["dimension", "point", "byte"] {
-            let output = temp_path(&format!("roundtrip-{format}.bpf"));
-            let mut options = Options::new();
-            options.add("filename", &output);
-            options.add("format", format);
-            let mut writer = BpfWriter::new(&options);
-            writer.write(std::slice::from_ref(&input)).unwrap();
+            for compression in [false, true] {
+                let output = temp_path(&format!("roundtrip-{format}-{compression}.bpf"));
+                let mut options = Options::new();
+                options.add("filename", &output);
+                options.add("format", format);
+                options.add("compression", compression);
+                let mut writer = BpfWriter::new(&options);
+                writer.write(std::slice::from_ref(&input)).unwrap();
 
-            let roundtrip = read_bpf(&output);
-            assert_eq!(roundtrip.len(), input.len());
-            for idx in [0, 17, 1064] {
-                for dim in [DimId::X, DimId::Y, DimId::Z, DimId::Intensity] {
-                    assert!(
-                        (roundtrip.get_f64(idx, &dim) - input.get_f64(idx, &dim)).abs() < 0.01,
-                        "format {format}, idx {idx}, dim {}",
-                        dim.name()
-                    );
+                let roundtrip = read_bpf(&output);
+                assert_eq!(roundtrip.len(), input.len());
+                for idx in [0, 17, 1064] {
+                    for dim in [DimId::X, DimId::Y, DimId::Z, DimId::Intensity] {
+                        assert!(
+                            (roundtrip.get_f64(idx, &dim) - input.get_f64(idx, &dim)).abs() < 0.01,
+                            "format {format}, idx {idx}, dim {}",
+                            dim.name()
+                        );
+                    }
                 }
+                std::fs::remove_file(output).ok();
             }
-            std::fs::remove_file(output).ok();
         }
     }
 
     #[test]
-    fn compressed_bpf_is_deferred() {
-        let mut options = Options::new();
-        options.add(
-            "filename",
-            data_path("bpf/autzen-utm-chipped-25-v3-deflate.bpf"),
-        );
-        let mut reader = BpfReader::new(&options);
-        let err = match reader.read() {
-            Ok(_) => panic!("compressed BPF unexpectedly read successfully"),
-            Err(err) => err,
-        };
+    fn reads_compressed_bpf() {
+        let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-deflate.bpf"));
 
-        assert!(err.0.contains("Compressed BPF"));
+        assert_eq!(view.len(), 1065);
+        assert!((view.get_f64(0, &DimId::X) - 494057.3).abs() < 0.25);
+        assert!((view.get_f64(17, &DimId::Z) - 130.03).abs() < 0.25);
     }
 }

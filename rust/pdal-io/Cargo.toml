@@ -7,6 +7,7 @@ description = "First-party readers and writers for the PDAL Rust port."
 
 [dependencies]
 byteorder = "1.5.0"
+flate2 = "1.1.9"
 las = { version = "0.9.11", features = ["laz"] }
 las-crs = "1.0.0"
 pdal-core = { path = "../pdal-core" }

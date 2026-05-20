@@ -659,6 +659,7 @@ name = "pdal-io"
 version = "0.0.0"
 dependencies = [
  "byteorder",
+ "flate2",
  "las",
  "las-crs",
  "pdal-core",
