@@ -41,11 +41,14 @@
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/Point.hpp"
+#include "private/RustViewConverter.hpp"
 #include "private/pnp/GridPnp.hpp"
 
 #include <cstdarg>
+#include <limits>
 #include <sstream>
 
 namespace pdal
@@ -230,30 +233,59 @@ void CropFilter::transform(const SpatialReference& srs)
 
 PointViewSet CropFilter::run(PointViewPtr view)
 {
-    PointViewSet viewSet;
-
     transform(view->spatialReference());
-    for (auto& geom : m_geoms)
-    {
-        PointViewPtr outView = view->makeNew();
-        crop(geom, *view, *outView);
-        viewSet.insert(outView);
-    }
 
+    std::vector<pdal_box3d_t> rustBounds;
     for (auto& box : m_boxes)
     {
-        PointViewPtr outView = view->makeNew();
-        crop(box, *view, *outView);
-        viewSet.insert(outView);
+        if (box.is3d())
+        {
+            const BOX3D b = box.to3d();
+            rustBounds.push_back(
+                {b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz});
+        }
+        else
+        {
+            const BOX2D b = box.to2d();
+            rustBounds.push_back(
+                {b.minx, b.miny, -std::numeric_limits<double>::infinity(),
+                 b.maxx, b.maxy, std::numeric_limits<double>::infinity()});
+        }
     }
 
+    std::vector<std::string> polygonText;
+    std::vector<const char*> polygonPtrs;
+    for (auto& geom : m_geoms)
+        polygonText.push_back(geom.m_poly.wkt());
+    for (auto& text : polygonText)
+        polygonPtrs.push_back(text.c_str());
+
+    std::vector<pdal_point3d_t> centers;
     for (auto& point : m_args->m_centers)
     {
-        PointViewPtr outView = view->makeNew();
-        crop(point, *view, *outView);
-        viewSet.insert(outView);
+        centers.push_back({point.x(), point.y(),
+                           point.is3d()
+                               ? point.z()
+                               : std::numeric_limits<double>::quiet_NaN()});
     }
 
+    pdal_stage_t* stage = pdal_stage_create_crop(
+        m_args->m_cropOutside, rustBounds.empty() ? nullptr : rustBounds.data(),
+        rustBounds.size(), polygonPtrs.empty() ? nullptr : polygonPtrs.data(),
+        polygonPtrs.size(), centers.empty() ? nullptr : centers.data(),
+        centers.size(), m_args->m_distance);
+    if (!stage)
+    {
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(std::string("filters.crop: ") + message);
+        throwError("Failed to create Rust crop stage.");
+    }
+
+    PointViewSet viewSet = rust_view_converter::runMulti(
+        stage, view,
+        m_geoms.size() + m_boxes.size() + m_args->m_centers.size());
+    pdal_stage_destroy(stage);
     return viewSet;
 }
 

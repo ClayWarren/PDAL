@@ -41,6 +41,8 @@
 #include <memory>
 #include <string>
 
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -67,6 +69,8 @@ private:
 
     void createTransform(const SpatialReference& srs);
     std::unique_ptr<SrsTransform> m_transform;
+    PointLayoutPtr m_layout;
+    pdal_stage_t* m_rustStage;
 
     H3Filter& operator=(const H3Filter&) = delete;
     H3Filter(const H3Filter&) = delete;

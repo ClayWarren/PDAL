@@ -44,6 +44,8 @@
 #include <pdal/private/gdal/SpatialRef.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+#include "private/RustViewConverter.hpp"
+
 namespace pdal
 {
 
@@ -54,6 +56,17 @@ static StaticPluginInfo const s_info{
     "https://pdal.org/stages/filters.overlay.html"};
 
 CREATE_STATIC_STAGE(OverlayFilter, s_info)
+
+OverlayFilter::OverlayFilter()
+    : m_ds(nullptr), m_lyr(nullptr), m_rustStage(nullptr)
+{
+}
+
+OverlayFilter::~OverlayFilter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 void OverlayFilter::addArgs(ProgramArgs& args)
 {
@@ -88,6 +101,7 @@ void OverlayFilter::initialize()
 
 void OverlayFilter::prepared(PointTableRef table)
 {
+    m_layout = table.layout();
     m_dim = table.layout()->findDim(m_dimName);
     if (m_dim == Dimension::Id::Unknown)
         throwError("Dimension '" + m_dimName + "' not found.");
@@ -97,6 +111,19 @@ void OverlayFilter::prepared(PointTableRef table)
 
 void OverlayFilter::ready(PointTableRef table)
 {
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_overlay(
+        m_dimName.c_str(), m_datasource.c_str(),
+        m_column.empty() ? nullptr : m_column.c_str());
+    if (!m_rustStage)
+    {
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(std::string("filters.overlay: ") + message);
+        throwError("Failed to create Rust overlay stage.");
+    }
+
     m_ds = OGRDSPtr(OGROpen(m_datasource.c_str(), 0, nullptr),
                     [](OGRDSPtr::element_type* p)
                     {
@@ -175,46 +202,20 @@ void OverlayFilter::spatialReferenceChanged(const SpatialReference& srs)
 
 bool OverlayFilter::processOne(PointRef& point)
 {
-    for (const auto& poly : m_polygons)
-    {
-        double x = point.getFieldAs<double>(Dimension::Id::X);
-        double y = point.getFieldAs<double>(Dimension::Id::Y);
-        if (poly.geom.contains(x, y))
-        {
-            point.setField(m_dim, poly.val);
-            break;
-        }
-    }
-    return true;
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(point, m_layout);
+    const bool keep = pdal_stage_process_one_at(m_rustStage, rustPoint, 0);
+    if (keep)
+        rust_view_converter::fromRustPoint(rustPoint, 0, point);
+    pdal_point_view_destroy(rustPoint);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust overlay filter failed.");
+    return keep;
 }
 
 void OverlayFilter::filter(PointView& view)
 {
-    point_count_t npoints = view.size();
-    point_count_t chunk_size = npoints / m_threads;
-    if (npoints % m_threads)
-        chunk_size++;
-    std::vector<std::thread> threadList(m_threads);
-
-    for (int t = 0; t < m_threads; t++)
-    {
-        threadList[t] = std::thread(
-            [&](const PointId start, const PointId end)
-            {
-                PointRef point(view, start);
-
-                for (PointId id = start; id < end; id++)
-                {
-                    point.setPointId(id);
-                    processOne(point);
-                }
-            },
-            t * chunk_size,
-            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size);
-    }
-
-    for (auto& t : threadList)
-        t.join();
+    rust_view_converter::runInPlace(m_rustStage, view);
 }
 
 } // namespace pdal

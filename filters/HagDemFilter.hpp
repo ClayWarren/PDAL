@@ -41,6 +41,8 @@
 #include <memory>
 #include <string>
 
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -56,6 +58,7 @@ class PDAL_EXPORT HagDemFilter : public Filter, public Streamable
 {
 public:
     HagDemFilter();
+    ~HagDemFilter() override;
     HagDemFilter& operator=(const HagDemFilter&) = delete;
     HagDemFilter(const HagDemFilter&) = delete;
 
@@ -76,8 +79,9 @@ private:
     double m_minClamp;
     double m_maxClamp;
     double m_noDataHeight;
-    double m_bandNoData;
     uint8_t m_class;
+    PointLayoutPtr m_layout;
+    pdal_stage_t* m_rustStage;
 };
 
 } // namespace pdal

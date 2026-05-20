@@ -7,6 +7,9 @@ use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
+use pdal_filters::colorinterp::ColorinterpFilter;
+use pdal_filters::colorization::{BandInfo, ColorizationFilter};
+use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
@@ -18,6 +21,8 @@ use pdal_filters::ferry::FerryFilter;
 use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
+use pdal_filters::h3::H3Filter;
+use pdal_filters::hag_dem::HagDemFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::iqr::IqrFilter;
@@ -30,6 +35,7 @@ use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
+use pdal_filters::overlay::OverlayFilter;
 use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
@@ -40,6 +46,7 @@ use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
 use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
+use pdal_filters::smrf::SmrfFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::splitter::SplitterFilter;
@@ -51,6 +58,23 @@ use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 use pdal_filters::zsmooth::ZsmoothFilter;
 use std::ffi::CStr;
 use std::os::raw::c_char;
+
+#[repr(C)]
+pub struct pdal_box3d_t {
+    pub minx: f64,
+    pub miny: f64,
+    pub minz: f64,
+    pub maxx: f64,
+    pub maxy: f64,
+    pub maxz: f64,
+}
+
+#[repr(C)]
+pub struct pdal_point3d_t {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
 
 /// Create a decimation filter stage from options.
 ///
@@ -65,6 +89,209 @@ pub unsafe extern "C" fn pdal_stage_create_decimation(ops: *const Options) -> *m
     } else {
         std::ptr::null_mut()
     }
+}
+
+/// Create a crop filter stage.
+///
+/// # Safety
+///
+/// Array pointers must either be null with a zero count or valid for their
+/// matching count.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_crop(
+    outside: bool,
+    bounds: *const pdal_box3d_t,
+    bounds_count: u64,
+    polygons: *const *const c_char,
+    poly_count: u64,
+    centers: *const pdal_point3d_t,
+    center_count: u64,
+    distance: f64,
+) -> *mut StageWrapper {
+    let mut rust_bounds = Vec::new();
+    if !bounds.is_null() {
+        for idx in 0..bounds_count {
+            let b = &*bounds.add(idx as usize);
+            rust_bounds.push((b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz));
+        }
+    }
+
+    let mut rust_polygons = Vec::new();
+    if !polygons.is_null() {
+        for idx in 0..poly_count {
+            let ptr = *polygons.add(idx as usize);
+            if !ptr.is_null() {
+                rust_polygons.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+            }
+        }
+    }
+
+    let mut rust_centers = Vec::new();
+    if !centers.is_null() {
+        for idx in 0..center_count {
+            let c = &*centers.add(idx as usize);
+            if c.z.is_finite() {
+                rust_centers.push(CropCenter::new_3d(c.x, c.y, c.z));
+            } else {
+                rust_centers.push(CropCenter::new_2d(c.x, c.y));
+            }
+        }
+    }
+
+    match CropFilter::new(outside, rust_bounds, rust_polygons, rust_centers, distance) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(err.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Create an overlay filter stage.
+///
+/// # Safety
+///
+/// String pointers must be null-terminated.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_overlay(
+    dim_name: *const c_char,
+    datasource: *const c_char,
+    column: *const c_char,
+) -> *mut StageWrapper {
+    if dim_name.is_null() || datasource.is_null() {
+        set_last_error("null argument to pdal_stage_create_overlay");
+        return std::ptr::null_mut();
+    }
+
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy();
+    let datasource = CStr::from_ptr(datasource).to_string_lossy();
+    let column = if column.is_null() {
+        "".into()
+    } else {
+        CStr::from_ptr(column).to_string_lossy()
+    };
+
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(OverlayFilter::new(&dim_name, &datasource, &column)),
+    }))
+}
+
+/// Create a color interpolation filter stage.
+///
+/// # Safety
+///
+/// String pointers must be null-terminated.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_colorinterp(
+    dim_name: *const c_char,
+    ramp: *const c_char,
+    min: f64,
+    max: f64,
+    clamp: bool,
+    invert: bool,
+) -> *mut StageWrapper {
+    if dim_name.is_null() || ramp.is_null() {
+        set_last_error("null argument to pdal_stage_create_colorinterp");
+        return std::ptr::null_mut();
+    }
+
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy();
+    let ramp = CStr::from_ptr(ramp).to_string_lossy();
+
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(ColorinterpFilter::new(
+            &dim_name, &ramp, min, max, clamp, invert,
+        )),
+    }))
+}
+
+#[repr(C)]
+pub struct pdal_band_info_t {
+    pub name: *const c_char,
+    pub band: u32,
+    pub scale: f64,
+}
+
+/// Create a colorization filter stage.
+///
+/// # Safety
+///
+/// `raster_path` and every band name must be null-terminated. `bands` must
+/// either be null with a zero count or valid for `count` entries.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_colorization(
+    raster_path: *const c_char,
+    bands: *const pdal_band_info_t,
+    count: u64,
+) -> *mut StageWrapper {
+    if raster_path.is_null() {
+        set_last_error("null argument to pdal_stage_create_colorization");
+        return std::ptr::null_mut();
+    }
+
+    let raster_path = CStr::from_ptr(raster_path).to_string_lossy();
+    let mut rust_bands = Vec::new();
+    if !bands.is_null() {
+        for idx in 0..count {
+            let band = &*bands.add(idx as usize);
+            if band.name.is_null() {
+                set_last_error("null band name to pdal_stage_create_colorization");
+                return std::ptr::null_mut();
+            }
+            rust_bands.push(BandInfo {
+                name: CStr::from_ptr(band.name).to_string_lossy().into_owned(),
+                band: band.band,
+                scale: band.scale,
+            });
+        }
+    }
+
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(ColorizationFilter::new(&raster_path, rust_bands)),
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_h3(resolution: u64) -> *mut StageWrapper {
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(H3Filter::new(resolution as u8)),
+    }))
+}
+
+/// Create a HAG DEM filter stage.
+///
+/// # Safety
+///
+/// `raster_path` must be a null-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_hag_dem(
+    raster_path: *const c_char,
+    band: i32,
+    zero_ground: bool,
+    min_clamp: f64,
+    max_clamp: f64,
+    nodata_height: f64,
+    ground_class: u8,
+) -> *mut StageWrapper {
+    if raster_path.is_null() {
+        set_last_error("null argument to pdal_stage_create_hag_dem");
+        return std::ptr::null_mut();
+    }
+
+    let raster_path = CStr::from_ptr(raster_path).to_string_lossy();
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(HagDemFilter::new(
+            &raster_path,
+            band,
+            zero_ground,
+            min_clamp,
+            max_clamp,
+            nodata_height,
+            ground_class,
+        )),
+    }))
 }
 
 /// Create a head filter stage from options.
@@ -654,6 +881,51 @@ pub extern "C" fn pdal_stage_create_elm(
     threshold: f64,
 ) -> *mut StageWrapper {
     let filter = Box::new(ElmFilter::new(cell, class_label, threshold));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create an SMRF stage.
+///
+/// # Safety
+///
+/// `returns` must either be null with a zero count or point to `count`
+/// NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_smrf(
+    cell: f64,
+    slope: f64,
+    has_window: bool,
+    window: f64,
+    scalar: f64,
+    threshold: f64,
+    ground_class: u8,
+    other_class: u8,
+    only_ground: bool,
+    returns: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    let mut rust_returns = Vec::new();
+    if !returns.is_null() {
+        for i in 0..count {
+            let ptr = *returns.offset(i as isize);
+            if ptr.is_null() {
+                return std::ptr::null_mut();
+            }
+            rust_returns.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+
+    let filter = Box::new(SmrfFilter::new(
+        cell,
+        slope,
+        if has_window { Some(window) } else { None },
+        scalar,
+        threshold,
+        ground_class,
+        other_class,
+        only_ground,
+        rust_returns,
+    ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

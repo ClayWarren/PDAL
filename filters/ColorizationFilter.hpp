@@ -39,6 +39,8 @@
 
 #include <map>
 
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -91,6 +93,8 @@ private:
     std::vector<BandInfo> m_bands;
 
     std::unique_ptr<gdal::Raster> m_raster;
+    PointLayoutPtr m_layout;
+    pdal_stage_t* m_rustStage;
 };
 
 } // namespace pdal

@@ -37,8 +37,11 @@
 #include <pdal/PointView.hpp>
 #include <pdal/private/gdal/Raster.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include <array>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -125,9 +128,13 @@ ColorizationFilter::BandInfo parseDim(const std::string& dim,
 
 } // unnamed namespace
 
-ColorizationFilter::ColorizationFilter() {}
+ColorizationFilter::ColorizationFilter() : m_rustStage(nullptr) {}
 
-ColorizationFilter::~ColorizationFilter() {}
+ColorizationFilter::~ColorizationFilter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 void ColorizationFilter::addArgs(ProgramArgs& args)
 {
@@ -177,6 +184,7 @@ void ColorizationFilter::addDimensions(PointLayoutPtr layout)
 void ColorizationFilter::ready(PointTableRef table)
 {
     using namespace gdal;
+    m_layout = table.layout();
 
     m_raster.reset(new gdal::Raster(m_rasterFilename));
 
@@ -194,40 +202,38 @@ void ColorizationFilter::ready(PointTableRef table)
             throwError(m_raster->errorMsg());
         }
     }
+
+    std::vector<pdal_band_info_t> bands;
+    bands.reserve(m_bands.size());
+    for (const BandInfo& band : m_bands)
+        bands.push_back({band.m_name.c_str(), band.m_band, band.m_scale});
+
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_colorization(m_rasterFilename.c_str(),
+                                                 bands.data(), bands.size());
+    if (!m_rustStage)
+        rust_view_converter::throwLastError(
+            "Unable to create Rust colorization stage.");
 }
 
 bool ColorizationFilter::processOne(PointRef& point)
 {
-    static std::vector<double> data;
-    static std::array<double, 2> pix;
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust colorization stage failed.");
+    pdal_stage_reset(m_rustStage);
 
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-
-    if (m_raster->read(x, y, data, pix) == gdal::GDALError::None)
-    {
-        int i(0);
-        for (auto bi = m_bands.begin(); bi != m_bands.end(); ++bi)
-        {
-            BandInfo& b = *bi;
-            point.setField(b.m_dim, data[i] * b.m_scale);
-            ++i;
-        }
-    }
-
-    // always return true to retain all points inside OR outside the raster. the
-    // output bands of any points outside the raster are ignored.
     return true;
 }
 
 void ColorizationFilter::filter(PointView& view)
 {
-    PointRef point = view.point(0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        point.setPointId(idx);
-        processOne(point);
-    }
+    rust_view_converter::runInPlace(m_rustStage, view);
 }
 
 } // namespace pdal

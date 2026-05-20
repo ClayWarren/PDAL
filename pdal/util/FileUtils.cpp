@@ -56,6 +56,7 @@ namespace fs = std::filesystem;
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal/util/VSIIO.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "pdal_util_internal.hpp"
 
@@ -76,11 +77,13 @@ bool isStdout(std::string filename)
            Utils::toupper(filename) == "STDOUT";
 }
 
-std::string addTrailingSlash(std::string path)
+std::string takeRustString(char* value)
 {
-    if (path[path.size() - 1] != '/' && path[path.size() - 1] != '\\')
-        path += "/";
-    return path;
+    if (!value)
+        return std::string();
+    std::string result(value);
+    pdal_string_free(value);
+    return result;
 }
 
 } // unnamed namespace
@@ -338,10 +341,7 @@ std::string readFileIntoString(const std::string& filename)
 
 std::string getcwd()
 {
-    char* pszCurDir = CPLGetCurrentDir();
-    std::string cwd = addTrailingSlash(std::string(pszCurDir));
-    CPLFree(pszCurDir);
-    return cwd;
+    return takeRustString(pdal_file_utils_getcwd());
 }
 
 std::string toCanonicalPath(std::string filename)
@@ -353,7 +353,7 @@ std::string toCanonicalPath(std::string filename)
 // otherwise, make it absolute (relative to current working dir) and return that
 std::string toAbsolutePath(const std::string& filename)
 {
-    return fs::absolute(toNative(filename)).u8string();
+    return takeRustString(pdal_file_utils_to_absolute_path(filename.c_str()));
 }
 
 // if the filename is an absolute path, just return it
@@ -363,45 +363,24 @@ std::string toAbsolutePath(const std::string& filename)
 // toAbsolutePath(base)
 std::string toAbsolutePath(const std::string& filename, const std::string base)
 {
-    const std::string newbase = toAbsolutePath(base);
-    fs::path f(toNative(filename));
-    fs::path b(toNative(newbase));
-
-    fs::path fb = b / f;
-    return fb.string();
+    return takeRustString(pdal_file_utils_to_absolute_path_with_base(
+        filename.c_str(), base.c_str()));
 }
 
 std::string getFilename(const std::string& path)
 {
-#ifdef _WIN32
-    std::string pathsep("\\/");
-#else
-    char pathsep = Utils::dirSeparator;
-#endif
-
-    std::string::size_type pos = path.find_last_of(pathsep);
-    if (pos == std::string::npos)
-        return path;
-    return path.substr(pos + 1);
+    return takeRustString(pdal_file_utils_get_filename(path.c_str()));
 }
 
 // Get the directory part of a filename.
 std::string getDirectory(const std::string& path)
 {
-    std::string pth(CPLGetPath(path.c_str()));
-    return addTrailingSlash(pth);
+    return takeRustString(pdal_file_utils_get_directory(path.c_str()));
 }
 
 std::string stem(const std::string& path)
 {
-    std::string f = getFilename(path);
-    if (f != "." && f != "..")
-    {
-        std::string::size_type pos = f.find_last_of('.');
-        if (pos != std::string::npos)
-            f = f.substr(0, pos);
-    }
-    return f;
+    return takeRustString(pdal_file_utils_stem(path.c_str()));
 }
 
 // Determine if the path represents a directory.
@@ -418,10 +397,7 @@ bool isDirectory(const std::string& path)
 // Determine if the path is an absolute path
 bool isAbsolutePath(const std::string& path)
 {
-    if (path.find("://") != std::string::npos)
-        return true;
-
-    return fs::path(toNative(path)).is_absolute();
+    return pdal_file_utils_is_absolute_path(path.c_str());
 }
 
 void fileTimes(const std::string& filename, struct tm* createTime,
@@ -439,10 +415,7 @@ void fileTimes(const std::string& filename, struct tm* createTime,
 
 std::string extension(const std::string& filename)
 {
-    auto idx = filename.find_last_of('.');
-    if (idx == std::string::npos)
-        return std::string();
-    return filename.substr(idx);
+    return takeRustString(pdal_file_utils_extension(filename.c_str()));
 }
 
 std::vector<std::string> glob(std::string path)

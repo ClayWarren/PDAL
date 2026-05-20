@@ -38,6 +38,7 @@
 #include <pdal/util/Utils.hpp>
 
 #include <pdal/private/SrsTransform.hpp>
+#include <pdal_capi.h>
 
 #include <cctype>
 #include <limits>
@@ -46,6 +47,8 @@
 #include <vector>
 
 #include <h3api.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -66,9 +69,13 @@ struct H3Filter::Args
     int m_resolution;
 };
 
-H3Filter::H3Filter() : m_args(new Args) {}
+H3Filter::H3Filter() : m_args(new Args), m_rustStage(nullptr) {}
 
-H3Filter::~H3Filter() {}
+H3Filter::~H3Filter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 void H3Filter::addArgs(ProgramArgs& args)
 {
@@ -80,42 +87,28 @@ void H3Filter::addArgs(ProgramArgs& args)
 void H3Filter::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDim(Dimension::Id::H3);
+    m_layout = layout;
 }
 
 bool H3Filter::processOne(PointRef& point)
 {
-
-    double x(point.getFieldAs<double>(Dimension::Id::X));
-    double y(point.getFieldAs<double>(Dimension::Id::Y));
-    double z(0.0);
-
-    LatLng ll;
-    H3Index index(0);
-    bool ok = m_transform->transform(x, y, z);
-    if (ok)
+    if (!m_rustStage)
     {
-        // x is longitude
-        double xrad = PDALH3degsToRads(x);
-        double yrad = PDALH3degsToRads(y);
-        ll.lat = yrad;
-        ll.lng = xrad;
-
-        H3Error err = PDALH3latLngToCell(&ll, m_args->m_resolution, &index);
-        if (err == E_SUCCESS)
-        {
-            point.setField(Dimension::Id::H3, index);
-        }
-        else
-        {
-            throwError("Unable to compute H3 cell id for point!");
-        }
+        m_rustStage = pdal_stage_create_h3(m_args->m_resolution);
+        if (!m_rustStage)
+            rust_view_converter::throwLastError(
+                "Unable to create Rust H3 stage.");
     }
-    else
-        throwError(
-            "Couldn't reproject point with X/Y/Z coordinates of (" +
-            std::to_string(point.getFieldAs<double>(Dimension::Id::X)) + ", " +
-            std::to_string(point.getFieldAs<double>(Dimension::Id::Y)) + ").");
-    return ok;
+
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust H3 stage failed.");
+    pdal_stage_reset(m_rustStage);
+    return true;
 }
 
 void H3Filter::spatialReferenceChanged(const SpatialReference& srs)
@@ -133,17 +126,12 @@ void H3Filter::createTransform(const SpatialReference& srsSRS)
 
 void H3Filter::filter(PointView& view)
 {
-    if (!m_transform)
-    {
-        createTransform(view.spatialReference());
-    }
-
-    PointRef point = view.point(0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        point.setPointId(idx);
-        processOne(point);
-    }
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_h3(m_args->m_resolution);
+    if (!m_rustStage)
+        rust_view_converter::throwLastError("Unable to create Rust H3 stage.");
+    rust_view_converter::runInPlace(m_rustStage, view);
 }
 
 } // namespace pdal

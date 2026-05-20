@@ -39,6 +39,7 @@
 #include <pdal/private/gdal/Raster.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 #include <algorithm>
 #include <array>
@@ -47,6 +48,7 @@
 #include <cpl_vsi.h>
 
 #include "ColorInterpRamps.hpp"
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -64,6 +66,12 @@ CREATE_STATIC_STAGE(ColorinterpFilter, s_info)
 std::string ColorinterpFilter::getName() const
 {
     return s_info.name;
+}
+
+ColorinterpFilter::~ColorinterpFilter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
 }
 
 // The VSIFILE* that VSIFileFromMemBuffer creates in this
@@ -143,6 +151,7 @@ void ColorinterpFilter::addDimensions(PointLayoutPtr layout)
 void ColorinterpFilter::prepared(PointTableRef table)
 {
     PointLayoutPtr layout(table.layout());
+    m_layout = layout;
     m_interpDim = layout->findDim(m_interpDimString);
     if (m_interpDim == Dimension::Id::Unknown)
         throwError("Dimension '" + m_interpDimString + "' does not exist.");
@@ -257,12 +266,15 @@ void ColorinterpFilter::filter(PointView& view)
             m_max = summary.maximum();
     }
 
-    PointRef point(view, 0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        point.setPointId(idx);
-        processOne(point);
-    }
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_colorinterp(
+        Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min, m_max,
+        m_clamp, m_invertRamp);
+    if (!m_rustStage)
+        rust_view_converter::throwLastError(
+            "Unable to create Rust colorinterp stage.");
+    rust_view_converter::runInPlace(m_rustStage, view);
 }
 
 bool ColorinterpFilter::pipelineStreamable() const
@@ -274,38 +286,24 @@ bool ColorinterpFilter::pipelineStreamable() const
 
 bool ColorinterpFilter::processOne(PointRef& point)
 {
-    double v = point.getFieldAs<double>(m_interpDim);
-
-    if (m_clamp)
+    if (!m_rustStage)
     {
-        v = Utils::clamp(v, m_min, m_max);
+        m_rustStage = pdal_stage_create_colorinterp(
+            Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min,
+            m_max, m_clamp, m_invertRamp);
+        if (!m_rustStage)
+            rust_view_converter::throwLastError(
+                "Unable to create Rust colorinterp stage.");
     }
 
-    // Don't color points that aren't in the min/max range
-    // unless they've been clamped. Allow v == m_max so that
-    // if the user wants to clamp all values outside m_min
-    // and m_max the values greater than m_max are colored
-    // as expected.
-    if (v < m_min || v > m_max)
-    {
-        return true;
-    }
-
-    double factor = (v - m_min) / (m_max - m_min);
-    size_t img_width = m_redBand.size();
-    size_t position = size_t(std::floor(factor * img_width));
-
-    // Handle the case that v == m_max (position == img_width) by clamping
-    // position to img_width - 1
-    position = (std::min)(position, img_width - 1);
-
-    if (m_invertRamp)
-        position = (img_width - 1) - position;
-
-    point.setField(Dimension::Id::Red, m_redBand[position]);
-    point.setField(Dimension::Id::Blue, m_blueBand[position]);
-    point.setField(Dimension::Id::Green, m_greenBand[position]);
-
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust colorinterp stage failed.");
+    pdal_stage_reset(m_rustStage);
     return true;
 }
 

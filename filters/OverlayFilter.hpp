@@ -37,6 +37,7 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Polygon.hpp>
 #include <pdal/Streamable.hpp>
+#include <pdal_capi.h>
 
 #include <map>
 #include <memory>
@@ -78,7 +79,8 @@ class PDAL_EXPORT OverlayFilter : public Filter, public Streamable
     };
 
 public:
-    OverlayFilter() : m_ds(nullptr), m_lyr(nullptr) {}
+    OverlayFilter();
+    ~OverlayFilter() override;
 
     std::string getName() const override
     {
@@ -108,6 +110,8 @@ private:
     std::vector<PolyVal> m_polygons;
     BOX2D m_bounds;
     int m_threads;
+    PointLayoutPtr m_layout;
+    pdal_stage_t* m_rustStage;
 };
 
 } // namespace pdal

@@ -45,7 +45,10 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include "private/DimRange.hpp"
+#include "private/RustViewConverter.hpp"
 #include "private/Segmentation.hpp"
+
+#include <pdal_capi.h>
 
 #include <Eigen/Dense>
 
@@ -96,9 +99,10 @@ struct SMRArgs
 
 SMRFilter::SMRFilter()
     : m_rows(0), m_cols(0), m_args(new SMRArgs),
-      m_groundClass(ClassLabel::Ground),
-      m_otherClass(ClassLabel::Unclassified), m_onlyGround(false)
-{}
+      m_groundClass(ClassLabel::Ground), m_otherClass(ClassLabel::Unclassified),
+      m_onlyGround(false)
+{
+}
 
 SMRFilter::~SMRFilter() {}
 
@@ -198,6 +202,27 @@ void SMRFilter::ready(PointTableRef table)
 PointViewSet SMRFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet{view};
+
+    if (m_args->m_dir.empty() && m_args->m_ignored.empty() &&
+        m_args->m_classbits.isNone())
+    {
+        std::vector<const char*> returns;
+        returns.reserve(m_args->m_returns.size());
+        for (const std::string& r : m_args->m_returns)
+            returns.push_back(r.c_str());
+
+        pdal_stage_t* stage = pdal_stage_create_smrf(
+            m_args->m_cell, m_args->m_slope, m_args->m_windowArg->set(),
+            m_args->m_window, m_args->m_scalar, m_args->m_threshold,
+            m_groundClass, m_otherClass, m_onlyGround, returns.data(),
+            returns.size());
+        if (!stage)
+            throwError("Failed to create Rust SMRF stage.");
+
+        rust_view_converter::runInPlace(stage, *view);
+        pdal_stage_destroy(stage);
+        return viewSet;
+    }
 
     // Segment input view into ignored/kept views.
     PointViewPtr ignoredView = view->makeNew();

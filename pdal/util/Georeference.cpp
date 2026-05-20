@@ -33,53 +33,28 @@
  ****************************************************************************/
 
 #include <pdal/util/Georeference.hpp>
-
-#include <cmath>
-#include <iostream>
-#include <vector>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 namespace georeference
 {
 
-namespace
-{
-
-static const double a = 6378137.0;
-static const double f = 1 / 298.257223563;
-static const double e2 = 2 * f - f * f;
-
-Xyz rotate(const Xyz& point, const RotationMatrix& matrix)
-{
-    return Xyz(
-        matrix.m00 * point.X + matrix.m01 * point.Y + matrix.m02 * point.Z,
-        matrix.m10 * point.X + matrix.m11 * point.Y + matrix.m12 * point.Z,
-        matrix.m20 * point.X + matrix.m21 * point.Y + matrix.m22 * point.Z);
-}
-
-Xyz cartesianToCurvilinear(const Xyz& point, double latitude)
-{
-    double w = std::sqrt(1 - e2 * std::sin(latitude) * std::sin(latitude));
-    double n = a / w;
-    double m = a * (1 - e2) / (w * w * w);
-    return Xyz(point.X / (n * std::cos(latitude)), point.Y / m, point.Z);
-}
-} // namespace
-
 Xyz georeferenceWgs84(double range, double scanAngle,
                       const RotationMatrix& boresightMatrix,
                       const RotationMatrix& imuMatrix, const Xyz& gpsPoint)
 {
-    Xyz pSocs =
-        Xyz(range * std::sin(scanAngle), 0, -range * std::cos(scanAngle));
-
-    Xyz pSocsAligned = rotate(pSocs, boresightMatrix);
-    Xyz pLocalLevel = rotate(pSocsAligned, imuMatrix);
-    Xyz pCurvilinear = cartesianToCurvilinear(pLocalLevel, gpsPoint.Y);
-
-    return Xyz(gpsPoint.X + pCurvilinear.X, gpsPoint.Y + pCurvilinear.Y,
-               gpsPoint.Z + pCurvilinear.Z);
+    pdal_rotation_matrix_t boresight{
+        boresightMatrix.m00, boresightMatrix.m01, boresightMatrix.m02,
+        boresightMatrix.m10, boresightMatrix.m11, boresightMatrix.m12,
+        boresightMatrix.m20, boresightMatrix.m21, boresightMatrix.m22};
+    pdal_rotation_matrix_t imu{imuMatrix.m00, imuMatrix.m01, imuMatrix.m02,
+                               imuMatrix.m10, imuMatrix.m11, imuMatrix.m12,
+                               imuMatrix.m20, imuMatrix.m21, imuMatrix.m22};
+    pdal_xyz_t gps{gpsPoint.X, gpsPoint.Y, gpsPoint.Z};
+    pdal_xyz_t point =
+        pdal_georeference_wgs84(range, scanAngle, boresight, imu, gps);
+    return Xyz(point.x, point.y, point.z);
 }
 } // namespace georeference
 } // namespace pdal

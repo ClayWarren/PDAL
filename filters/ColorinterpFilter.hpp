@@ -40,6 +40,8 @@
 
 #include <map>
 
+typedef struct pdal_stage pdal_stage_t;
+
 namespace pdal
 {
 
@@ -59,9 +61,10 @@ public:
         : m_interpDim(Dimension::Id::Z), m_interpDimString("Z"), m_min(0.0),
           m_max(0.0), m_clamp(false), m_rampFilename("/vsimem/colorramp.png"),
           m_invertRamp(false), m_stdDevThreshold(0.0), m_useMAD(false),
-          m_madMultiplier(1.4862)
+          m_madMultiplier(1.4862), m_rustStage(nullptr)
     {
     }
+    ~ColorinterpFilter() override;
     ColorinterpFilter& operator=(const ColorinterpFilter&) = delete;
     ColorinterpFilter(const ColorinterpFilter&) = delete;
     std::string getName() const override;
@@ -91,6 +94,8 @@ private:
     double m_stdDevThreshold;
     bool m_useMAD;
     double m_madMultiplier;
+    PointLayoutPtr m_layout;
+    pdal_stage_t* m_rustStage;
 };
 
 } // namespace pdal

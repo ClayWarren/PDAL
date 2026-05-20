@@ -36,6 +36,9 @@
 
 #include <algorithm>
 #include <pdal/private/gdal/Raster.hpp>
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
 
 namespace pdal
 {
@@ -51,7 +54,13 @@ std::string HagDemFilter::getName() const
     return s_info.name;
 }
 
-HagDemFilter::HagDemFilter() {}
+HagDemFilter::HagDemFilter() : m_rustStage(nullptr) {}
+
+HagDemFilter::~HagDemFilter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 void HagDemFilter::addArgs(ProgramArgs& args)
 {
@@ -78,6 +87,7 @@ void HagDemFilter::addArgs(ProgramArgs& args)
 void HagDemFilter::addDimensions(PointLayoutPtr layout)
 {
     layout->registerDim(Dimension::Id::HeightAboveGround);
+    m_layout = layout;
 }
 
 void HagDemFilter::ready(PointTableRef table)
@@ -106,6 +116,15 @@ void HagDemFilter::ready(PointTableRef table)
             << "Unable to open raster " << m_rasterName << '\n';
         throwError(m_raster->errorMsg());
     }
+
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_hag_dem(
+        m_rasterName.c_str(), m_band, m_zeroGround, m_minClamp, m_maxClamp,
+        m_noDataHeight, m_class);
+    if (!m_rustStage)
+        rust_view_converter::throwLastError(
+            "Unable to create Rust HAG DEM stage.");
 }
 
 void HagDemFilter::prepared(PointTableRef table)
@@ -116,63 +135,19 @@ void HagDemFilter::prepared(PointTableRef table)
 
 void HagDemFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
-    for (PointId i = 0; i < view.size(); ++i)
-    {
-        point.setPointId(i);
-        processOne(point);
-    }
+    rust_view_converter::runInPlace(m_rustStage, view);
 }
 
 bool HagDemFilter::processOne(PointRef& point)
 {
-    using namespace pdal::Dimension;
-    static std::vector<double> data;
-    static std::array<double, 2> pix;
-
-    double x = point.getFieldAs<double>(Id::X);
-    double y = point.getFieldAs<double>(Id::Y);
-    double val;
-    double hag;
-
-    if (m_zeroGround)
-    {
-        if (point.getFieldAs<uint8_t>(Id::Classification) == m_class)
-        {
-            point.setField(Dimension::Id::HeightAboveGround, 0);
-            return true;
-        }
-    }
-
-    // If raster has a point at X, Y of pointcloud point, use it.
-    // Otherwise the HAG value is not set.
-    gdal::GDALError readStatus = m_raster->read(x, y, data, pix);
-    if (readStatus == gdal::GDALError::None)
-    {
-        double z = point.getFieldAs<double>(Id::Z);
-        val = data[m_band - 1];
-        hag = z - val;
-
-        if (val == m_bandNoData)
-            hag = m_noDataHeight;
-
-        else if (hag < m_minClamp)
-            hag = m_minClamp;
-
-        else if (hag > m_maxClamp)
-            hag = m_maxClamp;
-    }
-    else if (readStatus == gdal::GDALError::NoData)
-    {
-        hag = m_noDataHeight;
-    }
-    else
-    {
-        // skip any other errors
-        return true;
-    }
-
-    point.setField(Dimension::Id::HeightAboveGround, hag);
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust HAG DEM stage failed.");
+    pdal_stage_reset(m_rustStage);
     return true;
 }
 

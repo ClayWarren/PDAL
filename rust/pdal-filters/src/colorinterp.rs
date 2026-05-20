@@ -35,8 +35,11 @@ impl ColorinterpFilter {
         if self.red_band.is_empty() {
             gdal::register_drivers();
             let raster = Raster::open(&self.ramp).map_err(StageError)?;
-            let width = 256;
-            let height = 1;
+            let width = raster.width().max(0) as usize;
+            let height = raster.height().max(0) as usize;
+            if width == 0 || height == 0 {
+                return Err(StageError("Color ramp has no pixels.".to_string()));
+            }
 
             self.red_band = vec![0.0; width * height];
             self.green_band = vec![0.0; width * height];
@@ -94,28 +97,16 @@ impl Streamable for ColorinterpFilter {
 
         let factor = (v - self.min) / (self.max - self.min);
         let img_width = self.red_band.len();
-        let mut position = (factor * (img_width as f64 - 1.0)).floor() as usize;
+        let mut position = (factor * img_width as f64).floor() as usize;
         position = position.min(img_width - 1);
 
         if self.invert {
             position = (img_width - 1) - position;
         }
 
-        view.set_f64(
-            idx,
-            &DimId::Other("Red".to_string()),
-            self.red_band[position],
-        );
-        view.set_f64(
-            idx,
-            &DimId::Other("Green".to_string()),
-            self.green_band[position],
-        );
-        view.set_f64(
-            idx,
-            &DimId::Other("Blue".to_string()),
-            self.blue_band[position],
-        );
+        view.set_f64(idx, &DimId::Red, self.red_band[position]);
+        view.set_f64(idx, &DimId::Green, self.green_band[position]);
+        view.set_f64(idx, &DimId::Blue, self.blue_band[position]);
 
         true
     }
