@@ -15,6 +15,7 @@ use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
+use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hagnn::HagNnFilter;
@@ -329,11 +330,42 @@ pub unsafe extern "C" fn pdal_stage_create_separatescanline(groupby: u64) -> *mu
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a geomdistance filter stage.
+///
+/// `wkt` is the candidate geometry; `ring` demotes polygons to their boundary
+/// so distances measure against the polygon's edge.
+///
+/// # Safety
+///
+/// `wkt` and `dim_name` must be valid NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_geomdistance(
+    wkt: *const c_char,
+    dim_name: *const c_char,
+    ring: bool,
+) -> *mut StageWrapper {
+    if wkt.is_null() || dim_name.is_null() {
+        set_last_error("null argument to pdal_stage_create_geomdistance");
+        return std::ptr::null_mut();
+    }
+    let wkt = CStr::from_ptr(wkt).to_string_lossy().into_owned();
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+    match GeomDistanceFilter::new(&wkt, &dim_name, ring) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Create a groupby filter stage.
 ///
 /// # Safety
 ///
-/// `dim_name` must be a valid NUL-terminated C-string.
+/// `dim_name` must be a valid NUL-terminated C string.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_groupby(dim_name: *const c_char) -> *mut StageWrapper {
     if dim_name.is_null() {

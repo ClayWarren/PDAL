@@ -373,7 +373,7 @@ pdal_metadata_node_t* pdal_expressionstats_metadata(
 // GDAL/PROJ Family Additions
 pdal_stage_t* pdal_stage_create_h3(uint64_t resolution);
 pdal_stage_t* pdal_stage_create_reprojection(const char* out_srs, const char* in_srs, bool error_on_failure);
-pdal_stage_t* pdal_stage_create_geomdistance(const char* wkt, const char* dim_name);
+pdal_stage_t* pdal_stage_create_geomdistance(const char* wkt, const char* dim_name, bool ring);
 pdal_stage_t* pdal_stage_create_overlay(const char* dim_name, const char* datasource, const char* column);
 pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
 pdal_stage_t* pdal_stage_create_projpipeline(const char* out_srs, const char* coord_op, bool reverse);

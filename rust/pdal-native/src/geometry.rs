@@ -32,6 +32,19 @@ impl Geometry {
             false
         }
     }
+
+    /// Return the geometry's boundary (PDAL's `Geometry::getRing`). For a
+    /// `Polygon`, the boundary is the closed line of its rings, so distances
+    /// measure against the edge rather than the polygon's interior.
+    pub fn boundary(&self) -> Result<Self, String> {
+        let boundary = self
+            .geos_geom
+            .boundary()
+            .map_err(|err| format!("boundary failed: {err}"))?;
+        Ok(Self {
+            geos_geom: boundary,
+        })
+    }
 }
 
 pub fn version() -> String {
@@ -74,5 +87,15 @@ mod tests {
     #[test]
     fn version_reports_geos() {
         assert!(!version().is_empty());
+    }
+
+    #[test]
+    fn polygon_boundary_makes_interior_points_have_a_distance() {
+        let polygon = Geometry::from_wkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+        // A point at the center has zero distance to the polygon but
+        // ~5 units to its boundary line.
+        assert_eq!(polygon.distance(5.0, 5.0, 0.0).unwrap(), 0.0);
+        let ring = polygon.boundary().unwrap();
+        assert_eq!(ring.distance(5.0, 5.0, 0.0).unwrap(), 5.0);
     }
 }

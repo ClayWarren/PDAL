@@ -46,6 +46,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include <pdal_capi.h>
+
+#include "private/RustViewConverter.hpp"
+
 namespace pdal
 {
 
@@ -120,12 +124,19 @@ void GeomDistanceFilter::ready(PointTableRef table)
 
 void GeomDistanceFilter::filter(PointView& view)
 {
-    PointRef point = view.point(0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
+    // ready() has already resolved OGR inputs and optional ring demotion.
+    std::string wkt = m_args->m_geometry.wkt();
+    pdal_stage_t* stage = pdal_stage_create_geomdistance(
+        wkt.c_str(), m_args->m_dimName.c_str(), false);
+    if (!stage)
     {
-        point.setPointId(idx);
-        processOne(point);
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(std::string("filters.geomdistance: ") + message);
+        throwError("Failed to create Rust geomdistance stage.");
     }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 bool GeomDistanceFilter::processOne(PointRef& point)

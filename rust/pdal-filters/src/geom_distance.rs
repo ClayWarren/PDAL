@@ -10,8 +10,14 @@ pub struct GeomDistanceFilter {
 }
 
 impl GeomDistanceFilter {
-    pub fn new(wkt: &str, dim_name: &str) -> Result<Self, StageError> {
-        let geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
+    pub fn new(wkt: &str, dim_name: &str, ring: bool) -> Result<Self, StageError> {
+        let mut geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
+        if ring {
+            // Match PDAL's `ring` option: demote polygons to their boundary so
+            // distance measures against the polygon's edge rather than its
+            // interior.
+            geometry = geometry.boundary().map_err(StageError)?;
+        }
         Ok(GeomDistanceFilter {
             geometry,
             dim_name: dim_name.to_string(),
