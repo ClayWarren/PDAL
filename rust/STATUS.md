@@ -43,7 +43,7 @@ Status definitions:
 | QFIT reader | in progress | Deterministic NASA ATM QFIT binary path is covered. |
 | SBET/SMRMSG I/O | in progress | SBET read/write and SMRMSG read coverage exist for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, SRS extraction, and compression/decompression. Keep parity tests honest before broad claims. |
-| COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path. COPC hierarchy traversal, bounds/resolution queries, remote reads, and writer behavior are deferred. |
+| COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits prune hierarchy depth before tile reads; bounds and origin filtering are applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles. Hierarchy bounds pruning, reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered slice. |
 | TerraSolid reader | in progress | Deterministic TerraSolid format 2 fixture is covered. `.bin` is not inferred because it conflicts with FBI. |

@@ -259,7 +259,7 @@ pub unsafe extern "C" fn pdal_reader_create_stac(ops: *const Options) -> *mut Re
 #[no_mangle]
 pub unsafe extern "C" fn pdal_reader_create_copc(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
-        let reader = Box::new(pdal_io::las::LasReader::new(options));
+        let reader = Box::new(pdal_io::copc::CopcReader::new(options));
         Box::into_raw(Box::new(ReaderHandle { reader }))
     } else {
         std::ptr::null_mut()
