@@ -319,6 +319,9 @@ pub(crate) fn dim_id_from_name(name: &str) -> DimId {
         "OptimalRadius" => DimId::OptimalRadius,
         "H3" => DimId::H3,
         "GpsTime" => DimId::GpsTime,
+        "Red" => DimId::Red,
+        "Green" => DimId::Green,
+        "Blue" => DimId::Blue,
         other => DimId::Other(other.to_string()),
     }
 }

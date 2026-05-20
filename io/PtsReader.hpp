@@ -34,9 +34,8 @@
 
 #pragma once
 
-#include <istream>
-
 #include <pdal/Reader.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -44,7 +43,8 @@ namespace pdal
 class PDAL_EXPORT PtsReader : public Reader
 {
 public:
-    PtsReader() : m_separator(' '), m_PointCount(0), m_istream(nullptr) {}
+    PtsReader() {}
+    ~PtsReader() override;
     std::string getName() const override;
 
 private:
@@ -89,11 +89,9 @@ private:
     void done(PointTableRef table) override;
 
 private:
-    char m_separator;
-    point_count_t m_PointCount;
-    std::istream* m_istream;
-    StringList m_dimNames;
     Dimension::IdList m_dims;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
 };
 
 } // namespace pdal

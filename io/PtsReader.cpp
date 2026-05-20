@@ -47,6 +47,31 @@ static StaticPluginInfo const s_info{"readers.pts",
 
 CREATE_STATIC_STAGE(PtsReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+PtsReader::~PtsReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 std::string PtsReader::getName() const
 {
     return s_info.name;
@@ -54,139 +79,73 @@ std::string PtsReader::getName() const
 
 void PtsReader::initialize(PointTableRef table)
 {
-    m_istream = Utils::openFile(m_filename);
-    if (!m_istream)
-        throwError("Unable to open file '" + m_filename + "'.");
-
-    std::string buf;
-    std::getline(*m_istream, buf);
-
-    // Very first line is point count
-    Utils::trim(buf);
-    auto res = Utils::fromString(buf, m_PointCount);
-    if (!res)
-        throwError("Unable to read expected point count at top of the file '" +
-                   m_filename + "': " + res.what());
-    // Peek second line to determine dimensions to add.
-    // Expect points in the formats:
-    //      X Y Z,
-    //      X Y Z Intensity,
-    //      X Y Z Intensity R G B
-    std::getline(*m_istream, buf);
-    StringList fields = Utils::split2(buf, m_separator);
-    switch (fields.size())
+    if (m_rustView)
     {
-    case 3:
-        m_dims.push_back(Dimension::Id::X);
-        m_dims.push_back(Dimension::Id::Y);
-        m_dims.push_back(Dimension::Id::Z);
-        break;
-    case 4:
-        m_dims.push_back(Dimension::Id::X);
-        m_dims.push_back(Dimension::Id::Y);
-        m_dims.push_back(Dimension::Id::Z);
-        m_dims.push_back(Dimension::Id::Intensity);
-        break;
-    case 7:
-        m_dims.push_back(Dimension::Id::X);
-        m_dims.push_back(Dimension::Id::Y);
-        m_dims.push_back(Dimension::Id::Z);
-        m_dims.push_back(Dimension::Id::Intensity);
-        m_dims.push_back(Dimension::Id::Red);
-        m_dims.push_back(Dimension::Id::Green);
-        m_dims.push_back(Dimension::Id::Blue);
-        break;
-    default:
-        throwError("Invalid number of fields for the first point in file '" +
-                   m_filename + "'.");
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_rustIndex = 0;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_pts(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PTS reader.");
     }
 
-    Utils::closeFile(m_istream);
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust PTS reader failed.");
 }
 
 void PtsReader::addDimensions(PointLayoutPtr layout)
 {
-    layout->registerDims(m_dims);
+    m_dims.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
+    {
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Id id =
+            layout->registerOrAssignDim(name, Dimension::Type::Double);
+        m_dims.push_back(id);
+    }
 }
 
 void PtsReader::ready(PointTableRef table)
 {
-    m_istream = Utils::openFile(m_filename);
-    if (!m_istream)
-        throwError("Unable to open file '" + m_filename + "'.");
-
-    // Skip header line.
-    std::string buf;
-    std::getline(*m_istream, buf);
+    m_rustIndex = 0;
 }
 
 point_count_t PtsReader::read(PointViewPtr view, point_count_t numPts)
 {
-    PointId idx = view->size();
-
     point_count_t cnt = 0;
-    size_t line = 1;
-
-    // Continue reading while count less than max points and count less than
-    // the expected point count.
-    while (m_istream->good() && cnt < numPts && cnt < m_PointCount)
+    while (cnt < numPts && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        std::string buf;
-        StringList fields;
-
-        std::getline(*m_istream, buf);
-        line++;
-        if (buf.empty())
-            continue;
-
-        fields = Utils::split2(buf, m_separator);
-        if (fields.size() != m_dims.size())
+        PointId outIdx = view->size();
+        view->point(outIdx);
+        for (Dimension::Id dim : m_dims)
         {
-            log()->get(LogLevel::Error)
-                << "Line " << line << " in '" << m_filename << "' contains "
-                << fields.size() << " fields when " << m_dims.size()
-                << " were expected.  "
-                   "Ignoring."
-                << '\n';
-            continue;
-        }
-
-        double d;
-        for (size_t i = 0; i < fields.size(); ++i)
-        {
-            if (!Utils::fromString(fields[i], d))
-            {
-                log()->get(LogLevel::Error)
-                    << "Can't convert "
-                       "field '"
-                    << fields[i] << "' to numeric value on line " << line
-                    << " in '" << m_filename << "'.  Setting to 0." << '\n';
-                d = 0;
-            }
-            if (i ==
-                3) // Intensity field in PTS is -2048 to 2047, we map to 0 4095
-            {
-                d += 2048;
-            }
-            view->setField(m_dims[i], idx, d);
+            view->setField(
+                dim, outIdx,
+                pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                        view->layout()->dimName(dim).c_str()));
         }
         cnt++;
-        idx++;
-    }
-
-    if (cnt < m_PointCount)
-    {
-        log()->get(LogLevel::Warning)
-            << "Expected " << m_PointCount << " points but only " << cnt
-            << " were found." << '\n';
+        m_rustIndex++;
     }
 
     return cnt;
 }
 
-void PtsReader::done(PointTableRef table)
-{
-    Utils::closeFile(m_istream);
-}
+void PtsReader::done(PointTableRef table) {}
 
 } // namespace pdal
