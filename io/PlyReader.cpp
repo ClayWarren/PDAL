@@ -34,11 +34,8 @@
 
 #include "PlyReader.hpp"
 
-#include <sstream>
-
-#include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/util/IStream.hpp>
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
@@ -50,219 +47,60 @@ static StaticPluginInfo const s_info{"readers.ply",
 
 CREATE_STATIC_STAGE(PlyReader, s_info)
 
-PlyReader::PlyReader() : m_vertexElt(nullptr) {}
-
-std::string PlyReader::readLine()
+namespace
 {
-    m_line.clear();
-    if (m_lines.size())
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+Dimension::Type cppType(int type)
+{
+    using Dimension::Type;
+    switch (type)
     {
-        m_line = m_lines.top();
-        m_lines.pop();
-    }
-    else
-    {
-        do
-        {
-            std::getline(*m_stream, m_line);
-        } while (m_line.empty() && m_stream->good());
-    }
-    Utils::trimTrailing(m_line);
-    m_linePos =
-        Utils::extract(m_line, 0, [](char c) { return !std::isspace(c); });
-    return std::string(m_line, 0, m_linePos);
-}
-
-void PlyReader::pushLine()
-{
-    m_lines.push(m_line);
-}
-
-std::string PlyReader::nextWord()
-{
-    std::string s;
-    std::string::size_type cnt = Utils::extractSpaces(m_line, m_linePos);
-    m_linePos += cnt;
-    if (m_linePos == m_line.size())
-        return s;
-
-    cnt = Utils::extract(m_line, m_linePos,
-                         [](char c) { return !std::isspace(c); });
-    s = std::string(m_line, m_linePos, cnt);
-    m_linePos += cnt;
-    return s;
-}
-
-void PlyReader::extractMagic()
-{
-    std::string first = readLine();
-    if (first != "ply")
-        throwError("File isn't a PLY file.  'ply' not found.");
-    if (m_linePos != m_line.size())
-        throwError("Text found following 'ply' keyword.");
-}
-
-void PlyReader::extractEnd()
-{
-    std::string first = readLine();
-    if (first != "end_header")
-        throwError("'end_header' expected but found line beginning with '" +
-                   first + "' instead.");
-    if (m_linePos != m_line.size())
-        throwError("Text found following 'end_header' keyword.");
-}
-
-void PlyReader::extractFormat()
-{
-    std::string word = readLine();
-    if (word != "format")
-        throwError("Expected format line not found in PLY file.");
-
-    word = nextWord();
-    if (word == "ascii")
-        m_format = Format::Ascii;
-    else if (word == "binary_big_endian")
-        m_format = Format::BinaryBe;
-    else if (word == "binary_little_endian")
-        m_format = Format::BinaryLe;
-    else
-        throwError("Unrecognized PLY format: '" + word + "'.");
-
-    word = nextWord();
-    if (word != "1.0")
-        throwError("Unsupported PLY version: '" + word + "'.");
-}
-
-Dimension::Type PlyReader::getType(const std::string& name)
-{
-    static std::map<std::string, Dimension::Type> types = {
-        {"int8", Dimension::Type::Signed8},
-        {"uint8", Dimension::Type::Unsigned8},
-        {"int16", Dimension::Type::Signed16},
-        {"uint16", Dimension::Type::Unsigned16},
-        {"int32", Dimension::Type::Signed32},
-        {"uint32", Dimension::Type::Unsigned32},
-        {"float32", Dimension::Type::Float},
-        {"float64", Dimension::Type::Double},
-
-        {"char", Dimension::Type::Signed8},
-        {"uchar", Dimension::Type::Unsigned8},
-        {"short", Dimension::Type::Signed16},
-        {"ushort", Dimension::Type::Unsigned16},
-        {"int", Dimension::Type::Signed32},
-        {"uint", Dimension::Type::Unsigned32},
-        {"float", Dimension::Type::Float},
-        {"double", Dimension::Type::Double}};
-
-    try
-    {
-        return types.at(name);
-    }
-    catch (std::out_of_range&)
-    {
-    }
-    return Dimension::Type::None;
-}
-
-void PlyReader::extractProperty(Element& element)
-{
-    std::string word = nextWord();
-    Dimension::Type type = getType(word);
-
-    if (type != Dimension::Type::None)
-    {
-        std::string name = nextWord();
-        if (name.empty())
-            throwError("No name for property of element '" + element.m_name +
-                       "'.");
-        element.m_properties.push_back(
-            std::unique_ptr<Property>(new SimpleProperty(name, type)));
-    }
-    else if (word == "list")
-    {
-        if (element.m_name == "vertex")
-            throwError("List properties are not supported for the 'vertex' "
-                       "element.");
-
-        word = nextWord();
-        Dimension::Type countType = getType(word);
-        if (countType == Dimension::Type::None)
-            throwError("No valid count type for list property of element '" +
-                       element.m_name + "'.");
-        word = nextWord();
-        Dimension::Type listType = getType(word);
-        if (listType == Dimension::Type::None)
-            throwError("No valid list type for list property of element '" +
-                       element.m_name + "'.");
-        std::string name = nextWord();
-        if (name.empty())
-            throwError("No name for property of element '" + element.m_name +
-                       "'.");
-        element.m_properties.push_back(std::unique_ptr<Property>(
-            new ListProperty(name, countType, listType)));
-    }
-    else
-        throwError("Invalid property type '" + word + "'.");
-}
-
-void PlyReader::extractProperties(Element& element)
-{
-    while (true)
-    {
-        std::string word = readLine();
-        if (word == "comment" || word == "obj_info")
-            continue;
-        else if (word == "property")
-            extractProperty(element);
-        else
-        {
-            pushLine();
-            break;
-        }
+    case 0:
+        return Type::Unsigned8;
+    case 1:
+        return Type::Unsigned16;
+    case 2:
+        return Type::Unsigned32;
+    case 3:
+        return Type::Unsigned64;
+    case 4:
+        return Type::Signed8;
+    case 5:
+        return Type::Signed16;
+    case 6:
+        return Type::Signed32;
+    case 7:
+        return Type::Signed64;
+    case 8:
+        return Type::Float;
+    case 9:
+    default:
+        return Type::Double;
     }
 }
 
-bool PlyReader::extractElement()
+void throwLastRustError(const std::string& fallback)
 {
-    std::string word = readLine();
-    if (word == "comment" || word == "obj_info")
-        return true;
-    else if (word == "end_header")
-    {
-        pushLine();
-        return false;
-    }
-    else if (word == "element")
-    {
-        std::string name = nextWord();
-        if (name.empty())
-            throwError("Missing element name.");
-        long count = std::stol(nextWord());
-        if (count < 0)
-            throwError("Invalid count for element '" + name + "'.");
-        m_elements.emplace_back(name, count);
-        extractProperties(m_elements.back());
-        return true;
-    }
-    throwError("Invalid keyword '" + word + "' when expecting an element.");
-    return false; // quiet compiler
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
 }
 
-void PlyReader::extractHeader()
-{
-    m_elements.clear();
-    extractMagic();
-    extractFormat();
-    while (extractElement())
-        ;
-    extractEnd();
-    m_dataPos = m_stream->tellg();
+} // namespace
 
-    for (Element& elt : m_elements)
-        if (elt.m_name == "vertex")
-            m_vertexElt = &elt;
-    if (!m_vertexElt)
-        throwError("Can't read PLY file without a 'vertex' element.");
+PlyReader::PlyReader() {}
+
+PlyReader::~PlyReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 std::string PlyReader::getName() const
@@ -274,207 +112,139 @@ QuickInfo PlyReader::inspect()
 {
     QuickInfo qi;
 
-    PointTable t;
     initialize();
-    addDimensions(t.layout());
-    t.finalize();
 
-    if (m_vertexElt)
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        // Get quick info information from the vertex element (if initialised).
-        // We ignore the bounds since calculating that would require reading the
-        // entire file. We also ignore the spatial reference since we don't have
-        // that.
-
-        qi.m_valid = true;
-        qi.m_pointCount = static_cast<point_count_t>(m_vertexElt->m_count);
-        for (auto& prop : m_vertexElt->m_properties)
-            qi.m_dimNames.push_back(prop->m_name);
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        qi.m_dimNames.push_back(Utils::tolower(rawName));
+        pdal_string_free(rawName);
     }
-
-    // We have to read the points to actually get the bounds
-    PointViewPtr v(new PointView(t));
-    ready(t);
-    read(v, qi.m_pointCount);
-    done(t);
-    for (const PointRef& p : *v)
-    {
-        float x = p.getFieldAs<float>(Dimension::Id::X);
-        float y = p.getFieldAs<float>(Dimension::Id::Y);
-        float z = p.getFieldAs<float>(Dimension::Id::Z);
-        qi.m_bounds.grow(x, y, z);
-    }
+    qi.m_pointCount = pdal_point_view_length(m_rustView);
+    qi.m_valid = true;
 
     return qi;
 }
 
 void PlyReader::initialize()
 {
-    m_stream = Utils::openFile(m_filename, true);
-    if (!m_stream)
-        throwError("Couldn't open '" + m_filename + "'.");
-    try
+    if (m_filename.empty())
+        throwError("Can't read PLY file without filename.");
+
+    if (m_rustView)
     {
-        extractHeader();
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
-    catch (...)
+    m_rustIndex = 0;
+    m_meshCopied = false;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_ply(options);
+    if (!reader)
     {
-        Utils::closeFile(m_stream);
-        m_stream = nullptr;
-        throw;
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PLY reader.");
     }
-    Utils::closeFile(m_stream);
-    m_stream = nullptr;
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust PLY reader failed.");
 }
 
 void PlyReader::addDimensions(PointLayoutPtr layout)
 {
-    // Override XYZ to doubles.
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
-
-    for (auto& elt : m_elements)
+    m_dims.clear();
+    m_dimNames.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        if (elt.m_name == "vertex")
-        {
-            for (auto& prop : elt.m_properties)
-            {
-                auto vprop = static_cast<SimpleProperty*>(prop.get());
-                layout->registerOrAssignDim(vprop->m_name, vprop->m_type);
-                vprop->setDim(
-                    layout->registerOrAssignDim(vprop->m_name, vprop->m_type));
-            }
-            return;
-        }
-    }
-    throwError("No 'vertex' element in header.");
-}
-
-bool PlyReader::readProperty(Property* prop, PointRef& point)
-{
-    if (!m_stream->good())
-        return false;
-    prop->read(m_stream, m_format, point);
-    return true;
-}
-
-void PlyReader::SimpleProperty::read(std::istream* stream,
-                                     PlyReader::Format format, PointRef& point)
-{
-    if (format == Format::Ascii)
-    {
-        double d;
-        *stream >> d;
-        point.setField(m_dim, d);
-    }
-    else if (format == Format::BinaryLe)
-    {
-        ILeStream in(stream);
-        Everything e = Utils::extractDim(in, m_type);
-        point.setField(m_dim, m_type, &e);
-    }
-    else if (format == Format::BinaryBe)
-    {
-        IBeStream in(stream);
-        Everything e = Utils::extractDim(in, m_type);
-        point.setField(m_dim, m_type, &e);
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Type type =
+            cppType(pdal_point_view_dim_type(m_rustView, idx));
+        Dimension::Id id = layout->registerOrAssignDim(name, type);
+        m_dims.push_back(id);
+        m_dimNames.push_back(name);
     }
 }
 
-// Right now we don't support list properties for point data.  We just
-// read the data and throw it away.
-void PlyReader::ListProperty::read(std::istream* stream,
-                                   PlyReader::Format format, PointRef& point)
+void PlyReader::ready(PointTableRef)
 {
-    if (format == Format::Ascii)
-    {
-        size_t cnt;
-        *stream >> cnt;
-
-        double d;
-        while (cnt--)
-            *stream >> d;
-    }
-    else if (format == Format::BinaryLe)
-    {
-        ILeStream istream(stream);
-        Everything e = Utils::extractDim(istream, m_countType);
-        size_t cnt = (size_t)Utils::toDouble(e, m_countType);
-        cnt *= Dimension::size(m_listType);
-        istream.seek(cnt, std::ios_base::cur);
-    }
-    else if (format == Format::BinaryBe)
-    {
-        IBeStream istream(stream);
-        Everything e = Utils::extractDim(istream, m_countType);
-        size_t cnt = (size_t)Utils::toDouble(e, m_countType);
-        cnt *= Dimension::size(m_listType);
-        istream.seek(cnt, std::ios_base::cur);
-    }
+    m_rustIndex = 0;
+    m_meshCopied = false;
 }
 
-void PlyReader::readElement(Element& elt, PointRef& point)
+void PlyReader::copyPoint(PointRef& point, PointId rustIndex)
 {
-    for (auto& prop : elt.m_properties)
-        if (!readProperty(prop.get(), point))
-            throwError("Error reading data for point/element " +
-                       std::to_string(point.pointId()) + ".");
+    for (size_t dimIdx = 0; dimIdx < m_dims.size(); ++dimIdx)
+        point.setField(m_dims[dimIdx],
+                       pdal_point_view_get_f64(m_rustView, rustIndex,
+                                               m_dimNames[dimIdx].c_str()));
 }
 
-void PlyReader::ready(PointTableRef table)
+void PlyReader::copyMesh(PointViewPtr view)
 {
-    m_stream = Utils::openFile(m_filename, true);
-    if (m_stream)
-        m_stream->seekg(m_dataPos);
-    for (Element& elt : m_elements)
-    {
-        if (&elt == m_vertexElt)
-            break;
+    if (m_meshCopied)
+        return;
 
-        // We read an element into point 0.  Since the element's properties
-        // weren't registered as dimensions, we'll try to write the data
-        // to a NULL dimension, which is a noop.
-        // This essentially just gets us to the vertex element.
-        // In binary mode, this is all silliness, since we should be able
-        // to seek right where we want to go, but in text mode, you've got
-        // to go through the data.
-        PointRef point(table, 0);
-        for (PointId idx = 0; idx < elt.m_count; ++idx)
-            readElement(elt, point);
+    uint64_t triangleCount = pdal_point_view_mesh_triangle_count(m_rustView);
+    if (!triangleCount)
+    {
+        m_meshCopied = true;
+        return;
     }
-    m_index = 0;
+
+    TriangularMesh* mesh = view->createMesh("ply");
+    if (!mesh)
+        throwError("Failed to create mesh");
+
+    for (uint64_t idx = 0; idx < triangleCount; ++idx)
+    {
+        uint64_t a = 0;
+        uint64_t b = 0;
+        uint64_t c = 0;
+        if (!pdal_point_view_mesh_triangle(m_rustView, idx, &a, &b, &c))
+            throwError("Rust PLY reader failed to return a mesh triangle.");
+        mesh->add(a, b, c);
+    }
+    m_meshCopied = true;
 }
 
 bool PlyReader::processOne(PointRef& point)
 {
-    if (m_index < m_vertexElt->m_count)
-    {
-        readElement(*m_vertexElt, point);
-        m_index++;
-        return true;
-    }
-    return false;
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
+        return false;
+
+    copyPoint(point, m_rustIndex);
+    ++m_rustIndex;
+    return true;
 }
 
-// We're just reading the vertex element here.
 point_count_t PlyReader::read(PointViewPtr view, point_count_t num)
 {
-    point_count_t cnt(0);
-
-    PointRef point(view->point(0));
-    for (PointId idx = 0; idx < m_vertexElt->m_count && idx < num; ++idx)
+    point_count_t cnt = 0;
+    while (cnt < num && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        point.setPointId(idx);
-        processOne(point);
-        cnt++;
+        PointRef point(*view, view->size());
+        copyPoint(point, m_rustIndex);
+        ++m_rustIndex;
+        ++cnt;
     }
+    copyMesh(view);
     return cnt;
 }
 
-void PlyReader::done(PointTableRef table)
-{
-    Utils::closeFile(m_stream);
-}
+void PlyReader::done(PointTableRef) {}
 
 } // namespace pdal

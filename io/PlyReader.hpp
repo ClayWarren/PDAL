@@ -34,13 +34,14 @@
 
 #pragma once
 
-#include <stack>
 #include <string>
 
 #include <pdal/Dimension.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/Streamable.hpp>
+
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -50,85 +51,10 @@ class PDAL_EXPORT PlyReader : public Reader, public Streamable
 public:
     std::string getName() const override;
 
-    typedef std::map<std::string, Dimension::Id> DimensionMap;
-
     PlyReader();
+    ~PlyReader() override;
 
 private:
-    enum class Format
-    {
-        Ascii,
-        BinaryLe,
-        BinaryBe
-    };
-
-    struct Property
-    {
-        Property(const std::string& name) : m_name(name) {}
-        virtual ~Property() {}
-
-        std::string m_name;
-
-        virtual void setDim(Dimension::Id id) {}
-        virtual void read(std::istream* stream, PlyReader::Format format,
-                          PointRef& point) = 0;
-    };
-
-    struct SimpleProperty : public Property
-    {
-        SimpleProperty(const std::string& name, Dimension::Type type)
-            : Property(name), m_type(type), m_dim(Dimension::Id::Unknown)
-        {
-        }
-
-        Dimension::Type m_type;
-        Dimension::Id m_dim;
-
-        void read(std::istream* stream, PlyReader::Format format,
-                  PointRef& point) override;
-        void setDim(Dimension::Id id) override
-        {
-            m_dim = id;
-        }
-    };
-
-    struct ListProperty : public Property
-    {
-        ListProperty(const std::string& name, Dimension::Type countType,
-                     Dimension::Type listType)
-            : Property(name), m_countType(countType), m_listType(listType)
-        {
-        }
-
-        Dimension::Type m_countType;
-        Dimension::Type m_listType;
-
-        void read(std::istream* stream, PlyReader::Format format,
-                  PointRef& point) override;
-    };
-
-    struct Element
-    {
-        Element(const std::string name, size_t count)
-            : m_name(name), m_count(count)
-        {
-        }
-
-        std::string m_name;
-        size_t m_count;
-        std::vector<std::unique_ptr<Property>> m_properties;
-    };
-
-    Format m_format;
-    std::string m_line;
-    std::string::size_type m_linePos;
-    std::stack<std::string> m_lines;
-    std::istream* m_stream;
-    std::istream::pos_type m_dataPos;
-    std::vector<Element> m_elements;
-    PointId m_index;
-    Element* m_vertexElt;
-
     QuickInfo inspect() override;
     void initialize() override;
     void addDimensions(PointLayoutPtr layout) override;
@@ -137,19 +63,14 @@ private:
     void done(PointTableRef table) override;
     bool processOne(PointRef& point) override;
 
-    std::string readLine();
-    void pushLine();
-    std::string nextWord();
-    void extractMagic();
-    void extractEnd();
-    void extractFormat();
-    Dimension::Type getType(const std::string& name);
-    void extractProperty(Element& element);
-    void extractProperties(Element& element);
-    bool extractElement();
-    void extractHeader();
-    void readElement(Element& elt, PointRef& point);
-    bool readProperty(Property* prop, PointRef& point);
+    void copyPoint(PointRef& point, PointId rustIndex);
+    void copyMesh(PointViewPtr view);
+
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_dims;
+    StringList m_dimNames;
+    PointId m_rustIndex = 0;
+    bool m_meshCopied = false;
 };
 
 } // namespace pdal
