@@ -20,17 +20,35 @@ impl App {
         }
 
         let mut positional: Vec<&str> = Vec::new();
+        let mut input: Option<&str> = None;
+        let mut output: Option<&str> = None;
         let mut length = 1000.0_f64;
         let mut origin_x = f64::NAN;
         let mut origin_y = f64::NAN;
         let mut buffer = 0.0_f64;
-        for arg in &self.command_args {
-            if let Some(rest) = arg.strip_prefix("--") {
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
+            if arg == "--input" || arg == "-i" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an input path");
+                    return 1;
+                };
+                input = Some(value);
+            } else if arg == "--output" || arg == "-o" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an output template");
+                    return 1;
+                };
+                output = Some(value);
+            } else if let Some(rest) = arg.strip_prefix("--") {
                 let (key, value) = match rest.split_once('=') {
                     Some(pair) => pair,
                     None => {
-                        eprintln!("Error: option '{arg}' must be in --key=value form");
-                        return 1;
+                        let Some(value) = args.next() else {
+                            eprintln!("Error: option '{arg}' requires a value");
+                            return 1;
+                        };
+                        (rest, value.as_str())
                     }
                 };
                 let target = match key {
@@ -50,17 +68,30 @@ impl App {
                         return 1;
                     }
                 }
+            } else if input.is_none() {
+                input = Some(arg);
+            } else if output.is_none() {
+                output = Some(arg);
             } else {
                 positional.push(arg);
             }
         }
-        if positional.len() != 2 {
+        if input.is_none() && !positional.is_empty() {
+            input = Some(positional.remove(0));
+        }
+        if output.is_none() && !positional.is_empty() {
+            output = Some(positional.remove(0));
+        }
+        if !positional.is_empty() {
             eprintln!("Error: tile expects an input path and an output template");
             return 1;
         }
+        let (Some(input), Some(output)) = (input, output) else {
+            eprintln!("Error: tile expects an input path and an output template");
+            return 1;
+        };
 
-        let (c_input, c_template) = match (CString::new(positional[0]), CString::new(positional[1]))
-        {
+        let (c_input, c_template) = match (CString::new(input), CString::new(output)) {
             (Ok(input), Ok(template)) => (input, template),
             _ => {
                 eprintln!("Error: a path contains an interior NUL byte");

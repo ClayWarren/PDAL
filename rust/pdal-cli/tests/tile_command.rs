@@ -101,6 +101,32 @@ fn tile_splits_a_file_into_a_grid() {
 }
 
 #[test]
+fn tile_supports_path_and_separated_numeric_options() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("pdal-rs-tile-options");
+    let template = temp.join("tile#.pcd");
+
+    let result = run_tile(&[
+        "--input",
+        input.to_str().unwrap(),
+        "--output",
+        template.to_str().unwrap(),
+        "--length",
+        "1000",
+        "--buffer",
+        "0",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs tile failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert!(tile_counts(&temp, "pcd", pcd_len).len() > 1);
+}
+
+#[test]
 fn tile_requires_a_hash_template() {
     let input = data_path("test/data/las/interesting.las");
     let temp = make_temp_dir("pdal-rs-tile-no-hash");
