@@ -208,6 +208,20 @@ pub unsafe extern "C" fn pdal_reader_create_fbi(ops: *const Options) -> *mut Rea
     }
 }
 
+/// Create a BpfReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_bpf(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::bpf::BpfReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Create a GdalReader from options.
 ///
 /// # Safety
@@ -308,6 +322,20 @@ pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut Wr
 pub unsafe extern "C" fn pdal_writer_create_fbi(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::fbi_writer::FbiWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a BpfWriter.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_bpf(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::bpf::BpfWriter::new(options));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()

@@ -421,6 +421,7 @@ pdal_reader_t* pdal_reader_create_smrmsg(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_optech(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_terrasolid(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_fbi(const pdal_options_t* ops);
+pdal_reader_t* pdal_reader_create_bpf(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_gdal(const pdal_options_t* ops);
 pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
 pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
@@ -438,6 +439,7 @@ char* pdal_delta(const char* path_a, const char* path_b);
 // Writer
 pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_fbi(const pdal_options_t* ops);
+pdal_writer_t* pdal_writer_create_bpf(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_pcd(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);
