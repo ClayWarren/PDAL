@@ -311,6 +311,11 @@ COVERED: dict[str, object] = {
         "float64",
     },
     "pdal_io_ilvis2_test": ALL,
+    "pdal_io_ilvis2_metadata_test": ALL,
+    "pdal_io_ilvis2_reader_metadata_test": {
+        "testValidMetadataFile",
+        "testNoMetadataFile",
+    },
     "pdal_io_optech_test": {"Header", "ReadingPoints", "Spatialreference"},
     "pdal_io_pcd_reader_test": ALL,
     "pdal_io_pcd_writer_test": ALL,
