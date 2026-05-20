@@ -179,6 +179,29 @@ pub fn base64_decode(value: &str) -> Vec<u8> {
     out
 }
 
+pub fn charbuf_seekpos(pos: i64, offset: i64, len: i64, for_output: bool) -> Option<i64> {
+    let adjusted = pos.checked_sub(offset)?;
+    if adjusted < 0 {
+        return None;
+    }
+    if for_output {
+        (adjusted <= len).then_some(adjusted)
+    } else {
+        (adjusted < len).then_some(adjusted)
+    }
+}
+
+pub fn charbuf_seekoff(off: i64, dir: u8, offset: i64, len: i64, current: i64) -> Option<i64> {
+    let target = match dir {
+        0 => off.checked_sub(offset)?,
+        1 => current.checked_add(off)?,
+        2 => len.checked_sub(off)?,
+        _ => return None,
+    };
+
+    (0..=len).contains(&target).then_some(target)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,5 +254,18 @@ mod tests {
         );
         assert_eq!(normalize_longitude(181.0), -179.0);
         assert_eq!(normalize_longitude(-181.0), 179.0);
+    }
+
+    #[test]
+    fn computes_charbuf_seek_positions() {
+        assert_eq!(charbuf_seekpos(3, 0, 5, false), Some(3));
+        assert_eq!(charbuf_seekpos(5, 0, 5, false), None);
+        assert_eq!(charbuf_seekpos(5, 0, 5, true), Some(5));
+        assert_eq!(charbuf_seekpos(12, 10, 5, true), Some(2));
+
+        assert_eq!(charbuf_seekoff(2, 0, 10, 5, 0), None);
+        assert_eq!(charbuf_seekoff(12, 0, 10, 5, 0), Some(2));
+        assert_eq!(charbuf_seekoff(1, 1, 10, 5, 3), Some(4));
+        assert_eq!(charbuf_seekoff(2, 2, 10, 5, 0), Some(3));
     }
 }

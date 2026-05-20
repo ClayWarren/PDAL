@@ -33,9 +33,26 @@
  ****************************************************************************/
 
 #include <pdal/util/Charbuf.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
+
+namespace
+{
+
+uint8_t seekdirId(std::ios_base::seekdir dir)
+{
+    if (dir == std::ios::beg)
+        return 0;
+    if (dir == std::ios::cur)
+        return 1;
+    if (dir == std::ios::end)
+        return 2;
+    return 255;
+}
+
+} // unnamed namespace
 
 void Charbuf::initialize(char* buf, size_t count, std::ios::pos_type bufOffset)
 {
@@ -48,22 +65,27 @@ void Charbuf::initialize(char* buf, size_t count, std::ios::pos_type bufOffset)
 std::ios::pos_type Charbuf::seekpos(std::ios::pos_type pos,
                                     std::ios_base::openmode which)
 {
-    pos -= m_bufOffset;
+    int64_t adjusted = pdal_charbuf_seekpos(
+        static_cast<std::streamoff>(pos),
+        static_cast<std::streamoff>(m_bufOffset), egptr() - eback(), false);
     if (which & std::ios_base::in)
     {
-        if (pos >= egptr() - eback())
+        if (adjusted < 0)
             return -1;
-        char* cpos = eback() + pos;
+        char* cpos = eback() + adjusted;
         setg(eback(), cpos, egptr());
     }
     if (which & std::ios_base::out)
     {
-        if (pos > epptr() - m_buf)
+        adjusted = pdal_charbuf_seekpos(
+            static_cast<std::streamoff>(pos),
+            static_cast<std::streamoff>(m_bufOffset), epptr() - m_buf, true);
+        if (adjusted < 0)
             return -1;
-        char* cpos = m_buf + pos;
+        char* cpos = m_buf + adjusted;
         setp(cpos, epptr());
     }
-    return pos;
+    return adjusted;
 }
 
 std::ios::pos_type Charbuf::seekoff(std::ios::off_type off,
@@ -71,46 +93,26 @@ std::ios::pos_type Charbuf::seekoff(std::ios::off_type off,
                                     std::ios_base::openmode which)
 {
     std::ios::pos_type pos;
-    char* cpos = nullptr;
+    const uint8_t dirId = seekdirId(dir);
     if (which & std::ios_base::in)
     {
-        switch (dir)
-        {
-        case std::ios::beg:
-            cpos = eback() + off - m_bufOffset;
-            break;
-        case std::ios::cur:
-            cpos = gptr() + off;
-            break;
-        case std::ios::end:
-            cpos = egptr() - off;
-            break;
-        default:
-            break; // Should never happen.
-        }
-        if (cpos < eback() || cpos > egptr())
+        int64_t adjusted = pdal_charbuf_seekoff(
+            off, dirId, static_cast<std::streamoff>(m_bufOffset),
+            egptr() - eback(), gptr() - eback());
+        if (adjusted < 0)
             return -1;
+        char* cpos = eback() + adjusted;
         setg(eback(), cpos, egptr());
         pos = cpos - eback();
     }
     if (which & std::ios_base::out)
     {
-        switch (dir)
-        {
-        case std::ios::beg:
-            cpos = m_buf + off - m_bufOffset;
-            break;
-        case std::ios::cur:
-            cpos = pptr() + off;
-            break;
-        case std::ios::end:
-            cpos = egptr() - off;
-            break;
-        default:
-            break; // Should never happen.
-        }
-        if (cpos < m_buf || cpos > epptr())
+        int64_t adjusted = pdal_charbuf_seekoff(
+            off, dirId, static_cast<std::streamoff>(m_bufOffset),
+            epptr() - m_buf, pptr() - m_buf);
+        if (adjusted < 0)
             return -1;
+        char* cpos = m_buf + adjusted;
         setp(cpos, epptr());
         pos = cpos - m_buf;
     }

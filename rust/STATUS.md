@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `747 / 927` individual C++ GoogleTest cases, or `80.58%`,
+Current checkpoint: `750 / 927` individual C++ GoogleTest cases, or `80.91%`,
 are validated against Rust-backed behavior.
 
 Counting rules:
@@ -88,6 +88,8 @@ Known mixed binaries:
 - `pdal_utils_test`: only `test_base64`, `blanks`, `replaceAll`,
   `escapeNonprinting`, and `escapeJSON` count. Other utility cases still test
   C++ templates, stream helpers, process helpers, or local formatting behavior.
+- `pdal_charbuf_test`: all 3 tests count; seek-position behavior routes through
+  Rust C ABI helpers while C++ keeps the `std::streambuf` pointer mechanics.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.

@@ -1,6 +1,7 @@
 use pdal_core::utils::{
-    base64_decode, base64_encode, escape_json, escape_nonprinting_bytes, looks_like_json,
-    normalize_longitude, replace_all, trim_leading, trim_trailing,
+    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, escape_json,
+    escape_nonprinting_bytes, looks_like_json, normalize_longitude, replace_all, trim_leading,
+    trim_trailing,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -112,6 +113,22 @@ pub unsafe extern "C" fn pdal_u8_array_free(ptr: *mut u8, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_charbuf_seekpos(pos: i64, offset: i64, len: i64, for_output: bool) -> i64 {
+    charbuf_seekpos(pos, offset, len, for_output).unwrap_or(-1)
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_charbuf_seekoff(
+    off: i64,
+    dir: u8,
+    offset: i64,
+    len: i64,
+    current: i64,
+) -> i64 {
+    charbuf_seekoff(off, dir, offset, len, current).unwrap_or(-1)
 }
 
 fn path_string(path: PathBuf) -> String {
