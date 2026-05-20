@@ -65,6 +65,22 @@ fn random_defaults_to_one_thousand_points() {
 }
 
 #[test]
+fn random_supports_output_and_separated_count_options() {
+    let temp = make_temp_dir("pdal-rs-random-options");
+    let output = temp.join("out.pcd");
+
+    let result = run_random(&["--output", output.to_str().unwrap(), "--count", "12"]);
+    assert!(
+        result.status.success(),
+        "pdal-rs random failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert_eq!(read_pcd(&output).len(), 12);
+}
+
+#[test]
 fn random_without_an_output_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("random")

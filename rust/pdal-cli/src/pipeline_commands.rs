@@ -711,7 +711,8 @@ impl App {
 
         let mut output: Option<&str> = None;
         let mut count: u64 = 1000;
-        for arg in &self.command_args {
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
             if let Some(value) = arg.strip_prefix("--count=") {
                 match value.parse::<u64>() {
                     Ok(parsed) => count = parsed,
@@ -719,6 +720,27 @@ impl App {
                         eprintln!("Error: --count must be a non-negative integer");
                         return 1;
                     }
+                }
+            } else if arg == "--count" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: --count requires a point count");
+                    return 1;
+                };
+                match value.parse::<u64>() {
+                    Ok(parsed) => count = parsed,
+                    Err(_) => {
+                        eprintln!("Error: --count must be a non-negative integer");
+                        return 1;
+                    }
+                }
+            } else if arg == "--output" || arg == "-o" {
+                let Some(path) = args.next() else {
+                    eprintln!("Error: {arg} requires an output path");
+                    return 1;
+                };
+                if output.replace(path).is_some() {
+                    eprintln!("Error: random expects a single output path");
+                    return 1;
                 }
             } else if arg.starts_with("--") {
                 eprintln!("Error: unknown option '{arg}' for random");
