@@ -634,6 +634,30 @@ fn stage_options_supports_json() {
         .any(|option| option["arg"] == "faces"));
 }
 
+#[test]
+fn stage_options_reports_scoped_ept_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("readers.ept")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"filename"));
+    assert!(args.contains(&"bounds"));
+    assert!(args.contains(&"resolution"));
+    assert!(args.contains(&"origin"));
+    assert!(args.contains(&"ignore_unreadable"));
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

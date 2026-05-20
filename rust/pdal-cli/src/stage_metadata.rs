@@ -139,9 +139,34 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
-        | "readers.terrasolid" | "readers.copc" | "readers.ept" | "readers.las" | "readers.laz" => {
-            vec![filename()]
-        }
+        | "readers.terrasolid" | "readers.las" | "readers.laz" => vec![filename()],
+        "readers.copc" => vec![
+            filename(),
+            option(
+                "bounds",
+                "Optional 2D or 3D bounds used to filter returned points.",
+                None,
+            ),
+        ],
+        "readers.ept" => vec![
+            filename(),
+            option(
+                "bounds",
+                "Optional 2D or 3D bounds used to filter returned points.",
+                None,
+            ),
+            option(
+                "resolution",
+                "Optional EPT hierarchy resolution limit.",
+                None,
+            ),
+            option("origin", "Optional EPT source origin id or name.", None),
+            option(
+                "ignore_unreadable",
+                "Skip unreadable EPT tiles instead of failing.",
+                Some(json!(false)),
+            ),
+        ],
         "readers.tindex" => vec![
             filename(),
             option(
