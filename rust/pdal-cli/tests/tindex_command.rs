@@ -2,6 +2,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use pdal_core::options::Options;
+use pdal_core::pipeline::Reader;
+use pdal_io::pcd::PcdReader;
+
 fn data_path(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -36,6 +40,17 @@ fn run_tindex_with_stdin(args: &[&str], stdin: &str) -> std::process::Output {
 
 fn run_installed_pdal(args: &[&str]) -> Option<std::process::Output> {
     Command::new("pdal").args(args).output().ok()
+}
+
+fn pcd_len(path: &Path) -> usize {
+    let mut options = Options::new();
+    options.add("filename", path.display());
+    PcdReader::new(&options)
+        .read()
+        .unwrap()
+        .pop()
+        .unwrap()
+        .len() as usize
 }
 
 fn make_temp_dir(name: &str) -> PathBuf {
@@ -254,6 +269,48 @@ fn tindex_uses_custom_location_field_name() {
     assert!(geojson["features"][0]["properties"]
         .get("location")
         .is_none());
+}
+
+#[test]
+fn tindex_merge_combines_geojson_index_sources() {
+    let input = data_path("test/data/ply/simple_text.ply");
+
+    let temp = make_temp_dir("tindex_merge");
+    let index = temp.join("index.geojson");
+    let output = temp.join("merged.pcd");
+
+    let create = run_tindex(&[
+        "create",
+        "--tindex",
+        index.to_str().unwrap(),
+        input.to_str().unwrap(),
+        input.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--fast_boundary",
+    ]);
+    assert!(
+        create.status.success(),
+        "tindex create failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&create.stdout),
+        String::from_utf8_lossy(&create.stderr)
+    );
+
+    let merge = run_tindex(&[
+        "merge",
+        "--tindex",
+        index.to_str().unwrap(),
+        "--filespec",
+        output.to_str().unwrap(),
+    ]);
+    assert!(
+        merge.status.success(),
+        "tindex merge failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&merge.stdout),
+        String::from_utf8_lossy(&merge.stderr)
+    );
+
+    assert_eq!(pcd_len(&output), 6);
 }
 
 #[test]

@@ -305,8 +305,7 @@ impl App {
 
         let subcommand = &self.command_args[0];
         if subcommand == "merge" {
-            eprintln!("Error: merge is not yet supported in the Rust tindex kernel");
-            return 1;
+            return self.run_tindex_merge();
         } else if subcommand != "create" {
             eprintln!("Error: expected 'create' or 'merge' subcommand");
             return 1;
@@ -597,6 +596,115 @@ impl App {
         }
 
         0
+    }
+
+    fn run_tindex_merge(&self) -> i32 {
+        let mut tindex_file: Option<&str> = None;
+        let mut output_file: Option<&str> = None;
+        let mut location_field = "location";
+
+        let mut args = self.command_args[1..].iter();
+        while let Some(arg) = args.next() {
+            if arg == "--tindex" {
+                let Some(path) = args.next() else {
+                    eprintln!("Error: --tindex requires an index path");
+                    return 1;
+                };
+                tindex_file = Some(path);
+            } else if arg == "--filespec" {
+                let Some(path) = args.next() else {
+                    eprintln!("Error: --filespec requires an output path");
+                    return 1;
+                };
+                output_file = Some(path);
+            } else if arg == "--tindex_name" {
+                let Some(name) = args.next() else {
+                    eprintln!("Error: --tindex_name requires a field name");
+                    return 1;
+                };
+                location_field = name;
+            } else if arg == "--lyr_name" || arg == "--ogrdriver" || arg == "-f" {
+                let Some(_) = args.next() else {
+                    eprintln!("Error: {arg} requires a value");
+                    return 1;
+                };
+            } else if arg.starts_with('-') {
+                eprintln!("Error: unknown tindex merge option '{arg}'");
+                return 1;
+            } else if tindex_file.is_none() {
+                tindex_file = Some(arg);
+            } else if output_file.is_none() {
+                output_file = Some(arg);
+            } else {
+                eprintln!("Error: tindex merge expects an index path and an output path");
+                return 1;
+            }
+        }
+
+        let Some(tindex_file) = tindex_file else {
+            eprintln!("Error: tindex merge requires --tindex <index>");
+            return 1;
+        };
+        let Some(output_file) = output_file else {
+            eprintln!("Error: tindex merge requires --filespec <output>");
+            return 1;
+        };
+
+        let index_json = match std::fs::read_to_string(tindex_file) {
+            Ok(json) => json,
+            Err(err) => {
+                eprintln!("Error: unable to read tindex '{tindex_file}': {err}");
+                return 1;
+            }
+        };
+        let index: serde_json::Value = match serde_json::from_str(&index_json) {
+            Ok(index) => index,
+            Err(err) => {
+                eprintln!("Error: unable to parse GeoJSON tindex '{tindex_file}': {err}");
+                return 1;
+            }
+        };
+        let Some(features) = index["features"].as_array() else {
+            eprintln!("Error: tindex merge expects a GeoJSON FeatureCollection");
+            return 1;
+        };
+        if features.is_empty() {
+            eprintln!("Error: tindex contains no features");
+            return 1;
+        }
+
+        let mut stages = Vec::new();
+        let mut tags = Vec::new();
+        for (index, feature) in features.iter().enumerate() {
+            let Some(location) = feature["properties"][location_field].as_str() else {
+                eprintln!("Error: tindex feature is missing '{location_field}'");
+                return 1;
+            };
+            let Some(reader) = pdal_core::driver::infer_reader_driver(location) else {
+                eprintln!("Error: unable to infer a reader driver for '{location}'");
+                return 1;
+            };
+            let tag = format!("tindex_input_{index}");
+            stages.push(serde_json::json!({
+                "type": reader,
+                "filename": location,
+                "tag": tag,
+            }));
+            tags.push(tag);
+        }
+        if stages.len() > 1 {
+            stages.push(serde_json::json!({
+                "type": "filters.merge",
+                "inputs": tags,
+            }));
+        }
+        let Some(writer) = pdal_core::driver::infer_writer_driver(output_file) else {
+            eprintln!("Error: unable to infer a writer driver for '{output_file}'");
+            return 1;
+        };
+        stages.push(serde_json::json!({ "type": writer, "filename": output_file }));
+
+        self.execute_stage_pipeline(stages)
     }
 
     pub(super) fn run_eval(&self) -> i32 {
