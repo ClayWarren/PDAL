@@ -311,13 +311,37 @@ impl App {
             };
         }
 
-        let (positional, stage_options) = match parse_stage_args(&self.command_args) {
-            Ok(parsed) => parsed,
-            Err(message) => {
-                eprintln!("Error: {message}");
-                return 1;
+        let mut positional: Vec<&str> = Vec::new();
+        let mut stage_options: Vec<StageOption> = Vec::new();
+        let mut driver_override: Option<&str> = None;
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
+            if arg == "--driver" {
+                let Some(driver) = args.next() else {
+                    eprintln!("Error: --driver requires a reader driver name");
+                    return 1;
+                };
+                driver_override = Some(driver);
+            } else if let Some(driver) = arg.strip_prefix("--driver=") {
+                driver_override = Some(driver);
+            } else if arg == "--files" || arg == "-f" {
+                let Some(path) = args.next() else {
+                    eprintln!("Error: {arg} requires a file path");
+                    return 1;
+                };
+                positional.push(path);
+            } else if arg.starts_with("--") {
+                match parse_stage_option_arg(arg) {
+                    Ok(option) => stage_options.push(option),
+                    Err(message) => {
+                        eprintln!("Error: {message}");
+                        return 1;
+                    }
+                }
+            } else {
+                positional.push(arg);
             }
-        };
+        }
         if positional.len() < 2 {
             eprintln!("Error: merge needs at least one input path and an output path");
             return 1;
@@ -330,7 +354,10 @@ impl App {
         let mut stages: Vec<serde_json::Value> = Vec::new();
         let mut tags: Vec<String> = Vec::new();
         for (index, input) in inputs.iter().enumerate() {
-            let reader = match pdal_core::driver::infer_reader_driver(input) {
+            let reader = match driver_override
+                .map(str::to_string)
+                .or_else(|| pdal_core::driver::infer_reader_driver(input).map(str::to_string))
+            {
                 Some(driver) => driver,
                 None => {
                     eprintln!("Error: unable to infer a reader driver for '{input}'");

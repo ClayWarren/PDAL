@@ -62,6 +62,33 @@ fn merge_combines_two_inputs_into_one_output() {
 }
 
 #[test]
+fn merge_supports_driver_override_and_files_option() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-merge-driver-override");
+    let extensionless_input = temp.join("simple_text_without_extension");
+    let output = temp.join("out.pcd");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_merge(&[
+        "--driver",
+        "readers.ply",
+        "--files",
+        extensionless_input.to_str().unwrap(),
+        "--files",
+        extensionless_input.to_str().unwrap(),
+        output.to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs merge failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert_eq!(read_pcd(&output).len(), 6);
+}
+
+#[test]
 fn merge_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("merge")
