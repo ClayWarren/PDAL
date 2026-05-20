@@ -105,6 +105,35 @@ fn sort_honors_an_alternate_dimension() {
 }
 
 #[test]
+fn sort_supports_driver_and_path_options() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-sort-driver-override");
+    let extensionless_input = temp.join("simple_text_without_extension");
+    let output = temp.join("out.pcd");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_sort(&[
+        "--driver",
+        "readers.ply",
+        "--input",
+        extensionless_input.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+        "--filters.sort.order=desc",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs sort failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let view = read_pcd(&output);
+    assert_eq!(view.get_f64(0, &DimId::X), 1.0);
+    assert_eq!(view.get_f64(2, &DimId::X), -1.0);
+}
+
+#[test]
 fn sort_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("sort")
