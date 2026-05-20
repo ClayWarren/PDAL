@@ -228,6 +228,7 @@ impl App {
             println!("  pdal tindex create --tindex <output> --glob <pattern> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --stdin [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --path_prefix <prefix> <files...>");
+            println!("  pdal tindex create --tindex <output> --lyr_name <name> <files...>");
             println!("  pdal tindex create <output> <files...> [-f <driver>]");
             println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
@@ -256,6 +257,8 @@ impl App {
         let mut driver_name = "ESRI Shapefile".to_string();
         let mut path_prefix: Option<String> = None;
         let mut write_absolute_path = false;
+        let mut layer_name = "pdal".to_string();
+        let mut location_field = "location".to_string();
 
         let mut args_iter = self.command_args[1..].iter();
         while let Some(arg) = args_iter.next() {
@@ -334,6 +337,18 @@ impl App {
                 path_prefix = Some(prefix.clone());
             } else if arg == "--write_absolute_path" {
                 write_absolute_path = true;
+            } else if arg == "--lyr_name" {
+                let Some(name) = args_iter.next() else {
+                    eprintln!("Error: --lyr_name requires a layer name");
+                    return 1;
+                };
+                layer_name = name.clone();
+            } else if arg == "--tindex_name" {
+                let Some(name) = args_iter.next() else {
+                    eprintln!("Error: --tindex_name requires a field name");
+                    return 1;
+                };
+                location_field = name.clone();
             } else if arg == "--fast_boundary" {
                 // The Rust tindex implementation currently writes extent
                 // polygons, matching PDAL's fast-boundary mode.
@@ -472,7 +487,7 @@ impl App {
             return 1;
         }
 
-        let layer = match dataset.open_or_create_layer("pdal", &first_srs) {
+        let layer = match dataset.open_or_create_layer(&layer_name, &first_srs) {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("Error creating layer: {}", e);
@@ -482,7 +497,7 @@ impl App {
 
         unsafe {
             for result in [
-                pdal_core::gdal::Vector::create_string_field(layer, "location"),
+                pdal_core::gdal::Vector::create_string_field(layer, &location_field),
                 pdal_core::gdal::Vector::create_string_field(layer, "srs"),
                 pdal_core::gdal::Vector::create_datetime_field(layer, "created"),
                 pdal_core::gdal::Vector::create_datetime_field(layer, "modified"),
@@ -501,7 +516,10 @@ impl App {
                 minx, miny, maxx, miny, maxx, maxy, minx, maxy, minx, miny
             );
 
-            let fields = vec![("location", file.as_str()), ("srs", wkt.as_str())];
+            let fields = vec![
+                (location_field.as_str(), file.as_str()),
+                ("srs", wkt.as_str()),
+            ];
 
             unsafe {
                 if let Err(e) = pdal_core::gdal::Vector::add_feature(layer, &poly_wkt, &fields) {
