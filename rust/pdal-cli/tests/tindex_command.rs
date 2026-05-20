@@ -63,6 +63,43 @@ fn tindex_creates_geojson_index() {
 }
 
 #[test]
+fn tindex_reads_inputs_from_filelist() {
+    let input1 = data_path("test/data/las/interesting.las");
+    let input2 = data_path("test/data/las/1.2-with-color.las");
+
+    let temp = make_temp_dir("tindex_filelist");
+    let filelist = temp.join("inputs.txt");
+    let output = temp.join("index.geojson");
+    std::fs::write(
+        &filelist,
+        format!("{}\n{}\n", input1.display(), input2.display()),
+    )
+    .unwrap();
+
+    let result = run_tindex(&[
+        "create",
+        "--tindex",
+        output.to_str().unwrap(),
+        "--filelist",
+        filelist.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--fast_boundary",
+    ]);
+
+    assert!(
+        result.status.success(),
+        "tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson = std::fs::read_to_string(&output).unwrap();
+    assert!(geojson.contains("interesting.las"));
+    assert!(geojson.contains("1.2-with-color.las"));
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_tindex_matches_rust_tindex_location_index() {
     let input = data_path("test/data/las/interesting.las");

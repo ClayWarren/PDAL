@@ -222,6 +222,7 @@ impl App {
         if self.help || self.command_args.is_empty() {
             println!("Usage:");
             println!("  pdal tindex create --tindex <output> <files...> [-f <driver>]");
+            println!("  pdal tindex create --tindex <output> --filelist <path> [-f <driver>]");
             println!("  pdal tindex create <output> <files...> [-f <driver>]");
             println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
@@ -245,9 +246,9 @@ impl App {
             return 1;
         }
 
-        let mut tindex_file: Option<&str> = None;
+        let mut tindex_file: Option<String> = None;
         let mut files = Vec::new();
-        let mut driver_name = "ESRI Shapefile";
+        let mut driver_name = "ESRI Shapefile".to_string();
 
         let mut args_iter = self.command_args[1..].iter();
         while let Some(arg) = args_iter.next() {
@@ -256,7 +257,26 @@ impl App {
                     eprintln!("Error: --tindex requires an output path");
                     return 1;
                 };
-                tindex_file = Some(path);
+                tindex_file = Some(path.clone());
+            } else if arg == "--filelist" {
+                let Some(path) = args_iter.next() else {
+                    eprintln!("Error: --filelist requires a path");
+                    return 1;
+                };
+                let contents = match std::fs::read_to_string(path) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        eprintln!("Error: unable to read file list '{path}': {err}");
+                        return 1;
+                    }
+                };
+                files.extend(
+                    contents
+                        .lines()
+                        .map(str::trim)
+                        .filter(|line| !line.is_empty())
+                        .map(str::to_string),
+                );
             } else if arg == "--fast_boundary" {
                 // The Rust tindex implementation currently writes extent
                 // polygons, matching PDAL's fast-boundary mode.
@@ -265,14 +285,14 @@ impl App {
                     eprintln!("Error: {arg} requires an OGR driver name");
                     return 1;
                 };
-                driver_name = d;
+                driver_name = d.clone();
             } else if arg.starts_with('-') {
                 eprintln!("Error: unknown tindex option '{arg}'");
                 return 1;
             } else if tindex_file.is_none() {
-                tindex_file = Some(arg);
+                tindex_file = Some(arg.clone());
             } else {
-                files.push(arg);
+                files.push(arg.clone());
             }
         }
         let Some(tindex_file) = tindex_file else {
@@ -288,7 +308,7 @@ impl App {
         pdal_core::gdal::register_drivers();
 
         // Create OGR dataset
-        let dataset = match pdal_core::gdal::Vector::create(tindex_file, driver_name) {
+        let dataset = match pdal_core::gdal::Vector::create(&tindex_file, &driver_name) {
             Ok(ds) => ds,
             Err(e) => {
                 eprintln!("Error creating tindex dataset: {}", e);
@@ -301,7 +321,7 @@ impl App {
         let mut valid_files = Vec::new();
 
         for file in files {
-            let driver = match pdal_core::driver::infer_reader_driver(file) {
+            let driver = match pdal_core::driver::infer_reader_driver(&file) {
                 Some(driver) => driver,
                 None => {
                     eprintln!("Error: unable to infer a reader driver for '{file}'");
