@@ -41,6 +41,7 @@
 #include <pdal/Reader.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/Streamable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -117,6 +118,8 @@ private:
     BOX3D m_bounds;
     StringList m_dimNames;
     StringList m_options;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
 };
 
 } // namespace pdal

@@ -38,7 +38,8 @@ impl Raster {
         unsafe {
             let mut transform = [0.0f64; 6];
             if gdal_sys::GDALGetGeoTransform(self.ds, transform.as_mut_ptr()) != CPLErr::CE_None {
-                return Err("Failed to get geo transform".to_string());
+                transform[1] = 1.0;
+                transform[5] = 1.0;
             }
             Ok(transform)
         }

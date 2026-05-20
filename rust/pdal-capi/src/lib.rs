@@ -819,6 +819,61 @@ mod tests {
     }
 
     #[test]
+    fn gdal_reader_honors_header_dimensions_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("filename", data_path("gdal/autzen-height.tif")),
+                ("header", "Intensity,Userdata,Z".to_string()),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_gdal(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(
+                !view.is_null(),
+                "{}",
+                CStr::from_ptr(pdal_last_error()).to_string_lossy()
+            );
+            assert_eq!(pdal_point_view_length(view), 735 * 973);
+
+            let x = CString::new("X").unwrap();
+            let y = CString::new("Y").unwrap();
+            let intensity = CString::new("Intensity").unwrap();
+            let userdata = CString::new("Userdata").unwrap();
+            let z = CString::new("Z").unwrap();
+            assert_eq!(pdal_point_view_get_f64(view, 120000, x.as_ptr()), 195.5);
+            assert_eq!(pdal_point_view_get_f64(view, 120000, y.as_ptr()), 163.5);
+            assert_eq!(
+                pdal_point_view_get_f64(view, 120000, intensity.as_ptr()),
+                255.0
+            );
+            assert_eq!(
+                pdal_point_view_get_f64(view, 120000, userdata.as_ptr()),
+                213.0
+            );
+            assert_eq!(pdal_point_view_get_f64(view, 120000, z.as_ptr()), 0.0);
+
+            let metadata = pdal_reader_metadata(reader);
+            assert!(!metadata.is_null());
+            let raster = CString::new("raster").unwrap();
+            assert_eq!(
+                pdal_metadata_node_child_named_count(metadata, raster.as_ptr()),
+                1
+            );
+
+            pdal_metadata_node_destroy(metadata);
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
     fn writer_write_view_consumes_point_view_through_c_abi() {
         unsafe {
             let mut filename = std::env::temp_dir();

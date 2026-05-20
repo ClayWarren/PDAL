@@ -338,7 +338,7 @@ pub(crate) fn dim_id_from_name(name: &str) -> DimId {
         "Mark" => DimId::Mark,
         "Alpha" => DimId::Alpha,
         "EchoRange" => DimId::EchoRange,
-        "UserData" => DimId::UserData,
+        "UserData" | "Userdata" => DimId::UserData,
         "EchoNorm" => DimId::EchoNorm,
         "EchoPos" => DimId::EchoPos,
         "Reflectance" => DimId::Reflectance,

@@ -52,6 +52,25 @@ static StaticPluginInfo const s_info{"readers.gdal",
 
 CREATE_STATIC_STAGE(GDALReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 std::string GDALReader::getName() const
 {
     return s_info.name;
@@ -61,6 +80,8 @@ GDALReader::GDALReader() : m_blockReader(*this) {}
 
 GDALReader::~GDALReader()
 {
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
     m_raster.reset();
 }
 
@@ -153,44 +174,71 @@ void GDALReader::addArgs(ProgramArgs& args)
 
 void GDALReader::ready(PointTableRef table)
 {
-    m_raster.reset(new gdal::Raster(m_filename));
-    if (m_raster->open(m_options) == gdal::GDALError::CantOpen)
-        throwError("Couldn't open raster file '" + m_filename + "'.");
-
-    if (m_useMemoryCopy)
+    m_rustIndex = 0;
+    if (m_rustView)
     {
-        gdal::Raster* r = m_raster->memoryCopy();
-        if (r)
-            m_raster.reset(r);
-        else
-            log()->get(LogLevel::Warning) << "Couldn't create raster memory "
-                                             "copy.  Using standard interface.";
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
 
-    m_blockReader.initialize();
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "header", m_header);
+
+    pdal_reader_t* reader = pdal_reader_create_gdal(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust GDAL reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust GDAL reader failed.");
 }
 
 point_count_t GDALReader::read(PointViewPtr view, point_count_t numPts)
 {
     point_count_t cnt = 0;
-    while (cnt < numPts)
+    PointId nextId = view->size();
+    while (cnt < numPts && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        point_count_t processed = m_blockReader.processBlock(view);
-        if (processed == 0)
-            break;
-        cnt += processed;
+        PointRef point(*view, nextId);
+        processOne(point);
+        ++nextId;
+        ++cnt;
     }
     return cnt;
 }
 
 bool GDALReader::processOne(PointRef& point)
 {
-    return m_blockReader.processOne(point);
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
+        return false;
+
+    point.setField(Dimension::Id::X,
+                   pdal_point_view_get_f64(m_rustView, m_rustIndex, "X"));
+    point.setField(Dimension::Id::Y,
+                   pdal_point_view_get_f64(m_rustView, m_rustIndex, "Y"));
+    for (size_t band = 0; band < m_bandIds.size(); ++band)
+    {
+        Dimension::Id id = m_bandIds[band];
+        point.setField(id, pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                                   m_dimNames[band].c_str()));
+    }
+    ++m_rustIndex;
+    return true;
 }
 
 void GDALReader::done(PointTableRef table)
 {
-    m_raster->close();
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
 }
 
 GDALReader::BlockReader::BlockReader(GDALReader& reader) : m_reader(reader) {}

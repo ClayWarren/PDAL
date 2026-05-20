@@ -247,7 +247,7 @@ impl DimId {
             "EdgeOfFlightLine" => DimId::EdgeOfFlightLine,
             "ScanAngleRank" => DimId::ScanAngleRank,
             "PointSourceId" => DimId::PointSourceId,
-            "UserData" => DimId::UserData,
+            "UserData" | "Userdata" => DimId::UserData,
             "EchoRange" => DimId::EchoRange,
             "EchoNorm" => DimId::EchoNorm,
             "EchoPos" => DimId::EchoPos,
