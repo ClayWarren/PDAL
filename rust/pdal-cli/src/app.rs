@@ -69,6 +69,7 @@ impl App {
                     }
                     self.command = args[i].clone();
                 }
+                "--debug" => self.verbose = self.verbose.max(3),
                 "--options" => {
                     i += 1;
                     if i >= args.len() {
@@ -137,6 +138,8 @@ impl App {
         println!("  --version           Show program version");
         println!("  --drivers           List available drivers");
         println!("  --list-commands     List available commands");
+        println!("  --command <name>    The PDAL command");
+        println!("  --debug             Sets the output level to 3");
         println!("  --options <stage>   Show options for specified stage");
         println!("  -v, --verbose       Set output verbosity");
         println!("  --log <file>        Log filename");
@@ -548,5 +551,14 @@ mod tests {
 
         assert_eq!(app.command, "pipeline");
         assert_eq!(app.command_args, vec!["pipeline.json".to_string()]);
+    }
+
+    #[test]
+    fn parse_supports_debug_option() {
+        let mut app = App::new();
+        app.parse_args(&["--debug".to_string(), "--verbose".to_string()])
+            .unwrap();
+
+        assert_eq!(app.verbose, 4);
     }
 }
