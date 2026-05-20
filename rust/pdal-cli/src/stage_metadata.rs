@@ -140,6 +140,20 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
         | "readers.terrasolid" | "readers.las" | "readers.laz" => vec![filename()],
+        "readers.text" => vec![
+            filename(),
+            option(
+                "separator",
+                "Separator character overriding header-line inference.",
+                Some(json!(" ")),
+            ),
+            option("header", "Use this string as the header line.", None),
+            option(
+                "skip",
+                "Lines to skip before reading the header line.",
+                Some(json!(0)),
+            ),
+        ],
         "readers.gdal" => vec![
             filename(),
             option(
@@ -350,6 +364,17 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
             option("class", "Ground classification value.", Some(json!(2))),
         ],
+        "filters.hexbin" => vec![
+            option(
+                "sample_size",
+                "Maximum sample size for auto-edge length calculation.",
+                Some(json!(5000)),
+            ),
+            option("threshold", "Required cell density.", Some(json!(15))),
+            option("edge_size", "Deprecated synonym for edge_length.", None),
+            option("edge_length", "Length of each hex edge.", None),
+            option("density", "Density tessellation output filename.", None),
+        ],
         "filters.iqr" => vec![
             option(
                 "multiplier",
@@ -451,6 +476,33 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Comma-separated return groups to keep.",
             Some(json!("last")),
         )],
+        "filters.smrf" => vec![
+            option("cell", "Cell size.", Some(json!(1.0))),
+            option("slope", "Percent slope.", Some(json!(0.15))),
+            option("scalar", "Elevation scalar.", Some(json!(1.25))),
+            option("threshold", "Elevation threshold.", Some(json!(0.5))),
+            option("window", "Maximum window size.", None),
+            option(
+                "returns",
+                "Comma-separated return groups to include.",
+                Some(json!("last,only")),
+            ),
+            option(
+                "ground_class",
+                "Classification value for ground points.",
+                Some(json!(2)),
+            ),
+            option(
+                "other_class",
+                "Classification value for non-ground points.",
+                Some(json!(1)),
+            ),
+            option(
+                "only_ground",
+                "Only modify classification for detected ground points.",
+                Some(json!(true)),
+            ),
+        ],
         "filters.sample" => vec![option("radius", "Sample radius.", Some(json!(1.0)))],
         "filters.separatescanline" => vec![option(
             "groupby",
@@ -630,5 +682,21 @@ mod tests {
         assert!(all.contains_key("readers.las"));
         assert!(all.contains_key("filters.decimation"));
         assert!(all.contains_key("writers.las"));
+    }
+
+    #[test]
+    fn rust_backed_stages_have_scoped_option_metadata() {
+        let allowed_empty = ["filters.merge", "writers.null"];
+
+        for stage in stage_list() {
+            if allowed_empty.contains(&stage.name) {
+                continue;
+            }
+            assert!(
+                !stage_options(stage.name).is_empty(),
+                "{} has no option metadata",
+                stage.name
+            );
+        }
     }
 }

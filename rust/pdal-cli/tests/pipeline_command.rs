@@ -681,6 +681,81 @@ fn stage_options_reports_scoped_gdal_reader_options() {
 }
 
 #[test]
+fn stage_options_reports_scoped_text_reader_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("readers.text")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"filename"));
+    assert!(args.contains(&"separator"));
+    assert!(args.contains(&"header"));
+    assert!(args.contains(&"skip"));
+}
+
+#[test]
+fn stage_options_reports_scoped_hexbin_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("filters.hexbin")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"sample_size"));
+    assert!(args.contains(&"threshold"));
+    assert!(args.contains(&"edge_size"));
+    assert!(args.contains(&"edge_length"));
+    assert!(args.contains(&"density"));
+}
+
+#[test]
+fn stage_options_reports_scoped_smrf_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("filters.smrf")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"cell"));
+    assert!(args.contains(&"slope"));
+    assert!(args.contains(&"scalar"));
+    assert!(args.contains(&"threshold"));
+    assert!(args.contains(&"window"));
+    assert!(args.contains(&"returns"));
+    assert!(args.contains(&"ground_class"));
+    assert!(args.contains(&"other_class"));
+    assert!(args.contains(&"only_ground"));
+}
+
+#[test]
 fn stage_options_reports_scoped_pcd_writer_options() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("--showjson")
