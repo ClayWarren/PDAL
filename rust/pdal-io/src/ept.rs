@@ -1,9 +1,8 @@
 //! `readers.ept` -- local LASzip EPT full-read slice.
 //!
 //! This handles local `ept.json` datasets whose `dataType` is `laszip` by
-//! walking JSON hierarchy files and merging local LAZ tiles. Binary/zstd EPT,
-//! spatial filtering, resolution limits, addons, remote access, and streaming
-//! are deferred.
+//! walking JSON hierarchy files and merging local tiles. Spatial filtering,
+//! resolution limits, addons, remote access, and streaming are deferred.
 
 use crate::tindex::append_view;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
@@ -14,6 +13,7 @@ use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
 use serde_json::Value;
 use std::collections::{BTreeSet, VecDeque};
+use std::io::Cursor;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -52,9 +52,9 @@ impl Reader for EptReader {
                 ept_path.display()
             ))
         })?;
-        if data_type != "laszip" && data_type != "binary" {
+        if data_type != "laszip" && data_type != "binary" && data_type != "zstandard" {
             return Err(StageError(format!(
-                "EptReader Rust slice supports only laszip and binary dataType, not '{data_type}'."
+                "EptReader Rust slice supports only laszip, binary, and zstandard dataType, not '{data_type}'."
             )));
         }
 
@@ -65,14 +65,19 @@ impl Reader for EptReader {
         let schema = EptSchema::parse(&info)?;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
         for key in keys {
-            let path = root.join("ept-data").join(format!(
-                "{key}.{}",
-                if data_type == "laszip" { "laz" } else { "bin" }
-            ));
+            let extension = match data_type {
+                "laszip" => "laz",
+                "binary" => "bin",
+                "zstandard" => "zst",
+                _ => unreachable!(),
+            };
+            let path = root.join("ept-data").join(format!("{key}.{extension}"));
             let views = if data_type == "laszip" {
                 let mut options = Options::new();
                 options.add("filename", path.display());
                 crate::las::LasReader::new(&options).read()?
+            } else if data_type == "zstandard" {
+                vec![read_zstandard_tile(&path, &schema, srs)?]
             } else {
                 vec![read_binary_tile(&path, &schema, srs)?]
             };
@@ -233,7 +238,32 @@ fn dim_type(kind: &str, size: usize) -> Result<DimType, StageError> {
 fn read_binary_tile(path: &Path, schema: &EptSchema, srs: &str) -> Result<PointView, StageError> {
     let bytes = std::fs::read(path)
         .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
-    if schema.point_size == 0 || bytes.len() % schema.point_size != 0 {
+    view_from_binary_tile(path, bytes, schema, srs)
+}
+
+fn read_zstandard_tile(
+    path: &Path,
+    schema: &EptSchema,
+    srs: &str,
+) -> Result<PointView, StageError> {
+    let bytes = std::fs::read(path)
+        .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
+    let decoded = zstd::stream::decode_all(Cursor::new(bytes)).map_err(|err| {
+        StageError(format!(
+            "Can't decompress EPT tile '{}': {err}",
+            path.display()
+        ))
+    })?;
+    view_from_binary_tile(path, decoded, schema, srs)
+}
+
+fn view_from_binary_tile(
+    path: &Path,
+    bytes: Vec<u8>,
+    schema: &EptSchema,
+    srs: &str,
+) -> Result<PointView, StageError> {
+    if schema.point_size == 0 || !bytes.len().is_multiple_of(schema.point_size) {
         return Err(StageError(format!(
             "EPT tile '{}' size does not match schema.",
             path.display()
@@ -325,12 +355,27 @@ mod tests {
     }
 
     #[test]
+    fn reads_local_zstandard_ept() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-zstandard/ept.json").display(),
+        );
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 100000);
+        assert!((views[0].get_f64(42, &DimId::X) + 8242697.94).abs() < 1e-9);
+    }
+
+    #[test]
     fn rejects_unsupported_ept_data_type() {
         let temp = tempfile::tempdir().unwrap();
         let ept = temp.path().join("ept.json");
         std::fs::write(
             &ept,
-            r#"{"dataType":"zstandard","hierarchyType":"json","schema":[]}"#,
+            r#"{"dataType":"unsupported","hierarchyType":"json","schema":[]}"#,
         )
         .unwrap();
         let mut options = Options::new();
