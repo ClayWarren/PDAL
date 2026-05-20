@@ -337,7 +337,7 @@ mod tests {
         // Two clouds (2x2 with a transform, then 4x1 identity) holding the
         // same four points; the transform makes them equal.
         let view = read_ptx("ptx/multiple-and-transform.ptx", true);
-        assert_eq!(view.len(), 2 * 2 + 4 * 1);
+        assert_eq!(view.len(), 8);
         assert!(view.layout().dim(&DimId::from_name("Red")).is_none());
 
         for i in 0..4 {

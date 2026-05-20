@@ -30,6 +30,10 @@ jobs:
         environments: >-
           dev
 
+    - name: Rust guard
+      run: |
+          pixi run -e dev rust-guard
+
     - name: Build
       run: |
           pixi run -e dev build
@@ -37,4 +41,3 @@ jobs:
     - name: Test
       run: |
           pixi run -e dev test
-

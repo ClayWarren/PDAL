@@ -684,6 +684,7 @@ dependencies = [
  "gdal-sys",
  "geos",
  "proj",
+ "proj-sys",
 ]
 
 [[package]]

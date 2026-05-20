@@ -69,7 +69,7 @@ the Rust-backed shape of PDAL.
 | Root CMake | done | `libpdal_capi.a` is built, linked into `pdalcpp`, and sourced from `cmake/rust.cmake` so the dependency list tracks every current Rust crate that can affect the C ABI or linked implementation. |
 | `cmake/` modules | in progress | Rust build options now live in `cmake/rust.cmake`. Install rules, CPack/source-package behavior, platform link details, and test wiring still need to move here as the integration matures. |
 | `pixi.toml` | done | The developer environment now includes the Rust toolchain and explicit `rust-fmt`, `rust-check`, `rust-clippy`, `rust-test`, and `rust-guard` tasks for the port workspace. |
-| GitHub workflows | not ready | Linux, macOS, Windows, pixi, conda, and release workflows need explicit Rust toolchain setup and Rust/C++ parity gates before the port is upstreamable. |
+| GitHub workflows | in progress | The Pixi workflow runs the Rust workspace guard through `pixi run -e dev rust-guard`. Linux, macOS, Windows, conda, and release workflows still need explicit Rust/C++ parity gates before the port is upstreamable. |
 | `PDALConfig.cmake.in` | not ready | Downstream `find_package(PDAL)` must keep working. Decide whether the Rust C ABI remains an internal implementation detail of `pdalcpp` or is exported as a stable target/header surface. |
 | `pdal_features.hpp.in` | not ready | Add a generated Rust-backed-build feature only if C++ wrappers or downstream code need a supported conditional. Avoid broad preprocessor branching. |
 | `dimbuilder/` | prototype | `dimbuilder` currently uses `PDAL_UTILS_NO_RUST_CAPI` while compiling `Utils.cpp` standalone. Keep this as an intentional generator-tool exception or replace it with a cleaner build path. |

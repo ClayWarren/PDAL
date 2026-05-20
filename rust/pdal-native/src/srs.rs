@@ -1,6 +1,7 @@
 //! Coordinate transformations through PROJ.
 
 use proj::Proj;
+use std::ffi::CStr;
 
 /// A native coordinate transformation.
 pub struct SrsTransform {
@@ -32,8 +33,12 @@ impl SrsTransform {
 }
 
 pub fn version() -> String {
-    match Proj::new("EPSG:4326") {
-        Ok(proj) => proj.lib_info().map(|info| info.version).unwrap_or_default(),
-        Err(_) => String::new(),
+    unsafe {
+        let info = proj_sys::proj_info();
+        if info.version.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(info.version).to_string_lossy().into_owned()
+        }
     }
 }

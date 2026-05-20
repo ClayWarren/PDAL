@@ -112,7 +112,8 @@ fn qfit_reader_returns_points_through_c_abi() {
 fn terrasolid_reader_returns_points_through_c_abi() {
     unsafe {
         let options = pdal_options_create();
-        for (key, value) in [("filename", data_path("terrasolid/20020715-time-color.bin"))] {
+        {
+            let (key, value) = ("filename", data_path("terrasolid/20020715-time-color.bin"));
             let key = CString::new(key).unwrap();
             let value = CString::new(value).unwrap();
             pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
@@ -146,7 +147,8 @@ fn terrasolid_reader_returns_points_through_c_abi() {
 fn fbi_reader_returns_points_through_c_abi() {
     unsafe {
         let options = pdal_options_create();
-        for (key, value) in [("filename", data_path("fbi/1.2-with-color.fbi"))] {
+        {
+            let (key, value) = ("filename", data_path("fbi/1.2-with-color.fbi"));
             let key = CString::new(key).unwrap();
             let value = CString::new(value).unwrap();
             pdal_options_add_str(options, key.as_ptr(), value.as_ptr());

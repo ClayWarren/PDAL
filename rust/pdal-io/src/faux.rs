@@ -398,9 +398,9 @@ mod tests {
             let x = views[0].get_f64(i, &DimId::X);
             let y = views[0].get_f64(i, &DimId::Y);
             let z = views[0].get_f64(i, &DimId::Z);
-            assert!(x >= 0.0 && x <= 10.0);
-            assert!(y >= 0.0 && y <= 10.0);
-            assert!(z >= 0.0 && z <= 10.0);
+            assert!((0.0..=10.0).contains(&x));
+            assert!((0.0..=10.0).contains(&y));
+            assert!((0.0..=10.0).contains(&z));
         }
     }
 

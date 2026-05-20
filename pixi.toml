@@ -6,9 +6,12 @@ version = "2.8.2"
 
 [feature.dev.dependencies]
 libgdal-core = "*"
+proj = ">=9.6"
+proj-data = "*"
 cmake = "*"
 compilers = "*"
 ninja = "*"
+pkg-config = "*"
 libpq = "*"
 hdf5 = "*"
 cpd = "*"
@@ -139,7 +142,7 @@ install = { cmd = "cd .build && ninja install", depends-on = ["build"] }
 rust-fmt = { cmd = "cargo fmt --manifest-path rust/Cargo.toml --all --check" }
 rust-check = { cmd = "cargo check --manifest-path rust/Cargo.toml --workspace" }
 rust-clippy = { cmd = "cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings" }
-rust-test = { cmd = "cargo test --manifest-path rust/Cargo.toml --workspace" }
+rust-test = { cmd = "cargo test --manifest-path rust/Cargo.toml --workspace", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test"] }
 
 [feature.doc.tasks]
