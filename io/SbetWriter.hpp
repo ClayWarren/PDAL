@@ -35,7 +35,7 @@
 #pragma once
 
 #include <pdal/Writer.hpp>
-#include <pdal/util/OStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "SbetCommon.hpp"
 
@@ -45,11 +45,13 @@ namespace pdal
 class PDAL_EXPORT SbetWriter : public Writer
 {
 public:
+    ~SbetWriter() override;
     std::string getName() const override;
 
 private:
-    std::unique_ptr<OLeStream> m_stream;
     bool m_anglesAreDegrees;
+    Dimension::IdList m_dims;
+    pdal_point_view_t* m_rustView = nullptr;
 
     void addArgs(ProgramArgs& args) override;
     void ready(PointTableRef table) override;

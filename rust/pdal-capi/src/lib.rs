@@ -871,6 +871,72 @@ mod tests {
     }
 
     #[test]
+    fn sbet_writer_writes_view_through_c_abi() {
+        unsafe {
+            let mut filename = std::env::temp_dir();
+            filename.push(format!(
+                "pdal-capi-sbet-writer-{}-{}.sbet",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            let filename_text = filename.display().to_string();
+
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("filename", filename_text.as_str()),
+                ("angles_are_degrees", "false"),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let layout = pdal_point_layout_create();
+            for dim in [
+                "GpsTime",
+                "Y",
+                "X",
+                "Z",
+                "XVelocity",
+                "YVelocity",
+                "ZVelocity",
+                "Roll",
+                "Pitch",
+                "Azimuth",
+                "WanderAngle",
+                "XBodyAccel",
+                "YBodyAccel",
+                "ZBodyAccel",
+                "XBodyAngRate",
+                "YBodyAngRate",
+                "ZBodyAngRate",
+            ] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+            }
+            let view = pdal_point_view_create(layout);
+            let point = pdal_point_view_add_point(view);
+            for (dim, value) in [("GpsTime", 1.0), ("X", 2.0), ("Y", 3.0), ("Z", 4.0)] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+            }
+
+            let writer = pdal_writer_create_sbet(options);
+            assert!(!writer.is_null());
+            assert!(pdal_writer_write_view(writer, view));
+            assert_eq!(std::fs::metadata(&filename).unwrap().len(), 17 * 8);
+
+            let _ = std::fs::remove_file(&filename);
+            pdal_writer_destroy(writer);
+            pdal_point_view_destroy(view);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
     fn pipeline_result_roundtrips_through_c_abi() {
         unsafe {
             let json = CString::new(

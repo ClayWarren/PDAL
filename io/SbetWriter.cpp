@@ -34,10 +34,9 @@
 
 #include "SbetWriter.hpp"
 
+#include <pdal/PointLayout.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-
-#include <cmath>
 
 namespace pdal
 {
@@ -49,6 +48,36 @@ static StaticPluginInfo const s_info{
     {"sbet"}};
 
 CREATE_STATIC_STAGE(SbetWriter, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    addOption(options, key, std::string(value ? "true" : "false"));
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+SbetWriter::~SbetWriter()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 std::string SbetWriter::getName() const
 {
@@ -64,33 +93,55 @@ void SbetWriter::addArgs(ProgramArgs& args)
 
 void SbetWriter::ready(PointTableRef)
 {
-    m_stream.reset(new OLeStream(filename()));
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
+    m_dims = sbet::fileDimensions();
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    for (Dimension::Id dim : m_dims)
+        pdal_point_layout_register_dim(layout, Dimension::name(dim).c_str(), 9);
+    m_rustView = pdal_point_view_create(layout);
 }
 
 void SbetWriter::write(const PointViewPtr view)
 {
-    auto degreesToRadians = [](double degrees)
-    { return degrees * M_PI / 180.0; };
-    Dimension::IdList dims = sbet::fileDimensions();
     for (PointId idx = 0; idx < view->size(); ++idx)
     {
-        for (auto di = dims.begin(); di != dims.end(); ++di)
+        PointId outIdx = pdal_point_view_add_point(m_rustView);
+        for (Dimension::Id dim : m_dims)
         {
-            // If a dimension doesn't exist, write 0.
-            Dimension::Id dim = *di;
             double value =
                 (view->hasDim(dim) ? view->getFieldAs<double>(dim, idx) : 0.0);
-            if (m_anglesAreDegrees && sbet::isAngularDimension(dim))
-            {
-                value = degreesToRadians(value);
-            }
-            *m_stream << value;
+            pdal_point_view_set_f64(m_rustView, outIdx,
+                                    Dimension::name(dim).c_str(), value);
         }
     }
 }
 
 void SbetWriter::done(PointTableRef table)
 {
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", filename());
+    addOption(options, "angles_are_degrees", m_anglesAreDegrees);
+
+    pdal_writer_t* writer = pdal_writer_create_sbet(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust SBET writer.");
+    }
+
+    bool ok = pdal_writer_write_view(writer, m_rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        throwLastRustError("Rust SBET writer failed.");
+
+    pdal_point_view_destroy(m_rustView);
+    m_rustView = nullptr;
     getMetadata().addList("filename", filename());
 }
 

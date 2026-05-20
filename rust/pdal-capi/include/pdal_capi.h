@@ -436,6 +436,7 @@ pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_pcd(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);
+pdal_writer_t* pdal_writer_create_sbet(const pdal_options_t* ops);
 bool pdal_writer_write_view(pdal_writer_t* writer, const pdal_point_view_t* view);
 void pdal_writer_destroy(pdal_writer_t* writer);
 
