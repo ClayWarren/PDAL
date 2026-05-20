@@ -659,6 +659,28 @@ fn stage_options_reports_scoped_ept_options() {
 }
 
 #[test]
+fn stage_options_reports_scoped_gdal_reader_options() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--showjson")
+        .arg("--options")
+        .arg("readers.gdal")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let args: Vec<_> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|option| option["arg"].as_str().unwrap())
+        .collect();
+    assert!(args.contains(&"filename"));
+    assert!(args.contains(&"header"));
+    assert!(args.contains(&"gdalopts"));
+}
+
+#[test]
 fn stage_options_reports_scoped_pcd_writer_options() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("--showjson")
