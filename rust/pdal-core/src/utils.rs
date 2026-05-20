@@ -33,6 +33,40 @@ pub fn replace_all(value: &str, replace_what: &str, replace_with: &str) -> Strin
     value.replace(replace_what, replace_with)
 }
 
+pub fn to_lower(value: &str) -> String {
+    value.to_ascii_lowercase()
+}
+
+pub fn to_upper(value: &str) -> String {
+    value.to_ascii_uppercase()
+}
+
+pub fn iequals(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
+}
+
+pub fn starts_with(value: &str, prefix: &str) -> bool {
+    value.starts_with(prefix)
+}
+
+pub fn split_char(value: &str, split: char) -> Vec<String> {
+    if value.is_empty() {
+        return Vec::new();
+    }
+    value.split(split).map(str::to_string).collect()
+}
+
+pub fn split2_char(value: &str, split: char) -> Vec<String> {
+    if value.is_empty() {
+        return Vec::new();
+    }
+    value
+        .split(split)
+        .filter(|part| !part.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 pub fn escape_json(value: &str) -> String {
     let mut out = String::new();
     for ch in value.chars() {
@@ -127,6 +161,128 @@ pub fn base64_encode(bytes: &[u8]) -> String {
     }
 
     out
+}
+
+pub fn word_wrap(value: &str, line_length: usize, first_length: usize) -> Vec<String> {
+    if value.is_empty() {
+        return Vec::new();
+    }
+
+    let line_length = line_length.max(1);
+    let mut len = if first_length == 0 {
+        line_length
+    } else {
+        first_length.max(1)
+    };
+    let mut output = Vec::new();
+    let mut line = String::new();
+
+    for mut word in value.split_whitespace().map(str::to_string) {
+        if line.len() + word.len() > len && !line.is_empty() {
+            output.push(line.trim_end().to_string());
+            len = line_length;
+            line.clear();
+        }
+
+        while word.len() > len {
+            output.push(word[..len].to_string());
+            word = word[len..].to_string();
+            len = line_length;
+        }
+
+        line.push_str(&word);
+        line.push(' ');
+    }
+
+    let trimmed = line.trim_end();
+    if !trimmed.is_empty() {
+        output.push(trimmed.to_string());
+    }
+    output
+}
+
+pub fn word_wrap2(value: &str, line_length: usize, first_length: usize) -> Vec<String> {
+    if value.is_empty() {
+        return Vec::new();
+    }
+
+    let line_length = line_length.max(1);
+    let mut len = if first_length == 0 {
+        line_length
+    } else {
+        first_length.max(1)
+    };
+    let mut output = Vec::new();
+    let mut start = 0usize;
+    let bytes = value.as_bytes();
+
+    loop {
+        let mut end = (start + len).saturating_sub(1).min(bytes.len() - 1);
+        if end + 1 == bytes.len() {
+            if start != end + 1 {
+                output.push(value[start..=end].to_string());
+            }
+            return output;
+        }
+
+        let mut pos = end;
+        while pos > start {
+            if bytes[pos].is_ascii_whitespace() && !bytes[pos + 1].is_ascii_whitespace() {
+                end = pos;
+                break;
+            }
+            pos -= 1;
+        }
+
+        if start != end + 1 {
+            output.push(value[start..=end].to_string());
+        }
+        len = line_length;
+        start = end + 1;
+    }
+}
+
+pub fn simple_wordexp(value: &str) -> Vec<String> {
+    let mut temp = String::new();
+    let mut in_string = false;
+    let mut escape = false;
+    let mut args = Vec::new();
+
+    for ch in value.chars() {
+        if in_string {
+            if escape {
+                if ch != '"' && ch != '\\' {
+                    temp.push('\\');
+                }
+                escape = false;
+                temp.push(ch);
+            } else if ch == '"' {
+                in_string = false;
+            } else if ch == '\\' {
+                escape = true;
+            } else {
+                temp.push(ch);
+            }
+        } else if escape {
+            escape = false;
+            temp.push(ch);
+        } else if ch == '"' {
+            in_string = true;
+        } else if ch == '\\' {
+            escape = true;
+        } else if ch.is_ascii_whitespace() {
+            if !temp.is_empty() {
+                args.push(std::mem::take(&mut temp));
+            }
+        } else {
+            temp.push(ch);
+        }
+    }
+
+    if !in_string && !temp.is_empty() {
+        args.push(temp);
+    }
+    args
 }
 
 fn base64_value(byte: u8) -> Option<u8> {
@@ -267,5 +423,44 @@ mod tests {
         assert_eq!(charbuf_seekoff(12, 0, 10, 5, 0), Some(2));
         assert_eq!(charbuf_seekoff(1, 1, 10, 5, 3), Some(4));
         assert_eq!(charbuf_seekoff(2, 2, 10, 5, 0), Some(3));
+    }
+
+    #[test]
+    fn wraps_words_like_cpp_utils() {
+        assert_eq!(
+            word_wrap(
+                "This   is   a    test    1234567890abcdefghij1234 a   ",
+                10,
+                12
+            ),
+            vec!["This is a", "test", "1234567890", "abcdefghij", "1234 a"]
+        );
+        assert_eq!(
+            word_wrap2(
+                "This   is   a    test    1234567890abcdefghij1234 a   ",
+                10,
+                12
+            ),
+            vec![
+                "This   is   ",
+                "a    ",
+                "test    ",
+                "1234567890",
+                "abcdefghij",
+                "1234 a   "
+            ]
+        );
+    }
+
+    #[test]
+    fn expands_simple_shell_words_like_cpp_utils() {
+        assert_eq!(
+            simple_wordexp("fo\"o\\n= \"b\\\"   ar\" \"b"),
+            vec!["foo\\n= b\"", "ar b"]
+        );
+        assert_eq!(
+            simple_wordexp("a b   c   def \"ghi jkl\""),
+            vec!["a", "b", "c", "def", "ghi jkl"]
+        );
     }
 }

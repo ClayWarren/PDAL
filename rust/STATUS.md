@@ -83,15 +83,15 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `835 / 927` individual C++ GoogleTest cases, or `90.08%`,
+Current checkpoint: `881 / 927` individual C++ GoogleTest cases, or `95.04%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
 
-Current C++ compatibility wrapper/adapter surface: `15,259` code LOC across
+Current C++ compatibility wrapper/adapter surface: `15,351` code LOC across
 `113` first-party C++ files that include or directly declare Rust C ABI entry
-points, split approximately as `pdal/` 7,295 LOC, `filters/` 5,680 LOC, and
+points, split approximately as `pdal/` 7,387 LOC, `filters/` 5,680 LOC, and
 `io/` 2,284 LOC. This is a coarse ceiling because several files still mix real
 legacy implementation with wrapper calls; the number should shrink as wrappers
 are split from implementation.
@@ -123,6 +123,8 @@ Known mixed binaries:
   remains C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: only `calculateBounds` counts. The broader point
   view/table data model is still C++.
+- `pdal_eigen_test`: only `calcBounds` counts. The bounds calculation routes
+  through the Rust C ABI; Eigen matrix behavior and math helpers remain C++.
 - `pdal_bounds_test`: only `test_ctor`, `test_clip`, `test_intersect`,
   `test_grow`, `test_bounds_grow_2_3_args`, `test_invalid`, `test_input`,
   `test_parse`, `test_parse2`, `test_parse_geojson`, `test_2d_input`,
@@ -131,8 +133,10 @@ Known mixed binaries:
   through the Rust C ABI. Equality, accessors, formatting, WKT/GeoJSON output,
   SRS bounds, and `ProgramArgs` plumbing remain C++.
 - `pdal_utils_test`: only `test_base64`, `blanks`, `replaceAll`,
-  `escapeNonprinting`, and `escapeJSON` count. Other utility cases still test
-  C++ templates, stream helpers, process helpers, or local formatting behavior.
+  `escapeNonprinting`, `escapeJSON`, `wordWrap`, `wordWrap2`, and
+  `simpleWordexpTest`, `splitChar`, `split2Char`, `case`, `starts`, and
+  `iequals` count. Other utility cases still test C++ templates, stream
+  helpers, process helpers, or local formatting behavior.
 - `pdal_file_utils_test`: only `test_toAbsolutePath`, `test_getDirectory`,
   `test_isAbsolute`, `filename`, `extension`, and `stem` count. Path
   normalization helpers route through the Rust C ABI. Filesystem mutation,
@@ -220,6 +224,30 @@ Known mixed binaries:
 - `pdal_io_las_reader_test` and `pdal_io_las_writer_test`: do not count as
   binaries yet. Rust LAS/LAZ exists, but the C++ reader/writer wrappers still
   have substantial legacy header, VLR, SRS, streaming, and option behavior.
+- `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
+  `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
+  `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`
+  count. Text parsing and point production route through the Rust C ABI; C++
+  warning plumbing remains wrapper behavior.
+- `pdal_io_text_writer_test`: `t1`, `t2`, `t2stream`, `precision`, and
+  `geojson` count. Text and GeoJSON output route through the Rust C ABI.
+- `pdal_io_pts_reader_test`: `ReadPtsExtraDims`, `ReadPtsThreeDims`, and
+  `ReadPtsFourDims` count. Constructor/factory registration remains C++.
+- `pdal_io_ptx_reader_test`: `Basic`, `DiscardMissingPointsWithComplexTransform`,
+  `MultipleClouds`, and `NoColor` count. PTX parsing and missing-point handling
+  route through the Rust C ABI.
+- `pdal_io_qfit_test`: `test_10_word` and `test_14_word` count. QFIT binary
+  point decoding routes through the Rust C ABI.
+- `pdal_io_obj_reader_test`: `NoFace`, `NoVertex`, `Read`,
+  `FourDimensionRead`, `TexturesAndNormals`, and `LargeFile` count. OBJ point
+  and mesh extraction route through the Rust C ABI.
+- `pdal_io_gltf_writer_test`: all 4 tests count; GLTF mesh output routes
+  through the Rust C ABI.
+- `pdal_io_faux_test`: `test_constant_mode_sequential_iter`,
+  `test_random_mode`, `test_ramp_mode_1`, `test_ramp_mode_2`,
+  `test_return_number`, `one_point`, and `grid` count. Constant, ramp, and grid
+  point generation route through the Rust C ABI; uniform/normal random
+  generation and seed validation remain C++.
 
 ## Command-Ready Filters
 

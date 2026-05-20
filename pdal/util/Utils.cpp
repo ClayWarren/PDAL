@@ -34,6 +34,8 @@
 
 #include <pdal/util/Utils.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <cassert>
 #include <cctype>
 #include <cstdlib>
@@ -78,6 +80,19 @@ std::string takeRustString(char* value)
     return result;
 }
 
+StringList takeRustStringList(char* value)
+{
+    std::string json = takeRustString(value);
+    try
+    {
+        return NL::json::parse(json).get<StringList>();
+    }
+    catch (NL::json::exception&)
+    {
+        return StringList();
+    }
+}
+
 } // unnamed namespace
 #endif
 
@@ -97,6 +112,57 @@ double Utils::random(double minimum, double maximum)
     assert(t <= maximum);
 
     return t;
+}
+
+std::string Utils::tolower(const std::string& s)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_to_lower(s.c_str()));
+#else
+    std::string out;
+    for (size_t i = 0; i < s.size(); ++i)
+        out += (char)std::tolower(s[i]);
+    return out;
+#endif
+}
+
+std::string Utils::toupper(const std::string& s)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_to_upper(s.c_str()));
+#else
+    std::string out;
+    for (size_t i = 0; i < s.size(); ++i)
+        out += (char)std::toupper(s[i]);
+    return out;
+#endif
+}
+
+bool Utils::iequals(const std::string& s, const std::string& s2)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_iequals(s.c_str(), s2.c_str());
+#else
+    if (s.length() != s2.length())
+        return false;
+    for (size_t i = 0; i < s.length(); ++i)
+        if (std::toupper(s[i]) != std::toupper(s2[i]))
+            return false;
+    return true;
+#endif
+}
+
+bool Utils::startsWith(const std::string& s, const std::string& prefix)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_starts_with(s.c_str(), prefix.c_str());
+#else
+    if (prefix.empty())
+        return true;
+    if (prefix.size() > s.size())
+        return false;
+    return (strncmp(prefix.data(), s.data(), prefix.size()) == 0);
+#endif
 }
 
 int Utils::getenv(const std::string& name, std::string& val)
@@ -358,6 +424,26 @@ std::string Utils::replaceAll(std::string result,
 #endif
 }
 
+StringList Utils::split(const std::string& s, char tChar)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustStringList(pdal_utils_split_char(s.c_str(), tChar));
+#else
+    auto pred = [tChar](char c) { return (c == tChar); };
+    return split(s, pred);
+#endif
+}
+
+StringList Utils::split2(const std::string& s, char tChar)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustStringList(pdal_utils_split2_char(s.c_str(), tChar));
+#else
+    auto pred = [tChar](char c) { return (c == tChar); };
+    return split2(s, pred);
+#endif
+}
+
 std::string Utils::escapeJSON(const std::string& str)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI
@@ -406,6 +492,10 @@ std::string Utils::escapeJSON(const std::string& str)
 StringList Utils::wordWrap(std::string const& s, size_t lineLength,
                            size_t firstLength)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustStringList(
+        pdal_utils_word_wrap(s.c_str(), lineLength, firstLength));
+#else
     std::vector<std::string> output;
     if (s.empty())
         return output;
@@ -441,11 +531,16 @@ StringList Utils::wordWrap(std::string const& s, size_t lineLength,
     if (!line.empty())
         output.push_back(line);
     return output;
+#endif
 }
 
 StringList Utils::wordWrap2(std::string const& s, size_t lineLength,
                             size_t firstLength)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustStringList(
+        pdal_utils_word_wrap2(s.c_str(), lineLength, firstLength));
+#else
     std::vector<std::string> output;
     if (s.empty())
         return output;
@@ -484,6 +579,7 @@ StringList Utils::wordWrap2(std::string const& s, size_t lineLength,
         startPos = endPos + 1;
     }
     return output;
+#endif
 }
 
 /// Demangle strings using the compiler-provided demangle function.
@@ -578,6 +674,9 @@ double Utils::normalizeLongitude(double longitude)
 
 std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustStringList(pdal_utils_simple_wordexp(cmdline.c_str()));
+#else
     std::string temp;
     bool instring = false;
     bool escape = false;
@@ -626,6 +725,7 @@ std::vector<std::string> Utils::simpleWordexp(const std::string& cmdline)
     if (!instring && temp.size())
         cmdArgs.push_back(temp);
     return cmdArgs;
+#endif
 }
 
 } // namespace pdal

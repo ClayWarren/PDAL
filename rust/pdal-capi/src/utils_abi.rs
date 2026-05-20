@@ -1,7 +1,8 @@
 use pdal_core::utils::{
     base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, escape_json,
-    escape_nonprinting_bytes, looks_like_json, normalize_longitude, replace_all, trim_leading,
-    trim_trailing,
+    escape_nonprinting_bytes, iequals, looks_like_json, normalize_longitude, replace_all,
+    simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper, trim_leading,
+    trim_trailing, word_wrap, word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -22,6 +23,10 @@ fn string_to_c(value: String) -> *mut c_char {
 
 fn bytes_to_c(value: Vec<u8>) -> *mut c_char {
     CString::new(value).unwrap_or_default().into_raw()
+}
+
+fn string_list_to_c(values: Vec<String>) -> *mut c_char {
+    string_to_c(serde_json::to_string(&values).unwrap_or_else(|_| "[]".to_string()))
 }
 
 unsafe fn c_string(ptr: *const c_char) -> String {
@@ -64,6 +69,44 @@ pub unsafe extern "C" fn pdal_utils_replace_all(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn pdal_utils_to_lower(value: *const c_char) -> *mut c_char {
+    string_to_c(to_lower(&c_string(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_to_upper(value: *const c_char) -> *mut c_char {
+    string_to_c(to_upper(&c_string(value)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_iequals(left: *const c_char, right: *const c_char) -> bool {
+    iequals(&c_string(left), &c_string(right))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_starts_with(
+    value: *const c_char,
+    prefix: *const c_char,
+) -> bool {
+    starts_with(&c_string(value), &c_string(prefix))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_split_char(value: *const c_char, split: c_char) -> *mut c_char {
+    let split = split as u8 as char;
+    string_list_to_c(split_char(&c_string(value), split))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_split2_char(
+    value: *const c_char,
+    split: c_char,
+) -> *mut c_char {
+    let split = split as u8 as char;
+    string_list_to_c(split2_char(&c_string(value), split))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn pdal_utils_escape_json(value: *const c_char) -> *mut c_char {
     string_to_c(escape_json(&c_string(value)))
 }
@@ -76,6 +119,37 @@ pub unsafe extern "C" fn pdal_utils_escape_nonprinting(value: *const c_char) -> 
 #[no_mangle]
 pub extern "C" fn pdal_utils_normalize_longitude(longitude: f64) -> f64 {
     normalize_longitude(longitude)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_word_wrap(
+    value: *const c_char,
+    line_length: u64,
+    first_length: u64,
+) -> *mut c_char {
+    string_list_to_c(word_wrap(
+        &c_string(value),
+        line_length as usize,
+        first_length as usize,
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_word_wrap2(
+    value: *const c_char,
+    line_length: u64,
+    first_length: u64,
+) -> *mut c_char {
+    string_list_to_c(word_wrap2(
+        &c_string(value),
+        line_length as usize,
+        first_length as usize,
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_simple_wordexp(value: *const c_char) -> *mut c_char {
+    string_list_to_c(simple_wordexp(&c_string(value)))
 }
 
 #[no_mangle]

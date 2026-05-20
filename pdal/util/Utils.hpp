@@ -176,26 +176,14 @@ inline double sround(double r)
 
   \return  Converted string.
 **/
-inline std::string tolower(const std::string& s)
-{
-    std::string out;
-    for (size_t i = 0; i < s.size(); ++i)
-        out += (char)std::tolower(s[i]);
-    return out;
-}
+PDAL_EXPORT std::string tolower(const std::string& s);
 
 /**
   Convert a string to uppercase.
 
   \return  Converted string.
 */
-inline std::string toupper(const std::string& s)
-{
-    std::string out;
-    for (size_t i = 0; i < s.size(); ++i)
-        out += (char)std::toupper(s[i]);
-    return out;
-}
+PDAL_EXPORT std::string toupper(const std::string& s);
 
 /**
   Compare strings in a case-insensitive manner.
@@ -204,15 +192,7 @@ inline std::string toupper(const std::string& s)
   \param s2  Second string to compare.
   \return  Whether the strings are equal.
 */
-inline bool iequals(const std::string& s, const std::string& s2)
-{
-    if (s.length() != s2.length())
-        return false;
-    for (size_t i = 0; i < s.length(); ++i)
-        if (std::toupper(s[i]) != std::toupper(s2[i]))
-            return false;
-    return true;
-}
+PDAL_EXPORT bool iequals(const std::string& s, const std::string& s2);
 
 /**
   Determine if a string starts with a particular prefix.
@@ -221,14 +201,7 @@ inline bool iequals(const std::string& s, const std::string& s2)
   \param prefix  Prefix to search for.
   \return  Whether the string begins with the prefix.
 */
-inline bool startsWith(const std::string& s, const std::string& prefix)
-{
-    if (prefix.empty())
-        return true;
-    if (prefix.size() > s.size())
-        return false;
-    return (strncmp(prefix.data(), s.data(), prefix.size()) == 0);
-}
+PDAL_EXPORT bool startsWith(const std::string& s, const std::string& prefix);
 
 /**
   Determine if a string ends with a particular postfix.
@@ -583,12 +556,7 @@ PDAL_EXPORT std::vector<std::string> split2(const std::string& s, PREDICATE p)
   \param p  Character indicating split positions.
   \return  Substrings.
 */
-inline PDAL_EXPORT std::vector<std::string> split(const std::string& s,
-                                                  char tChar)
-{
-    auto pred = [tChar](char c) { return (c == tChar); };
-    return split(s, pred);
-}
+PDAL_EXPORT std::vector<std::string> split(const std::string& s, char tChar);
 
 /**
   Split a string into substrings based a splitting character.  The
@@ -599,12 +567,7 @@ inline PDAL_EXPORT std::vector<std::string> split(const std::string& s,
   \param p  Character indicating split positions.
   \return  Substrings.
 */
-inline PDAL_EXPORT std::vector<std::string> split2(const std::string& s,
-                                                   char tChar)
-{
-    auto pred = [tChar](char c) { return (c == tChar); };
-    return split2(s, pred);
-}
+PDAL_EXPORT std::vector<std::string> split2(const std::string& s, char tChar);
 
 /**
   Perform shell-style word expansion (break a string into arguments).
