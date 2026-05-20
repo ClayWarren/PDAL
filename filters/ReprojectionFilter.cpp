@@ -34,9 +34,12 @@
 
 #include "ReprojectionFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
 #include <pdal/PointView.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -161,18 +164,20 @@ void ReprojectionFilter::createTransform(const SpatialReference& srsSRS)
 PointViewSet ReprojectionFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
-    PointViewPtr outView = view->makeNew();
-
-    createTransform(view->spatialReference());
-
-    PointRef point(*view, 0);
-    for (PointId id = 0; id < view->size(); ++id)
+    std::string inSrsText = m_inSRS.getWKT();
+    const char* inSrs = m_inferInputSRS ? nullptr : inSrsText.c_str();
+    pdal_stage_t* stage = pdal_stage_create_reprojection(
+        m_outSRS.getWKT().c_str(), inSrs, m_errorOnFailure);
+    if (!stage)
     {
-        point.setPointId(id);
-        if (processOne(point))
-            outView->appendPoint(*view, id);
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(std::string("filters.reprojection: ") + message);
+        throwError("Failed to create Rust reprojection stage.");
     }
 
+    PointViewPtr outView = rust_view_converter::runSingle(stage, view);
+    pdal_stage_destroy(stage);
     viewSet.insert(outView);
     return viewSet;
 }
