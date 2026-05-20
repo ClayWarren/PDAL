@@ -83,6 +83,11 @@ void ProjPipelineFilter::initialize()
     createTransform(m_coordOperation, m_reverseTransfo);
 }
 
+void ProjPipelineFilter::prepared(PointTableRef table)
+{
+    m_layout = table.layout();
+}
+
 void ProjPipelineFilter::createTransform(const std::string coordOperation,
                                          bool reverseTransfo)
 {
@@ -127,6 +132,25 @@ PointViewSet ProjPipelineFilter::run(PointViewPtr view)
 
 bool ProjPipelineFilter::processOne(PointRef& point)
 {
+    if (!m_reverseTransfo)
+    {
+        pdal_stage_t* stage = pdal_stage_create_projpipeline(
+            m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), false);
+        if (!stage)
+            rust_view_converter::throwLastError(
+                "Failed to create Rust projpipeline stage.");
+
+        pdal_point_view_t* rustView =
+            rust_view_converter::toRustPoint(point, m_layout);
+        bool ok = pdal_stage_process_one_at(stage, rustView, 0);
+        rust_view_converter::fromRustPoint(rustView, 0, point);
+        pdal_point_view_destroy(rustView);
+        pdal_stage_destroy(stage);
+        if (rust_view_converter::hasLastError())
+            rust_view_converter::throwLastError("Rust projpipeline failed.");
+        return ok;
+    }
+
     double x(point.getFieldAs<double>(Dimension::Id::X));
     double y(point.getFieldAs<double>(Dimension::Id::Y));
     double z(point.getFieldAs<double>(Dimension::Id::Z));

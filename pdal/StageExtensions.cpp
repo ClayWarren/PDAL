@@ -36,6 +36,7 @@
 
 #include <pdal/StageExtensions.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -47,6 +48,25 @@ namespace
 //  are defined in the stage files themselves.
 
 using Extensions = std::map<std::string, StringList>;
+
+std::string takeRustString(char* value)
+{
+    std::string output(value ? value : "");
+    pdal_string_free(value);
+    return output;
+}
+
+std::string inferredReaderForExtension(const std::string& extension)
+{
+    return takeRustString(
+        pdal_infer_reader_driver(("stage." + extension).c_str()));
+}
+
+std::string inferredWriterForExtension(const std::string& extension)
+{
+    return takeRustString(
+        pdal_infer_writer_driver(("stage." + extension).c_str()));
+}
 
 static const Extensions readerExtensions = {
     {"readers.arrow", {"feather", "parquet"}},
@@ -116,18 +136,40 @@ void StageExtensions::set(const std::string& stage, const StringList& exts)
 // are specified without the leading '.'
 std::string StageExtensions::defaultReader(const std::string& extension)
 {
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        auto it = m_readers.find(extension);
+        if (it != m_readers.end())
+            return it->second;
+    }
+
+    std::string inferred = inferredReaderForExtension(extension);
+    if (!inferred.empty())
+        return inferred;
+
     load();
     std::lock_guard<std::mutex> lock(m_mutex);
-    return (m_readers[extension]);
+    return m_readers[extension];
 }
 
 // Get the default writer associated with an extension.  Extensions
 // are specified without the leading '.'
 std::string StageExtensions::defaultWriter(const std::string& extension)
 {
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        auto it = m_writers.find(extension);
+        if (it != m_writers.end())
+            return it->second;
+    }
+
+    std::string inferred = inferredWriterForExtension(extension);
+    if (!inferred.empty())
+        return inferred;
+
     load();
     std::lock_guard<std::mutex> lock(m_mutex);
-    return (m_writers[extension]);
+    return m_writers[extension];
 }
 
 StringList StageExtensions::extensions(const std::string& stage)

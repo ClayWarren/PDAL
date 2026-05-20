@@ -67,6 +67,15 @@
 #include "Inserter.hpp"
 #include "Utils.hpp"
 
+extern "C"
+{
+    bool pdal_uuid_parse(const char* input, uint8_t* outBytes);
+    char* pdal_uuid_unparse(const uint8_t* bytes);
+    bool pdal_uuid_random(uint8_t* outBytes);
+    bool pdal_uuid_is_null(const uint8_t* bytes);
+    void pdal_string_free(char* ptr);
+}
+
 namespace pdal
 {
 
@@ -174,55 +183,21 @@ public:
 
     bool parse(const std::string& s)
     {
-        if (s.length() != 36)
+        uint8_t bytes[16];
+        if (!pdal_uuid_parse(s.c_str(), bytes))
             return false;
-
-        // Format validation.
-        const char* cp = s.data();
-        for (size_t i = 0; i < 36; i++)
-        {
-            if ((i == 8) || (i == 13) || (i == 18) || (i == 23))
-            {
-                if (*cp != '-')
-                    return false;
-            }
-            else if (!isxdigit(*cp))
-                return false;
-            ++cp;
-        }
-
-        cp = s.data();
-        m_data.time_low = strtoul(cp, nullptr, 16);
-        m_data.time_mid = (uint16_t)strtoul(cp + 9, nullptr, 16);
-        m_data.time_hi_and_version = (uint16_t)strtoul(cp + 14, nullptr, 16);
-        m_data.clock_seq = (uint16_t)strtoul(cp + 19, nullptr, 16);
-
-        // Extract bytes as pairs of hex digits.
-        cp = s.data() + 24;
-        char buf[3];
-        buf[2] = 0;
-        for (size_t i = 0; i < 6; i++)
-        {
-            buf[0] = *cp++;
-            buf[1] = *cp++;
-            m_data.node[i] = (uint8_t)strtoul(buf, nullptr, 16);
-        }
+        unpack(reinterpret_cast<const char*>(bytes));
         return true;
     }
 
     std::string unparse() const
     {
-        Utils::StringStreamClassicLocale out;
-
-        out << std::hex << std::uppercase << std::setfill('0');
-        out << std::setw(8) << m_data.time_low << '-';
-        out << std::setw(4) << m_data.time_mid << '-';
-        out << std::setw(4) << m_data.time_hi_and_version << '-';
-        out << std::setw(2) << (m_data.clock_seq >> 8);
-        out << std::setw(2) << (m_data.clock_seq & 0xFF) << '-';
-        for (size_t i = 0; i < 6; ++i)
-            out << std::setw(2) << (int)m_data.node[i];
-        return out.str();
+        uint8_t bytes[16];
+        pack(reinterpret_cast<char*>(bytes));
+        char* text = pdal_uuid_unparse(bytes);
+        std::string output(text ? text : "");
+        pdal_string_free(text);
+        return output;
     }
 
     std::string toString() const
@@ -237,11 +212,9 @@ public:
 
     bool isNull() const
     {
-        const char* c = (const char*)&m_data;
-        for (size_t i = 0; i < sizeof(m_data); ++i)
-            if (*c++ != 0)
-                return false;
-        return true;
+        uint8_t bytes[16];
+        pack(reinterpret_cast<char*>(bytes));
+        return pdal_uuid_is_null(bytes);
     }
 
     static constexpr size_t size()
@@ -258,7 +231,11 @@ class PDAL_EXPORT RandomUuid : public Uuid
 public:
     RandomUuid()
     {
-        m_data.randomize();
+        uint8_t bytes[16];
+        if (pdal_uuid_random(bytes))
+            unpack(reinterpret_cast<const char*>(bytes));
+        else
+            m_data.randomize();
     }
 };
 

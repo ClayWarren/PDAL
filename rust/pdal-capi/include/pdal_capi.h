@@ -67,6 +67,10 @@ extern "C"
     char* pdal_utils_base64_encode(const uint8_t* bytes, uint64_t len);
     uint8_t* pdal_utils_base64_decode(const char* value, uint64_t* out_len);
     void pdal_u8_array_free(uint8_t* ptr, uint64_t len);
+    bool pdal_uuid_parse(const char* input, uint8_t* out_bytes);
+    char* pdal_uuid_unparse(const uint8_t* bytes);
+    bool pdal_uuid_random(uint8_t* out_bytes);
+    bool pdal_uuid_is_null(const uint8_t* bytes);
     int64_t pdal_charbuf_seekpos(int64_t pos, int64_t offset, int64_t len,
                                  bool for_output);
     int64_t pdal_charbuf_seekoff(int64_t off, uint8_t dir, int64_t offset,

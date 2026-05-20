@@ -26,4 +26,5 @@ pub mod spatial;
 pub mod srs;
 pub mod stage;
 pub mod utils;
+pub mod uuid;
 pub mod xml_schema;

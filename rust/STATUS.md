@@ -58,21 +58,40 @@ Status definitions:
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
 | Broad kernels/apps/tools migration | deferred | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels, `apps/pdal.cpp`, `lasdump`, and `nitfwrap` wait on lower-layer parity. |
 
+## Root-Level Migration Status
+
+The Rust port is not complete just because Rust-backed tests pass. The root
+build, install, packaging, CI, examples, and docs must also describe and verify
+the Rust-backed shape of PDAL.
+
+| Area | Status | Notes |
+|---|---|---|
+| Root CMake | in progress | `libpdal_capi.a` is built and linked into `pdalcpp`, but the source dependency list must continue tracking every Rust crate that can affect the C ABI or linked implementation. |
+| `cmake/` modules | in progress | Rust build options, install rules, CPack/source-package behavior, platform link details, and test wiring should move here as the integration matures instead of accumulating in root `CMakeLists.txt`. |
+| `pixi.toml` | not ready | The developer environment still assumes a C++/conda-only build shape and should explicitly provide the Rust toolchain used by the port. |
+| GitHub workflows | not ready | Linux, macOS, Windows, pixi, conda, and release workflows need explicit Rust toolchain setup and Rust/C++ parity gates before the port is upstreamable. |
+| `PDALConfig.cmake.in` | not ready | Downstream `find_package(PDAL)` must keep working. Decide whether the Rust C ABI remains an internal implementation detail of `pdalcpp` or is exported as a stable target/header surface. |
+| `pdal_features.hpp.in` | not ready | Add a generated Rust-backed-build feature only if C++ wrappers or downstream code need a supported conditional. Avoid broad preprocessor branching. |
+| `dimbuilder/` | prototype | `dimbuilder` currently uses `PDAL_UTILS_NO_RUST_CAPI` while compiling `Utils.cpp` standalone. Keep this as an intentional generator-tool exception or replace it with a cleaner build path. |
+| `package.sh` and release packaging | not ready | Release packaging still assumes C++ build tools only and must learn the Rust toolchain, Rust sources, licenses, and generated artifacts before release use. |
+| `examples/` | deferred | Examples should prove installed Rust-backed PDAL works after the C ABI, C++ wrapper, and install/export story stabilizes. |
+| `doc/` | deferred | Public docs should be updated once build, install, plugin, and ABI boundaries are stable enough to describe accurately. |
+
 ## C++ Test Parity Accounting
 
 The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `789 / 927` individual C++ GoogleTest cases, or `85.11%`,
+Current checkpoint: `835 / 927` individual C++ GoogleTest cases, or `90.08%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
 
-Current C++ compatibility wrapper/adapter surface: `14,929` code LOC across
-`111` first-party C++ files that include or directly declare Rust C ABI entry
-points, split approximately as `pdal/` 6,986 LOC, `filters/` 5,659 LOC, and
+Current C++ compatibility wrapper/adapter surface: `15,259` code LOC across
+`113` first-party C++ files that include or directly declare Rust C ABI entry
+points, split approximately as `pdal/` 7,295 LOC, `filters/` 5,680 LOC, and
 `io/` 2,284 LOC. This is a coarse ceiling because several files still mix real
 legacy implementation with wrapper calls; the number should shrink as wrappers
 are split from implementation.
@@ -136,15 +155,22 @@ Known mixed binaries:
   behavior, iterators, and row/column tables remain C++.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
-- `pdal_stage_factory_test`: only `extensionTest` counts; reader/writer driver
-  inference routes through the Rust C ABI. Plugin loading and per-instance
-  extension tables remain C++.
+- `pdal_config_test`: all 1 test counts; version integer and full-version
+  formatting route through the Rust C ABI while compile-time version constants
+  remain C++.
+- `pdal_log_test`: only `t1` counts; level-name formatting routes through the
+  Rust C ABI. File output, devnull routing, and CLI logging remain C++.
+- `pdal_stage_factory_test`: only `extensionTest` and
+  `stageExtensionsLoadPerInstance` count; reader/writer driver inference and
+  default extension lookup route through the Rust C ABI. Plugin loading and
+  custom extension overrides remain C++.
 - `pdal_plugin_manager_test`: only `validnames` counts; plugin filename
   validation routes through the Rust C ABI. Plugin registration and object
   creation remain C++.
-- `pdal_options_test`: only `valid` counts; option-name validation routes
-  through the Rust C ABI. Option storage, conditional merging, metadata, JSON,
-  and `ProgramArgs` behavior remain mixed C++.
+- `pdal_options_test`: `valid`, `programargs`, `nan`, `doublepreicison`, and
+  `issue_4751` count; option-name validation and command-line argument
+  formatting route through the Rust C ABI, and JSON scalar formatting uses Rust
+  metadata helpers. Option storage and conditional merging remain C++.
 - `pdal_polygon_test`: only `valid` counts; geometry validity routes through
   the Rust native geometry ABI. Polygon construction, serialization, bounds,
   simplification, and point coverage remain C++/GDAL.
@@ -153,9 +179,44 @@ Known mixed binaries:
 - `pdal_xml_schema_test`: only `legacyNames` counts; legacy dimension-name
   remapping routes through the Rust C ABI. XML parsing, metadata, xforms, and
   schema round-tripping remain C++/libxml.
-- `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
-  JSON formatting use Rust helpers, but the metadata tree implementation is
-  still C++.
+- `pdal_uuid_test`: all 3 tests count; UUID parsing, canonical formatting,
+  null checks, and v4 random byte generation route through the Rust C ABI while
+  C++ keeps the small value wrapper.
+- `pdal_ogr_arg_test`: only `parseErrors` counts; OGR JSON option validation
+  routes through the Rust C ABI. Geometry loading and polygon extraction remain
+  C++/GDAL.
+- `pdal_filters_crop_test`: only `test_crop`, `test_crop_3d`,
+  `test_crop_polygon`, `multibounds`, `circle`, `sphere`, and
+  `test_crop_on_edge` count. The crop selection itself routes through the Rust
+  C ABI. SRS reprojection, OGR geometry loading, and streaming `processOne`
+  behavior remain C++/GDAL.
+- `pdal_filters_colorinterp_test`: `minmax`, `badramp`, `autorange`, `k`, and
+  `mad` count. Color interpolation execution routes through the Rust C ABI.
+  Missing-dimension validation and streamability checks remain C++ wrapper
+  behavior.
+- `pdal_filters_colorization_test`: `test1`, `test2`, `test3`, and `test5`
+  count. Color sampling and point updates route through the Rust C ABI. Invalid
+  dimension-name validation remains C++ layout behavior.
+- `pdal_filters_hag_test`: `dem` and `dem_clamps` count for `filters.hag_dem`.
+  The DEM sampling and HAG assignment route through the Rust C ABI.
+- `pdal_filters_h3_test`: only `stream_test_2` counts; H3 indexing routes
+  through the Rust C ABI. Stage creation remains C++ factory behavior.
+- `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry
+  distance calculation routes through the Rust C ABI.
+- `pdal_filters_overlay_test`: all 2 tests count; overlay point mutation
+  routes through the Rust C ABI after C++/GDAL datasource setup.
+- `pdal_filters_reprojection_test`: all 3 tests count; coordinate
+  reprojection routes through the Rust C ABI.
+- `pdal_filters_divider_test`: `partition_count`, `partition_capacity`,
+  `round_robin_count`, `round_robin_capacity`, `break_on_expression`, and
+  `break_on_userdata` count. View partitioning routes through the Rust C ABI.
+  Option validation and C++ expression evaluation remain C++.
+- `pdal_filters_sparsesurface_test`: only `lowest_is_ground_rest_low_noise`
+  counts; classification assignment routes through the Rust C ABI. Factory
+  registration and equal-class option validation remain C++.
+- `pdal_metadata_test`: only `typed_value`, `test_float`, and `infnan` count.
+  Scalar conversion and JSON scalar formatting route through Rust helpers. The
+  metadata tree implementation is still C++.
 - `pdal_io_las_reader_test` and `pdal_io_las_writer_test`: do not count as
   binaries yet. Rust LAS/LAZ exists, but the C++ reader/writer wrappers still
   have substantial legacy header, VLR, SRS, streaming, and option behavior.
@@ -169,6 +230,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `cluster`
 - `dbscan`
 - `decimation`
+- `divider`
 - `eigenvalues`
 - `elm`
 - `estimaterank`
@@ -196,6 +258,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `sample`
 - `separatescanline`
 - `smrf`
+- `sparsesurface`
 - `sort`
 - `splitter`
 - `stats`
@@ -213,8 +276,8 @@ are deliberately added to the registry with option parsing and coverage.
 These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
-- GDAL/PROJ/SRS/OGR-backed: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
-  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`.
+- GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
+  option-complete behavior.
 - Private or specialized algorithms: `CS`, `Delaunay`, `FaceRaster`,
   `Georeference`, `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`,
   `Miniball`, `Normal`, `PMF`, `Poisson`, `Straighten`, `Supervoxel`,

@@ -60,6 +60,7 @@ private:
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
+    void prepared(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
     bool processOne(PointRef& point) override;
 
@@ -69,6 +70,7 @@ private:
     bool m_reverseTransfo;
     std::string m_coordOperation;
     std::unique_ptr<CoordTransform> m_coordTransform;
+    PointLayoutPtr m_layout;
 };
 
 class ProjPipelineFilter::CoordTransform

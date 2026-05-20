@@ -31,6 +31,7 @@ mod stage_abi;
 mod stats_abi;
 mod tile_abi;
 mod utils_abi;
+mod uuid_abi;
 mod xml_schema_abi;
 
 pub use config_abi::*;
@@ -59,6 +60,7 @@ pub use stage_abi::*;
 pub use stats_abi::*;
 pub use tile_abi::*;
 pub use utils_abi::*;
+pub use uuid_abi::*;
 pub use xml_schema_abi::*;
 
 #[cfg(test)]
