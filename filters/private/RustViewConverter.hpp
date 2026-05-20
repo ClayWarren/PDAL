@@ -3,6 +3,7 @@
 #include <pdal/PointView.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/pdal_types.hpp>
+#include <pdal/private/Raster.hpp>
 #include <pdal_capi.h>
 
 #include <string>
@@ -57,6 +58,24 @@ inline SpatialReference spatialReference(pdal_point_view_t* rustView)
     srs.setEpoch(pdal_spatial_reference_epoch(rustSrs));
     pdal_spatial_reference_destroy(rustSrs);
     return srs;
+}
+
+inline pdal_raster_limits_t toRustLimits(const RasterLimits& limits)
+{
+    pdal_raster_limits_t rustLimits;
+    rustLimits.x_origin = limits.xOrigin;
+    rustLimits.y_origin = limits.yOrigin;
+    rustLimits.width = limits.width;
+    rustLimits.height = limits.height;
+    rustLimits.edge_length = limits.edgeLength;
+    return rustLimits;
+}
+
+inline RasterLimits fromRustLimits(const pdal_raster_limits_t& limits)
+{
+    return RasterLimits(limits.x_origin, limits.y_origin,
+                        static_cast<int>(limits.width),
+                        static_cast<int>(limits.height), limits.edge_length);
 }
 
 inline int typeId(Dimension::Type type)
@@ -124,6 +143,31 @@ inline pdal_point_view_t* toRust(PointView& inView)
                                     inView.layout()->dimName(dim).c_str(), v);
         }
     }
+    if (TriangularMesh* mesh = inView.mesh())
+    {
+        for (const Triangle& triangle : *mesh)
+        {
+            pdal_point_view_add_mesh_triangle(rust_in_view, triangle.m_a,
+                                              triangle.m_b, triangle.m_c);
+        }
+    }
+    if (Rasterd* raster = inView.raster())
+    {
+        pdal_raster_limits_t limits = toRustLimits(raster->limits());
+        if (pdal_point_view_create_raster(rust_in_view, raster->name().c_str(),
+                                          &limits, raster->initializer()))
+        {
+            for (int y = 0; y < raster->height(); ++y)
+            {
+                for (int x = 0; x < raster->width(); ++x)
+                {
+                    pdal_point_view_set_raster_cell(rust_in_view,
+                                                    raster->name().c_str(), x,
+                                                    y, raster->at(x, y));
+                }
+            }
+        }
+    }
     // Ownership of layout is transferred to rust_in_view. Do not destroy layout
     // here.
     return rust_in_view;
@@ -141,8 +185,7 @@ inline pdal_point_view_t* toRustPoint(PointRef& point, PointLayoutPtr layout)
     pdal_point_layout_t* rustLayout = pdal_point_layout_create();
     for (auto dim : layout->dims())
     {
-        pdal_point_layout_register_dim(rustLayout,
-                                       layout->dimName(dim).c_str(),
+        pdal_point_layout_register_dim(rustLayout, layout->dimName(dim).c_str(),
                                        typeId(layout->dimType(dim)));
     }
     pdal_point_view_t* rustView = pdal_point_view_create(rustLayout);
@@ -163,12 +206,72 @@ inline void fromRustPoint(pdal_point_view_t* rust_out_view, uint64_t rust_idx,
         uint64_t dimCount = pdal_point_view_dim_count(rust_out_view);
         for (uint64_t i = 0; i < dimCount; ++i)
         {
-            std::string dimName = takeString(pdal_point_view_dim_name(rust_out_view, i));
+            std::string dimName =
+                takeString(pdal_point_view_dim_name(rust_out_view, i));
             Dimension::Id id = Dimension::id(dimName);
             if (id != Dimension::Id::Unknown)
             {
-                double v = pdal_point_view_get_f64(rust_out_view, rust_idx, dimName.c_str());
+                double v = pdal_point_view_get_f64(rust_out_view, rust_idx,
+                                                   dimName.c_str());
                 outPoint.setField(id, v);
+            }
+        }
+    }
+}
+
+inline void copyMeshFromRust(pdal_point_view_t* rustView, PointView& outView)
+{
+    uint64_t triangleCount = pdal_point_view_mesh_triangle_count(rustView);
+    if (!triangleCount)
+        return;
+
+    TriangularMesh* mesh = outView.mesh();
+    if (!mesh)
+        mesh = outView.createMesh("");
+    if (!mesh)
+        return;
+
+    for (uint64_t idx = 0; idx < triangleCount; ++idx)
+    {
+        uint64_t a = 0;
+        uint64_t b = 0;
+        uint64_t c = 0;
+        if (pdal_point_view_mesh_triangle(rustView, idx, &a, &b, &c))
+            mesh->add(a, b, c);
+    }
+}
+
+inline void copyRastersFromRust(pdal_point_view_t* rustView, PointView& outView)
+{
+    uint64_t rasterCount = pdal_point_view_raster_count(rustView);
+    for (uint64_t idx = 0; idx < rasterCount; ++idx)
+    {
+        std::string name =
+            takeString(pdal_point_view_raster_name(rustView, idx));
+        pdal_raster_limits_t rustLimits;
+        if (!pdal_point_view_raster_limits(rustView, name.c_str(), &rustLimits))
+            continue;
+
+        Rasterd* raster = outView.raster(name);
+        if (!raster)
+        {
+            raster = outView.createRaster(
+                name, fromRustLimits(rustLimits),
+                pdal_point_view_raster_initializer(rustView, name.c_str()));
+        }
+        if (!raster)
+            continue;
+
+        for (int y = 0; y < raster->height(); ++y)
+        {
+            for (int x = 0; x < raster->width(); ++x)
+            {
+                double value = 0;
+                if (pdal_point_view_raster_cell(rustView, name.c_str(), x, y,
+                                                &value))
+                {
+                    raster->at(x, y) = value;
+                }
             }
         }
     }
@@ -194,6 +297,8 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
                 outView.setField(dim, out_idx, v);
             }
         }
+        copyMeshFromRust(rust_out_view, outView);
+        copyRastersFromRust(rust_out_view, outView);
     }
 }
 
@@ -217,6 +322,8 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointViewPtr baseView,
                 outView.setField(dim, out_idx, v);
             }
         }
+        copyMeshFromRust(rust_out_view, outView);
+        copyRastersFromRust(rust_out_view, outView);
     }
 }
 

@@ -216,6 +216,15 @@ extern "C"
         double sqr_dist;
     } pdal_spatial_result_t;
 
+    typedef struct
+    {
+        double x_origin;
+        double y_origin;
+        uint64_t width;
+        uint64_t height;
+        double edge_length;
+    } pdal_raster_limits_t;
+
     pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
     uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
     void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx,
@@ -238,11 +247,39 @@ extern "C"
     bool pdal_point_view_calculate_bounds_3d(const pdal_point_view_t* view,
                                              pdal_bounds3d_t* out_bounds);
     uint64_t pdal_point_view_mesh_triangle_count(const pdal_point_view_t* view);
+    uint64_t
+    pdal_point_view_named_mesh_triangle_count(const pdal_point_view_t* view,
+                                              const char* name);
     bool pdal_point_view_mesh_triangle(const pdal_point_view_t* view,
                                        uint64_t idx, uint64_t* a, uint64_t* b,
                                        uint64_t* c);
+    bool pdal_point_view_named_mesh_triangle(const pdal_point_view_t* view,
+                                             const char* name, uint64_t idx,
+                                             uint64_t* a, uint64_t* b,
+                                             uint64_t* c);
     bool pdal_point_view_add_mesh_triangle(pdal_point_view_t* view, uint64_t a,
                                            uint64_t b, uint64_t c);
+    bool pdal_point_view_add_named_mesh_triangle(pdal_point_view_t* view,
+                                                 const char* name, uint64_t a,
+                                                 uint64_t b, uint64_t c);
+    uint64_t pdal_point_view_raster_count(const pdal_point_view_t* view);
+    char* pdal_point_view_raster_name(const pdal_point_view_t* view,
+                                      uint64_t idx);
+    bool pdal_point_view_create_raster(pdal_point_view_t* view,
+                                       const char* name,
+                                       const pdal_raster_limits_t* limits,
+                                       double initializer);
+    bool pdal_point_view_raster_limits(const pdal_point_view_t* view,
+                                       const char* name,
+                                       pdal_raster_limits_t* out_limits);
+    double pdal_point_view_raster_initializer(const pdal_point_view_t* view,
+                                              const char* name);
+    bool pdal_point_view_raster_cell(const pdal_point_view_t* view,
+                                     const char* name, uint64_t x, uint64_t y,
+                                     double* out_value);
+    bool pdal_point_view_set_raster_cell(pdal_point_view_t* view,
+                                         const char* name, uint64_t x,
+                                         uint64_t y, double value);
     uint64_t pdal_point_view_knn(const pdal_point_view_t* view,
                                  const char* const* dim_names,
                                  const double* query, uint64_t dim_count,

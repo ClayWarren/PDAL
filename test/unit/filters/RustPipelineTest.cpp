@@ -36,7 +36,10 @@
 
 #include <io/FauxReader.hpp>
 
+#include <pdal/private/Raster.hpp>
+
 #include <filters/private/RustPipeline.hpp>
+#include <filters/private/RustViewConverter.hpp>
 
 using namespace pdal;
 
@@ -329,4 +332,45 @@ TEST(RustPipelineTest, fauxReaderFilterWriterPipeline)
     MetadataNode meta = pipeline.metadata();
     EXPECT_EQ(meta.name(), "pipeline");
     EXPECT_GE(meta.children().size(), 3u);
+}
+
+TEST(RustPipelineTest, viewConverterPreservesMeshAndRaster)
+{
+    PointTable table;
+    PointLayoutPtr layout(table.layout());
+    layout->registerDim(Dimension::Id::X);
+    layout->registerDim(Dimension::Id::Y);
+    layout->registerDim(Dimension::Id::Z);
+
+    PointViewPtr input(new PointView(table));
+    for (PointId idx = 0; idx < 3; ++idx)
+    {
+        input->point(idx);
+        input->setField(Dimension::Id::X, idx, static_cast<double>(idx));
+        input->setField(Dimension::Id::Y, idx, static_cast<double>(idx + 1));
+        input->setField(Dimension::Id::Z, idx, static_cast<double>(idx + 2));
+    }
+    input->createMesh("")->add(0, 1, 2);
+
+    Rasterd* raster =
+        input->createRaster("surface", RasterLimits(10, 20, 2, 2, 0.5), -1);
+    ASSERT_NE(raster, nullptr);
+    raster->at(1, 0) = 42;
+
+    pdal_point_view_t* rustView = rust_view_converter::toRust(input);
+    PointViewPtr output = rust_view_converter::fromRust(rustView, input);
+    pdal_point_view_destroy(rustView);
+
+    ASSERT_NE(output, nullptr);
+    ASSERT_NE(output->mesh(), nullptr);
+    EXPECT_EQ(output->mesh()->size(), 1u);
+    EXPECT_EQ((*output->mesh())[0].m_a, 0u);
+    EXPECT_EQ((*output->mesh())[0].m_b, 1u);
+    EXPECT_EQ((*output->mesh())[0].m_c, 2u);
+
+    Rasterd* copied = output->raster("surface");
+    ASSERT_NE(copied, nullptr);
+    EXPECT_EQ(copied->limits(), raster->limits());
+    EXPECT_EQ(copied->initializer(), -1);
+    EXPECT_EQ(copied->at(1, 0), 42);
 }
