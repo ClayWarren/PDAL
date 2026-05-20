@@ -45,10 +45,34 @@ static const StaticPluginInfo sc_info{
 
 CREATE_STATIC_STAGE(PtxReader, sc_info);
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    addOption(options, key, std::string(value ? "true" : "false"));
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 PtxReader::~PtxReader()
 {
-    if (m_istream)
-        Utils::closeFile(m_istream);
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 std::string PtxReader::getName() const
@@ -56,174 +80,31 @@ std::string PtxReader::getName() const
     return sc_info.name;
 }
 
-PtxReader::PtxHeader PtxReader::readHeader()
-{
-    // Read header from input stream. Ptx files can have multiple headers per
-    // file, each with their own column count, row count, scanner posisition and
-    // scanner transform. The 4x4 transform combines the scanner position
-    // translation and 3x3 scanner transform afaik. For the sake of this reader
-    // we actually ignore the scanner position and 3x3 transform and apply the
-    // 4x4 transform matrix instead. It possibly makes sense to validate the
-    // scanner position and 3x3 transform is the same as the 4x4 transformation
-    // matrix. Possibly this is incorrect to assume?
-    //
-    //      c                   (Column count)
-    //      r                   (Row count)
-    //      sx sy sz            (Scanner position)
-    //      s11 s21 s31         (Scanner 3x3 transformation matrix)
-    //      s12 s22 s32
-    //      s13 s23 s33
-    //      t11 t21 t31 t41     (4x4 transformation matrix)
-    //      t12 t22 t32 t42
-    //      t13 t23 t33 t43
-    //      t14 t24 t34 t44
-    //
-
-    PtxHeader header;
-    std::string buf;
-
-    if (!m_istream || !m_istream->good())
-        throwError("Unable to read header for file '" + m_filename + "'.");
-
-    // Read column count and row count.
-
-    std::getline(*m_istream, buf);
-    if (!m_istream->good())
-        throwError("Unable to read column size for file '" + m_filename + "'.");
-    Utils::trim(buf);
-    if (auto status = Utils::fromString(buf, header.m_columns); !status)
-    {
-        throwError("Invalid column size '" + buf + "' in header for file '" +
-                   m_filename + "'. " + status.what());
-    }
-
-    std::getline(*m_istream, buf);
-    if (!m_istream->good())
-        throwError("Unable to read row size for file '" + m_filename + "'.");
-    Utils::trim(buf);
-    if (auto status = Utils::fromString(buf, header.m_rows); !status)
-    {
-        throwError("Invalid row size '" + buf + "' in header for file '" +
-                   m_filename + "'. " + status.what());
-    }
-
-    // Skip scanner position and scanner 3x3 transformation matrix.
-
-    for (size_t skip = 0; skip < 4; ++skip)
-    {
-        std::getline(*m_istream, buf);
-        if (!m_istream->good())
-        {
-            throwError("Unable to skip scanner position and scanner transform "
-                       "in header for file '" +
-                       m_filename + "'.");
-        }
-    }
-
-    // Read 4x4 transformation matrix.
-
-    for (size_t ty = 0; ty < 4; ++ty)
-    {
-        std::getline(*m_istream, buf);
-        if (!m_istream->good())
-        {
-            throwError("Unable to read transform row for file '" + m_filename +
-                       "'.");
-        }
-
-        const StringList fields = Utils::split2(buf, ' ');
-        if (fields.size() != 4)
-        {
-            throwError("Invalid transform row '" + buf +
-                       "' in header for file'" + m_filename + "'.");
-        }
-
-        for (size_t tx = 0; tx < 4; ++tx)
-        {
-            double& value = header.m_transform[tx + ty * 4];
-            auto status = Utils::fromString(fields[tx], value);
-            if (!status)
-            {
-                throwError("Invalid transform value '" + fields[tx] +
-                           "' in "
-                           "header for file '" +
-                           m_filename + "'. " + status.what());
-            }
-        }
-    }
-
-    return header;
-}
-
-void PtxReader::PtxHeader::applyTransform(double& x, double& y, double& z) const
-{
-    const double x2 = x * m_transform[0] + y * m_transform[4] +
-                      z * m_transform[8] + m_transform[12];
-    const double y2 = x * m_transform[1] + y * m_transform[5] +
-                      z * m_transform[9] + m_transform[13];
-    const double z2 = x * m_transform[2] + y * m_transform[6] +
-                      z * m_transform[10] + m_transform[14];
-    x = x2;
-    y = y2;
-    z = z2;
-}
-
 void PtxReader::initialize(PointTableRef table)
 {
-    m_istream = Utils::openFile(m_filename);
-    if (!m_istream)
-        throwError("Unable to open file '" + m_filename + "'.");
-
-    // We read past the header and peek the first point of the file to determine
-    // what dimensions we are going to have. We assume each cloud in the Ptx
-    // file has the same layout.
-
-    readHeader();
-
-    // Read point from input stream. Ptx files have a similar-ish point layout
-    // to Pts files. Points will have X, Y, Z, intensity (between 0.0 and 1.0)
-    // and *optional* R, G, B. The valid configurations are:
-    //
-    //      X Y Z Intensity
-    //
-    //          or
-    //
-    //      X Y Z Intensity R G B
-    //
-    // NOTE: A 10 column Ptx file format which contains normal X Y and Z fields
-    //       after the R G B fields may exist. But I have not been able to find
-    //       an example of one.
-    //
-
-    std::string buf;
-    std::getline(*m_istream, buf);
-    if (!m_istream->good())
-        throwError("Unable to peek first point for file '" + m_filename + "'.");
-
-    const StringList fields = Utils::split2(buf, ' ');
-
-    m_dimensions = {};
-    switch (fields.size())
+    if (m_rustView)
     {
-    case 7:
-        m_dimensions.push_back(Dimension::Id::Blue);
-        m_dimensions.push_back(Dimension::Id::Green);
-        m_dimensions.push_back(Dimension::Id::Red);
-        [[fallthrough]];
-    case 4:
-        m_dimensions.push_back(Dimension::Id::Intensity);
-        m_dimensions.push_back(Dimension::Id::Z);
-        m_dimensions.push_back(Dimension::Id::Y);
-        m_dimensions.push_back(Dimension::Id::X);
-        break;
-    default:
-        throwError("Invalid number of fields for the first point in file '" +
-                   m_filename + "'.");
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
-    std::reverse(m_dimensions.begin(), m_dimensions.end());
+    m_rustIndex = 0;
 
-    Utils::closeFile(m_istream);
-    m_istream = nullptr;
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "discard_missing_points", m_discardMissingPoints);
+
+    pdal_reader_t* reader = pdal_reader_create_ptx(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PTX reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust PTX reader failed.");
 }
 
 void PtxReader::addArgs(ProgramArgs& args)
@@ -235,160 +116,47 @@ void PtxReader::addArgs(ProgramArgs& args)
 
 void PtxReader::addDimensions(PointLayoutPtr layout)
 {
-    layout->registerDims(m_dimensions);
+    m_dimensions.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
+    {
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Id id =
+            layout->registerOrAssignDim(name, Dimension::Type::Double);
+        m_dimensions.push_back(id);
+    }
 }
 
 void PtxReader::ready(PointTableRef table)
 {
-    m_istream = Utils::openFile(m_filename);
-    if (!m_istream)
-        throwError("Unable to open file '" + m_filename + "'.");
+    m_rustIndex = 0;
 }
 
 point_count_t PtxReader::read(PointViewPtr view, point_count_t numPts)
 {
-    PointId index = view->size();
     point_count_t count = 0;
-
-    PtxHeader header;
-    size_t line = 1;
-    point_count_t countPerHeader = 0;
-    std::string buf;
-
-    while (m_istream && m_istream->good() && count < numPts)
+    while (count < numPts && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        if (countPerHeader == 0 ||
-            countPerHeader == (header.m_columns * header.m_rows))
+        PointId outIdx = view->size();
+        view->point(outIdx);
+        for (Dimension::Id dim : m_dimensions)
         {
-            // Either we are at the start of the file OR we have finished
-            // reading the expected number of points for our previous header.
-            // In either case we expect now to read the next header.
-
-            if (m_istream->peek() == EOF)
-                break; // We have reached the end of the file, so we break out!
-
-            // Read next header. This will throw on failure. We are a bit
-            // stricter about this than we are with point read failures.
-
-            try
-            {
-                header = readHeader();
-            }
-            catch (...)
-            {
-                log()->get(LogLevel::Error)
-                    << "Line " << line << " in '" << m_filename
-                    << "' contains an invalid header!" << '\n';
-                throw;
-            }
-
-            line += 10;
-            countPerHeader = 0;
+            view->setField(
+                dim, outIdx,
+                pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                        view->layout()->dimName(dim).c_str()));
         }
-
-        ++countPerHeader;
-
-        std::getline(*m_istream, buf);
-        ++line;
-        if (buf.empty())
-            continue;
-
-        const StringList fields = Utils::split2(buf, ' ');
-        if (fields.size() != m_dimensions.size())
-        {
-            // As mentioned above. We assume each cloud in the Ptx file has
-            // the same number of fields.
-
-            log()->get(LogLevel::Error)
-                << "Line " << line << " in '" << m_filename << "' contains "
-                << fields.size() << " fields when " << m_dimensions.size()
-                << " were expected.  "
-                   "Ignoring."
-                << '\n';
-            continue;
-        }
-
-        // NOTE: Similar to the Ptx reader we lazily treat RGB as doubles, for
-        //       simplicity. It gets casted to the appropriate type when we set
-        //       the RGB dimension value.
-
-        std::array<double, 7> values{0.0};
-        for (size_t i = 0; i < fields.size(); ++i)
-        {
-            double value;
-            auto status = Utils::fromString(fields[i], value);
-            if (!status)
-            {
-                log()->get(LogLevel::Error)
-                    << "Can't convert "
-                       "field '"
-                    << fields[i] << "' to numeric value on line " << line
-                    << " in '" << m_filename << "'. " << status.what()
-                    << " Setting to 0." << '\n';
-                value = 0.0;
-            }
-
-            if (m_dimensions[i] == Dimension::Id::Intensity)
-            {
-                // Intensity field in Ptx is 0.0 to 1.0, we map to PDAL 0 to
-                // 4096. We don't (but possible should) check the intensity is
-                // between 0.0 and 1.0.
-
-                value *= 4096;
-            }
-
-            values[i] = value;
-        }
-
-        if (m_discardMissingPoints)
-        {
-            // Ptx files contain "fully populated" point clouds. This means they
-            // can (and likely will) contain missing points. If the discard
-            // missing points argument was set we will skip over these. A
-            // missing point is defined as a point with XYZ values of "0 0 0".
-            // We check the XYZ values were exactly 0 to determine if the point
-            // was a missing point.
-
-            if (values[0] == 0.0 && values[1] == 0.0 && values[2] == 0.0)
-            {
-                log()->get(LogLevel::Debug)
-                    << "Line " << line << " in '" << m_filename
-                    << "' is a missing point. Ignoring." << '\n';
-                continue;
-            }
-        }
-
-        // Apply the 4x4 transformation matrix for our current header to the
-        // point's X, Y and Z values.
-
-        header.applyTransform(values[0], values[1], values[2]);
-
-        // Write our field values to their dimensions.
-
-        for (size_t i = 0; i < fields.size(); ++i)
-            view->setField(m_dimensions[i], index, values[i]);
-
-        ++count;
-        ++index;
-    }
-
-    if (countPerHeader < (header.m_columns * header.m_rows))
-    {
-        log()->get(LogLevel::Warning)
-            << "Expected " << (header.m_columns * header.m_rows)
-            << " points but only " << countPerHeader << " were found." << '\n';
+        count++;
+        m_rustIndex++;
     }
 
     return count;
 }
 
-void PtxReader::done(PointTableRef table)
-{
-    if (m_istream)
-    {
-        Utils::closeFile(m_istream);
-        m_istream = nullptr;
-    }
-}
+void PtxReader::done(PointTableRef table) {}
 
 } // namespace pdal

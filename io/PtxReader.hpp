@@ -35,6 +35,7 @@
 #pragma once
 
 #include "pdal/Reader.hpp"
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -47,18 +48,6 @@ public:
     std::string getName() const override;
 
 protected:
-    struct PtxHeader
-    {
-        size_t m_columns;
-        size_t m_rows;
-        std::array<double, 16> m_transform;
-
-        void applyTransform(double& x, double& y, double& z) const;
-        PtxHeader() : m_columns(0), m_rows(0) {};
-    };
-
-    PtxHeader readHeader();
-
 private:
     void initialize(PointTableRef table) override;
     void addArgs(ProgramArgs& args) override;
@@ -69,8 +58,9 @@ private:
 
 private:
     bool m_discardMissingPoints{true};
-    std::istream* m_istream{nullptr};
     Dimension::IdList m_dimensions;
+    pdal_point_view_t* m_rustView{nullptr};
+    PointId m_rustIndex{0};
 };
 
 } // namespace pdal
