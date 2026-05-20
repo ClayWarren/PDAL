@@ -73,6 +73,7 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.sbet",
     "readers.smrmsg",
     "readers.terrasolid",
+    "readers.copc",
     "readers.las",
     "readers.laz",
     "readers.ply",
@@ -162,7 +163,9 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.terrasolid" => Ok(Box::new(pdal_io::terrasolid::TerrasolidReader::new(
             options,
         ))),
-        "readers.las" | "readers.laz" => Ok(Box::new(pdal_io::las::LasReader::new(options))),
+        "readers.copc" | "readers.las" | "readers.laz" => {
+            Ok(Box::new(pdal_io::las::LasReader::new(options)))
+        }
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
         "readers.stac" => Ok(Box::new(pdal_io::stac::StacReader::new(options))),
         "readers.tindex" => Ok(Box::new(pdal_io::tindex::TindexReader::new(options))),

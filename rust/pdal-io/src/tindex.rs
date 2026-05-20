@@ -106,7 +106,9 @@ pub(crate) fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError>
         "readers.sbet" => crate::sbet::SbetReader::new(&options).read(),
         "readers.smrmsg" => crate::smrmsg::SmrmsgReader::new(&options).read(),
         "readers.terrasolid" => crate::terrasolid::TerrasolidReader::new(&options).read(),
-        "readers.las" | "readers.laz" => crate::las::LasReader::new(&options).read(),
+        "readers.copc" | "readers.las" | "readers.laz" => {
+            crate::las::LasReader::new(&options).read()
+        }
         "readers.ply" => crate::ply::PlyReader::new(&options).read(),
         _ => Err(StageError(format!(
             "TindexReader driver '{driver}' is not available in the Rust port."
