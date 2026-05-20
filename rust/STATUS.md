@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `758 / 927` individual C++ GoogleTest cases, or `81.77%`,
+Current checkpoint: `761 / 927` individual C++ GoogleTest cases, or `82.09%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
@@ -119,6 +119,15 @@ Known mixed binaries:
   through the Rust C ABI.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
+- `pdal_stage_factory_test`: only `extensionTest` counts; reader/writer driver
+  inference routes through the Rust C ABI. Plugin loading and per-instance
+  extension tables remain C++.
+- `pdal_plugin_manager_test`: only `validnames` counts; plugin filename
+  validation routes through the Rust C ABI. Plugin registration and object
+  creation remain C++.
+- `pdal_options_test`: only `valid` counts; option-name validation routes
+  through the Rust C ABI. Option storage, conditional merging, metadata, JSON,
+  and `ProgramArgs` behavior remain mixed C++.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.
