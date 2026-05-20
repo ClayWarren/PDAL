@@ -26,7 +26,7 @@ Off limits unless the user explicitly revises this plan:
 - Do not port optional plugins or design a Rust plugin loading SDK yet.
 - Do not copy vendored C/C++ code into Rust crates. Follow `rust/VENDOR.md`.
 - Do not start remote I/O, optional plugin work, or broad vendor-heavy work
-  without a concrete parity milestone. LAS/LAZ, the first GDAL reader slice,
+  without a concrete parity milestone. LAS/LAZ, the first GDAL reader path,
   and simple command work have started; new work in those families must stay
   narrow and regression-backed.
 - Do not add new concrete CLI commands just because `pdal-cli` can dispatch
@@ -51,8 +51,8 @@ roadmap as permission to sweep a directory.
    Keep the existing C++ tests as the behavioral contract, keep Rust tests
    green, and keep every Rust-backed path behind the C ABI. No work counts if
    it weakens C++ validation, bypasses the C ABI, or lacks parity coverage.
-1. Stabilize the active Rust vertical slice.
-   The current slice is Rust core -> C ABI -> local readers/writers ->
+1. Stabilize the active Rust end-to-end path.
+   The current path is Rust core -> C ABI -> local readers/writers ->
    command-ready filters -> `pdal-rs` commands. Close correctness gaps in
    option parsing, metadata, bounds, dimensions, errors, and output artifacts
    before broadening the surface.
@@ -115,7 +115,7 @@ Approximate first-party code size, excluding comments and blanks:
   current spike area because it can prove the Rust core -> C ABI -> C++ wrapper
   loop without starting with file-format or GDAL/PROJ complexity.
 - `io/`: 24.6k LOC. Readers and writers. The Rust port has an active local
-  I/O vertical slice here now; keep additions narrow, fixture-scoped, and
+  I/O path here now; keep additions narrow, fixture-scoped, and
   parity-backed.
 - `kernels/`: 3.3k LOC. CLI subcommands. The first simple, pipeline-shaped
   commands are now present in `pdal-cli`; broader kernels remain late
@@ -135,7 +135,7 @@ Non-porting scope:
   Treat Rust plugin loading or a Rust plugin SDK as a final compatibility
   phase, not a way to make early progress.
 
-The migration order is intentionally vertical-slice driven: build only the
+The migration order is intentionally end-to-end driven: build only the
 core pieces needed by the next stage family, prove parity through the C ABI,
 then move outward. A broad rewrite by directory is not the plan.
 
@@ -158,7 +158,7 @@ Current target crates:
 - `pdal-capi`: stable C ABI. This is the real cross-language contract.
 - `pdal-filters`: first-party filters.
 - `pdal-io`: first-party readers and writers. The deterministic local I/O
-  vertical slice is active here.
+  path is active here.
 - `pdal-kernels`: CLI subcommands and command-contract helpers. Keep heavy
   kernel behavior out until the underlying core/I/O/filter capabilities have
   parity coverage.
@@ -199,7 +199,7 @@ foundations are not permission to skip ahead to broad top-layer ports.
    directory-wide core rewrite; each new core capability should be justified by
    a stage parity need.
 3. `io/` after the filter/core loop is stable. This checkpoint is now active:
-   local text/ASCII/binary formats, LAS/LAZ, and the first GDAL reader slice
+   local text/ASCII/binary formats, LAS/LAZ, and the first GDAL reader path
    exist. Continue one narrow reader/writer family at a time, with option,
    metadata, and installed-PDAL regression coverage.
 4. `apps/` and `tools/` after the library surface is stable enough to run real
@@ -218,7 +218,7 @@ foundations are not permission to skip ahead to broad top-layer ports.
 Do not jump to broad `kernels/`, apps/tools, plugins, vendor-heavy work, or
 broad `io/` work just because those areas are smaller or visible. The active
 post-filter milestone is the local I/O plus simple command surface, kept
-vertical-slice driven.
+end-to-end driven.
 
 Command work is allowed only after the library can run realistic pipelines
 without special-case test plumbing:
@@ -314,7 +314,7 @@ Done when:
 
 - Rust unit/parity tests pass.
 - The matching C++ filter test binaries pass.
-- The full `pdal_filters_*` CTest slice passes.
+- The full `pdal_filters_*` CTest subset passes.
 - No C++ object pointer crosses the C ABI.
 
 ### 2. Filter Bridge Contract Complete
@@ -333,7 +333,7 @@ Required shape:
 
 Done when:
 
-- The full `pdal_filters_*` CTest slice passes.
+- The full `pdal_filters_*` CTest subset passes.
 - Rust `cargo fmt`, `cargo clippy --workspace -- -D warnings`, and
   `cargo test --workspace` pass.
 - New bridge behavior has direct Rust or C++ regression coverage.
@@ -355,7 +355,7 @@ Required shape:
 Done when:
 
 - Ported spatial and linear/statistical filters pass their C++ test binaries.
-- The full `pdal_filters_*` CTest slice passes.
+- The full `pdal_filters_*` CTest subset passes.
 - The shared Rust APIs are documented enough that new filters use them instead
   of duplicating local algorithms.
 
@@ -378,9 +378,9 @@ Done when:
 - Each family has a short design note or commit message explaining port versus
   FFI versus defer.
 - Existing C++ tests pass, with coverage added first where needed.
-- The full `pdal_filters_*` CTest slice passes.
+- The full `pdal_filters_*` CTest subset passes.
 
-### 5. Core Pipeline Slice
+### 5. Core Pipeline Checkpoint
 
 Goal: expand from filter execution into the minimum `pdal/` core needed to run
 simple pipelines through the ABI.
@@ -400,14 +400,14 @@ Done when:
 - Relevant `pdal/` unit tests or parity tests pass.
 - Existing filter tests still pass.
 
-### 6. I/O Vertical Slice
+### 6. I/O End-To-End Checkpoint
 
 Goal: prove readers/writers after the core and filter ABI are stable.
 
-This checkpoint is active and no longer limited to the first text slice. Keep
+This checkpoint is active and no longer limited to the first text path. Keep
 the same discipline: each reader/writer family should be narrow,
 fixture-scoped, option-aware, and regression-tested against installed PDAL
-where possible. LAS/LAZ and the first GDAL-backed reader slice have started;
+where possible. LAS/LAZ and the first GDAL-backed reader path have started;
 remote I/O, plugin-backed I/O, and broad GDAL/PROJ coverage remain deferred.
 
 Required shape:
@@ -420,7 +420,7 @@ Required shape:
 Done when:
 
 - The matching C++ I/O test binary passes.
-- The pipeline slice can use the ported I/O path end to end.
+- The pipeline checkpoint can use the ported I/O path end to end.
 - Existing filter/core tests still pass.
 
 Current reader/writer status and exact regression commands live in
@@ -505,7 +505,7 @@ tests:
 
 1. Rust unit/parity tests pass.
 2. The matching C++ test binary passes.
-3. The full `pdal_filters_*` CTest slice passes before leaving `filters/`.
+3. The full `pdal_filters_*` CTest subset passes before leaving `filters/`.
 4. The unsafe footprint is reviewed. Run:
    `rg -n "unsafe\\s*\\{|unsafe extern|unsafe fn" rust --glob '*.rs'`
    and confirm any new unsafe use is confined to C ABI wrappers, native FFI
@@ -513,8 +513,8 @@ tests:
 5. No unsafe reinterpret-cast crosses the C ABI.
 6. The port preserves user-visible behavior, not just compile/link success.
 
-For non-filter ports, replace item 3 with the matching focused CTest slice and
-any lower-layer regression slice the change can affect. For example, I/O work
+For non-filter ports, replace item 3 with the matching focused CTest subset and
+any lower-layer regression subset the change can affect. For example, I/O work
 should run the matching `pdal_io_*` tests when C++ wrappers are involved, plus
 the Rust workspace gates.
 

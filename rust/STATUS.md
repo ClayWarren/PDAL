@@ -7,7 +7,7 @@ intentional or before asking an agent to broaden the port.
 Status definitions:
 
 - `done`: believed done for the stated scope. No known major deficits in that
-  slice. OK to log bugs or add parity cases.
+  area. OK to log bugs or add parity cases.
 - `in progress`: actively being built. Some behavior works and some does not.
   OK to log crashes, panics, missing parity, and concrete gaps.
 - `prototype`: proof-of-concept only. Do not treat as supported behavior.
@@ -32,7 +32,7 @@ Status definitions:
 | Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 40 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
-| Text I/O | done | `readers.text` and `writers.text` cover the deterministic local text slice and installed-PDAL regression coverage. |
+| Text I/O | done | `readers.text` and `writers.text` cover deterministic local text behavior and installed-PDAL regression coverage. |
 | PCD I/O | in progress | ASCII and binary PCD read/write are covered for deterministic local fixtures. Binary-compressed PCD is deferred. |
 | PTS/PTX readers | in progress | Deterministic Leica ASCII fixture behavior is covered, including installed-PDAL regressions. |
 | ILVIS2 reader | in progress | Deterministic ASCII point path and fixture-shaped XML sidecar metadata are covered. |
@@ -45,11 +45,11 @@ Status definitions:
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, `start`/`count`/`nosrs` reader options, SRS extraction, compression/decompression, and core writer header options. Keep parity tests honest before broad claims. |
 | COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles. Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
-| FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered slice. |
+| FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Deterministic TerraSolid format 2 fixture is covered. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Deterministic Optech CSD fixture and localized WGS84 georeference math are covered. |
 | BPF I/O | in progress | Deterministic local BPF read/write is covered for uncompressed and compressed point/dimension/byte interleaves, including bundled-file metadata roundtrips. Remote files and ULEM/polar metadata are deferred. |
-| GDAL reader/writer | prototype | A narrow local raster-to-point-cloud reader slice and first raster writer slice exist. Writer support currently covers Float64 GDAL output for core grid statistics; this is not broad GDAL/PROJ permission. |
+| GDAL reader/writer | prototype | A narrow local raster-to-point-cloud reader path and first raster writer path exist. Writer support currently covers Float64 GDAL output for core grid statistics; this is not broad GDAL/PROJ permission. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
