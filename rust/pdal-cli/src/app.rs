@@ -254,6 +254,12 @@ impl App {
         }
     }
 
+    fn command_help_requested(&self) -> bool {
+        self.command_args
+            .iter()
+            .any(|arg| arg == "--help" || arg == "-h")
+    }
+
     fn run(&self) -> i32 {
         let command = self.command.to_lowercase();
 
@@ -572,5 +578,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(app.verbose, 4);
+    }
+
+    #[test]
+    fn command_help_requested_detects_command_local_help() {
+        let mut app = App::new();
+        app.parse_args(&["tindex".to_string(), "--help".to_string()])
+            .unwrap();
+
+        assert!(app.command_help_requested());
     }
 }

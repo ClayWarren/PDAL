@@ -3,7 +3,7 @@ use std::ffi::CString;
 
 impl App {
     pub(super) fn run_pipeline(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal pipeline <pipeline.json>");
             return if self.command_args.is_empty() && !self.help {
@@ -74,7 +74,7 @@ impl App {
     }
 
     pub(super) fn run_info(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal info [--summary] <file>");
             return if self.command_args.is_empty() && !self.help {
@@ -162,7 +162,7 @@ impl App {
     }
 
     pub(super) fn run_translate(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!(
                 "  pdal translate <input> <output> [filter ...] [--<stage>.<key>=<value> ...]"
@@ -226,7 +226,7 @@ impl App {
     }
 
     pub(super) fn run_merge(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal merge <input> [input ...] <output> [--<stage>.<key>=<value> ...]");
             return if self.command_args.is_empty() && !self.help {
@@ -288,7 +288,7 @@ impl App {
     }
 
     pub(super) fn run_sort(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal sort <input> <output> [--<stage>.<key>=<value> ...]");
             return if self.command_args.is_empty() && !self.help {
@@ -343,7 +343,7 @@ impl App {
     }
 
     pub(super) fn run_ground(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal ground <input> <output> [--<stage>.<key>=<value> ...]");
             return if self.command_args.is_empty() && !self.help {
@@ -398,7 +398,7 @@ impl App {
     }
 
     pub(super) fn run_density(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal density <input> <output.geojson> [--<stage>.<key>=<value> ...]");
             return if self.command_args.is_empty() && !self.help {
@@ -447,7 +447,7 @@ impl App {
     }
 
     pub(super) fn run_random(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal random <output> [--count=N]");
             return if self.command_args.is_empty() && !self.help {
@@ -510,7 +510,7 @@ impl App {
     }
 
     pub(super) fn run_split(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal split <input> <output> [--length=N | --capacity=N] [--origin_x=X] [--origin_y=Y]");
             return if self.command_args.is_empty() && !self.help {

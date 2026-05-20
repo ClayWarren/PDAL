@@ -5,7 +5,7 @@ use std::path::Path;
 
 impl App {
     pub(super) fn run_tile(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!(
                 "  pdal tile <input> <output-template> \
@@ -87,7 +87,7 @@ impl App {
     }
 
     pub(super) fn run_hausdorff(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal hausdorff <source> <candidate>");
             return if self.command_args.is_empty() && !self.help {
@@ -138,7 +138,7 @@ impl App {
     }
 
     pub(super) fn run_chamfer(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal chamfer <source> <candidate>");
             return if self.command_args.is_empty() && !self.help {
@@ -182,7 +182,7 @@ impl App {
     }
 
     pub(super) fn run_delta(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal delta <source> <candidate>");
             return if self.command_args.is_empty() && !self.help {
@@ -221,7 +221,7 @@ impl App {
     }
 
     pub(super) fn run_tindex(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal tindex create --tindex <output> <files...> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --filelist <path> [-f <driver>]");
@@ -535,7 +535,7 @@ impl App {
     }
 
     pub(super) fn run_eval(&self) -> i32 {
-        if self.help || self.command_args.is_empty() {
+        if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!(
                 "  pdal eval <predicted> <truth> --labels=<l1,l2,...> \

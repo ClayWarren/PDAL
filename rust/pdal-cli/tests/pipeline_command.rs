@@ -281,6 +281,20 @@ fn unknown_command_fails_cleanly() {
 }
 
 #[test]
+fn command_local_help_succeeds() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("tindex")
+        .arg("--help")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("pdal tindex create"));
+    assert!(stdout.contains("--filelist"));
+}
+
+#[test]
 fn list_commands_reports_rust_commands() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("--list-commands")
