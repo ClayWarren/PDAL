@@ -1,5 +1,6 @@
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 fn data_path(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -13,6 +14,24 @@ fn run_tindex(args: &[&str]) -> std::process::Output {
         .args(args)
         .output()
         .unwrap()
+}
+
+fn run_tindex_with_stdin(args: &[&str], stdin: &str) -> std::process::Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("tindex")
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
 }
 
 fn run_installed_pdal(args: &[&str]) -> Option<std::process::Output> {
@@ -119,6 +138,37 @@ fn tindex_reads_inputs_from_glob() {
         "GeoJSON",
         "--fast_boundary",
     ]);
+
+    assert!(
+        result.status.success(),
+        "tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson = std::fs::read_to_string(&output).unwrap();
+    assert!(geojson.contains("interesting.las"));
+}
+
+#[test]
+fn tindex_reads_inputs_from_stdin() {
+    let input = data_path("test/data/las/interesting.las");
+
+    let temp = make_temp_dir("tindex_stdin");
+    let output = temp.join("index.geojson");
+
+    let result = run_tindex_with_stdin(
+        &[
+            "create",
+            "--tindex",
+            output.to_str().unwrap(),
+            "--stdin",
+            "--ogrdriver",
+            "GeoJSON",
+            "--fast_boundary",
+        ],
+        &format!("{}\n", input.display()),
+    );
 
     assert!(
         result.status.success(),

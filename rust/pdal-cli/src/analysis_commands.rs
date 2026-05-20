@@ -1,5 +1,6 @@
 use super::*;
 use std::ffi::CString;
+use std::io::Read;
 
 impl App {
     pub(super) fn run_tile(&self) -> i32 {
@@ -224,6 +225,7 @@ impl App {
             println!("  pdal tindex create --tindex <output> <files...> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --filelist <path> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --glob <pattern> [-f <driver>]");
+            println!("  pdal tindex create --tindex <output> --stdin [-f <driver>]");
             println!("  pdal tindex create <output> <files...> [-f <driver>]");
             println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
@@ -307,6 +309,19 @@ impl App {
                     eprintln!("Error: glob pattern '{pattern}' did not match any files");
                     return 1;
                 }
+            } else if arg == "--stdin" || arg == "-s" {
+                let mut contents = String::new();
+                if let Err(err) = std::io::stdin().read_to_string(&mut contents) {
+                    eprintln!("Error: unable to read tindex input list from stdin: {err}");
+                    return 1;
+                }
+                files.extend(
+                    contents
+                        .lines()
+                        .map(str::trim)
+                        .filter(|line| !line.is_empty())
+                        .map(str::to_string),
+                );
             } else if arg == "--fast_boundary" {
                 // The Rust tindex implementation currently writes extent
                 // polygons, matching PDAL's fast-boundary mode.
