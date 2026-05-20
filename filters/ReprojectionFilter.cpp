@@ -164,6 +164,24 @@ void ReprojectionFilter::createTransform(const SpatialReference& srsSRS)
 PointViewSet ReprojectionFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
+    if (m_inAxisOrdering.size() || m_outAxisOrdering.size() ||
+        !pdal::Utils::compare_approx(m_inCoordEpochArg, 0.0f, 0.00f) ||
+        !pdal::Utils::compare_approx(m_outCoordEpochArg, 0.0f, 0.00f))
+    {
+        if (!m_transform)
+            createTransform(view->spatialReference());
+
+        PointViewPtr outView = view->makeNew();
+        outView->append(*view);
+        for (PointId id = 0; id < outView->size(); ++id)
+        {
+            PointRef point(*outView, id);
+            processOne(point);
+        }
+        viewSet.insert(outView);
+        return viewSet;
+    }
+
     std::string inSrsText = m_inSRS.getWKT();
     const char* inSrs = m_inferInputSRS ? nullptr : inSrsText.c_str();
     pdal_stage_t* stage = pdal_stage_create_reprojection(

@@ -162,6 +162,20 @@ void AssignFilter::prepared(PointTableRef table)
 
 bool AssignFilter::processOne(PointRef& point)
 {
+    if (!m_args->m_condition.m_name.empty() &&
+        !m_args->m_condition.valuePasses(
+            point.getFieldAs<double>(m_args->m_condition.m_id)))
+        return true;
+
+    for (const auto& r : m_args->m_assignments)
+        if (r.valuePasses(point.getFieldAs<double>(r.m_id)))
+            point.setField(r.m_id, r.m_value);
+
+    for (expr::AssignStatement& expr : m_args->m_statements)
+        if (expr.conditionalExpr().eval(point))
+            point.setField(expr.identExpr().eval(),
+                           expr.valueExpr().eval(point));
+
     return true;
 }
 
@@ -185,18 +199,22 @@ void AssignFilter::filter(PointView& view)
         assignments.push_back(range);
     }
 
-    pdal_stage_t* stage = pdal_stage_create_assign(
-        has_condition, cond_dim, m_args->m_condition.m_lower_bound,
-        m_args->m_condition.m_upper_bound,
-        m_args->m_condition.m_inclusive_lower_bound,
-        m_args->m_condition.m_inclusive_upper_bound,
-        m_args->m_condition.m_negate,
-        assignments.empty() ? nullptr : assignments.data(), assignments.size());
-    if (!stage)
-        throwError("Failed to create Rust assign stage.");
+    if (has_condition || !assignments.empty())
+    {
+        pdal_stage_t* stage = pdal_stage_create_assign(
+            has_condition, cond_dim, m_args->m_condition.m_lower_bound,
+            m_args->m_condition.m_upper_bound,
+            m_args->m_condition.m_inclusive_lower_bound,
+            m_args->m_condition.m_inclusive_upper_bound,
+            m_args->m_condition.m_negate,
+            assignments.empty() ? nullptr : assignments.data(),
+            assignments.size());
+        if (!stage)
+            throwError("Failed to create Rust assign stage.");
 
-    rust_view_converter::runInPlace(stage, view);
-    pdal_stage_destroy(stage);
+        rust_view_converter::runInPlace(stage, view);
+        pdal_stage_destroy(stage);
+    }
 
     for (PointId id = 0; id < view.size(); ++id)
     {

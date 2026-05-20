@@ -357,7 +357,7 @@ fn spatial_results(
             let delta = view.get_f64(idx, dim) - query[dim_idx];
             sqr_dist += delta * delta;
         }
-        if sqr_dist <= max_sqr_dist {
+        if sqr_dist < max_sqr_dist {
             results.push(pdal_spatial_result_t { id: idx, sqr_dist });
         }
     }

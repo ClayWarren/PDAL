@@ -337,6 +337,7 @@ pub(crate) fn dim_id_from_name(name: &str) -> DimId {
         "NumberOfReturns" => DimId::NumberOfReturns,
         "ScanAngleRank" => DimId::ScanAngleRank,
         "PointSourceId" => DimId::PointSourceId,
+        "EdgeOfFlightLine" => DimId::EdgeOfFlightLine,
         "Flag" => DimId::Flag,
         "Mark" => DimId::Mark,
         "Alpha" => DimId::Alpha,
