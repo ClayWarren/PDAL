@@ -30,13 +30,19 @@ fn las_writer_honors_format_scale_and_offset_options() {
     let mut writer_options = Options::new();
     writer_options.add("filename", output.display());
     writer_options.add("minor_version", 4);
-    writer_options.add("dataformat_id", 7);
+    writer_options.add("format", 7);
     writer_options.add("scale_x", 0.001);
     writer_options.add("scale_y", 0.002);
     writer_options.add("scale_z", 0.003);
     writer_options.add("offset_x", 100.0);
     writer_options.add("offset_y", 200.0);
     writer_options.add("offset_z", -50.0);
+    writer_options.add("filesource_id", 42);
+    writer_options.add("system_id", "PDAL Rust Test");
+    writer_options.add("software_id", "pdal-rust");
+    writer_options.add("creation_year", 2014);
+    writer_options.add("creation_doy", 142);
+    writer_options.add("project_id", "00112233-4455-6677-8899-aabbccddeeff");
 
     let mut writer = LasWriter::new(&writer_options);
     writer.write(&[single_point_view_with_color()]).unwrap();
@@ -51,6 +57,17 @@ fn las_writer_honors_format_scale_and_offset_options() {
     assert_eq!(header.transforms().x.offset, 100.0);
     assert_eq!(header.transforms().y.offset, 200.0);
     assert_eq!(header.transforms().z.offset, -50.0);
+    assert_eq!(header.file_source_id(), 42);
+    assert_eq!(header.system_identifier(), "PDAL Rust Test");
+    assert_eq!(header.generating_software(), "pdal-rust");
+    assert_eq!(
+        header.date(),
+        Some(chrono::NaiveDate::from_yo_opt(2014, 142).unwrap())
+    );
+    assert_eq!(
+        header.guid().to_string(),
+        "00112233-4455-6677-8899-aabbccddeeff"
+    );
 }
 
 #[test]

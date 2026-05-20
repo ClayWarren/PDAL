@@ -3,6 +3,7 @@
 //! Port of `io/LasWriter.cpp` using the `las` Rust crate.
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use chrono::NaiveDate;
 use las::point::{Classification, Format, ScanDirection};
 use las::{Builder, Header, Point, Vlr};
 use pdal_core::metadata::MetadataNode;
@@ -25,6 +26,12 @@ pub struct LasWriter {
     offset_x: Option<f64>,
     offset_y: Option<f64>,
     offset_z: Option<f64>,
+    file_source_id: Option<u16>,
+    system_id: Option<String>,
+    software_id: Option<String>,
+    creation_doy: Option<u32>,
+    creation_year: Option<i32>,
+    project_id: Option<uuid::Uuid>,
 }
 
 struct ExtraDim {
@@ -43,10 +50,10 @@ impl LasWriter {
     }
 
     fn new_with_compression(options: &Options, driver_requests_compression: bool) -> Self {
-        let point_format = options
-            .value("dataformat_id")
-            .and_then(|value| value.trim().parse().ok())
-            .unwrap_or_else(|| options.get_u64("point_format", 3) as u8);
+        let point_format = ["dataformat_id", "format", "point_format"]
+            .into_iter()
+            .find_map(|key| numeric_option_u8(options, key))
+            .unwrap_or(3);
 
         Self {
             filename: options.get_str("filename", ""),
@@ -59,6 +66,14 @@ impl LasWriter {
             offset_x: numeric_option_f64(options, "offset_x"),
             offset_y: numeric_option_f64(options, "offset_y"),
             offset_z: numeric_option_f64(options, "offset_z"),
+            file_source_id: numeric_option_u16(options, "filesource_id"),
+            system_id: string_option(options, "system_id"),
+            software_id: string_option(options, "software_id"),
+            creation_doy: numeric_option_u32(options, "creation_doy"),
+            creation_year: numeric_option_i32(options, "creation_year"),
+            project_id: options
+                .value("project_id")
+                .and_then(|value| uuid::Uuid::parse_str(value.trim()).ok()),
         }
     }
 }
@@ -80,6 +95,21 @@ impl Writer for LasWriter {
             .map_err(|e| StageError(format!("Invalid point format: {}", e)))?;
         if let Some(minor) = self.minor_version {
             builder.version = las::Version { major: 1, minor };
+        }
+        if let Some(file_source_id) = self.file_source_id {
+            builder.file_source_id = file_source_id;
+        }
+        if let Some(system_id) = &self.system_id {
+            builder.system_identifier = system_id.clone();
+        }
+        if let Some(software_id) = &self.software_id {
+            builder.generating_software = software_id.clone();
+        }
+        if let Some(project_id) = self.project_id {
+            builder.guid = project_id;
+        }
+        if let (Some(year), Some(doy)) = (self.creation_year, self.creation_doy) {
+            builder.date = NaiveDate::from_yo_opt(year, doy);
         }
 
         // If an SRS is present, we must use LAS 1.4 for WKT support
@@ -340,6 +370,28 @@ fn numeric_option_u8(options: &Options, key: &str) -> Option<u8> {
     options
         .value(key)
         .and_then(|value| value.trim().parse::<u8>().ok())
+}
+
+fn numeric_option_u16(options: &Options, key: &str) -> Option<u16> {
+    options
+        .value(key)
+        .and_then(|value| value.trim().parse::<u16>().ok())
+}
+
+fn numeric_option_u32(options: &Options, key: &str) -> Option<u32> {
+    options
+        .value(key)
+        .and_then(|value| value.trim().parse::<u32>().ok())
+}
+
+fn numeric_option_i32(options: &Options, key: &str) -> Option<i32> {
+    options
+        .value(key)
+        .and_then(|value| value.trim().parse::<i32>().ok())
+}
+
+fn string_option(options: &Options, key: &str) -> Option<String> {
+    options.value(key).map(ToString::to_string)
 }
 
 fn pdal_to_las_type(ty: DimType) -> u8 {

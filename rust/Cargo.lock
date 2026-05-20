@@ -685,6 +685,7 @@ name = "pdal-io"
 version = "0.0.0"
 dependencies = [
  "byteorder",
+ "chrono",
  "flate2",
  "las",
  "las-crs",
@@ -693,6 +694,7 @@ dependencies = [
  "roxmltree",
  "serde_json",
  "tempfile",
+ "uuid",
  "zstd",
 ]
 
