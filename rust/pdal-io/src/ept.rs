@@ -23,6 +23,7 @@ use std::rc::Rc;
 pub struct EptReader {
     filename: String,
     bounds: String,
+    origin: String,
     ignore_unreadable: bool,
     metadata: MetadataNode,
 }
@@ -32,6 +33,7 @@ impl EptReader {
         Self {
             filename: options.get_str("filename", ""),
             bounds: options.get_str("bounds", ""),
+            origin: options.get_str("origin", ""),
             ignore_unreadable: options.get_bool("ignore_unreadable", false),
             metadata: MetadataNode::new("readers.ept"),
         }
@@ -72,6 +74,7 @@ impl Reader for EptReader {
         let schema = EptSchema::parse(&info)?;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
         let bounds = self.bounds_filter()?;
+        let origin = self.origin_filter(root)?;
         for tile in tiles {
             let extension = match data_type {
                 "laszip" => "laz",
@@ -108,7 +111,7 @@ impl Reader for EptReader {
             };
             validate_tile_count(&path, &views, tile.expected_points)?;
             for view in views {
-                let view = apply_bounds(view, bounds.as_ref());
+                let view = apply_origin(apply_bounds(view, bounds.as_ref()), origin);
                 point_count += view.len();
                 append_view(&mut merged, &view, &path)?;
             }
@@ -136,11 +139,40 @@ impl EptReader {
             .map(|parsed| Some(QueryBounds::Two(parsed.bounds)))
             .map_err(|err| StageError(format!("Invalid EPT bounds option: {err}")))
     }
+
+    fn origin_filter(&self, root: &Path) -> Result<Option<u64>, StageError> {
+        if self.origin.is_empty() {
+            return Ok(None);
+        }
+        let sources = source_origins(root)?;
+        if let Ok(origin) = self.origin.parse::<u64>() {
+            if !sources.is_empty() && !sources.iter().any(|source| source.id == origin) {
+                return Err(StageError(format!("Invalid EPT origin '{}'.", self.origin)));
+            }
+            return Ok(Some(origin));
+        }
+        sources
+            .iter()
+            .find(|source| source.matches(&self.origin))
+            .map(|source| Some(source.id))
+            .ok_or_else(|| StageError(format!("Invalid EPT origin '{}'.", self.origin)))
+    }
 }
 
 struct EptTile {
     key: String,
     expected_points: u64,
+}
+
+struct SourceOrigin {
+    id: u64,
+    names: Vec<String>,
+}
+
+impl SourceOrigin {
+    fn matches(&self, query: &str) -> bool {
+        self.names.iter().any(|name| name == query)
+    }
 }
 
 fn read_json(path: &Path) -> Result<Value, StageError> {
@@ -199,6 +231,46 @@ fn validate_tile_count(
     Ok(())
 }
 
+fn source_origins(root: &Path) -> Result<Vec<SourceOrigin>, StageError> {
+    let sources = root.join("ept-sources");
+    let manifest = sources.join("manifest.json");
+    if manifest.exists() {
+        return source_origins_from_array(&read_json(&manifest)?);
+    }
+    let list = sources.join("list.json");
+    if list.exists() {
+        return source_origins_from_array(&read_json(&list)?);
+    }
+    Ok(Vec::new())
+}
+
+fn source_origins_from_array(value: &Value) -> Result<Vec<SourceOrigin>, StageError> {
+    let array = value
+        .as_array()
+        .ok_or_else(|| StageError("EPT source list must be a JSON array.".to_string()))?;
+    Ok(array
+        .iter()
+        .enumerate()
+        .map(|(idx, item)| SourceOrigin {
+            id: item["origin"].as_u64().unwrap_or(idx as u64),
+            names: source_origin_names(item),
+        })
+        .collect())
+}
+
+fn source_origin_names(item: &Value) -> Vec<String> {
+    let mut names = Vec::new();
+    for field in ["id", "metadataPath", "path"] {
+        if let Some(value) = item[field].as_str() {
+            names.push(value.to_string());
+            if let Some(stem) = Path::new(value).file_stem().and_then(|stem| stem.to_str()) {
+                names.push(stem.to_string());
+            }
+        }
+    }
+    names
+}
+
 fn metadata_from_info(info: &Value) -> MetadataNode {
     let mut node = MetadataNode::new("readers.ept");
     if let Some(data_type) = info["dataType"].as_str() {
@@ -242,6 +314,20 @@ fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
     let mut output = view.make_new();
     for idx in 0..view.len() {
         if bounds.contains(&view, idx) {
+            output.append_point(&view, idx);
+        }
+    }
+    output
+}
+
+fn apply_origin(view: PointView, origin: Option<u64>) -> PointView {
+    let Some(origin) = origin else {
+        return view;
+    };
+    let origin_dim = DimId::from_name("OriginId");
+    let mut output = view.make_new();
+    for idx in 0..view.len() {
+        if view.get_f64(idx, &origin_dim) as u64 == origin {
             output.append_point(&view, idx);
         }
     }
@@ -528,6 +614,40 @@ mod tests {
 
         let views = reader.read().unwrap();
         assert!(views.is_empty());
+    }
+
+    #[test]
+    fn filters_named_origin_from_manifest() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-binary/ept.json").display(),
+        );
+        options.add("origin", "ellipsoid");
+        let mut reader = EptReader::new(&options);
+
+        let views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 100000);
+        let origin_id = DimId::from_name("OriginId");
+        assert_eq!(views[0].get_f64(0, &origin_id), 0.0);
+        assert_eq!(views[0].get_f64(99999, &origin_id), 0.0);
+    }
+
+    #[test]
+    fn rejects_unknown_numeric_origin() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/lone-star-laszip/ept.json").display(),
+        );
+        options.add("origin", "4");
+        let mut reader = EptReader::new(&options);
+
+        let Err(err) = reader.read() else {
+            panic!("expected bad EPT origin to fail");
+        };
+        assert!(err.0.contains("Invalid EPT origin '4'"));
     }
 
     #[test]
