@@ -194,30 +194,85 @@ impl App {
             };
         }
 
-        let (positional, stage_options) = match parse_stage_args(&self.command_args) {
-            Ok(parsed) => parsed,
-            Err(message) => {
-                eprintln!("Error: {message}");
-                return 1;
+        let mut input: Option<&str> = None;
+        let mut output: Option<&str> = None;
+        let mut reader_override: Option<&str> = None;
+        let mut writer_override: Option<&str> = None;
+        let mut filters: Vec<&str> = Vec::new();
+        let mut stage_options: Vec<StageOption> = Vec::new();
+
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
+            if arg == "--input" || arg == "-i" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an input path");
+                    return 1;
+                };
+                input = Some(value);
+            } else if arg == "--output" || arg == "-o" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an output path");
+                    return 1;
+                };
+                output = Some(value);
+            } else if arg == "--reader" || arg == "-r" || arg == "--driver" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a reader driver name");
+                    return 1;
+                };
+                reader_override = Some(value);
+            } else if arg == "--writer" || arg == "-w" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a writer driver name");
+                    return 1;
+                };
+                writer_override = Some(value);
+            } else if arg == "--filter" || arg == "-f" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a filter name");
+                    return 1;
+                };
+                filters.push(value);
+            } else if arg.starts_with("--") {
+                match parse_stage_option_arg(arg) {
+                    Ok(option) => stage_options.push(option),
+                    Err(message) => {
+                        eprintln!("Error: {message}");
+                        return 1;
+                    }
+                }
+            } else if input.is_none() {
+                input = Some(arg);
+            } else if output.is_none() {
+                output = Some(arg);
+            } else {
+                filters.push(arg);
             }
-        };
-        if positional.len() < 2 {
+        }
+
+        let Some(input) = input else {
             eprintln!("Error: translate needs an input path and an output path");
             return 1;
-        }
-        // PDAL `translate` positional order is: input, output, then filters.
-        let input = positional[0];
-        let output = positional[1];
-        let filters = &positional[2..];
+        };
+        let Some(output) = output else {
+            eprintln!("Error: translate needs an input path and an output path");
+            return 1;
+        };
 
-        let reader = match pdal_core::driver::infer_reader_driver(input) {
+        let reader = match reader_override
+            .map(str::to_string)
+            .or_else(|| pdal_core::driver::infer_reader_driver(input).map(str::to_string))
+        {
             Some(driver) => driver,
             None => {
                 eprintln!("Error: unable to infer a reader driver for '{input}'");
                 return 1;
             }
         };
-        let writer = match pdal_core::driver::infer_writer_driver(output) {
+        let writer = match writer_override
+            .map(str::to_string)
+            .or_else(|| pdal_core::driver::infer_writer_driver(output).map(str::to_string))
+        {
             Some(driver) => driver,
             None => {
                 eprintln!("Error: unable to infer a writer driver for '{output}'");
@@ -228,7 +283,7 @@ impl App {
         // Assemble reader -> filters -> writer pipeline stages.
         let mut stages: Vec<serde_json::Value> = Vec::new();
         stages.push(serde_json::json!({ "type": reader, "filename": input }));
-        for name in filters {
+        for name in &filters {
             let stage_type = if name.contains('.') {
                 (*name).to_string()
             } else {

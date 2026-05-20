@@ -434,27 +434,30 @@ fn parse_stage_args(args: &[String]) -> Result<(Vec<&str>, Vec<StageOption>), St
     let mut positional: Vec<&str> = Vec::new();
     let mut stage_options: Vec<StageOption> = Vec::new();
     for arg in args {
-        if let Some(spec) = arg.strip_prefix("--") {
-            let parsed = spec
-                .split_once('=')
-                .and_then(|(lhs, value)| lhs.rsplit_once('.').map(|(s, k)| (s, k, value)));
-            match parsed {
-                Some((stage, key, value)) => {
-                    stage_options.push(StageOption {
-                        stage: stage.to_string(),
-                        key: key.to_string(),
-                        value: value.to_string(),
-                    });
-                }
-                None => {
-                    return Err(format!("option '{arg}' must be --<stage>.<key>=<value>"));
-                }
-            }
+        if arg.starts_with("--") {
+            stage_options.push(parse_stage_option_arg(arg)?);
         } else {
             positional.push(arg);
         }
     }
     Ok((positional, stage_options))
+}
+
+fn parse_stage_option_arg(arg: &str) -> Result<StageOption, String> {
+    let Some(spec) = arg.strip_prefix("--") else {
+        return Err(format!("option '{arg}' must be --<stage>.<key>=<value>"));
+    };
+    let parsed = spec
+        .split_once('=')
+        .and_then(|(lhs, value)| lhs.rsplit_once('.').map(|(s, k)| (s, k, value)));
+    match parsed {
+        Some((stage, key, value)) => Ok(StageOption {
+            stage: stage.to_string(),
+            key: key.to_string(),
+            value: value.to_string(),
+        }),
+        None => Err(format!("option '{arg}' must be --<stage>.<key>=<value>")),
+    }
 }
 
 /// Apply `--<stage>.<key>=<value>` options to matching pipeline stages. A bare

@@ -78,6 +78,37 @@ fn translate_applies_a_named_filter_with_stage_options() {
 }
 
 #[test]
+fn translate_supports_reader_writer_and_filter_options() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-translate-options");
+    let extensionless_input = temp.join("input_without_extension");
+    let output = temp.join("out_without_extension");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_translate(&[
+        "--reader",
+        "readers.ply",
+        "--input",
+        extensionless_input.to_str().unwrap(),
+        "--writer",
+        "writers.pcd",
+        "--output",
+        output.to_str().unwrap(),
+        "--filter",
+        "decimation",
+        "--filters.decimation.step=2",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs translate failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert_eq!(read_pcd(&output).len(), 2);
+}
+
+#[test]
 fn translate_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("translate")
