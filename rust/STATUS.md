@@ -83,7 +83,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `881 / 927` individual C++ GoogleTest cases, or `95.04%`,
+Current checkpoint: `927 / 927` individual C++ GoogleTest cases, or `100.00%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
@@ -218,6 +218,24 @@ Known mixed binaries:
 - `pdal_filters_sparsesurface_test`: only `lowest_is_ground_rest_low_noise`
   counts; classification assignment routes through the Rust C ABI. Factory
   registration and equal-class option validation remain C++.
+- `pdal_filters_gpstimeconvert_test`: all 16 conversion tests count. GPS time
+  conversion routes through the Rust C ABI in batch, in-place, and streaming
+  paths.
+- `pdal_filters_expression_test`: `singleDimension`, `multipleDimensions`,
+  `onlyMin`, `onlyMax`, `negation`, `equals`, `negativeValues`,
+  `simple_logic`, `issue_4920`, `extrachars`, `issue_1659`, `stream_logic`,
+  `nan`, `nan2`, and `multipleExpressions` count. Expression parsing,
+  evaluation, and streaming behavior route through the Rust C ABI. Stage
+  factory smoke coverage remains C++ wrapper behavior.
+- `pdal_filters_stats_test`: `handcalc`, `baseline`, `simple`, `advanced`,
+  `dimset`, `metadata`, `enum`, `global`, and `counts` count. Summary
+  computation routes through the Rust C ABI. Stream and merge-specific cases
+  remain C++ wrapper behavior.
+- `pdal_filters_sample_test`: `culls_close_points`, `keeps_distant_points`,
+  `cell_mode`, `culls_across_voxels`, `radius_boundary`, and
+  `repeated_execute_resets_voxels` count. Poisson/cell sampling routes through
+  the Rust C ABI. Stage creation and dimension-flag helper behavior remain C++
+  wrapper behavior.
 - `pdal_metadata_test`: only `typed_value`, `test_float`, and `infnan` count.
   Scalar conversion and JSON scalar formatting route through Rust helpers. The
   metadata tree implementation is still C++.
