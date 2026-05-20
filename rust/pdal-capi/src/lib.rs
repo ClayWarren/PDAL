@@ -633,6 +633,96 @@ mod tests {
     }
 
     #[test]
+    fn reader_read_first_returns_point_view_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("mode", "ramp"),
+                ("count", "3"),
+                ("minx", "10"),
+                ("maxx", "12"),
+                ("miny", "20"),
+                ("maxy", "22"),
+                ("minz", "30"),
+                ("maxz", "32"),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_faux(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(!view.is_null());
+            assert_eq!(pdal_point_view_length(view), 3);
+
+            let x = CString::new("X").unwrap();
+            let y = CString::new("Y").unwrap();
+            let z = CString::new("Z").unwrap();
+            assert_eq!(pdal_point_view_get_f64(view, 0, x.as_ptr()), 10.0);
+            assert_eq!(pdal_point_view_get_f64(view, 1, y.as_ptr()), 21.0);
+            assert_eq!(pdal_point_view_get_f64(view, 2, z.as_ptr()), 32.0);
+
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
+    fn writer_write_view_consumes_point_view_through_c_abi() {
+        unsafe {
+            let mut filename = std::env::temp_dir();
+            filename.push(format!(
+                "pdal-capi-writer-write-view-{}-{}.csv",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            let filename_text = filename.display().to_string();
+
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("filename", filename_text.as_str()),
+                ("order", "X:1,Y:1,Z:1"),
+                ("keep_unspecified", "false"),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let layout = pdal_point_layout_create();
+            for dim in ["X", "Y", "Z"] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+            }
+            let view = pdal_point_view_create(layout);
+            let point = pdal_point_view_add_point(view);
+            for (dim, value) in [("X", 1.25), ("Y", 2.5), ("Z", 3.75)] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+            }
+
+            let writer = pdal_writer_create_text(options);
+            assert!(!writer.is_null());
+            assert!(pdal_writer_write_view(writer, view));
+            assert_eq!(
+                std::fs::read_to_string(&filename).unwrap(),
+                "\"X\",\"Y\",\"Z\"\n1.2,2.5,3.8\n"
+            );
+
+            let _ = std::fs::remove_file(&filename);
+            pdal_writer_destroy(writer);
+            pdal_point_view_destroy(view);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
     fn pipeline_result_roundtrips_through_c_abi() {
         unsafe {
             let json = CString::new(

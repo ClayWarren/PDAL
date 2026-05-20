@@ -1,4 +1,6 @@
+use crate::error::{clear_last_error, set_last_error};
 use pdal_core::options::Options;
+use pdal_core::point::PointView;
 
 // ---------------------------------------------------------------------------
 // Reader C ABI
@@ -121,6 +123,34 @@ pub unsafe extern "C" fn pdal_reader_create_ply(ops: *const Options) -> *mut Rea
     }
 }
 
+/// Read the first point view produced by a reader.
+///
+/// # Safety
+/// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
+/// The returned view must be freed with `pdal_point_view_destroy`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_read_first(reader: *mut ReaderHandle) -> *mut PointView {
+    let Some(reader) = reader.as_mut() else {
+        set_last_error("null reader");
+        return std::ptr::null_mut();
+    };
+
+    match reader.reader.read() {
+        Ok(mut views) => {
+            clear_last_error();
+            views
+                .drain(..)
+                .next()
+                .map(|view| Box::into_raw(Box::new(view)))
+                .unwrap_or(std::ptr::null_mut())
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Destroy a reader handle.
 ///
 /// # Safety
@@ -195,6 +225,34 @@ pub unsafe extern "C" fn pdal_writer_create_ply(ops: *const Options) -> *mut Wri
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()
+    }
+}
+
+/// Write a point view with a writer.
+///
+/// # Safety
+/// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
+/// `view` must be a valid pointer returned by `pdal_point_view_create` or
+/// `pdal_reader_read_first`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_write_view(
+    writer: *mut WriterHandle,
+    view: *const PointView,
+) -> bool {
+    let (Some(writer), Some(view)) = (writer.as_mut(), view.as_ref()) else {
+        set_last_error("null writer or view");
+        return false;
+    };
+
+    match writer.writer.write(&[view.clone()]) {
+        Ok(()) => {
+            clear_last_error();
+            true
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            false
+        }
     }
 }
 

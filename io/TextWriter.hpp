@@ -36,11 +36,10 @@
 
 #include <pdal/Streamable.hpp>
 #include <pdal/Writer.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
-
-typedef std::shared_ptr<std::ostream> FileStreamPtr;
 
 class PDAL_EXPORT TextWriter : public Writer, public Streamable
 {
@@ -62,6 +61,7 @@ class PDAL_EXPORT TextWriter : public Writer, public Streamable
 
 public:
     TextWriter() {}
+    ~TextWriter() override;
     TextWriter& operator=(const TextWriter&) = delete;
     TextWriter(const TextWriter&) = delete;
 
@@ -73,13 +73,6 @@ private:
     void write(const PointViewPtr view) override;
     void done(PointTableRef table) override;
     bool processOne(PointRef& point) override;
-
-    void writeHeader(PointTableRef table);
-    void writeFooter();
-    void writeGeoJSONHeader();
-    void writeCSVHeader(PointTableRef table);
-    void processOneCSV(PointRef& point);
-    void processOneGeoJSON(PointRef& point);
 
     DimSpec extractDim(std::string dim, PointTableRef table);
     bool findDim(Dimension::Id id, DimSpec& ds);
@@ -95,11 +88,9 @@ private:
     int m_precision;
     PointId m_idx;
 
-    FileStreamPtr m_stream;
     std::vector<DimSpec> m_dims;
-    DimSpec m_xDim;
-    DimSpec m_yDim;
-    DimSpec m_zDim;
+    Dimension::IdList m_rustDims;
+    pdal_point_view_t* m_rustView = nullptr;
 };
 
 } // namespace pdal

@@ -40,8 +40,6 @@
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
-#include <iostream>
-
 namespace pdal
 {
 
@@ -52,6 +50,71 @@ static StaticPluginInfo const s_info{
     {"csv", "txt", "json", "xyz", ""}};
 
 CREATE_STATIC_STAGE(TextWriter, s_info)
+
+namespace
+{
+
+int rustTypeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    addOption(options, key, std::string(value ? "true" : "false"));
+}
+
+void addOption(pdal_options_t* options, const std::string& key, int value)
+{
+    addOption(options, key, std::to_string(value));
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+TextWriter::~TextWriter()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 std::string TextWriter::getName() const
 {
@@ -80,19 +143,6 @@ std::ostream& operator<<(std::ostream& out, const TextWriter::OutputType& type)
         out << "GEOJSON";
     return out;
 }
-
-struct FileStreamDeleter
-{
-
-    template <typename T> void operator()(T* ptr)
-    {
-        if (ptr)
-        {
-            ptr->flush();
-            Utils::closeFile(ptr);
-        }
-    }
-};
 
 void TextWriter::addArgs(ProgramArgs& args)
 {
@@ -152,31 +202,19 @@ bool TextWriter::findDim(Dimension::Id id, DimSpec& ds)
 
 void TextWriter::ready(PointTableRef table)
 {
-    m_stream =
-        FileStreamPtr(Utils::createFile(filename(), true), FileStreamDeleter());
-    if (!m_stream)
-        throwError("Couldn't open '" + filename() + "' for output.");
-
-    *m_stream << std::fixed;
-
-    m_xDim = {Dimension::Id::X, static_cast<size_t>(m_precision),
-              table.layout()->dimName(Dimension::Id::X)};
-    m_yDim = {Dimension::Id::Y, static_cast<size_t>(m_precision),
-              table.layout()->dimName(Dimension::Id::Y)};
-    m_zDim = {Dimension::Id::Z, static_cast<size_t>(m_precision),
-              table.layout()->dimName(Dimension::Id::Z)};
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_dims.clear();
+    m_rustDims.clear();
 
     // Find the dimensions listed and put them on the id list.
     StringList dimNames = Utils::split2(m_dimOrder, ',');
     for (const std::string& dim : dimNames)
     {
         const DimSpec& spec = extractDim(dim, table);
-        if (spec.id == Dimension::Id::X)
-            m_xDim = spec;
-        else if (spec.id == Dimension::Id::Y)
-            m_yDim = spec;
-        else if (spec.id == Dimension::Id::Z)
-            m_zDim = spec;
         m_dims.push_back(spec);
     }
 
@@ -194,106 +232,39 @@ void TextWriter::ready(PointTableRef table)
         }
     }
 
-    if (!m_writeHeader)
-        log()->get(LogLevel::Debug) << "Not writing header" << '\n';
-    else
-        writeHeader(table);
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    auto registerDim = [&](Dimension::Id id)
+    {
+        if (std::find(m_rustDims.begin(), m_rustDims.end(), id) !=
+            m_rustDims.end())
+            return;
+        pdal_point_layout_register_dim(rustLayout,
+                                       table.layout()->dimName(id).c_str(),
+                                       rustTypeId(table.layout()->dimType(id)));
+        m_rustDims.push_back(id);
+    };
+
+    for (const DimSpec& dim : m_dims)
+        registerDim(dim.id);
+    if (m_outputType == OutputType::GEOJSON)
+    {
+        registerDim(Dimension::Id::X);
+        registerDim(Dimension::Id::Y);
+        registerDim(Dimension::Id::Z);
+    }
+
+    m_rustView = pdal_point_view_create(rustLayout);
     m_idx = 0;
-}
-
-void TextWriter::writeHeader(PointTableRef table)
-{
-    log()->get(LogLevel::Debug)
-        << "Writing header to filename: " << filename() << '\n';
-    if (m_outputType == OutputType::GEOJSON)
-        writeGeoJSONHeader();
-    else if (m_outputType == OutputType::CSV)
-        writeCSVHeader(table);
-}
-
-void TextWriter::writeFooter()
-{
-    if (m_outputType == OutputType::GEOJSON)
-    {
-        *m_stream << "]}";
-        if (m_callback.size())
-            *m_stream << ")";
-    }
-    m_stream.reset();
-}
-
-void TextWriter::writeGeoJSONHeader()
-{
-    if (m_callback.size())
-        *m_stream << m_callback << "(";
-    *m_stream << "{ \"type\": \"FeatureCollection\", \"features\": [";
-}
-
-void TextWriter::writeCSVHeader(PointTableRef table)
-{
-    const PointLayoutPtr layout(table.layout());
-    for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
-    {
-        if (di != m_dims.begin())
-            *m_stream << m_delimiter;
-
-        if (m_quoteHeader)
-            *m_stream << "\"" << layout->dimName(di->id) << "\"";
-        else
-            *m_stream << layout->dimName(di->id);
-    }
-    *m_stream << m_newline;
-}
-
-void TextWriter::processOneCSV(PointRef& point)
-{
-    for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
-    {
-        if (di != m_dims.begin())
-            *m_stream << m_delimiter;
-        m_stream->precision(di->precision);
-        *m_stream << point.getFieldAs<double>(di->id);
-    }
-    *m_stream << m_newline;
-}
-
-void TextWriter::processOneGeoJSON(PointRef& point)
-{
-    if (m_idx > 0)
-        *m_stream << ",";
-    *m_stream << "{ \"type\":\"Feature\",\"geometry\": "
-                 "{ \"type\": \"Point\", \"coordinates\": [";
-
-    m_stream->precision(m_xDim.precision);
-    *m_stream << point.getFieldAs<double>(Dimension::Id::X) << ",";
-    m_stream->precision(m_yDim.precision);
-    *m_stream << point.getFieldAs<double>(Dimension::Id::Y) << ",";
-    m_stream->precision(m_zDim.precision);
-    *m_stream << point.getFieldAs<double>(Dimension::Id::Z) << "]},";
-
-    *m_stream << "\"properties\": {";
-
-    for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
-    {
-        if (di != m_dims.begin())
-            *m_stream << ",";
-
-        *m_stream << "\"" << di->name << "\":";
-        *m_stream << "\"";
-        m_stream->precision(di->precision);
-        *m_stream << point.getFieldAs<double>(di->id);
-        *m_stream << "\"";
-    }
-    *m_stream << "}"; // end properties
-    *m_stream << "}"; // end feature
 }
 
 bool TextWriter::processOne(PointRef& point)
 {
-    if (m_outputType == OutputType::CSV)
-        processOneCSV(point);
-    else
-        processOneGeoJSON(point);
+    PointId idx = pdal_point_view_add_point(m_rustView);
+    for (Dimension::Id dim : m_rustDims)
+    {
+        pdal_point_view_set_f64(m_rustView, idx, Dimension::name(dim).c_str(),
+                                point.getFieldAs<double>(dim));
+    }
     m_idx++;
     return true;
 }
@@ -311,7 +282,35 @@ void TextWriter::write(const PointViewPtr view)
 
 void TextWriter::done(PointTableRef /*table*/)
 {
-    writeFooter();
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", filename());
+    addOption(
+        options, "format",
+        std::string(m_outputType == OutputType::GEOJSON ? "geojson" : "csv"));
+    addOption(options, "jscallback", m_callback);
+    addOption(options, "keep_unspecified", m_writeAllDims);
+    addOption(options, "order", m_dimOrder);
+    addOption(options, "write_header", m_writeHeader);
+    addOption(options, "newline", m_newline);
+    addOption(options, "delimiter", m_delimiter);
+    addOption(options, "quote_header", m_quoteHeader);
+    addOption(options, "precision", m_precision);
+
+    pdal_writer_t* writer = pdal_writer_create_text(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust text writer.");
+    }
+
+    bool ok = pdal_writer_write_view(writer, m_rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        throwLastRustError("Rust text writer failed.");
+
+    pdal_point_view_destroy(m_rustView);
+    m_rustView = nullptr;
     getMetadata().addList("filename", filename());
 }
 

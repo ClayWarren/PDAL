@@ -410,7 +410,9 @@ pdal_reader_t* pdal_reader_create_pcd(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_pts(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_ptx(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_ilvis2(const pdal_options_t* ops);
+pdal_reader_t* pdal_reader_create_obj(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_ply(const pdal_options_t* ops);
+pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
 void pdal_reader_destroy(pdal_reader_t* reader);
 
 // Stage registry: construct implemented stages from PDAL driver names.
@@ -427,6 +429,7 @@ pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_pcd(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);
+bool pdal_writer_write_view(pdal_writer_t* writer, const pdal_point_view_t* view);
 void pdal_writer_destroy(pdal_writer_t* writer);
 
 // Pipeline
