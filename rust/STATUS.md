@@ -64,15 +64,15 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `768 / 927` individual C++ GoogleTest cases, or `82.85%`,
+Current checkpoint: `789 / 927` individual C++ GoogleTest cases, or `85.11%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
 
-Current C++ compatibility wrapper/adapter surface: `15,069` code LOC across
+Current C++ compatibility wrapper/adapter surface: `14,929` code LOC across
 `111` first-party C++ files that include or directly declare Rust C ABI entry
-points, split approximately as `pdal/` 7,126 LOC, `filters/` 5,659 LOC, and
+points, split approximately as `pdal/` 6,986 LOC, `filters/` 5,659 LOC, and
 `io/` 2,284 LOC. This is a coarse ceiling because several files still mix real
 legacy implementation with wrapper calls; the number should shrink as wrappers
 are split from implementation.
@@ -105,13 +105,22 @@ Known mixed binaries:
 - `pdal_point_view_test`: only `calculateBounds` counts. The broader point
   view/table data model is still C++.
 - `pdal_bounds_test`: only `test_ctor`, `test_clip`, `test_intersect`,
-  `test_grow`, `test_bounds_grow_2_3_args`, and `test_invalid` count. Bounds
-  clear/empty/contains/overlap/clip/grow arithmetic routes through the Rust C
-  ABI. Equality, accessors, parsing, formatting, WKT/GeoJSON, SRS bounds, and
-  `ProgramArgs` integration remain C++.
+  `test_grow`, `test_bounds_grow_2_3_args`, `test_invalid`, `test_input`,
+  `test_parse`, `test_parse2`, `test_parse_geojson`, `test_2d_input`,
+  `test_precisionloss`, and `fromstring` count. Bounds
+  clear/empty/contains/overlap/clip/grow arithmetic and non-SRS parsing route
+  through the Rust C ABI. Equality, accessors, formatting, WKT/GeoJSON output,
+  SRS bounds, and `ProgramArgs` plumbing remain C++.
 - `pdal_utils_test`: only `test_base64`, `blanks`, `replaceAll`,
   `escapeNonprinting`, and `escapeJSON` count. Other utility cases still test
   C++ templates, stream helpers, process helpers, or local formatting behavior.
+- `pdal_file_utils_test`: only `test_toAbsolutePath`, `test_getDirectory`,
+  `test_isAbsolute`, `filename`, `extension`, and `stem` count. Path
+  normalization helpers route through the Rust C ABI. Filesystem mutation,
+  VSI, glob, Unicode filesystem behavior, and mmap behavior remain C++/GDAL.
+- `pdal_georeference_test`: only the 5 `Georeference.*` tests count;
+  WGS84 georeference math routes through the Rust C ABI. `RotationMatrix`
+  construction tests remain C++.
 - `pdal_charbuf_test`: all 3 tests count; seek-position behavior routes through
   Rust C ABI helpers while C++ keeps the `std::streambuf` pointer mechanics.
 - `pdal_math_utils_test`: all 2 tests count; both exercise
@@ -122,6 +131,9 @@ Known mixed binaries:
   validation route through the Rust C ABI.
 - `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
   through the Rust C ABI.
+- `pdal_point_table_test`: only `resolveType` counts; dimension type
+  resolution routes through the Rust C ABI. Point table storage, user-view
+  behavior, iterators, and row/column tables remain C++.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
 - `pdal_stage_factory_test`: only `extensionTest` counts; reader/writer driver
@@ -136,6 +148,11 @@ Known mixed binaries:
 - `pdal_polygon_test`: only `valid` counts; geometry validity routes through
   the Rust native geometry ABI. Polygon construction, serialization, bounds,
   simplification, and point coverage remain C++/GDAL.
+- `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
+  fills, depth, and region queries route through the Rust C ABI.
+- `pdal_xml_schema_test`: only `legacyNames` counts; legacy dimension-name
+  remapping routes through the Rust C ABI. XML parsing, metadata, xforms, and
+  schema round-tripping remain C++/libxml.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.

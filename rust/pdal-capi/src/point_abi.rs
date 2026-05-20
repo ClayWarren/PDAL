@@ -1,5 +1,5 @@
 use crate::error::string_to_c_ptr;
-use pdal_core::bounds::{Bounds2D, Bounds3D};
+use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
 use pdal_core::point::{
     fix_dimension_name, pdal_dimension_interpretation_name as core_dimension_interpretation_name,
     pdal_dimension_type_from_base_and_size as core_dimension_type_from_base_and_size,
@@ -194,6 +194,32 @@ pub unsafe extern "C" fn pdal_bounds2d_overlaps(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_parse(
+    input: *const c_char,
+    pos: u64,
+    out_bounds: *mut pdal_bounds2d_t,
+    out_wkt: *mut *mut c_char,
+    out_pos: *mut u64,
+) -> *mut c_char {
+    if input.is_null() || out_bounds.is_null() || out_pos.is_null() {
+        return string_to_c_ptr("Invalid null bounds parse argument.".to_string());
+    }
+
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_bounds2d(&input, pos as usize) {
+        Ok(parsed) => {
+            *out_bounds = parsed.bounds.into();
+            *out_pos = parsed.pos as u64;
+            if let Some(out_wkt) = out_wkt.as_mut() {
+                *out_wkt = string_to_c_ptr(parsed.wkt);
+            }
+            std::ptr::null_mut()
+        }
+        Err(error) => string_to_c_ptr(error),
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn pdal_bounds3d_clear(bounds: *mut pdal_bounds3d_t) {
     if let Some(bounds) = bounds.as_mut() {
         *bounds = Bounds3D::empty().into();
@@ -289,6 +315,32 @@ pub unsafe extern "C" fn pdal_bounds3d_overlaps(
     match (bounds.as_ref(), other.as_ref()) {
         (Some(bounds), Some(other)) => Bounds3D::from(*bounds).overlaps(&Bounds3D::from(*other)),
         _ => false,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds3d_parse(
+    input: *const c_char,
+    pos: u64,
+    out_bounds: *mut pdal_bounds3d_t,
+    out_wkt: *mut *mut c_char,
+    out_pos: *mut u64,
+) -> *mut c_char {
+    if input.is_null() || out_bounds.is_null() || out_pos.is_null() {
+        return string_to_c_ptr("Invalid null bounds parse argument.".to_string());
+    }
+
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_bounds3d(&input, pos as usize) {
+        Ok(parsed) => {
+            *out_bounds = parsed.bounds.into();
+            *out_pos = parsed.pos as u64;
+            if let Some(out_wkt) = out_wkt.as_mut() {
+                *out_wkt = string_to_c_ptr(parsed.wkt);
+            }
+            std::ptr::null_mut()
+        }
+        Err(error) => string_to_c_ptr(error),
     }
 }
 

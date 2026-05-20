@@ -153,6 +153,44 @@ fn point_view_bounds_c_abi_reports_unavailable_bounds() {
 }
 
 #[test]
+fn bounds_parse_roundtrips_through_c_abi() {
+    unsafe {
+        let input = CString::new("([1,101],[2,102],[3,103])").unwrap();
+        let mut bounds = pdal_bounds3d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+            minz: 0.0,
+            maxz: 0.0,
+        };
+        let mut wkt = std::ptr::null_mut();
+        let mut pos = 0;
+        let err = pdal_bounds3d_parse(input.as_ptr(), 0, &mut bounds, &mut wkt, &mut pos);
+        assert!(err.is_null());
+        assert_eq!(bounds.minx, 1.0);
+        assert_eq!(bounds.maxz, 103.0);
+        assert_eq!(pos, 25);
+        assert_eq!(take_string(wkt), "");
+
+        let input =
+            CString::new(r#"{"minx": 1,"miny": 2,"maxx": 101,"maxy": 102,"crs":"EPSG:2596"}"#)
+                .unwrap();
+        let mut bounds2d = pdal_bounds2d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+        };
+        let mut wkt = std::ptr::null_mut();
+        let err = pdal_bounds2d_parse(input.as_ptr(), 0, &mut bounds2d, &mut wkt, &mut pos);
+        assert!(err.is_null());
+        assert_eq!(bounds2d.maxx, 101.0);
+        assert_eq!(take_string(wkt), "EPSG:2596");
+    }
+}
+
+#[test]
 fn dimension_type_helpers_roundtrip_through_c_abi() {
     unsafe {
         let signed = CString::new("signed").unwrap();

@@ -173,6 +173,9 @@ extern "C"
                                        const pdal_bounds2d_t* other);
     bool pdal_bounds2d_overlaps(const pdal_bounds2d_t* bounds,
                                 const pdal_bounds2d_t* other);
+    char* pdal_bounds2d_parse(const char* input, uint64_t pos,
+                              pdal_bounds2d_t* out_bounds, char** out_wkt,
+                              uint64_t* out_pos);
     void pdal_bounds3d_clear(pdal_bounds3d_t* bounds);
     bool pdal_bounds3d_empty(const pdal_bounds3d_t* bounds);
     void pdal_bounds3d_grow_point(pdal_bounds3d_t* bounds, double x, double y,
@@ -188,6 +191,9 @@ extern "C"
                                        const pdal_bounds3d_t* other);
     bool pdal_bounds3d_overlaps(const pdal_bounds3d_t* bounds,
                                 const pdal_bounds3d_t* other);
+    char* pdal_bounds3d_parse(const char* input, uint64_t pos,
+                              pdal_bounds3d_t* out_bounds, char** out_wkt,
+                              uint64_t* out_pos);
 
     typedef struct
     {
