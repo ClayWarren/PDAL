@@ -437,6 +437,7 @@ char* pdal_delta(const char* path_a, const char* path_b);
 
 // Writer
 pdal_writer_t* pdal_writer_create_null(const pdal_options_t* ops);
+pdal_writer_t* pdal_writer_create_fbi(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_text(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_pcd(const pdal_options_t* ops);
 pdal_writer_t* pdal_writer_create_ply(const pdal_options_t* ops);

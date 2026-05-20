@@ -300,6 +300,20 @@ pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut Wr
     Box::into_raw(Box::new(WriterHandle { writer }))
 }
 
+/// Create an FbiWriter.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_fbi(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::fbi_writer::FbiWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Create a TextWriter.
 ///
 /// # Safety

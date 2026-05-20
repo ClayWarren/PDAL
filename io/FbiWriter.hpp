@@ -34,13 +34,9 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
-#include <pdal/Log.hpp>
 #include <pdal/Writer.hpp>
 
-#include "FbiHeader.hpp"
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -54,8 +50,12 @@ public:
     std::string getName() const override;
 
 private:
-    std::unique_ptr<fbi::FbiHdr> hdr;
+    void ready(PointTableRef table) override;
     void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
+
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_rustDims;
 };
 
 } // namespace pdal

@@ -264,7 +264,7 @@ fn write_xyz<W: Write>(
     view: &PointView,
     header: &FbiHeader,
 ) -> Result<(), StageError> {
-    let mul = 1.0 / header.units_xyz as f64;
+    let mul = header.units_xyz as f64;
     for i in 0..view.len() {
         writer
             .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::X) - header.org_x) * mul) as u32)
