@@ -58,6 +58,40 @@ Status definitions:
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
 | Broad kernels/apps/tools migration | deferred | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels, `apps/pdal.cpp`, `lasdump`, and `nitfwrap` wait on lower-layer parity. |
 
+## C++ Test Parity Accounting
+
+The first target is the pre-existing C++ test suite running against Rust
+implementations through the C ABI and C++ wrappers. Rust linkage alone does not
+count.
+
+Current checkpoint: `742 / 927` individual C++ GoogleTest cases, or `80.04%`,
+are validated against Rust-backed behavior.
+
+Counting rules:
+
+- Count a whole test binary only when the primary behavior under test is routed
+  through the Rust C ABI.
+- Count mixed C++ test binaries only at the individual-test level.
+- Do not count tests where Rust is merely present elsewhere in the link graph.
+- Do not count registry exposure, Rust unit tests, or command regressions as
+  C++ test-suite parity.
+
+Known mixed binaries:
+
+- `pdal_kdindex_test`: all 5 tests currently count; KNN/radius queries route
+  through Rust spatial query ABI.
+- `pdal_spatial_reference_test`: only `calcZone` and `wgs84FromZone` count.
+  Most SRS normalization, authority lookup, WKT/PROJJSON, and LAS SRS behavior
+  remains C++ GDAL/OGR-backed.
+- `pdal_point_view_test`: only `calculateBounds` counts. The broader point
+  view/table data model is still C++.
+- `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
+  JSON formatting use Rust helpers, but the metadata tree implementation is
+  still C++.
+- `pdal_io_las_reader_test` and `pdal_io_las_writer_test`: do not count as
+  binaries yet. Rust LAS/LAZ exists, but the C++ reader/writer wrappers still
+  have substantial legacy header, VLR, SRS, streaming, and option behavior.
+
 ## Command-Ready Filters
 
 Pipeline JSON can currently construct this command-ready filter subset:
