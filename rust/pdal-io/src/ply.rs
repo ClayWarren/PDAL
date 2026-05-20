@@ -527,6 +527,11 @@ impl Writer for PlyWriter {
         let format = self
             .format
             .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
+        if format != PlyFormat::Ascii && self.precision.is_some() {
+            return Err(StageError(
+                "Option 'precision' can only be set of the 'storage_mode' is ascii.".to_string(),
+            ));
+        }
 
         let count: u64 = views.iter().map(PointView::len).sum();
         self.point_count = count;
@@ -1010,5 +1015,20 @@ mod tests {
         assert_eq!(back.get_f64(0, &DimId::X), 1.0);
         assert_eq!(back.get_f64(0, &DimId::Y), 1.0);
         assert_eq!(back.get_f64(0, &DimId::Z), 1.0);
+    }
+
+    #[test]
+    fn binary_storage_rejects_precision_like_cpp_writer() {
+        let view = xyz_view(&[(1.0, 1.0, 1.0)]);
+        let output = temp_path("binary-precision.ply");
+        let mut options = Options::new();
+        options
+            .add("filename", &output)
+            .add("storage_mode", "little endian")
+            .add("precision", 3);
+
+        let err = PlyWriter::new(&options).write(&[view]).unwrap_err();
+        assert!(err.0.contains("precision"));
+        assert!(err.0.contains("storage_mode"));
     }
 }
