@@ -219,10 +219,11 @@ impl App {
     }
 
     pub(super) fn run_tindex(&self) -> i32 {
-        if self.help || self.command_args.len() < 3 {
+        if self.help || self.command_args.is_empty() {
             println!("Usage:");
-            println!("  pdal tindex create <tindex> <files...> [-f <driver>]");
-            println!("  pdal tindex merge <tindex> <filespec>");
+            println!("  pdal tindex create --tindex <output> <files...> [-f <driver>]");
+            println!("  pdal tindex create <output> <files...> [-f <driver>]");
+            println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
@@ -239,13 +240,27 @@ impl App {
             return 1;
         }
 
-        let tindex_file = &self.command_args[1];
+        if self.command_args.len() < 2 {
+            eprintln!("Error: tindex {subcommand} needs more arguments");
+            return 1;
+        }
+
+        let mut tindex_file: Option<&str> = None;
         let mut files = Vec::new();
         let mut driver_name = "ESRI Shapefile";
 
-        let mut args_iter = self.command_args[2..].iter();
+        let mut args_iter = self.command_args[1..].iter();
         while let Some(arg) = args_iter.next() {
-            if arg == "-f" || arg == "--ogrdriver" {
+            if arg == "--tindex" {
+                let Some(path) = args_iter.next() else {
+                    eprintln!("Error: --tindex requires an output path");
+                    return 1;
+                };
+                tindex_file = Some(path);
+            } else if arg == "--fast_boundary" {
+                // The Rust tindex implementation currently writes extent
+                // polygons, matching PDAL's fast-boundary mode.
+            } else if arg == "-f" || arg == "--ogrdriver" {
                 let Some(d) = args_iter.next() else {
                     eprintln!("Error: {arg} requires an OGR driver name");
                     return 1;
@@ -254,10 +269,16 @@ impl App {
             } else if arg.starts_with('-') {
                 eprintln!("Error: unknown tindex option '{arg}'");
                 return 1;
+            } else if tindex_file.is_none() {
+                tindex_file = Some(arg);
             } else {
                 files.push(arg);
             }
         }
+        let Some(tindex_file) = tindex_file else {
+            eprintln!("Error: tindex create requires --tindex <output>");
+            return 1;
+        };
         if files.is_empty() {
             eprintln!("Error: tindex create needs at least one input file");
             return 1;

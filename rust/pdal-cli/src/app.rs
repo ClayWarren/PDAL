@@ -62,6 +62,13 @@ impl App {
                 "--version" => self.show_version = true,
                 "--drivers" => self.show_drivers = true,
                 "--list-commands" => self.show_commands = true,
+                "--command" => {
+                    i += 1;
+                    if i >= args.len() {
+                        return Err("--command requires a command name argument".to_string());
+                    }
+                    self.command = args[i].clone();
+                }
                 "--options" => {
                     i += 1;
                     if i >= args.len() {
@@ -525,6 +532,20 @@ mod tests {
 
         assert_eq!(app.verbose, 1);
         assert!(app.show_json);
+        assert_eq!(app.command, "pipeline");
+        assert_eq!(app.command_args, vec!["pipeline.json".to_string()]);
+    }
+
+    #[test]
+    fn parse_supports_command_option() {
+        let mut app = App::new();
+        app.parse_args(&[
+            "--command".to_string(),
+            "pipeline".to_string(),
+            "pipeline.json".to_string(),
+        ])
+        .unwrap();
+
         assert_eq!(app.command, "pipeline");
         assert_eq!(app.command_args, vec!["pipeline.json".to_string()]);
     }

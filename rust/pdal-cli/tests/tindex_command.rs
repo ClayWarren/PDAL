@@ -36,11 +36,13 @@ fn tindex_creates_geojson_index() {
 
     let result = run_tindex(&[
         "create",
+        "--tindex",
         output.to_str().unwrap(),
         input1.to_str().unwrap(),
         input2.to_str().unwrap(),
-        "-f",
+        "--ogrdriver",
         "GeoJSON",
+        "--fast_boundary",
     ]);
 
     assert!(
@@ -88,10 +90,12 @@ fn installed_pdal_tindex_matches_rust_tindex_location_index() {
 
     let rust = run_tindex(&[
         "create",
+        "--tindex",
         rust_output.to_str().unwrap(),
-        input.to_str().unwrap(),
-        "-f",
+        "--ogrdriver",
         "GeoJSON",
+        "--fast_boundary",
+        input.to_str().unwrap(),
     ]);
     assert!(
         rust.status.success(),
