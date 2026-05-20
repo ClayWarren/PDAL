@@ -37,8 +37,8 @@
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
-#include <pdal/util/IStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -47,14 +47,13 @@ class PDAL_EXPORT SmrmsgReader : public Reader, public Streamable
 {
 public:
     SmrmsgReader() : Reader() {}
+    ~SmrmsgReader() override;
 
     std::string getName() const override;
 
 private:
-    std::unique_ptr<ILeStream> m_stream;
-    // Number of points in the file.
-    point_count_t m_numPts;
-    point_count_t m_index;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
     Dimension::IdList m_dims;
 
     bool processOne(PointRef& point) override;
@@ -63,8 +62,6 @@ private:
     void ready(PointTableRef table) override;
     point_count_t read(PointViewPtr view, point_count_t count) override;
     virtual bool eof();
-
-    void seek(PointId idx);
 };
 
 } // namespace pdal

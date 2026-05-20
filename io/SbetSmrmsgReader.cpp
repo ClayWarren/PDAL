@@ -36,9 +36,6 @@
 #include "SbetCommon.hpp"
 
 #include <pdal/PointRef.hpp>
-#include <pdal/util/FileUtils.hpp>
-
-#include <cmath>
 
 namespace pdal
 {
@@ -50,6 +47,31 @@ static StaticPluginInfo const s_info{
     {"smrmsg"}};
 
 CREATE_STATIC_STAGE(SmrmsgReader, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+SmrmsgReader::~SmrmsgReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 std::string SmrmsgReader::getName() const
 {
@@ -65,58 +87,68 @@ void SmrmsgReader::addDimensions(PointLayoutPtr layout)
 
 void SmrmsgReader::ready(PointTableRef)
 {
-    size_t fileSize = FileUtils::fileSize(m_filename);
-    size_t pointSize = sbet::smrmsgFileDimensions().size() * sizeof(double);
-    if ((fileSize == 0) || (fileSize % pointSize != 0))
-        throwError("Invalid file size.");
-    m_numPts = fileSize / pointSize;
-    m_index = 0;
-    m_stream.reset(new ILeStream(m_filename));
+    m_rustIndex = 0;
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_smrmsg(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust SMRMSG reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust SMRMSG reader failed.");
+
     m_dims = sbet::smrmsgFileDimensions();
-    seek(m_index);
 }
 
 bool SmrmsgReader::processOne(PointRef& point)
 {
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
+        return false;
+
     for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
     {
-        double d;
-        *m_stream >> d;
         Dimension::Id dim = *di;
-        point.setField(dim, d);
+        point.setField(dim,
+                       pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str()));
     }
-    return (m_stream->good());
+    m_rustIndex++;
+    return true;
 }
 
 point_count_t SmrmsgReader::read(PointViewPtr view, point_count_t count)
 {
     PointId nextId = view->size();
-    PointId idx = m_index;
     point_count_t numRead = 0;
-    seek(idx);
-    while (numRead < count && idx < m_numPts)
+    while (numRead < count && m_rustIndex < pdal_point_view_length(m_rustView))
     {
         PointRef point = view->point(nextId);
         processOne(point);
         if (m_cb)
             m_cb(*view, nextId);
 
-        idx++;
         nextId++;
         numRead++;
     }
-    m_index = idx;
     return numRead;
 }
 
 bool SmrmsgReader::eof()
 {
-    return m_index >= m_numPts;
-}
-
-void SmrmsgReader::seek(PointId idx)
-{
-    m_stream->seek(idx * sizeof(double) * sbet::smrmsgFileDimensions().size());
+    return m_rustIndex >= pdal_point_view_length(m_rustView);
 }
 
 } // namespace pdal

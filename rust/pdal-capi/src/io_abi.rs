@@ -138,6 +138,34 @@ pub unsafe extern "C" fn pdal_reader_create_qfit(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create an SbetReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_sbet(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::sbet::SbetReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create an SmrmsgReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_smrmsg(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::smrmsg::SmrmsgReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Read the first point view produced by a reader.
 ///
 /// # Safety

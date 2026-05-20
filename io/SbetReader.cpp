@@ -39,18 +39,15 @@
 
 #include <pdal/PointRef.hpp>
 #include <pdal/util/FileUtils.hpp>
-
-#include <cmath>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 
 struct SbetReader::Private
 {
-    std::unique_ptr<ILeStream> stream;
-    // Number of points in the file.
-    point_count_t numPts;
-    point_count_t index;
+    pdal_point_view_t* rustView = nullptr;
+    PointId rustIndex = 0;
     Dimension::IdList dims;
     bool anglesAsDegrees;
 
@@ -62,6 +59,8 @@ SbetReader::SbetReader() : m_private(new Private) {}
 
 SbetReader::~SbetReader()
 {
+    if (m_private->rustView)
+        pdal_point_view_destroy(m_private->rustView);
     cleanup();
 }
 
@@ -72,6 +71,25 @@ static StaticPluginInfo const s_info{
     {"sbet"}};
 
 CREATE_STATIC_STAGE(SbetReader, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
 
 std::string SbetReader::getName() const
 {
@@ -93,65 +111,71 @@ void SbetReader::ready(PointTableRef)
 {
     tryLoadRemote();
 
-    size_t fileSize = FileUtils::fileSize(m_filename);
-    size_t pointSize = sbet::fileDimensions().size() * sizeof(double);
-    if ((fileSize == 0) || (fileSize % pointSize != 0))
-        throwError("Invalid file size.");
-    m_private->numPts = fileSize / pointSize;
-    m_private->index = 0;
-    m_private->stream.reset(new ILeStream(m_filename));
+    m_private->rustIndex = 0;
+    if (m_private->rustView)
+    {
+        pdal_point_view_destroy(m_private->rustView);
+        m_private->rustView = nullptr;
+    }
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "angles_as_degrees",
+              m_private->anglesAsDegrees ? "true" : "false");
+
+    pdal_reader_t* reader = pdal_reader_create_sbet(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust SBET reader.");
+    }
+
+    m_private->rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_private->rustView)
+        throwLastRustError("Rust SBET reader failed.");
+
     m_private->dims = sbet::fileDimensions();
-    seek(m_private->index);
 }
 
 bool SbetReader::processOne(PointRef& point)
 {
-    auto radiansToDegrees = [](double radians)
-    { return radians * 180.0 / M_PI; };
+    if (m_private->rustIndex >= pdal_point_view_length(m_private->rustView))
+        return false;
+
     for (auto di = m_private->dims.begin(); di != m_private->dims.end(); ++di)
     {
-        double d;
-        *(m_private->stream) >> d;
         Dimension::Id dim = *di;
-        if (m_private->anglesAsDegrees && sbet::isAngularDimension(dim))
-        {
-            d = radiansToDegrees(d);
-        }
-        point.setField(dim, d);
+        point.setField(dim, pdal_point_view_get_f64(
+                                m_private->rustView, m_private->rustIndex,
+                                Dimension::name(dim).c_str()));
     }
-    return (m_private->stream->good());
+    m_private->rustIndex++;
+    return true;
 }
 
 point_count_t SbetReader::read(PointViewPtr view, point_count_t count)
 {
     PointId nextId = view->size();
-    PointId idx = m_private->index;
     point_count_t numRead = 0;
-    seek(idx);
-    while (numRead < count && idx < m_private->numPts)
+    while (numRead < count &&
+           m_private->rustIndex < pdal_point_view_length(m_private->rustView))
     {
         PointRef point = view->point(nextId);
         processOne(point);
         if (m_cb)
             m_cb(*view, nextId);
 
-        idx++;
         nextId++;
         numRead++;
     }
-    m_private->index = idx;
     return numRead;
 }
 
 bool SbetReader::eof()
 {
-    return m_private->index >= m_private->numPts;
-}
-
-void SbetReader::seek(PointId idx)
-{
-    m_private->stream->seek(idx * sizeof(double) *
-                            sbet::fileDimensions().size());
+    return m_private->rustIndex >= pdal_point_view_length(m_private->rustView);
 }
 
 void SbetReader::done(PointTableRef table)

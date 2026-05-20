@@ -37,7 +37,6 @@
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
-#include <pdal/util/IStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
 namespace pdal
@@ -59,8 +58,6 @@ private:
     point_count_t read(PointViewPtr view, point_count_t count) override;
     virtual bool eof();
     void done(PointTableRef table) override;
-
-    void seek(PointId idx);
 
     void cleanup();
     void tryLoadRemote();
