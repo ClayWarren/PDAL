@@ -14,6 +14,7 @@ pub struct FaceRasterFilter {
     fixed_arg_count: usize,
     no_data: f64,
     max_triangle_edge_length: f64,
+    mesh_name: String,
 }
 
 impl FaceRasterFilter {
@@ -30,6 +31,7 @@ impl FaceRasterFilter {
                 .count(),
             no_data: options.get_f64("nodata", f64::NAN),
             max_triangle_edge_length: options.get_f64("max_triangle_edge_length", f64::INFINITY),
+            mesh_name: options.get_str("mesh", ""),
         }
     }
 
@@ -82,8 +84,11 @@ impl Filter for FaceRasterFilter {
         if input.raster("faceraster").is_some() {
             return Err(StageError("Raster already exists".to_string()));
         }
-        let Some(mesh) = input.mesh() else {
-            return Err(StageError("Mesh '' does not exist.".to_string()));
+        let Some(mesh) = input.mesh_named(&self.mesh_name) else {
+            return Err(StageError(format!(
+                "Mesh '{}' does not exist.",
+                self.mesh_name
+            )));
         };
 
         let limits = self.limits(input)?;
@@ -275,6 +280,26 @@ mod tests {
         let mut filter = FaceRasterFilter::new(&options);
 
         let output = filter.run_one(&triangle_view()).unwrap().pop().unwrap();
+
+        assert_eq!(output.raster("faceraster").unwrap().data(), &[-9999.0; 4]);
+    }
+
+    #[test]
+    fn mesh_option_selects_a_named_mesh() {
+        let mut view = triangle_view();
+        view.create_named_mesh("empty").unwrap();
+
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        options.add("origin_x", 0.0);
+        options.add("origin_y", 0.0);
+        options.add("width", 2);
+        options.add("height", 2);
+        options.add("nodata", -9999.0);
+        options.add("mesh", "empty");
+        let mut filter = FaceRasterFilter::new(&options);
+
+        let output = filter.run_one(&view).unwrap().pop().unwrap();
 
         assert_eq!(output.raster("faceraster").unwrap().data(), &[-9999.0; 4]);
     }

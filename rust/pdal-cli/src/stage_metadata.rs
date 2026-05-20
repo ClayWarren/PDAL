@@ -338,6 +338,7 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             option("width", "Fixed raster width in cells.", None),
             option("height", "Fixed raster height in cells.", None),
             option("nodata", "No-data value.", None),
+            option("mesh", "Mesh name.", None),
             option(
                 "max_triangle_edge_length",
                 "Maximum triangle edge length to rasterize.",

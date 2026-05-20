@@ -9,6 +9,7 @@
 
 use crate::raster::RasterData;
 use crate::srs::SpatialReference;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 /// Index of a point within a view.
@@ -595,7 +596,7 @@ pub struct PointView {
     data: Vec<u8>,
     source_indices: Vec<PointId>,
     spatial_reference: SpatialReference,
-    mesh: Option<TriangularMesh>,
+    meshes: BTreeMap<String, TriangularMesh>,
     rasters: Vec<RasterData>,
 }
 
@@ -607,7 +608,7 @@ impl PointView {
             data: Vec::new(),
             source_indices: Vec::new(),
             spatial_reference: SpatialReference::default(),
-            mesh: None,
+            meshes: BTreeMap::new(),
             rasters: Vec::new(),
         }
     }
@@ -619,7 +620,7 @@ impl PointView {
             data: Vec::new(),
             source_indices: Vec::new(),
             spatial_reference: self.spatial_reference.clone(),
-            mesh: None,
+            meshes: BTreeMap::new(),
             rasters: Vec::new(),
         }
     }
@@ -638,7 +639,7 @@ impl PointView {
 
         let mut output = PointView::new(Rc::new(layout));
         output.spatial_reference = self.spatial_reference.clone();
-        output.mesh = self.mesh.clone();
+        output.meshes = self.meshes.clone();
         output.rasters = self.rasters.clone();
 
         for idx in 0..self.len() {
@@ -672,11 +673,28 @@ impl PointView {
     }
 
     pub fn create_mesh(&mut self) -> &mut TriangularMesh {
-        self.mesh.get_or_insert_with(TriangularMesh::default)
+        self.meshes.entry(String::new()).or_default()
+    }
+
+    pub fn create_named_mesh(&mut self, name: &str) -> Option<&mut TriangularMesh> {
+        if self.meshes.contains_key(name) {
+            return None;
+        }
+        self.meshes
+            .insert(name.to_string(), TriangularMesh::default());
+        self.meshes.get_mut(name)
     }
 
     pub fn mesh(&self) -> Option<&TriangularMesh> {
-        self.mesh.as_ref()
+        self.mesh_named("")
+    }
+
+    pub fn mesh_named(&self, name: &str) -> Option<&TriangularMesh> {
+        self.meshes.get(name).or_else(|| {
+            name.is_empty()
+                .then(|| self.meshes.values().next())
+                .flatten()
+        })
     }
 
     pub fn add_raster(&mut self, raster: RasterData) {

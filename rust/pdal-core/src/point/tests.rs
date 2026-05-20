@@ -305,3 +305,22 @@ fn triangular_mesh_tracks_face_indices() {
     assert_eq!(mesh.triangles()[0].c, 2);
     assert!(view.make_new().mesh().is_none());
 }
+
+#[test]
+fn named_meshes_match_point_view_lookup_contract() {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    let mut view = PointView::new(Rc::new(layout));
+    for _ in 0..6 {
+        view.add_point();
+    }
+
+    view.create_named_mesh("surface").unwrap().add(0, 1, 2);
+    assert!(view.create_named_mesh("surface").is_none());
+    view.create_named_mesh("z_last").unwrap().add(3, 4, 5);
+
+    assert_eq!(view.mesh_named("surface").unwrap().triangles()[0].a, 0);
+    assert_eq!(view.mesh_named("z_last").unwrap().triangles()[0].a, 3);
+    assert_eq!(view.mesh().unwrap().triangles()[0].a, 0);
+    assert!(view.mesh_named("missing").is_none());
+}
