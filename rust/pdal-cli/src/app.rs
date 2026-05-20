@@ -53,6 +53,21 @@ impl App {
         while i < args.len() {
             let arg = &args[i];
             if !self.command.is_empty() {
+                if arg == "--developer-debug" {
+                    i += 1;
+                    continue;
+                }
+                if arg == "--label" {
+                    i += 2;
+                    if i > args.len() {
+                        return Err("--label requires a label argument".to_string());
+                    }
+                    continue;
+                }
+                if arg.starts_with("--label=") {
+                    i += 1;
+                    continue;
+                }
                 self.command_args.push(arg.clone());
                 i += 1;
                 continue;
@@ -78,6 +93,13 @@ impl App {
                     self.show_options = Some(args[i].clone());
                 }
                 "--showjson" => self.show_json = true,
+                "--developer-debug" => {}
+                "--label" => {
+                    i += 1;
+                    if i >= args.len() {
+                        return Err("--label requires a label argument".to_string());
+                    }
+                }
                 "--verbose" | "-v" => {
                     self.verbose += 1;
                 }
@@ -140,6 +162,8 @@ impl App {
         println!("  --list-commands     List available commands");
         println!("  --command <name>    The PDAL command");
         println!("  --debug             Sets the output level to 3");
+        println!("  --label <label>     Label the process");
+        println!("  --developer-debug   Enable developer debug");
         println!("  --options <stage>   Show options for specified stage");
         println!("  -v, --verbose       Set output verbosity");
         println!("  --log <file>        Log filename");
@@ -617,6 +641,26 @@ mod tests {
             .unwrap();
 
         assert_eq!(app.verbose, 4);
+    }
+
+    #[test]
+    fn parse_ignores_standard_label_and_developer_debug_options() {
+        let mut app = App::new();
+        app.parse_args(&[
+            "info".to_string(),
+            "--label".to_string(),
+            "smoke".to_string(),
+            "--developer-debug".to_string(),
+            "--summary".to_string(),
+            "input.las".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(app.command, "info");
+        assert_eq!(
+            app.command_args,
+            vec!["--summary".to_string(), "input.las".to_string()]
+        );
     }
 
     #[test]
