@@ -34,6 +34,8 @@
 
 #include "ObjReader.hpp"
 
+#include <pdal/PointView.hpp>
+
 namespace pdal
 {
 
@@ -44,368 +46,173 @@ static StaticPluginInfo const s_info{"readers.obj",
 
 CREATE_STATIC_STAGE(ObjReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+Dimension::Type cppType(int type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case 0:
+        return Type::Unsigned8;
+    case 1:
+        return Type::Unsigned16;
+    case 2:
+        return Type::Unsigned32;
+    case 3:
+        return Type::Unsigned64;
+    case 4:
+        return Type::Signed8;
+    case 5:
+        return Type::Signed16;
+    case 6:
+        return Type::Signed32;
+    case 7:
+        return Type::Signed64;
+    case 8:
+        return Type::Float;
+    case 9:
+    default:
+        return Type::Double;
+    }
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 std::string ObjReader::getName() const
 {
     return s_info.name;
 }
 
+ObjReader::ObjReader() {}
+
+ObjReader::~ObjReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
+QuickInfo ObjReader::inspect()
+{
+    QuickInfo qi;
+
+    initialize();
+
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
+    {
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        qi.m_dimNames.push_back(rawName);
+        pdal_string_free(rawName);
+    }
+    qi.m_pointCount = pdal_point_view_length(m_rustView);
+    qi.m_valid = true;
+
+    return qi;
+}
+
+void ObjReader::initialize()
+{
+    if (m_filename.empty())
+        throwError("Can't read OBJ file without filename.");
+
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_copied = false;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_obj(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust OBJ reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust OBJ reader failed.");
+}
+
 void ObjReader::addDimensions(PointLayoutPtr layout)
 {
-    layout->registerDims({
-        Dimension::Id::X,
-        Dimension::Id::Y,
-        Dimension::Id::Z,
-        Dimension::Id::W,
-        Dimension::Id::TextureU,
-        Dimension::Id::TextureV,
-        Dimension::Id::TextureW,
-        Dimension::Id::NormalX,
-        Dimension::Id::NormalY,
-        Dimension::Id::NormalZ,
-    });
-}
-
-void ObjReader::ready(PointTableRef)
-{
-    m_istream = Utils::openFile(m_filename, false);
-    if (!m_istream)
-        throwError("Couldn't open '" + m_filename + "'.");
-    m_index = 0;
-}
-
-void ObjReader::done(PointTableRef)
-{
-    Utils::closeFile(m_istream);
-}
-
-point_count_t ObjReader::read(PointViewPtr view, point_count_t cnt)
-{
-    m_mesh = view->createMesh("obj");
-    if (!m_mesh)
+    m_dims.clear();
+    m_dimNames.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        throwError("Failed to create mesh");
-    }
-
-    while (true)
-    {
-        FACE face;
-        if (!readFace(face, view))
-            break;
-
-        auto triangles = triangulate(face);
-        for (const auto& tri : triangles)
-        {
-            newTriangle(view, tri);
-        }
-    }
-    return m_index;
-}
-
-void ObjReader::newTriangle(PointViewPtr view, TRI tri)
-{
-    // checks if a point exists yet, if not, adds it to the point table via
-    // addPoint()
-    auto insertPoint = [view, this](VTN vertex)
-    {
-        PointId id;
-        auto it = m_points.find(vertex);
-        if (it == m_points.end())
-        {
-            id = addPoint(view, vertex);
-            m_points.insert({vertex, id});
-        }
-        else
-            id = it->second;
-        return id;
-    };
-    PointId p1 = insertPoint(tri[0]);
-    PointId p2 = insertPoint(tri[1]);
-    PointId p3 = insertPoint(tri[2]);
-    m_mesh->add(p1, p2, p3);
-}
-
-// adds a point to the point table
-PointId ObjReader::addPoint(PointViewPtr view, VTN vertex)
-{
-    XYZW v, t, n;
-    PointRef pt = view->point(m_index);
-    m_index++;
-
-    int64_t vertexIndex = std::get<0>(vertex) - 1;
-    if (vertexIndex < 0 || (size_t)vertexIndex >= m_vertices.size())
-        throwError("Vertex index '" + std::to_string(vertexIndex + 1) +
-                   "` specified "
-                   "for face doesn't exist.");
-    v = m_vertices.at(vertexIndex);
-    pt.setField(Dimension::Id::X, v.x);
-    pt.setField(Dimension::Id::Y, v.y);
-    pt.setField(Dimension::Id::Z, v.z);
-    pt.setField(Dimension::Id::W, v.w);
-
-    int64_t textureIndex = std::get<1>(vertex) - 1;
-    if (textureIndex >= 0)
-    {
-        if ((size_t)textureIndex >= m_textureVertices.size())
-            throwError("Texture vertex index '" +
-                       std::to_string(textureIndex + 1) +
-                       "' specified "
-                       "for face doesn't exist.");
-        t = m_textureVertices.at(textureIndex);
-        pt.setField(Dimension::Id::TextureU, t.x);
-        pt.setField(Dimension::Id::TextureV, t.y);
-        pt.setField(Dimension::Id::TextureW, t.z);
-    }
-
-    int64_t normalIndex = std::get<2>(vertex) - 1;
-    if (normalIndex >= 0)
-    {
-        if ((size_t)normalIndex >= m_normalVertices.size())
-            throwError("Normal vertex index '" +
-                       std::to_string(normalIndex + 1) +
-                       "' specified "
-                       "for face doesn't exist.");
-        n = m_normalVertices.at(normalIndex);
-        pt.setField(Dimension::Id::NormalX, n.x);
-        pt.setField(Dimension::Id::NormalY, n.y);
-        pt.setField(Dimension::Id::NormalZ, n.z);
-    }
-    return pt.pointId();
-}
-
-void ObjReader::newVertex(double x, double y, double z)
-{
-    // w defaults to 1 according to
-    // https://en.wikipedia.org/wiki/Wavefront_.obj_file
-    m_vertices.push_back({x, y, z, 1});
-}
-
-void ObjReader::newVertex(double x, double y, double z, double w)
-{
-    m_vertices.push_back({x, y, z, w});
-}
-
-// undefined texture values default to 0 according to
-// https://en.wikipedia.org/wiki/Wavefront_.obj_file
-void ObjReader::newTextureVertex(double x)
-{
-    m_textureVertices.push_back({x, 0, 0, 0});
-}
-
-void ObjReader::newTextureVertex(double x, double y)
-{
-    m_textureVertices.push_back({x, y, 0, 0});
-}
-
-void ObjReader::newTextureVertex(double x, double y, double z)
-{
-    m_textureVertices.push_back({x, y, z, 0});
-}
-
-void ObjReader::newNormalVertex(double x, double y, double z)
-{
-    m_normalVertices.push_back({x, y, z, 0});
-}
-
-bool ObjReader::readFace(FACE& face, PointViewPtr view)
-{
-    long long lineOfFile = 0;
-    while (true)
-    {
-        if (m_istream->peek() == EOF)
-            return false;
-
-        std::string line;
-        std::getline(*m_istream, line);
-        lineOfFile++;
-        Utils::trim(line);
-        if (line.length() == 0)
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
             continue;
-
-        StringList fields = Utils::split2(line, ' ');
-        std::string key = fields[0];
-        if (key == "#")
-        {
-            // Comment: Do nothing
-        }
-        else if (key == "v")
-        {
-            // Vertex
-            size_t numDims = fields.size() - 1;
-
-            auto throwVertexError = [this, line, lineOfFile]()
-            {
-                std::stringstream errorMessage;
-                errorMessage << "Could not convert vertex specification to "
-                                "double on line #"
-                             << lineOfFile << ": '" << line << "'" << '\n';
-                throwError(errorMessage.str());
-            };
-
-            if (numDims < 3)
-            {
-                throwVertexError();
-            }
-            else if (numDims == 3)
-            {
-                double x, y, z;
-                if (Utils::fromString(fields[1], x) &&
-                    Utils::fromString(fields[2], y) &&
-                    Utils::fromString(fields[3], z))
-                    newVertex(x, y, z);
-                else
-                    throwVertexError();
-            }
-            else if (numDims > 3)
-            {
-                double x, y, z, w;
-                if (Utils::fromString(fields[1], x) &&
-                    Utils::fromString(fields[2], y) &&
-                    Utils::fromString(fields[3], z) &&
-                    Utils::fromString(fields[4], w))
-                    newVertex(x, y, z, w);
-                else
-                    throwVertexError();
-            }
-        }
-        else if (key == "vt")
-        {
-            auto throwTextureError = [this, line, lineOfFile]()
-            {
-                std::stringstream ss;
-                ss << "Could not convert texture vertex specification to "
-                      "double on line #"
-                   << lineOfFile << ": '" << line << "'" << '\n';
-                throwError(ss.str());
-            };
-            // Vertex texture
-            if (fields.size() == 4)
-            {
-                double x, y, z;
-                if (Utils::fromString(fields[1], x) &&
-                    Utils::fromString(fields[2], y) &&
-                    Utils::fromString(fields[3], z))
-                    newTextureVertex(x, y, z);
-                else
-                    throwTextureError();
-            }
-            else if (fields.size() == 3)
-            {
-                double x, y;
-                if (Utils::fromString(fields[1], x) &&
-                    Utils::fromString(fields[2], y))
-                    newTextureVertex(x, y);
-                else
-                    throwTextureError();
-            }
-            else if (fields.size() == 2)
-            {
-                double x;
-                if (Utils::fromString(fields[1], x))
-                    newTextureVertex(x);
-                else
-                    throwTextureError();
-            }
-        }
-        else if (key == "vn")
-        {
-            // Vertex normal
-            double x, y, z;
-            if (fields.size() >= 4 && Utils::fromString(fields[1], x) &&
-                Utils::fromString(fields[2], y) &&
-                Utils::fromString(fields[3], z))
-                newNormalVertex(x, y, z);
-            else
-            {
-                std::stringstream ss;
-                ss << "Could not convert normal vertex specification to double "
-                      "on line #"
-                   << lineOfFile << ": '" << line << "'" << '\n';
-                throwError(ss.str());
-            }
-        }
-        else if (key == "f")
-        {
-            // Face
-            if (fields.size() < 4)
-                throwError("Not enough vertices in face specification.");
-            StringList vertices(fields.begin() + 1, fields.end());
-            extractFace(vertices, face);
-            return true;
-        }
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Type type =
+            cppType(pdal_point_view_dim_type(m_rustView, idx));
+        Dimension::Id id = layout->registerOrAssignDim(name, type);
+        m_dims.push_back(id);
+        m_dimNames.push_back(name);
     }
 }
 
-void ObjReader::extractFace(StringList fields, ObjReader::FACE& face)
+void ObjReader::ready(PointTableRef) {}
+
+point_count_t ObjReader::read(PointViewPtr view, point_count_t)
 {
-    for (const std::string& field : fields)
-        face.push_back(extractVertex(field));
-}
+    if (m_copied)
+        return 0;
 
-std::vector<ObjReader::TRI> ObjReader::triangulate(FACE face)
-{
-    std::vector<TRI> triangles;
-
-    unsigned int totalTriangles = face.size() - 2;
-    while (triangles.size() < totalTriangles)
+    point_count_t count = pdal_point_view_length(m_rustView);
+    for (PointId idx = 0; idx < count; ++idx)
     {
-        TRI tri;
-        tri[0] = face[0];
-        tri[1] = face[triangles.size() + 1];
-        tri[2] = face[triangles.size() + 2];
-        triangles.push_back(tri);
-    }
-    return triangles;
-}
-
-ObjReader::VTN ObjReader::extractVertex(const std::string& vstring)
-{
-    VTN vtn{-1, -1, -1};
-    std::string s(vstring);
-    Utils::trim(s);
-    StringList parts = Utils::split(s, '/');
-    for (auto& part : parts)
-        Utils::trim(part);
-
-    if (parts.size() > 3)
-        throwError("Too many items in vertex specification.");
-
-    char* p;
-    long index = std::strtol(parts[0].c_str(), &p, 10);
-    if (index == 0 || p != parts[0].c_str() + parts[0].size())
-        throwError("Invalid index in face specification.");
-    else if (index < 0)
-        std::get<0>(vtn) = m_vertices.size() - index;
-    else
-        std::get<0>(vtn) = index;
-
-    if (parts.size() > 1)
-    {
-        if (parts[1].length() > 0)
-        {
-            index = std::strtol(parts[1].c_str(), &p, 10);
-            if (index == 0 || p != parts[1].c_str() + parts[1].size())
-                throwError("Invalid index in face specification.");
-            else if (index < 0)
-                std::get<1>(vtn) = m_vertices.size() - index;
-            else
-                std::get<1>(vtn) = index;
-        }
+        PointRef point(*view, view->size());
+        for (size_t dimIdx = 0; dimIdx < m_dims.size(); ++dimIdx)
+            point.setField(m_dims[dimIdx],
+                           pdal_point_view_get_f64(m_rustView, idx,
+                                                   m_dimNames[dimIdx].c_str()));
     }
 
-    if (parts.size() > 2)
+    TriangularMesh* mesh = view->createMesh("obj");
+    if (!mesh)
+        throwError("Failed to create mesh");
+
+    uint64_t triangleCount = pdal_point_view_mesh_triangle_count(m_rustView);
+    for (uint64_t idx = 0; idx < triangleCount; ++idx)
     {
-        if (parts[2].length() > 0)
-        {
-            index = std::strtol(parts[2].c_str(), &p, 10);
-            if (index == 0 || p != parts[2].c_str() + parts[2].size())
-                throwError("Invalid index in face specification.");
-            else if (index < 0)
-                std::get<2>(vtn) = m_vertices.size() - index;
-            else
-                std::get<2>(vtn) = index;
-        }
+        uint64_t a = 0;
+        uint64_t b = 0;
+        uint64_t c = 0;
+        if (!pdal_point_view_mesh_triangle(m_rustView, idx, &a, &b, &c))
+            throwError("Rust OBJ reader failed to return a mesh triangle.");
+        mesh->add(a, b, c);
     }
-    return vtn;
+
+    m_copied = true;
+    return count;
 }
+
+void ObjReader::done(PointTableRef) {}
 
 } // namespace pdal

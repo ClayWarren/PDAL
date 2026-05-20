@@ -298,6 +298,10 @@ pub(crate) fn dim_id_from_name(name: &str) -> DimId {
         "X" => DimId::X,
         "Y" => DimId::Y,
         "Z" => DimId::Z,
+        "W" => DimId::W,
+        "TextureU" => DimId::TextureU,
+        "TextureV" => DimId::TextureV,
+        "TextureW" => DimId::TextureW,
         "Intensity" => DimId::Intensity,
         "OffsetTime" => DimId::OffsetTime,
         "Classification" => DimId::Classification,
@@ -754,6 +758,75 @@ pub unsafe extern "C" fn pdal_point_view_calculate_bounds_3d(
         minz: bounds.minz,
         maxz: bounds.maxz,
     };
+    true
+}
+
+/// Return the number of triangles in this view's mesh, or zero if no mesh
+/// exists.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_mesh_triangle_count(view: *const PointView) -> u64 {
+    view.as_ref()
+        .and_then(PointView::mesh)
+        .map_or(0, |mesh| mesh.len() as u64)
+}
+
+/// Copy one mesh triangle out of a view.
+///
+/// Returns false when `view` is null, no mesh exists, the index is out of
+/// range, or any output pointer is null.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`. `a`, `b`, and `c` must point to writable
+/// memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_mesh_triangle(
+    view: *const PointView,
+    idx: u64,
+    a: *mut u64,
+    b: *mut u64,
+    c: *mut u64,
+) -> bool {
+    let (Some(view), Some(a), Some(b), Some(c)) =
+        (view.as_ref(), a.as_mut(), b.as_mut(), c.as_mut())
+    else {
+        return false;
+    };
+    let Some(mesh) = view.mesh() else {
+        return false;
+    };
+    let Some(triangle) = mesh.triangles().get(idx as usize) else {
+        return false;
+    };
+    *a = triangle.a;
+    *b = triangle.b;
+    *c = triangle.c;
+    true
+}
+
+/// Add one triangle to a view's mesh, creating the mesh if needed.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_add_mesh_triangle(
+    view: *mut PointView,
+    a: u64,
+    b: u64,
+    c: u64,
+) -> bool {
+    let Some(view) = view.as_mut() else {
+        return false;
+    };
+    view.create_mesh().add(a, b, c);
     true
 }
 

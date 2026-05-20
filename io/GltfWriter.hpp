@@ -36,16 +36,13 @@
 
 #include <pdal/Writer.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
-class OLeStream;
-
-typedef std::shared_ptr<std::ostream> FileStreamPtr;
 
 class PDAL_EXPORT GltfWriter : public Writer
 {
-    struct ViewData;
-
 public:
     GltfWriter();
     ~GltfWriter() override;
@@ -57,20 +54,14 @@ public:
 private:
     void addArgs(ProgramArgs& args) override;
     void ready(PointTableRef table) override;
-    void write(const PointViewPtr v) override;
+    void write(const PointViewPtr view) override;
     void done(PointTableRef table) override;
     void prepared(PointTableRef table) override;
 
-    void writeGltfHeader();
-    void writeJsonChunk();
-    void writeBinHeader();
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_rustDims;
 
-    std::unique_ptr<OLeStream> m_stream;
-    std::vector<ViewData> m_viewData;
-    size_t m_totalSize;
-    size_t m_binSize;
     bool m_writeNormals;
-
     double m_metallic;
     double m_roughness;
     double m_red;
@@ -79,17 +70,6 @@ private:
     double m_alpha;
     bool m_doubleSided;
     bool m_colorVertices;
-};
-
-struct GltfWriter::ViewData
-{
-    BOX3D m_bounds;
-    size_t m_indexOffset;
-    size_t m_indexByteLength;
-    size_t m_indexCount;
-    size_t m_vertexOffset;
-    size_t m_vertexByteLength;
-    size_t m_vertexCount;
 };
 
 } // namespace pdal

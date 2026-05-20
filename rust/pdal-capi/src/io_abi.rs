@@ -342,6 +342,20 @@ pub unsafe extern "C" fn pdal_writer_create_ply(ops: *const Options) -> *mut Wri
     }
 }
 
+/// Create a GltfWriter.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_gltf(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::gltf::GltfWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Create an SbetWriter from options.
 ///
 /// # Safety
