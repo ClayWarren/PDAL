@@ -135,6 +135,11 @@ impl Options {
         self.last_value(key)
     }
 
+    /// All values for an option key, preserving insertion order.
+    pub fn values(&self, key: &str) -> &[String] {
+        self.map.get(key).map(Vec::as_slice).unwrap_or(&[])
+    }
+
     /// Option parsed as `bool`, or `default` if unset or unparseable.
     pub fn get_bool(&self, key: &str, default: bool) -> bool {
         self.map

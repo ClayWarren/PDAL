@@ -1,13 +1,20 @@
 //! `readers.bpf` / `writers.bpf` -- Binary Point Format.
 //!
-//! This slice covers deterministic local BPF files. Remote files, bundled
-//! files, and polarization/ULEM metadata remain C++ territory until a later
-//! I/O checkpoint needs them.
+//! This slice covers deterministic local BPF files. Remote files and full
+//! polarization/ULEM metadata remain C++ territory until a later I/O checkpoint
+//! needs them.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+#[path = "bpf_base64.rs"]
+mod bpf_base64;
+#[path = "bpf_metadata.rs"]
+mod bpf_metadata;
+
+use bpf_base64::decode_base64;
+use bpf_metadata::reader_metadata;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
@@ -38,6 +45,18 @@ struct BpfDimension {
     max: f64,
     label: String,
     id: DimId,
+}
+
+#[derive(Clone, Debug)]
+struct BundledFile {
+    name: String,
+    data: Vec<u8>,
+}
+
+impl BundledFile {
+    fn record_len(&self) -> usize {
+        4 + 4 + 32 + self.data.len()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -78,6 +97,7 @@ impl Default for BpfHeader {
 pub struct BpfReader {
     filename: String,
     fix_dims: bool,
+    metadata: MetadataNode,
 }
 
 impl BpfReader {
@@ -85,6 +105,7 @@ impl BpfReader {
         Self {
             filename: options.get_str("filename", ""),
             fix_dims: options.get_bool("fix_dims", true),
+            metadata: MetadataNode::new("readers.bpf"),
         }
     }
 }
@@ -106,6 +127,7 @@ impl Reader for BpfReader {
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;
         let dims = read_dimensions(&mut reader, &header, self.fix_dims)?;
+        self.metadata = reader_metadata(&mut reader, &header)?;
 
         reader
             .seek(SeekFrom::Start(header.len as u64))
@@ -141,7 +163,7 @@ impl Reader for BpfReader {
     }
 
     fn metadata(&self) -> MetadataNode {
-        MetadataNode::new("readers.bpf")
+        self.metadata.clone()
     }
 }
 
@@ -152,6 +174,8 @@ pub struct BpfWriter {
     coord_id: i32,
     output_dims: Vec<String>,
     scaling: Scaling,
+    header_data: Vec<u8>,
+    bundled_files: Vec<String>,
 }
 
 impl BpfWriter {
@@ -163,6 +187,8 @@ impl BpfWriter {
             coord_id: parse_coord_id(&options.get_str("coord_id", "0")),
             output_dims: parse_output_dims(&options.get_str("output_dims", "")),
             scaling: writer_scaling(options),
+            header_data: decode_base64(&options.get_str("header_data", "")).unwrap_or_default(),
+            bundled_files: options.values("bundledfile").to_vec(),
         }
     }
 }
@@ -191,8 +217,15 @@ impl Writer for BpfWriter {
             ));
         }
         let dims = writer_dimensions(view, &self.output_dims, &scaling)?;
+        let bundled_files = bundled_file_specs(&self.bundled_files)?;
         let mut header = BpfHeader {
-            len: (176 + dims.len() * 56) as i32,
+            len: (176
+                + dims.len() * 56
+                + bundled_files
+                    .iter()
+                    .map(BundledFile::record_len)
+                    .sum::<usize>()
+                + self.header_data.len()) as i32,
             num_dim: dims.len(),
             format: self.format,
             compression: u8::from(self.compression),
@@ -210,6 +243,8 @@ impl Writer for BpfWriter {
         let mut writer = BufWriter::new(file);
         write_header(&mut writer, &header)?;
         write_dimensions(&mut writer, &dims)?;
+        write_bundled_files(&mut writer, &bundled_files)?;
+        writer.write_all(&self.header_data).map_err(io_error)?;
         if self.compression {
             let mut data = Vec::new();
             match self.format {
@@ -610,6 +645,47 @@ fn write_dimensions<W: Write>(writer: &mut W, dims: &[BpfDimension]) -> Result<(
     Ok(())
 }
 
+fn bundled_file_specs(paths: &[String]) -> Result<Vec<BundledFile>, StageError> {
+    let mut files = Vec::new();
+    for path in paths {
+        let name = Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| StageError(format!("Bundledfile '{path}' has no filename.")))?
+            .to_string();
+        if name.len() > 32 {
+            return Err(StageError(format!(
+                "Bundled file '{path}' name exceeds maximum length of 32."
+            )));
+        }
+        let data = std::fs::read(path)
+            .map_err(|_| StageError(format!("Bundledfile '{path}' doesn't exist.")))?;
+        if data.is_empty() {
+            return Err(StageError(format!(
+                "Bundled file '{path}' empty or otherwise invalid."
+            )));
+        }
+        files.push(BundledFile { name, data });
+    }
+    Ok(files)
+}
+
+fn write_bundled_files<W: Write>(writer: &mut W, files: &[BundledFile]) -> Result<(), StageError> {
+    for file in files {
+        writer.write_all(b"FILE").map_err(io_error)?;
+        writer
+            .write_u32::<LittleEndian>(file.data.len() as u32)
+            .map_err(io_error)?;
+        let mut name = [0u8; 32];
+        let bytes = file.name.as_bytes();
+        let len = bytes.len().min(name.len());
+        name[..len].copy_from_slice(&bytes[..len]);
+        writer.write_all(&name).map_err(io_error)?;
+        writer.write_all(&file.data).map_err(io_error)?;
+    }
+    Ok(())
+}
+
 fn write_point_major<W: Write>(
     writer: &mut W,
     view: &PointView,
@@ -886,142 +962,5 @@ fn io_error(error: std::io::Error) -> StageError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use pdal_core::pipeline::Writer;
-    use pdal_core::point::DimId;
-
-    fn data_path(name: &str) -> String {
-        format!("{}/../../test/data/{name}", env!("CARGO_MANIFEST_DIR"))
-    }
-
-    fn temp_path(name: &str) -> String {
-        std::env::temp_dir()
-            .join(format!("pdal-rust-bpf-{}-{name}", std::process::id()))
-            .to_string_lossy()
-            .into_owned()
-    }
-
-    fn read_bpf(path: &str) -> PointView {
-        let mut options = Options::new();
-        options.add("filename", path);
-        let mut reader = BpfReader::new(&options);
-        reader.read().unwrap().remove(0)
-    }
-
-    #[test]
-    fn reads_uncompressed_dim_major_bpf() {
-        let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
-
-        assert_eq!(view.len(), 1065);
-        assert!((view.get_f64(0, &DimId::X) - 494057.30).abs() < 0.25);
-        assert!((view.get_f64(0, &DimId::Y) - 4877433.35).abs() < 0.25);
-        assert!((view.get_f64(0, &DimId::Z) - 130.63).abs() < 0.01);
-        assert!(view.layout().dim(&DimId::Intensity).is_some());
-    }
-
-    #[test]
-    fn reads_uncompressed_point_major_bpf() {
-        let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-interleaved.bpf"));
-
-        assert_eq!(view.len(), 1065);
-        assert!((view.get_f64(1, &DimId::X) - 494133.82).abs() < 0.25);
-        assert!((view.get_f64(1, &DimId::Y) - 4877439.82).abs() < 0.25);
-    }
-
-    #[test]
-    fn reads_uncompressed_byte_major_bpf() {
-        let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-segregated.bpf"));
-
-        assert_eq!(view.len(), 1065);
-        assert!((view.get_f64(2, &DimId::Z) - 130.46).abs() < 0.01);
-    }
-
-    #[test]
-    fn writer_roundtrips_each_interleave() {
-        let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
-
-        for format in ["dimension", "point", "byte"] {
-            for compression in [false, true] {
-                let output = temp_path(&format!("roundtrip-{format}-{compression}.bpf"));
-                let mut options = Options::new();
-                options.add("filename", &output);
-                options.add("format", format);
-                options.add("compression", compression);
-                let mut writer = BpfWriter::new(&options);
-                writer.write(std::slice::from_ref(&input)).unwrap();
-
-                let roundtrip = read_bpf(&output);
-                assert_eq!(roundtrip.len(), input.len());
-                for idx in [0, 17, 1064] {
-                    for dim in [DimId::X, DimId::Y, DimId::Z, DimId::Intensity] {
-                        assert!(
-                            (roundtrip.get_f64(idx, &dim) - input.get_f64(idx, &dim)).abs() < 0.01,
-                            "format {format}, idx {idx}, dim {}",
-                            dim.name()
-                        );
-                    }
-                }
-                std::fs::remove_file(output).ok();
-            }
-        }
-    }
-
-    #[test]
-    fn writer_respects_output_dims() {
-        let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
-        let output = temp_path("output-dims.bpf");
-        let mut options = Options::new();
-        options.add("filename", &output);
-        options.add("output_dims", "X,Y,Z,Red,Green");
-        let mut writer = BpfWriter::new(&options);
-        writer.write(std::slice::from_ref(&input)).unwrap();
-
-        let roundtrip = read_bpf(&output);
-        assert_eq!(roundtrip.layout().dim_count(), 5);
-        assert!(roundtrip.layout().dim(&DimId::Blue).is_none());
-        assert!((roundtrip.get_f64(0, &DimId::Red) - input.get_f64(0, &DimId::Red)).abs() < 0.01);
-        assert!(
-            (roundtrip.get_f64(0, &DimId::Green) - input.get_f64(0, &DimId::Green)).abs() < 0.01
-        );
-        std::fs::remove_file(output).ok();
-    }
-
-    #[test]
-    fn writer_roundtrips_with_scale_and_offset() {
-        let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
-        let output = temp_path("scaling.bpf");
-        let mut options = Options::new();
-        options.add("filename", &output);
-        options.add("format", "point");
-        options.add("offset_x", 494000.0);
-        options.add("offset_y", 4870000.0);
-        options.add("offset_z", 130.0);
-        options.add("scale_x", 0.001);
-        options.add("scale_y", 0.01);
-        options.add("scale_z", 10.0);
-        let mut writer = BpfWriter::new(&options);
-        writer.write(std::slice::from_ref(&input)).unwrap();
-
-        let roundtrip = read_bpf(&output);
-        for idx in [0, 17, 1064] {
-            for dim in [DimId::X, DimId::Y, DimId::Z] {
-                assert!(
-                    (roundtrip.get_f64(idx, &dim) - input.get_f64(idx, &dim)).abs() < 0.01,
-                    "idx {idx}, dim {}",
-                    dim.name()
-                );
-            }
-        }
-        std::fs::remove_file(output).ok();
-    }
-
-    #[test]
-    fn reads_compressed_bpf() {
-        let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-deflate.bpf"));
-
-        assert_eq!(view.len(), 1065);
-        assert!((view.get_f64(0, &DimId::X) - 494057.3).abs() < 0.25);
-        assert!((view.get_f64(17, &DimId::Z) - 130.03).abs() < 0.25);
-    }
-}
+#[path = "bpf_tests.rs"]
+mod tests;
