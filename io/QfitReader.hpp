@@ -34,12 +34,9 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include <pdal/Options.hpp>
 #include <pdal/Reader.hpp>
-#include <pdal/util/IStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -56,20 +53,16 @@ class PDAL_EXPORT QfitReader : public pdal::Reader
 {
 public:
     QfitReader();
+    ~QfitReader() override;
 
     std::string getName() const override;
 
 private:
-    QFIT_Format_Type m_format;
-    std::ios::off_type m_point_bytes;
-    std::size_t m_offset;
-    uint32_t m_size;
     bool m_flip_x;
     double m_scale_z;
-    bool m_littleEndian;
-    point_count_t m_numPoints;
-    std::unique_ptr<IStream> m_istream;
-    point_count_t m_index;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    Dimension::IdList m_dims;
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
@@ -77,6 +70,7 @@ private:
     void ready(PointTableRef table) override;
     point_count_t read(PointViewPtr buf, point_count_t count) override;
     void done(PointTableRef table) override;
+    void copyPoint(PointViewPtr data, PointId outIdx);
 
     QfitReader& operator=(const QfitReader&) = delete;
     QfitReader(const QfitReader&) = delete;

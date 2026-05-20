@@ -167,12 +167,7 @@ Word #       Content
 #include "QfitReader.hpp"
 
 #include <pdal/PointView.hpp>
-#include <pdal/util/Extractor.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal/util/portable_endian.hpp>
-
-#include <algorithm>
-#include <map>
 
 #pragma warning(disable : 4127) // conditional expression is constant
 
@@ -187,79 +182,69 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(QfitReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 std::string QfitReader::getName() const
 {
     return s_info.name;
 }
 
-QfitReader::QfitReader()
-    : pdal::Reader(), m_format(QFIT_Format_Unknown), m_size(0),
-      m_littleEndian(false), m_istream()
+QfitReader::QfitReader() : pdal::Reader() {}
+
+QfitReader::~QfitReader()
 {
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 void QfitReader::initialize()
 {
-    ISwitchableStream str(m_filename);
-    if (!str)
-        throwError("Unable to open file '" + m_filename + "'");
-    str.seek(0);
-
-    int32_t int4(0);
-
-    str >> int4;
-
-    // They started writting little-endian data->
-
-    /* For years we produced ATM data in big-endian format. With changes in
-    computer hardware, we reluctantly changed our standard output to
-    little-endian. The transition occurred between the two 2010 campaigns. The
-    format of the binary ( .qi, for example) files can be identified by
-    examining the first four bytes of the file. Read as a long integer (one
-    4-byte word), the value will contain the record length (in bytes) of the
-    data records. For example, a .qi file containing 14 words per record will
-    have a value 56 (=4*14). If the format of the file matches the format of
-    your processor, the value will be reasonable without byte-swapping. If the
-    format of the file differs from your processor, then the value is
-    interpreted as some very large number, unless you swap the byte order. If
-    you use Intel or equivalent processors, then you had to byte-swap files
-    from spring 2010 and earlier, you do not swap the ones from fall 2010 and
-    later. */
-
-    // If the size comes back something other than 4*no_dimensions, we assume
-    // The data were flipped
-    if (int4 < 100)
+    m_rustIndex = 0;
+    if (m_rustView)
     {
-        m_littleEndian = true;
-    }
-    else
-    {
-        str.switchToBigEndian();
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
 
-    if (!m_littleEndian)
-        int4 = int32_t(be32toh(uint32_t(int4)));
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "flip_coordinates", m_flip_x ? "true" : "false");
+    addOption(options, "scale_z", m_scale_z);
 
-    if (int4 % 4 != 0)
-        throwError("Base QFIT format is not a multiple of 4, "
-                   "unrecognized format!");
+    pdal_reader_t* reader = pdal_reader_create_qfit(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust QFIT reader.");
+    }
 
-    m_size = int4;
-    m_format = static_cast<QFIT_Format_Type>(m_size / sizeof(m_size));
-
-    // The offset to start reading point data should be here.
-    str.seek(m_size + sizeof(int4));
-
-    str >> int4;
-    m_offset = static_cast<std::size_t>(int4);
-
-    // Seek to the end
-    str.seek(0, std::istream::end);
-    std::ios::pos_type end = str.position();
-
-    // First integer is the format of the file
-    std::ios::off_type offset = static_cast<std::ios::off_type>(m_offset);
-    m_point_bytes = end - offset;
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust QFIT reader failed.");
 }
 
 void QfitReader::addArgs(ProgramArgs& args)
@@ -272,130 +257,56 @@ void QfitReader::addArgs(ProgramArgs& args)
 
 void QfitReader::addDimensions(PointLayoutPtr layout)
 {
-    using namespace Dimension;
-
-    m_size = 0;
-    layout->registerDim(Id::OffsetTime);
-    layout->registerDim(Id::Y);
-    layout->registerDim(Id::X);
-    layout->registerDim(Id::Z);
-    layout->registerDim(Id::StartPulse);
-    layout->registerDim(Id::ReflectedPulse);
-    layout->registerDim(Id::Azimuth);
-    layout->registerDim(Id::Pitch);
-    layout->registerDim(Id::Roll);
-    m_size += 36;
-
-    if (m_format == QFIT_Format_12)
+    m_dims.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        layout->registerDim(Id::Pdop);
-        layout->registerDim(Id::PulseWidth);
-        m_size += 8;
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+
+        Dimension::Id id =
+            layout->registerOrAssignDim(name, Dimension::Type::Double);
+        m_dims.push_back(id);
     }
-    else if (m_format == QFIT_Format_14)
-    {
-        layout->registerDim(Id::PassiveSignal);
-        layout->registerDim(Id::PassiveY);
-        layout->registerDim(Id::PassiveX);
-        layout->registerDim(Id::PassiveZ);
-        m_size += 16;
-    }
-    m_size += 4; // For the GPS time that we currently discard.
 }
 
 void QfitReader::ready(PointTableRef)
 {
-    m_numPoints = m_point_bytes / m_size;
-    if (m_point_bytes % m_size)
-        throwError("Error calculating file point count.  File size is "
-                   "inconsistent with point size.");
-    m_index = 0;
-    m_istream.reset(new IStream(m_filename));
-    m_istream->seek(m_offset);
+    m_rustIndex = 0;
 }
 
 point_count_t QfitReader::read(PointViewPtr data, point_count_t count)
 {
-    if (!m_istream->good())
-        throwError("Corrupted file/file read error.");
-    if (m_istream->stream()->eof())
-        throwError("End of file detected.");
-
-    count = (std::min)(m_numPoints - m_index, count);
-    std::vector<char> buf(m_size);
     PointId nextId = data->size();
     point_count_t numRead = 0;
-    while (count--)
+    while (numRead < count && m_rustIndex < pdal_point_view_length(m_rustView))
     {
-        m_istream->get(buf);
-        SwitchableExtractor extractor(buf.data(), m_size, m_littleEndian);
-
-        // always read the base fields
-        {
-            int32_t time, y, xi, z, start_pulse, reflected_pulse, scan_angle,
-                pitch, roll;
-            extractor >> time >> y >> xi >> z >> start_pulse >>
-                reflected_pulse >> scan_angle >> pitch >> roll;
-            double x = xi / 1000000.0;
-            if (m_flip_x && x > 180)
-                x -= 360;
-
-            data->setField(Dimension::Id::OffsetTime, nextId, time);
-            data->setField(Dimension::Id::Y, nextId, y / 1000000.0);
-            data->setField(Dimension::Id::X, nextId, x);
-            data->setField(Dimension::Id::Z, nextId, z * m_scale_z);
-            data->setField(Dimension::Id::StartPulse, nextId, start_pulse);
-            data->setField(Dimension::Id::ReflectedPulse, nextId,
-                           reflected_pulse);
-            data->setField(Dimension::Id::Azimuth, nextId, scan_angle / 1000.0);
-            data->setField(Dimension::Id::Pitch, nextId, pitch / 1000.0);
-            data->setField(Dimension::Id::Roll, nextId, roll / 1000.0);
-        }
-
-        if (m_format == QFIT_Format_12)
-        {
-            int32_t pdop, pulse_width;
-            extractor >> pdop >> pulse_width;
-            data->setField(Dimension::Id::Pdop, nextId, pdop / 10.0);
-            data->setField(Dimension::Id::PulseWidth, nextId, pulse_width);
-        }
-        else if (m_format == QFIT_Format_14)
-        {
-            int32_t passive_signal, passive_y, passive_x, passive_z;
-            extractor >> passive_signal >> passive_y >> passive_x >> passive_z;
-            double x = passive_x / 1000000.0;
-            if (m_flip_x && x > 180)
-                x -= 360;
-            data->setField(Dimension::Id::PassiveSignal, nextId,
-                           passive_signal);
-            data->setField(Dimension::Id::PassiveY, nextId,
-                           passive_y / 1000000.0);
-            data->setField(Dimension::Id::PassiveX, nextId, x);
-            data->setField(Dimension::Id::PassiveZ, nextId,
-                           passive_z * m_scale_z);
-        }
-        // GPS time is really a GPS offset from the start of the GPS day
-        // encoded in this odd way: 153320100 = 15 hours 33 minutes
-        // 20 seconds 100 milliseconds.
-        // Not sure why we have that AND the other offset time.  For now
-        // we'll just extract this time and drop it.
-        int32_t gpstime;
-        extractor >> gpstime;
+        copyPoint(data, nextId);
 
         if (m_cb)
             m_cb(*data, nextId);
 
         numRead++;
         nextId++;
+        m_rustIndex++;
     }
-    m_index += numRead;
 
     return numRead;
 }
 
-void QfitReader::done(PointTableRef)
+void QfitReader::copyPoint(PointViewPtr data, PointId outIdx)
 {
-    m_istream.reset();
+    for (Dimension::Id dim : m_dims)
+    {
+        data->setField(dim, outIdx,
+                       pdal_point_view_get_f64(m_rustView, m_rustIndex,
+                                               Dimension::name(dim).c_str()));
+    }
 }
+
+void QfitReader::done(PointTableRef) {}
 
 } // namespace pdal

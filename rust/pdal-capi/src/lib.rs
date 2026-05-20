@@ -664,7 +664,7 @@ mod tests {
             assert!(!reader.is_null());
             let view = pdal_reader_read_first(reader);
             assert!(!view.is_null());
-            assert_eq!(pdal_point_view_length(view), 3);
+            assert_eq!(pdal_point_view_length(view), 2000);
 
             let x = CString::new("X").unwrap();
             let y = CString::new("Y").unwrap();
@@ -712,6 +712,37 @@ mod tests {
 
             pdal_metadata_node_destroy(child);
             pdal_metadata_node_destroy(metadata);
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
+    fn qfit_reader_returns_points_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [
+                ("filename", data_path("qfit/10-word.qi")),
+                ("flip_coordinates", "false".to_string()),
+                ("scale_z", "0.001".to_string()),
+            ] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_qfit(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(!view.is_null());
+            assert_eq!(pdal_point_view_length(view), 2000);
+
+            let x = CString::new("X").unwrap();
+            let z = CString::new("Z").unwrap();
+            assert_eq!(pdal_point_view_get_f64(view, 0, x.as_ptr()), 221.826822);
+            assert_eq!(pdal_point_view_get_f64(view, 2, z.as_ptr()), 32.0);
+
             pdal_point_view_destroy(view);
             pdal_reader_destroy(reader);
             pdal_options_destroy(options);
