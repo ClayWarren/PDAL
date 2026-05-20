@@ -42,6 +42,38 @@ fn gdal_writer_writes_count_raster() {
 }
 
 #[test]
+fn gdal_reader_matches_existing_header_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let repo = repo_root();
+    let input = repo.join("test/data/gdal/autzen-height.tif");
+    let mut options = Options::new();
+    options.add("filename", input.display());
+    options.add("header", "Intensity,Userdata,Z");
+    let mut reader = GdalReader::new(&options);
+    let view = reader.read().unwrap().pop().unwrap();
+
+    assert_eq!(view.len(), 735 * 973);
+    assert_gdal_reader_point(&view, 0, 0.5, 0.5, 0.0, 0.0, 0.0);
+    assert_gdal_reader_point(&view, 120000, 195.5, 163.5, 255.0, 213.0, 0.0);
+    assert_gdal_reader_point(&view, 290000, 410.5, 394.5, 0.0, 255.0, 206.0);
+    assert_gdal_reader_point(&view, 715154, 734.5, 972.5, 0.0, 0.0, 0.0);
+}
+
+#[test]
+fn gdal_reader_matches_existing_typed_raster_fixtures() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    for fixture in [
+        "byte.tif",
+        "int16.tif",
+        "int32.tif",
+        "float32.tif",
+        "float64.tif",
+    ] {
+        assert_gdal_reader_matches_xyz_fixture(fixture);
+    }
+}
+
+#[test]
 fn gdal_writer_matches_existing_min_grid_fixture() {
     let _guard = GDAL_TEST_LOCK.lock().unwrap();
     let output = write_grid_fixture("min", false);
@@ -326,8 +358,12 @@ fn write_grid_fixture_with_options(
     output
 }
 
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
 fn write_fixed_multi_view_grid_fixture() -> PathBuf {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let repo = repo_root();
     let temp = make_temp_dir("gdal-writer-fixed-multi-view");
     let output = temp.join("grid.tif");
 
@@ -352,6 +388,64 @@ fn read_text_views(path: &Path) -> Vec<PointView> {
     let mut options = Options::new();
     options.add("filename", path.display());
     TextReader::new(&options).read().unwrap()
+}
+
+fn assert_gdal_reader_point(
+    view: &PointView,
+    idx: u64,
+    expected_x: f64,
+    expected_y: f64,
+    expected_intensity: f64,
+    expected_user_data: f64,
+    expected_z: f64,
+) {
+    assert_eq!(view.get_f64(idx, &DimId::X), expected_x);
+    assert_eq!(view.get_f64(idx, &DimId::Y), expected_y);
+    assert_eq!(view.get_f64(idx, &DimId::Intensity), expected_intensity);
+    assert_eq!(view.get_f64(idx, &DimId::UserData), expected_user_data);
+    assert_eq!(view.get_f64(idx, &DimId::Z), expected_z);
+}
+
+fn assert_gdal_reader_matches_xyz_fixture(fixture: &str) {
+    let repo = repo_root();
+    let mut expected = read_xyz_points(&repo.join("test/data/gdal/data.xyz"));
+    let mut options = Options::new();
+    options.add(
+        "filename",
+        repo.join("test/data/gdal").join(fixture).display(),
+    );
+    let mut reader = GdalReader::new(&options);
+    let view = reader.read().unwrap().pop().unwrap();
+
+    let mut actual: Vec<(String, String, String)> = (0..view.len())
+        .map(|idx| {
+            (
+                view.get_f64(idx, &DimId::X).to_string(),
+                view.get_f64(idx, &DimId::Y).to_string(),
+                view.get_f64(idx, &DimId::from_name("band_1")).to_string(),
+            )
+        })
+        .collect();
+    actual.sort();
+    expected.sort();
+    assert_eq!(actual, expected, "{fixture}");
+}
+
+fn read_xyz_points(path: &Path) -> Vec<(String, String, String)> {
+    fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .filter_map(|line| {
+            let values: Vec<&str> = line.split_whitespace().collect();
+            (values.len() == 3).then(|| {
+                (
+                    values[0].to_string(),
+                    values[1].to_string(),
+                    values[2].to_string(),
+                )
+            })
+        })
+        .collect()
 }
 
 fn assert_band_near(path: &Path, expected: &[f64]) {
