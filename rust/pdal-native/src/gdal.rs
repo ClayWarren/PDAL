@@ -22,6 +22,51 @@ impl Raster {
         }
     }
 
+    pub fn create_float64(
+        path: &str,
+        driver_name: &str,
+        width: i32,
+        height: i32,
+        band_count: i32,
+        geo_transform: [f64; 6],
+        srs_wkt: &str,
+    ) -> Result<Self, String> {
+        let path_c = CString::new(path).map_err(|e| e.to_string())?;
+        let driver_name_c = CString::new(driver_name).map_err(|e| e.to_string())?;
+        unsafe {
+            let driver = gdal_sys::GDALGetDriverByName(driver_name_c.as_ptr());
+            if driver.is_null() {
+                return Err(format!("GDAL driver '{}' not found", driver_name));
+            }
+            let ds = gdal_sys::GDALCreate(
+                driver,
+                path_c.as_ptr(),
+                width,
+                height,
+                band_count,
+                GDALDataType::GDT_Float64,
+                std::ptr::null_mut(),
+            );
+            if ds.is_null() {
+                return Err(format!("Failed to create GDAL dataset: {}", path));
+            }
+            if gdal_sys::GDALSetGeoTransform(ds, geo_transform.as_ptr() as *mut f64)
+                != CPLErr::CE_None
+            {
+                gdal_sys::GDALClose(ds);
+                return Err("Failed to set GDAL geotransform".to_string());
+            }
+            if !srs_wkt.is_empty() {
+                let srs_c = CString::new(srs_wkt).map_err(|e| e.to_string())?;
+                if gdal_sys::GDALSetProjection(ds, srs_c.as_ptr()) != CPLErr::CE_None {
+                    gdal_sys::GDALClose(ds);
+                    return Err("Failed to set GDAL projection".to_string());
+                }
+            }
+            Ok(Self { ds })
+        }
+    }
+
     pub fn width(&self) -> i32 {
         unsafe { gdal_sys::GDALGetRasterXSize(self.ds) }
     }
@@ -86,6 +131,54 @@ impl Raster {
 
             if res != CPLErr::CE_None {
                 return Err("GDAL RasterIO failed".to_string());
+            }
+            Ok(())
+        }
+    }
+
+    pub fn write_band_f64(
+        &mut self,
+        band_idx: i32,
+        width: usize,
+        height: usize,
+        buffer: &[f64],
+        no_data: f64,
+        description: &str,
+    ) -> Result<(), String> {
+        if buffer.len() != width * height {
+            return Err("GDAL band buffer size does not match raster dimensions.".to_string());
+        }
+        let description_c = CString::new(description).map_err(|e| e.to_string())?;
+        unsafe {
+            let band = GDALGetRasterBand(self.ds, band_idx);
+            if band.is_null() {
+                return Err(format!("Failed to get band {}", band_idx));
+            }
+            if gdal_sys::GDALSetRasterNoDataValue(band, no_data) != CPLErr::CE_None {
+                return Err(format!("Failed to set no-data value for band {}", band_idx));
+            }
+            gdal_sys::GDALSetDescription(
+                band as gdal_sys::GDALMajorObjectH,
+                description_c.as_ptr(),
+            );
+
+            let res = GDALRasterIO(
+                band,
+                GDALRWFlag::GF_Write,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                buffer.as_ptr() as *mut _,
+                width as i32,
+                height as i32,
+                GDALDataType::GDT_Float64,
+                0,
+                0,
+            );
+
+            if res != CPLErr::CE_None {
+                return Err("GDAL RasterIO write failed".to_string());
             }
             Ok(())
         }

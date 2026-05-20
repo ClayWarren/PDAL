@@ -10,6 +10,7 @@ pub mod faux;
 pub mod fbi;
 pub mod fbi_writer;
 pub mod gdal_reader;
+pub mod gdal_writer;
 pub mod gltf;
 pub mod ilvis2;
 pub mod ilvis2_metadata;

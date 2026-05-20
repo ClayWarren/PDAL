@@ -49,7 +49,7 @@ Status definitions:
 | TerraSolid reader | in progress | Deterministic TerraSolid format 2 fixture is covered. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Deterministic Optech CSD fixture and localized WGS84 georeference math are covered. |
 | BPF I/O | in progress | Deterministic local BPF read/write is covered for uncompressed and compressed point/dimension/byte interleaves, including bundled-file metadata roundtrips. Remote files and ULEM/polar metadata are deferred. |
-| GDAL reader | prototype | A narrow local raster-to-point-cloud slice has started. This is not broad GDAL/PROJ permission. |
+| GDAL reader/writer | prototype | A narrow local raster-to-point-cloud reader slice and first raster writer slice exist. Writer support currently covers Float64 GDAL output for core grid statistics; this is not broad GDAL/PROJ permission. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |

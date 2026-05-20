@@ -683,6 +683,46 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             option("multicount", "Points per feature.", Some(json!(1))),
             option("measure_dim", "Dimension to use as a measure value.", None),
         ],
+        "writers.gdal" => vec![
+            filename(),
+            option(
+                "resolution",
+                "Cell edge size in X/Y units.",
+                Some(json!(1.0)),
+            ),
+            option(
+                "radius",
+                "Radius from each cell center for source points.",
+                None,
+            ),
+            option("power", "IDW weighting power.", Some(json!(1.0))),
+            option(
+                "gdaldriver",
+                "GDAL writer driver name.",
+                Some(json!("GTiff")),
+            ),
+            option(
+                "output_type",
+                "Raster statistic names to write.",
+                Some(json!("all")),
+            ),
+            option(
+                "dimension",
+                "Point dimension to rasterize.",
+                Some(json!("Z")),
+            ),
+            option("nodata", "No-data value.", Some(json!(-9999.0))),
+            option(
+                "binmode",
+                "Assign points directly to cells.",
+                Some(json!(false)),
+            ),
+            option("allow_empty", "Allow empty output.", Some(json!(false))),
+            option("origin_x", "Fixed grid X origin.", None),
+            option("origin_y", "Fixed grid Y origin.", None),
+            option("width", "Fixed grid width in cells.", None),
+            option("height", "Fixed grid height in cells.", None),
+        ],
         _ => Vec::new(),
     }
 }
