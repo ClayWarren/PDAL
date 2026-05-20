@@ -372,7 +372,7 @@ pub unsafe extern "C" fn pdal_writer_write_view(
         return false;
     };
 
-    match writer.writer.write(&[view.clone()]) {
+    match writer.writer.write(std::slice::from_ref(view)) {
         Ok(()) => {
             clear_last_error();
             true

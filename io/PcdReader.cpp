@@ -32,11 +32,9 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/util/Algorithm.hpp>
-
-#include "PcdHeader.hpp"
 #include "PcdReader.hpp"
+
+#include <pdal/PointView.hpp>
 
 namespace pdal
 {
@@ -49,6 +47,54 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(PcdReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+Dimension::Type cppType(int type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case 0:
+        return Type::Unsigned8;
+    case 1:
+        return Type::Unsigned16;
+    case 2:
+        return Type::Unsigned32;
+    case 3:
+        return Type::Unsigned64;
+    case 4:
+        return Type::Signed8;
+    case 5:
+        return Type::Signed16;
+    case 6:
+        return Type::Signed32;
+    case 7:
+        return Type::Signed64;
+    case 8:
+        return Type::Float;
+    case 9:
+    default:
+        return Type::Double;
+    }
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 std::string PcdReader::getName() const
 {
     return s_info.name;
@@ -56,220 +102,69 @@ std::string PcdReader::getName() const
 
 PcdReader::PcdReader() {}
 
+PcdReader::~PcdReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 QuickInfo PcdReader::inspect()
 {
     QuickInfo qi;
 
     initialize();
 
-    for (const auto& i : m_header.m_fields)
-        qi.m_dimNames.push_back(i.m_label);
-    qi.m_pointCount = m_header.m_pointCount;
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
+    {
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        qi.m_dimNames.push_back(rawName);
+        pdal_string_free(rawName);
+    }
+    qi.m_pointCount = pdal_point_view_length(m_rustView);
     qi.m_valid = true;
 
     return qi;
 }
 
-void PcdReader::ready(PointTableRef table)
+void PcdReader::ready(PointTableRef)
 {
     m_index = 0;
-    switch (m_header.m_dataStorage)
-    {
-    case PcdDataStorage::ASCII:
-        m_istreamPtr = Utils::openFile(m_filename, true);
-        if (!m_istreamPtr)
-            throwError("Unable to open ASCII PCD file '" + m_filename + "'.");
-        m_istreamPtr->seekg(m_header.m_dataOffset);
-        break;
-    case PcdDataStorage::BINARY:
-        m_istreamPtr = Utils::openFile(m_filename, true);
-        if (!m_istreamPtr)
-            throwError("Unable to open binary PCD file '" + m_filename + "'.");
-        m_stream = ILeStream(m_istreamPtr);
-        m_stream.seek(m_header.m_dataOffset);
-        break;
-    case PcdDataStorage::COMPRESSED:
-        throwError("Binary compressed PCD is not supported at this time.");
-        break;
-    case PcdDataStorage::unknown:
-    default:
-        throwError("Unrecognized data storage.");
-    }
 }
 
 void PcdReader::addDimensions(PointLayoutPtr layout)
 {
     m_dims.clear();
-    for (PcdField& i : m_header.m_fields)
+    m_dimNames.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        Dimension::BaseType base = Dimension::BaseType::None;
-        if (i.m_type == PcdFieldType::U)
-            base = Dimension::BaseType::Unsigned;
-        else if (i.m_type == PcdFieldType::I)
-            base = Dimension::BaseType::Signed;
-        else if (i.m_type == PcdFieldType::F)
-            base = Dimension::BaseType::Floating;
-        Dimension::Type t =
-            static_cast<Dimension::Type>(unsigned(base) | i.m_size);
-        Utils::trim(i.m_label);
-        i.m_label = Utils::toupper(i.m_label);
-        if (i.m_label == "X" || i.m_label == "Y" || i.m_label == "Z")
-            t = Dimension::Type::Double;
-        i.m_id = layout->registerOrAssignDim(i.m_label, t);
-        if (Utils::contains(m_dims, i.m_id) &&
-            i.m_id != pdal::Dimension::Id::Unknown)
-            throwError("Duplicate dimension '" + i.m_label +
-                       "' detected in input file '" + m_filename + "'.");
-        m_dims.push_back(i.m_id);
-    }
-}
-
-bool PcdReader::fillFields()
-{
-    while (true)
-    {
-        if (!m_istreamPtr->good())
-            return false;
-
-        std::string buf;
-
-        std::getline(*m_istreamPtr, buf);
-        m_line++;
-        if (buf.empty())
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
             continue;
-
-        Utils::trim(buf);
-        m_fields = Utils::split(buf, [](char c)
-                                { return c == '\t' || c == '\r' || c == ' '; });
-        if (m_fields.size() != m_dims.size())
-        {
-            log()->get(LogLevel::Error)
-                << "Line " << m_line << " in '" << m_filename << "' contains "
-                << m_fields.size() << " fields when " << m_dims.size()
-                << " were expected.  "
-                   "Ignoring."
-                << '\n';
-            continue;
-        }
-        return true;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Type type =
+            cppType(pdal_point_view_dim_type(m_rustView, idx));
+        Dimension::Id id = layout->registerOrAssignDim(name, type);
+        m_dims.push_back(id);
+        m_dimNames.push_back(name);
     }
 }
 
 bool PcdReader::processOne(PointRef& point)
 {
-    switch (m_header.m_dataStorage)
-    {
-    case PcdDataStorage::ASCII:
-        if (!fillFields())
-            return false;
-
-        double d;
-        for (size_t i = 0; i < m_fields.size(); ++i)
-        {
-            if (!Utils::fromString(m_fields[i], d))
-            {
-                log()->get(LogLevel::Error)
-                    << "Can't convert field '" << m_fields[i]
-                    << "' to numeric value on line " << m_line << " in '"
-                    << m_filename << "'.  Setting to 0." << '\n';
-                d = 0;
-            }
-            point.setField(m_dims[i], d);
-        }
-        return true;
-    case PcdDataStorage::BINARY:
-        if (!m_stream.good())
-            return false;
-
-        if ((m_index >= m_count) ||
-            (m_index >= (point_count_t)m_header.m_pointCount))
-            return false;
-
-        for (auto const& i : m_header.m_fields)
-        {
-            switch (i.m_type)
-            {
-            case PcdFieldType::I:
-                if (i.m_size == 1)
-                {
-                    int8_t ival;
-                    m_stream >> ival;
-                    point.setField(i.m_id, ival);
-                }
-                if (i.m_size == 2)
-                {
-                    int16_t ival;
-                    m_stream >> ival;
-                    point.setField(i.m_id, ival);
-                }
-                if (i.m_size == 4)
-                {
-                    int32_t ival;
-                    m_stream >> ival;
-                    point.setField(i.m_id, ival);
-                }
-                if (i.m_size == 8)
-                {
-                    int64_t ival;
-                    m_stream >> ival;
-                    point.setField(i.m_id, ival);
-                }
-                break;
-            case PcdFieldType::F:
-                if (i.m_size == sizeof(float))
-                {
-                    float fval;
-                    m_stream >> fval;
-                    point.setField(i.m_id, fval);
-                }
-                if (i.m_size == sizeof(double))
-                {
-                    double fval;
-                    m_stream >> fval;
-                    point.setField(i.m_id, fval);
-                }
-                break;
-            case PcdFieldType::U:
-                if (i.m_size == 1)
-                {
-                    uint8_t uval;
-                    m_stream >> uval;
-                    point.setField(i.m_id, uval);
-                }
-                if (i.m_size == 2)
-                {
-                    uint16_t uval;
-                    m_stream >> uval;
-                    point.setField(i.m_id, uval);
-                }
-                if (i.m_size == 4)
-                {
-                    uint32_t uval;
-                    m_stream >> uval;
-                    point.setField(i.m_id, uval);
-                }
-                if (i.m_size == 8)
-                {
-                    uint64_t uval;
-                    m_stream >> uval;
-                    point.setField(i.m_id, uval);
-                }
-                break;
-            case PcdFieldType::unknown:
-            default:
-                throwError("Unsupported field type.");
-            }
-        }
-        m_index++;
-        return true;
-    case PcdDataStorage::COMPRESSED:
-        throwError("Binary compressed PCD is not supported at this time.");
+    if (m_index >= pdal_point_view_length(m_rustView))
         return false;
-    case PcdDataStorage::unknown:
-    default:
-        throwError("Unrecognized data storage.");
-        return false;
-    }
+
+    for (size_t dimIdx = 0; dimIdx < m_dims.size(); ++dimIdx)
+        point.setField(m_dims[dimIdx],
+                       pdal_point_view_get_f64(m_rustView, m_index,
+                                               m_dimNames[dimIdx].c_str()));
+    m_index++;
+    return true;
 }
 
 point_count_t PcdReader::read(PointViewPtr view, point_count_t count)
@@ -293,29 +188,30 @@ void PcdReader::initialize()
     if (m_filename.empty())
         throwError("Can't read PCD file without filename.");
 
-    m_istreamPtr = Utils::openFile(m_filename, true);
-    if (!m_istreamPtr)
-        throwError("Can't open file '" + m_filename + "'.");
-    try
+    if (m_rustView)
     {
-        m_header.clear();
-        *m_istreamPtr >> m_header;
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
     }
-    catch (...)
-    {
-        Utils::closeFile(m_istreamPtr);
-        m_istreamPtr = nullptr;
-        throw;
-    }
-    m_line = m_header.m_numLines;
+    m_index = 0;
 
-    Utils::closeFile(m_istreamPtr);
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+
+    pdal_reader_t* reader = pdal_reader_create_pcd(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PCD reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust PCD reader failed.");
 }
 
-void PcdReader::done(PointTableRef table)
-{
-    m_stream.close();
-    Utils::closeFile(m_istreamPtr);
-}
+void PcdReader::done(PointTableRef) {}
 
 } // namespace pdal

@@ -37,6 +37,9 @@ Off limits unless the user explicitly revises this plan:
 - Do not weaken existing C++ validation or tests to make a Rust port pass.
 - Do not mark a stage/reader/writer "ported" without behavior coverage and the
   relevant C++ parity gate.
+- Do not let `unsafe` spread casually. New unsafe code should be limited to
+  `pdal-capi` ownership/lifetime boundaries or explicit native FFI adapters,
+  and each new cluster should explain why safe Rust cannot own that boundary.
 
 ## Finish-Line Milestones
 
@@ -503,8 +506,12 @@ tests:
 1. Rust unit/parity tests pass.
 2. The matching C++ test binary passes.
 3. The full `pdal_filters_*` CTest slice passes before leaving `filters/`.
-4. No unsafe reinterpret-cast crosses the C ABI.
-5. The port preserves user-visible behavior, not just compile/link success.
+4. The unsafe footprint is reviewed. Run:
+   `rg -n "unsafe\\s*\\{|unsafe extern|unsafe fn" rust --glob '*.rs'`
+   and confirm any new unsafe use is confined to C ABI wrappers, native FFI
+   adapters, or a documented exception.
+5. No unsafe reinterpret-cast crosses the C ABI.
+6. The port preserves user-visible behavior, not just compile/link success.
 
 For non-filter ports, replace item 3 with the matching focused CTest slice and
 any lower-layer regression slice the change can affect. For example, I/O work
@@ -526,7 +533,9 @@ these are true:
    output artifact behavior match installed PDAL for covered workflows.
 5. Native dependencies and vendor replacements are documented in
    `rust/VENDOR.md`, with no vendored C/C++ code copied into Rust crates.
-6. Performance, memory usage, binary size, startup time, and compile time have
+6. Unsafe Rust is small, audited by boundary, and concentrated in `pdal-capi`
+   and native FFI crates rather than algorithmic code.
+7. Performance, memory usage, binary size, startup time, and compile time have
    comparison harnesses and no unexplained major regression.
-7. Optional plugins either remain supported through the C++ compatibility path
+8. Optional plugins either remain supported through the C++ compatibility path
    or have a deliberately versioned Rust plugin boundary with parity coverage.

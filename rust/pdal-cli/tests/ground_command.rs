@@ -57,8 +57,7 @@ fn ground_classifies_a_las_file_and_keeps_every_point() {
     let view = read_pcd(&output);
     // interesting.las has 1065 points; ground keeps them all.
     assert_eq!(view.len(), 1065);
-    // The PCD writer lowercases dimension names.
-    let classification = DimId::from_name("classification");
+    let classification = DimId::Classification;
     assert!(view.layout().dim(&classification).is_some());
 
     // SMRF should discriminate: some ground (class 2), some not.

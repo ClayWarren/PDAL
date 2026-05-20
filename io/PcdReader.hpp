@@ -36,9 +36,8 @@
 
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
-#include <pdal/util/IStream.hpp>
 
-#include "PcdHeader.hpp"
+#include "rust/pdal-capi/include/pdal_capi.h"
 
 namespace pdal
 {
@@ -49,6 +48,7 @@ public:
     std::string getName() const override;
 
     PcdReader();
+    ~PcdReader() override;
 
 private:
     QuickInfo inspect() override;
@@ -58,15 +58,11 @@ private:
     point_count_t read(PointViewPtr view, point_count_t numPts) override;
     void done(PointTableRef table) override;
     bool processOne(PointRef& point) override;
-    bool fillFields();
 
-    PcdHeader m_header;
-    std::istream* m_istreamPtr;
-    ILeStream m_stream;
+    pdal_point_view_t* m_rustView = nullptr;
     Dimension::IdList m_dims;
-    StringList m_fields;
-    point_count_t m_index;
-    size_t m_line;
+    StringList m_dimNames;
+    point_count_t m_index = 0;
 };
 
 } // namespace pdal

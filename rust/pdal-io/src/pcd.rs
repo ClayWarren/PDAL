@@ -32,7 +32,7 @@ struct Header {
     storage: String,
 }
 
-/// ASCII PCD reader.
+/// PCD reader.
 pub struct PcdReader {
     filename: String,
 }
@@ -57,13 +57,12 @@ impl Reader for PcdReader {
             ));
         }
 
-        let text = fs::read_to_string(Path::new(&self.filename))
+        let bytes = fs::read(Path::new(&self.filename))
             .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
-        let lines: Vec<&str> = text.lines().collect();
-        let header = parse_header(&lines)?;
-        if header.storage != "ascii" {
+        let header = parse_header(&bytes)?;
+        if header.storage == "binary_compressed" {
             return Err(StageError(format!(
-                "PCD data storage '{}' is not supported by the Rust ASCII slice.",
+                "PCD data storage '{}' is not supported by the Rust slice.",
                 header.storage
             )));
         }
@@ -75,20 +74,42 @@ impl Reader for PcdReader {
         let layout = Rc::new(layout);
         let mut view = PointView::new(layout);
 
-        for line in lines.iter().skip(header.data_start) {
-            let fields: Vec<&str> = line.split_whitespace().collect();
-            if fields.len() != header.fields.len() {
-                continue;
-            }
+        if header.storage == "ascii" {
+            let body = std::str::from_utf8(&bytes[header.data_start..])
+                .map_err(|_| StageError("PCD ASCII body is not valid UTF-8.".to_string()))?;
+            for line in body.lines() {
+                let fields: Vec<&str> = line.split_whitespace().collect();
+                if fields.len() != header.fields.len() {
+                    continue;
+                }
 
-            let point = view.add_point();
-            for (field, value) in header.fields.iter().zip(fields) {
-                let parsed = value.parse::<f64>().unwrap_or(0.0);
-                view.set_f64(point, &field.id, storage_value(parsed, field));
+                let point = view.add_point();
+                for (field, value) in header.fields.iter().zip(fields) {
+                    let parsed = value.parse::<f64>().unwrap_or(0.0);
+                    view.set_f64(point, &field.id, storage_value(parsed, field));
+                }
+                if view.len() >= header.points {
+                    break;
+                }
             }
-            if view.len() >= header.points {
-                break;
+        } else if header.storage == "binary" {
+            let mut offset = header.data_start;
+            for _ in 0..header.points {
+                let point = view.add_point();
+                for field in &header.fields {
+                    for count in 0..field.count {
+                        let value = read_binary_value(&bytes, &mut offset, field)?;
+                        if count == 0 {
+                            view.set_f64(point, &field.id, value);
+                        }
+                    }
+                }
             }
+        } else {
+            return Err(StageError(format!(
+                "Unrecognized PCD data storage '{}'.",
+                header.storage
+            )));
         }
 
         Ok(vec![view])
@@ -99,7 +120,7 @@ impl Reader for PcdReader {
     }
 }
 
-/// ASCII PCD writer.
+/// PCD writer.
 pub struct PcdWriter {
     filename: String,
     compression: String,
@@ -194,9 +215,9 @@ impl Writer for PcdWriter {
                 "PcdWriter requires a filename option.".to_string(),
             ));
         }
-        if self.compression != "ascii" {
+        if self.compression != "ascii" && self.compression != "binary" {
             return Err(StageError(format!(
-                "PCD compression '{}' is not supported by the Rust ASCII slice.",
+                "PCD compression '{}' is not supported by the Rust slice.",
                 self.compression
             )));
         }
@@ -211,46 +232,66 @@ impl Writer for PcdWriter {
         let count: u64 = views.iter().map(PointView::len).sum();
         self.point_count = count;
 
-        let mut output = String::new();
-        output.push_str("VERSION 0.7\n");
-        output.push_str("FIELDS");
+        let mut output = Vec::new();
+        let mut header = String::new();
+        header.push_str("VERSION 0.7\n");
+        header.push_str("FIELDS");
         for field in &specs {
-            output.push(' ');
-            output.push_str(&field.label.to_lowercase());
+            header.push(' ');
+            header.push_str(&field.label.to_lowercase());
         }
-        output.push_str("\nSIZE");
+        header.push_str("\nSIZE");
         for field in &specs {
-            output.push_str(&format!(" {}", field.size));
+            header.push_str(&format!(" {}", field.size));
         }
-        output.push_str("\nTYPE");
+        header.push_str("\nTYPE");
         for field in &specs {
-            output.push_str(match field.ty {
+            header.push_str(match field.ty {
                 FieldType::Signed => " I",
                 FieldType::Unsigned => " U",
                 FieldType::Float => " F",
             });
         }
-        output.push_str("\nCOUNT");
+        header.push_str("\nCOUNT");
         for field in &specs {
-            output.push_str(&format!(" {}", field.count));
+            header.push_str(&format!(" {}", field.count));
         }
-        output.push_str(&format!("\nWIDTH {count}\nHEIGHT 1\n"));
-        output
+        header.push_str(&format!("\nWIDTH {count}\nHEIGHT 1\n"));
+        header
             .push_str("VIEWPOINT 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000\n");
-        output.push_str(&format!("POINTS {count}\nDATA ascii\n"));
+        header.push_str(&format!("POINTS {count}\nDATA {}\n", self.compression));
+        output.extend_from_slice(header.as_bytes());
 
-        for view in views {
-            for point in 0..view.len() {
-                for field in &specs {
-                    output.push_str(&format_number(
-                        view.get_f64(point, &field.id),
-                        field.precision,
-                        field.ty,
-                        field.size,
-                    ));
-                    output.push(' ');
+        if self.compression == "ascii" {
+            for view in views {
+                for point in 0..view.len() {
+                    for field in &specs {
+                        output.extend_from_slice(
+                            format_number(
+                                view.get_f64(point, &field.id),
+                                field.precision,
+                                field.ty,
+                                field.size,
+                            )
+                            .as_bytes(),
+                        );
+                        output.push(b' ');
+                    }
+                    output.push(b'\n');
                 }
-                output.push('\n');
+            }
+        } else {
+            for view in views {
+                for point in 0..view.len() {
+                    for field in &specs {
+                        write_binary_value(
+                            &mut output,
+                            view.get_f64(point, &field.id),
+                            field.ty,
+                            field.size,
+                        )?;
+                    }
+                }
             }
         }
 
@@ -266,7 +307,7 @@ impl Writer for PcdWriter {
     }
 }
 
-fn parse_header(lines: &[&str]) -> Result<Header, StageError> {
+fn parse_header(bytes: &[u8]) -> Result<Header, StageError> {
     let mut labels: Vec<String> = Vec::new();
     let mut sizes: Vec<u32> = Vec::new();
     let mut types: Vec<FieldType> = Vec::new();
@@ -274,9 +315,25 @@ fn parse_header(lines: &[&str]) -> Result<Header, StageError> {
     let mut width = 1;
     let mut height = 0;
     let mut points = 0;
+    let mut start = 0;
 
-    for (idx, raw) in lines.iter().enumerate() {
-        let line = raw.trim();
+    while start < bytes.len() {
+        let end = bytes[start..]
+            .iter()
+            .position(|b| *b == b'\n')
+            .map(|pos| start + pos)
+            .unwrap_or(bytes.len());
+        let next = if end < bytes.len() { end + 1 } else { end };
+        let line_bytes = if end > start && bytes[end - 1] == b'\r' {
+            &bytes[start..end - 1]
+        } else {
+            &bytes[start..end]
+        };
+        let line = std::str::from_utf8(line_bytes)
+            .map_err(|_| StageError("PCD header is not valid UTF-8.".to_string()))?
+            .trim();
+        start = next;
+
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -347,7 +404,7 @@ fn parse_header(lines: &[&str]) -> Result<Header, StageError> {
                 return Ok(Header {
                     fields,
                     points,
-                    data_start: idx + 1,
+                    data_start: start,
                     storage,
                 });
             }
@@ -362,6 +419,58 @@ fn parse_header(lines: &[&str]) -> Result<Header, StageError> {
     Err(StageError(
         "unrecognized PCD header, or missing DATA marker".to_string(),
     ))
+}
+
+fn read_binary_value(bytes: &[u8], offset: &mut usize, field: &Field) -> Result<f64, StageError> {
+    let size = field.size as usize;
+    if *offset + size > bytes.len() {
+        return Err(StageError("Unexpected end of binary PCD data.".to_string()));
+    }
+    let value = &bytes[*offset..*offset + size];
+    *offset += size;
+
+    match (field.ty, field.size) {
+        (FieldType::Signed, 1) => Ok(i8::from_le_bytes([value[0]]) as f64),
+        (FieldType::Signed, 2) => Ok(i16::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Signed, 4) => Ok(i32::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Signed, 8) => Ok(i64::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Unsigned, 1) => Ok(value[0] as f64),
+        (FieldType::Unsigned, 2) => Ok(u16::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Unsigned, 4) => Ok(u32::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Unsigned, 8) => Ok(u64::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Float, 4) => Ok(f32::from_le_bytes(value.try_into().unwrap()) as f64),
+        (FieldType::Float, 8) => Ok(f64::from_le_bytes(value.try_into().unwrap())),
+        _ => Err(StageError(format!(
+            "Unsupported PCD binary field size {}.",
+            field.size
+        ))),
+    }
+}
+
+fn write_binary_value(
+    output: &mut Vec<u8>,
+    value: f64,
+    ty: FieldType,
+    size: u32,
+) -> Result<(), StageError> {
+    match (ty, size) {
+        (FieldType::Signed, 1) => output.extend_from_slice(&(value as i8).to_le_bytes()),
+        (FieldType::Signed, 2) => output.extend_from_slice(&(value as i16).to_le_bytes()),
+        (FieldType::Signed, 4) => output.extend_from_slice(&(value as i32).to_le_bytes()),
+        (FieldType::Signed, 8) => output.extend_from_slice(&(value as i64).to_le_bytes()),
+        (FieldType::Unsigned, 1) => output.extend_from_slice(&(value as u8).to_le_bytes()),
+        (FieldType::Unsigned, 2) => output.extend_from_slice(&(value as u16).to_le_bytes()),
+        (FieldType::Unsigned, 4) => output.extend_from_slice(&(value as u32).to_le_bytes()),
+        (FieldType::Unsigned, 8) => output.extend_from_slice(&(value as u64).to_le_bytes()),
+        (FieldType::Float, 4) => output.extend_from_slice(&(value as f32).to_le_bytes()),
+        (FieldType::Float, 8) => output.extend_from_slice(&value.to_le_bytes()),
+        _ => {
+            return Err(StageError(format!(
+                "Unsupported PCD binary field size {size}."
+            )))
+        }
+    }
+    Ok(())
 }
 
 fn parse_numbers(values: &[&str], label: &str) -> Result<Vec<u32>, StageError> {
@@ -395,10 +504,23 @@ fn parse_field_type(value: &str) -> Result<FieldType, StageError> {
 }
 
 fn canonical_dim_name(label: &str) -> String {
-    match label.to_uppercase().as_str() {
-        "X" => "X".to_string(),
-        "Y" => "Y".to_string(),
-        "Z" => "Z".to_string(),
+    match label.to_ascii_lowercase().as_str() {
+        "x" => "X".to_string(),
+        "y" => "Y".to_string(),
+        "z" => "Z".to_string(),
+        "intensity" => "Intensity".to_string(),
+        "returnnumber" => "ReturnNumber".to_string(),
+        "numberofreturns" => "NumberOfReturns".to_string(),
+        "scandirectionflag" => "ScanDirectionFlag".to_string(),
+        "edgeofflightline" => "EdgeOfFlightLine".to_string(),
+        "classification" => "Classification".to_string(),
+        "scananglerank" => "ScanAngleRank".to_string(),
+        "userdata" => "UserData".to_string(),
+        "pointsourceid" => "PointSourceId".to_string(),
+        "gpstime" => "GpsTime".to_string(),
+        "red" => "Red".to_string(),
+        "green" => "Green".to_string(),
+        "blue" => "Blue".to_string(),
         _ => label.to_string(),
     }
 }
@@ -544,6 +666,20 @@ mod tests {
     }
 
     #[test]
+    fn reads_binary_pcd_with_double_fields() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/autzen-utm.pcd"));
+        let mut reader = PcdReader::new(&options);
+        let view = reader.read().unwrap().pop().unwrap();
+
+        assert_eq!(view.len(), 1065);
+        assert!((view.get_f64(0, &DimId::X) - 494428.61).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Y) - 4877455.58).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Z) - 131.57).abs() < 0.01);
+        assert!(view.get_f64(0, &DimId::GpsTime) > 0.0);
+    }
+
+    #[test]
     fn comma_separated_ascii_rows_are_skipped_like_cpp_reader() {
         let mut options = Options::new();
         options.add("filename", data_path("pcd/utm17_comma.pcd"));
@@ -627,6 +763,54 @@ mod tests {
         assert!(written.contains("1 1 1 1"));
         assert!(written.contains("2 2 2 2"));
         assert!(written.contains("3 3 3 3"));
+    }
+
+    #[test]
+    fn writes_binary_pcd_that_reader_roundtrips_typed_fields() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for values in [
+            [1.0, 1.0, 1.0, 1.0],
+            [
+                2.222_222_222_2,
+                2.222_222_222_2,
+                2.222_222_222_2,
+                2.222_222_22,
+            ],
+            [3.33, 3.33, 3.33, 3.33],
+        ] {
+            let point = view.add_point();
+            view.set_f64(point, &DimId::X, values[0]);
+            view.set_f64(point, &DimId::Y, values[1]);
+            view.set_f64(point, &DimId::Z, values[2]);
+            view.set_f64(point, &DimId::Intensity, values[3]);
+        }
+
+        let output = temp_path("binary.pcd");
+        let mut options = Options::new();
+        options
+            .add("filename", &output)
+            .add("order", "X=Float,Y=Float,Z=Float,Intensity=Unsigned32")
+            .add("compression", "binary");
+        let mut writer = PcdWriter::new(&options);
+        writer.write(std::slice::from_ref(&view)).unwrap();
+
+        let mut read_options = Options::new();
+        read_options.add("filename", &output);
+        let mut reader = PcdReader::new(&read_options);
+        let roundtrip = reader.read().unwrap().pop().unwrap();
+
+        assert_eq!(roundtrip.len(), 3);
+        assert_eq!(roundtrip.get_f64(0, &DimId::Intensity), 1.0);
+        assert_eq!(roundtrip.get_f64(1, &DimId::Intensity), 2.0);
+        assert_eq!(roundtrip.get_f64(2, &DimId::Intensity), 3.0);
+        assert!((roundtrip.get_f64(1, &DimId::X) - 2.222_222_222_2).abs() < 0.0001);
+        assert!((roundtrip.get_f64(2, &DimId::Z) - 3.33).abs() < 0.0001);
     }
 
     #[test]

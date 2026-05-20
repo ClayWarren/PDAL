@@ -38,6 +38,8 @@
 
 #include <pdal/Writer.hpp>
 
+#include "rust/pdal-capi/include/pdal_capi.h"
+
 namespace pdal
 {
 
@@ -60,6 +62,7 @@ public:
     std::string getName() const override;
 
     PcdWriter();
+    ~PcdWriter() override;
     PcdWriter& operator=(const PcdWriter&) = delete;
     PcdWriter(const PcdWriter&) = delete;
 
@@ -71,8 +74,6 @@ private:
 
     DimSpec extractDim(std::string dim, PointTableRef table);
     bool findDim(Dimension::Id id, DimSpec& ds);
-    void writeAscii(const PointViewPtr view, std::ostream& out);
-    void writeBinary(const PointViewPtr view, std::ostream& out);
 
     std::string m_compression_string;
     bool m_writeAllDims;
@@ -80,6 +81,8 @@ private:
     uint32_t m_precision;
 
     std::vector<DimSpec> m_dims;
+    Dimension::IdList m_rustDims;
+    pdal_point_view_t* m_rustView = nullptr;
     DimSpec m_xDim;
     DimSpec m_yDim;
     DimSpec m_zDim;

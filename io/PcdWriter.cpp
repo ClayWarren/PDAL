@@ -36,7 +36,6 @@
 #include "PcdHeader.hpp"
 
 #include <pdal/PDALUtils.hpp>
-#include <pdal/util/OStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
 namespace pdal
@@ -52,12 +51,77 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(PcdWriter, s_info)
 
+namespace
+{
+
+int rustTypeId(Dimension::Type type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case Type::Unsigned8:
+        return 0;
+    case Type::Unsigned16:
+        return 1;
+    case Type::Unsigned32:
+        return 2;
+    case Type::Unsigned64:
+        return 3;
+    case Type::Signed8:
+        return 4;
+    case Type::Signed16:
+        return 5;
+    case Type::Signed32:
+        return 6;
+    case Type::Signed64:
+        return 7;
+    case Type::Float:
+        return 8;
+    case Type::Double:
+    case Type::None:
+        return 9;
+    }
+    return 9;
+}
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    addOption(options, key, std::string(value ? "true" : "false"));
+}
+
+void addOption(pdal_options_t* options, const std::string& key, uint32_t value)
+{
+    addOption(options, key, std::to_string(value));
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
 std::string PcdWriter::getName() const
 {
     return s_info.name;
 }
 
 PcdWriter::PcdWriter() {}
+
+PcdWriter::~PcdWriter()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 void PcdWriter::addArgs(ProgramArgs& args)
 {
@@ -188,6 +252,14 @@ bool PcdWriter::findDim(Id id, DimSpec& ds)
 
 void PcdWriter::ready(PointTableRef table)
 {
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_dims.clear();
+    m_rustDims.clear();
+
     PcdField field;
     field.m_label = table.layout()->dimName(Id::X);
     field.m_id = Id::X;
@@ -235,143 +307,54 @@ void PcdWriter::ready(PointTableRef table)
                 m_dims.push_back(ds);
         }
     }
+
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto id : table.layout()->dims())
+    {
+        pdal_point_layout_register_dim(rustLayout,
+                                       table.layout()->dimName(id).c_str(),
+                                       rustTypeId(table.layout()->dimType(id)));
+        m_rustDims.push_back(id);
+    }
+    m_rustView = pdal_point_view_create(rustLayout);
 }
 
 void PcdWriter::write(const PointViewPtr view)
 {
-    std::unique_ptr<std::ostream> out(Utils::createFile(filename(), false));
-    if (!out)
-        throwError("Couldn't open '" + filename() + "' for output.");
-
-    PcdHeader header;
-
-    header.m_version = PcdVersion::PCD_V7;
-    header.m_height = 1;
-    if (m_compression_string == "ascii")
-        header.m_dataStorage = PcdDataStorage::ASCII;
-    else if (m_compression_string == "binary")
-        header.m_dataStorage = PcdDataStorage::BINARY;
-    else
-        throwError("Unrecognized compression string '" + m_compression_string +
-                   "'. "
-                   "Expected 'ASCII' or 'BINARY'.");
-
-    for (auto di = m_dims.begin(); di != m_dims.end(); ++di)
-        header.m_fields.push_back(di->m_field);
-
-    header.m_width = view->size();
-    header.m_pointCount = view->size();
-
-    *out << header;
-
-    if (m_compression_string == "ascii")
-        writeAscii(view, *out);
-    else
+    for (PointId idx = 0; idx < view->size(); ++idx)
     {
-        // Reopen as for binary output, seeking to the end of the header before
-        // writing data.
-        out.reset(FileUtils::openExisting(filename(), true));
-        out->seekp(0, std::ios::end);
-        writeBinary(view, *out);
-    }
-}
-
-void PcdWriter::writeAscii(const PointViewPtr view, std::ostream& out)
-{
-    for (const PointRef& point : *view)
-    {
-        out << std::fixed;
-        for (DimSpec& dim : m_dims)
-        {
-            if (dim.m_field.m_type == PcdFieldType::F &&
-                dim.m_field.m_size == 8)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<double>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::F &&
-                     dim.m_field.m_size == 4)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<float>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 8)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<uint64_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 4)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<uint32_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 2)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<uint16_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 1)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<uint8_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 8)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<int64_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 4)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<int32_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 2)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<int16_t>(dim.m_field.m_id) << " ";
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 1)
-                out << std::setprecision(dim.m_precision)
-                    << point.getFieldAs<int8_t>(dim.m_field.m_id) << " ";
-        }
-        out << "\n";
-    }
-}
-
-void PcdWriter::writeBinary(const PointViewPtr view, std::ostream& out)
-{
-    // Write little-endian binary.
-    OLeStream leOut(&out);
-    for (const PointRef& point : *view)
-    {
-        for (DimSpec& dim : m_dims)
-        {
-            if (dim.m_field.m_type == PcdFieldType::F &&
-                dim.m_field.m_size == 8)
-                leOut << point.getFieldAs<double>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::F &&
-                     dim.m_field.m_size == 4)
-                leOut << point.getFieldAs<float>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 8)
-                leOut << point.getFieldAs<uint64_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 4)
-                leOut << point.getFieldAs<uint32_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::U &&
-                     dim.m_field.m_size == 2)
-                leOut << point.getFieldAs<uint16_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 1)
-                leOut << point.getFieldAs<uint8_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 8)
-                leOut << point.getFieldAs<int64_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 4)
-                leOut << point.getFieldAs<int32_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 2)
-                leOut << point.getFieldAs<int16_t>(dim.m_field.m_id);
-            else if (dim.m_field.m_type == PcdFieldType::I &&
-                     dim.m_field.m_size == 1)
-                leOut << point.getFieldAs<int8_t>(dim.m_field.m_id);
-        }
+        PointId outIdx = pdal_point_view_add_point(m_rustView);
+        for (Dimension::Id dim : m_rustDims)
+            pdal_point_view_set_f64(m_rustView, outIdx,
+                                    view->layout()->dimName(dim).c_str(),
+                                    view->getFieldAs<double>(dim, idx));
     }
 }
 
 void PcdWriter::done(PointTableRef table)
 {
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", filename());
+    addOption(options, "compression", m_compression_string);
+    addOption(options, "keep_unspecified", m_writeAllDims);
+    addOption(options, "order", m_dimOrder);
+    addOption(options, "precision", m_precision);
+
+    pdal_writer_t* writer = pdal_writer_create_pcd(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PCD writer.");
+    }
+
+    bool ok = pdal_writer_write_view(writer, m_rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        throwLastRustError("Rust PCD writer failed.");
+
+    pdal_point_view_destroy(m_rustView);
+    m_rustView = nullptr;
     getMetadata().addList("filename", filename());
 }
 
