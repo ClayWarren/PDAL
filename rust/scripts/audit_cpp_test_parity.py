@@ -252,6 +252,12 @@ COVERED: dict[str, object] = {
     },
     "pdal_filters_returns_test": ALL,
     "pdal_morton_order_test": ALL,
+    "pdal_filters_rust_pipeline_test": ALL,
+    "pdal_filters_optimalneighborhood_test": {"k_within_bounds", "custom_k_window"},
+    "pdal_filters_fps_test": {"samples_to_count", "fewer_points_than_count"},
+    "pdal_filters_smrf_test": ALL,
+    "pdal_filters_labelduplicates_test": ALL,
+    "pdal_filters_separatescanline_test": ALL,
     "pdal_metadata_test": {"typed_value", "test_float", "infnan"},
     "pdal_io_text_reader_test": {
         "t1",
