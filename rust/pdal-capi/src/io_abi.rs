@@ -2,6 +2,8 @@ use crate::error::{clear_last_error, set_last_error};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
+use std::ffi::{c_char, CStr};
+use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Reader C ABI
@@ -277,6 +279,37 @@ pub unsafe extern "C" fn pdal_reader_metadata(reader: *const ReaderHandle) -> *m
 
     clear_last_error();
     Box::into_raw(Box::new(reader.reader.metadata()))
+}
+
+/// Read an ILVIS2 XML metadata sidecar file.
+///
+/// # Safety
+/// `filename` must be a valid NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ilvis2_metadata_read(filename: *const c_char) -> *mut MetadataNode {
+    if filename.is_null() {
+        set_last_error("null metadata filename");
+        return std::ptr::null_mut();
+    }
+
+    let path = match CStr::from_ptr(filename).to_str() {
+        Ok(path) => path,
+        Err(err) => {
+            set_last_error(format!("invalid metadata filename: {err}"));
+            return std::ptr::null_mut();
+        }
+    };
+
+    match pdal_io::ilvis2_metadata::read_metadata_file(Path::new(path)) {
+        Ok(metadata) => {
+            clear_last_error();
+            Box::into_raw(Box::new(metadata))
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Destroy a reader handle.

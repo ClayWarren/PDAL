@@ -425,6 +425,7 @@ pdal_reader_t* pdal_reader_create_bpf(const pdal_options_t* ops);
 pdal_reader_t* pdal_reader_create_gdal(const pdal_options_t* ops);
 pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
 pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
+pdal_metadata_node_t* pdal_ilvis2_metadata_read(const char* filename);
 void pdal_reader_destroy(pdal_reader_t* reader);
 
 // Stage registry: construct implemented stages from PDAL driver names.

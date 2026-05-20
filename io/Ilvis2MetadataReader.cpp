@@ -45,28 +45,84 @@
 
 #include "Ilvis2MetadataReader.hpp"
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
+
+namespace
+{
+
+std::string takeString(char* value)
+{
+    std::string output(value ? value : "");
+    pdal_string_free(value);
+    return output;
+}
+
+MetadataNode addMetadataChild(MetadataNode& parent,
+                              const pdal_metadata_node_t* rustNode)
+{
+    std::string name = takeString(pdal_metadata_node_name(rustNode));
+    std::string description =
+        takeString(pdal_metadata_node_description(rustNode));
+    uint8_t valueKind = pdal_metadata_node_value_kind(rustNode);
+
+    switch (valueKind)
+    {
+    case 1:
+        return parent.add(name, pdal_metadata_node_value_i64(rustNode),
+                          description);
+    case 2:
+        return parent.add(name, pdal_metadata_node_value_u64(rustNode),
+                          description);
+    case 3:
+        return parent.add(name, pdal_metadata_node_value_f64(rustNode),
+                          description);
+    case 4:
+        return parent.add(name, pdal_metadata_node_value_bool(rustNode),
+                          description);
+    case 0:
+        return parent.add(name, takeString(pdal_metadata_node_value(rustNode)),
+                          description);
+    default:
+        return parent.add(name);
+    }
+}
+
+void copyMetadataChildren(const pdal_metadata_node_t* rustNode,
+                          MetadataNode& cppNode)
+{
+    uint64_t childCount = pdal_metadata_node_child_count(rustNode);
+    for (uint64_t i = 0; i < childCount; ++i)
+    {
+        pdal_metadata_node_t* rustChild = pdal_metadata_node_child(rustNode, i);
+        MetadataNode cppChild = addMetadataChild(cppNode, rustChild);
+        copyMetadataChildren(rustChild, cppChild);
+        pdal_metadata_node_destroy(rustChild);
+    }
+}
+
+void throwLastRustError()
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw Ilvis2MetadataReader::error(message);
+    throw Ilvis2MetadataReader::error("Unable to read ILVIS2 metadata.");
+}
+
+} // namespace
 
 void Ilvis2MetadataReader::readMetadataFile(std::string filename,
                                             MetadataNode* m)
 {
-    xmlDocPtr doc;
-    xmlNodePtr node;
+    pdal_metadata_node_t* metadata =
+        pdal_ilvis2_metadata_read(filename.c_str());
+    if (!metadata)
+        throwLastRustError();
 
-    doc = xmlReadFile(filename.c_str(), nullptr, 0);
-    if (doc == nullptr)
-    {
-        return;
-    }
-
-    node = xmlDocGetRootElement(doc);
-
-    parseGranuleMetaDataFile(node, m);
-
-    xmlFreeDoc(doc);
-    xmlCleanupParser();
-    xmlMemoryDump();
+    copyMetadataChildren(metadata, *m);
+    pdal_metadata_node_destroy(metadata);
 }
 
 void Ilvis2MetadataReader::parseGranuleMetaDataFile(xmlNodePtr node,
