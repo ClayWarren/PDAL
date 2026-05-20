@@ -9,21 +9,35 @@
 //! Binary PLY (`binary_little_endian` / `binary_big_endian`) is intentionally
 //! deferred -- this slice covers the deterministic ASCII path only.
 
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 use std::rc::Rc;
+use std::str::SplitWhitespace;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlyFormat {
+    Ascii,
+    BinaryLittleEndian,
+    BinaryBigEndian,
+}
 
 /// One declared property of a PLY element.
 enum PlyProp {
     /// A scalar value: one ASCII token.
     Simple { dim: DimId, ty: DimType },
     /// A list value: a count token followed by that many value tokens.
-    List { name: String },
+    List {
+        name: String,
+        count_ty: DimType,
+        list_ty: DimType,
+    },
 }
 
 /// One declared PLY element (`vertex`, `face`, ...).
@@ -31,6 +45,90 @@ struct Element {
     name: String,
     count: usize,
     props: Vec<PlyProp>,
+}
+
+enum PlyData<'a> {
+    Ascii(SplitWhitespace<'a>),
+    Binary {
+        cursor: Cursor<&'a [u8]>,
+        format: PlyFormat,
+    },
+}
+
+impl PlyData<'_> {
+    fn read_simple(&mut self, prop: &PlyProp, element_name: &str) -> Result<f64, StageError> {
+        let PlyProp::Simple { ty, .. } = prop else {
+            return Err(StageError(format!(
+                "Expected scalar data for the '{element_name}' element."
+            )));
+        };
+        self.read_value(*ty, element_name)
+    }
+
+    fn read_count(&mut self, ty: DimType, element_name: &str) -> Result<usize, StageError> {
+        Ok(self.read_value(ty, element_name)? as usize)
+    }
+
+    fn read_index(&mut self, ty: DimType, element_name: &str) -> Result<u64, StageError> {
+        Ok(self.read_value(ty, element_name)? as u64)
+    }
+
+    fn read_value(&mut self, ty: DimType, element_name: &str) -> Result<f64, StageError> {
+        match self {
+            PlyData::Ascii(tokens) => {
+                let token = tokens.next().ok_or_else(|| {
+                    StageError(format!(
+                        "Error reading data for the '{element_name}' element."
+                    ))
+                })?;
+                token.parse::<f64>().map_err(|_| {
+                    StageError(format!(
+                        "Invalid numeric value '{token}' in '{element_name}' data."
+                    ))
+                })
+            }
+            PlyData::Binary { cursor, format } => read_binary_value(cursor, *format, ty),
+        }
+    }
+}
+
+fn read_binary_value(
+    cursor: &mut Cursor<&[u8]>,
+    format: PlyFormat,
+    ty: DimType,
+) -> Result<f64, StageError> {
+    let value = match (format, ty) {
+        (_, DimType::I8) => cursor.read_i8().map(f64::from),
+        (_, DimType::U8) => cursor.read_u8().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::I16) => {
+            cursor.read_i16::<LittleEndian>().map(f64::from)
+        }
+        (PlyFormat::BinaryBigEndian, DimType::I16) => cursor.read_i16::<BigEndian>().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::U16) => {
+            cursor.read_u16::<LittleEndian>().map(f64::from)
+        }
+        (PlyFormat::BinaryBigEndian, DimType::U16) => cursor.read_u16::<BigEndian>().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::I32) => {
+            cursor.read_i32::<LittleEndian>().map(f64::from)
+        }
+        (PlyFormat::BinaryBigEndian, DimType::I32) => cursor.read_i32::<BigEndian>().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::U32) => {
+            cursor.read_u32::<LittleEndian>().map(f64::from)
+        }
+        (PlyFormat::BinaryBigEndian, DimType::U32) => cursor.read_u32::<BigEndian>().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::F32) => {
+            cursor.read_f32::<LittleEndian>().map(f64::from)
+        }
+        (PlyFormat::BinaryBigEndian, DimType::F32) => cursor.read_f32::<BigEndian>().map(f64::from),
+        (PlyFormat::BinaryLittleEndian, DimType::F64) => cursor.read_f64::<LittleEndian>(),
+        (PlyFormat::BinaryBigEndian, DimType::F64) => cursor.read_f64::<BigEndian>(),
+        (PlyFormat::Ascii, _) | (_, DimType::I64 | DimType::U64) => {
+            return Err(StageError(
+                "Unsupported binary PLY property type.".to_string(),
+            ));
+        }
+    };
+    value.map_err(|err| StageError(err.to_string()))
 }
 
 /// Reader for the Stanford PLY format (ASCII encoding).
@@ -57,10 +155,14 @@ impl Reader for PlyReader {
                 "PlyReader requires a filename option.".to_string(),
             ));
         }
-        let text = fs::read_to_string(Path::new(&self.filename))
+        let bytes = fs::read(Path::new(&self.filename))
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
+        let header_end = find_header_end(&bytes)
+            .ok_or_else(|| StageError("'end_header' not found in PLY file.".to_string()))?;
+        let header = std::str::from_utf8(&bytes[..header_end])
+            .map_err(|_| StageError("PLY header is not valid UTF-8.".to_string()))?;
 
-        let (elements, data_start) = parse_header(&text)?;
+        let (elements, format) = parse_header(header)?;
 
         // The vertex element fixes the point layout.
         let vertex = elements
@@ -81,11 +183,18 @@ impl Reader for PlyReader {
         }
         let mut view = PointView::new(Rc::new(layout));
 
-        // The data section is a flat whitespace-separated token stream.
-        let mut tokens = text
-            .lines()
-            .skip(data_start)
-            .flat_map(|line| line.split_whitespace());
+        let data = &bytes[header_end..];
+        let data_text;
+        let mut data_reader = if format == PlyFormat::Ascii {
+            data_text = std::str::from_utf8(data)
+                .map_err(|_| StageError("PLY ASCII data is not valid UTF-8.".to_string()))?;
+            PlyData::Ascii(data_text.split_whitespace())
+        } else {
+            PlyData::Binary {
+                cursor: Cursor::new(data),
+                format,
+            }
+        };
 
         for element in &elements {
             let is_vertex = element.name == "vertex";
@@ -94,46 +203,20 @@ impl Reader for PlyReader {
                 for prop in &element.props {
                     match prop {
                         PlyProp::Simple { dim, .. } => {
-                            let token = tokens.next().ok_or_else(|| {
-                                StageError(format!(
-                                    "Error reading data for the '{}' element.",
-                                    element.name
-                                ))
-                            })?;
-                            let value = token.parse::<f64>().map_err(|_| {
-                                StageError(format!(
-                                    "Invalid numeric value '{token}' in '{}' data.",
-                                    element.name
-                                ))
-                            })?;
+                            let value = data_reader.read_simple(prop, &element.name)?;
                             if let Some(point) = point {
                                 view.set_f64(point, dim, value);
                             }
                         }
-                        PlyProp::List { name } => {
-                            let count = tokens
-                                .next()
-                                .and_then(|token| token.parse::<usize>().ok())
-                                .ok_or_else(|| {
-                                    StageError(format!(
-                                        "Error reading list data for the '{}' element.",
-                                        element.name
-                                    ))
-                                })?;
+                        PlyProp::List {
+                            name,
+                            count_ty,
+                            list_ty,
+                        } => {
+                            let count = data_reader.read_count(*count_ty, &element.name)?;
                             let mut values = Vec::with_capacity(count);
                             for _ in 0..count {
-                                let value = tokens.next().ok_or_else(|| {
-                                    StageError(format!(
-                                        "Error reading list data for the '{}' element.",
-                                        element.name
-                                    ))
-                                })?;
-                                values.push(value.parse::<u64>().map_err(|_| {
-                                    StageError(format!(
-                                        "Invalid list value '{value}' in '{}' data.",
-                                        element.name
-                                    ))
-                                })?);
+                                values.push(data_reader.read_index(*list_ty, &element.name)?);
                             }
                             if element.name == "face" && name == "vertex_indices" && count >= 3 {
                                 let mesh = view.create_mesh();
@@ -155,12 +238,12 @@ impl Reader for PlyReader {
     }
 }
 
-/// Parse the PLY header, returning the elements and the line index at which
-/// the data section begins.
-fn parse_header(text: &str) -> Result<(Vec<Element>, usize), StageError> {
+/// Parse the PLY header, returning the elements and storage format.
+fn parse_header(text: &str) -> Result<(Vec<Element>, PlyFormat), StageError> {
     let mut elements: Vec<Element> = Vec::new();
     let mut seen = 0;
-    for (idx, raw) in text.lines().enumerate() {
+    let mut format = None;
+    for raw in text.lines() {
         let line = raw.trim();
         if line.is_empty() {
             continue;
@@ -182,20 +265,17 @@ fn parse_header(text: &str) -> Result<(Vec<Element>, usize), StageError> {
                     "Expected format line not found in PLY file.".to_string(),
                 ));
             }
-            match words.get(1).copied() {
-                Some("ascii") => {}
-                Some("binary_little_endian") | Some("binary_big_endian") => {
-                    return Err(StageError(
-                        "Binary PLY is not supported by the Rust ASCII slice.".to_string(),
-                    ));
-                }
+            format = Some(match words.get(1).copied() {
+                Some("ascii") => PlyFormat::Ascii,
+                Some("binary_little_endian") => PlyFormat::BinaryLittleEndian,
+                Some("binary_big_endian") => PlyFormat::BinaryBigEndian,
                 other => {
                     return Err(StageError(format!(
                         "Unrecognized PLY format: '{}'.",
                         other.unwrap_or("")
                     )));
                 }
-            }
+            });
             if words.get(2).copied() != Some("1.0") {
                 return Err(StageError("Unsupported PLY version.".to_string()));
             }
@@ -226,7 +306,14 @@ fn parse_header(text: &str) -> Result<(Vec<Element>, usize), StageError> {
                 let prop = parse_property(&words, &element.name)?;
                 element.props.push(prop);
             }
-            "end_header" => return Ok((elements, idx + 1)),
+            "end_header" => {
+                return Ok((
+                    elements,
+                    format.ok_or_else(|| {
+                        StageError("Expected format line not found in PLY file.".to_string())
+                    })?,
+                ));
+            }
             other => {
                 return Err(StageError(format!(
                     "Invalid keyword '{other}' when expecting an element."
@@ -237,6 +324,25 @@ fn parse_header(text: &str) -> Result<(Vec<Element>, usize), StageError> {
     Err(StageError(
         "'end_header' not found in PLY file.".to_string(),
     ))
+}
+
+fn find_header_end(bytes: &[u8]) -> Option<usize> {
+    let marker = b"end_header";
+    bytes
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .map(|pos| {
+            let after_marker = pos + marker.len();
+            if bytes.get(after_marker) == Some(&b'\r')
+                && bytes.get(after_marker + 1) == Some(&b'\n')
+            {
+                after_marker + 2
+            } else if bytes.get(after_marker) == Some(&b'\n') {
+                after_marker + 1
+            } else {
+                after_marker
+            }
+        })
 }
 
 /// Parse a `property` declaration line.
@@ -265,6 +371,8 @@ fn parse_property(words: &[&str], element_name: &str) -> Result<PlyProp, StageEr
             }
             Ok(PlyProp::List {
                 name: name.to_string(),
+                count_ty: count_type.unwrap(),
+                list_ty: list_type.unwrap(),
             })
         }
         Some(type_name) => {
@@ -629,10 +737,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_binary_ply() {
-        let mut options = Options::new();
-        options.add("filename", data_path("ply/simple_binary.ply"));
-        assert!(PlyReader::new(&options).read().is_err());
+    fn reads_binary_little_endian_vertices() {
+        let view = read_ply("ply/simple_binary.ply");
+        assert_eq!(view.len(), 3);
+
+        for (idx, (x, y, z)) in [(-1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (1.0, 0.0, 0.0)]
+            .into_iter()
+            .enumerate()
+        {
+            let idx = idx as u64;
+            assert_eq!(view.get_f64(idx, &DimId::X), x);
+            assert_eq!(view.get_f64(idx, &DimId::Y), y);
+            assert_eq!(view.get_f64(idx, &DimId::Z), z);
+        }
     }
 
     fn temp_path(name: &str) -> String {
