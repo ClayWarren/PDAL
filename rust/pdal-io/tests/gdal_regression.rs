@@ -133,6 +133,25 @@ fn gdal_writer_matches_existing_percentile_grid_fixture() {
 }
 
 #[test]
+fn gdal_writer_matches_existing_fixed_multi_view_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_fixed_multi_view_grid_fixture();
+    assert_band_dimensions_near(
+        &output,
+        7,
+        9,
+        &[
+            -9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -1.0, -9999.0, -9999.0, -9999.0,
+            -9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -9999.0, 5.0, -9999.0, 7.0, 8.0, 8.9,
+            -9999.0, -9999.0, 4.0, -9999.0, 6.0, 7.0, 8.0, -9999.0, -9999.0, 3.0, 4.0, 5.0, 5.4,
+            6.4, -9999.0, -9999.0, 2.0, 3.0, 4.0, 4.4, 5.4, -9999.0, -9999.0, 1.0, 2.0, 3.0, 4.0,
+            5.0, -1.0, -1.0, -9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -1.0, -1.0, -9999.0,
+            -9999.0, -9999.0, -9999.0, -9999.0,
+        ],
+    );
+}
+
+#[test]
 fn gdal_writer_matches_existing_min_window_fixture() {
     let _guard = GDAL_TEST_LOCK.lock().unwrap();
     let output = write_grid_window_fixture("min");
@@ -307,10 +326,42 @@ fn write_grid_fixture_with_options(
     output
 }
 
+fn write_fixed_multi_view_grid_fixture() -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = make_temp_dir("gdal-writer-fixed-multi-view");
+    let output = temp.join("grid.tif");
+
+    let mut views = read_text_views(&repo.join("test/data/gdal/grid.txt"));
+    views.extend(read_text_views(&repo.join("test/data/gdal/grid2.txt")));
+
+    let mut writer_options = Options::new();
+    writer_options.add("filename", output.display());
+    writer_options.add("output_type", "min");
+    writer_options.add("resolution", 1.0);
+    writer_options.add("radius", 7071.0 / 10000.0);
+    writer_options.add("origin_x", -2.0);
+    writer_options.add("origin_y", -2.0);
+    writer_options.add("width", 7);
+    writer_options.add("height", 9);
+    let mut writer = GdalWriter::new(&writer_options);
+    writer.write(&views).unwrap();
+    output
+}
+
+fn read_text_views(path: &Path) -> Vec<PointView> {
+    let mut options = Options::new();
+    options.add("filename", path.display());
+    TextReader::new(&options).read().unwrap()
+}
+
 fn assert_band_near(path: &Path, expected: &[f64]) {
+    assert_band_dimensions_near(path, 5, 5, expected);
+}
+
+fn assert_band_dimensions_near(path: &Path, width: i32, height: i32, expected: &[f64]) {
     let raster = pdal_core::gdal::Raster::open(path.to_str().unwrap()).unwrap();
-    assert_eq!(raster.width(), 5);
-    assert_eq!(raster.height(), 5);
+    assert_eq!(raster.width(), width);
+    assert_eq!(raster.height(), height);
     let mut data = vec![0.0; expected.len()];
     raster
         .read_band(
