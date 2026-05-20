@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `761 / 927` individual C++ GoogleTest cases, or `82.09%`,
+Current checkpoint: `768 / 927` individual C++ GoogleTest cases, or `82.85%`,
 are validated against Rust-backed behavior.
 
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
@@ -104,6 +104,11 @@ Known mixed binaries:
   remains C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: only `calculateBounds` counts. The broader point
   view/table data model is still C++.
+- `pdal_bounds_test`: only `test_ctor`, `test_clip`, `test_intersect`,
+  `test_grow`, `test_bounds_grow_2_3_args`, and `test_invalid` count. Bounds
+  clear/empty/contains/overlap/clip/grow arithmetic routes through the Rust C
+  ABI. Equality, accessors, parsing, formatting, WKT/GeoJSON, SRS bounds, and
+  `ProgramArgs` integration remain C++.
 - `pdal_utils_test`: only `test_base64`, `blanks`, `replaceAll`,
   `escapeNonprinting`, and `escapeJSON` count. Other utility cases still test
   C++ templates, stream helpers, process helpers, or local formatting behavior.
@@ -128,6 +133,9 @@ Known mixed binaries:
 - `pdal_options_test`: only `valid` counts; option-name validation routes
   through the Rust C ABI. Option storage, conditional merging, metadata, JSON,
   and `ProgramArgs` behavior remain mixed C++.
+- `pdal_polygon_test`: only `valid` counts; geometry validity routes through
+  the Rust native geometry ABI. Polygon construction, serialization, bounds,
+  simplification, and point coverage remain C++/GDAL.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.
