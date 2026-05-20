@@ -3,6 +3,45 @@ use std::ffi::CString;
 use std::io::Read;
 use std::path::Path;
 
+fn parse_source_candidate_args<'a>(
+    command: &str,
+    args: &'a [String],
+) -> Result<(&'a str, &'a str), String> {
+    let mut source = None;
+    let mut candidate = None;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--source" {
+            let Some(value) = iter.next() else {
+                return Err("--source requires a filename".to_string());
+            };
+            source = Some(value.as_str());
+        } else if let Some(value) = arg.strip_prefix("--source=") {
+            source = Some(value);
+        } else if arg == "--candidate" {
+            let Some(value) = iter.next() else {
+                return Err("--candidate requires a filename".to_string());
+            };
+            candidate = Some(value.as_str());
+        } else if let Some(value) = arg.strip_prefix("--candidate=") {
+            candidate = Some(value);
+        } else if arg.starts_with("--") {
+            return Err(format!("unknown {command} option '{arg}'"));
+        } else if source.is_none() {
+            source = Some(arg.as_str());
+        } else if candidate.is_none() {
+            candidate = Some(arg.as_str());
+        } else {
+            return Err(format!("{command} expects exactly two filenames"));
+        }
+    }
+
+    match (source, candidate) {
+        (Some(source), Some(candidate)) => Ok((source, candidate)),
+        _ => Err(format!("{command} expects exactly two filenames")),
+    }
+}
+
 impl App {
     pub(super) fn run_tile(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
@@ -127,16 +166,15 @@ impl App {
                 0
             };
         }
-        if self.command_args.len() != 2 {
-            eprintln!("Error: hausdorff expects exactly two filenames");
-            return 1;
-        }
-        let source = &self.command_args[0];
-        let candidate = &self.command_args[1];
-        let (c_source, c_candidate) = match (
-            CString::new(source.as_str()),
-            CString::new(candidate.as_str()),
-        ) {
+        let (source, candidate) = match parse_source_candidate_args("hausdorff", &self.command_args)
+        {
+            Ok(paths) => paths,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
             (Ok(source), Ok(candidate)) => (source, candidate),
             _ => {
                 eprintln!("Error: a filename contains an interior NUL byte");
@@ -178,16 +216,14 @@ impl App {
                 0
             };
         }
-        if self.command_args.len() != 2 {
-            eprintln!("Error: chamfer expects exactly two filenames");
-            return 1;
-        }
-        let source = &self.command_args[0];
-        let candidate = &self.command_args[1];
-        let (c_source, c_candidate) = match (
-            CString::new(source.as_str()),
-            CString::new(candidate.as_str()),
-        ) {
+        let (source, candidate) = match parse_source_candidate_args("chamfer", &self.command_args) {
+            Ok(paths) => paths,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
             (Ok(source), Ok(candidate)) => (source, candidate),
             _ => {
                 eprintln!("Error: a filename contains an interior NUL byte");
@@ -222,16 +258,14 @@ impl App {
                 0
             };
         }
-        if self.command_args.len() != 2 {
-            eprintln!("Error: delta expects exactly two filenames");
-            return 1;
-        }
-        let source = &self.command_args[0];
-        let candidate = &self.command_args[1];
-        let (c_source, c_candidate) = match (
-            CString::new(source.as_str()),
-            CString::new(candidate.as_str()),
-        ) {
+        let (source, candidate) = match parse_source_candidate_args("delta", &self.command_args) {
+            Ok(paths) => paths,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
             (Ok(source), Ok(candidate)) => (source, candidate),
             _ => {
                 eprintln!("Error: a filename contains an interior NUL byte");

@@ -48,6 +48,27 @@ fn chamfer_of_distinct_files_is_positive_and_finite() {
 }
 
 #[test]
+fn chamfer_supports_named_source_and_candidate() {
+    let source = data_path("test/data/ply/simple_text.ply");
+    let candidate = data_path("test/data/ply/text_extradim.ply");
+    let result = run_chamfer(&[
+        "--source",
+        source.to_str().unwrap(),
+        "--candidate",
+        candidate.to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs chamfer failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(json["chamfer"].as_f64().unwrap() > 0.0);
+}
+
+#[test]
 fn chamfer_without_two_files_fails() {
     let file = data_path("test/data/ply/simple_text.ply");
     let result = run_chamfer(&[file.to_str().unwrap()]);

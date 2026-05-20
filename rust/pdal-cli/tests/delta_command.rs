@@ -60,6 +60,27 @@ fn delta_of_distinct_files_reports_finite_dimension_stats() {
 }
 
 #[test]
+fn delta_supports_named_source_and_candidate() {
+    let source = data_path("test/data/ply/simple_text.ply");
+    let candidate = data_path("test/data/ply/text_extradim.ply");
+    let result = run_delta(&[
+        "--source",
+        source.to_str().unwrap(),
+        "--candidate",
+        candidate.to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs delta failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(json["X"]["max"].as_f64().unwrap().is_finite());
+}
+
+#[test]
 fn delta_without_two_files_fails() {
     let file = data_path("test/data/ply/simple_text.ply");
     let result = run_delta(&[file.to_str().unwrap()]);
