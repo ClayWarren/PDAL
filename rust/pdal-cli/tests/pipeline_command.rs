@@ -1,6 +1,7 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -51,6 +52,68 @@ fn pipeline_command_accepts_root_pipeline_object() {
     let text = fs::read_to_string(output).unwrap();
     assert!(text.starts_with("X,Y,Z\n"));
     assert!(text.lines().count() > 1);
+}
+
+#[test]
+fn pipeline_command_accepts_input_option() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-input-option");
+    let output = temp.join("out.txt");
+    let pipeline = temp.join("pipeline.json");
+
+    write_text_pipeline(&pipeline, &input, &output);
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg("--input")
+        .arg(&pipeline)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(fs::read_to_string(output).unwrap().starts_with("X,Y,Z\n"));
+}
+
+#[test]
+fn pipeline_command_accepts_stdin_and_validate() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-stdin");
+    let output = temp.join("out.txt");
+    let pipeline = temp.join("pipeline.json");
+
+    write_text_pipeline(&pipeline, &input, &output);
+    let pipeline_json = fs::read_to_string(&pipeline).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg("--stdin")
+        .arg("--validate")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(pipeline_json.as_bytes())
+        .unwrap();
+    let result = child.wait_with_output().unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline validate failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!output.exists());
 }
 
 #[test]

@@ -1,30 +1,68 @@
 use super::*;
 use std::ffi::CString;
+use std::io::Read;
 
 impl App {
     pub(super) fn run_pipeline(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
             println!("  pdal pipeline <pipeline.json>");
+            println!("  pdal pipeline --input <pipeline.json>");
+            println!("  pdal pipeline --stdin");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
                 0
             };
         }
-        if self.command_args.len() != 1 {
+
+        let mut input: Option<&str> = None;
+        let mut read_stdin = false;
+        let mut validate_only = false;
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
+            if arg == "--input" || arg == "-i" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a pipeline filename");
+                    return 1;
+                };
+                input = Some(value);
+            } else if arg == "--stdin" || arg == "-s" {
+                read_stdin = true;
+            } else if arg == "--validate" {
+                validate_only = true;
+            } else if arg.starts_with("--") {
+                eprintln!("Error: unknown option '{arg}' for pipeline");
+                return 1;
+            } else if input.replace(arg).is_some() {
+                eprintln!("Error: pipeline expects exactly one JSON filename");
+                return 1;
+            }
+        }
+        if read_stdin && input.is_some() {
+            eprintln!("Error: pipeline accepts either --stdin or an input filename, not both");
+            return 1;
+        }
+        if !read_stdin && input.is_none() {
             eprintln!("Error: pipeline expects exactly one JSON filename");
             return 1;
         }
 
-        let json = match std::fs::read_to_string(&self.command_args[0]) {
-            Ok(json) => json,
-            Err(err) => {
-                eprintln!(
-                    "Error: unable to read pipeline '{}': {}",
-                    self.command_args[0], err
-                );
+        let json = if read_stdin {
+            let mut json = String::new();
+            if let Err(err) = std::io::stdin().read_to_string(&mut json) {
+                eprintln!("Error: unable to read pipeline from stdin: {err}");
                 return 1;
+            }
+            json
+        } else {
+            let input = input.unwrap();
+            match std::fs::read_to_string(input) {
+                Ok(json) => json,
+                Err(err) => {
+                    eprintln!("Error: unable to read pipeline '{input}': {err}");
+                    return 1;
+                }
             }
         };
         let c_json = match CString::new(json) {
@@ -39,6 +77,10 @@ impl App {
         if pipeline.is_null() {
             self.output_last_error();
             return 1;
+        }
+        if validate_only {
+            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+            return 0;
         }
 
         if self.show_json {
