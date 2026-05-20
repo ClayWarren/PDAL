@@ -46,6 +46,7 @@
 
 #include <pdal/Geometry.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "private/SrsTransform.hpp"
 
@@ -242,11 +243,18 @@ BOX3D Geometry::bounds() const
 
 double Geometry::distance(double x, double y, double z) const
 {
-    OGRPoint p(x, y, z);
     throwNoGeos();
     if (!m_geom)
         throw pdal_error("Cannot compare distance of null geometry!");
-    return m_geom->Distance((OGRGeometry*)&p);
+
+    double distance(0.0);
+    if (pdal_geometry_wkt_distance_to_point(wkt().c_str(), x, y, z, &distance))
+        return distance;
+
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error("Geometry distance failed.");
 }
 
 Geometry Geometry::getRing() const
@@ -273,7 +281,11 @@ bool Geometry::valid() const
 {
     throwNoGeos();
 
-    return (bool)m_geom->IsValid();
+    bool valid(false);
+    if (pdal_geometry_wkt_is_valid(wkt().c_str(), &valid))
+        return valid;
+
+    return false;
 }
 
 std::string Geometry::wkt(double precision, bool bOutputZ) const
