@@ -117,6 +117,45 @@ fn pipeline_command_accepts_stdin_and_validate() {
 }
 
 #[test]
+fn pipeline_command_writes_metadata_and_serialization_files() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let temp = make_temp_dir("pdal-rs-pipeline-sidecars");
+    let output = temp.join("out.txt");
+    let pipeline = temp.join("pipeline.json");
+    let metadata = temp.join("metadata.json");
+    let serialization = temp.join("serialized.json");
+
+    write_text_pipeline(&pipeline, &input, &output);
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg(&pipeline)
+        .arg("--metadata")
+        .arg(&metadata)
+        .arg("--pipeline-serialization")
+        .arg(&serialization)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let metadata_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&metadata).unwrap()).unwrap();
+    assert!(metadata_json["point_count"].is_number());
+    assert!(metadata_json["metadata"].is_object());
+    assert_eq!(
+        fs::read_to_string(&serialization).unwrap(),
+        fs::read_to_string(&pipeline).unwrap()
+    );
+    assert!(fs::read_to_string(output).unwrap().starts_with("X,Y,Z\n"));
+}
+
+#[test]
 fn pipeline_command_accepts_filename_string_stages() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");

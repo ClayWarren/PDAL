@@ -9,6 +9,7 @@ impl App {
             println!("  pdal pipeline <pipeline.json>");
             println!("  pdal pipeline --input <pipeline.json>");
             println!("  pdal pipeline --stdin");
+            println!("  pdal pipeline <pipeline.json> --metadata <metadata.json>");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
@@ -19,6 +20,8 @@ impl App {
         let mut input: Option<&str> = None;
         let mut read_stdin = false;
         let mut validate_only = false;
+        let mut metadata_file: Option<&str> = None;
+        let mut serialization_file: Option<&str> = None;
         let mut args = self.command_args.iter();
         while let Some(arg) = args.next() {
             if arg == "--input" || arg == "-i" {
@@ -31,6 +34,18 @@ impl App {
                 read_stdin = true;
             } else if arg == "--validate" {
                 validate_only = true;
+            } else if arg == "--metadata" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: --metadata requires an output filename");
+                    return 1;
+                };
+                metadata_file = Some(value);
+            } else if arg == "--pipeline-serialization" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: --pipeline-serialization requires an output filename");
+                    return 1;
+                };
+                serialization_file = Some(value);
             } else if arg.starts_with("--") {
                 eprintln!("Error: unknown option '{arg}' for pipeline");
                 return 1;
@@ -65,6 +80,12 @@ impl App {
                 }
             }
         };
+        if let Some(path) = serialization_file {
+            if let Err(err) = std::fs::write(path, &json) {
+                eprintln!("Error: unable to write pipeline serialization '{path}': {err}");
+                return 1;
+            }
+        }
         let c_json = match CString::new(json) {
             Ok(json) => json,
             Err(_) => {
@@ -83,7 +104,7 @@ impl App {
             return 0;
         }
 
-        if self.show_json {
+        if self.show_json || metadata_file.is_some() {
             let json_ptr = unsafe {
                 pdal_capi::pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut())
             };
@@ -92,8 +113,19 @@ impl App {
                 unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
                 return 1;
             }
-            if let Some(json) = safe_cstr(json_ptr) {
-                println!("{}", json);
+            let summary = safe_cstr(json_ptr).unwrap_or_default();
+            if let Some(path) = metadata_file {
+                if let Err(err) = std::fs::write(path, &summary) {
+                    eprintln!("Error: unable to write metadata '{path}': {err}");
+                    unsafe {
+                        pdal_capi::pdal_string_free(json_ptr);
+                        pdal_capi::pdal_pipeline_destroy(pipeline);
+                    }
+                    return 1;
+                }
+            }
+            if self.show_json {
+                println!("{}", summary);
             }
             unsafe {
                 pdal_capi::pdal_string_free(json_ptr);
