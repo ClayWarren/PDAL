@@ -48,6 +48,61 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(FauxReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
+void addOption(pdal_options_t* options, const std::string& key, uint64_t value)
+{
+    pdal_options_add_u64(options, key.c_str(), value);
+}
+
+void throwLastRustError()
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error("Rust FauxReader failed.");
+}
+
+std::string modeName(Mode mode)
+{
+    switch (mode)
+    {
+    case Mode::Constant:
+        return "constant";
+    case Mode::Ramp:
+        return "ramp";
+    case Mode::Uniform:
+        return "uniform";
+    case Mode::Normal:
+        return "normal";
+    case Mode::Grid:
+        return "grid";
+    case Mode::Invalid:
+        return "invalid";
+    }
+    return "ramp";
+}
+
+} // namespace
+
+FauxReader::~FauxReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 std::string FauxReader::getName() const
 {
     return s_info.name;
@@ -87,6 +142,12 @@ void FauxReader::prepared(PointTableRef table)
 
 void FauxReader::initialize()
 {
+    if (usesRustReader())
+    {
+        createRustView();
+        return;
+    }
+
     if (m_mode == Mode::Uniform || m_mode == Mode::Normal)
     {
         if (!m_seedArg->set())
@@ -195,6 +256,15 @@ void FauxReader::ready(PointTableRef /*table*/)
 #pragma warning(disable : 4244)
 bool FauxReader::processOne(PointRef& point)
 {
+    if (m_rustView)
+    {
+        if (m_index >= pdal_point_view_length(m_rustView))
+            return false;
+        copyRustPoint(point);
+        ++m_index;
+        return true;
+    }
+
     double x(0);
     double y(0);
     double z(0);
@@ -274,6 +344,68 @@ bool FauxReader::processOne(PointRef& point)
     return true;
 }
 #pragma warning(pop)
+
+bool FauxReader::usesRustReader() const
+{
+    return m_mode == Mode::Constant || m_mode == Mode::Ramp ||
+           m_mode == Mode::Grid || m_mode == Mode::Invalid;
+}
+
+void FauxReader::createRustView()
+{
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "mode", modeName(m_mode));
+    addOption(options, "count", (uint64_t)m_count);
+    addOption(options, "minx", m_bounds.minx);
+    addOption(options, "maxx", m_bounds.maxx);
+    addOption(options, "miny", m_bounds.miny);
+    addOption(options, "maxy", m_bounds.maxy);
+    addOption(options, "minz", m_bounds.minz);
+    addOption(options, "maxz", m_bounds.maxz);
+    addOption(options, "number_of_returns", (uint64_t)m_numReturns);
+
+    pdal_reader_t* reader = pdal_reader_create_faux(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError();
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError();
+    m_count = pdal_point_view_length(m_rustView);
+}
+
+void FauxReader::copyRustPoint(PointRef& point)
+{
+    point.setField(Dimension::Id::X,
+                   pdal_point_view_get_f64(m_rustView, m_index, "X"));
+    point.setField(Dimension::Id::Y,
+                   pdal_point_view_get_f64(m_rustView, m_index, "Y"));
+    point.setField(Dimension::Id::Z,
+                   pdal_point_view_get_f64(m_rustView, m_index, "Z"));
+    point.setField(Dimension::Id::OffsetTime,
+                   pdal_point_view_get_f64(m_rustView, m_index, "OffsetTime"));
+
+    if (m_numReturns > 0)
+    {
+        point.setField(
+            Dimension::Id::ReturnNumber,
+            pdal_point_view_get_f64(m_rustView, m_index, "ReturnNumber"));
+        point.setField(
+            Dimension::Id::NumberOfReturns,
+            pdal_point_view_get_f64(m_rustView, m_index, "NumberOfReturns"));
+    }
+}
 
 point_count_t FauxReader::read(PointViewPtr view, point_count_t count)
 {

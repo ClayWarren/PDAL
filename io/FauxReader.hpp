@@ -38,6 +38,7 @@
 
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -127,6 +128,7 @@ class PDAL_EXPORT FauxReader : public Reader, public Streamable
 {
 public:
     FauxReader() {}
+    ~FauxReader() override;
 
     std::string getName() const override;
 
@@ -158,6 +160,7 @@ private:
     std::unique_ptr<urd> m_uniformX;
     std::unique_ptr<urd> m_uniformY;
     std::unique_ptr<urd> m_uniformZ;
+    pdal_point_view_t* m_rustView = nullptr;
 
     void addArgs(ProgramArgs& args) override;
     void prepared(PointTableRef table) override;
@@ -166,6 +169,9 @@ private:
     void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     point_count_t read(PointViewPtr view, point_count_t count) override;
+    bool usesRustReader() const;
+    void createRustView();
+    void copyRustPoint(PointRef& point);
     virtual bool eof()
     {
         return false;
