@@ -76,6 +76,40 @@ fn density_writes_a_hexagonal_tessellation_as_geojson() {
 }
 
 #[test]
+fn density_supports_driver_path_and_native_options() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("pdal-rs-density-options");
+    let extensionless_input = temp.join("interesting_without_extension");
+    let output = temp.join("density.geojson");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_density(&[
+        "--driver",
+        "readers.las",
+        "--input",
+        extensionless_input.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--edge_length",
+        "25",
+        "--threshold=2",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs density failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&output).unwrap()).unwrap();
+    assert_eq!(geojson["type"], "FeatureCollection");
+    assert!(!feature_counts(&geojson).is_empty());
+}
+
+#[test]
 fn density_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("density")

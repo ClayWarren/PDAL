@@ -592,21 +592,89 @@ impl App {
             };
         }
 
-        let (positional, stage_options) = match parse_stage_args(&self.command_args) {
-            Ok(parsed) => parsed,
-            Err(message) => {
-                eprintln!("Error: {message}");
+        let mut input: Option<&str> = None;
+        let mut output: Option<&str> = None;
+        let mut driver_override: Option<&str> = None;
+        let mut stage_options: Vec<StageOption> = Vec::new();
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
+            if arg == "--input" || arg == "-i" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an input path");
+                    return 1;
+                };
+                input = Some(value);
+            } else if arg == "--output" || arg == "-o" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires an output path");
+                    return 1;
+                };
+                output = Some(value);
+            } else if arg == "--driver" {
+                let Some(driver) = args.next() else {
+                    eprintln!("Error: --driver requires a reader driver name");
+                    return 1;
+                };
+                driver_override = Some(driver);
+            } else if let Some(driver) = arg.strip_prefix("--driver=") {
+                driver_override = Some(driver);
+            } else if arg == "--ogrdriver" || arg == "-f" {
+                let Some(_) = args.next() else {
+                    eprintln!("Error: {arg} requires an OGR driver name");
+                    return 1;
+                };
+            } else if arg == "--edge_length" || arg == "--threshold" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a value");
+                    return 1;
+                };
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: arg.trim_start_matches("--").to_string(),
+                    value: value.clone(),
+                });
+            } else if let Some(value) = arg.strip_prefix("--edge_length=") {
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "edge_length".to_string(),
+                    value: value.to_string(),
+                });
+            } else if let Some(value) = arg.strip_prefix("--threshold=") {
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "threshold".to_string(),
+                    value: value.to_string(),
+                });
+            } else if arg.starts_with("--") {
+                match parse_stage_option_arg(arg) {
+                    Ok(option) => stage_options.push(option),
+                    Err(message) => {
+                        eprintln!("Error: {message}");
+                        return 1;
+                    }
+                }
+            } else if input.is_none() {
+                input = Some(arg);
+            } else if output.is_none() {
+                output = Some(arg);
+            } else {
+                eprintln!("Error: density expects an input path and an output path");
                 return 1;
             }
-        };
-        if positional.len() != 2 {
+        }
+        let Some(input) = input else {
             eprintln!("Error: density expects an input path and an output path");
             return 1;
-        }
-        let input = positional[0];
-        let output = positional[1];
+        };
+        let Some(output) = output else {
+            eprintln!("Error: density expects an input path and an output path");
+            return 1;
+        };
 
-        let reader = match pdal_core::driver::infer_reader_driver(input) {
+        let reader = match driver_override
+            .map(str::to_string)
+            .or_else(|| pdal_core::driver::infer_reader_driver(input).map(str::to_string))
+        {
             Some(driver) => driver,
             None => {
                 eprintln!("Error: unable to infer a reader driver for '{input}'");

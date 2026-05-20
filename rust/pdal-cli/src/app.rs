@@ -428,21 +428,6 @@ fn numbered_output(path: &Path, index: usize) -> PathBuf {
     }
 }
 
-/// Split command arguments into positional values and
-/// `--<stage>.<key>=<value>` stage options.
-fn parse_stage_args(args: &[String]) -> Result<(Vec<&str>, Vec<StageOption>), String> {
-    let mut positional: Vec<&str> = Vec::new();
-    let mut stage_options: Vec<StageOption> = Vec::new();
-    for arg in args {
-        if arg.starts_with("--") {
-            stage_options.push(parse_stage_option_arg(arg)?);
-        } else {
-            positional.push(arg);
-        }
-    }
-    Ok((positional, stage_options))
-}
-
 fn parse_stage_option_arg(arg: &str) -> Result<StageOption, String> {
     let Some(spec) = arg.strip_prefix("--") else {
         return Err(format!("option '{arg}' must be --<stage>.<key>=<value>"));
