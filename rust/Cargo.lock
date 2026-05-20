@@ -627,6 +627,7 @@ dependencies = [
 name = "pdal-cli"
 version = "0.0.0"
 dependencies = [
+ "glob",
  "pdal-capi",
  "pdal-core",
  "pdal-io",

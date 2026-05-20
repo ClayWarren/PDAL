@@ -223,6 +223,7 @@ impl App {
             println!("Usage:");
             println!("  pdal tindex create --tindex <output> <files...> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --filelist <path> [-f <driver>]");
+            println!("  pdal tindex create --tindex <output> --glob <pattern> [-f <driver>]");
             println!("  pdal tindex create <output> <files...> [-f <driver>]");
             println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
@@ -277,6 +278,35 @@ impl App {
                         .filter(|line| !line.is_empty())
                         .map(str::to_string),
                 );
+            } else if arg == "--glob" {
+                let Some(pattern) = args_iter.next() else {
+                    eprintln!("Error: --glob requires a pattern");
+                    return 1;
+                };
+                let entries = match glob::glob(pattern) {
+                    Ok(entries) => entries,
+                    Err(err) => {
+                        eprintln!("Error: invalid glob pattern '{pattern}': {err}");
+                        return 1;
+                    }
+                };
+                let mut matched = false;
+                for entry in entries {
+                    match entry {
+                        Ok(path) => {
+                            matched = true;
+                            files.push(path.to_string_lossy().into_owned());
+                        }
+                        Err(err) => {
+                            eprintln!("Error reading glob match for '{pattern}': {err}");
+                            return 1;
+                        }
+                    }
+                }
+                if !matched {
+                    eprintln!("Error: glob pattern '{pattern}' did not match any files");
+                    return 1;
+                }
             } else if arg == "--fast_boundary" {
                 // The Rust tindex implementation currently writes extent
                 // polygons, matching PDAL's fast-boundary mode.

@@ -100,6 +100,38 @@ fn tindex_reads_inputs_from_filelist() {
 }
 
 #[test]
+fn tindex_reads_inputs_from_glob() {
+    let input = data_path("test/data/las/interesting.las");
+
+    let temp = make_temp_dir("tindex_glob");
+    let output = temp.join("index.geojson");
+    let link = temp.join("interesting.las");
+    std::fs::copy(&input, &link).unwrap();
+    let pattern = temp.join("*.las");
+
+    let result = run_tindex(&[
+        "create",
+        "--tindex",
+        output.to_str().unwrap(),
+        "--glob",
+        pattern.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--fast_boundary",
+    ]);
+
+    assert!(
+        result.status.success(),
+        "tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson = std::fs::read_to_string(&output).unwrap();
+    assert!(geojson.contains("interesting.las"));
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_tindex_matches_rust_tindex_location_index() {
     let input = data_path("test/data/las/interesting.las");
