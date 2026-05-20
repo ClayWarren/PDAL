@@ -50,7 +50,8 @@ impl Filter for ProjPipelineFilter {
 
             if let Some(ref xform) = self.transform {
                 if xform.transform(&mut x, &mut y, &mut z) {
-                    let out_idx = output.add_point();
+                    output.append_point(input, idx);
+                    let out_idx = output.len() - 1;
                     output.set_f64(out_idx, &DimId::X, x);
                     output.set_f64(out_idx, &DimId::Y, y);
                     output.set_f64(out_idx, &DimId::Z, z);
@@ -84,5 +85,39 @@ impl Streamable for ProjPipelineFilter {
 
     fn reset(&mut self) {
         self.transform = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    #[test]
+    fn run_preserves_non_coordinate_dimensions() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::F64);
+
+        let mut input = PointView::new(Rc::new(layout));
+        let idx = input.add_point();
+        input.set_f64(idx, &DimId::X, -93.35156259);
+        input.set_f64(idx, &DimId::Y, 41.577148395);
+        input.set_f64(idx, &DimId::Z, 16.0);
+        input.set_f64(idx, &DimId::Intensity, 42.0);
+
+        let mut filter = ProjPipelineFilter::new(
+            "",
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=deg",
+            false,
+        );
+        let output = filter.run_one(&input).unwrap();
+
+        assert_eq!(output[0].len(), 1);
+        assert_eq!(output[0].get_f64(0, &DimId::Intensity), 42.0);
+        assert_eq!(output[0].source_index(0), 0);
     }
 }

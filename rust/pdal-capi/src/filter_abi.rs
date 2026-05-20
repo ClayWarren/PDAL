@@ -31,6 +31,7 @@ use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
+use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{RangeFilter, RangeLimit};
@@ -359,6 +360,28 @@ pub unsafe extern "C" fn pdal_stage_create_geomdistance(
             std::ptr::null_mut()
         }
     }
+}
+
+/// Create a projpipeline filter stage.
+///
+/// # Safety
+///
+/// `out_srs` and `coord_op` must be valid NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_projpipeline(
+    out_srs: *const c_char,
+    coord_op: *const c_char,
+    reverse: bool,
+) -> *mut StageWrapper {
+    if out_srs.is_null() || coord_op.is_null() {
+        set_last_error("null argument to pdal_stage_create_projpipeline");
+        return std::ptr::null_mut();
+    }
+
+    let out_srs = CStr::from_ptr(out_srs).to_string_lossy();
+    let coord_op = CStr::from_ptr(coord_op).to_string_lossy();
+    let filter = Box::new(ProjPipelineFilter::new(&out_srs, &coord_op, reverse));
+    Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create a groupby filter stage.

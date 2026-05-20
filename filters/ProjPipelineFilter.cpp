@@ -34,9 +34,12 @@
 
 #include "ProjPipelineFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
+
 #include <pdal/PointView.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include <ogr_spatialref.h>
 
@@ -89,6 +92,25 @@ void ProjPipelineFilter::createTransform(const std::string coordOperation,
 PointViewSet ProjPipelineFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
+
+    if (!m_reverseTransfo)
+    {
+        pdal_stage_t* stage = pdal_stage_create_projpipeline(
+            m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), false);
+        if (!stage)
+        {
+            const char* message = pdal_last_error();
+            if (message && message[0])
+                throwError(std::string("filters.projpipeline: ") + message);
+            throwError("Failed to create Rust projpipeline stage.");
+        }
+
+        PointViewPtr outView = rust_view_converter::runSingle(stage, view);
+        pdal_stage_destroy(stage);
+        viewSet.insert(outView);
+        return viewSet;
+    }
+
     PointViewPtr outView = view->makeNew();
 
     PointRef point(*view, 0);
