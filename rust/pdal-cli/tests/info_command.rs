@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn data_path(rel: &str) -> String {
@@ -7,6 +8,13 @@ fn data_path(rel: &str) -> String {
         .join(rel)
         .display()
         .to_string()
+}
+
+fn make_temp_dir(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    dir
 }
 
 #[test]
@@ -40,6 +48,32 @@ fn info_reports_a_summary_for_a_ply_file() {
         .unwrap()
         .iter()
         .any(|dim| dim["name"] == "X"));
+}
+
+#[test]
+fn info_supports_driver_override_and_input_option() {
+    let temp = make_temp_dir("info-driver-override");
+    let input = temp.join("simple_text_without_extension");
+    fs::copy(data_path("test/data/ply/simple_text.ply"), &input).unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("info")
+        .arg("--driver")
+        .arg("readers.ply")
+        .arg("--input")
+        .arg(&input)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs info failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(json["driver"], "readers.ply");
+    assert_eq!(json["point_count"], 3);
 }
 
 #[test]

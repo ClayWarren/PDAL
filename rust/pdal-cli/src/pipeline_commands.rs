@@ -84,15 +84,32 @@ impl App {
             };
         }
         let mut filename: Option<&str> = None;
-        for arg in &self.command_args {
+        let mut driver_override: Option<&str> = None;
+        let mut args = self.command_args.iter();
+        while let Some(arg) = args.next() {
             if arg == "--summary" {
                 continue;
-            }
-            if arg.starts_with("--") {
+            } else if arg == "--driver" {
+                let Some(driver) = args.next() else {
+                    eprintln!("Error: --driver requires a reader driver name");
+                    return 1;
+                };
+                driver_override = Some(driver);
+            } else if let Some(driver) = arg.strip_prefix("--driver=") {
+                driver_override = Some(driver);
+            } else if arg == "--input" || arg == "-i" {
+                let Some(input) = args.next() else {
+                    eprintln!("Error: {arg} requires an input filename");
+                    return 1;
+                };
+                if filename.replace(input).is_some() {
+                    eprintln!("Error: info expects exactly one filename");
+                    return 1;
+                }
+            } else if arg.starts_with("--") {
                 eprintln!("Error: unknown option '{arg}' for info");
                 return 1;
-            }
-            if filename.replace(arg).is_some() {
+            } else if filename.replace(arg).is_some() {
                 eprintln!("Error: info expects exactly one filename");
                 return 1;
             }
@@ -103,7 +120,10 @@ impl App {
         };
 
         // Resolve the reader driver from the filename, as `pdal info` does.
-        let driver = match pdal_core::driver::infer_reader_driver(filename) {
+        let driver = match driver_override
+            .map(|driver| driver.to_string())
+            .or_else(|| pdal_core::driver::infer_reader_driver(filename).map(str::to_string))
+        {
             Some(driver) => driver,
             None => {
                 eprintln!("Error: unable to infer a reader driver for '{}'", filename);
