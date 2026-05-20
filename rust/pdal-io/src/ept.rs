@@ -1,14 +1,17 @@
 //! `readers.ept` -- local LASzip EPT full-read slice.
 //!
 //! This handles local `ept.json` datasets whose `dataType` is `laszip` by
-//! walking JSON hierarchy files and merging local tiles. Spatial filtering,
-//! resolution limits, addons, remote access, and streaming are deferred.
+//! walking JSON hierarchy files and merging local tiles. Bounds filtering is
+//! applied after tile reads; hierarchy pruning, reprojection, polygon/OGR
+//! filters, resolution limits, addons, remote access, and streaming are
+//! deferred.
 
 use crate::tindex::append_view;
+use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
-use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::point::{DimId, DimType, PointId, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
 use serde_json::Value;
@@ -19,6 +22,7 @@ use std::rc::Rc;
 
 pub struct EptReader {
     filename: String,
+    bounds: String,
     metadata: MetadataNode,
 }
 
@@ -26,6 +30,7 @@ impl EptReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            bounds: options.get_str("bounds", ""),
             metadata: MetadataNode::new("readers.ept"),
         }
     }
@@ -64,6 +69,7 @@ impl Reader for EptReader {
         let mut point_count = 0;
         let schema = EptSchema::parse(&info)?;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
+        let bounds = self.bounds_filter()?;
         for key in keys {
             let extension = match data_type {
                 "laszip" => "laz",
@@ -82,6 +88,7 @@ impl Reader for EptReader {
                 vec![read_binary_tile(&path, &schema, srs)?]
             };
             for view in views {
+                let view = apply_bounds(view, bounds.as_ref());
                 point_count += view.len();
                 append_view(&mut merged, &view, &path)?;
             }
@@ -94,6 +101,20 @@ impl Reader for EptReader {
 
     fn metadata(&self) -> MetadataNode {
         self.metadata.clone()
+    }
+}
+
+impl EptReader {
+    fn bounds_filter(&self) -> Result<Option<QueryBounds>, StageError> {
+        if self.bounds.is_empty() {
+            return Ok(None);
+        }
+        if let Ok(parsed) = parse_bounds3d(&self.bounds, 0) {
+            return Ok(Some(QueryBounds::Three(parsed.bounds)));
+        }
+        parse_bounds2d(&self.bounds, 0)
+            .map(|parsed| Some(QueryBounds::Two(parsed.bounds)))
+            .map_err(|err| StageError(format!("Invalid EPT bounds option: {err}")))
     }
 }
 
@@ -153,6 +174,35 @@ fn metadata_from_info(info: &Value) -> MetadataNode {
         node.add_value("srs", MetadataValue::String(wkt.to_string()));
     }
     node
+}
+
+enum QueryBounds {
+    Two(Bounds2D),
+    Three(Bounds3D),
+}
+
+impl QueryBounds {
+    fn contains(&self, view: &PointView, idx: PointId) -> bool {
+        let x = view.get_f64(idx, &DimId::X);
+        let y = view.get_f64(idx, &DimId::Y);
+        match self {
+            QueryBounds::Two(bounds) => bounds.contains_point(x, y),
+            QueryBounds::Three(bounds) => bounds.contains_point(x, y, view.get_f64(idx, &DimId::Z)),
+        }
+    }
+}
+
+fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
+    let Some(bounds) = bounds else {
+        return view;
+    };
+    let mut output = view.make_new();
+    for idx in 0..view.len() {
+        if bounds.contains(&view, idx) {
+            output.append_point(&view, idx);
+        }
+    }
+    output
 }
 
 #[derive(Clone)]
@@ -367,6 +417,30 @@ mod tests {
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].len(), 100000);
         assert!((views[0].get_f64(42, &DimId::X) + 8242697.94).abs() < 1e-9);
+    }
+
+    #[test]
+    fn applies_3d_bounds_filter() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-binary/ept.json").display(),
+        );
+        options.add("bounds", "([-8242746,-8242600],[4966506,4966706],[-50,50])");
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert!(!views[0].is_empty());
+        assert!(views[0].len() < 100000);
+        for idx in 0..views[0].len() {
+            let x = views[0].get_f64(idx, &DimId::X);
+            let y = views[0].get_f64(idx, &DimId::Y);
+            let z = views[0].get_f64(idx, &DimId::Z);
+            assert!((-8242746.0..=-8242600.0).contains(&x));
+            assert!((4966506.0..=4966706.0).contains(&y));
+            assert!((-50.0..=50.0).contains(&z));
+        }
     }
 
     #[test]
