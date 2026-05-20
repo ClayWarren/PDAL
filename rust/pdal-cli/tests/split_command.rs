@@ -88,6 +88,37 @@ fn split_by_length_writes_numbered_outputs() {
 }
 
 #[test]
+fn split_supports_driver_path_and_separated_options() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-split-options");
+    let extensionless_input = temp.join("simple_text_without_extension");
+    let output = temp.join("out.pcd");
+    fs::copy(&input, &extensionless_input).unwrap();
+
+    let result = run_split(&[
+        "--driver",
+        "readers.ply",
+        "--input",
+        extensionless_input.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
+        "--capacity",
+        "2",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs split failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert_eq!(
+        read_pcd(&temp.join("out_1.pcd")).len() + read_pcd(&temp.join("out_2.pcd")).len(),
+        3
+    );
+}
+
+#[test]
 fn split_rejects_length_and_capacity_together() {
     let input = data_path("test/data/ply/simple_text.ply");
     let temp = make_temp_dir("pdal-rs-split-invalid");

@@ -802,7 +802,11 @@ impl App {
             }
         };
 
-        let reader = match pdal_core::driver::infer_reader_driver(split.input) {
+        let reader = match split
+            .reader_driver
+            .map(str::to_string)
+            .or_else(|| pdal_core::driver::infer_reader_driver(split.input).map(str::to_string))
+        {
             Some(driver) => driver,
             None => {
                 eprintln!(

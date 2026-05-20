@@ -339,6 +339,7 @@ struct StageOption {
 struct SplitArgs<'a> {
     input: &'a str,
     output: PathBuf,
+    reader_driver: Option<&'a str>,
     length: Option<f64>,
     capacity: Option<u64>,
     origin_x: Option<f64>,
@@ -348,12 +349,16 @@ struct SplitArgs<'a> {
 impl<'a> SplitArgs<'a> {
     fn parse(args: &'a [String]) -> Result<Self, String> {
         let mut positional = Vec::new();
+        let mut input = None;
+        let mut output = None;
+        let mut reader_driver = None;
         let mut length = None;
         let mut capacity = None;
         let mut origin_x = None;
         let mut origin_y = None;
 
-        for arg in args {
+        let mut iter = args.iter();
+        while let Some(arg) = iter.next() {
             if let Some(value) = arg.strip_prefix("--length=") {
                 length = Some(parse_f64_option("length", value)?);
             } else if let Some(value) = arg.strip_prefix("--capacity=") {
@@ -362,6 +367,43 @@ impl<'a> SplitArgs<'a> {
                 origin_x = Some(parse_f64_option("origin_x", value)?);
             } else if let Some(value) = arg.strip_prefix("--origin_y=") {
                 origin_y = Some(parse_f64_option("origin_y", value)?);
+            } else if arg == "--length" {
+                let Some(value) = iter.next() else {
+                    return Err("--length requires a value".to_string());
+                };
+                length = Some(parse_f64_option("length", value)?);
+            } else if arg == "--capacity" {
+                let Some(value) = iter.next() else {
+                    return Err("--capacity requires a value".to_string());
+                };
+                capacity = Some(parse_u64_option("capacity", value)?);
+            } else if arg == "--origin_x" {
+                let Some(value) = iter.next() else {
+                    return Err("--origin_x requires a value".to_string());
+                };
+                origin_x = Some(parse_f64_option("origin_x", value)?);
+            } else if arg == "--origin_y" {
+                let Some(value) = iter.next() else {
+                    return Err("--origin_y requires a value".to_string());
+                };
+                origin_y = Some(parse_f64_option("origin_y", value)?);
+            } else if arg == "--input" || arg == "-i" {
+                let Some(value) = iter.next() else {
+                    return Err(format!("{arg} requires an input path"));
+                };
+                input = Some(value.as_str());
+            } else if arg == "--output" || arg == "-o" {
+                let Some(value) = iter.next() else {
+                    return Err(format!("{arg} requires an output path"));
+                };
+                output = Some(value.as_str());
+            } else if arg == "--driver" {
+                let Some(value) = iter.next() else {
+                    return Err("--driver requires a reader driver name".to_string());
+                };
+                reader_driver = Some(value.as_str());
+            } else if let Some(value) = arg.strip_prefix("--driver=") {
+                reader_driver = Some(value);
             } else if arg.starts_with("--") {
                 return Err(format!("unknown option '{arg}' for split"));
             } else {
@@ -369,7 +411,13 @@ impl<'a> SplitArgs<'a> {
             }
         }
 
-        if positional.len() != 2 {
+        if input.is_none() && !positional.is_empty() {
+            input = Some(positional.remove(0));
+        }
+        if output.is_none() && !positional.is_empty() {
+            output = Some(positional.remove(0));
+        }
+        if input.is_none() || output.is_none() || !positional.is_empty() {
             return Err("split expects an input path and an output path".to_string());
         }
         if length.is_some() && capacity.is_some() {
@@ -379,9 +427,12 @@ impl<'a> SplitArgs<'a> {
             return Err("origin_x and origin_y require length mode".to_string());
         }
 
+        let input = input.unwrap();
+        let output = output.unwrap();
         Ok(Self {
-            input: positional[0],
-            output: split_output_path(positional[0], positional[1]),
+            input,
+            output: split_output_path(input, output),
+            reader_driver,
             length,
             capacity,
             origin_x,
