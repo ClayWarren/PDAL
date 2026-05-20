@@ -750,6 +750,40 @@ mod tests {
     }
 
     #[test]
+    fn terrasolid_reader_returns_points_through_c_abi() {
+        unsafe {
+            let options = pdal_options_create();
+            for (key, value) in [("filename", data_path("terrasolid/20020715-time-color.bin"))] {
+                let key = CString::new(key).unwrap();
+                let value = CString::new(value).unwrap();
+                pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+            }
+
+            let reader = pdal_reader_create_terrasolid(options);
+            assert!(!reader.is_null());
+            let view = pdal_reader_read_first(reader);
+            assert!(!view.is_null());
+            assert_eq!(pdal_point_view_length(view), 1000);
+
+            let x = CString::new("X").unwrap();
+            let intensity = CString::new("Intensity").unwrap();
+            let point_source_id = CString::new("PointSourceId").unwrap();
+            let alpha = CString::new("Alpha").unwrap();
+            assert_eq!(pdal_point_view_get_f64(view, 0, x.as_ptr()), 363127.94);
+            assert_eq!(pdal_point_view_get_f64(view, 0, intensity.as_ptr()), 1840.0);
+            assert_eq!(
+                pdal_point_view_get_f64(view, 0, point_source_id.as_ptr()),
+                27207.0
+            );
+            assert_eq!(pdal_point_view_get_f64(view, 0, alpha.as_ptr()), 0.0);
+
+            pdal_point_view_destroy(view);
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+        }
+    }
+
+    #[test]
     fn writer_write_view_consumes_point_view_through_c_abi() {
         unsafe {
             let mut filename = std::env::temp_dir();

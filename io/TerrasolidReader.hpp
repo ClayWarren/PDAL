@@ -36,10 +36,7 @@
 
 #include <pdal/Options.hpp>
 #include <pdal/Reader.hpp>
-#include <pdal/util/IStream.hpp>
-
-#include <memory>
-#include <vector>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -78,6 +75,8 @@ class PDAL_EXPORT TerrasolidReader : public pdal::Reader
 {
 public:
     TerrasolidReader() : pdal::Reader(), m_format(TERRASOLID_Format_Unknown) {}
+    ~TerrasolidReader() override;
+
     std::string getName() const override;
 
     point_count_t getNumPoints() const
@@ -97,21 +96,21 @@ public:
 private:
     TerraSolidHeaderPtr m_header;
     TERRASOLID_Format_Type m_format;
-    uint32_t m_size;
     bool m_haveColor;
     bool m_haveTime;
-    uint32_t m_baseTime;
-    std::unique_ptr<IStream> m_istream;
-    point_count_t m_index;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    Dimension::IdList m_dims;
 
     void initialize() override;
     void addDimensions(PointLayoutPtr layout) override;
     void ready(PointTableRef table) override;
     point_count_t read(PointViewPtr view, point_count_t count) override;
     void done(PointTableRef table) override;
+    void copyPoint(PointViewPtr view, PointId outIdx);
     virtual bool eof()
     {
-        return m_index >= getNumPoints();
+        return m_rustIndex >= pdal_point_view_length(m_rustView);
     }
 
     TerrasolidReader& operator=(const TerrasolidReader&); // not implemented
