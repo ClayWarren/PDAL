@@ -1,6 +1,7 @@
 use super::*;
 use std::ffi::CString;
 use std::io::Read;
+use std::path::Path;
 
 impl App {
     pub(super) fn run_tile(&self) -> i32 {
@@ -226,6 +227,7 @@ impl App {
             println!("  pdal tindex create --tindex <output> --filelist <path> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --glob <pattern> [-f <driver>]");
             println!("  pdal tindex create --tindex <output> --stdin [-f <driver>]");
+            println!("  pdal tindex create --tindex <output> --path_prefix <prefix> <files...>");
             println!("  pdal tindex create <output> <files...> [-f <driver>]");
             println!("  pdal tindex merge --tindex <index> --filespec <output>");
             return if self.command_args.is_empty() && !self.help {
@@ -252,6 +254,8 @@ impl App {
         let mut tindex_file: Option<String> = None;
         let mut files = Vec::new();
         let mut driver_name = "ESRI Shapefile".to_string();
+        let mut path_prefix: Option<String> = None;
+        let mut write_absolute_path = false;
 
         let mut args_iter = self.command_args[1..].iter();
         while let Some(arg) = args_iter.next() {
@@ -322,6 +326,14 @@ impl App {
                         .filter(|line| !line.is_empty())
                         .map(str::to_string),
                 );
+            } else if arg == "--path_prefix" {
+                let Some(prefix) = args_iter.next() else {
+                    eprintln!("Error: --path_prefix requires a prefix");
+                    return 1;
+                };
+                path_prefix = Some(prefix.clone());
+            } else if arg == "--write_absolute_path" {
+                write_absolute_path = true;
             } else if arg == "--fast_boundary" {
                 // The Rust tindex implementation currently writes extent
                 // polygons, matching PDAL's fast-boundary mode.
@@ -438,7 +450,21 @@ impl App {
             if first_srs.is_empty() && !wkt.is_empty() {
                 first_srs = wkt.clone();
             }
-            valid_files.push((file.clone(), wkt, minx, miny, maxx, maxy));
+            let mut location = if write_absolute_path {
+                match Path::new(&file).canonicalize() {
+                    Ok(path) => path.to_string_lossy().into_owned(),
+                    Err(err) => {
+                        eprintln!("Error: unable to resolve absolute path for '{file}': {err}");
+                        return 1;
+                    }
+                }
+            } else {
+                file.clone()
+            };
+            if let Some(prefix) = &path_prefix {
+                location = format!("{prefix}{location}");
+            }
+            valid_files.push((location, wkt, minx, miny, maxx, maxy));
         }
 
         if valid_files.is_empty() {

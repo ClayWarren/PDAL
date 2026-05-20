@@ -182,6 +182,42 @@ fn tindex_reads_inputs_from_stdin() {
 }
 
 #[test]
+fn tindex_applies_location_path_options() {
+    let input = data_path("test/data/las/interesting.las");
+
+    let temp = make_temp_dir("tindex_path_options");
+    let output = temp.join("index.geojson");
+
+    let result = run_tindex(&[
+        "create",
+        "--tindex",
+        output.to_str().unwrap(),
+        "--write_absolute_path",
+        "--path_prefix",
+        "prefix:",
+        input.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--fast_boundary",
+    ]);
+
+    assert!(
+        result.status.success(),
+        "tindex failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&output).unwrap()).unwrap();
+    let location = geojson["features"][0]["properties"]["location"]
+        .as_str()
+        .unwrap();
+    assert!(location.starts_with("prefix:/"));
+    assert!(location.ends_with("interesting.las"));
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_tindex_matches_rust_tindex_location_index() {
     let input = data_path("test/data/las/interesting.las");
