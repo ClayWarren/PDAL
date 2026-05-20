@@ -64,7 +64,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `754 / 927` individual C++ GoogleTest cases, or `81.34%`,
+Current checkpoint: `756 / 927` individual C++ GoogleTest cases, or `81.55%`,
 are validated against Rust-backed behavior.
 
 Counting rules:
@@ -94,6 +94,8 @@ Known mixed binaries:
   `barycentricInterpolation`, which routes through the Rust C ABI.
 - `pdal_scaling_test`: all 2 tests count; auto scale/offset computation routes
   through the Rust C ABI.
+- `pdal_filespec_test`: all 2 tests count; file-spec JSON ingestion and
+  validation route through the Rust C ABI.
 - `pdal_metadata_test`: do not count as a binary yet. Scalar conversion and
   JSON formatting use Rust helpers, but the metadata tree implementation is
   still C++.
