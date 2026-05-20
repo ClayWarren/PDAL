@@ -1,9 +1,8 @@
 //! `writers.ogr` -- GeoJSON-only local writer slice.
 //!
-//! The C++ writer is a broad OGR/GDAL adapter. This Rust slice intentionally
-//! covers only point FeatureCollection output for the GeoJSON driver. Shapefile,
-//! GeoPackage, transactions, measure dimensions, and multipoint grouping stay
-//! deferred to the native OGR milestone.
+//! The C++ writer is a broad OGR/GDAL adapter. This Rust writer covers local
+//! GeoJSON output. Shapefile, GeoPackage, transactions, and measure dimensions
+//! stay deferred to the native OGR milestone.
 
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
@@ -77,17 +76,22 @@ impl OgrWriter {
         let driver = self.resolved_driver();
         if driver != "GeoJSON" {
             return Err(StageError(format!(
-                "OgrWriter Rust slice supports only GeoJSON, not '{driver}'."
+                "OgrWriter Rust implementation supports only GeoJSON, not '{driver}'."
             )));
         }
-        if self.multicount != 1 {
+        if self.multicount == 0 {
             return Err(StageError(
-                "OgrWriter Rust slice does not support multicount > 1.".to_string(),
+                "OgrWriter multicount must be greater than 0.".to_string(),
+            ));
+        }
+        if self.multicount > 1 && !self.attr_dims.is_empty() {
+            return Err(StageError(
+                "OgrWriter multicount > 1 is incompatible with attr_dims.".to_string(),
             ));
         }
         if !self.measure_dim.is_empty() {
             return Err(StageError(
-                "OgrWriter Rust slice does not support measure_dim.".to_string(),
+                "OgrWriter Rust implementation does not support measure_dim.".to_string(),
             ));
         }
         Ok(())
@@ -104,6 +108,10 @@ impl OgrWriter {
     }
 
     fn features(&mut self, views: &[PointView]) -> Result<Vec<Value>, StageError> {
+        if self.multicount > 1 {
+            return Ok(self.multi_point_features(views));
+        }
+
         let mut features = Vec::new();
         for view in views {
             let attr_dims = self.resolve_attr_dims(view.layout())?;
@@ -113,17 +121,31 @@ impl OgrWriter {
                     "type": "Feature",
                     "geometry": {
                         "type": "Point",
-                        "coordinates": [
-                            view.get_f64(point, &DimId::X),
-                            view.get_f64(point, &DimId::Y),
-                            view.get_f64(point, &DimId::Z),
-                        ],
+                        "coordinates": point_coordinates(view, point),
                     },
                     "properties": properties(view, point, &attr_dims),
                 }));
             }
         }
         Ok(features)
+    }
+
+    fn multi_point_features(&mut self, views: &[PointView]) -> Vec<Value> {
+        let mut features = Vec::new();
+        let mut coordinates = Vec::new();
+        for view in views {
+            for point in 0..view.len() {
+                self.point_count += 1;
+                coordinates.push(Value::Array(point_coordinates(view, point)));
+                if coordinates.len() == self.multicount as usize {
+                    features.push(multi_point_feature(std::mem::take(&mut coordinates)));
+                }
+            }
+        }
+        if !coordinates.is_empty() {
+            features.push(multi_point_feature(coordinates));
+        }
+        features
     }
 
     fn resolve_attr_dims(&self, layout: &PointLayout) -> Result<Vec<DimId>, StageError> {
@@ -152,6 +174,25 @@ impl OgrWriter {
             })
             .collect()
     }
+}
+
+fn multi_point_feature(coordinates: Vec<Value>) -> Value {
+    json!({
+        "type": "Feature",
+        "geometry": {
+            "type": "MultiPoint",
+            "coordinates": coordinates,
+        },
+        "properties": {},
+    })
+}
+
+fn point_coordinates(view: &PointView, point: u64) -> Vec<Value> {
+    vec![
+        json!(view.get_f64(point, &DimId::X)),
+        json!(view.get_f64(point, &DimId::Y)),
+        json!(view.get_f64(point, &DimId::Z)),
+    ]
 }
 
 fn properties(view: &PointView, point: u64, dims: &[DimId]) -> Value {
@@ -236,6 +277,38 @@ mod tests {
 
         assert_eq!(json["features"][0]["properties"]["Intensity"], 10.0);
         assert_eq!(json["features"][1]["properties"]["Intensity"], 20.0);
+    }
+
+    #[test]
+    fn multicount_groups_points_as_multipoint_features() {
+        let json = write_geojson(|options| {
+            options.add("ogrdriver", "GeoJSON").add("multicount", 3);
+        });
+
+        assert_eq!(json["features"].as_array().unwrap().len(), 1);
+        assert_eq!(json["features"][0]["geometry"]["type"], "MultiPoint");
+        assert_eq!(
+            json["features"][0]["geometry"]["coordinates"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(json["features"][0]["geometry"]["coordinates"][1][2], 6.0);
+    }
+
+    #[test]
+    fn multicount_rejects_attr_dims_like_cpp_writer() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let mut options = Options::new();
+        options
+            .add("filename", temp.path().with_extension("geojson").display())
+            .add("ogrdriver", "GeoJSON")
+            .add("multicount", 3)
+            .add("attr_dims", "Intensity");
+        let mut writer = OgrWriter::new(&options);
+
+        assert!(writer.write(&[test_view()]).is_err());
     }
 
     #[test]
