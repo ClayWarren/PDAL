@@ -37,20 +37,26 @@
 #include <pdal/Streamable.hpp>
 #include <pdal/Writer.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
 
 class PDAL_EXPORT NullWriter : public NoFilenameWriter, public Streamable
 {
 public:
+    NullWriter();
+    ~NullWriter() override;
+
     std::string getName() const override;
 
 private:
-    void write(const PointViewPtr /*view*/) override {}
-    bool processOne(PointRef& p) override
-    {
-        return true;
-    }
+    void ready(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    bool processOne(PointRef& point) override;
+    void done(PointTableRef table) override;
+
+    pdal_writer_t* m_rustWriter = nullptr;
 };
 
 } // namespace pdal
