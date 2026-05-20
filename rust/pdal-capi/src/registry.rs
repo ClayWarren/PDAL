@@ -134,6 +134,7 @@ pub const WRITER_DRIVERS: &[&str] = &[
     "writers.las",
     "writers.laz",
     "writers.ply",
+    "writers.ogr",
 ];
 
 pub enum CreatedStage {
@@ -445,6 +446,7 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.las" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
         "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new_laz(options))),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options))),
+        "writers.ogr" => Ok(Box::new(pdal_io::ogr_writer::OgrWriter::new(options))),
         _ => Err(StageError(format!(
             "Writer driver '{name}' is not available in the Rust port."
         ))),

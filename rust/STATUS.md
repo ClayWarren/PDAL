@@ -39,6 +39,7 @@ Status definitions:
 | PLY I/O | in progress | ASCII and binary PLY read paths plus ASCII write coverage exist for deterministic local fixtures. Broader writer parity remains incomplete. |
 | OBJ reader | in progress | Deterministic Wavefront OBJ ASCII path, mesh faces, and VTN de-duplication are covered. |
 | GLTF writer | in progress | Deterministic local GLB output from mesh-backed views is covered for existing C++ unit-test shapes. |
+| OGR writer | prototype | GeoJSON point FeatureCollection output is covered. Shapefile, GeoPackage, native OGR layer creation, transactions, measure dimensions, and multipoint grouping are deferred. |
 | QFIT reader | in progress | Deterministic NASA ATM QFIT binary path is covered. |
 | SBET/SMRMSG I/O | in progress | SBET read/write and SMRMSG read coverage exist for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, SRS extraction, and compression/decompression. Keep parity tests honest before broad claims. |

@@ -15,6 +15,7 @@ pub mod las;
 pub mod las_writer;
 pub mod nullwriter;
 pub mod obj;
+pub mod ogr_writer;
 pub mod optech;
 pub mod pcd;
 pub mod ply;

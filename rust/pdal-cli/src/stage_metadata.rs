@@ -517,6 +517,13 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             option("precision", "Floating-point output precision.", None),
             option("faces", "Write triangular mesh faces.", Some(json!(false))),
         ],
+        "writers.ogr" => vec![
+            filename(),
+            option("ogrdriver", "OGR driver name.", Some(json!("GeoJSON"))),
+            option("attr_dims", "Comma-separated attribute dimensions.", None),
+            option("multicount", "Points per feature.", Some(json!(1))),
+            option("measure_dim", "Dimension to use as a measure value.", None),
+        ],
         _ => Vec::new(),
     }
 }

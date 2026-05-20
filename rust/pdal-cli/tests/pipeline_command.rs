@@ -277,6 +277,33 @@ fn pipeline_command_reads_stac_pipeline() {
 }
 
 #[test]
+fn pipeline_command_writes_ogr_geojson_pipeline() {
+    let temp = make_temp_dir("pdal-rs-pipeline-ogr");
+    let output = temp.join("out.geojson");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.faux","count":2,"mode":"ramp","minx":1,"maxx":2,"miny":3,"maxy":4,"minz":5,"maxz":6}},
+  {{"type":"writers.ogr","filename":"{}","ogrdriver":"GeoJSON"}}
+]"#,
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+
+    run_rust_pipeline(&pipeline);
+
+    let json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap();
+    assert_eq!(json["type"], "FeatureCollection");
+    assert_eq!(json["features"].as_array().unwrap().len(), 2);
+    assert_eq!(json["features"][0]["geometry"]["coordinates"][0], 1.0);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_matches_rust_pipeline_command() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

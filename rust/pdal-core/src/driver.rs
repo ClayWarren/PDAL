@@ -75,6 +75,7 @@ const WRITER_EXTENSIONS: &[(&str, &str)] = &[
     ("vrt", "writers.gdal"),
     ("glb", "writers.gltf"),
     ("gltf", "writers.gltf"),
+    ("geojson", "writers.ogr"),
     ("feather", "writers.arrow"),
     ("parquet", "writers.arrow"),
     ("drc", "writers.draco"),
@@ -203,6 +204,7 @@ mod tests {
         assert_eq!(infer_writer_driver("out.csv"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.txt"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.las"), Some("writers.las"));
+        assert_eq!(infer_writer_driver("out.geojson"), Some("writers.ogr"));
         assert_eq!(infer_writer_driver("out.tif"), Some("writers.gdal"));
         assert_eq!(infer_writer_driver("out.tiff"), Some("writers.gdal"));
         assert_eq!(infer_writer_driver("out.vrt"), Some("writers.gdal"));
