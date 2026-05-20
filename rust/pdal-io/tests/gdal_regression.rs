@@ -1,16 +1,21 @@
 use pdal_core::options::Options;
-use pdal_core::pipeline::{Pipeline, Writer};
+use pdal_core::pipeline::{Pipeline, Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_io::gdal_reader::GdalReader;
 use pdal_io::gdal_writer::GdalWriter;
+use pdal_io::text::TextReader;
 use pdal_io::text_writer::TextWriter;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
+use std::sync::Mutex;
+
+static GDAL_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn gdal_writer_writes_count_raster() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
     let temp = make_temp_dir("gdal-writer-count");
     let output = temp.join("count.tif");
     let mut options = Options::new();
@@ -33,7 +38,33 @@ fn gdal_writer_writes_count_raster() {
 
     let mut data = vec![0.0; 4];
     raster.read_band(1, 2, 2, &mut data).unwrap();
-    assert_eq!(data, vec![-9999.0, 1.0, 1.0, -9999.0]);
+    assert_eq!(data, vec![0.0, 1.0, 1.0, 0.0]);
+}
+
+#[test]
+fn gdal_writer_matches_existing_min_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("min", false);
+    assert_band_near(
+        &output,
+        &[
+            5.0, -9999.0, 7.0, 8.0, 8.9, 4.0, -9999.0, 6.0, 7.0, 8.0, 3.0, 4.0, 5.0, 5.4, 6.4, 2.0,
+            3.0, 4.0, 4.4, 5.4, 1.0, 2.0, 3.0, 4.0, 5.0,
+        ],
+    );
+}
+
+#[test]
+fn gdal_writer_matches_existing_count_grid_fixture() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let output = write_grid_fixture("count", false);
+    assert_band_near(
+        &output,
+        &[
+            1.0, 0.0, 1.0, 1.0, 3.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0,
+            2.0, 5.0, 4.0, 1.0, 1.0, 1.0, 2.0, 2.0,
+        ],
+    );
 }
 
 #[test]
@@ -107,6 +138,50 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     );
     pipeline.add_dependency(writer, reader).unwrap();
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
+}
+
+fn write_grid_fixture(output_type: &str, binmode: bool) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/gdal/grid.txt");
+    let temp = make_temp_dir(&format!("gdal-writer-{output_type}"));
+    let output = temp.join("grid.tif");
+
+    let mut reader_options = Options::new();
+    reader_options.add("filename", input.display());
+    let mut reader = TextReader::new(&reader_options);
+    let views = reader.read().unwrap();
+
+    let mut writer_options = Options::new();
+    writer_options.add("filename", output.display());
+    writer_options.add("output_type", output_type);
+    writer_options.add("resolution", 1.0);
+    writer_options.add("radius", 7071.0 / 10000.0);
+    writer_options.add("binmode", binmode);
+    let mut writer = GdalWriter::new(&writer_options);
+    writer.write(&views).unwrap();
+    output
+}
+
+fn assert_band_near(path: &Path, expected: &[f64]) {
+    let raster = pdal_core::gdal::Raster::open(path.to_str().unwrap()).unwrap();
+    assert_eq!(raster.width(), 5);
+    assert_eq!(raster.height(), 5);
+    let mut data = vec![0.0; expected.len()];
+    raster
+        .read_band(
+            1,
+            raster.width() as usize,
+            raster.height() as usize,
+            &mut data,
+        )
+        .unwrap();
+    assert_eq!(data.len(), expected.len());
+    for (idx, (actual, expected)) in data.iter().zip(expected).enumerate() {
+        assert!(
+            (actual - expected).abs() <= 0.001,
+            "cell {idx}: actual {actual}, expected {expected}"
+        );
+    }
 }
 
 fn two_point_view() -> PointView {

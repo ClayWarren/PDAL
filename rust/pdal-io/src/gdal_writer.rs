@@ -331,6 +331,9 @@ fn render_stat(
         for col in 0..grid.width {
             let values = cell_values(grid, row, col, samples, writer);
             if values.is_empty() {
+                if matches!(stat, OutputStat::Count) {
+                    out[row * grid.width + col] = 0.0;
+                }
                 continue;
             }
             out[row * grid.width + col] = match stat {
@@ -373,8 +376,9 @@ fn cell_values(
             .collect();
     }
 
-    let center_x = grid.origin_x + (col as f64 * writer.resolution);
-    let center_y = grid.origin_y + ((grid.height - 1 - row) as f64 * writer.resolution);
+    let center_x = grid.origin_x + (col as f64 + 0.5) * writer.resolution;
+    let center_y =
+        grid.origin_y + (grid.height - row) as f64 * writer.resolution - writer.resolution / 2.0;
     let radius = writer.radius.unwrap_or(writer.resolution * 2.0_f64.sqrt());
     samples
         .iter()
@@ -515,6 +519,7 @@ mod tests {
         options.add("output_type", "count");
         options.add("resolution", 1.0);
         options.add("radius", 0.1);
+        options.add("binmode", true);
         let writer = GdalWriter::new(&options);
         let grid = FixedGrid {
             origin_x: 0.0,
@@ -524,6 +529,6 @@ mod tests {
         };
         let samples = collect_samples(&[view], &DimId::Z).unwrap();
         let bands = writer.render_bands(grid, &samples);
-        assert_eq!(bands[0].1, vec![writer.no_data, 1.0, 1.0, writer.no_data]);
+        assert_eq!(bands[0].1, vec![0.0, 1.0, 1.0, 0.0]);
     }
 }

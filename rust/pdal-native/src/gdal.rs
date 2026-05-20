@@ -108,6 +108,9 @@ impl Raster {
         height: usize,
         buffer: &mut [f64],
     ) -> Result<(), String> {
+        if buffer.len() != width * height {
+            return Err("GDAL band buffer size does not match raster dimensions.".to_string());
+        }
         unsafe {
             let band = GDALGetRasterBand(self.ds, band_idx);
             if band.is_null() {
