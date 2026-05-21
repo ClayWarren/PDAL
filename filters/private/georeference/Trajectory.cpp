@@ -92,7 +92,7 @@ Trajectory::Trajectory(const std::string& filename, const NL::json& opts)
         }
         default:
         {
-            readerOptions.add(arg.key(), arg.value());
+            readerOptions.add(arg.key(), arg.value().dump());
             break;
         }
         }
