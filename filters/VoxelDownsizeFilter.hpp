@@ -39,6 +39,8 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -47,7 +49,6 @@ class PointView;
 
 class PDAL_EXPORT VoxelDownsizeFilter : public Filter, public Streamable
 {
-    using Voxel = std::tuple<int, int, int>;
     enum class Mode
     {
         First,
@@ -56,6 +57,7 @@ class PDAL_EXPORT VoxelDownsizeFilter : public Filter, public Streamable
 
 public:
     VoxelDownsizeFilter();
+    ~VoxelDownsizeFilter() override;
     VoxelDownsizeFilter& operator=(const VoxelDownsizeFilter&) = delete;
     VoxelDownsizeFilter(const VoxelDownsizeFilter&) = delete;
 
@@ -63,18 +65,15 @@ public:
 
 private:
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     PointViewSet run(PointViewPtr view) override;
-    void ready(PointTableRef) override;
+    void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override;
 
-    bool voxelize(PointRef& point);
-
     double m_cell;
-    double m_originX;
-    double m_originY;
-    double m_originZ;
-    std::set<Voxel> m_populatedVoxels;
     Mode m_mode;
+    PointLayoutPtr m_layout;
+    pdal_stage* m_rustStage;
 
     friend std::istream& operator>>(std::istream& in,
                                     VoxelDownsizeFilter::Mode&);

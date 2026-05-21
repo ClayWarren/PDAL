@@ -260,7 +260,10 @@ Known mixed binaries:
   `bounds_inside_outside` count. Crop selection routes through the Rust C ABI in
   batch and streaming paths. SRS reprojection and OGR geometry loading remain
   C++/GDAL.
-- `pdal_filters_colorinterp_test`: `minmax`, `badramp`, `autorange`, `k`, and
+- `pdal_filters_range_test`: all 13 listed cases count. Range filtering routes
+  through the Rust C ABI in batch and streaming paths.
+- `pdal_filters_voxel_downsize_test`: all 6 tests count. Voxel downsizing routes
+  through the Rust C ABI in batch and streaming paths.
   `mad` count. Color interpolation execution routes through the Rust C ABI.
   Missing-dimension validation and streamability checks remain C++ wrapper
   behavior.

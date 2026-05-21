@@ -81,7 +81,12 @@ std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-VoxelDownsizeFilter::VoxelDownsizeFilter() {}
+VoxelDownsizeFilter::VoxelDownsizeFilter() : m_rustStage(nullptr) {}
+
+VoxelDownsizeFilter::~VoxelDownsizeFilter()
+{
+    pdal_stage_destroy(m_rustStage);
+}
 
 std::string VoxelDownsizeFilter::getName() const
 {
@@ -95,70 +100,50 @@ void VoxelDownsizeFilter::addArgs(ProgramArgs& args)
              Mode::Center);
 }
 
-void VoxelDownsizeFilter::ready(PointTableRef)
-{
-    m_populatedVoxels.clear();
-}
-
-PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
+void VoxelDownsizeFilter::initialize()
 {
     pdal_options_t* ops = pdal_options_create();
     pdal_options_add_f64(ops, "cell", m_cell);
     pdal_options_add_str(ops, "mode",
                          m_mode == Mode::Center ? "center" : "first");
 
-    pdal_stage_t* stage = pdal_stage_create_voxeldownsize(ops);
-    if (!stage)
-    {
-        pdal_options_destroy(ops);
-        throwError("Failed to create Rust voxeldownsize stage.");
-    }
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
 
-    PointViewPtr outView = rust_view_converter::runSingle(stage, view);
-    pdal_stage_destroy(stage);
+    m_rustStage = pdal_stage_create_voxeldownsize(ops);
     pdal_options_destroy(ops);
-
-    PointViewSet viewSet;
-    viewSet.insert(outView);
-    return viewSet;
+    if (!m_rustStage)
+        throwError("Failed to create Rust voxeldownsize stage.");
 }
 
-bool VoxelDownsizeFilter::voxelize(PointRef& point)
+void VoxelDownsizeFilter::ready(PointTableRef table)
 {
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    double z = point.getFieldAs<double>(Dimension::Id::Z);
-    if (m_populatedVoxels.empty())
-    {
-        m_originX = x - (m_cell / 2);
-        m_originY = y - (m_cell / 2);
-        m_originZ = z - (m_cell / 2);
-    }
+    m_layout = table.layout();
+    if (m_rustStage)
+        pdal_stage_reset(m_rustStage);
+}
 
-    x -= m_originX;
-    y -= m_originY;
-    z -= m_originZ;
-
-    Voxel v = std::make_tuple((int)(std::floor(x / m_cell)),
-                              (int)(std::floor(y / m_cell)),
-                              (int)(std::floor(z / m_cell)));
-
-    auto inserted = m_populatedVoxels.insert(v).second;
-    if ((m_mode == Mode::Center) && inserted)
-    {
-        point.setField(Dimension::Id::X,
-                       (std::get<0>(v) + 0.5) * m_cell + m_originX);
-        point.setField(Dimension::Id::Y,
-                       (std::get<1>(v) + 0.5) * m_cell + m_originY);
-        point.setField(Dimension::Id::Z,
-                       (std::get<2>(v) + 0.5) * m_cell + m_originZ);
-    }
-    return inserted;
+PointViewSet VoxelDownsizeFilter::run(PointViewPtr view)
+{
+    PointViewSet viewSet;
+    viewSet.insert(rust_view_converter::runSingle(m_rustStage, view));
+    return viewSet;
 }
 
 bool VoxelDownsizeFilter::processOne(PointRef& point)
 {
-    return voxelize(point);
+    if (!m_rustStage)
+        throwError("Rust voxeldownsize stage was not initialized.");
+
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError(
+            "Rust voxeldownsize streaming failed.");
+    return keep;
 }
 
 } // namespace pdal

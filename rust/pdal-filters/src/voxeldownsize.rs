@@ -31,6 +31,39 @@ impl VoxelDownsizeFilter {
             origin: None,
         }
     }
+
+    fn keep_point(&mut self, x: f64, y: f64, z: f64) -> Option<(f64, f64, f64)> {
+        let (ox, oy, oz) = if let Some(origin) = self.origin {
+            origin
+        } else {
+            let origin = (
+                x - self.cell / 2.0,
+                y - self.cell / 2.0,
+                z - self.cell / 2.0,
+            );
+            self.origin = Some(origin);
+            origin
+        };
+
+        let vx = ((x - ox) / self.cell).floor() as i32;
+        let vy = ((y - oy) / self.cell).floor() as i32;
+        let vz = ((z - oz) / self.cell).floor() as i32;
+
+        let voxel = (vx, vy, vz);
+        if !self.populated_voxels.insert(voxel) {
+            return None;
+        }
+
+        if self.mode == VoxelMode::Center {
+            Some((
+                (vx as f64 + 0.5) * self.cell + ox,
+                (vy as f64 + 0.5) * self.cell + oy,
+                (vz as f64 + 0.5) * self.cell + oz,
+            ))
+        } else {
+            Some((x, y, z))
+        }
+    }
 }
 
 impl Filter for VoxelDownsizeFilter {
@@ -53,33 +86,12 @@ impl Filter for VoxelDownsizeFilter {
             let x = view.get_f64(idx, &DimId::X);
             let y = view.get_f64(idx, &DimId::Y);
             let z = view.get_f64(idx, &DimId::Z);
-
-            let (ox, oy, oz) = if let Some(origin) = self.origin {
-                origin
-            } else {
-                let origin = (
-                    x - self.cell / 2.0,
-                    y - self.cell / 2.0,
-                    z - self.cell / 2.0,
-                );
-                self.origin = Some(origin);
-                origin
-            };
-
-            let vx = ((x - ox) / self.cell).floor() as i32;
-            let vy = ((y - oy) / self.cell).floor() as i32;
-            let vz = ((z - oz) / self.cell).floor() as i32;
-
-            let voxel = (vx, vy, vz);
-            let inserted = self.populated_voxels.insert(voxel);
-            if inserted {
+            if let Some((x, y, z)) = self.keep_point(x, y, z) {
                 output.append_point(view, idx);
-                if self.mode == VoxelMode::Center {
-                    let out_idx = output.len() - 1;
-                    output.set_f64(out_idx, &DimId::X, (vx as f64 + 0.5) * self.cell + ox);
-                    output.set_f64(out_idx, &DimId::Y, (vy as f64 + 0.5) * self.cell + oy);
-                    output.set_f64(out_idx, &DimId::Z, (vz as f64 + 0.5) * self.cell + oz);
-                }
+                let out_idx = output.len() - 1;
+                output.set_f64(out_idx, &DimId::X, x);
+                output.set_f64(out_idx, &DimId::Y, y);
+                output.set_f64(out_idx, &DimId::Z, z);
             }
         }
         Ok(vec![output])
@@ -87,8 +99,18 @@ impl Filter for VoxelDownsizeFilter {
 }
 
 impl Streamable for VoxelDownsizeFilter {
-    fn process_one(&mut self, _view: &mut PointView, _idx: pdal_core::point::PointId) -> bool {
-        false
+    fn process_one(&mut self, view: &mut PointView, idx: pdal_core::point::PointId) -> bool {
+        let x = view.get_f64(idx, &DimId::X);
+        let y = view.get_f64(idx, &DimId::Y);
+        let z = view.get_f64(idx, &DimId::Z);
+        if let Some((x, y, z)) = self.keep_point(x, y, z) {
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+            view.set_f64(idx, &DimId::Z, z);
+            true
+        } else {
+            false
+        }
     }
 
     fn reset(&mut self) {
@@ -149,6 +171,7 @@ mod tests {
         assert_eq!(out.get_f64(1, &DimId::X), 2.0);
 
         let mut stream_view = view(&[(0.0, 0.0, 0.0)]);
+        assert!(filter.process_one(&mut stream_view, 0));
         assert!(!filter.process_one(&mut stream_view, 0));
         filter.reset();
         assert!(filter.populated_voxels.is_empty());
