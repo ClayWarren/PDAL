@@ -32,6 +32,7 @@ pub struct GdalWriter {
     allow_empty: bool,
     fixed_grid: Option<FixedGrid>,
     fixed_grid_arg_count: usize,
+    metadata: Vec<(String, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -78,6 +79,7 @@ impl GdalWriter {
             allow_empty: options.get_bool("allow_empty", false),
             fixed_grid: fixed_grid(options),
             fixed_grid_arg_count: fixed_grid_arg_count(options),
+            metadata: parse_metadata(options),
         }
     }
 }
@@ -164,6 +166,11 @@ impl Writer for GdalWriter {
                     self.no_data,
                     name,
                 )
+                .map_err(StageError)?;
+        }
+        for (key, value) in &self.metadata {
+            raster
+                .set_metadata_item(key, value)
                 .map_err(StageError)?;
         }
         Ok(())
@@ -529,6 +536,24 @@ fn is_percentile(stat: &OutputStat) -> bool {
     matches!(stat, OutputStat::Percentile(_))
 }
 
+fn parse_metadata(options: &Options) -> Vec<(String, String)> {
+    let spec = options.get_str("metadata", "");
+    if spec.is_empty() {
+        return Vec::new();
+    }
+
+    spec.split(',')
+        .filter_map(|entry| {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return None;
+            }
+            let (key, value) = entry.split_once('=')?;
+            Some((key.trim().to_string(), value.to_string()))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,6 +587,23 @@ mod tests {
         let grid = fixed_grid(&options).unwrap();
         assert_eq!(grid.width, 3);
         assert_eq!(grid.height, 4);
+    }
+
+    #[test]
+    fn parses_gdal_metadata_items() {
+        let mut options = Options::new();
+        options.add(
+            "metadata",
+            "AREA_OR_PIXEL=Pixel,empty=,equals=some_more_equals===",
+        );
+        assert_eq!(
+            parse_metadata(&options),
+            vec![
+                ("AREA_OR_PIXEL".to_string(), "Pixel".to_string()),
+                ("empty".to_string(), String::new()),
+                ("equals".to_string(), "some_more_equals===".to_string()),
+            ]
+        );
     }
 
     #[test]

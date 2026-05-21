@@ -465,6 +465,8 @@ void GDALWriter::writeRustOutput()
     addOption(options, "binmode", m_binMode);
     addOption(options, "allow_empty", m_allowEmpty);
     addOption(options, "window_size", m_windowSize);
+    if (!m_GDAL_metadata.empty())
+        addOption(options, "metadata", m_GDAL_metadata);
     if (m_fixedGrid)
     {
         addOption(options, "origin_x", m_bounds.to2d().minx);

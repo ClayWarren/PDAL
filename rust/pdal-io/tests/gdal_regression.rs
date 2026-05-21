@@ -184,6 +184,46 @@ fn gdal_writer_matches_existing_fixed_multi_view_grid_fixture() {
 }
 
 #[test]
+fn gdal_writer_writes_raster_metadata() {
+    let _guard = GDAL_TEST_LOCK.lock().unwrap();
+    let repo = repo_root();
+    let input = repo.join("test/data/gdal/grid.txt");
+    let temp = make_temp_dir("gdal-writer-metadata");
+    let output = temp.join("metadata.tif");
+
+    let mut reader_options = Options::new();
+    reader_options.add("filename", input.display());
+    let views = TextReader::new(&reader_options).read().unwrap();
+
+    let mut writer_options = Options::new();
+    writer_options.add("filename", output.display());
+    writer_options.add("output_type", "max");
+    writer_options.add("resolution", 1.0);
+    writer_options.add("radius", 7071.0 / 10000.0);
+    writer_options.add("window_size", 2);
+    writer_options.add(
+        "metadata",
+        "AREA_OR_PIXEL=Pixel,empty=,equals=some_more_equals===",
+    );
+    GdalWriter::new(&writer_options)
+        .write(&views)
+        .unwrap();
+
+    pdal_core::gdal::register_drivers();
+    let raster = pdal_core::gdal::Raster::open(output.to_str().unwrap()).unwrap();
+    assert_eq!(
+        raster.metadata_item("AREA_OR_PIXEL").as_deref(),
+        Some("Pixel")
+    );
+    assert_eq!(
+        raster.metadata_item("equals").as_deref(),
+        Some("some_more_equals===")
+    );
+    // GTiff does not persist empty metadata values when the dataset is closed.
+    assert!(raster.metadata_item("empty").is_none());
+}
+
+#[test]
 fn gdal_writer_matches_existing_min_window_fixture() {
     let _guard = GDAL_TEST_LOCK.lock().unwrap();
     let output = write_grid_window_fixture("min");

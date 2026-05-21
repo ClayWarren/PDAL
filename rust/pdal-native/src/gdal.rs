@@ -187,6 +187,61 @@ impl Raster {
         }
     }
 
+    pub fn set_metadata_item(&mut self, key: &str, value: &str) -> Result<(), String> {
+        let key_c = CString::new(key).map_err(|e| e.to_string())?;
+        let value_c = CString::new(value).map_err(|e| e.to_string())?;
+        let domain_c = CString::new("").map_err(|e| e.to_string())?;
+        unsafe {
+            if gdal_sys::GDALSetMetadataItem(
+                self.ds as gdal_sys::GDALMajorObjectH,
+                key_c.as_ptr(),
+                value_c.as_ptr(),
+                domain_c.as_ptr(),
+            ) != CPLErr::CE_None
+            {
+                return Err(format!("Failed to set GDAL metadata item '{key}'"));
+            }
+            Ok(())
+        }
+    }
+
+    pub fn metadata_item(&self, key: &str) -> Option<String> {
+        let key_c = CString::new(key).ok()?;
+        let domain_c = CString::new("").ok()?;
+        unsafe {
+            let value = gdal_sys::GDALGetMetadataItem(
+                self.ds as gdal_sys::GDALMajorObjectH,
+                key_c.as_ptr(),
+                domain_c.as_ptr(),
+            );
+            if !value.is_null() {
+                return Some(CStr::from_ptr(value).to_string_lossy().into_owned());
+            }
+
+            // GDALGetMetadataItem returns null for empty values; scan the list instead.
+            let items = gdal_sys::GDALGetMetadata(
+                self.ds as gdal_sys::GDALMajorObjectH,
+                domain_c.as_ptr(),
+            );
+            if items.is_null() {
+                return None;
+            }
+            let count = gdal_sys::CSLCount(items);
+            for idx in 0..count {
+                let item = *items.offset(idx as isize);
+                if item.is_null() {
+                    continue;
+                }
+                let entry = CStr::from_ptr(item).to_string_lossy();
+                if let Some((item_key, item_value)) = entry.split_once('=') {
+                    if item_key == key {
+                        return Some(item_value.to_string());
+                    }
+                }
+            }
+            None
+        }
+    }
     pub fn read_at(&self, x: f64, y: f64, buffer: &mut [f64]) -> Result<(), String> {
         unsafe {
             let mut transform = [0.0f64; 6];
@@ -443,6 +498,58 @@ pub fn register_drivers() {
     unsafe {
         gdal_sys::GDALAllRegister();
         gdal_sys::OGRRegisterAll();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn temp_tif(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("pdal-native-{name}-{}.tif", std::process::id()));
+        let _ = fs::remove_file(&path);
+        path
+    }
+
+    #[test]
+    fn metadata_roundtrip_includes_empty_values_in_memory() {
+        register_drivers();
+        let path = temp_tif("metadata-empty");
+        let mut raster = Raster::create_float64(
+            path.to_str().unwrap(),
+            "GTiff",
+            1,
+            1,
+            1,
+            [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+            "",
+        )
+        .unwrap();
+        raster.write_band_f64(1, 1, 1, &[1.0], -9999.0, "Z").unwrap();
+        raster
+            .set_metadata_item("AREA_OR_PIXEL", "Pixel")
+            .unwrap();
+        raster.set_metadata_item("empty", "").unwrap();
+        raster
+            .set_metadata_item("equals", "some_more_equals===")
+            .unwrap();
+        assert_eq!(raster.metadata_item("empty").as_deref(), Some(""));
+
+        drop(raster);
+
+        let raster = Raster::open(path.to_str().unwrap()).unwrap();
+        assert_eq!(
+            raster.metadata_item("AREA_OR_PIXEL").as_deref(),
+            Some("Pixel")
+        );
+        assert_eq!(
+            raster.metadata_item("equals").as_deref(),
+            Some("some_more_equals===")
+        );
+        // GTiff does not persist empty metadata values when the dataset is closed.
+        assert!(raster.metadata_item("empty").is_none());
     }
 }
 
