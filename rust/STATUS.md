@@ -33,7 +33,7 @@ Status definitions:
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | `readers.text` and `writers.text` cover deterministic local text behavior and installed-PDAL regression coverage. |
-| PCD I/O | in progress | ASCII, binary, and binary-compressed PCD read/write are covered for deterministic local fixtures. Broader fixture and installed-PDAL parity coverage can still grow. |
+| PCD I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII, binary, binary-compressed, precision, streaming, and double-field coverage. Broader installed-PDAL parity coverage can still grow. |
 | PTS/PTX readers | in progress | Deterministic Leica ASCII fixture behavior is covered, including installed-PDAL regressions. |
 | ILVIS2 reader | in progress | Deterministic ASCII point path and fixture-shaped XML sidecar metadata are covered. |
 | PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
@@ -48,7 +48,7 @@ Status definitions:
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Deterministic TerraSolid format 2 fixture is covered. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Deterministic Optech CSD fixture and localized WGS84 georeference math are covered. |
-| BPF I/O | in progress | Deterministic local BPF read/write is covered for uncompressed and compressed point/dimension/byte interleaves, including bundled-file metadata roundtrips. Remote files and ULEM/polar metadata are deferred. |
+| BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
 | GDAL reader/writer | prototype | A narrow local raster-to-point-cloud reader path and first raster writer path exist. Writer support currently covers Float64 GDAL output for core grid statistics; this is not broad GDAL/PROJ permission. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
