@@ -1,4 +1,4 @@
-//! `readers.ply` -- Stanford PLY format (ASCII).
+//! `readers.ply` -- Stanford PLY format.
 //!
 //! Port of the ASCII path of `io/PlyReader.cpp`. A PLY file has a text header
 //! (`ply`, `format`, `element`/`property` declarations, `end_header`) followed
@@ -6,8 +6,7 @@
 //! points; elements declared before `vertex` are consumed to reach it, and
 //! face lists can be stored in the view mesh.
 //!
-//! Binary PLY (`binary_little_endian` / `binary_big_endian`) is intentionally
-//! deferred -- this slice covers the deterministic ASCII path only.
+//! ASCII and binary little/big endian storage modes are supported.
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
@@ -436,12 +435,10 @@ fn dim_for(name: &str) -> DimId {
     }
 }
 
-/// Writer for the Stanford PLY format (ASCII encoding).
+/// Writer for the Stanford PLY format.
 ///
-/// Port of the ASCII path of `io/PlyWriter.cpp`. Binary storage modes are
-/// intentionally deferred. When `precision` is unset, floating values use
-/// Rust's shortest round-trip formatting rather than PDAL's
-/// 6-significant-digit default.
+/// When `precision` is unset, floating values use Rust's shortest round-trip
+/// formatting rather than PDAL's 6-significant-digit default.
 pub struct PlyWriter {
     filename: String,
     format: Option<PlyFormat>,
@@ -511,30 +508,18 @@ impl PlyWriter {
         }
         Ok(dims)
     }
-}
 
-impl Writer for PlyWriter {
-    fn name(&self) -> &str {
-        "writers.ply"
+    fn expanded_filename(&self, index: usize) -> String {
+        self.filename.replace('#', &(index + 1).to_string())
     }
 
-    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
-        if self.filename.is_empty() {
-            return Err(StageError(
-                "PlyWriter requires a filename option.".to_string(),
-            ));
-        }
-        let format = self
-            .format
-            .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
-        if format != PlyFormat::Ascii && self.precision.is_some() {
-            return Err(StageError(
-                "Option 'precision' can only be set of the 'storage_mode' is ascii.".to_string(),
-            ));
-        }
-
+    fn write_file(
+        &self,
+        filename: &str,
+        views: &[PointView],
+        format: PlyFormat,
+    ) -> Result<u64, StageError> {
         let count: u64 = views.iter().map(PointView::len).sum();
-        self.point_count = count;
         let dims = match views.first() {
             Some(view) => self.resolve_dims(view.layout())?,
             None => Vec::new(),
@@ -597,12 +582,47 @@ impl Writer for PlyWriter {
             }
         }
 
-        fs::write(Path::new(&self.filename), output).map_err(|_| {
-            StageError(format!(
-                "Couldn't open file '{}' for output.",
-                self.filename
-            ))
-        })
+        fs::write(Path::new(filename), output)
+            .map_err(|_| StageError(format!("Couldn't open file '{filename}' for output.")))?;
+        Ok(count)
+    }
+}
+
+impl Writer for PlyWriter {
+    fn name(&self) -> &str {
+        "writers.ply"
+    }
+
+    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "PlyWriter requires a filename option.".to_string(),
+            ));
+        }
+        let format = self
+            .format
+            .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
+        if format != PlyFormat::Ascii && self.precision.is_some() {
+            return Err(StageError(
+                "Option 'precision' can only be set of the 'storage_mode' is ascii.".to_string(),
+            ));
+        }
+
+        if self.filename.contains('#') {
+            let mut count = 0;
+            for (idx, view) in views.iter().enumerate() {
+                count += self.write_file(
+                    &self.expanded_filename(idx),
+                    std::slice::from_ref(view),
+                    format,
+                )?;
+            }
+            self.point_count = count;
+            return Ok(());
+        }
+
+        self.point_count = self.write_file(&self.filename, views, format)?;
+        Ok(())
     }
 
     fn metadata(&self) -> MetadataNode {
@@ -1015,6 +1035,31 @@ mod tests {
         assert_eq!(back.get_f64(0, &DimId::X), 1.0);
         assert_eq!(back.get_f64(0, &DimId::Y), 1.0);
         assert_eq!(back.get_f64(0, &DimId::Z), 1.0);
+    }
+
+    #[test]
+    fn writes_hash_template_as_one_file_per_view() {
+        let views = [
+            xyz_view(&[(1.0, 2.0, 3.0)]),
+            xyz_view(&[(4.0, 5.0, 6.0), (7.0, 8.0, 9.0)]),
+            xyz_view(&[(10.0, 11.0, 12.0), (13.0, 14.0, 15.0), (16.0, 17.0, 18.0)]),
+        ];
+        let output = temp_path("flex-#.ply");
+        for idx in 1..=3 {
+            let _ = fs::remove_file(output.replace('#', &idx.to_string()));
+        }
+
+        let mut options = Options::new();
+        options.add("filename", &output);
+        PlyWriter::new(&options).write(&views).unwrap();
+
+        assert!(!Path::new(&output).exists());
+        for (idx, expected_len) in [1, 2, 3].into_iter().enumerate() {
+            let path = output.replace('#', &(idx + 1).to_string());
+            let back = read_back(&path);
+            assert_eq!(back.len(), expected_len);
+            assert_eq!(back.get_f64(0, &DimId::X), views[idx].get_f64(0, &DimId::X));
+        }
     }
 
     #[test]
