@@ -333,3 +333,65 @@ TEST(PcdWriterTest, binaryPdalTypes)
     EXPECT_NEAR(3.33, v->getFieldAs<float>(Dimension::Id::Z, 2), 0.0001);
     EXPECT_EQ(3, v->getFieldAs<int>(Dimension::Id::Intensity, 2));
 }
+
+TEST(PcdWriterTest, compressedPdalTypes)
+{
+    using namespace Dimension;
+
+    PointTable table;
+    table.layout()->registerDims({Id::X, Id::Y, Id::Z, Id::Intensity});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Id::X, 0, 1);
+    view->setField(Id::Y, 0, 2);
+    view->setField(Id::Z, 0, 3);
+    view->setField(Id::Intensity, 0, 42);
+
+    view->setField(Id::X, 1, 4.5);
+    view->setField(Id::Y, 1, 5.5);
+    view->setField(Id::Z, 1, 6.5);
+    view->setField(Id::Intensity, 1, 43);
+
+    view->setField(Id::X, 2, 7.25);
+    view->setField(Id::Y, 2, 8.25);
+    view->setField(Id::Z, 2, 9.25);
+    view->setField(Id::Intensity, 2, 44);
+
+    BufferReader r;
+    r.addView(view);
+
+    std::string outfile(Support::temppath("compressed-test.pcd"));
+
+    PcdWriter w;
+
+    Options o;
+    o.add("order", "X=Float,Y=Float,Z=Float,Intensity=Unsigned16");
+    o.add("compression", "compressed");
+    o.add("filename", outfile);
+
+    w.setInput(r);
+    w.setOptions(o);
+
+    w.prepare(table);
+    w.execute(table);
+
+    std::string contents = FileUtils::readFileIntoString(outfile);
+    EXPECT_NE(contents.find("DATA binary_compressed\n"), std::string::npos);
+
+    PcdReader pr;
+    Options po;
+    po.add("filename", outfile);
+    pr.setOptions(po);
+    PointTable t;
+    pr.prepare(t);
+    PointViewSet pvs = pr.execute(t);
+
+    PointViewPtr v = *pvs.begin();
+    EXPECT_EQ(3U, v->size());
+
+    EXPECT_NEAR(1, v->getFieldAs<float>(Dimension::Id::X, 0), 0.0001);
+    EXPECT_NEAR(5.5, v->getFieldAs<float>(Dimension::Id::Y, 1), 0.0001);
+    EXPECT_NEAR(9.25, v->getFieldAs<float>(Dimension::Id::Z, 2), 0.0001);
+    EXPECT_EQ(42, v->getFieldAs<int>(Dimension::Id::Intensity, 0));
+    EXPECT_EQ(44, v->getFieldAs<int>(Dimension::Id::Intensity, 2));
+}
