@@ -36,7 +36,7 @@ Status definitions:
 | PCD I/O | in progress | ASCII, binary, and binary-compressed PCD read/write are covered for deterministic local fixtures. Broader fixture and installed-PDAL parity coverage can still grow. |
 | PTS/PTX readers | in progress | Deterministic Leica ASCII fixture behavior is covered, including installed-PDAL regressions. |
 | ILVIS2 reader | in progress | Deterministic ASCII point path and fixture-shaped XML sidecar metadata are covered. |
-| PLY I/O | in progress | ASCII and binary PLY read paths plus ASCII/binary write coverage exist for deterministic local fixtures. Broader writer parity remains incomplete. |
+| PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
 | OBJ reader | in progress | Deterministic Wavefront OBJ ASCII path, mesh faces, and VTN de-duplication are covered. |
 | GLTF writer | in progress | Deterministic local GLB output from mesh-backed views is covered for existing C++ unit-test shapes. |
 | OGR writer | prototype | GeoJSON point FeatureCollection output is covered. Shapefile, GeoPackage, native OGR layer creation, transactions, measure dimensions, and multipoint grouping are deferred. |
