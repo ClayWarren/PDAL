@@ -490,6 +490,32 @@ fn las_reader_honors_srs_vlr_order() {
     );
 }
 
+#[test]
+fn las_reader_honors_geotiff_srs_vlr_order() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/las/utm17.las");
+
+    let read_srs = |order: &str| -> String {
+        let mut reader_options = Options::new();
+        reader_options.add("filename", input.display());
+        reader_options.add("srs_vlr_order", order);
+        let mut reader = LasReader::new(&reader_options);
+        reader.read().unwrap()[0]
+            .spatial_reference()
+            .wkt()
+            .to_string()
+    };
+
+    assert!(
+        read_srs("geotiff").contains("32617"),
+        "expected geotiff VLR order to resolve EPSG:32617"
+    );
+    assert!(
+        read_srs("geotiff, wkt1, wkt2, projjson").contains("32617"),
+        "expected geotiff to win when listed first"
+    );
+}
+
 fn push_user_vlr(
     options: &mut Options,
     user_id: &str,

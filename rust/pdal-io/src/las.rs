@@ -5,7 +5,7 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use las::point::ScanDirection;
 use las::Header;
-use las_crs::ParseEpsgCRS;
+use las_crs::{get_epsg_from_geotiff_crs, ParseEpsgCRS};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -25,6 +25,7 @@ const LIBLAS_USER_ID: &str = "liblas";
 const WKT_RECORD_ID: u16 = 2112;
 const WKT2_RECORD_ID: u16 = 4224;
 const PROJJSON_RECORD_ID: u16 = 4225;
+const GEOTIFF_DIRECTORY_RECORD_ID: u16 = 34735;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SrsVlrKind {
@@ -493,11 +494,28 @@ fn resolve_spatial_reference_from_vlrs(
                     }
                 }
             }
-            SrsVlrKind::Geotiff => {}
+            SrsVlrKind::Geotiff => {
+                if find_vlr(header, TRANSFORM_USER_ID, GEOTIFF_DIRECTORY_RECORD_ID).is_some() {
+                    if let Some(srs) = spatial_reference_from_geotiff_vlrs(header) {
+                        return Some(srs);
+                    }
+                }
+            }
         }
     }
 
     None
+}
+
+fn spatial_reference_from_geotiff_vlrs(
+    header: &Header,
+) -> Option<pdal_core::srs::SpatialReference> {
+    let geotiff = header.get_geotiff_crs().ok()??;
+    let crs = get_epsg_from_geotiff_crs(&geotiff).ok()?;
+    Some(pdal_core::srs::SpatialReference::new(&format!(
+        "EPSG:{}",
+        crs.get_horizontal()
+    )))
 }
 
 fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {

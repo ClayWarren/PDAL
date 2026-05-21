@@ -521,6 +521,45 @@ fn las_reader_preserves_legacy_synthetic_flag_through_c_abi() {
 }
 
 #[test]
+fn las_reader_honors_geotiff_srs_vlr_order_through_c_abi() {
+    unsafe {
+        let options = pdal_options_create();
+        {
+            let (filename_key, filename) = ("filename", data_path("las/utm17.las"));
+            let (order_key, order) = ("srs_vlr_order", "geotiff");
+            let filename_key = CString::new(filename_key).unwrap();
+            let filename = CString::new(filename).unwrap();
+            let order_key = CString::new(order_key).unwrap();
+            let order = CString::new(order).unwrap();
+            pdal_options_add_str(options, filename_key.as_ptr(), filename.as_ptr());
+            pdal_options_add_str(options, order_key.as_ptr(), order.as_ptr());
+        }
+
+        let reader = pdal_reader_create_las(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(
+            !view.is_null(),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+
+        let srs = pdal_point_view_spatial_reference(view);
+        assert!(!srs.is_null());
+        let text = take_string(pdal_spatial_reference_text(srs));
+        assert!(
+            text.contains("32617"),
+            "expected geotiff order to resolve EPSG:32617, got {text}"
+        );
+
+        pdal_spatial_reference_destroy(srs);
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn las_reader_preserves_extrabytes_through_c_abi() {
     unsafe {
         let options = pdal_options_create();
