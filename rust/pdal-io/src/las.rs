@@ -20,12 +20,18 @@ use std::rc::Rc;
 const SCAN_ANGLE_SCALE_FACTOR: f64 = 0.006;
 const VLR_HEADER_SIZE: u64 = 54;
 
+struct ConfiguredExtraDim {
+    name: String,
+    type_name: String,
+}
+
 pub struct LasReader {
     filename: String,
     start: u64,
     count: Option<u64>,
     nosrs: bool,
     ignore_missing_vlrs: bool,
+    configured_extra_dims: Vec<ConfiguredExtraDim>,
     metadata: MetadataNode,
 }
 
@@ -46,6 +52,7 @@ impl LasReader {
             count: options.has("count").then(|| options.get_u64("count", 0)),
             nosrs: options.get_bool("nosrs", false),
             ignore_missing_vlrs: options.get_bool("ignore_missing_vlrs", false),
+            configured_extra_dims: configured_extra_dims_from_options(options),
             metadata: MetadataNode::new("readers.las"),
         }
     }
@@ -186,7 +193,7 @@ impl Reader for LasReader {
             }
 
             self.add_metadata(&header);
-            let (layout, extra_dims) = las_layout(&header)?;
+            let (layout, extra_dims) = las_layout(&header, &self.configured_extra_dims)?;
 
             let mut view = PointView::new(Rc::new(layout));
             self.set_spatial_reference(&mut view, &header);
@@ -207,7 +214,7 @@ impl Reader for LasReader {
             }
 
             self.add_metadata(header);
-            let (layout, extra_dims) = las_layout(header)?;
+            let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
 
             let mut view = PointView::new(Rc::new(layout));
             self.set_spatial_reference(&mut view, header);
@@ -377,11 +384,97 @@ fn append_point(
     set_extra_dims(view, id, point, extra_dims)
 }
 
-fn las_layout(header: &Header) -> Result<(PointLayout, Vec<ExtraDim>), StageError> {
+fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {
+    let names = options.values("extra_dim_name");
+    let types = options.values("extra_dim_type");
+    let count = names.len().min(types.len());
+
+    (0..count)
+        .map(|idx| ConfiguredExtraDim {
+            name: names[idx].clone(),
+            type_name: types[idx].clone(),
+        })
+        .collect()
+}
+
+fn dim_type_from_interpretation(name: &str) -> Option<DimType> {
+    let normalized = name.trim().to_ascii_lowercase();
+    if normalized.contains("int8") {
+        Some(DimType::I8)
+    } else if normalized.contains("int16") {
+        Some(DimType::I16)
+    } else if normalized.contains("int32") {
+        Some(DimType::I32)
+    } else if normalized.contains("int64") {
+        Some(DimType::I64)
+    } else if normalized.contains("uint8") || normalized.contains("unsigned8") {
+        Some(DimType::U8)
+    } else if normalized.contains("uint16") || normalized.contains("unsigned16") {
+        Some(DimType::U16)
+    } else if normalized.contains("uint32") || normalized.contains("unsigned32") {
+        Some(DimType::U32)
+    } else if normalized.contains("uint64") || normalized.contains("unsigned64") {
+        Some(DimType::U64)
+    } else if normalized.contains("float") {
+        Some(DimType::F32)
+    } else if normalized.contains("double") {
+        Some(DimType::F64)
+    } else {
+        None
+    }
+}
+
+fn las_layout(
+    header: &Header,
+    configured_extra_dims: &[ConfiguredExtraDim],
+) -> Result<(PointLayout, Vec<ExtraDim>), StageError> {
     let mut layout = PointLayout::new();
     register_standard_dims(&mut layout, header);
-    let extra_dims = extra_dims_from_header(&mut layout, header)?;
+    let extra_dims = if configured_extra_dims.is_empty() {
+        extra_dims_from_header(&mut layout, header)?
+    } else {
+        extra_dims_from_configured(&mut layout, header, configured_extra_dims)?
+    };
     Ok((layout, extra_dims))
+}
+
+fn extra_dims_from_configured(
+    layout: &mut PointLayout,
+    header: &Header,
+    configured_extra_dims: &[ConfiguredExtraDim],
+) -> Result<Vec<ExtraDim>, StageError> {
+    let mut extra_dims = Vec::new();
+    let mut offset = 0usize;
+    let mut remaining = header.point_format().extra_bytes as usize;
+
+    for spec in configured_extra_dims {
+        let ty = dim_type_from_interpretation(&spec.type_name).ok_or_else(|| {
+            StageError(format!(
+                "Invalid extra_dim type '{}' for dimension '{}'.",
+                spec.type_name, spec.name
+            ))
+        })?;
+        let size = ty.size();
+        if size > remaining {
+            return Err(StageError(
+                "Extra byte specification exceeds point length beyond base format length."
+                    .to_string(),
+            ));
+        }
+        remaining -= size;
+        layout.register(DimId::from_name(&spec.name), ty);
+        extra_dims.push(ExtraDim {
+            name: spec.name.clone(),
+            ty,
+            size,
+            offset,
+            scale: 1.0,
+            value_offset: 0.0,
+        });
+        offset += size;
+    }
+
+    Ok(extra_dims)
 }
 
 fn register_standard_dims(layout: &mut PointLayout, header: &Header) {
@@ -739,16 +832,33 @@ mod tests {
     }
 
     #[test]
-    fn reader_tolerates_missing_vlrs_when_requested() {
+    fn reader_reads_extrabytes_vlr_with_undocumented_record() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../test/data/las/bad_vlr_count.las"
+            "/../../test/data/las/extrabytes.las"
         );
         let mut options = Options::new();
         options.add("filename", path);
-        options.add("ignore_missing_vlrs", "true");
         let mut reader = LasReader::new(&options);
-        let views = reader.read().expect("read bad_vlr_count.las");
-        assert_eq!(views[0].len(), 10);
+        let views = reader.read().expect("read extrabytes.las");
+        let view = &views[0];
+        let flags0 = DimId::from_name("Flags0");
+        let flags1 = DimId::from_name("Flags1");
+        assert_eq!(view.get_f64(0, &flags0), 1.0);
+        assert_eq!(view.get_f64(0, &flags1), 1.0);
+        assert_eq!(
+            view.get_f64(0, &flags0),
+            view.get_f64(0, &DimId::ReturnNumber)
+        );
+
+        let names: Vec<String> = (0..view.layout().dim_count())
+            .filter_map(|idx| {
+                view.layout()
+                    .dim_at(idx)
+                    .map(|(id, _)| id.name().to_string())
+            })
+            .collect();
+        assert!(names.iter().any(|name| name == "Flags0"));
+        assert!(names.iter().any(|name| name == "Time"));
     }
 }

@@ -521,6 +521,49 @@ fn las_reader_preserves_legacy_synthetic_flag_through_c_abi() {
 }
 
 #[test]
+fn las_reader_preserves_extrabytes_through_c_abi() {
+    unsafe {
+        let options = pdal_options_create();
+        {
+            let (key, value) = ("filename", data_path("las/extrabytes.las"));
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let reader = pdal_reader_create_las(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(
+            !view.is_null(),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+
+        let flags0 = CString::new("Flags0").unwrap();
+        let return_number = CString::new("ReturnNumber").unwrap();
+        assert_eq!(
+            pdal_point_view_get_f64(view, 0, flags0.as_ptr()),
+            pdal_point_view_get_f64(view, 0, return_number.as_ptr())
+        );
+        assert_eq!(pdal_point_view_get_f64(view, 0, flags0.as_ptr()), 1.0);
+
+        let mut saw_flags0 = false;
+        for idx in 0..pdal_point_view_dim_count(view) {
+            let name = take_string(pdal_point_view_dim_name(view, idx));
+            if name == "Flags0" {
+                saw_flags0 = true;
+            }
+        }
+        assert!(saw_flags0);
+
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn spz_reader_returns_points_through_c_abi() {
     unsafe {
         let options = pdal_options_create();

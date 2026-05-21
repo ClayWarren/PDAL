@@ -77,6 +77,20 @@ struct SrsOrderSpec
     std::vector<las::SrsType> types;
 };
 
+void addExtraDimsToOptions(pdal_options_t* options,
+                         const std::vector<las::ExtraDim>& extraDims)
+{
+    for (const las::ExtraDim& dim : extraDims)
+    {
+        if (dim.m_dimType.m_type == Dimension::Type::None)
+            continue;
+        pdal_options_add_str(options, "extra_dim_name", dim.m_name.c_str());
+        pdal_options_add_str(
+            options, "extra_dim_type",
+            Dimension::interpretationName(dim.m_dimType.m_type).c_str());
+    }
+}
+
 } // unnamed namespace
 
 namespace Utils
@@ -494,90 +508,36 @@ void LasReader::ready(PointTableRef table)
     if (getNumPoints() == 0)
         return;
 
-    const bool useRustReader = d->opts.extraDimSpec.empty();
-
-    if (useRustReader && d->rustView)
+    if (d->rustView)
     {
         pdal_point_view_destroy(d->rustView);
         d->rustView = nullptr;
     }
 
-    if (useRustReader)
+    pdal_options_t* options = pdal_options_create();
+    pdal_options_add_str(options, "filename", m_filename.c_str());
+    pdal_options_add_u64(options, "start", d->opts.start);
+    pdal_options_add_u64(options, "count", getNumPoints());
+    pdal_options_add_str(options, "nosrs", d->opts.nosrs ? "true" : "false");
+    pdal_options_add_str(options, "ignore_missing_vlrs",
+                         d->opts.ignoreMissingVLRs ? "true" : "false");
+    if (!d->opts.extraDimSpec.empty())
+        addExtraDimsToOptions(options, d->extraDims);
+
+    pdal_reader_t* reader = pdal_reader_create_las(options);
+    if (!reader)
     {
-        pdal_options_t* options = pdal_options_create();
-        pdal_options_add_str(options, "filename", m_filename.c_str());
-        pdal_options_add_u64(options, "start", d->opts.start);
-        pdal_options_add_u64(options, "count", getNumPoints());
-        pdal_options_add_str(options, "nosrs",
-                             d->opts.nosrs ? "true" : "false");
-        pdal_options_add_str(options, "ignore_missing_vlrs",
-                             d->opts.ignoreMissingVLRs ? "true" : "false");
-
-        pdal_reader_t* reader = pdal_reader_create_las(options);
-        if (!reader)
-        {
-            pdal_options_destroy(options);
-            rust_view_converter::throwLastError(
-                "Failed to create Rust LAS reader.");
-        }
-
-        d->rustView = pdal_reader_read_first(reader);
-        pdal_reader_destroy(reader);
         pdal_options_destroy(options);
-        if (!d->rustView)
-            rust_view_converter::throwLastError("Rust LAS reader failed.");
-
-        d->index = 0;
-        return;
+        rust_view_converter::throwLastError("Failed to create Rust LAS reader.");
     }
 
-    d->pool.resize(d->opts.numThreads);
-    LasStreamPtr lasStream(createStream());
-    std::istream& stream(*lasStream);
-
-    d->currentTile.reset();
-    d->tiles.clear();
+    d->rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!d->rustView)
+        rust_view_converter::throwLastError("Rust LAS reader failed.");
 
     d->index = 0;
-    if (d->header.dataCompressed())
-    {
-        const las::Vlr* vlr =
-            las::findVlr(las::LaszipUserId, las::LaszipRecordId, d->vlrs);
-        if (!vlr)
-            throwError("LAZ file missing required laszip VLR.");
-        lazperf::laz_vlr laz_vlr;
-        laz_vlr.fill(vlr->data(), vlr->dataSize());
-        try
-        {
-            d->chunkInfo.load(stream, d->header.pointOffset,
-                              d->header.pointCount(), laz_vlr.chunk_size);
-        }
-        catch (const pdal_error& e)
-        {
-            throwError(e.what());
-        }
-
-        d->nextFetchChunk = 0;
-        d->nextFetchPoint = 0;
-        if (d->opts.start > 0)
-        {
-            if (d->opts.start >= d->header.pointCount())
-                throwError("'start' option set past end of file.");
-            d->nextFetchChunk = d->chunkInfo.chunk(d->opts.start);
-            d->nextFetchPoint =
-                d->chunkInfo.index(d->opts.start, d->nextFetchChunk);
-        }
-        d->nextReadChunk = d->nextFetchChunk;
-    }
-    else
-    {
-        d->nextFetchPoint = d->opts.start;
-        d->nextFetchChunk = 0;
-        d->nextReadChunk = 0;
-    }
-
-    for (int i = 0; i < d->opts.numThreads; ++i)
-        d->queueNext();
 }
 
 void LasReader::queueNextCompressedChunk()

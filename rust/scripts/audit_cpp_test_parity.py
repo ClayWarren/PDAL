@@ -367,6 +367,9 @@ COVERED: dict[str, object] = {
         "SyntheticPoints",
         "extraBytes",
         "IgnoreBadVLRs",
+        "Laz_with_extra_byte",
+        "Laz_with_severals_extra_byte_with_wrong_options_name",
+        "multi_eb",
     },
     "pdal_io_las_writer_test": {
         "srs",
