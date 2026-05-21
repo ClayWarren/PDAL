@@ -129,6 +129,44 @@ void addForwardVlrsToOptions(pdal_options_t* options, MetadataNode& forward,
     }
 }
 
+void addUserVlrsToOptions(pdal_options_t* options,
+                          std::vector<las::Evlr> userVlrs,
+                          MetadataNode& metadata, uint8_t minorVersion)
+{
+    for (las::Evlr& v : userVlrs)
+    {
+        v.fillData(metadata);
+        bool asEvlr = false;
+        if (v.dataSize() > las::Vlr::MaxDataSize)
+        {
+            if (minorVersion >= 4)
+                asEvlr = true;
+            else
+                throw pdal_error(
+                    "Can't write VLR with user ID/record ID = " + v.userId +
+                    "/" + std::to_string(v.recordId) +
+                    ".  The data size exceeds the maximum supported.");
+        }
+        else if (v.writeAsEVLR)
+        {
+            if (minorVersion >= 4)
+                asEvlr = true;
+            else
+                throw pdal_error("User specified writing as EVLR but the file "
+                                 "is not a 1.4+ file!");
+        }
+
+        addOption(options, "user_vlr_user_id", v.userId);
+        addOption(options, "user_vlr_record_id", Utils::toString(v.recordId));
+        addOption(options, "user_vlr_description", v.description);
+        const unsigned char* data(
+            reinterpret_cast<const unsigned char*>(v.data()));
+        addOption(options, "user_vlr_data",
+                  Utils::base64_encode(data, v.dataSize()));
+        addOption(options, "user_vlr_evlr", asEvlr ? "true" : "false");
+    }
+}
+
 } // unnamed namespace
 
 std::string LasWriter::getName() const
@@ -393,8 +431,7 @@ void LasWriter::readyTable(PointTableRef table)
         m_forwardMetadata = table.privateMetadata("lasforward");
         m_rustLayout = table.layout();
         m_firstPoint = true;
-        if (d->opts.writePDALMetadata)
-            m_tableMetadata = table.metadata();
+        m_tableMetadata = table.metadata();
         return;
     }
 
@@ -1312,8 +1349,6 @@ bool LasWriter::useRustWriter() const
 {
     if (!d->opts.extraDimSpec.empty())
         return false;
-    if (!d->opts.userVlrs.empty())
-        return false;
     if (d->opts.discardHighReturnNumbers)
         return false;
     if (d->opts.enhancedSrsVlrs)
@@ -1423,6 +1458,11 @@ void LasWriter::writeRustOutput()
         std::ostringstream ostr;
         PipelineWriter::writePipeline(this, ostr);
         addOption(options, "pdal_pipeline_json", ostr.str());
+    }
+    if (!d->opts.userVlrs.empty())
+    {
+        addUserVlrsToOptions(options, d->opts.userVlrs, m_tableMetadata,
+                             d->opts.minorVersion.val());
     }
 
     std::string ext = FileUtils::extension(d->curFilename);

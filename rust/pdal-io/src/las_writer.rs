@@ -46,7 +46,16 @@ pub struct LasWriter {
     a_srs: Option<String>,
     pdal_metadata_json: Option<String>,
     pdal_pipeline_json: Option<String>,
+    user_vlrs: Vec<UserVlr>,
     forward_vlrs: Vec<ForwardedVlr>,
+}
+
+struct UserVlr {
+    user_id: String,
+    record_id: u16,
+    description: String,
+    data: Vec<u8>,
+    write_as_evlr: bool,
 }
 
 struct ForwardedVlr {
@@ -100,6 +109,7 @@ impl LasWriter {
             a_srs: string_option(options, "a_srs"),
             pdal_metadata_json: string_option(options, "pdal_metadata_json"),
             pdal_pipeline_json: string_option(options, "pdal_pipeline_json"),
+            user_vlrs: user_vlrs_from_options(options),
             forward_vlrs: forward_vlrs_from_options(options),
         }
     }
@@ -199,6 +209,7 @@ impl Writer for LasWriter {
         );
         let extra_dims = extra_dims_from_views(views, self.point_format);
         add_extra_bytes_vlr(&mut builder, &extra_dims)?;
+        add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
         builder.point_format.is_compressed = should_compress;
 
@@ -271,6 +282,36 @@ fn extra_dims_from_views(views: &[PointView], point_format: u8) -> Vec<ExtraDim>
     extra_dims
 }
 
+fn user_vlrs_from_options(options: &Options) -> Vec<UserVlr> {
+    let user_ids = options.values("user_vlr_user_id");
+    let record_ids = options.values("user_vlr_record_id");
+    let descriptions = options.values("user_vlr_description");
+    let data_values = options.values("user_vlr_data");
+    let evlr_flags = options.values("user_vlr_evlr");
+    let count = user_ids
+        .len()
+        .min(record_ids.len())
+        .min(descriptions.len())
+        .min(data_values.len())
+        .min(evlr_flags.len());
+
+    (0..count)
+        .filter_map(|idx| {
+            let record_id = record_ids[idx].trim().parse::<u16>().ok()?;
+            Some(UserVlr {
+                user_id: user_ids[idx].clone(),
+                record_id,
+                description: descriptions[idx].clone(),
+                data: base64_decode(data_values[idx].trim()),
+                write_as_evlr: matches!(
+                    evlr_flags[idx].trim().to_lowercase().as_str(),
+                    "true" | "1" | "yes" | "on"
+                ),
+            })
+        })
+        .collect()
+}
+
 fn forward_vlrs_from_options(options: &Options) -> Vec<ForwardedVlr> {
     let user_ids = options.values("forward_vlr_user_id");
     let record_ids = options.values("forward_vlr_record_id");
@@ -318,6 +359,39 @@ fn add_pdal_vlrs(builder: &mut Builder, metadata_json: Option<&str>, pipeline_js
             });
         }
     }
+}
+
+fn add_user_vlrs(builder: &mut Builder, user_vlrs: &[UserVlr]) -> Result<(), StageError> {
+    let minor = builder.version.minor;
+    for user_vlr in user_vlrs {
+        let vlr = Vlr {
+            user_id: user_vlr.user_id.clone(),
+            record_id: user_vlr.record_id,
+            description: user_vlr.description.clone(),
+            data: user_vlr.data.clone(),
+        };
+        if user_vlr.data.len() > MAX_VLR_DATA_SIZE {
+            if minor >= 4 {
+                builder.evlrs.push(vlr);
+            } else {
+                return Err(StageError(format!(
+                    "Can't write VLR with user ID/record ID = {}/{}.  The data size exceeds the maximum supported.",
+                    user_vlr.user_id, user_vlr.record_id
+                )));
+            }
+        } else if user_vlr.write_as_evlr {
+            if minor >= 4 {
+                builder.evlrs.push(vlr);
+            } else {
+                return Err(StageError(
+                    "User specified writing as EVLR but the file is not a 1.4+ file!".to_string(),
+                ));
+            }
+        } else {
+            builder.vlrs.push(vlr);
+        }
+    }
+    Ok(())
 }
 
 fn add_forward_vlrs(builder: &mut Builder, forward_vlrs: &[ForwardedVlr]) {
@@ -607,10 +681,17 @@ fn pdrf_dims(pdrf: u8) -> Vec<DimId> {
         DimId::ScanDirectionFlag,
         DimId::EdgeOfFlightLine,
         DimId::Classification,
+        DimId::Synthetic,
+        DimId::KeyPoint,
+        DimId::Withheld,
+        DimId::Overlap,
         DimId::ScanAngleRank,
         DimId::UserData,
         DimId::PointSourceId,
     ];
+    if pdrf >= 6 {
+        dims.push(DimId::from_name("ScanChannel"));
+    }
     if pdrf == 1 || pdrf == 3 || pdrf >= 6 {
         dims.push(DimId::GpsTime);
     }

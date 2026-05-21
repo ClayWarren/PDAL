@@ -396,6 +396,7 @@ COVERED: dict[str, object] = {
         "las14_classflags_from_las14_classflags",
         "pdal_metadata",
         "flex_vlr",
+        "pdal_add_vlr",
     },
     "pdal_io_ilvis2_test": ALL,
     "pdal_io_ilvis2_metadata_test": ALL,

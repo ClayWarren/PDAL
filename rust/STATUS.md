@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `496 / 917` built C++ GoogleTest cases, or `54.09%`, are
+Current checkpoint: `497 / 917` built C++ GoogleTest cases, or `54.20%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -317,12 +317,12 @@ Known mixed binaries:
 - `pdal_io_las_writer_test`: `srs`, `srs2`, `flex`, `flex2`, `forward`, `header_bbox`,
   `issue2235`, `issue2320`, `issue3288`, `issue3652`, `issue3964`, `lazperf`, `stream`,
   `compressed1_4`, `auto_offset`, `auto_offset2`, `auto_scale_with_auto_offset`, `issue1940`,
-  `forwardvlr`, `forward_spec_3`, `issue2663`, `pdal_metadata`, `flex_vlr`, and the four LAS
+  `forwardvlr`, `forward_spec_3`, `issue2663`, `pdal_metadata`, `flex_vlr`, `pdal_add_vlr`, and the four LAS
   1.0/1.4 classification roundtrip tests count. Rust LAS/LAZ point materialization, scaled
-  header bounds, format 6+ uncompressed and compressed writes, header and VLR forwarding
-  (excluding user VLRs), PDAL metadata/pipeline VLRs, auto scale/offset, legacy header count
+  header bounds, format 6+ uncompressed and compressed writes, header and VLR forwarding,
+  PDAL metadata/pipeline VLRs, user-specified VLRs/EVLRs, auto scale/offset, legacy header count
   zeroing, and supported header options route through the Rust C ABI for the gated subset.
-  User VLR behavior and C++ header inspection tests remain legacy.
+  C++ header inspection tests remain legacy.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`
