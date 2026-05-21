@@ -39,7 +39,7 @@ Status definitions:
 | PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
 | OBJ reader | in progress | Deterministic Wavefront OBJ ASCII path, mesh faces, and VTN de-duplication are covered. |
 | GLTF writer | in progress | Deterministic local GLB output from mesh-backed views is covered for existing C++ unit-test shapes. |
-| OGR writer | prototype | GeoJSON point FeatureCollection output is covered. Shapefile, GeoPackage, native OGR layer creation, transactions, measure dimensions, and multipoint grouping are deferred. |
+| OGR writer | prototype | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
 | QFIT reader | in progress | Deterministic NASA ATM QFIT binary path is covered. |
 | SBET/SMRMSG I/O | in progress | SBET read/write and SMRMSG read coverage exist for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, `start`/`count`/`nosrs` reader options, SRS extraction, compression/decompression, and core writer header options. Keep parity tests honest before broad claims. |
