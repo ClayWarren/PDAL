@@ -42,7 +42,7 @@ Status definitions:
 | OGR writer | prototype | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
-| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, `start`/`count`/`nosrs` reader options, SRS extraction, compression/decompression, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, but the C++ `LasReader`/`LasWriter` classes still use the legacy implementation. Keep parity tests honest before broad claims. |
+| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes, `start`/`count`/`nosrs` reader options, SRS extraction, compression/decompression, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route a narrow supported subset through Rust for local read/write parity. Keep parity tests honest before broad claims. |
 | COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles. Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `466 / 917` built C++ GoogleTest cases, or `50.82%`, are
+Current checkpoint: `493 / 917` built C++ GoogleTest cases, or `53.76%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -310,13 +310,19 @@ Known mixed binaries:
   Scalar conversion and JSON scalar formatting route through Rust helpers. The
   metadata tree implementation is still C++.
 - `pdal_io_las_reader_test`: `test_sequential`, `test_different_formats`,
-  `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, and `Start` count. LAS
-  point materialization routes through the Rust C ABI for the supported subset;
-  header, VLR, SRS, extra-byte override, bad-VLR recovery, and synthetic-flag
-  edge behavior remain C++.
-- `pdal_io_las_writer_test`: do not count as a binary yet. Rust LAS/LAZ writer
-  exists, but the C++ writer wrapper still has substantial legacy header, VLR,
-  SRS, streaming, and option behavior.
+  `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, `Start`,
+  `SyntheticPoints`, and `extraBytes` count. LAS point materialization routes
+  through the Rust C ABI for the supported subset; header, VLR, SRS, extra-byte
+  override, and bad-VLR recovery remain C++.
+- `pdal_io_las_writer_test`: `srs`, `srs2`, `flex`, `flex2`, `forward`, `header_bbox`,
+  `issue2235`, `issue2320`, `issue3288`, `issue3652`, `issue3964`, `lazperf`, `stream`,
+  `compressed1_4`, `auto_offset`, `auto_offset2`, `auto_scale_with_auto_offset`, `issue1940`,
+  `forwardvlr`, `forward_spec_3`, `issue2663`, and the four LAS 1.0/1.4 classification roundtrip
+  tests count. Rust LAS/LAZ point materialization, scaled header bounds, format 6+ uncompressed
+  and compressed writes, header and VLR forwarding (excluding user/metadata VLRs),
+  auto scale/offset, legacy header count zeroing, and supported header options route
+  through the Rust C ABI for the gated subset. User/metadata VLR behavior and C++
+  header inspection tests remain legacy.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`

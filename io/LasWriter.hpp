@@ -43,6 +43,8 @@
 
 #include "private/las/Vlr.hpp"
 
+struct pdal_point_view;
+
 namespace pdal
 {
 class LeInserter;
@@ -156,6 +158,18 @@ private:
     void finishLazPerfOutput();
     bool processPoint(PointRef& point);
     const las::Header& header() const;
+
+    bool useRustWriter() const;
+    void readyRustView(PointLayoutPtr layout);
+    void clearRustView();
+    bool appendRustPoint(PointRef& point);
+    void appendRustView(const PointViewPtr view);
+    void writeRustOutput();
+    void reloadHeaderFromFile();
+
+    bool m_useRustWriter = false;
+    pdal_point_view* m_rustView = nullptr;
+    PointLayoutPtr m_rustLayout;
 
     LasWriter& operator=(const LasWriter&) = delete;
     LasWriter(const LasWriter&) = delete;

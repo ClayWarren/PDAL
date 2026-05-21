@@ -13,6 +13,8 @@ use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::io::{Cursor, Read};
 use std::path::Path;
+
+const SCAN_ANGLE_SCALE_FACTOR: f64 = 0.006;
 use std::rc::Rc;
 
 pub struct LasReader {
@@ -106,6 +108,7 @@ impl LasReader {
         &self,
         reader: &mut las::Reader,
         point_count: u64,
+        point_format: u8,
         view: &mut PointView,
         extra_dims: &[ExtraDim],
     ) -> Result<(), StageError> {
@@ -118,7 +121,7 @@ impl LasReader {
             let point =
                 point.map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
             let id = view.add_point();
-            set_standard_dims(view, id, &point);
+            set_standard_dims(view, id, &point, point_format);
             set_optional_dims(view, id, &point);
             set_extra_dims(view, id, &point, extra_dims)?;
         }
@@ -143,6 +146,7 @@ impl Reader for LasReader {
 
         let header = reader.header();
         let point_count = header.number_of_points();
+        let point_format = header.point_format().to_u8().unwrap_or(3);
         if self.start >= point_count && point_count > 0 {
             return Err(StageError(format!(
                 "LAS start point {} is outside the file's {} points.",
@@ -155,7 +159,13 @@ impl Reader for LasReader {
 
         let mut view = PointView::new(Rc::new(layout));
         self.set_spatial_reference(&mut view, header);
-        self.read_points(&mut reader, point_count, &mut view, &extra_dims)?;
+        self.read_points(
+            &mut reader,
+            point_count,
+            point_format,
+            &mut view,
+            &extra_dims,
+        )?;
 
         Ok(vec![view])
     }
@@ -200,6 +210,9 @@ fn register_standard_dims(layout: &mut PointLayout, header: &Header) {
     }
     if header.point_format().has_nir {
         layout.register(DimId::Infrared, DimType::U16);
+    }
+    if header.point_format().is_extended {
+        layout.register(DimId::from_name("ScanChannel"), DimType::U8);
     }
 }
 
@@ -353,7 +366,16 @@ fn extra_dim_offset(record: &ExtraDimRecord, field_idx: usize) -> f64 {
     }
 }
 
-fn set_standard_dims(view: &mut PointView, id: u64, point: &las::Point) {
+fn scan_angle_degrees(point: &las::Point, point_format: u8) -> f64 {
+    if point_format >= 6 {
+        let scaled = (f64::from(point.scan_angle) / SCAN_ANGLE_SCALE_FACTOR).round() as i16;
+        f64::from(scaled) * SCAN_ANGLE_SCALE_FACTOR
+    } else {
+        f64::from(point.scan_angle)
+    }
+}
+
+fn set_standard_dims(view: &mut PointView, id: u64, point: &las::Point, point_format: u8) {
     view.set_f64(id, &DimId::X, point.x);
     view.set_f64(id, &DimId::Y, point.y);
     view.set_f64(id, &DimId::Z, point.z);
@@ -386,9 +408,17 @@ fn set_standard_dims(view: &mut PointView, id: u64, point: &las::Point) {
         &DimId::Classification,
         u8::from(point.classification) as f64,
     );
-    view.set_f64(id, &DimId::ScanAngleRank, point.scan_angle as f64);
+    view.set_f64(
+        id,
+        &DimId::ScanAngleRank,
+        scan_angle_degrees(point, point_format),
+    );
     view.set_f64(id, &DimId::UserData, point.user_data as f64);
     view.set_f64(id, &DimId::PointSourceId, point.point_source_id as f64);
+    let scan_channel = DimId::from_name("ScanChannel");
+    if view.layout().dim(&scan_channel).is_some() {
+        view.set_f64(id, &scan_channel, point.scanner_channel as f64);
+    }
 }
 
 fn set_optional_dims(view: &mut PointView, id: u64, point: &las::Point) {
@@ -483,5 +513,26 @@ fn read_pdal_val(reader: &mut dyn std::io::Read, ty: DimType) -> Result<f64, Sta
         DimType::F64 => reader
             .read_f64::<LittleEndian>()
             .map_err(|e| StageError(e.to_string())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::options::Options;
+
+    #[test]
+    fn reader_preserves_legacy_synthetic_flag() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/synthetic_test.las"
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+        let mut reader = LasReader::new(&options);
+        let views = reader.read().expect("read synthetic_test.las");
+        let view = &views[0];
+        assert_eq!(view.get_f64(0, &DimId::Classification), 0.0);
+        assert_eq!(view.get_f64(0, &DimId::Synthetic), 1.0);
     }
 }

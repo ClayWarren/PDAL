@@ -486,6 +486,41 @@ fn las_reader_returns_points_through_c_abi() {
 }
 
 #[test]
+fn las_reader_preserves_legacy_synthetic_flag_through_c_abi() {
+    unsafe {
+        let options = pdal_options_create();
+        {
+            let (key, value) = ("filename", data_path("las/synthetic_test.las"));
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let reader = pdal_reader_create_las(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(
+            !view.is_null(),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert_eq!(pdal_point_view_length(view), 1);
+
+        let classification = CString::new("Classification").unwrap();
+        let synthetic = CString::new("Synthetic").unwrap();
+        assert_eq!(
+            pdal_point_view_get_f64(view, 0, classification.as_ptr()),
+            0.0
+        );
+        assert_eq!(pdal_point_view_get_f64(view, 0, synthetic.as_ptr()), 1.0);
+
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn spz_reader_returns_points_through_c_abi() {
     unsafe {
         let options = pdal_options_create();

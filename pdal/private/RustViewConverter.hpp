@@ -208,7 +208,7 @@ inline void fromRustPoint(pdal_point_view_t* rust_out_view, uint64_t rust_idx,
         {
             std::string dimName =
                 takeString(pdal_point_view_dim_name(rust_out_view, i));
-            Dimension::Id id = Dimension::id(dimName);
+            Dimension::Id id = outPoint.layout()->findDim(dimName);
             if (id != Dimension::Id::Unknown)
             {
                 double v = pdal_point_view_get_f64(rust_out_view, rust_idx,

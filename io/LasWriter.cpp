@@ -42,6 +42,7 @@
 #include "private/las/Vlr.hpp"
 
 #include <climits>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -49,12 +50,14 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/pdal_features.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Inserter.hpp>
 #include <pdal/util/OStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 #include "private/las/Geotiff.hpp"
 
@@ -67,6 +70,66 @@ static StaticPluginInfo const s_info{"writers.las",
                                      {"las", "laz"}};
 
 CREATE_STATIC_STAGE(LasWriter, s_info)
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
+bool isForwardedSpatialRefVlr(const std::string& userId, uint16_t recordId)
+{
+    if (userId == las::TransformUserId &&
+        (recordId == las::GeotiffDirectoryRecordId ||
+         recordId == las::GeotiffDoublesRecordId ||
+         recordId == las::GeotiffAsciiRecordId ||
+         recordId == las::WktRecordId))
+        return true;
+    return userId == las::LiblasUserId && recordId == las::WktRecordId;
+}
+
+void addForwardVlrsToOptions(pdal_options_t* options, MetadataNode& forward,
+                             bool skipSpatialRefVlrs, bool skipLaszipVlr)
+{
+    if (!forward)
+        return;
+
+    auto pred = [](MetadataNode n)
+    { return Utils::startsWith(n.name(), "vlr_"); };
+
+    for (auto& n : forward.findChildren(pred))
+    {
+        const MetadataNode& userIdNode = n.findChild("user_id");
+        const MetadataNode& recordIdNode = n.findChild("record_id");
+        const MetadataNode& dataNode = n.findChild("data");
+        if (!recordIdNode.valid() || !userIdNode.valid() || !dataNode.valid())
+            continue;
+
+        uint16_t recordId = (uint16_t)std::stoi(recordIdNode.value());
+        const std::string& userId = userIdNode.value();
+        if (skipSpatialRefVlrs && isForwardedSpatialRefVlr(userId, recordId))
+            continue;
+        if (skipLaszipVlr && userId == las::LaszipUserId &&
+            recordId == las::LaszipRecordId)
+            continue;
+
+        addOption(options, "forward_vlr_user_id", userId);
+        addOption(options, "forward_vlr_record_id",
+                  Utils::toString(recordId));
+        addOption(options, "forward_vlr_description", n.description());
+        addOption(options, "forward_vlr_data", dataNode.value());
+    }
+}
+
+} // unnamed namespace
 
 std::string LasWriter::getName() const
 {
@@ -117,6 +180,7 @@ LasWriter::LasWriter()
 
 LasWriter::~LasWriter()
 {
+    clearRustView();
     delete m_compressor;
 }
 
@@ -323,6 +387,15 @@ void LasWriter::fillForwardList()
 
 void LasWriter::readyTable(PointTableRef table)
 {
+    m_useRustWriter = useRustWriter();
+    if (m_useRustWriter)
+    {
+        m_forwardMetadata = table.privateMetadata("lasforward");
+        m_rustLayout = table.layout();
+        m_firstPoint = true;
+        return;
+    }
+
     m_firstPoint = true;
     m_forwardMetadata = table.privateMetadata("lasforward");
     MetadataNode m = table.metadata();
@@ -339,6 +412,16 @@ void LasWriter::readyTable(PointTableRef table)
 void LasWriter::readyFile(const std::string& filename,
                           const SpatialReference& srs)
 {
+    if (m_useRustWriter)
+    {
+        d->curFilename = filename;
+        m_srs = getSpatialReference().empty() ? srs : getSpatialReference();
+        handleHeaderForwards(m_forwardMetadata);
+        readyRustView(m_rustLayout);
+        Utils::writeProgress(m_progressFd, "READYFILE", filename);
+        return;
+    }
+
     std::ostream* out = Utils::createFile(filename, true);
     if (!out)
         throwError("Couldn't open file '" + filename + "' for output.");
@@ -774,6 +857,49 @@ void LasWriter::readyCompression()
 // This is only called in stream mode.
 bool LasWriter::processOne(PointRef& point)
 {
+    if (m_useRustWriter)
+    {
+        if (m_firstPoint)
+        {
+            auto doScale =
+                [this](const XForm::XFormComponent& scale,
+                       const std::string& name)
+            {
+                if (scale.m_auto)
+                    log()->get(LogLevel::Warning)
+                        << "Auto scale for " << name
+                        << " requested in stream mode.  Using value of 1.0."
+                        << '\n';
+            };
+
+            doScale(m_scaling.m_xXform.m_scale, "X");
+            doScale(m_scaling.m_yXform.m_scale, "Y");
+            doScale(m_scaling.m_zXform.m_scale, "Z");
+
+            auto doOffset = [this](XForm::XFormComponent& offset, double val,
+                                   const std::string name)
+            {
+                if (offset.m_auto)
+                {
+                    offset.m_val = val;
+                    log()->get(LogLevel::Warning)
+                        << "Auto offset for '" << name
+                        << "' requested in stream mode.  Using value of "
+                        << offset.m_val << "." << '\n';
+                }
+            };
+
+            doOffset(m_scaling.m_xXform.m_offset,
+                     point.getFieldAs<double>(Dimension::Id::X), "X");
+            doOffset(m_scaling.m_yXform.m_offset,
+                     point.getFieldAs<double>(Dimension::Id::Y), "Y");
+            doOffset(m_scaling.m_zXform.m_offset,
+                     point.getFieldAs<double>(Dimension::Id::Z), "Z");
+            m_firstPoint = false;
+        }
+        return appendRustPoint(point);
+    }
+
     if (m_firstPoint)
     {
         auto doScale =
@@ -837,11 +963,28 @@ bool LasWriter::processPoint(PointRef& point)
 
 void LasWriter::prerunFile(const PointViewSet& pvSet)
 {
+    if (m_useRustWriter)
+    {
+        m_scaling.setAutoXForm(pvSet);
+        return;
+    }
     m_scaling.setAutoXForm(pvSet);
 }
 
 void LasWriter::writeView(const PointViewPtr view)
 {
+    if (m_useRustWriter)
+    {
+        Utils::writeProgress(m_progressFd, "READYVIEW",
+                             std::to_string(view->size()));
+        appendRustView(view);
+        rust_view_converter::setSpatialReference(m_rustView,
+                                                 view->spatialReference());
+        Utils::writeProgress(m_progressFd, "DONEVIEW",
+                             std::to_string(view->size()));
+        return;
+    }
+
     Utils::writeProgress(m_progressFd, "READYVIEW",
                          std::to_string(view->size()));
 
@@ -1105,6 +1248,15 @@ point_count_t LasWriter::fillWriteBuf(const PointView& view, PointId startId,
 
 void LasWriter::doneFile()
 {
+    if (m_useRustWriter)
+    {
+        writeRustOutput();
+        clearRustView();
+        Utils::writeProgress(m_progressFd, "DONEFILE", d->curFilename);
+        getMetadata().addList("filename", d->curFilename);
+        return;
+    }
+
     finishOutput();
     Utils::writeProgress(m_progressFd, "DONEFILE", d->curFilename);
     getMetadata().addList("filename", d->curFilename);
@@ -1152,6 +1304,152 @@ void LasWriter::finishLazPerfOutput()
 const las::Header& LasWriter::header() const
 {
     return d->header;
+}
+
+bool LasWriter::useRustWriter() const
+{
+    if (!d->opts.extraDimSpec.empty())
+        return false;
+    if (d->opts.writePDALMetadata)
+        return false;
+    if (!d->opts.userVlrs.empty())
+        return false;
+    if (d->opts.discardHighReturnNumbers)
+        return false;
+    if (d->opts.enhancedSrsVlrs)
+        return false;
+    return true;
+}
+
+void LasWriter::readyRustView(PointLayoutPtr layout)
+{
+    clearRustView();
+    if (!layout)
+        throwError("Rust LAS writer missing point layout.");
+
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto id : layout->dims())
+    {
+        pdal_point_layout_register_dim(
+            rustLayout, layout->dimName(id).c_str(),
+            rust_view_converter::typeId(layout->dimType(id)));
+    }
+    m_rustView = pdal_point_view_create(rustLayout);
+}
+
+void LasWriter::clearRustView()
+{
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+}
+
+bool LasWriter::appendRustPoint(PointRef& point)
+{
+    if (!m_rustView || !m_rustLayout)
+        throwError("Rust LAS writer missing output view.");
+
+    PointId outIdx = pdal_point_view_add_point(m_rustView);
+    for (auto dim : m_rustLayout->dims())
+    {
+        pdal_point_view_set_f64(m_rustView, outIdx,
+                                m_rustLayout->dimName(dim).c_str(),
+                                point.getFieldAs<double>(dim));
+    }
+    return true;
+}
+
+void LasWriter::appendRustView(const PointViewPtr view)
+{
+    if (!m_rustView)
+        throwError("Rust LAS writer missing output view.");
+
+    PointRef point(*view, 0);
+    for (PointId idx = 0; idx < view->size(); ++idx)
+    {
+        point.setPointId(idx);
+        appendRustPoint(point);
+    }
+}
+
+void LasWriter::writeRustOutput()
+{
+    if (!m_rustView)
+        throwError("Rust LAS writer has no output view.");
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", d->curFilename);
+    addOption(options, "minor_version", Utils::toString(d->opts.minorVersion.val()));
+    addOption(options, "dataformat_id", Utils::toString(d->opts.dataformatId.val()));
+    addOption(options, "major_version",
+              Utils::toString(d->opts.majorVersion.val()));
+    addOption(options, "global_encoding",
+              Utils::toString(d->opts.globalEncoding.val()));
+    addOption(options, "scale_x", m_scaling.m_xXform.m_scale.m_val);
+    addOption(options, "scale_y", m_scaling.m_yXform.m_scale.m_val);
+    addOption(options, "scale_z", m_scaling.m_zXform.m_scale.m_val);
+    addOption(options, "offset_x", m_scaling.m_xXform.m_offset.m_val);
+    addOption(options, "offset_y", m_scaling.m_yXform.m_offset.m_val);
+    addOption(options, "offset_z", m_scaling.m_zXform.m_offset.m_val);
+    if (d->opts.filesourceId.valSet())
+        addOption(options, "filesource_id",
+                  Utils::toString(d->opts.filesourceId.val()));
+    if (d->opts.systemId.valSet())
+        addOption(options, "system_id", d->opts.systemId.val());
+    if (d->opts.softwareId.valSet())
+        addOption(options, "software_id", d->opts.softwareId.val());
+    if (d->opts.creationDoy.valSet())
+        addOption(options, "creation_doy",
+                  Utils::toString(d->opts.creationDoy.val()));
+    if (d->opts.creationYear.valSet())
+        addOption(options, "creation_year",
+                  Utils::toString(d->opts.creationYear.val()));
+    if (d->opts.projectId.valSet())
+        addOption(options, "project_id", d->opts.projectId.val().toString());
+    if (m_srs.valid())
+        addOption(options, "a_srs", m_srs.getWKT());
+    if (d->opts.compression == las::Compression::True)
+        addOption(options, "compression", "true");
+    if (d->forwardVlrs)
+    {
+        addForwardVlrsToOptions(options, m_forwardMetadata, m_srs.valid(),
+                                d->opts.compression == las::Compression::True);
+    }
+
+    std::string ext = FileUtils::extension(d->curFilename);
+    pdal_writer_t* writer = (d->opts.compression == las::Compression::True ||
+                             Utils::iequals(ext, ".laz"))
+                                ? pdal_writer_create_laz(options)
+                                : pdal_writer_create_las(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        rust_view_converter::throwLastError("Failed to create Rust LAS writer.");
+    }
+
+    rust_view_converter::setSpatialReference(m_rustView, m_srs);
+
+    bool ok = pdal_writer_write_view(writer, m_rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        rust_view_converter::throwLastError("Rust LAS writer failed.");
+
+    reloadHeaderFromFile();
+}
+
+void LasWriter::reloadHeaderFromFile()
+{
+    std::ifstream in(d->curFilename, std::ios::binary);
+    if (!in)
+        return;
+
+    char headerBuf[las::Header::Size14];
+    in.read(headerBuf, las::Header::Size14);
+    if (in.gcount() >= (std::streamsize)las::Header::Size12)
+        d->header.fill(headerBuf, las::Header::Size14);
 }
 
 } // namespace pdal

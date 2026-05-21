@@ -949,28 +949,6 @@ TEST(LasWriterTest, compressed1_4)
     {
         view1->getPackedPoint(dims, idx, buf1.data());
         view2->getPackedPoint(dims, idx, buf2.data());
-        char* b1 = buf1.data();
-        char* b2 = buf2.data();
-        // Uncomment this to figure out the exact byte at which things are
-        // broken.
-        /**
-        for (size_t i = 0; i < pointSize; ++i)
-        {
-            if (*b1++ != *b2++)
-            {
-                {
-                    size_t s = 0;
-                    for (auto di = dims.begin(); di != dims.end(); ++di)
-                    {
-                        std::cerr << "Dim " << view1->dimName(di->m_id) <<
-                            " at " << s << "!\n";
-                        s += Dimension::size(di->m_type);
-                    }
-                }
-                throw pdal_error("Mismatch at byte = " + to_string(i) + "!");
-            }
-        }
-        **/
         EXPECT_EQ(memcmp(buf1.data(), buf2.data(), pointSize), 0);
     }
 }

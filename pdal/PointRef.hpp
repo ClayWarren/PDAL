@@ -84,6 +84,11 @@ public:
         return m_table->layout()->hasDim(dim);
     }
 
+    PointLayoutPtr layout() const
+    {
+        return m_table->layout();
+    }
+
     /**
       Get the value of a field/dimension, converting it to the type as
       requested.  NOTE: Throws an exception if the value of the dimension

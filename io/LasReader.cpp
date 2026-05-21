@@ -495,8 +495,7 @@ void LasReader::ready(PointTableRef table)
         return;
 
     const bool useRustReader =
-        d->extraDims.empty() && !d->opts.ignoreMissingVLRs &&
-        m_filename.find("synthetic_test.las") == std::string::npos;
+        d->opts.extraDimSpec.empty() && !d->opts.ignoreMissingVLRs;
 
     if (useRustReader && d->rustView)
     {
