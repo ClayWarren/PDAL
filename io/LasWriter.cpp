@@ -167,6 +167,36 @@ void addUserVlrsToOptions(pdal_options_t* options,
     }
 }
 
+void addNullTerminatedVlrOption(pdal_options_t* options, const std::string& key,
+                                const std::string& text)
+{
+    if (text.empty())
+        return;
+
+    std::vector<char> bytes(text.begin(), text.end());
+    bytes.resize(bytes.size() + 1, 0);
+    const unsigned char* data(reinterpret_cast<const unsigned char*>(bytes.data()));
+    addOption(options, key, Utils::base64_encode(data, bytes.size()));
+}
+
+void addEnhancedSrsVlrsToOptions(pdal_options_t* options,
+                                 const SpatialReference& srs)
+{
+    addOption(options, "enhanced_srs_vlrs", "true");
+    addNullTerminatedVlrOption(options, "srs_wkt2_vlr", srs.getWKT2());
+    addNullTerminatedVlrOption(options, "srs_projjson_vlr", srs.getPROJJSON());
+
+    std::string wkt1;
+    try
+    {
+        wkt1 = srs.getWKT1();
+    }
+    catch (const std::exception&)
+    {
+    }
+    addNullTerminatedVlrOption(options, "srs_wkt1_vlr", wkt1);
+}
+
 } // unnamed namespace
 
 std::string LasWriter::getName() const
@@ -1351,8 +1381,6 @@ bool LasWriter::useRustWriter() const
         return false;
     if (d->opts.discardHighReturnNumbers)
         return false;
-    if (d->opts.enhancedSrsVlrs)
-        return false;
     return true;
 }
 
@@ -1443,8 +1471,13 @@ void LasWriter::writeRustOutput()
                   Utils::toString(d->opts.creationYear.val()));
     if (d->opts.projectId.valSet())
         addOption(options, "project_id", d->opts.projectId.val().toString());
-    if (m_srs.valid())
-        addOption(options, "a_srs", m_srs.getWKT());
+    if (!m_srs.empty())
+    {
+        if (d->opts.enhancedSrsVlrs && d->opts.minorVersion.val() >= 4)
+            addEnhancedSrsVlrsToOptions(options, m_srs);
+        else
+            addOption(options, "a_srs", m_srs.getWKT());
+    }
     if (d->opts.compression == las::Compression::True)
         addOption(options, "compression", "true");
     if (d->forwardVlrs)

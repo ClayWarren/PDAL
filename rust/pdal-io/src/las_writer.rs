@@ -24,6 +24,11 @@ const PDAL_USER_ID: &str = "PDAL";
 const PDAL_METADATA_RECORD_ID: u16 = 12;
 const PDAL_PIPELINE_RECORD_ID: u16 = 13;
 const MAX_VLR_DATA_SIZE: usize = u16::MAX as usize;
+const TRANSFORM_USER_ID: &str = "LASF_Projection";
+const LIBLAS_USER_ID: &str = "liblas";
+const WKT_RECORD_ID: u16 = 2112;
+const WKT2_RECORD_ID: u16 = 4224;
+const PROJJSON_RECORD_ID: u16 = 4225;
 
 pub struct LasWriter {
     filename: String,
@@ -46,6 +51,10 @@ pub struct LasWriter {
     a_srs: Option<String>,
     pdal_metadata_json: Option<String>,
     pdal_pipeline_json: Option<String>,
+    enhanced_srs_vlrs: bool,
+    srs_wkt2_vlr: Option<Vec<u8>>,
+    srs_projjson_vlr: Option<Vec<u8>>,
+    srs_wkt1_vlr: Option<Vec<u8>>,
     user_vlrs: Vec<UserVlr>,
     forward_vlrs: Vec<ForwardedVlr>,
 }
@@ -109,6 +118,10 @@ impl LasWriter {
             a_srs: string_option(options, "a_srs"),
             pdal_metadata_json: string_option(options, "pdal_metadata_json"),
             pdal_pipeline_json: string_option(options, "pdal_pipeline_json"),
+            enhanced_srs_vlrs: options.get_bool("enhanced_srs_vlrs", false),
+            srs_wkt2_vlr: binary_option(options, "srs_wkt2_vlr"),
+            srs_projjson_vlr: binary_option(options, "srs_projjson_vlr"),
+            srs_wkt1_vlr: binary_option(options, "srs_wkt1_vlr"),
             user_vlrs: user_vlrs_from_options(options),
             forward_vlrs: forward_vlrs_from_options(options),
         }
@@ -211,12 +224,22 @@ impl Writer for LasWriter {
         add_extra_bytes_vlr(&mut builder, &extra_dims)?;
         add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
+        if self.enhanced_srs_vlrs {
+            add_enhanced_srs_vlrs(
+                &mut builder,
+                self.srs_wkt2_vlr.as_deref(),
+                self.srs_projjson_vlr.as_deref(),
+                self.srs_wkt1_vlr.as_deref(),
+            );
+        }
         builder.point_format.is_compressed = should_compress;
 
         let mut header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
-        set_header_srs(&mut header, views, self.a_srs.as_deref());
+        if !self.enhanced_srs_vlrs {
+            set_header_srs(&mut header, views, self.a_srs.as_deref());
+        }
 
         let file = File::create(path)
             .map(BufWriter::new)
@@ -358,6 +381,46 @@ fn add_pdal_vlrs(builder: &mut Builder, metadata_json: Option<&str>, pipeline_js
                 data: json.as_bytes().to_vec(),
             });
         }
+    }
+}
+
+fn add_enhanced_srs_vlrs(
+    builder: &mut Builder,
+    wkt2: Option<&[u8]>,
+    projjson: Option<&[u8]>,
+    wkt1: Option<&[u8]>,
+) {
+    if let Some(data) = wkt2 {
+        builder.vlrs.push(Vlr {
+            user_id: TRANSFORM_USER_ID.to_string(),
+            record_id: WKT2_RECORD_ID,
+            description: "PDAL WKT2 Record".to_string(),
+            data: data.to_vec(),
+        });
+        builder.has_wkt_crs = true;
+    }
+    if let Some(data) = projjson {
+        builder.vlrs.push(Vlr {
+            user_id: PDAL_USER_ID.to_string(),
+            record_id: PROJJSON_RECORD_ID,
+            description: "PDAL PROJJSON Record".to_string(),
+            data: data.to_vec(),
+        });
+    }
+    if let Some(data) = wkt1 {
+        builder.vlrs.push(Vlr {
+            user_id: TRANSFORM_USER_ID.to_string(),
+            record_id: WKT_RECORD_ID,
+            description: "OGC Transformation Record".to_string(),
+            data: data.to_vec(),
+        });
+        builder.vlrs.push(Vlr {
+            user_id: LIBLAS_USER_ID.to_string(),
+            record_id: WKT_RECORD_ID,
+            description: "OGR variant of OpenGIS WKT SRS".to_string(),
+            data: data.to_vec(),
+        });
+        builder.has_wkt_crs = true;
     }
 }
 
@@ -738,6 +801,13 @@ fn numeric_option_i32(options: &Options, key: &str) -> Option<i32> {
 
 fn string_option(options: &Options, key: &str) -> Option<String> {
     options.value(key).map(ToString::to_string)
+}
+
+fn binary_option(options: &Options, key: &str) -> Option<Vec<u8>> {
+    options
+        .value(key)
+        .map(|value| base64_decode(value.trim()))
+        .filter(|value| !value.is_empty())
 }
 
 fn pdal_to_las_type(ty: DimType) -> u8 {

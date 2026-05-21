@@ -371,6 +371,7 @@ COVERED: dict[str, object] = {
     "pdal_io_las_writer_test": {
         "srs",
         "srs2",
+        "srsWkt2",
         "flex",
         "flex2",
         "forward",
@@ -397,6 +398,9 @@ COVERED: dict[str, object] = {
         "pdal_metadata",
         "flex_vlr",
         "pdal_add_vlr",
+        "pdal_wkt2_vlr",
+        "pdal_wkt2_with_derivedprojcrs_vlr",
+        "pdal_wkt2_read_as_projjson",
     },
     "pdal_io_ilvis2_test": ALL,
     "pdal_io_ilvis2_metadata_test": ALL,
