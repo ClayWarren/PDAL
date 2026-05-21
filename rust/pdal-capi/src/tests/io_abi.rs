@@ -235,6 +235,40 @@ fn gdal_reader_honors_header_dimensions_through_c_abi() {
 }
 
 #[test]
+fn las_reader_returns_points_through_c_abi() {
+    unsafe {
+        let options = pdal_options_create();
+        {
+            let (key, value) = ("filename", data_path("las/simple.las"));
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let reader = pdal_reader_create_las(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(
+            !view.is_null(),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert_eq!(pdal_point_view_length(view), 1065);
+
+        let x = CString::new("X").unwrap();
+        let y = CString::new("Y").unwrap();
+        let intensity = CString::new("Intensity").unwrap();
+        assert!(pdal_point_view_get_f64(view, 0, x.as_ptr()).is_finite());
+        assert!(pdal_point_view_get_f64(view, 0, y.as_ptr()).is_finite());
+        assert!(pdal_point_view_get_f64(view, 0, intensity.as_ptr()).is_finite());
+
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn spz_reader_returns_points_through_c_abi() {
     unsafe {
         let options = pdal_options_create();
@@ -319,6 +353,78 @@ fn writer_write_view_consumes_point_view_through_c_abi() {
         );
 
         let _ = std::fs::remove_file(&filename);
+        pdal_writer_destroy(writer);
+        pdal_point_view_destroy(view);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
+fn las_writer_writes_view_through_c_abi() {
+    unsafe {
+        let mut filename = std::env::temp_dir();
+        filename.push(format!(
+            "pdal-capi-las-writer-{}-{}.las",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let filename_text = filename.display().to_string();
+
+        let options = pdal_options_create();
+        for (key, value) in [
+            ("filename", filename_text.as_str()),
+            ("minor_version", "2"),
+            ("dataformat_id", "3"),
+        ] {
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let layout = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "Intensity"] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        let view = pdal_point_view_create(layout);
+        for (x, y, z, intensity) in [(1.0, 2.0, 3.0, 10.0), (4.0, 5.0, 6.0, 20.0)] {
+            let point = pdal_point_view_add_point(view);
+            for (dim, value) in [("X", x), ("Y", y), ("Z", z), ("Intensity", intensity)] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+            }
+        }
+
+        let writer = pdal_writer_create_las(options);
+        assert!(!writer.is_null());
+        assert!(
+            pdal_writer_write_view(writer, view),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert!(std::fs::metadata(&filename).unwrap().len() > 0);
+
+        let read_options = pdal_options_create();
+        {
+            let key = CString::new("filename").unwrap();
+            let value = CString::new(filename_text).unwrap();
+            pdal_options_add_str(read_options, key.as_ptr(), value.as_ptr());
+        }
+        let reader = pdal_reader_create_las(read_options);
+        assert!(!reader.is_null());
+        let back = pdal_reader_read_first(reader);
+        assert!(!back.is_null());
+        assert_eq!(pdal_point_view_length(back), 2);
+        let z = CString::new("Z").unwrap();
+        assert_eq!(pdal_point_view_get_f64(back, 1, z.as_ptr()), 6.0);
+
+        let _ = std::fs::remove_file(&filename);
+        pdal_point_view_destroy(back);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(read_options);
         pdal_writer_destroy(writer);
         pdal_point_view_destroy(view);
         pdal_options_destroy(options);

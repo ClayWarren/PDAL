@@ -238,6 +238,29 @@ pub unsafe extern "C" fn pdal_reader_create_gdal(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create a LasReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_las(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::las::LasReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a LazReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_laz(ops: *const Options) -> *mut ReaderHandle {
+    pdal_reader_create_las(ops)
+}
+
 /// Create an SpzReader from options.
 ///
 /// # Safety
@@ -495,6 +518,34 @@ pub unsafe extern "C" fn pdal_writer_create_gltf(ops: *const Options) -> *mut Wr
 pub unsafe extern "C" fn pdal_writer_create_sbet(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::sbet_writer::SbetWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a LasWriter from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_las(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::las_writer::LasWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a LazWriter from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_laz(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::las_writer::LasWriter::new_laz(options));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()
