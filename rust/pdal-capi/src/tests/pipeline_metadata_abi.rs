@@ -84,6 +84,90 @@ fn pipeline_result_c_abi_rejects_missing_output() {
 }
 
 #[test]
+fn pipeline_management_c_abi_covers_tags_and_empty_execution() {
+    unsafe {
+        let stage_name = CString::new("filters.decimation").unwrap();
+        let explicit = CString::new("").unwrap();
+        let existing = CString::new("decimation").unwrap();
+        let existing_tags = [existing.as_ptr()];
+        assert_eq!(
+            take_string(pdal_pipeline_generate_stage_tag(
+                stage_name.as_ptr(),
+                explicit.as_ptr(),
+                existing_tags.as_ptr(),
+                existing_tags.len() as u64,
+            )),
+            "filters_decimation1"
+        );
+        assert!(pdal_pipeline_generate_stage_tag(
+            stage_name.as_ptr(),
+            explicit.as_ptr(),
+            std::ptr::null(),
+            1,
+        )
+        .is_null());
+
+        let pipeline = pdal_pipeline_create();
+        assert_eq!(pdal_pipeline_stage_count(pipeline), 0);
+        assert_eq!(pdal_pipeline_stage_count(std::ptr::null()), 0);
+        assert!(pdal_pipeline_execute(std::ptr::null_mut(), std::ptr::null_mut()).is_null());
+        assert_eq!(
+            pdal_pipeline_execute_count(std::ptr::null_mut(), std::ptr::null_mut()),
+            -1
+        );
+        assert!(
+            pdal_pipeline_execute_summary_json(std::ptr::null_mut(), std::ptr::null_mut())
+                .is_null()
+        );
+        assert!(pdal_pipeline_metadata(std::ptr::null()).is_null());
+        assert_eq!(
+            pdal_pipeline_find_by_tag(std::ptr::null(), existing.as_ptr()),
+            -1
+        );
+        assert_eq!(pdal_pipeline_find_by_tag(pipeline, std::ptr::null()), -1);
+        assert_eq!(pdal_pipeline_add_dependency(std::ptr::null_mut(), 0, 0), -1);
+        assert_eq!(pdal_pipeline_add_dependency(pipeline, 1, 0), -1);
+        assert_eq!(
+            pdal_pipeline_add_stage(std::ptr::null_mut(), std::ptr::null_mut()),
+            -1
+        );
+        assert_eq!(
+            pdal_pipeline_add_reader(std::ptr::null_mut(), std::ptr::null_mut()),
+            -1
+        );
+        assert_eq!(
+            pdal_pipeline_add_writer(std::ptr::null_mut(), std::ptr::null_mut()),
+            -1
+        );
+
+        let metadata = pdal_pipeline_metadata(pipeline);
+        assert!(!metadata.is_null());
+        assert_eq!(take_string(pdal_metadata_node_name(metadata)), "pipeline");
+        pdal_metadata_node_destroy(metadata);
+
+        let options = pdal_options_create();
+        let count = CString::new("count").unwrap();
+        let three = CString::new("3").unwrap();
+        pdal_options_add_str(options, count.as_ptr(), three.as_ptr());
+        let stage = pdal_stage_create_decimation(options);
+        let tag = CString::new("keep").unwrap();
+        assert_eq!(
+            pdal_pipeline_add_stage_tagged(pipeline, stage, tag.as_ptr()),
+            0
+        );
+        assert_eq!(pdal_pipeline_find_by_tag(pipeline, tag.as_ptr()), 0);
+        assert_eq!(
+            pdal_pipeline_add_stage_tagged(pipeline, std::ptr::null_mut(), tag.as_ptr()),
+            -1
+        );
+
+        pdal_options_destroy(options);
+        pdal_pipeline_destroy(pipeline);
+        pdal_pipeline_destroy(std::ptr::null_mut());
+    }
+}
+
+#[test]
 fn metadata_tree_roundtrips_through_c_abi() {
     unsafe {
         let root_name = CString::new("root").unwrap();
@@ -177,6 +261,91 @@ fn metadata_numeric_values_roundtrip_through_c_abi() {
         assert_eq!(take_string(pdal_metadata_node_value(node)), "42");
 
         pdal_metadata_node_destroy(node);
+    }
+}
+
+#[test]
+fn metadata_scalar_conversions_and_nulls_follow_c_abi_contract() {
+    unsafe {
+        let empty = pdal_metadata_node_create(std::ptr::null());
+        assert_eq!(take_string(pdal_metadata_node_name(empty)), "");
+        assert_eq!(take_string(pdal_metadata_node_type(empty)), "");
+        assert_eq!(take_string(pdal_metadata_node_description(empty)), "");
+        assert_eq!(pdal_metadata_node_value_kind(empty), 255);
+        assert_eq!(pdal_metadata_node_child_count(std::ptr::null()), 0);
+        assert!(pdal_metadata_node_clone(std::ptr::null()).is_null());
+        assert!(pdal_metadata_node_child(empty, 0).is_null());
+        assert!(pdal_metadata_node_child_named(empty, std::ptr::null(), 0).is_null());
+
+        let type_name = CString::new("integer").unwrap();
+        let value = CString::new("-7").unwrap();
+        let mut out_i64 = 0;
+        assert!(pdal_metadata_value_as_i64(
+            type_name.as_ptr(),
+            value.as_ptr(),
+            &mut out_i64
+        ));
+        assert_eq!(out_i64, -7);
+
+        let type_name = CString::new("unsigned").unwrap();
+        let value = CString::new("7").unwrap();
+        let mut out_u64 = 0;
+        assert!(pdal_metadata_value_as_u64(
+            type_name.as_ptr(),
+            value.as_ptr(),
+            &mut out_u64
+        ));
+        assert_eq!(out_u64, 7);
+
+        let type_name = CString::new("double").unwrap();
+        let value = CString::new("3.5").unwrap();
+        let mut out_f64 = 0.0;
+        assert!(pdal_metadata_value_as_f64(
+            type_name.as_ptr(),
+            value.as_ptr(),
+            &mut out_f64
+        ));
+        assert_eq!(out_f64, 3.5);
+
+        let type_name = CString::new("boolean").unwrap();
+        let value = CString::new("true").unwrap();
+        let mut out_bool = false;
+        assert!(pdal_metadata_value_as_bool(
+            type_name.as_ptr(),
+            value.as_ptr(),
+            &mut out_bool
+        ));
+        assert!(out_bool);
+        assert_eq!(
+            take_string(pdal_metadata_json_value(type_name.as_ptr(), value.as_ptr())),
+            "true"
+        );
+
+        pdal_metadata_node_set_i64(empty, -2);
+        assert_eq!(pdal_metadata_node_value_i64(empty), -2);
+        pdal_metadata_node_set_f64(empty, 2.5);
+        assert_eq!(pdal_metadata_node_value_f64(empty), 2.5);
+        pdal_metadata_node_set_bool(empty, true);
+        assert!(pdal_metadata_node_value_bool(empty));
+        pdal_metadata_node_set_type(empty, std::ptr::null());
+        pdal_metadata_node_set_description(empty, std::ptr::null());
+
+        assert!(!pdal_metadata_value_as_i64(
+            CString::new("integer").unwrap().as_ptr(),
+            CString::new("nope").unwrap().as_ptr(),
+            std::ptr::null_mut(),
+        ));
+        pdal_metadata_node_add_child_clone(std::ptr::null_mut(), empty);
+        pdal_metadata_node_add_or_update_child_clone(std::ptr::null_mut(), empty);
+        pdal_metadata_node_add_child(std::ptr::null_mut(), std::ptr::null_mut());
+        pdal_metadata_node_add_or_update_child(std::ptr::null_mut(), std::ptr::null_mut());
+        assert_eq!(
+            take_string(pdal_metadata_node_to_json(std::ptr::null())),
+            "null"
+        );
+
+        pdal_metadata_node_destroy(empty);
+        pdal_metadata_node_destroy(std::ptr::null_mut());
     }
 }
 

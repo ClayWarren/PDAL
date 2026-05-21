@@ -261,3 +261,86 @@ impl Streamable for StatsFilter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::options::Options;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(values: &[(f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Classification, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, class) in values {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, *x);
+            view.set_f64(idx, &DimId::Classification, *class);
+        }
+        view
+    }
+
+    #[test]
+    fn summary_computes_basic_and_advanced_statistics() {
+        let mut summary = Summary::new("X".to_string(), 3, true);
+        for value in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            summary.insert(value);
+        }
+        summary.compute_global_stats();
+
+        assert_eq!(summary.cnt, 5);
+        assert_eq!(summary.min, 1.0);
+        assert_eq!(summary.max, 5.0);
+        assert_eq!(summary.m1, 3.0);
+        assert_eq!(summary.variance(), 2.5);
+        assert!((summary.stddev() - 2.5_f64.sqrt()).abs() < 1e-12);
+        assert_eq!(summary.median, 3.0);
+        assert_eq!(summary.mad, 1.0);
+        assert_eq!(summary.values.get(&3.0f64.to_bits()), Some(&1));
+        assert!(summary.skewness().abs() < 1e-12);
+        assert!(summary.kurtosis().is_finite());
+    }
+
+    #[test]
+    fn run_summarizes_selected_dimensions_and_preserves_points() {
+        let mut options = Options::new();
+        options
+            .add("dimensions", "X")
+            .add("count", "Classification")
+            .add("advanced", "true");
+        let mut filter = StatsFilter::from_options(&options);
+        let input = view(&[(10.0, 2.0), (20.0, 2.0), (30.0, 5.0)]);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out.get_f64(2, &DimId::X), 30.0);
+
+        let x = filter.summaries.get("X").unwrap();
+        assert_eq!(x.cnt, 3);
+        assert_eq!(x.min, 10.0);
+        assert_eq!(x.max, 30.0);
+        assert_eq!(x.m1, 20.0);
+
+        let classes = filter.summaries.get("Classification").unwrap();
+        assert_eq!(classes.enumerate, 2);
+        assert_eq!(classes.values.get(&2.0f64.to_bits()), Some(&2));
+        assert_eq!(classes.values.get(&5.0f64.to_bits()), Some(&1));
+    }
+
+    #[test]
+    fn empty_configuration_summarizes_every_layout_dimension_and_reset_clears_state() {
+        let mut filter = StatsFilter::new();
+        let input = view(&[(1.0, 7.0), (3.0, 8.0)]);
+
+        filter.process_one(&mut input.clone(), 0);
+        filter.process_one(&mut input.clone(), 1);
+        assert_eq!(filter.summaries.get("X").unwrap().cnt, 2);
+        assert_eq!(filter.summaries.get("Classification").unwrap().cnt, 2);
+
+        filter.reset();
+        assert_eq!(filter.summaries.get("X").unwrap().cnt, 0);
+        assert_eq!(filter.summaries.get("Classification").unwrap().cnt, 0);
+    }
+}

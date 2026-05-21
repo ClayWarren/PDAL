@@ -191,6 +191,78 @@ fn bounds_parse_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn bounds_operations_roundtrip_through_c_abi() {
+    unsafe {
+        let mut bounds2d = pdal_bounds2d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+        };
+        pdal_bounds2d_clear(&mut bounds2d);
+        assert!(pdal_bounds2d_empty(&bounds2d));
+        assert!(pdal_bounds2d_empty(std::ptr::null()));
+        pdal_bounds2d_grow_point(&mut bounds2d, 1.0, 2.0);
+        pdal_bounds2d_grow_point(&mut bounds2d, 3.0, 4.0);
+        pdal_bounds2d_grow_distance(&mut bounds2d, 1.0);
+        assert!(pdal_bounds2d_contains_point(&bounds2d, 1.0, 2.0));
+        assert!(!pdal_bounds2d_contains_point(std::ptr::null(), 1.0, 2.0));
+
+        let other2d = pdal_bounds2d_t {
+            minx: 0.5,
+            maxx: 2.0,
+            miny: 1.5,
+            maxy: 3.0,
+        };
+        assert!(pdal_bounds2d_contains_bounds(&bounds2d, &other2d));
+        assert!(pdal_bounds2d_overlaps(&bounds2d, &other2d));
+        pdal_bounds2d_clip(&mut bounds2d, &other2d);
+        assert_eq!(bounds2d, other2d);
+        pdal_bounds2d_grow_bounds(&mut bounds2d, &other2d);
+        assert!(!pdal_bounds2d_contains_bounds(&bounds2d, std::ptr::null()));
+        pdal_bounds2d_grow_point(std::ptr::null_mut(), 0.0, 0.0);
+
+        let mut bounds3d = pdal_bounds3d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+            minz: 0.0,
+            maxz: 0.0,
+        };
+        pdal_bounds3d_clear(&mut bounds3d);
+        assert!(pdal_bounds3d_empty(&bounds3d));
+        assert!(pdal_bounds3d_empty(std::ptr::null()));
+        pdal_bounds3d_grow_point(&mut bounds3d, 1.0, 2.0, 3.0);
+        pdal_bounds3d_grow_point(&mut bounds3d, 4.0, 5.0, 6.0);
+        pdal_bounds3d_grow_distance(&mut bounds3d, 1.0);
+        assert!(pdal_bounds3d_contains_point(&bounds3d, 1.0, 2.0, 3.0));
+        assert!(!pdal_bounds3d_contains_point(
+            std::ptr::null(),
+            1.0,
+            2.0,
+            3.0
+        ));
+
+        let other3d = pdal_bounds3d_t {
+            minx: 0.5,
+            maxx: 2.0,
+            miny: 1.5,
+            maxy: 3.0,
+            minz: 2.5,
+            maxz: 4.0,
+        };
+        assert!(pdal_bounds3d_contains_bounds(&bounds3d, &other3d));
+        assert!(pdal_bounds3d_overlaps(&bounds3d, &other3d));
+        pdal_bounds3d_clip(&mut bounds3d, &other3d);
+        assert_eq!(bounds3d, other3d);
+        pdal_bounds3d_grow_bounds(&mut bounds3d, &other3d);
+        assert!(!pdal_bounds3d_overlaps(&bounds3d, std::ptr::null()));
+        pdal_bounds3d_grow_point(std::ptr::null_mut(), 0.0, 0.0, 0.0);
+    }
+}
+
+#[test]
 fn dimension_type_helpers_roundtrip_through_c_abi() {
     unsafe {
         let signed = CString::new("signed").unwrap();
@@ -211,6 +283,122 @@ fn dimension_type_helpers_roundtrip_through_c_abi() {
             pdal_dimension_type_from_base_and_size(std::ptr::null(), 8),
             0
         );
+    }
+}
+
+#[test]
+fn dimension_names_cover_ported_layout_mapping() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let names = [
+            "W",
+            "TextureU",
+            "TextureV",
+            "TextureW",
+            "ClusterID",
+            "HeightAboveGround",
+            "LocalOutlierFactor",
+            "LocalReachabilityDistance",
+            "RadialDensity",
+            "NNDistance",
+            "Reciprocity",
+            "Rank",
+            "Coplanar",
+            "PlaneFit",
+            "Eigenvalue0",
+            "Eigenvalue1",
+            "Eigenvalue2",
+            "OptimalKNN",
+            "OptimalRadius",
+            "H3",
+            "GpsTime",
+            "StartPulse",
+            "ReflectedPulse",
+            "Azimuth",
+            "Pitch",
+            "Roll",
+            "Pdop",
+            "PulseWidth",
+            "PassiveSignal",
+            "PassiveX",
+            "PassiveY",
+            "PassiveZ",
+            "ReturnNumber",
+            "NumberOfReturns",
+            "ScanAngleRank",
+            "PointSourceId",
+            "EdgeOfFlightLine",
+            "Flag",
+            "Mark",
+            "Alpha",
+            "EchoRange",
+            "Userdata",
+            "EchoNorm",
+            "EchoPos",
+            "Reflectance",
+            "Deviation",
+            "Reliability",
+            "Amplitude",
+            "NormalX",
+            "NormalY",
+            "NormalZ",
+            "Dimension",
+            "Image",
+            "Infrared",
+            "XVelocity",
+            "YVelocity",
+            "ZVelocity",
+            "WanderAngle",
+            "XBodyAccel",
+            "YBodyAccel",
+            "ZBodyAccel",
+            "XBodyAngRate",
+            "YBodyAngRate",
+            "ZBodyAngRate",
+            "NorthPositionRMS",
+            "EastPositionRMS",
+            "DownPositionRMS",
+            "NorthVelocityRMS",
+            "EastVelocityRMS",
+            "DownVelocityRMS",
+            "RollRMS",
+            "PitchRMS",
+            "HeadingRMS",
+            "Red",
+            "Green",
+            "Blue",
+            "CustomDim",
+        ];
+        let cstrings: Vec<CString> = names
+            .iter()
+            .map(|name| CString::new(*name).unwrap())
+            .collect();
+        for name in &cstrings {
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        let view = pdal_point_view_create(layout);
+        let point = pdal_point_view_add_point(view);
+        for (idx, name) in cstrings.iter().enumerate() {
+            pdal_point_view_set_f64(view, point, name.as_ptr(), idx as f64);
+        }
+
+        assert_eq!(pdal_point_view_dim_count(view), names.len() as u64);
+        assert_eq!(
+            pdal_point_view_get_f64(view, point, CString::new("CustomDim").unwrap().as_ptr()),
+            (names.len() - 1) as f64
+        );
+        assert_eq!(pdal_point_view_dim_type(view, names.len() as u64), -1);
+        assert!(pdal_point_view_dim_name(view, names.len() as u64).is_null());
+        assert_eq!(
+            pdal_point_view_get_f64(std::ptr::null_mut(), 0, cstrings[0].as_ptr()),
+            0.0
+        );
+        assert_eq!(pdal_point_view_source_index(std::ptr::null_mut(), 42), 42);
+
+        pdal_point_view_destroy(view);
+
+        let throwaway = pdal_point_layout_create();
+        pdal_point_layout_destroy(throwaway);
     }
 }
 

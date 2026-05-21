@@ -34,6 +34,7 @@ pub mod lof;
 pub mod mad;
 pub mod math;
 pub mod merge;
+pub mod miniball;
 pub mod mongo;
 pub mod mortonorder;
 pub mod neighborclassifier;

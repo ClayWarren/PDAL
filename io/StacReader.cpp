@@ -38,6 +38,7 @@
 #include <pdal/Polygon.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/SrsTransform.hpp>
 
 #include <arbiter/arbiter.hpp>
@@ -49,6 +50,8 @@
 #include <pdal/util/IStream.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/ThreadPool.hpp>
+#include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 #include "private/stac/Collection.hpp"
 #include "private/stac/ItemCollection.hpp"
@@ -63,6 +66,56 @@ using namespace stac;
 
 namespace
 {
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+Dimension::Type cppType(int type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case 0:
+        return Type::Unsigned8;
+    case 1:
+        return Type::Unsigned16;
+    case 2:
+        return Type::Unsigned32;
+    case 3:
+        return Type::Unsigned64;
+    case 4:
+        return Type::Signed8;
+    case 5:
+        return Type::Signed16;
+    case 6:
+        return Type::Signed32;
+    case 7:
+        return Type::Signed64;
+    case 8:
+        return Type::Float;
+    case 9:
+    default:
+        return Type::Double;
+    }
+}
+
+bool rustStacTypeSupported(const std::string& filename)
+{
+    try
+    {
+        NL::json stacJson =
+            NL::json::parse(FileUtils::readFileIntoString(filename));
+        std::string stacType = Utils::jsonValue<std::string>(stacJson, "type");
+        return stacType == "Feature" || stacType == "Collection";
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 
 struct Args
 {
@@ -102,6 +155,10 @@ public:
     std::vector<Reader*> m_readerList;
     std::unique_ptr<connector::Connector> m_connector;
     mutable std::mutex m_mutex;
+    pdal_point_view_t* m_rustView = nullptr;
+    PointId m_rustIndex = 0;
+    std::vector<Dimension::Id> m_dims;
+    std::vector<std::string> m_dimNames;
 
     // book keeping
     std::vector<std::string> m_itemList;
@@ -123,6 +180,7 @@ public:
     void handleItemCollection(NL::json stacJson, std::string icPath);
     void initializeArgs();
     void printErrors(stac::Catalog& c);
+    bool canUseRustReader(const std::string& filename);
 
     void setLog(LogPtr log)
     {
@@ -353,6 +411,16 @@ void StacReader::Private::printErrors(Catalog& c)
     }
 }
 
+bool StacReader::Private::canUseRustReader(const std::string& filename)
+{
+    Args& args = *m_args;
+    return !Utils::isRemote(filename) && args.items.empty() &&
+           args.catalogs.empty() && args.collections.empty() &&
+           args.properties.empty() && args.rawReaderArgs.empty() &&
+           args.dates.empty() && args.bounds.empty() && !args.ogr.size() &&
+           !args.validateSchema && rustStacTypeSupported(filename);
+}
+
 std::string listStr(std::string key, std::vector<RegEx> ids)
 {
     std::stringstream s;
@@ -485,11 +553,63 @@ void StacReader::Private::initializeArgs()
 
 void StacReader::addDimensions(PointLayoutPtr layout)
 {
+    if (m_p->m_rustView)
+    {
+        m_p->m_dims.clear();
+        m_p->m_dimNames.clear();
+        uint64_t dimCount = pdal_point_view_dim_count(m_p->m_rustView);
+        for (uint64_t idx = 0; idx < dimCount; ++idx)
+        {
+            std::string name = rust_view_converter::takeString(
+                pdal_point_view_dim_name(m_p->m_rustView, idx));
+            if (name.empty())
+                continue;
+            Dimension::Type type =
+                cppType(pdal_point_view_dim_type(m_p->m_rustView, idx));
+            Dimension::Id id = layout->registerOrAssignDim(name, type);
+            m_p->m_dims.push_back(id);
+            m_p->m_dimNames.push_back(name);
+        }
+        return;
+    }
+
     StageWrapper::addDimensions(m_p->m_merge, layout);
 }
 
 void StacReader::initialize()
 {
+    if (m_p->m_rustView)
+    {
+        pdal_point_view_destroy(m_p->m_rustView);
+        m_p->m_rustView = nullptr;
+    }
+    m_p->m_rustIndex = 0;
+    m_p->m_dims.clear();
+    m_p->m_dimNames.clear();
+
+    if (m_p->canUseRustReader(m_filename))
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        for (const std::string& assetName : m_p->m_args->assetNames)
+            addOption(options, "asset_names", assetName);
+
+        pdal_reader_t* reader = pdal_reader_create_stac(options);
+        if (!reader)
+        {
+            pdal_options_destroy(options);
+            rust_view_converter::throwLastError(
+                "Failed to create Rust STAC reader.");
+        }
+
+        m_p->m_rustView = pdal_reader_read_first(reader);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        if (!m_p->m_rustView)
+            rust_view_converter::throwLastError("Rust STAC reader failed.");
+        return;
+    }
+
     m_p->m_connector.reset(new connector::Connector(m_filespec));
 
     m_p->m_pool.reset(new ThreadPool(m_p->m_args->threads));
@@ -526,6 +646,31 @@ QuickInfo StacReader::inspect()
     QuickInfo qi;
 
     initialize();
+
+    if (m_p->m_rustView)
+    {
+        pdal_bounds3d_t bounds;
+        if (pdal_point_view_calculate_bounds_3d(m_p->m_rustView, &bounds))
+        {
+            qi.m_bounds.minx = bounds.minx;
+            qi.m_bounds.maxx = bounds.maxx;
+            qi.m_bounds.miny = bounds.miny;
+            qi.m_bounds.maxy = bounds.maxy;
+            qi.m_bounds.minz = bounds.minz;
+            qi.m_bounds.maxz = bounds.maxz;
+        }
+        qi.m_pointCount = pdal_point_view_length(m_p->m_rustView);
+        uint64_t dimCount = pdal_point_view_dim_count(m_p->m_rustView);
+        for (uint64_t idx = 0; idx < dimCount; ++idx)
+        {
+            std::string name = rust_view_converter::takeString(
+                pdal_point_view_dim_name(m_p->m_rustView, idx));
+            if (!name.empty())
+                qi.m_dimNames.push_back(name);
+        }
+        qi.m_valid = true;
+        return qi;
+    }
 
     for (auto& reader : m_p->m_readerList)
     {
@@ -564,6 +709,20 @@ QuickInfo StacReader::inspect()
 
 point_count_t StacReader::read(PointViewPtr view, point_count_t num)
 {
+    if (m_p->m_rustView)
+    {
+        point_count_t cnt = 0;
+        PointRef point(*view);
+        while (cnt < num &&
+               m_p->m_rustIndex < pdal_point_view_length(m_p->m_rustView))
+        {
+            point.setPointId(view->size());
+            processOne(point);
+            ++cnt;
+        }
+        return cnt;
+    }
+
     point_count_t cnt(0);
 
     PointRef point(view->point(0));
@@ -578,28 +737,70 @@ point_count_t StacReader::read(PointViewPtr view, point_count_t num)
 
 bool StacReader::processOne(PointRef& point)
 {
+    if (m_p->m_rustView)
+    {
+        if (m_p->m_rustIndex >= pdal_point_view_length(m_p->m_rustView))
+            return false;
+        for (size_t dimIdx = 0; dimIdx < m_p->m_dims.size(); ++dimIdx)
+        {
+            point.setField(
+                m_p->m_dims[dimIdx],
+                pdal_point_view_get_f64(m_p->m_rustView, m_p->m_rustIndex,
+                                        m_p->m_dimNames[dimIdx].c_str()));
+        }
+        ++m_p->m_rustIndex;
+        return true;
+    }
+
     return true;
 }
 
 void StacReader::prepared(PointTableRef table)
 {
+    if (m_p->m_rustView)
+        return;
+
     m_p->m_merge.prepare(table);
     m_p->m_merge.setLog(log());
 }
 
 void StacReader::ready(PointTableRef table)
 {
+    if (m_p->m_rustView)
+    {
+        m_p->m_rustIndex = 0;
+        return;
+    }
+
     StageWrapper::ready(m_p->m_merge, table);
 }
 
 PointViewSet StacReader::run(PointViewPtr view)
 {
+    if (m_p->m_rustView)
+    {
+        PointViewSet views;
+        PointViewPtr out = view->makeNew();
+        read(out, pdal_point_view_length(m_p->m_rustView));
+        views.insert(out);
+        return views;
+    }
+
     return StageWrapper::run(m_p->m_merge, view);
 }
 
 void StacReader::done(PointTableRef)
 {
-    m_p->m_pool->stop();
+    if (m_p->m_rustView)
+    {
+        pdal_point_view_destroy(m_p->m_rustView);
+        m_p->m_rustView = nullptr;
+        m_p->m_rustIndex = 0;
+        return;
+    }
+
+    if (m_p->m_pool)
+        m_p->m_pool->stop();
     m_p->m_connector.reset();
 }
 

@@ -181,6 +181,10 @@ fn register_standard_dims(layout: &mut PointLayout, header: &Header) {
     layout.register(DimId::NumberOfReturns, DimType::U8);
     layout.register(DimId::ScanDirectionFlag, DimType::U8);
     layout.register(DimId::EdgeOfFlightLine, DimType::U8);
+    layout.register(DimId::Synthetic, DimType::U8);
+    layout.register(DimId::KeyPoint, DimType::U8);
+    layout.register(DimId::Withheld, DimType::U8);
+    layout.register(DimId::Overlap, DimType::U8);
     layout.register(DimId::Classification, DimType::U8);
     layout.register(DimId::ScanAngleRank, DimType::F32);
     layout.register(DimId::UserData, DimType::U8);
@@ -373,6 +377,10 @@ fn set_standard_dims(view: &mut PointView, id: u64, point: &las::Point) {
             0.0
         },
     );
+    view.set_f64(id, &DimId::Synthetic, point.is_synthetic as u8 as f64);
+    view.set_f64(id, &DimId::KeyPoint, point.is_key_point as u8 as f64);
+    view.set_f64(id, &DimId::Withheld, point.is_withheld as u8 as f64);
+    view.set_f64(id, &DimId::Overlap, point.is_overlap as u8 as f64);
     view.set_f64(
         id,
         &DimId::Classification,

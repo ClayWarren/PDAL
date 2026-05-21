@@ -33,11 +33,14 @@
 
 #include "GDALWriter.hpp"
 
+#include <cmath>
 #include <sstream>
 
 #include <pdal/PointView.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/Raster.hpp>
 #include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 #include "private/GDALGrid.hpp"
 
@@ -55,6 +58,37 @@ CREATE_STATIC_STAGE(GDALWriter, s_info)
 std::string GDALWriter::getName() const
 {
     return s_info.name;
+}
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, bool value)
+{
+    pdal_options_add_str(options, key.c_str(), value ? "true" : "false");
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
+void addOption(pdal_options_t* options, const std::string& key, size_t value)
+{
+    pdal_options_add_u64(options, key.c_str(), value);
+}
+
+} // unnamed namespace
+
+GDALWriter::~GDALWriter()
+{
+    clearRustViews();
 }
 
 void GDALWriter::addArgs(ProgramArgs& args)
@@ -196,6 +230,7 @@ void GDALWriter::initialize()
 
 void GDALWriter::prepared(PointTableRef table)
 {
+    m_supportsView = table.supportsView();
     m_interpDim = table.layout()->findDim(m_interpDimString);
     if (m_interpDim == Dimension::Id::Unknown)
         throwError("Specified dimension '" + m_interpDimString +
@@ -216,6 +251,11 @@ void GDALWriter::readyFile(const std::string& filename,
     if (m_srs.empty())
         m_srs = m_defaultSrs;
     m_grid.reset();
+    m_rustWriter = useRustWriter();
+    clearRustViews();
+    if (m_rustWriter)
+        return;
+
     if (m_fixedGrid)
         createGrid(m_bounds.to2d());
 }
@@ -256,6 +296,16 @@ void GDALWriter::createGrid(BOX2D bounds)
 
 void GDALWriter::writeView(const PointViewPtr view)
 {
+    if (m_rustWriter)
+    {
+        m_rustViews.push_back(rust_view_converter::toRust(view));
+        Utils::writeProgress(m_progressFd, "READYVIEW",
+                             std::to_string(view->size()));
+        Utils::writeProgress(m_progressFd, "DONEVIEW",
+                             std::to_string(view->size()));
+        return;
+    }
+
     m_expandByPoint = false;
 
     // When we're running in standard mode, it's better to get the bounds and
@@ -305,6 +355,14 @@ bool GDALWriter::processOne(PointRef& point)
 
 void GDALWriter::doneFile()
 {
+    if (m_rustWriter)
+    {
+        writeRustOutput();
+        clearRustViews();
+        getMetadata().addList("filename", filename());
+        return;
+    }
+
     if (!m_grid && !m_allowEmpty)
         throw pdal_error("Unable to write GDAL data with no points "
                          "for output.");
@@ -378,6 +436,66 @@ void GDALWriter::doneFile()
     }
 
     getMetadata().add(raster.getMetadata());
+}
+
+bool GDALWriter::useRustWriter() const
+{
+    return m_supportsView && m_options.empty() && !m_writePDALMetadata &&
+           !m_overrideSrs.valid() && !m_defaultSrs.valid() &&
+           m_dataType == Dimension::Type::Double;
+}
+
+void GDALWriter::writeRustOutput()
+{
+    if (m_rustViews.empty() && !m_allowEmpty)
+        throw pdal_error(
+            "Unable to write GDAL data with no points for output.");
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_outputFilename);
+    addOption(options, "gdaldriver", m_drivername);
+    for (const std::string& outputType : m_outputTypeString)
+        addOption(options, "output_type", outputType);
+    addOption(options, "resolution", m_edgeLength);
+    addOption(options, "radius", m_radius);
+    addOption(options, "power", m_power);
+    if (std::isfinite(m_noData))
+        addOption(options, "nodata", m_noData);
+    addOption(options, "dimension", Dimension::name(m_interpDim));
+    addOption(options, "binmode", m_binMode);
+    addOption(options, "allow_empty", m_allowEmpty);
+    addOption(options, "window_size", m_windowSize);
+    if (m_fixedGrid)
+    {
+        addOption(options, "origin_x", m_bounds.to2d().minx);
+        addOption(options, "origin_y", m_bounds.to2d().miny);
+        addOption(options, "width", m_width);
+        addOption(options, "height", m_height);
+    }
+
+    pdal_writer_t* writer = pdal_writer_create_gdal(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        rust_view_converter::throwLastError(
+            "Failed to create Rust GDAL writer.");
+    }
+
+    std::vector<const pdal_point_view_t*> rustViews(m_rustViews.begin(),
+                                                    m_rustViews.end());
+    bool ok =
+        pdal_writer_write_views(writer, rustViews.data(), rustViews.size());
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        rust_view_converter::throwLastError("Rust GDAL writer failed.");
+}
+
+void GDALWriter::clearRustViews()
+{
+    for (pdal_point_view_t* view : m_rustViews)
+        pdal_point_view_destroy(view);
+    m_rustViews.clear();
 }
 
 void GDALWriter::readyTable(PointTableRef table)

@@ -38,6 +38,7 @@
 #include <atomic>
 #include <functional>
 #include <limits>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -47,10 +48,12 @@
 #include <pdal/Scaling.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/Charbuf.hpp>
 #include <pdal/util/ThreadPool.hpp>
+#include <pdal_capi.h>
 
 #include "private/connector/Connector.hpp"
 #include "private/copc/Entry.hpp"
@@ -204,6 +207,34 @@ template <> std::string toString(const SrsOrderSpec& srsOrder)
 
 CREATE_STATIC_STAGE(CopcReader, s_info);
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+std::string boundsOption(const SrsBounds& bounds)
+{
+    if (bounds.to3d().valid())
+    {
+        std::ostringstream out;
+        out << bounds.to3d();
+        return out.str();
+    }
+    if (bounds.to2d().valid())
+    {
+        std::ostringstream out;
+        out << bounds.to2d();
+        return out.str();
+    }
+    return "";
+}
+
+} // unnamed namespace
+
 struct PolyXform
 {
     Polygon poly;
@@ -254,6 +285,8 @@ public:
     Scaling scaling;
     uint64_t tileCount;
     int32_t tilePointNum;
+    PointId rustIndex = 0;
+    pdal_point_view_t* rustView = nullptr;
     las::Header header;
     copc::Info copc_info;
     point_count_t hierarchyPointCount;
@@ -657,12 +690,43 @@ void CopcReader::addDimensions(PointLayoutPtr layout)
 
 void CopcReader::ready(PointTableRef table)
 {
+    if (m_p->rustView)
+    {
+        pdal_point_view_destroy(m_p->rustView);
+        m_p->rustView = nullptr;
+    }
+    m_p->rustIndex = 0;
+
     // We may need to reset these after initialize(), since the reader could be
     // being run multiple times without re-initializing.
     if (m_p->done)
     {
         m_p->pool.reset(new ThreadPool(m_args->threads));
         m_p->connector.reset(new connector::Connector(m_filespec));
+    }
+
+    if (table.supportsView() && !Utils::isRemote(m_filename) &&
+        m_args->resolution == 0 && m_args->polys.empty() &&
+        m_args->ogr.empty() && !m_args->nosrs)
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        const std::string bounds = boundsOption(m_args->clip);
+        if (!bounds.empty())
+            addOption(options, "bounds", bounds);
+        pdal_reader_t* reader = pdal_reader_create_copc(options);
+        if (!reader)
+        {
+            pdal_options_destroy(options);
+            rust_view_converter::throwLastError(
+                "Failed to create Rust COPC reader.");
+        }
+        m_p->rustView = pdal_reader_read_first(reader);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        if (!m_p->rustView)
+            rust_view_converter::throwLastError("Rust COPC reader failed.");
+        return;
     }
 
     // Determine all overlapping data files we'll need to fetch.
@@ -898,6 +962,22 @@ bool CopcReader::processPoint(const char* inbuf, PointRef& dst)
 
 point_count_t CopcReader::read(PointViewPtr view, point_count_t count)
 {
+    if (m_p->rustView)
+    {
+        point_count_t numRead = 0;
+        PointRef point(*view);
+        while (numRead < count &&
+               m_p->rustIndex < pdal_point_view_length(m_p->rustView))
+        {
+            point.setPointId(view->size());
+            rust_view_converter::fromRustPoint(m_p->rustView, m_p->rustIndex,
+                                               point);
+            ++m_p->rustIndex;
+            ++numRead;
+        }
+        return numRead;
+    }
+
     if (m_p->tileCount == 0)
         return 0;
 
@@ -954,6 +1034,16 @@ void CopcReader::process(PointViewPtr dstView, const copc::Tile& tile,
 
 bool CopcReader::processOne(PointRef& point)
 {
+    if (m_p->rustView)
+    {
+        if (m_p->rustIndex >= pdal_point_view_length(m_p->rustView))
+            return false;
+        rust_view_converter::fromRustPoint(m_p->rustView, m_p->rustIndex,
+                                           point);
+        ++m_p->rustIndex;
+        return true;
+    }
+
 top:
     // If we've processed all the tiles, return false to indicate that
     // we're done.
@@ -1009,6 +1099,13 @@ void CopcReader::done(PointTableRef)
 
 void CopcReader::done()
 {
+    if (m_p->rustView)
+    {
+        pdal_point_view_destroy(m_p->rustView);
+        m_p->rustView = nullptr;
+        m_p->rustIndex = 0;
+    }
+
     if (m_p->pool)
     {
         m_p->done = true;

@@ -34,6 +34,8 @@
 
 #include "MemoryViewReader.hpp"
 
+#include <pdal/PDALUtils.hpp>
+
 namespace pdal
 {
 
@@ -51,6 +53,12 @@ std::string MemoryViewReader::getName() const
 }
 
 MemoryViewReader::MemoryViewReader() : m_prepared(false) {}
+
+MemoryViewReader::~MemoryViewReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
 
 // NOTE: - Forces reading of the entire file.
 /**
@@ -178,6 +186,32 @@ void MemoryViewReader::ready(PointTableRef)
     if (!m_incrementer)
         throwError("Points cannot be read without calling setIncrementer().");
     m_index = 0;
+
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+
+    std::vector<pdal_memoryview_field_t> fields;
+    fields.reserve(m_fields.size());
+    for (const FullField& f : m_fields)
+    {
+        fields.push_back({f.m_name.c_str(), Utils::toNative(f.m_type),
+                          static_cast<uint64_t>(f.m_offset)});
+    }
+
+    m_rustView = pdal_memoryview_read(
+        fields.data(), fields.size(), MemoryViewReader::increment, this,
+        m_shape.depth(), m_shape.rows(), m_shape.columns(),
+        m_order == Order::ColumnMajor);
+    if (!m_rustView)
+    {
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(message);
+        throwError("Rust MemoryViewReader failed.");
+    }
 }
 
 point_count_t MemoryViewReader::read(PointViewPtr v, point_count_t numPts)
@@ -199,6 +233,31 @@ point_count_t MemoryViewReader::read(PointViewPtr v, point_count_t numPts)
 
 bool MemoryViewReader::processOne(PointRef& point)
 {
+    if (m_rustView)
+    {
+        if (m_index >= pdal_point_view_length(m_rustView))
+            return false;
+
+        for (const FullField& f : m_fields)
+        {
+            double value =
+                pdal_point_view_get_f64(m_rustView, m_index, f.m_name.c_str());
+            point.setField(f.m_id, value);
+        }
+        if (m_shape.valid())
+        {
+            point.setField(Dimension::Id::X,
+                           pdal_point_view_get_f64(m_rustView, m_index, "X"));
+            point.setField(Dimension::Id::Y,
+                           pdal_point_view_get_f64(m_rustView, m_index, "Y"));
+            point.setField(Dimension::Id::Z,
+                           pdal_point_view_get_f64(m_rustView, m_index, "Z"));
+        }
+
+        m_index++;
+        return true;
+    }
+
     char* base = m_incrementer(m_index);
     if (!base)
         return false;
@@ -215,6 +274,16 @@ bool MemoryViewReader::processOne(PointRef& point)
 
     m_index++;
     return true;
+}
+
+const unsigned char* MemoryViewReader::increment(uint64_t pointId,
+                                                 void* userData)
+{
+    MemoryViewReader* reader = static_cast<MemoryViewReader*>(userData);
+    if (!reader || !reader->m_incrementer)
+        return nullptr;
+    return reinterpret_cast<const unsigned char*>(
+        reader->m_incrementer(pointId));
 }
 
 } // namespace pdal

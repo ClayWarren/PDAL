@@ -85,3 +85,47 @@ impl Streamable for GeoreferenceFilter {
         self.transform = None;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view_with_srs(srs: &str) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        view.set_spatial_reference(SpatialReference::new(srs));
+        let id = view.add_point();
+        view.set_f64(id, &DimId::X, -116.0);
+        view.set_f64(id, &DimId::Y, 32.0);
+        view.set_f64(id, &DimId::Z, 10.0);
+        view
+    }
+
+    #[test]
+    fn transforms_coordinates_and_updates_output_srs() {
+        let input = view_with_srs("EPSG:4326");
+        let mut filter = GeoreferenceFilter::new("EPSG:3857");
+
+        let output = filter.run_one(&input).unwrap().remove(0);
+
+        assert_eq!(output.spatial_reference().wkt(), "EPSG:3857");
+        assert!((output.get_f64(0, &DimId::X) - input.get_f64(0, &DimId::X)).abs() > 1.0);
+        assert!((output.get_f64(0, &DimId::Y) - input.get_f64(0, &DimId::Y)).abs() > 1.0);
+        assert_eq!(output.get_f64(0, &DimId::Z), 10.0);
+    }
+
+    #[test]
+    fn rejects_empty_srs_and_resets_cached_transform() {
+        let mut filter = GeoreferenceFilter::new("EPSG:3857");
+        let mut input = view_with_srs("");
+
+        assert!(filter.run_one(&input).is_err());
+        assert!(!filter.process_one(&mut input, 0));
+        filter.reset();
+    }
+}

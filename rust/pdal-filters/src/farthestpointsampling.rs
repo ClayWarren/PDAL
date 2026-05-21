@@ -98,3 +98,70 @@ impl Streamable for FarthestPointSamplingFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(points: &[(f64, f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z) in points {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, *x);
+            view.set_f64(idx, &DimId::Y, *y);
+            view.set_f64(idx, &DimId::Z, *z);
+        }
+        view
+    }
+
+    #[test]
+    fn empty_input_produces_no_views() {
+        let mut filter = FarthestPointSamplingFilter::new(2);
+        assert!(filter
+            .run(std::slice::from_ref(&view(&[])))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn count_larger_than_input_keeps_every_point() {
+        let input = view(&[(1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]);
+        let mut filter = FarthestPointSamplingFilter::new(5);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out.get_f64(0, &DimId::X), 1.0);
+        assert_eq!(out.get_f64(1, &DimId::X), 2.0);
+    }
+
+    #[test]
+    fn selects_iteratively_farthest_points() {
+        let input = view(&[
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (10.0, 0.0, 0.0),
+            (5.0, 0.0, 0.0),
+        ]);
+        let mut filter = FarthestPointSamplingFilter::new(3);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out.get_f64(0, &DimId::X), 0.0);
+        assert_eq!(out.get_f64(1, &DimId::X), 10.0);
+        assert_eq!(out.get_f64(2, &DimId::X), 5.0);
+    }
+
+    #[test]
+    fn streaming_is_not_supported() {
+        let mut filter = FarthestPointSamplingFilter::new(1);
+        let mut input = view(&[(0.0, 0.0, 0.0)]);
+
+        assert!(!filter.process_one(&mut input, 0));
+    }
+}

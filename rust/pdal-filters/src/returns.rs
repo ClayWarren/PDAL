@@ -89,3 +89,54 @@ impl Streamable for ReturnsFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(returns: &[(f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        layout.register(DimId::NumberOfReturns, DimType::U8);
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (idx, (rn, nr)) in returns.iter().enumerate() {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::ReturnNumber, *rn);
+            view.set_f64(id, &DimId::NumberOfReturns, *nr);
+            view.set_f64(id, &DimId::X, idx as f64);
+        }
+        view
+    }
+
+    #[test]
+    fn splits_requested_return_groups_in_stable_order() {
+        let input = view(&[(1.0, 3.0), (2.0, 3.0), (3.0, 3.0), (1.0, 1.0)]);
+        let mut filter = ReturnsFilter::new(vec![
+            "first".to_string(),
+            "intermediate".to_string(),
+            "last".to_string(),
+            "only".to_string(),
+        ]);
+
+        let outputs = filter.run_one(&input).unwrap();
+
+        assert_eq!(outputs.len(), 4);
+        assert_eq!(outputs[0].get_f64(0, &DimId::X), 0.0);
+        assert_eq!(outputs[1].get_f64(0, &DimId::X), 1.0);
+        assert_eq!(outputs[2].get_f64(0, &DimId::X), 2.0);
+        assert_eq!(outputs[3].get_f64(0, &DimId::X), 3.0);
+    }
+
+    #[test]
+    fn rejects_unknown_return_groups_and_is_not_streamable() {
+        let mut filter = ReturnsFilter::new(vec!["bogus".to_string()]);
+        assert!(filter.run_one(&view(&[(1.0, 1.0)])).is_err());
+
+        let mut input = view(&[(1.0, 1.0)]);
+        assert!(!filter.process_one(&mut input, 0));
+        filter.reset();
+    }
+}

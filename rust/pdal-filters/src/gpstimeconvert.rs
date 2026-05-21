@@ -285,3 +285,128 @@ fn civil_from_days(days: i64) -> Date {
         day: day as u32,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::options::Options;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn gps_view(times: &[f64]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::GpsTime, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for time in times {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::GpsTime, *time);
+        }
+        view
+    }
+
+    fn options(pairs: &[(&str, &str)]) -> Options {
+        let mut options = Options::new();
+        for (key, value) in pairs {
+            options.add(key, *value);
+        }
+        options
+    }
+
+    #[test]
+    fn converts_week_seconds_to_gps_time_from_start_date() {
+        let options = options(&[("conversion", "gws2gt"), ("start_date", "2020-01-08")]);
+        let mut filter = GpsTimeConvert::from_options(&options).unwrap();
+        let input = gps_view(&[10.0, 20.0]);
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        let expected = week_start_gps_seconds(Date {
+            year: 2020,
+            month: 1,
+            day: 8,
+        }) as f64;
+
+        assert_eq!(out.get_f64(0, &DimId::GpsTime), expected + 10.0);
+        assert_eq!(out.get_f64(1, &DimId::GpsTime), expected + 20.0);
+    }
+
+    #[test]
+    fn converts_gps_time_to_day_and_week_seconds() {
+        let date = Date {
+            year: 2020,
+            month: 1,
+            day: 8,
+        };
+        let gt = day_start_gps_seconds(date) as f64 + 42.0;
+        let input = gps_view(&[gt]);
+
+        let mut to_day =
+            GpsTimeConvert::from_options(&options(&[("in_time", "gt"), ("out_time", "gds")]))
+                .unwrap();
+        let out = to_day.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.get_f64(0, &DimId::GpsTime), 42.0);
+
+        let mut to_week =
+            GpsTimeConvert::from_options(&options(&[("in_time", "gt"), ("out_time", "gws")]))
+                .unwrap();
+        let out = to_week.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(
+            out.get_f64(0, &DimId::GpsTime),
+            (day_start_gps_seconds(date) - week_start_gps_seconds(date)) as f64 + 42.0
+        );
+    }
+
+    #[test]
+    fn wraps_and_unwraps_periodic_seconds() {
+        let mut wrap =
+            GpsTimeConvert::from_options(&options(&[("conversion", "gt2gws"), ("wrap", "true")]))
+                .unwrap();
+        let input = gps_view(&[WEEK_SECONDS + 5.0]);
+        let out = wrap.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.get_f64(0, &DimId::GpsTime), 5.0);
+
+        let mut unwrap = GpsTimeConvert::from_options(&options(&[
+            ("conversion", "gws2gt"),
+            ("start_date", "2020-01-08"),
+            ("wrapped", "true"),
+        ]))
+        .unwrap();
+        let input = gps_view(&[WEEK_SECONDS - 1.0, 2.0]);
+        let out = unwrap.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(
+            out.get_f64(1, &DimId::GpsTime) - out.get_f64(0, &DimId::GpsTime),
+            3.0
+        );
+    }
+
+    #[test]
+    fn validates_conversion_options_and_dates() {
+        assert!(GpsTimeConvert::from_options(&Options::new()).is_err());
+        assert!(GpsTimeConvert::from_options(&options(&[("conversion", "bad")])).is_err());
+        assert!(GpsTimeConvert::from_options(&options(&[
+            ("conversion", "gws2gt"),
+            ("start_date", "not-a-date"),
+        ]))
+        .is_err());
+        assert!(GpsTimeConvert::from_options(&options(&[
+            ("conversion", "gds2gt"),
+            ("start_date", "2020-01-08"),
+        ]))
+        .is_ok());
+    }
+
+    #[test]
+    fn gps_standard_time_conversion_applies_existing_offset_direction() {
+        let input = gps_view(&[GPS_TIME_OFFSET + 100.0]);
+        let mut to_gt =
+            GpsTimeConvert::from_options(&options(&[("conversion", "gst2gt")])).unwrap();
+        let out = to_gt.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(
+            out.get_f64(0, &DimId::GpsTime),
+            2.0 * GPS_TIME_OFFSET + 100.0
+        );
+
+        let mut to_gst =
+            GpsTimeConvert::from_options(&options(&[("conversion", "gt2gst")])).unwrap();
+        let out = to_gst.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.get_f64(0, &DimId::GpsTime), 100.0);
+    }
+}

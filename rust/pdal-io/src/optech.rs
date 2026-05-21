@@ -226,3 +226,45 @@ fn read_pulse<R: Read>(reader: &mut R) -> Result<Pulse, StageError> {
 fn io_error(error: std::io::Error) -> StageError {
     StageError(error.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::pipeline::Reader;
+
+    fn data_path(path: &str) -> String {
+        format!("{}/../../test/data/{path}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn reads_existing_optech_fixture() {
+        let mut options = Options::new();
+        options.add("filename", data_path("optech/sample.csd"));
+        let views = OptechReader::new(&options).read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        let view = &views[0];
+        assert_eq!(view.len(), 1000);
+        assert_eq!(view.spatial_reference().wkt(), "EPSG:4326");
+        assert_eq!(view.get_f64(0, &DimId::GpsTime), 5.756_447_448_456_39e5);
+        assert_eq!(view.get_f64(0, &DimId::ReturnNumber), 1.0);
+        assert_eq!(view.get_f64(0, &DimId::NumberOfReturns), 1.0);
+        assert_eq!(view.get_f64(0, &DimId::Intensity), 384.0);
+        assert!((view.get_f64(0, &DimId::X) - -82.554_028_877_408_56).abs() < 1e-12);
+        assert!((view.get_f64(0, &DimId::Y) - 36.534_611_447_321_91).abs() < 1e-12);
+        assert!((view.get_f64(0, &DimId::Z) - 344.80889224602356).abs() < 1e-12);
+        assert!((view.get_f64(0, &DimId::ScanAngleRank) - -14.555161476135254).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rejects_missing_or_non_csd_files() {
+        assert!(OptechReader::new(&Options::new()).read().is_err());
+
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"NOPE").unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+
+        assert!(OptechReader::new(&options).read().is_err());
+    }
+}

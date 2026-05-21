@@ -551,6 +551,7 @@ extern "C"
                                                         double threshold1,
                                                         double threshold2);
     pdal_stage_t* pdal_stage_create_planefit(uint64_t knn);
+    pdal_stage_t* pdal_stage_create_miniball(uint64_t knn);
     pdal_stage_t* pdal_stage_create_eigenvalues(uint64_t knn, bool normalize,
                                                 uint64_t stride,
                                                 bool has_radius, double radius,
@@ -717,6 +718,21 @@ extern "C"
     pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
     pdal_metadata_node_t* pdal_ilvis2_metadata_read(const char* filename);
     void pdal_reader_destroy(pdal_reader_t* reader);
+
+    typedef const unsigned char* (*pdal_memoryview_incrementer_t)(
+        uint64_t point_id, void* user_data);
+
+    typedef struct
+    {
+        const char* name;
+        int type_id;
+        uint64_t offset;
+    } pdal_memoryview_field_t;
+
+    pdal_point_view_t* pdal_memoryview_read(
+        const pdal_memoryview_field_t* fields, uint64_t field_count,
+        pdal_memoryview_incrementer_t incrementer, void* user_data,
+        uint64_t depth, uint64_t rows, uint64_t columns, bool column_major);
 
     // Stage registry: construct implemented stages from PDAL driver names.
     pdal_reader_t* pdal_create_reader(const char* name,

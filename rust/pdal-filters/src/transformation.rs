@@ -63,3 +63,61 @@ impl Streamable for TransformationFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(points: &[(f64, f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z) in points {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *x);
+            view.set_f64(id, &DimId::Y, *y);
+            view.set_f64(id, &DimId::Z, *z);
+        }
+        view
+    }
+
+    #[test]
+    fn applies_affine_transform_to_every_point() {
+        let input = view(&[(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]);
+        let matrix = [
+            1.0, 0.0, 0.0, 10.0, 0.0, 2.0, 0.0, 20.0, 0.0, 0.0, 3.0, 30.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let mut filter = TransformationFilter::new(matrix);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+
+        assert_eq!(out.len(), 2);
+        assert_eq!(out.get_f64(0, &DimId::X), 11.0);
+        assert_eq!(out.get_f64(0, &DimId::Y), 24.0);
+        assert_eq!(out.get_f64(0, &DimId::Z), 39.0);
+        assert_eq!(out.get_f64(1, &DimId::X), 14.0);
+        assert_eq!(out.get_f64(1, &DimId::Y), 30.0);
+        assert_eq!(out.get_f64(1, &DimId::Z), 48.0);
+    }
+
+    #[test]
+    fn supports_perspective_divide_and_is_not_streamable() {
+        let mut input = view(&[(2.0, 4.0, 6.0)]);
+        let matrix = [
+            2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0,
+        ];
+        let mut filter = TransformationFilter::new(matrix);
+
+        filter.transform_point(&mut input, 0);
+
+        assert_eq!(input.get_f64(0, &DimId::X), 2.0);
+        assert_eq!(input.get_f64(0, &DimId::Y), 4.0);
+        assert_eq!(input.get_f64(0, &DimId::Z), 6.0);
+        assert!(!filter.process_one(&mut input, 0));
+        filter.reset();
+    }
+}

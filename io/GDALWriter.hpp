@@ -40,6 +40,8 @@
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+struct pdal_point_view;
+
 namespace pdal
 {
 
@@ -51,6 +53,7 @@ public:
     std::string getName() const override;
 
     GDALWriter() : m_outputTypes(0), m_expandByPoint(true) {}
+    ~GDALWriter() override;
 
 private:
     void addArgs(ProgramArgs& args) override;
@@ -67,6 +70,9 @@ private:
     int width() const;
     int height() const;
     void processValue(PointRef& point);
+    bool useRustWriter() const;
+    void writeRustOutput();
+    void clearRustViews();
 
     std::string m_outputFilename;
     std::string m_drivername;
@@ -102,6 +108,9 @@ private:
     bool m_binMode;
     bool m_allowEmpty;
     std::vector<int> m_percentiles;
+    bool m_supportsView = false;
+    bool m_rustWriter = false;
+    std::vector<pdal_point_view*> m_rustViews;
 };
 
 } // namespace pdal

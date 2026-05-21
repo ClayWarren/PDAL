@@ -116,3 +116,96 @@ impl Streamable for AssignFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(values: &[f64]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Classification, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for value in values {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *value);
+            view.set_f64(id, &DimId::Classification, 1.0);
+        }
+        view
+    }
+
+    #[test]
+    fn assigns_values_inside_range_when_condition_passes() {
+        let input = view(&[0.0, 5.0, 10.0]);
+        let mut filter = AssignFilter::new(
+            Some(AssignCondition {
+                dim_name: "X".to_string(),
+                lower_bound: 0.0,
+                upper_bound: 10.0,
+                inclusive_lower: true,
+                inclusive_upper: true,
+                negate: false,
+            }),
+            vec![AssignRange {
+                dim_name: "Classification".to_string(),
+                value: 7.0,
+                lower_bound: 1.0,
+                upper_bound: 1.0,
+                inclusive_lower: true,
+                inclusive_upper: true,
+                negate: false,
+            }],
+        );
+
+        let output = filter.run_one(&input).unwrap().remove(0);
+
+        assert_eq!(output.get_f64(0, &DimId::Classification), 7.0);
+        assert_eq!(output.get_f64(1, &DimId::Classification), 7.0);
+        assert_eq!(output.get_f64(2, &DimId::Classification), 7.0);
+        assert_eq!(input.get_f64(0, &DimId::Classification), 1.0);
+    }
+
+    #[test]
+    fn exclusive_bounds_negation_nan_and_streaming_match_range_contract() {
+        assert!(!AssignFilter::value_passes(
+            1.0, 1.0, 2.0, false, true, false
+        ));
+        assert!(AssignFilter::value_passes(1.0, 1.0, 2.0, false, true, true));
+        assert!(!AssignFilter::value_passes(
+            f64::NAN,
+            1.0,
+            2.0,
+            true,
+            true,
+            false
+        ));
+        assert!(AssignFilter::value_passes(
+            f64::NAN,
+            1.0,
+            2.0,
+            true,
+            true,
+            true
+        ));
+
+        let mut filter = AssignFilter::new(
+            None,
+            vec![AssignRange {
+                dim_name: "Classification".to_string(),
+                value: 9.0,
+                lower_bound: 1.0,
+                upper_bound: 1.0,
+                inclusive_lower: true,
+                inclusive_upper: true,
+                negate: false,
+            }],
+        );
+        let mut input = view(&[1.0]);
+
+        assert!(filter.process_one(&mut input, 0));
+        assert_eq!(input.get_f64(0, &DimId::Classification), 9.0);
+        filter.reset();
+    }
+}

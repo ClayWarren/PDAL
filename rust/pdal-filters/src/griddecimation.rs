@@ -93,3 +93,48 @@ pub fn get_kept_indices(view: &PointView, resolution: f64, output_type: &str) ->
     }
     kept
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(points: &[(f64, f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z) in points {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *x);
+            view.set_f64(id, &DimId::Y, *y);
+            view.set_f64(id, &DimId::Z, *z);
+        }
+        view
+    }
+
+    #[test]
+    fn keeps_minimum_or_maximum_z_per_grid_cell() {
+        let input = view(&[(0.1, 0.1, 10.0), (0.2, 0.2, 5.0), (1.2, 0.2, 7.0)]);
+
+        let mut min_indices = get_kept_indices(&input, 1.0, "min");
+        min_indices.sort_unstable();
+        assert_eq!(min_indices, vec![1, 2]);
+
+        let mut max_indices = get_kept_indices(&input, 1.0, "max");
+        max_indices.sort_unstable();
+        assert_eq!(max_indices, vec![0, 2]);
+    }
+
+    #[test]
+    fn handles_empty_and_boundary_adjusted_points() {
+        assert!(get_kept_indices(&view(&[]), 1.0, "min").is_empty());
+
+        let input = view(&[(0.0, 0.0, 1.0), (1.0, 1.0, 2.0), (-1.1, -1.1, 3.0)]);
+        let kept = get_kept_indices(&input, 1.0, "max");
+
+        assert_eq!(kept.len(), 3);
+    }
+}

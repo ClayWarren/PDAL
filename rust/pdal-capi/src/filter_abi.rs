@@ -32,6 +32,7 @@ use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
+use pdal_filters::miniball::MiniballFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
@@ -1095,6 +1096,13 @@ pub extern "C" fn pdal_stage_create_approximatecoplanar(
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_planefit(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(PlaneFitFilter::new(knn as usize));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a miniball filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_miniball(knn: u64) -> *mut StageWrapper {
+    let filter = Box::new(MiniballFilter::new(knn));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 

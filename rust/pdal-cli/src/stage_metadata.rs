@@ -489,6 +489,11 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Number of nearest neighbors to fit.",
             Some(json!(8)),
         )],
+        "filters.miniball" => vec![option(
+            "knn",
+            "Number of nearest neighbors to inspect.",
+            Some(json!(8)),
+        )],
         "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
         "filters.reciprocity" => vec![option(
             "knn",

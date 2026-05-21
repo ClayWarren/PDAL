@@ -42,6 +42,8 @@ fn empty_pipeline_result() -> pdal_pipeline_result_t {
 }
 
 mod core_abi;
+mod filter_abi;
 mod io_abi;
 mod pipeline_metadata_abi;
 mod point_abi;
+mod utility_abi;

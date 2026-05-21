@@ -509,6 +509,7 @@ PDAL_ADD_TEST(pdal_filters_voxel_downsize_test FILES filters/VoxelDownsizeFilter
 PDAL_ADD_TEST(pdal_filters_rust_pipeline_test
     FILES
         filters/RustPipelineTest.cpp
+        ${PDAL_SRC_DIR}/private/Raster.cpp
     INCLUDES
         ${PDAL_ROOT_DIR}
         ${ROOT_DIR}/rust/pdal-capi/include

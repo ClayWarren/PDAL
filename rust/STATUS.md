@@ -49,7 +49,7 @@ Status definitions:
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Optech CSD fixture data and localized WGS84 georeference math. |
 | BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
-| GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Writer support is Rust-side/C-ABI only so far and covers Float64 GDAL output for core grid statistics; the C++ writer remains the legacy GDAL implementation. This is not broad GDAL/PROJ permission. |
+| GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Standard-mode C++ GDAL writer cases with simple GDAL options now route raster rendering through the Rust C ABI for Float64 core grid statistics. Streaming, typed output, metadata, SRS override/default handling, and no-point error behavior remain C++. This is not broad GDAL/PROJ permission. |
 | Raster writer | in progress | Raster attachments on Rust point views can write through the Rust C ABI, and `pdal_filters_faceraster_test` now exercises the Rust-backed `writers.raster` wrapper. Named/multi-raster behavior is narrow and broader GDAL raster data-type parity remains open. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
@@ -58,6 +58,7 @@ Status definitions:
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
+| Rust coverage reporting | prototype | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace and currently reports 80.16% line coverage. This is visibility only and is not part of `rust-guard`. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
@@ -74,7 +75,7 @@ the Rust-backed shape of PDAL.
 |---|---|---|
 | Root CMake | done | `libpdal_capi.a` is built, linked into `pdalcpp`, and sourced from `cmake/rust.cmake` so the dependency list tracks every current Rust crate that can affect the C ABI or linked implementation. |
 | `cmake/` modules | in progress | Rust build options now live in `cmake/rust.cmake`. Install rules, CPack/source-package behavior, platform link details, and test wiring still need to move here as the integration matures. |
-| `pixi.toml` | done | The developer environment now includes the Rust toolchain and explicit `rust-fmt`, `rust-check`, `rust-clippy`, `rust-test`, and `rust-guard` tasks for the port workspace. |
+| `pixi.toml` | done | The developer environment now includes the Rust toolchain and explicit `rust-fmt`, `rust-check`, `rust-clippy`, `rust-test`, `rust-coverage`, and `rust-guard` tasks for the port workspace. |
 | GitHub workflows | in progress | The Pixi workflow runs the Rust workspace guard through `pixi run -e dev rust-guard`. Linux, macOS, Windows, conda, and release workflows still need explicit Rust/C++ parity gates before the port is upstreamable. |
 | `PDALConfig.cmake.in` | not ready | Downstream `find_package(PDAL)` must keep working. Decide whether the Rust C ABI remains an internal implementation detail of `pdalcpp` or is exported as a stable target/header surface. |
 | `pdal_features.hpp.in` | not ready | Add a generated Rust-backed-build feature only if C++ wrappers or downstream code need a supported conditional. Avoid broad preprocessor branching. |
@@ -137,9 +138,9 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `408 / 917` built C++ GoogleTest cases, or `44.49%`, are
+Current checkpoint: `466 / 917` built C++ GoogleTest cases, or `50.82%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
-a conservative lower bound, not a final port-completion percentage: 54 built
+a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
 claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.
@@ -147,10 +148,10 @@ different denominator.
 Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
 
-Current C++ compatibility wrapper/adapter surface: `15,351` code LOC across
-`113` first-party C++ files that include or directly declare Rust C ABI entry
-points, split approximately as `pdal/` 7,387 LOC, `filters/` 5,680 LOC, and
-`io/` 2,284 LOC. This is a coarse ceiling because several files still mix real
+Current C++ compatibility wrapper/adapter surface: `19,792` code LOC across
+`125` first-party C++ files that include or directly declare Rust C ABI entry
+points, split approximately as `pdal/` 7,387 LOC, `filters/` 5,917 LOC, and
+`io/` 6,107 LOC. This is a coarse ceiling because several files still mix real
 legacy implementation with wrapper calls; the number should shrink as wrappers
 are split from implementation.
 
@@ -303,12 +304,19 @@ Known mixed binaries:
   `repeated_execute_resets_voxels` count. Poisson/cell sampling routes through
   the Rust C ABI. Stage creation and dimension-flag helper behavior remain C++
   wrapper behavior.
+- `pdal_filters_miniball_test`: all 2 tests count. K-nearest-neighbor
+  miniball scoring routes through the Rust C ABI.
 - `pdal_metadata_test`: only `typed_value`, `test_float`, and `infnan` count.
   Scalar conversion and JSON scalar formatting route through Rust helpers. The
   metadata tree implementation is still C++.
-- `pdal_io_las_reader_test` and `pdal_io_las_writer_test`: do not count as
-  binaries yet. Rust LAS/LAZ exists, but the C++ reader/writer wrappers still
-  have substantial legacy header, VLR, SRS, streaming, and option behavior.
+- `pdal_io_las_reader_test`: `test_sequential`, `test_different_formats`,
+  `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, and `Start` count. LAS
+  point materialization routes through the Rust C ABI for the supported subset;
+  header, VLR, SRS, extra-byte override, bad-VLR recovery, and synthetic-flag
+  edge behavior remain C++.
+- `pdal_io_las_writer_test`: do not count as a binary yet. Rust LAS/LAZ writer
+  exists, but the C++ writer wrapper still has substantial legacy header, VLR,
+  SRS, streaming, and option behavior.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`
@@ -323,11 +331,35 @@ Known mixed binaries:
   route through the Rust C ABI.
 - `pdal_io_qfit_test`: `test_10_word` and `test_14_word` count. QFIT binary
   point decoding routes through the Rust C ABI.
+- `pdal_io_gdal_writer_test`: `min`, `min2`, `minWindow`, `max`, `maxWindow`,
+  `mean`, `meanWindow`, `idw`, `idwWindow`, `count`, `percentile`, `stdev`,
+  `stdevWindow`, `bounds`, `issue_2074`, `issue_2545`, and `alternate_grid`
+  count. Standard-mode raster rendering routes through the Rust C ABI for
+  simple GDAL options. Streaming, typed output, metadata, SRS override/default
+  handling, and no-point error behavior remain C++ wrapper behavior.
+- `pdal_io_copc_reader_test`: `fullRead`, `boundedRead2d`, and `boundedRead3d`
+  count. Local COPC point materialization and simple dataset-coordinate bounds
+  route through the Rust C ABI. Resolution, streaming, preview,
+  polygon/OGR/reprojection crops, and multi-input behavior remain C++.
+- `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
+  `boundedRead2d`, `boundedRead3d`, `originReadVersion1_0_0`, and `originRead`
+  count. Local EPT point materialization, simple dataset-coordinate bounds, and
+  origin selection route through the Rust C ABI. Resolution, streaming,
+  unreadable-data tolerance, SRS-bound reprojection, polygon/OGR crops, addons,
+  preview behavior, and prepare-time bad-origin validation remain C++.
+- `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.
+  Local STAC Feature/Collection traversal with direct asset reads routes through
+  the Rust C ABI. Catalog/FeatureCollection preview metadata, filters, schema
+  validation, remote assets, and mixed-reader option behavior remain C++.
 - `pdal_io_obj_reader_test`: `NoFace`, `NoVertex`, `Read`,
   `FourDimensionRead`, `TexturesAndNormals`, and `LargeFile` count. OBJ point
   and mesh extraction route through the Rust C ABI.
 - `pdal_io_gltf_writer_test`: all 4 tests count; GLTF mesh output routes
   through the Rust C ABI.
+- `pdal_io_memoryview_reader_test`: `readsFieldsFromMemory` and
+  `synthesizesRowMajorShapeCoordinates` count. Raw callback memory
+  materialization and row-major shape coordinate synthesis route through the
+  Rust C ABI. Shape option parsing remains C++.
 - `pdal_io_faux_test`: `test_constant_mode_sequential_iter`,
   `test_random_mode`, `test_ramp_mode_1`, `test_ramp_mode_2`,
   `test_return_number`, `one_point`, and `grid` count. Constant, ramp, and grid
@@ -359,6 +391,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `lof`
 - `mad`
 - `merge`
+- `miniball`
 - `mortonorder`
 - `nndistance`
 - `optimalneighborhood`
@@ -393,8 +426,8 @@ algorithm decision.
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
 - Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
-  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `Miniball`, `Normal`, `PMF`,
-  `Poisson`, `Straighten`, `Supervoxel`, `GreedyProjection`,
+  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `Normal`, `PMF`, `Poisson`,
+  `Straighten`, `Supervoxel`, `GreedyProjection`,
   `IterativeClosestPoint`, `RelaxationDartThrowing`.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,
@@ -445,6 +478,10 @@ existing filter tests. Do not reapply it wholesale.
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`
   `rust/scripts/measure_guardrails.sh`
+- Rust coverage reporting:
+  `pixi run -e dev rust-coverage`
+  `pixi run -e dev rust-coverage --html`
+  `pixi run -e dev rust-coverage --lcov --output-path rust/target/llvm-cov/lcov.info`
 - Rust mutation testing:
   `cargo install --locked cargo-mutants`
   `pixi run -e dev rust-mutants`

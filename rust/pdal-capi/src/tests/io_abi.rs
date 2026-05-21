@@ -1,4 +1,83 @@
 use super::*;
+use std::ffi::c_void;
+
+#[test]
+fn reader_and_writer_constructors_cover_supported_driver_handles() {
+    unsafe {
+        let options = pdal_options_create();
+        let filename = CString::new("dummy").unwrap();
+        let key = CString::new("filename").unwrap();
+        pdal_options_add_str(options, key.as_ptr(), filename.as_ptr());
+
+        let readers = [
+            pdal_reader_create_faux(options),
+            pdal_reader_create_text(options),
+            pdal_reader_create_pcd(options),
+            pdal_reader_create_pts(options),
+            pdal_reader_create_ptx(options),
+            pdal_reader_create_ilvis2(options),
+            pdal_reader_create_obj(options),
+            pdal_reader_create_ply(options),
+            pdal_reader_create_qfit(options),
+            pdal_reader_create_sbet(options),
+            pdal_reader_create_smrmsg(options),
+            pdal_reader_create_optech(options),
+            pdal_reader_create_terrasolid(options),
+            pdal_reader_create_fbi(options),
+            pdal_reader_create_bpf(options),
+            pdal_reader_create_gdal(options),
+            pdal_reader_create_las(options),
+            pdal_reader_create_laz(options),
+            pdal_reader_create_spz(options),
+            pdal_reader_create_stac(options),
+            pdal_reader_create_copc(options),
+            pdal_reader_create_ept(options),
+        ];
+        for reader in readers {
+            assert!(!reader.is_null());
+            pdal_reader_destroy(reader);
+        }
+
+        let writers = [
+            pdal_writer_create_null(std::ptr::null()),
+            pdal_writer_create_fbi(options),
+            pdal_writer_create_bpf(options),
+            pdal_writer_create_text(options),
+            pdal_writer_create_pcd(options),
+            pdal_writer_create_ply(options),
+            pdal_writer_create_gltf(options),
+            pdal_writer_create_sbet(options),
+            pdal_writer_create_las(options),
+            pdal_writer_create_laz(options),
+            pdal_writer_create_spz(options),
+            pdal_writer_create_ogr(options),
+            pdal_writer_create_gdal(options),
+            pdal_writer_create_raster(options),
+        ];
+        for writer in writers {
+            assert!(!writer.is_null());
+            pdal_writer_destroy(writer);
+        }
+
+        assert!(pdal_reader_create_faux(std::ptr::null()).is_null());
+        assert!(pdal_writer_create_fbi(std::ptr::null()).is_null());
+        assert!(pdal_reader_read_first(std::ptr::null_mut()).is_null());
+        assert!(pdal_reader_metadata(std::ptr::null()).is_null());
+        assert!(!pdal_writer_write_view(
+            std::ptr::null_mut(),
+            std::ptr::null()
+        ));
+        assert!(!pdal_writer_write_views(
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            0
+        ));
+
+        pdal_reader_destroy(std::ptr::null_mut());
+        pdal_writer_destroy(std::ptr::null_mut());
+        pdal_options_destroy(options);
+    }
+}
 
 #[test]
 fn reader_read_first_returns_point_view_through_c_abi() {
@@ -35,6 +114,144 @@ fn reader_read_first_returns_point_view_through_c_abi() {
         pdal_point_view_destroy(view);
         pdal_reader_destroy(reader);
         pdal_options_destroy(options);
+    }
+}
+
+#[repr(C)]
+struct MemoryPoint {
+    x: f64,
+    y: f64,
+    z: f64,
+    intensity: u16,
+}
+
+unsafe extern "C" fn memory_incrementer(point_id: u64, user_data: *mut c_void) -> *const u8 {
+    let points = &*(user_data as *const Vec<MemoryPoint>);
+    points
+        .get(point_id as usize)
+        .map(|point| point as *const MemoryPoint as *const u8)
+        .unwrap_or(std::ptr::null())
+}
+
+#[test]
+fn memoryview_reader_materializes_callback_memory_through_c_abi() {
+    let points = vec![
+        MemoryPoint {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            intensity: 10,
+        },
+        MemoryPoint {
+            x: 4.0,
+            y: 5.0,
+            z: 6.0,
+            intensity: 20,
+        },
+    ];
+    let x = CString::new("X").unwrap();
+    let y = CString::new("Y").unwrap();
+    let z = CString::new("Z").unwrap();
+    let intensity = CString::new("Intensity").unwrap();
+    let fields = [
+        pdal_memoryview_field_t {
+            name: x.as_ptr(),
+            type_id: 0x408,
+            offset: std::mem::offset_of!(MemoryPoint, x) as u64,
+        },
+        pdal_memoryview_field_t {
+            name: y.as_ptr(),
+            type_id: 0x408,
+            offset: std::mem::offset_of!(MemoryPoint, y) as u64,
+        },
+        pdal_memoryview_field_t {
+            name: z.as_ptr(),
+            type_id: 0x408,
+            offset: std::mem::offset_of!(MemoryPoint, z) as u64,
+        },
+        pdal_memoryview_field_t {
+            name: intensity.as_ptr(),
+            type_id: 0x202,
+            offset: std::mem::offset_of!(MemoryPoint, intensity) as u64,
+        },
+    ];
+
+    unsafe {
+        let view = pdal_memoryview_read(
+            fields.as_ptr(),
+            fields.len() as u64,
+            Some(memory_incrementer),
+            &points as *const Vec<MemoryPoint> as *mut c_void,
+            0,
+            0,
+            0,
+            false,
+        );
+        assert!(!view.is_null());
+        assert_eq!(pdal_point_view_length(view), 2);
+        assert_eq!(pdal_point_view_get_f64(view, 1, x.as_ptr()), 4.0);
+        assert_eq!(pdal_point_view_get_f64(view, 1, intensity.as_ptr()), 20.0);
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
+fn memoryview_reader_synthesizes_row_major_shape_coordinates() {
+    let values = vec![
+        MemoryPoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            intensity: 10,
+        },
+        MemoryPoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            intensity: 20,
+        },
+        MemoryPoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            intensity: 30,
+        },
+        MemoryPoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            intensity: 40,
+        },
+    ];
+    let intensity = CString::new("Intensity").unwrap();
+    let x = CString::new("X").unwrap();
+    let y = CString::new("Y").unwrap();
+    let z = CString::new("Z").unwrap();
+    let fields = [pdal_memoryview_field_t {
+        name: intensity.as_ptr(),
+        type_id: 0x202,
+        offset: std::mem::offset_of!(MemoryPoint, intensity) as u64,
+    }];
+
+    unsafe {
+        let view = pdal_memoryview_read(
+            fields.as_ptr(),
+            fields.len() as u64,
+            Some(memory_incrementer),
+            &values as *const Vec<MemoryPoint> as *mut c_void,
+            1,
+            2,
+            2,
+            false,
+        );
+        assert!(!view.is_null());
+        assert_eq!(pdal_point_view_length(view), 4);
+        assert_eq!(pdal_point_view_get_f64(view, 0, x.as_ptr()), 0.0);
+        assert_eq!(pdal_point_view_get_f64(view, 1, x.as_ptr()), 1.0);
+        assert_eq!(pdal_point_view_get_f64(view, 2, y.as_ptr()), 1.0);
+        assert_eq!(pdal_point_view_get_f64(view, 3, z.as_ptr()), 0.0);
+        assert_eq!(pdal_point_view_get_f64(view, 3, intensity.as_ptr()), 40.0);
+        pdal_point_view_destroy(view);
     }
 }
 

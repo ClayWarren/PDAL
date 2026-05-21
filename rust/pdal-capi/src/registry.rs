@@ -31,6 +31,7 @@ use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
+use pdal_filters::miniball::MiniballFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
@@ -105,6 +106,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.lof",
     "filters.mad",
     "filters.merge",
+    "filters.miniball",
     "filters.mortonorder",
     "filters.nndistance",
     "filters.optimalneighborhood",
@@ -285,6 +287,9 @@ pub fn create_filter(
             get_f64(options, "mad_multiplier", 2.0)?,
         )))),
         "filters.merge" => Ok(Box::new(FilterWrapper::new(MergeFilter::new()))),
+        "filters.miniball" => Ok(Box::new(FilterWrapper::new(MiniballFilter::new(get_u64(
+            options, "knn", 8,
+        )?)))),
         "filters.mortonorder" => Ok(Box::new(FilterWrapper::new(MortonOrderFilter::new(
             get_bool(options, "reverse", false)?,
         )))),

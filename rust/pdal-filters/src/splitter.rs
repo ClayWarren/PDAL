@@ -144,3 +144,62 @@ impl Streamable for SplitterFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(points: &[(f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y) in points {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *x);
+            view.set_f64(id, &DimId::Y, *y);
+        }
+        view
+    }
+
+    #[test]
+    fn splits_points_into_grid_cells_with_implicit_origin() {
+        let input = view(&[(10.0, 10.0), (11.1, 10.2), (9.2, 9.2)]);
+        let mut filter = SplitterFilter::new(1.0, f64::NAN, f64::NAN, 0.0);
+
+        let tiles = filter.split(&input).unwrap();
+
+        let keys: Vec<_> = tiles.iter().map(|(key, _)| *key).collect();
+        assert_eq!(keys, vec![(-1, -1), (0, 0), (1, 0)]);
+        assert!(tiles.iter().all(|(_, tile)| tile.len() == 1));
+    }
+
+    #[test]
+    fn buffer_duplicates_points_into_neighboring_tiles() {
+        let input = view(&[(0.95, 0.95)]);
+        let mut filter = SplitterFilter::new(1.0, 0.0, 0.0, 0.1);
+
+        let tiles = filter.split(&input).unwrap();
+
+        let keys: Vec<_> = tiles.iter().map(|(key, _)| *key).collect();
+        assert_eq!(keys, vec![(0, 0), (0, 1), (1, 0), (1, 1)]);
+    }
+
+    #[test]
+    fn rejects_too_large_buffer_and_is_not_streamable() {
+        let input = view(&[(0.0, 0.0)]);
+        let mut filter = SplitterFilter::new(1.0, 0.0, 0.0, 0.5);
+
+        let err = match filter.split(&input) {
+            Ok(_) => panic!("expected oversized buffer to fail"),
+            Err(err) => err,
+        };
+        assert!(err.0.contains("Buffer"));
+
+        let mut stream_view = view(&[(0.0, 0.0)]);
+        assert!(!filter.process_one(&mut stream_view, 0));
+        filter.reset();
+    }
+}

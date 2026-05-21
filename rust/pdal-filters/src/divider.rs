@@ -116,3 +116,98 @@ impl Streamable for DividerFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimId, DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(size: u64) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for i in 0..size {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, i as f64);
+        }
+        view
+    }
+
+    fn xs(view: &PointView) -> Vec<f64> {
+        (0..view.len())
+            .map(|i| view.get_f64(i, &DimId::X))
+            .collect()
+    }
+
+    #[test]
+    fn partition_and_capacity_modes_split_points() {
+        let input = view(5);
+        let mut filter = DividerFilter::new(
+            DividerMode::Partition,
+            DividerSizeMode::Count,
+            2,
+            Vec::new(),
+        );
+
+        let outputs = filter.run_one(&input).unwrap();
+
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(xs(&outputs[0]), vec![0.0, 1.0, 2.0]);
+        assert_eq!(xs(&outputs[1]), vec![3.0, 4.0]);
+
+        let outputs = DividerFilter::new(
+            DividerMode::Partition,
+            DividerSizeMode::Capacity,
+            2,
+            Vec::new(),
+        )
+        .run_one(&input)
+        .unwrap();
+        assert_eq!(outputs.len(), 3);
+    }
+
+    #[test]
+    fn round_robin_and_expression_modes_route_points() {
+        let input = view(5);
+        let outputs = DividerFilter::new(
+            DividerMode::RoundRobin,
+            DividerSizeMode::Count,
+            2,
+            Vec::new(),
+        )
+        .run_one(&input)
+        .unwrap();
+
+        assert_eq!(xs(&outputs[0]), vec![0.0, 2.0, 4.0]);
+        assert_eq!(xs(&outputs[1]), vec![1.0, 3.0]);
+
+        let outputs = DividerFilter::new(
+            DividerMode::Expression,
+            DividerSizeMode::Count,
+            0,
+            vec![false, true, false, true],
+        )
+        .run_one(&input)
+        .unwrap();
+        assert_eq!(outputs.len(), 3);
+        assert_eq!(xs(&outputs[0]), vec![0.0]);
+        assert_eq!(xs(&outputs[1]), vec![1.0, 2.0]);
+        assert_eq!(xs(&outputs[2]), vec![3.0, 4.0]);
+    }
+
+    #[test]
+    fn empty_input_and_streaming_contract() {
+        let mut filter = DividerFilter::new(
+            DividerMode::Partition,
+            DividerSizeMode::Count,
+            0,
+            Vec::new(),
+        );
+        assert!(filter.run_one(&view(0)).unwrap().is_empty());
+
+        let mut input = view(1);
+        assert!(!filter.process_one(&mut input, 0));
+        filter.reset();
+    }
+}

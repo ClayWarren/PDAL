@@ -39,7 +39,7 @@
 #include <pdal/private/Raster.hpp>
 
 #include <filters/private/RustPipeline.hpp>
-#include <filters/private/RustViewConverter.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 
 using namespace pdal;
 

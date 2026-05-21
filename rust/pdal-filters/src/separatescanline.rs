@@ -53,3 +53,53 @@ impl Streamable for SeparateScanLineFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(edge_flags: &[f64]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::from_name("EdgeOfFlightLine"), DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (idx, edge) in edge_flags.iter().enumerate() {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, idx as f64);
+            view.set_f64(id, &DimId::from_name("EdgeOfFlightLine"), *edge);
+        }
+        view
+    }
+
+    #[test]
+    fn groups_scan_lines_by_edge_markers() {
+        let input = view(&[0.0, 1.0, 0.0, 1.0, 0.0]);
+        let mut filter = SeparateScanLineFilter::new(2);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap();
+
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].len(), 4);
+        assert_eq!(out[0].get_f64(0, &DimId::X), 0.0);
+        assert_eq!(out[0].get_f64(3, &DimId::X), 3.0);
+        assert_eq!(out[1].len(), 1);
+        assert_eq!(out[1].get_f64(0, &DimId::X), 4.0);
+    }
+
+    #[test]
+    fn keeps_trailing_partial_group_and_is_not_streamable() {
+        let input = view(&[0.0, 1.0, 0.0]);
+        let mut filter = SeparateScanLineFilter::new(3);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap();
+
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].len(), 3);
+
+        let mut stream_view = view(&[0.0]);
+        assert!(!filter.process_one(&mut stream_view, 0));
+        filter.reset();
+    }
+}

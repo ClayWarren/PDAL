@@ -143,3 +143,61 @@ impl Streamable for MortonOrderFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(points: &[(f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y) in points {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, *x);
+            view.set_f64(idx, &DimId::Y, *y);
+        }
+        view
+    }
+
+    fn xy(view: &PointView) -> Vec<(f64, f64)> {
+        (0..view.len())
+            .map(|idx| (view.get_f64(idx, &DimId::X), view.get_f64(idx, &DimId::Y)))
+            .collect()
+    }
+
+    #[test]
+    fn morton_order_sorts_points_by_z_order() {
+        let input = view(&[(1.0, 1.0), (0.0, 1.0), (1.0, 0.0), (0.0, 0.0)]);
+        let mut filter = MortonOrderFilter::new(false);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(
+            xy(&out),
+            vec![(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)]
+        );
+    }
+
+    #[test]
+    fn reverse_morton_order_uses_reversed_codes() {
+        let input = view(&[(0.0, 0.0), (10.0, 0.0), (0.0, 10.0), (10.0, 10.0)]);
+        let mut filter = MortonOrderFilter::new(true);
+
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert_eq!(out.len(), 4);
+        assert_ne!(xy(&out), xy(&input));
+    }
+
+    #[test]
+    fn empty_input_returns_empty_view_and_streaming_is_unsupported() {
+        let input = view(&[]);
+        let mut filter = MortonOrderFilter::new(false);
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+
+        assert_eq!(out.len(), 0);
+        assert!(!filter.process_one(&mut input.clone(), 0));
+    }
+}

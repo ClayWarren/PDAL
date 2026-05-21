@@ -40,6 +40,7 @@
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -109,6 +110,7 @@ public:
     std::string getName() const override;
 
     MemoryViewReader();
+    ~MemoryViewReader() override;
 
     /**
       Push a data field into the structure of ordered fields.
@@ -181,9 +183,12 @@ private:
     */
     bool processOne(PointRef& point) override;
 
+    static const unsigned char* increment(uint64_t pointId, void* userData);
+
 private:
     PointIncrementer m_incrementer;
     std::vector<FullField> m_fields;
+    pdal_point_view_t* m_rustView = nullptr;
     bool m_prepared;
     PointId m_index;
     Shape m_shape;

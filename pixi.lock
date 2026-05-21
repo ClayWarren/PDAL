@@ -45,6 +45,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/c-compiler-1.8.0-h2b85faf_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ca-certificates-2024.8.30-hbcca054_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/capnproto-1.4.0-h791c776_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/cargo-llvm-cov-0.8.7-hdab8a38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ceres-solver-2.2.0-h417fa77_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/cmake-3.31.2-hf9cb763_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/compilers-1.8.0-ha770c72_1.conda
@@ -230,6 +231,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/c-compiler-1.9.0-h6561dab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/ca-certificates-2025.1.31-hcefe29a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/capnproto-1.0.2-h23cc76c_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/cargo-llvm-cov-0.8.7-h1ebd7d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/ceres-solver-2.2.0-h816774e_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/cmake-4.0.0-h0efca9c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/compilers-1.9.0-h8af1aa0_0.conda
@@ -433,6 +435,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/c-compiler-1.8.0-hfc4bf79_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ca-certificates-2024.8.30-h8857fd0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/capnproto-1.4.0-h218a8eb_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/cargo-llvm-cov-0.8.7-h009cd8f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/cctools-1010.6-h5b2de21_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/cctools_osx-64-1010.6-hea4301f_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ceres-solver-2.2.0-he6a300e_5.conda
@@ -607,6 +610,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/c-compiler-1.8.0-hf48404e_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2024.8.30-hf0a4a13_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/capnproto-1.4.0-ha5ad7e1_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/cargo-llvm-cov-0.8.7-h748bcf4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/cctools-1010.6-hf67d63f_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/cctools_osx-arm64-1010.6-h623e0ac_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ceres-solver-2.2.0-h30efb5c_5.conda
@@ -782,6 +786,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-1.8.0-hcfcfb64_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/ca-certificates-2024.8.30-h56e8100_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/capnproto-1.4.0-h905dac0_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/cargo-llvm-cov-0.8.7-h77a83cd_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/ceres-solver-2.2.0-h0d88682_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/clang-19-19.1.5-default_hec7ea82_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/clang-19.1.5-default_hec7ea82_0.conda
@@ -4523,6 +4528,18 @@ packages:
   license_family: MIT
   size: 4186283
   timestamp: 1773686734540
+- conda: https://conda.anaconda.org/conda-forge/linux-64/cargo-llvm-cov-0.8.7-hdab8a38_0.conda
+  sha256: 53c56b26634f024bb0f5959a74a246f1d6636e55153822c36d200f262e8d6a2c
+  md5: 111b31aa6e7d28827526d4e4ce904710
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  constrains:
+  - __glibc >=2.17
+  license: Apache-2.0
+  license_family: Apache
+  size: 1324967
+  timestamp: 1778642097940
 - conda: https://conda.anaconda.org/conda-forge/linux-64/ceres-solver-2.2.0-h417fa77_5.conda
   sha256: 07a6ce3e12efa64e1c6cd03e3578186f19897a457836a05669dcf561eb1f9f17
   md5: def84047946a1d2fad7726f7b476ee6a
@@ -10040,6 +10057,17 @@ packages:
   license_family: MIT
   size: 3943049
   timestamp: 1730914547203
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/cargo-llvm-cov-0.8.7-h1ebd7d5_0.conda
+  sha256: 96463914f68926fdc41d13fcd5a2a4c1b0ea634855e7a8c5aaa2bf6e3ae6dc94
+  md5: d11eaddabd09979a818b0c923fdb8853
+  depends:
+  - libgcc >=14
+  constrains:
+  - __glibc >=2.17
+  license: Apache-2.0
+  license_family: Apache
+  size: 1220142
+  timestamp: 1778642125918
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/ceres-solver-2.2.0-h816774e_5.conda
   sha256: 13547ae0bd2fd3c4cdc22ca512e7468d7140bcd80e1c3e32cb5c2cfb25bad10e
   md5: b1120ea9b0ae95b82ca4f8a0ae916ffa
@@ -17564,6 +17592,17 @@ packages:
   license_family: MIT
   size: 3167493
   timestamp: 1773686805360
+- conda: https://conda.anaconda.org/conda-forge/osx-64/cargo-llvm-cov-0.8.7-h009cd8f_0.conda
+  sha256: f8c47148aa17505288261f148994bd387c5615d120f0ab6603960e85f2f943f3
+  md5: fc649ea1d1063a80d18bb4b56b410513
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: Apache-2.0
+  license_family: Apache
+  size: 1253647
+  timestamp: 1778642456224
 - conda: https://conda.anaconda.org/conda-forge/osx-64/cctools-1010.6-h5b2de21_2.conda
   sha256: d34964e81d7f5c94279999a7af2a83677327418543848cd7e80d86f6a6e7cf14
   md5: 97f24eeeb3509883a6988894fd7c9bbf
@@ -22308,6 +22347,17 @@ packages:
   license_family: MIT
   size: 3157856
   timestamp: 1773686772019
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/cargo-llvm-cov-0.8.7-h748bcf4_0.conda
+  sha256: d8414be30616fe78fdea8c4be1011c38f172ea3843b65b4c61ca30256e78508f
+  md5: 5fa54e076a5d79033ec79f6336afa3d8
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: Apache-2.0
+  license_family: Apache
+  size: 1150283
+  timestamp: 1778642519278
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/cctools-1010.6-hf67d63f_2.conda
   sha256: 5cd748e93968df7a3575f5cd051fb387ca0b1753537374e8c9270d44315186d2
   md5: 409225e7241a0099a81ce5fc0f3576d8
@@ -27199,6 +27249,17 @@ packages:
   license_family: MIT
   size: 9979619
   timestamp: 1773686758803
+- conda: https://conda.anaconda.org/conda-forge/win-64/cargo-llvm-cov-0.8.7-h77a83cd_0.conda
+  sha256: 1fcae7d44cfe1d8b5e55e5e2f8a4147966bd695e8da7b64a35e5965eae15e95d
+  md5: ca4f66f0876f063bf905efdd1e5b51a0
+  depends:
+  - ucrt >=10.0.20348.0
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  license: Apache-2.0
+  license_family: Apache
+  size: 1295216
+  timestamp: 1778642257194
 - conda: https://conda.anaconda.org/conda-forge/win-64/ceres-solver-2.2.0-h0d88682_3.conda
   sha256: 221f98a81612086bfb85872b0338dbe669576d98b2ad3a1936f9f93ad4653ddd
   md5: 62452051eec24051ac8b3b5ac8f2ee06

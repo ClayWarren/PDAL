@@ -125,15 +125,13 @@ fn build_header(view: &PointView) -> FbiHeader {
     header.bits_normal = bits_if(view, &DimId::NormalX, 32);
     header.bits_image = bits_if(view, &DimId::Image, 16);
 
-    let channels = color_channels(view, header.bits_color);
     header.pos_xyz = header.hdr_size as u64;
     header.pos_time = header.pos_xyz + 3 * view.len() * 4;
     header.pos_distance = header.pos_time + stream_size(view, header.bits_time);
     header.pos_group = header.pos_distance + stream_size(view, header.bits_distance);
     header.pos_normal = header.pos_group + stream_size(view, header.bits_group);
     header.pos_color = header.pos_normal + stream_size(view, header.bits_normal);
-    header.pos_intensity =
-        header.pos_color + channels * view.len() * u64::from(header.bits_color) / 8;
+    header.pos_intensity = header.pos_color + view.len() * u64::from(header.bits_color) / 8;
     header.pos_line = header.pos_intensity + stream_size(view, header.bits_intensity);
     header.pos_echo_len = header.pos_line + stream_size(view, header.bits_line);
     header.pos_amplitude = header.pos_echo_len + stream_size(view, header.bits_echo_len);
@@ -358,11 +356,12 @@ fn write_color_stream<W: Write>(
     if header.bits_color == 0 {
         return Ok(());
     }
-    let bytes = (header.bits_color / 8) as usize;
+    let channels = color_channels(view, header.bits_color);
+    let bytes = (header.bits_color / 8 / channels as u32) as usize;
     for i in 0..view.len() {
-        write_uint_bytes(writer, view.get_f64(i, &DimId::Blue) as u32, bytes)?;
-        write_uint_bytes(writer, view.get_f64(i, &DimId::Green) as u32, bytes)?;
         write_uint_bytes(writer, view.get_f64(i, &DimId::Red) as u32, bytes)?;
+        write_uint_bytes(writer, view.get_f64(i, &DimId::Green) as u32, bytes)?;
+        write_uint_bytes(writer, view.get_f64(i, &DimId::Blue) as u32, bytes)?;
         if has_dim(view, &DimId::Infrared) {
             write_uint_bytes(writer, view.get_f64(i, &DimId::Infrared) as u32, bytes)?;
         }
@@ -425,7 +424,11 @@ fn color_bits(view: &PointView) -> u32 {
     if (has_dim(view, &DimId::Red) && has_dim(view, &DimId::Green) && has_dim(view, &DimId::Blue))
         || has_dim(view, &DimId::Infrared)
     {
-        16
+        if has_dim(view, &DimId::Infrared) {
+            64
+        } else {
+            48
+        }
     } else {
         0
     }
@@ -464,4 +467,106 @@ fn encode_normal(dim: u32, x: f64, y: f64, z: f64) -> u32 {
 
 fn io_error(error: std::io::Error) -> StageError {
     StageError(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fbi::FbiReader;
+    use pdal_core::pipeline::{Reader, Writer};
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn make_view() -> PointView {
+        let mut layout = PointLayout::new();
+        for (dim, ty) in [
+            (DimId::X, DimType::F64),
+            (DimId::Y, DimType::F64),
+            (DimId::Z, DimType::F64),
+            (DimId::Intensity, DimType::U16),
+            (DimId::Classification, DimType::U8),
+            (DimId::Red, DimType::U16),
+            (DimId::Green, DimType::U16),
+            (DimId::Blue, DimType::U16),
+            (DimId::NormalX, DimType::F64),
+            (DimId::NormalY, DimType::F64),
+            (DimId::NormalZ, DimType::F64),
+            (DimId::Dimension, DimType::U8),
+            (DimId::ReturnNumber, DimType::U8),
+            (DimId::ScanAngleRank, DimType::I8),
+        ] {
+            layout.register(dim, ty);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z, intensity, class) in [
+            (100.0, 200.0, 300.0, 42.0, 7.0),
+            (101.0, 201.0, 301.0, 43.0, 8.0),
+        ] {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, x);
+            view.set_f64(id, &DimId::Y, y);
+            view.set_f64(id, &DimId::Z, z);
+            view.set_f64(id, &DimId::Intensity, intensity);
+            view.set_f64(id, &DimId::Classification, class);
+            view.set_f64(id, &DimId::Red, 1000.0 + id as f64);
+            view.set_f64(id, &DimId::Green, 2000.0 + id as f64);
+            view.set_f64(id, &DimId::Blue, 3000.0 + id as f64);
+            view.set_f64(id, &DimId::NormalX, 1.0);
+            view.set_f64(id, &DimId::NormalY, 0.0);
+            view.set_f64(id, &DimId::NormalZ, 0.0);
+            view.set_f64(id, &DimId::Dimension, 2.0);
+            view.set_f64(id, &DimId::ReturnNumber, 1.0 + id as f64);
+            view.set_f64(id, &DimId::ScanAngleRank, -5.0 + id as f64);
+        }
+        view
+    }
+
+    #[test]
+    fn writer_roundtrips_core_streams_through_reader() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+        FbiWriter::new(&options).write(&[make_view()]).unwrap();
+
+        let views = FbiReader::new(&options).read().unwrap();
+        assert_eq!(views.len(), 1);
+        let view = &views[0];
+        assert_eq!(view.len(), 2);
+        assert!((view.get_f64(0, &DimId::X) - 100.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Y) - 200.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Z) - 300.0).abs() < 0.01);
+        assert_eq!(view.get_f64(0, &DimId::Intensity), 42.0);
+        assert_eq!(view.get_f64(1, &DimId::Classification), 8.0);
+        assert_eq!(view.get_f64(1, &DimId::Red), 1001.0);
+        assert_eq!(view.get_f64(1, &DimId::Green), 2001.0);
+        assert_eq!(view.get_f64(1, &DimId::Blue), 3001.0);
+        assert_eq!(view.get_f64(1, &DimId::ReturnNumber), 2.0);
+    }
+
+    #[test]
+    fn writer_rejects_missing_filename_and_input() {
+        assert!(FbiWriter::new(&Options::new())
+            .write(&[make_view()])
+            .is_err());
+
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+        assert!(FbiWriter::new(&options).write(&[]).is_err());
+    }
+
+    #[test]
+    fn writer_handles_empty_views_with_header_only_streams() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+
+        FbiWriter::new(&options).write(&[view]).unwrap();
+        assert_eq!(FbiReader::new(&options).read().unwrap()[0].len(), 0);
+    }
 }

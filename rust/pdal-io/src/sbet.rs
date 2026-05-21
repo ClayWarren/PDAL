@@ -120,3 +120,64 @@ impl Reader for SbetReader {
         MetadataNode::new("readers.sbet")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::pipeline::Reader;
+
+    fn data_path(path: &str) -> String {
+        format!("{}/../../test/data/{path}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    fn assert_near(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 0.0001,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn reads_existing_two_point_fixture_as_degrees() {
+        let mut options = Options::new();
+        options.add("filename", data_path("sbet/2-points.sbet"));
+        let views = SbetReader::new(&options).read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        let view = &views[0];
+        assert_eq!(view.len(), 2);
+        assert_near(view.get_f64(0, &DimId::GpsTime), 1.516_310_028_360_71e5);
+        assert_near(view.get_f64(0, &DimId::Y), 32.545149);
+        assert_near(view.get_f64(0, &DimId::X), -116.978180);
+        assert_near(view.get_f64(0, &DimId::Z), 107.715_295_329_656);
+        assert_near(view.get_f64(0, &DimId::Roll), -1.611964);
+        assert_near(view.get_f64(0, &DimId::Pitch), -1.392233);
+        assert_near(view.get_f64(0, &DimId::Azimuth), 174.567247);
+        assert_near(view.get_f64(1, &DimId::GpsTime), 1.516310078318641e5);
+        assert_near(view.get_f64(1, &DimId::Y), 32.545216);
+        assert_near(view.get_f64(1, &DimId::Azimuth), 174.587752);
+    }
+
+    #[test]
+    fn can_leave_angular_values_as_radians() {
+        let mut options = Options::new();
+        options.add("filename", data_path("sbet/2-points.sbet"));
+        options.add("angles_as_degrees", false);
+        let views = SbetReader::new(&options).read().unwrap();
+        let view = &views[0];
+
+        assert_near(view.get_f64(0, &DimId::Y), 0.5680211852972264);
+        assert_near(view.get_f64(0, &DimId::X), -2.041_654_392_303_94);
+        assert_near(view.get_f64(0, &DimId::Roll), -0.02813407149321339);
+        assert_near(view.get_f64(0, &DimId::Azimuth), 3.046773230278662);
+    }
+
+    #[test]
+    fn rejects_bad_sbet_file_sizes() {
+        let mut options = Options::new();
+        options.add("filename", data_path("sbet/badfile.sbet"));
+
+        assert!(SbetReader::new(&options).read().is_err());
+        assert!(SbetReader::new(&Options::new()).read().is_err());
+    }
+}

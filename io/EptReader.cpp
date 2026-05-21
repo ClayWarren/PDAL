@@ -36,6 +36,7 @@
 
 #include <atomic>
 #include <limits>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -44,9 +45,11 @@
 #include <pdal/SrsBounds.hpp>
 #include <pdal/pdal_features.hpp>
 #include <pdal/private/OGRSpec.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/SrsTransform.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/ThreadPool.hpp>
+#include <pdal_capi.h>
 
 #include "private/connector/Connector.hpp"
 #include "private/ept/Artifact.hpp"
@@ -136,6 +139,34 @@ BOX3D reprojectBoundsBcbfToLonLat(BOX3D src, const SrsTransform& xform)
 
 CREATE_STATIC_STAGE(EptReader, s_info);
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+std::string boundsOption(const SrsBounds& bounds)
+{
+    if (bounds.to3d().valid())
+    {
+        std::ostringstream out;
+        out << bounds.to3d();
+        return out.str();
+    }
+    if (bounds.to2d().valid())
+    {
+        std::ostringstream out;
+        out << bounds.to2d();
+        return out.str();
+    }
+    return "";
+}
+
+} // unnamed namespace
+
 struct PolyXform
 {
     Polygon poly;
@@ -179,6 +210,8 @@ public:
     uint64_t depthEnd{0}; // Zero indicates selection of all depths.
     uint64_t hierarchyStep{0};
     uint64_t nodeId;
+    PointId rustIndex = 0;
+    pdal_point_view_t* rustView = nullptr;
     std::atomic<bool> done;
 
     void overlaps(ept::Hierarchy& target, const NL::json& hier,
@@ -587,6 +620,13 @@ void EptReader::load(const ept::Overlap& overlap)
 
 void EptReader::ready(PointTableRef table)
 {
+    if (m_p->rustView)
+    {
+        pdal_point_view_destroy(m_p->rustView);
+        m_p->rustView = nullptr;
+    }
+    m_p->rustIndex = 0;
+
     // These may not exist, in general they are only needed to track point
     // origins and ordering for an EPT writer.
     m_nodeIdDim = table.layout()->findDim("EptNodeId");
@@ -598,6 +638,34 @@ void EptReader::ready(PointTableRef table)
     {
         m_p->connector.reset(new connector::Connector(m_filespec));
         m_p->pool.reset(new ThreadPool(m_args->m_threads));
+    }
+
+    if (table.supportsView() && !Utils::isRemote(m_filename) &&
+        m_args->m_resolution == 0 &&
+        m_args->m_bounds.spatialReference().empty() &&
+        m_args->m_polys.empty() && m_args->m_addons.empty() &&
+        m_args->m_ogr.empty() && !m_args->m_ignoreUnreadable)
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        const std::string bounds = boundsOption(m_args->m_bounds);
+        if (!bounds.empty())
+            addOption(options, "bounds", bounds);
+        if (!m_args->m_origin.empty())
+            addOption(options, "origin", m_args->m_origin);
+        pdal_reader_t* reader = pdal_reader_create_ept(options);
+        if (!reader)
+        {
+            pdal_options_destroy(options);
+            rust_view_converter::throwLastError(
+                "Failed to create Rust EPT reader.");
+        }
+        m_p->rustView = pdal_reader_read_first(reader);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        if (!m_p->rustView)
+            rust_view_converter::throwLastError("Rust EPT reader failed.");
+        return;
     }
 
     if (m_queryOriginId != -1 &&
@@ -904,6 +972,22 @@ point_count_t EptReader::read(PointViewPtr view, point_count_t count)
                    "PDAL must be configured with WITH_ZSTD=On");
 #endif
 
+    if (m_p->rustView)
+    {
+        point_count_t numRead = 0;
+        PointRef point(*view);
+        while (numRead < count &&
+               m_p->rustIndex < pdal_point_view_length(m_p->rustView))
+        {
+            point.setPointId(view->size());
+            rust_view_converter::fromRustPoint(m_p->rustView, m_p->rustIndex,
+                                               point);
+            ++m_p->rustIndex;
+            ++numRead;
+        }
+        return numRead;
+    }
+
     point_count_t numRead = 0;
 
     if (m_p->hierarchy->size())
@@ -962,6 +1046,12 @@ void EptReader::process(PointViewPtr dstView, const ept::TileContents& tile,
 
 void EptReader::done(PointTableRef)
 {
+    if (m_p->rustView)
+    {
+        pdal_point_view_destroy(m_p->rustView);
+        m_p->rustView = nullptr;
+        m_p->rustIndex = 0;
+    }
     m_p->done = true;
     m_p->pool->await();
     m_p->connector.reset();
@@ -969,6 +1059,16 @@ void EptReader::done(PointTableRef)
 
 bool EptReader::processOne(PointRef& point)
 {
+    if (m_p->rustView)
+    {
+        if (m_p->rustIndex >= pdal_point_view_length(m_p->rustView))
+            return false;
+        rust_view_converter::fromRustPoint(m_p->rustView, m_p->rustIndex,
+                                           point);
+        ++m_p->rustIndex;
+        return true;
+    }
+
 top:
     if (m_tileCount == 0)
         return false;

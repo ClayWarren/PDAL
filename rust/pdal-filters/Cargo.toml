@@ -12,3 +12,4 @@ serde_json = "1"
 
 [dev-dependencies]
 pdal-io = { path = "../pdal-io" }
+tempfile = "3.27.0"
