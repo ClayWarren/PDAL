@@ -92,7 +92,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_colorinterp_test": {"minmax", "badramp", "autorange", "k", "mad"},
     "pdal_filters_colorization_test": {"test1", "test2", "test3", "test5"},
     "pdal_filters_additional_merge_test": ALL,
-    "pdal_filters_hag_test": {"dem", "dem_clamps"},
+    "pdal_filters_hag_test": {"dem", "dem_clamps", "neighbors", "closest"},
     "pdal_filters_h3_test": {"stream_test_2"},
     "pdal_filters_geomdistance_test": {"test_polygon"},
     "pdal_filters_faceraster_test": ALL,
@@ -220,7 +220,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_reciprocity_test": ALL,
     "pdal_filters_skewness_test": ALL,
     "pdal_filters_zsmooth_test": {"medianpercent_selects_neighbor_z"},
-    "pdal_filters_chipper_test": {"issue_2479", "empty_buffer"},
+    "pdal_filters_chipper_test": {"issue_2479", "empty_buffer", "test_construction"},
     "pdal_filters_groupby_test": ALL,
     "pdal_filters_merge_test": ALL,
     "pdal_filters_sort_test": {

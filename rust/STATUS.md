@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `515 / 917` built C++ GoogleTest cases, or `56.16%`, are
+Current checkpoint: `518 / 917` built C++ GoogleTest cases, or `56.49%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -266,8 +266,16 @@ Known mixed binaries:
 - `pdal_filters_colorization_test`: `test1`, `test2`, `test3`, and `test5`
   count. Color sampling and point updates route through the Rust C ABI. Invalid
   dimension-name validation remains C++ layout behavior.
-- `pdal_filters_hag_test`: `dem` and `dem_clamps` count for `filters.hag_dem`.
-  The DEM sampling and HAG assignment route through the Rust C ABI.
+- `pdal_filters_hag_test`: `dem` and `dem_clamps` count for `filters.hag_dem`;
+  `neighbors` and `closest` count for `filters.hag_nn`. DEM sampling and
+  nearest-neighbor HAG assignment route through the Rust C ABI. Delaunay and
+  other hag variants remain C++.
+- `pdal_filters_chipper_test`: `issue_2479`, `empty_buffer`, and
+  `test_construction` count. View partitioning routes through the Rust C ABI.
+  Factory smoke coverage remains C++ wrapper behavior.
+- `pdal_filters_ferry_test`: `stream` and `test_ferry_copy_json` count.
+  Dimension ferrying routes through the Rust C ABI in batch and streaming paths.
+  Stage factory smoke coverage remains C++ wrapper behavior.
 - `pdal_filters_h3_test`: only `stream_test_2` counts; H3 indexing routes
   through the Rust C ABI. Stage creation remains C++ factory behavior.
 - `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry

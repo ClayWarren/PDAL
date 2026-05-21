@@ -81,6 +81,7 @@ private:
 
     StringList m_dimSpec;
     std::vector<Info> m_dims;
+    PointLayoutPtr m_layout;
     pdal_stage* m_rust_stage;
 };
 

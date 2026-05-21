@@ -112,6 +112,7 @@ void FerryFilter::initialize()
 
 void FerryFilter::addDimensions(PointLayoutPtr layout)
 {
+    m_layout = layout;
     for (auto& info : m_dims)
     {
         const Dimension::Id fromId = layout->findDim(info.m_fromName);
@@ -139,14 +140,16 @@ void FerryFilter::prepared(PointTableRef table)
 
 bool FerryFilter::processOne(PointRef& point)
 {
-    for (const auto& info : m_dims)
-    {
-        if (info.m_fromId != Dimension::Id::Unknown)
-        {
-            double v = point.getFieldAs<double>(info.m_fromId);
-            point.setField(info.m_toId, v);
-        }
-    }
+    if (!m_rust_stage)
+        throwError("Rust ferry stage was not initialized.");
+
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    pdal_stage_ferry_point(m_rust_stage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust ferry stage failed.");
     return true;
 }
 
