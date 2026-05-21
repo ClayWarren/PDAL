@@ -1,6 +1,6 @@
 #include "RadiusAssignFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>

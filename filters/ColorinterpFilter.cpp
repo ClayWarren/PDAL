@@ -48,7 +48,7 @@
 #include <cpl_vsi.h>
 
 #include "ColorInterpRamps.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {

@@ -34,7 +34,7 @@
 
 #include "VoxelCentroidNearestNeighborFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal_capi.h>
 

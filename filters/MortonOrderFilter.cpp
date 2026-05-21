@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "MortonOrderFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <climits>
 #include <iostream>

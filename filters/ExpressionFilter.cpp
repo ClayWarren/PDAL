@@ -37,7 +37,7 @@
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <string>
 #include <vector>

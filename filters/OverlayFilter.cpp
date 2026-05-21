@@ -44,7 +44,7 @@
 #include <pdal/private/gdal/SpatialRef.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {

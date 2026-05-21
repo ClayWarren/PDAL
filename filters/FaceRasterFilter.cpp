@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include "FaceRasterFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/private/Raster.hpp>
 #include <pdal_capi.h>

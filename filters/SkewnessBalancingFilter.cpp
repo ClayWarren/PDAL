@@ -34,7 +34,7 @@
 
 #include "SkewnessBalancingFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>

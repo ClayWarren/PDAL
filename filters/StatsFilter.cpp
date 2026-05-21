@@ -34,7 +34,7 @@
  ****************************************************************************/
 
 #include "StatsFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include <cmath>
 #include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>

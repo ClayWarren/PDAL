@@ -35,7 +35,7 @@
 
 #include "AssignFilter.hpp"
 #include "private/DimRange.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include "private/expr/AssignStatement.hpp"
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>

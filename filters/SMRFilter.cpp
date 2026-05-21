@@ -45,7 +45,7 @@
 #include <pdal/util/ProgramArgs.hpp>
 
 #include "private/DimRange.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include "private/Segmentation.hpp"
 
 #include <pdal_capi.h>

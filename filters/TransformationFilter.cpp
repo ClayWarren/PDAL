@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include "TransformationFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/FileUtils.hpp>
 
 #include <Eigen/Dense>

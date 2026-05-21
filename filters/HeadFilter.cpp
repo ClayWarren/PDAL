@@ -35,7 +35,7 @@
 
 #include <pdal_capi.h>
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {

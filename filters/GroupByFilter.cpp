@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include "GroupByFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/util/ProgramArgs.hpp>
 

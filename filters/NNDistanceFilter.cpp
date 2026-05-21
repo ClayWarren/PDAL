@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include "NNDistanceFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal_capi.h>
 

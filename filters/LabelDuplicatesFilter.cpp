@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include "LabelDuplicatesFilter.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <string>
 #include <vector>

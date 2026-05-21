@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "RasterWriter.hpp"
-#include "../filters/private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/PointView.hpp>
 #include <pdal_capi.h>

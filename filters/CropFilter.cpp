@@ -44,7 +44,7 @@
 #include <pdal_capi.h>
 
 #include "private/Point.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include "private/pnp/GridPnp.hpp"
 
 #include <cstdarg>

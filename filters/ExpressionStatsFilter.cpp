@@ -35,7 +35,7 @@
 #include "ExpressionStatsFilter.hpp"
 
 #include "private/RustMetadata.hpp"
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>

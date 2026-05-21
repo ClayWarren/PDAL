@@ -39,7 +39,7 @@
 #include <pdal/util/Utils.hpp>
 #include <pdal_capi.h>
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include "private/DimRange.hpp"
 

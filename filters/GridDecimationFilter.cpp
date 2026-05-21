@@ -45,7 +45,7 @@
 
 #include <cstdarg>
 #include <sstream>
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal_capi.h>
 
 extern "C" {

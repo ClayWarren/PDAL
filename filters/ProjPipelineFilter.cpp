@@ -34,7 +34,7 @@
 
 #include "ProjPipelineFilter.hpp"
 
-#include "private/RustViewConverter.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/PointView.hpp>
 #include <pdal/private/SrsTransform.hpp>
