@@ -308,6 +308,63 @@ fn spz_reader_returns_points_through_c_abi() {
 }
 
 #[test]
+fn stac_reader_returns_local_asset_through_c_abi() {
+    unsafe {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!(
+            "pdal-capi-stac-reader-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::copy(
+            data_path("ply/simple_text.ply"),
+            dir.join("simple_text.ply"),
+        )
+        .unwrap();
+        let item = dir.join("item.json");
+        std::fs::write(
+            &item,
+            r#"{
+  "type": "Feature",
+  "assets": {
+    "data": {"href": "simple_text.ply", "type": "application/octet-stream"}
+  }
+}"#,
+        )
+        .unwrap();
+
+        let options = pdal_options_create();
+        {
+            let key = CString::new("filename").unwrap();
+            let value = CString::new(item.display().to_string()).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let reader = pdal_reader_create_stac(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(
+            !view.is_null(),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert_eq!(pdal_point_view_length(view), 3);
+
+        let x = CString::new("X").unwrap();
+        assert_eq!(pdal_point_view_get_f64(view, 0, x.as_ptr()), -1.0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn writer_write_view_consumes_point_view_through_c_abi() {
     unsafe {
         let mut filename = std::env::temp_dir();
@@ -351,6 +408,62 @@ fn writer_write_view_consumes_point_view_through_c_abi() {
             std::fs::read_to_string(&filename).unwrap(),
             "\"X\",\"Y\",\"Z\"\n1.2,2.5,3.8\n"
         );
+
+        let _ = std::fs::remove_file(&filename);
+        pdal_writer_destroy(writer);
+        pdal_point_view_destroy(view);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
+fn ogr_writer_writes_geojson_through_c_abi() {
+    unsafe {
+        let mut filename = std::env::temp_dir();
+        filename.push(format!(
+            "pdal-capi-ogr-writer-{}-{}.geojson",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let filename_text = filename.display().to_string();
+
+        let options = pdal_options_create();
+        for (key, value) in [
+            ("filename", filename_text.as_str()),
+            ("ogrdriver", "GeoJSON"),
+            ("attr_dims", "Intensity"),
+        ] {
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let layout = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "Intensity"] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        let view = pdal_point_view_create(layout);
+        let point = pdal_point_view_add_point(view);
+        for (dim, value) in [("X", 1.0), ("Y", 2.0), ("Z", 3.0), ("Intensity", 10.0)] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+        }
+
+        let writer = pdal_writer_create_ogr(options);
+        assert!(!writer.is_null());
+        assert!(
+            pdal_writer_write_view(writer, view),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&filename).unwrap()).unwrap();
+        assert_eq!(json["type"], "FeatureCollection");
+        assert_eq!(json["features"][0]["properties"]["Intensity"], 10.0);
 
         let _ = std::fs::remove_file(&filename);
         pdal_writer_destroy(writer);

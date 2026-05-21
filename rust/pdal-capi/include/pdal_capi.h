@@ -710,6 +710,9 @@ extern "C"
     pdal_reader_t* pdal_reader_create_las(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_laz(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_spz(const pdal_options_t* ops);
+    pdal_reader_t* pdal_reader_create_stac(const pdal_options_t* ops);
+    pdal_reader_t* pdal_reader_create_copc(const pdal_options_t* ops);
+    pdal_reader_t* pdal_reader_create_ept(const pdal_options_t* ops);
     pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
     pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
     pdal_metadata_node_t* pdal_ilvis2_metadata_read(const char* filename);
@@ -739,6 +742,7 @@ extern "C"
     pdal_writer_t* pdal_writer_create_las(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_laz(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_spz(const pdal_options_t* ops);
+    pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);
     bool pdal_writer_write_view(pdal_writer_t* writer,
                                 const pdal_point_view_t* view);
     void pdal_writer_destroy(pdal_writer_t* writer);
