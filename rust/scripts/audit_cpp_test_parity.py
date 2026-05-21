@@ -91,6 +91,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_hag_test": {"dem", "dem_clamps"},
     "pdal_filters_h3_test": {"stream_test_2"},
     "pdal_filters_geomdistance_test": {"test_polygon"},
+    "pdal_filters_faceraster_test": ALL,
     "pdal_filters_overlay_test": ALL,
     "pdal_filters_reprojection_test": ALL,
     "pdal_filters_divider_test": {
