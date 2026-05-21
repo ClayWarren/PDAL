@@ -743,6 +743,8 @@ extern "C"
     pdal_writer_t* pdal_writer_create_laz(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_spz(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);
+    pdal_writer_t* pdal_writer_create_gdal(const pdal_options_t* ops);
+    pdal_writer_t* pdal_writer_create_raster(const pdal_options_t* ops);
     bool pdal_writer_write_view(pdal_writer_t* writer,
                                 const pdal_point_view_t* view);
     void pdal_writer_destroy(pdal_writer_t* writer);

@@ -473,6 +473,127 @@ fn ogr_writer_writes_geojson_through_c_abi() {
 }
 
 #[test]
+fn gdal_writer_writes_raster_through_c_abi() {
+    unsafe {
+        let mut filename = std::env::temp_dir();
+        filename.push(format!(
+            "pdal-capi-gdal-writer-{}-{}.tif",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let filename_text = filename.display().to_string();
+
+        let options = pdal_options_create();
+        for (key, value) in [
+            ("filename", filename_text.as_str()),
+            ("gdaldriver", "GTiff"),
+            ("resolution", "1"),
+            ("output_type", "count"),
+        ] {
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let layout = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z"] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        let view = pdal_point_view_create(layout);
+        for (x, y, z) in [(0.25, 0.25, 1.0), (1.25, 0.25, 2.0), (0.25, 1.25, 3.0)] {
+            let point = pdal_point_view_add_point(view);
+            for (dim, value) in [("X", x), ("Y", y), ("Z", z)] {
+                let name = CString::new(dim).unwrap();
+                pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+            }
+        }
+
+        let writer = pdal_writer_create_gdal(options);
+        assert!(!writer.is_null());
+        assert!(
+            pdal_writer_write_view(writer, view),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert!(std::fs::metadata(&filename).unwrap().len() > 0);
+
+        let _ = std::fs::remove_file(&filename);
+        pdal_writer_destroy(writer);
+        pdal_point_view_destroy(view);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
+fn raster_writer_writes_attachment_through_c_abi() {
+    unsafe {
+        let mut filename = std::env::temp_dir();
+        filename.push(format!(
+            "pdal-capi-raster-writer-{}-{}.tif",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let filename_text = filename.display().to_string();
+
+        let options = pdal_options_create();
+        for (key, value) in [
+            ("filename", filename_text.as_str()),
+            ("gdaldriver", "GTiff"),
+            ("rasters", "faceraster"),
+        ] {
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let layout = pdal_point_layout_create();
+        let view = pdal_point_view_create(layout);
+        let name = CString::new("faceraster").unwrap();
+        let limits = pdal_raster_limits_t {
+            x_origin: 10.0,
+            y_origin: 20.0,
+            width: 2,
+            height: 2,
+            edge_length: 1.0,
+        };
+        assert!(pdal_point_view_create_raster(
+            view,
+            name.as_ptr(),
+            &limits,
+            -9999.0
+        ));
+        assert!(pdal_point_view_set_raster_cell(
+            view,
+            name.as_ptr(),
+            0,
+            0,
+            42.0
+        ));
+
+        let writer = pdal_writer_create_raster(options);
+        assert!(!writer.is_null());
+        assert!(
+            pdal_writer_write_view(writer, view),
+            "{}",
+            CStr::from_ptr(pdal_last_error()).to_string_lossy()
+        );
+        assert!(std::fs::metadata(&filename).unwrap().len() > 0);
+
+        let _ = std::fs::remove_file(&filename);
+        pdal_writer_destroy(writer);
+        pdal_point_view_destroy(view);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn las_writer_writes_view_through_c_abi() {
     unsafe {
         let mut filename = std::env::temp_dir();

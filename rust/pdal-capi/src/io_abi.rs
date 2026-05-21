@@ -580,6 +580,34 @@ pub unsafe extern "C" fn pdal_writer_create_ogr(ops: *const Options) -> *mut Wri
     }
 }
 
+/// Create a GdalWriter from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_gdal(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::gdal_writer::GdalWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a RasterWriter from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_raster(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::raster_writer::RasterWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Write a point view with a writer.
 ///
 /// # Safety
