@@ -494,8 +494,7 @@ void LasReader::ready(PointTableRef table)
     if (getNumPoints() == 0)
         return;
 
-    const bool useRustReader =
-        d->opts.extraDimSpec.empty() && !d->opts.ignoreMissingVLRs;
+    const bool useRustReader = d->opts.extraDimSpec.empty();
 
     if (useRustReader && d->rustView)
     {
@@ -511,6 +510,8 @@ void LasReader::ready(PointTableRef table)
         pdal_options_add_u64(options, "count", getNumPoints());
         pdal_options_add_str(options, "nosrs",
                              d->opts.nosrs ? "true" : "false");
+        pdal_options_add_str(options, "ignore_missing_vlrs",
+                             d->opts.ignoreMissingVLRs ? "true" : "false");
 
         pdal_reader_t* reader = pdal_reader_create_las(options);
         if (!reader)

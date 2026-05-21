@@ -103,6 +103,7 @@ private:
     int m_srsCnt;
 
     MetadataNode m_forwardMetadata;
+    MetadataNode m_tableMetadata;
     bool m_firstPoint;
 
     void addArgs(ProgramArgs& args) override;

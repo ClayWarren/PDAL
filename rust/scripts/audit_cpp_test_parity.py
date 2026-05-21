@@ -366,6 +366,7 @@ COVERED: dict[str, object] = {
         "Start",
         "SyntheticPoints",
         "extraBytes",
+        "IgnoreBadVLRs",
     },
     "pdal_io_las_writer_test": {
         "srs",
@@ -393,6 +394,8 @@ COVERED: dict[str, object] = {
         "las10_classification_from_las14_classflags",
         "las14_classflags_from_las10_classification",
         "las14_classflags_from_las14_classflags",
+        "pdal_metadata",
+        "flex_vlr",
     },
     "pdal_io_ilvis2_test": ALL,
     "pdal_io_ilvis2_metadata_test": ALL,

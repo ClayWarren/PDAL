@@ -20,6 +20,10 @@ const HEADER_MAX_X_OFFSET: u64 = 179;
 const LEGACY_POINT_COUNT_OFFSET: u64 = 107;
 const LEGACY_POINTS_BY_RETURN_OFFSET: u64 = 111;
 const SCAN_ANGLE_SCALE_FACTOR: f64 = 0.006;
+const PDAL_USER_ID: &str = "PDAL";
+const PDAL_METADATA_RECORD_ID: u16 = 12;
+const PDAL_PIPELINE_RECORD_ID: u16 = 13;
+const MAX_VLR_DATA_SIZE: usize = u16::MAX as usize;
 
 pub struct LasWriter {
     filename: String,
@@ -40,6 +44,8 @@ pub struct LasWriter {
     project_id: Option<uuid::Uuid>,
     global_encoding: Option<u16>,
     a_srs: Option<String>,
+    pdal_metadata_json: Option<String>,
+    pdal_pipeline_json: Option<String>,
     forward_vlrs: Vec<ForwardedVlr>,
 }
 
@@ -92,6 +98,8 @@ impl LasWriter {
                 .and_then(|value| uuid::Uuid::parse_str(value.trim()).ok()),
             global_encoding: numeric_option_u16(options, "global_encoding"),
             a_srs: string_option(options, "a_srs"),
+            pdal_metadata_json: string_option(options, "pdal_metadata_json"),
+            pdal_pipeline_json: string_option(options, "pdal_pipeline_json"),
             forward_vlrs: forward_vlrs_from_options(options),
         }
     }
@@ -184,6 +192,11 @@ impl Writer for LasWriter {
         let path = Path::new(&self.filename);
         let should_compress = self.should_compress(path);
         let mut builder = self.initial_builder(views)?;
+        add_pdal_vlrs(
+            &mut builder,
+            self.pdal_metadata_json.as_deref(),
+            self.pdal_pipeline_json.as_deref(),
+        );
         let extra_dims = extra_dims_from_views(views, self.point_format);
         add_extra_bytes_vlr(&mut builder, &extra_dims)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
@@ -280,6 +293,31 @@ fn forward_vlrs_from_options(options: &Options) -> Vec<ForwardedVlr> {
             })
         })
         .collect()
+}
+
+fn add_pdal_vlrs(builder: &mut Builder, metadata_json: Option<&str>, pipeline_json: Option<&str>) {
+    let supports_evlr = builder.version.minor >= 4;
+
+    if let Some(json) = metadata_json {
+        if json.len() <= MAX_VLR_DATA_SIZE || supports_evlr {
+            builder.vlrs.push(Vlr {
+                user_id: PDAL_USER_ID.to_string(),
+                record_id: PDAL_METADATA_RECORD_ID,
+                description: "PDAL metadata".to_string(),
+                data: json.as_bytes().to_vec(),
+            });
+        }
+    }
+    if let Some(json) = pipeline_json {
+        if json.len() <= MAX_VLR_DATA_SIZE || supports_evlr {
+            builder.vlrs.push(Vlr {
+                user_id: PDAL_USER_ID.to_string(),
+                record_id: PDAL_PIPELINE_RECORD_ID,
+                description: "PDAL pipeline".to_string(),
+                data: json.as_bytes().to_vec(),
+            });
+        }
+    }
 }
 
 fn add_forward_vlrs(builder: &mut Builder, forward_vlrs: &[ForwardedVlr]) {

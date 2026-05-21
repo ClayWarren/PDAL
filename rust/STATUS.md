@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `493 / 917` built C++ GoogleTest cases, or `53.76%`, are
+Current checkpoint: `496 / 917` built C++ GoogleTest cases, or `54.09%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -311,18 +311,18 @@ Known mixed binaries:
   metadata tree implementation is still C++.
 - `pdal_io_las_reader_test`: `test_sequential`, `test_different_formats`,
   `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, `Start`,
-  `SyntheticPoints`, and `extraBytes` count. LAS point materialization routes
-  through the Rust C ABI for the supported subset; header, VLR, SRS, extra-byte
-  override, and bad-VLR recovery remain C++.
+  `SyntheticPoints`, `extraBytes`, and `IgnoreBadVLRs` count. LAS point
+  materialization routes through the Rust C ABI for the supported subset; header,
+  VLR, SRS, extra-byte override, and LAZ bad-VLR recovery remain C++.
 - `pdal_io_las_writer_test`: `srs`, `srs2`, `flex`, `flex2`, `forward`, `header_bbox`,
   `issue2235`, `issue2320`, `issue3288`, `issue3652`, `issue3964`, `lazperf`, `stream`,
   `compressed1_4`, `auto_offset`, `auto_offset2`, `auto_scale_with_auto_offset`, `issue1940`,
-  `forwardvlr`, `forward_spec_3`, `issue2663`, and the four LAS 1.0/1.4 classification roundtrip
-  tests count. Rust LAS/LAZ point materialization, scaled header bounds, format 6+ uncompressed
-  and compressed writes, header and VLR forwarding (excluding user/metadata VLRs),
-  auto scale/offset, legacy header count zeroing, and supported header options route
-  through the Rust C ABI for the gated subset. User/metadata VLR behavior and C++
-  header inspection tests remain legacy.
+  `forwardvlr`, `forward_spec_3`, `issue2663`, `pdal_metadata`, `flex_vlr`, and the four LAS
+  1.0/1.4 classification roundtrip tests count. Rust LAS/LAZ point materialization, scaled
+  header bounds, format 6+ uncompressed and compressed writes, header and VLR forwarding
+  (excluding user VLRs), PDAL metadata/pipeline VLRs, auto scale/offset, legacy header count
+  zeroing, and supported header options route through the Rust C ABI for the gated subset.
+  User VLR behavior and C++ header inspection tests remain legacy.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`

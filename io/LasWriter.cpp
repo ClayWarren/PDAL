@@ -393,6 +393,8 @@ void LasWriter::readyTable(PointTableRef table)
         m_forwardMetadata = table.privateMetadata("lasforward");
         m_rustLayout = table.layout();
         m_firstPoint = true;
+        if (d->opts.writePDALMetadata)
+            m_tableMetadata = table.metadata();
         return;
     }
 
@@ -1310,8 +1312,6 @@ bool LasWriter::useRustWriter() const
 {
     if (!d->opts.extraDimSpec.empty())
         return false;
-    if (d->opts.writePDALMetadata)
-        return false;
     if (!d->opts.userVlrs.empty())
         return false;
     if (d->opts.discardHighReturnNumbers)
@@ -1416,6 +1416,13 @@ void LasWriter::writeRustOutput()
     {
         addForwardVlrsToOptions(options, m_forwardMetadata, m_srs.valid(),
                                 d->opts.compression == las::Compression::True);
+    }
+    if (d->opts.writePDALMetadata)
+    {
+        addOption(options, "pdal_metadata_json", Utils::toJSON(m_tableMetadata));
+        std::ostringstream ostr;
+        PipelineWriter::writePipeline(this, ostr);
+        addOption(options, "pdal_pipeline_json", ostr.str());
     }
 
     std::string ext = FileUtils::extension(d->curFilename);

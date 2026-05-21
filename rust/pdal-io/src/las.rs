@@ -11,17 +11,21 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::io::{Cursor, Read};
+use std::cmp::Ordering;
+use std::fs::File;
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
+use std::rc::Rc;
 
 const SCAN_ANGLE_SCALE_FACTOR: f64 = 0.006;
-use std::rc::Rc;
+const VLR_HEADER_SIZE: u64 = 54;
 
 pub struct LasReader {
     filename: String,
     start: u64,
     count: Option<u64>,
     nosrs: bool,
+    ignore_missing_vlrs: bool,
     metadata: MetadataNode,
 }
 
@@ -41,6 +45,7 @@ impl LasReader {
             start: options.get_u64("start", 0),
             count: options.has("count").then(|| options.get_u64("count", 0)),
             nosrs: options.get_bool("nosrs", false),
+            ignore_missing_vlrs: options.get_bool("ignore_missing_vlrs", false),
             metadata: MetadataNode::new("readers.las"),
         }
     }
@@ -120,10 +125,32 @@ impl LasReader {
         {
             let point =
                 point.map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
-            let id = view.add_point();
-            set_standard_dims(view, id, &point, point_format);
-            set_optional_dims(view, id, &point);
-            set_extra_dims(view, id, &point, extra_dims)?;
+            append_point(view, &point, point_format, extra_dims)?;
+        }
+        Ok(())
+    }
+
+    fn read_points_from_stream<R: Read + Seek>(
+        &self,
+        read: &mut R,
+        header: &Header,
+        point_format: u8,
+        view: &mut PointView,
+        extra_dims: &[ExtraDim],
+    ) -> Result<(), StageError> {
+        let point_count = header.number_of_points();
+        let take_count = self.count.unwrap_or(point_count.saturating_sub(self.start));
+        let format = header.point_format();
+
+        for _ in 0..self.start {
+            las::raw::Point::read_from(&mut *read, format)
+                .map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
+        }
+        for _ in 0..take_count {
+            let raw_point = las::raw::Point::read_from(&mut *read, format)
+                .map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
+            let point = las::Point::new(raw_point, header.transforms());
+            append_point(view, &point, point_format, extra_dims)?;
         }
         Ok(())
     }
@@ -141,31 +168,58 @@ impl Reader for LasReader {
             ));
         }
 
-        let mut reader = las::Reader::from_path(Path::new(&self.filename))
-            .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
+        let path = Path::new(&self.filename);
+        let view = if self.ignore_missing_vlrs {
+            let file = File::open(path)
+                .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
+            let mut read = BufReader::new(file);
+            let raw_header = las::raw::Header::read_from(&mut read)
+                .map_err(|e| StageError(format!("Failed to read LAS header: {}", e)))?;
+            let header = read_header_lenient(&mut read, raw_header)?;
+            let point_count = header.number_of_points();
+            let point_format = header.point_format().to_u8().unwrap_or(3);
+            if self.start >= point_count && point_count > 0 {
+                return Err(StageError(format!(
+                    "LAS start point {} is outside the file's {} points.",
+                    self.start, point_count
+                )));
+            }
 
-        let header = reader.header();
-        let point_count = header.number_of_points();
-        let point_format = header.point_format().to_u8().unwrap_or(3);
-        if self.start >= point_count && point_count > 0 {
-            return Err(StageError(format!(
-                "LAS start point {} is outside the file's {} points.",
-                self.start, point_count
-            )));
-        }
+            self.add_metadata(&header);
+            let (layout, extra_dims) = las_layout(&header)?;
 
-        self.add_metadata(header);
-        let (layout, extra_dims) = las_layout(header)?;
+            let mut view = PointView::new(Rc::new(layout));
+            self.set_spatial_reference(&mut view, &header);
+            self.read_points_from_stream(&mut read, &header, point_format, &mut view, &extra_dims)?;
+            view
+        } else {
+            let mut reader = las::Reader::from_path(path)
+                .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
 
-        let mut view = PointView::new(Rc::new(layout));
-        self.set_spatial_reference(&mut view, header);
-        self.read_points(
-            &mut reader,
-            point_count,
-            point_format,
-            &mut view,
-            &extra_dims,
-        )?;
+            let header = reader.header();
+            let point_count = header.number_of_points();
+            let point_format = header.point_format().to_u8().unwrap_or(3);
+            if self.start >= point_count && point_count > 0 {
+                return Err(StageError(format!(
+                    "LAS start point {} is outside the file's {} points.",
+                    self.start, point_count
+                )));
+            }
+
+            self.add_metadata(header);
+            let (layout, extra_dims) = las_layout(header)?;
+
+            let mut view = PointView::new(Rc::new(layout));
+            self.set_spatial_reference(&mut view, header);
+            self.read_points(
+                &mut reader,
+                point_count,
+                point_format,
+                &mut view,
+                &extra_dims,
+            )?;
+            view
+        };
 
         Ok(vec![view])
     }
@@ -173,6 +227,154 @@ impl Reader for LasReader {
     fn metadata(&self) -> MetadataNode {
         self.metadata.clone()
     }
+}
+
+enum VlrReadResult {
+    Ok(las::Vlr),
+    Stop,
+}
+
+fn read_vlr_lenient<R: Read + Seek>(read: &mut R, point_offset: u64) -> VlrReadResult {
+    let vlr_start = match read.stream_position() {
+        Ok(position) => position,
+        Err(_) => return VlrReadResult::Stop,
+    };
+
+    let mut header_buf = [0u8; VLR_HEADER_SIZE as usize];
+    if read.read_exact(&mut header_buf).is_err() {
+        return VlrReadResult::Stop;
+    }
+
+    let data_len = u64::from(u16::from_le_bytes([header_buf[20], header_buf[21]]));
+    if vlr_start + VLR_HEADER_SIZE + data_len > point_offset {
+        return VlrReadResult::Stop;
+    }
+
+    let mut data = vec![0u8; data_len as usize];
+    if read.read_exact(&mut data).is_err() {
+        return VlrReadResult::Stop;
+    }
+
+    let mut user_id = [0u8; 16];
+    user_id.copy_from_slice(&header_buf[2..18]);
+    let mut description = [0u8; 32];
+    description.copy_from_slice(&header_buf[22..54]);
+    let raw_vlr = las::raw::Vlr {
+        reserved: u16::from_le_bytes([header_buf[0], header_buf[1]]),
+        user_id,
+        record_id: u16::from_le_bytes([header_buf[18], header_buf[19]]),
+        record_length_after_header: las::raw::vlr::RecordLength::Vlr(u16::from_le_bytes([
+            header_buf[20],
+            header_buf[21],
+        ])),
+        description,
+        data,
+    };
+    VlrReadResult::Ok(las::Vlr::new(raw_vlr))
+}
+
+fn read_header_lenient<R: Read + Seek>(
+    read: &mut R,
+    raw_header: las::raw::Header,
+) -> Result<Header, StageError> {
+    let point_format = las::point::Format::new(raw_header.point_data_record_format)
+        .map_err(|e| StageError(format!("Invalid LAS point format: {}", e)))?;
+    if point_format.is_compressed {
+        return Err(StageError(
+            "ignore_missing_vlrs is not supported for LAZ files.".to_string(),
+        ));
+    }
+
+    let mut position = u64::from(raw_header.header_size);
+    let vlr_count = raw_header.number_of_variable_length_records;
+    let offset_to_point_data = u64::from(raw_header.offset_to_point_data);
+    let offset_to_end_of_points = raw_header.offset_to_end_of_points();
+    let evlr = raw_header.evlr;
+
+    let mut builder = las::Builder::new(raw_header)
+        .map_err(|e| StageError(format!("Failed to build LAS header: {}", e)))?;
+
+    for _ in 0..vlr_count {
+        match read_vlr_lenient(read, offset_to_point_data) {
+            VlrReadResult::Ok(vlr) => {
+                position += vlr.len(false) as u64;
+                builder.vlrs.push(vlr);
+            }
+            VlrReadResult::Stop => break,
+        }
+    }
+
+    match position.cmp(&offset_to_point_data) {
+        Ordering::Less => {
+            read.by_ref()
+                .take(offset_to_point_data - position)
+                .read_to_end(&mut builder.vlr_padding)
+                .map_err(|e| StageError(format!("Failed to read LAS VLR padding: {}", e)))?;
+        }
+        Ordering::Equal => {}
+        Ordering::Greater => {
+            return Err(StageError(format!(
+                "LAS offset to point data ({}) is too small.",
+                offset_to_point_data
+            )));
+        }
+    }
+
+    read.seek(SeekFrom::Start(offset_to_end_of_points))
+        .map_err(|e| StageError(format!("Failed to seek LAS point data: {}", e)))?;
+    if let Some(evlr) = evlr {
+        if !builder.point_format.is_compressed {
+            match evlr.start_of_first_evlr.cmp(&offset_to_end_of_points) {
+                Ordering::Less => {
+                    return Err(StageError(format!(
+                        "LAS offset to EVLRs ({}) is too small.",
+                        evlr.start_of_first_evlr
+                    )));
+                }
+                Ordering::Equal => {}
+                Ordering::Greater => {
+                    let n = evlr.start_of_first_evlr - offset_to_end_of_points;
+                    read.by_ref()
+                        .take(n)
+                        .read_to_end(&mut builder.point_padding)
+                        .map_err(|e| {
+                            StageError(format!("Failed to read LAS point padding: {}", e))
+                        })?;
+                }
+            }
+        }
+        read.seek(SeekFrom::Start(evlr.start_of_first_evlr))
+            .map_err(|e| StageError(format!("Failed to seek LAS EVLRs: {}", e)))?;
+        let evlr = las::raw::Vlr::read_from(read.by_ref(), true)
+            .map(las::Vlr::new)
+            .map_err(|e| StageError(format!("Failed to read LAS EVLR: {}", e)))?;
+        builder.evlrs.push(evlr);
+    }
+
+    read.seek(SeekFrom::Start(offset_to_point_data))
+        .map_err(|e| StageError(format!("Failed to seek LAS point data: {}", e)))?;
+
+    if let Some(version) = builder.minimum_supported_version() {
+        if version > builder.version {
+            builder.version = version;
+        }
+    }
+
+    builder
+        .into_header()
+        .map_err(|e| StageError(format!("Failed to finalize LAS header: {}", e)))
+}
+
+fn append_point(
+    view: &mut PointView,
+    point: &las::Point,
+    point_format: u8,
+    extra_dims: &[ExtraDim],
+) -> Result<(), StageError> {
+    let id = view.add_point();
+    set_standard_dims(view, id, point, point_format);
+    set_optional_dims(view, id, point);
+    set_extra_dims(view, id, point, extra_dims)
 }
 
 fn las_layout(header: &Header) -> Result<(PointLayout, Vec<ExtraDim>), StageError> {
@@ -534,5 +736,19 @@ mod tests {
         let view = &views[0];
         assert_eq!(view.get_f64(0, &DimId::Classification), 0.0);
         assert_eq!(view.get_f64(0, &DimId::Synthetic), 1.0);
+    }
+
+    #[test]
+    fn reader_tolerates_missing_vlrs_when_requested() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/bad_vlr_count.las"
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+        options.add("ignore_missing_vlrs", "true");
+        let mut reader = LasReader::new(&options);
+        let views = reader.read().expect("read bad_vlr_count.las");
+        assert_eq!(views[0].len(), 10);
     }
 }
