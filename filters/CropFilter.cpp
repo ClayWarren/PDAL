@@ -84,9 +84,12 @@ std::string CropFilter::getName() const
     return s_info.name;
 }
 
-CropFilter::CropFilter() : m_args(new CropArgs), m_distance2(0.0) {}
+CropFilter::CropFilter() : m_args(new CropArgs), m_distance2(0.0), m_rustStage(nullptr) {}
 
-CropFilter::~CropFilter() {}
+CropFilter::~CropFilter()
+{
+    pdal_stage_destroy(m_rustStage);
+}
 
 void CropFilter::addArgs(ProgramArgs& args)
 {
@@ -152,32 +155,24 @@ void CropFilter::ready(PointTableRef table)
     }
     for (auto& geom : m_geoms)
         geom.m_poly.setSpatialReference(m_args->m_assignedSrs);
+
+    m_layout = table.layout();
 }
 
 bool CropFilter::processOne(PointRef& point)
 {
-    for (auto& g : m_geoms)
-        for (auto& gridPnp : g.m_gridPnps)
-            if (crop(point, *gridPnp))
-                return true;
+    if (!m_rustStage)
+        rebuildRustStage();
+    if (!m_rustStage)
+        throwError("Failed to create Rust crop stage.");
 
-    for (auto& box : m_boxes)
-        if (box.is3d())
-        {
-            if (crop(point, box.to3d()))
-                return true;
-        }
-        else
-        {
-            if (crop(point, box.to2d()))
-                return true;
-        }
-
-    for (auto& center : m_args->m_centers)
-        if (crop(point, center))
-            return true;
-
-    return false;
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust crop streaming failed.");
+    return keep;
 }
 
 void CropFilter::spatialReferenceChanged(const SpatialReference& srs)
@@ -204,7 +199,10 @@ void CropFilter::transform(const SpatialReference& srs)
 
     // If we don't have any SRS, do nothing.
     if (srs.empty() && m_args->m_assignedSrs.empty())
+    {
+        rebuildRustStage();
         return;
+    }
 
     // Note that we should never have assigned SRS empty here since
     // if it is missing we assign it from the point data.
@@ -229,11 +227,15 @@ void CropFilter::transform(const SpatialReference& srs)
     // Set the assigned SRS for the points/bounds to the one we've
     // transformed to.
     m_args->m_assignedSrs = srs;
+
+    rebuildRustStage();
 }
 
-PointViewSet CropFilter::run(PointViewPtr view)
+void CropFilter::rebuildRustStage()
 {
-    transform(view->spatialReference());
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = nullptr;
 
     std::vector<pdal_box3d_t> rustBounds;
     for (auto& box : m_boxes)
@@ -269,23 +271,27 @@ PointViewSet CropFilter::run(PointViewPtr view)
                                : std::numeric_limits<double>::quiet_NaN()});
     }
 
-    pdal_stage_t* stage = pdal_stage_create_crop(
+    m_rustStage = pdal_stage_create_crop(
         m_args->m_cropOutside, rustBounds.empty() ? nullptr : rustBounds.data(),
         rustBounds.size(), polygonPtrs.empty() ? nullptr : polygonPtrs.data(),
         polygonPtrs.size(), centers.empty() ? nullptr : centers.data(),
         centers.size(), m_args->m_distance);
-    if (!stage)
+    if (!m_rustStage)
     {
         const char* message = pdal_last_error();
         if (message && message[0])
             throwError(std::string("filters.crop: ") + message);
         throwError("Failed to create Rust crop stage.");
     }
+}
+
+PointViewSet CropFilter::run(PointViewPtr view)
+{
+    transform(view->spatialReference());
 
     PointViewSet viewSet = rust_view_converter::runMulti(
-        stage, view,
+        m_rustStage, view,
         m_geoms.size() + m_boxes.size() + m_args->m_centers.size());
-    pdal_stage_destroy(stage);
     return viewSet;
 }
 

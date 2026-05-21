@@ -105,6 +105,10 @@ void RangeFilter::prepared(PointTableRef table)
         pdal_stage_destroy(m_rust_stage);
 
     m_rust_stage = pdal_stage_create_range(limits.data(), limits.size());
+    if (!m_rust_stage)
+        throwError(pdal_last_error());
+
+    m_layout = layout;
 }
 
 // The range list is sorted by dimension, so the logic here should work
@@ -113,21 +117,22 @@ void RangeFilter::prepared(PointTableRef table)
 // common case.
 bool RangeFilter::processOne(PointRef& point)
 {
-    return DimRange::pointPasses(m_ranges, point);
+    if (!m_rust_stage)
+        throwError("Rust range stage was not initialized.");
+
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rust_stage, rustPoint, 0);
+    pdal_point_view_destroy(rustPoint);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust range streaming failed.");
+    return keep;
 }
 
 PointViewSet RangeFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
-    PointViewPtr outView = inView->makeNew();
-    PointRef point(*inView, 0);
-    for (PointId idx = 0; idx < inView->size(); ++idx)
-    {
-        point.setPointId(idx);
-        if (processOne(point))
-            outView->appendPoint(*inView, idx);
-    }
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rust_stage, inView));
     return viewSet;
 }
 

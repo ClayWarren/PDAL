@@ -88,6 +88,8 @@ COVERED: dict[str, object] = {
         "sphere",
         "test_crop_on_edge",
         "issue_3114",
+        "stream",
+        "bounds_inside_outside",
     },
     "pdal_filters_colorinterp_test": {"minmax", "badramp", "autorange", "k", "mad"},
     "pdal_filters_colorization_test": {"test1", "test2", "test3", "test5"},

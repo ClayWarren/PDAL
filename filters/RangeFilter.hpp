@@ -58,6 +58,7 @@ public:
 
 private:
     std::vector<DimRange> m_ranges;
+    PointLayoutPtr m_layout;
     pdal_stage* m_rust_stage;
 
     void addArgs(ProgramArgs& args) override;

@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `518 / 917` built C++ GoogleTest cases, or `56.49%`, are
+Current checkpoint: `520 / 917` built C++ GoogleTest cases, or `56.71%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -254,11 +254,12 @@ Known mixed binaries:
 - `pdal_ogr_arg_test`: only `parseErrors` counts; OGR JSON option validation
   routes through the Rust C ABI. Geometry loading and polygon extraction remain
   C++/GDAL.
-- `pdal_filters_crop_test`: only `test_crop`, `test_crop_3d`,
-  `test_crop_polygon`, `multibounds`, `circle`, `sphere`, and
-  `test_crop_on_edge` count. The crop selection itself routes through the Rust
-  C ABI. SRS reprojection, OGR geometry loading, and streaming `processOne`
-  behavior remain C++/GDAL.
+- `pdal_filters_crop_test`: `test_crop`, `test_crop_3d`, `test_crop_polygon`,
+  `test_crop_polygon_reprojection`, `test_crop_ogr`, `multibounds`, `circle`,
+  `sphere`, `test_crop_on_edge`, `issue_3114`, `stream`, and
+  `bounds_inside_outside` count. Crop selection routes through the Rust C ABI in
+  batch and streaming paths. SRS reprojection and OGR geometry loading remain
+  C++/GDAL.
 - `pdal_filters_colorinterp_test`: `minmax`, `badramp`, `autorange`, `k`, and
   `mad` count. Color interpolation execution routes through the Rust C ABI.
   Missing-dimension validation and streamability checks remain C++ wrapper

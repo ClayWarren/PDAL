@@ -15,18 +15,17 @@ pub struct RangeLimit {
 
 impl RangeLimit {
     pub fn value_passes(&self, v: f64) -> bool {
-        if v.is_nan() {
-            return self.negate;
-        }
-        let fail = (self.inclusive_lower && v < self.lower_bound)
+        let mut fail = (self.inclusive_lower && v < self.lower_bound)
             || (!self.inclusive_lower && v <= self.lower_bound)
             || (self.inclusive_upper && v > self.upper_bound)
             || (!self.inclusive_upper && v >= self.upper_bound);
-        if self.negate {
-            fail
-        } else {
-            !fail
+        if v.is_nan() {
+            fail = true;
         }
+        if self.negate {
+            fail = !fail;
+        }
+        !fail
     }
 }
 
@@ -62,24 +61,12 @@ impl RangeFilter {
                 continue;
             }
 
-            let dim_id = parse_dim_id(&r.dim_name);
+            let dim_id = DimId::from_name(&r.dim_name);
             let val = view.get_f64(idx, &dim_id);
             passes = r.value_passes(val);
         }
 
         passes
-    }
-}
-
-fn parse_dim_id(name: &str) -> DimId {
-    match name {
-        "X" => DimId::X,
-        "Y" => DimId::Y,
-        "Z" => DimId::Z,
-        "Intensity" => DimId::Intensity,
-        "OffsetTime" => DimId::OffsetTime,
-        "Classification" => DimId::Classification,
-        other => DimId::Other(other.to_string()),
     }
 }
 

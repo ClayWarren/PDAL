@@ -41,6 +41,8 @@
 #include <pdal/Polygon.hpp>
 #include <pdal/Streamable.hpp>
 
+struct pdal_stage;
+
 namespace pdal
 {
 
@@ -77,6 +79,8 @@ private:
     double m_distance2;
     std::vector<ViewGeom> m_geoms;
     std::vector<Bounds> m_boxes;
+    PointLayoutPtr m_layout;
+    pdal_stage* m_rustStage;
 
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
@@ -85,6 +89,7 @@ private:
     void spatialReferenceChanged(const SpatialReference& srs) override;
     bool processOne(PointRef& point) override;
     PointViewSet run(PointViewPtr view) override;
+    void rebuildRustStage();
     bool crop(const PointRef& point, const BOX2D& box);
     bool crop(const PointRef& point, const BOX3D& box);
     void crop(const BOX3D& box, PointView& input, PointView& output);
