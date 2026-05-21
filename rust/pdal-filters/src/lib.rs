@@ -43,6 +43,7 @@ pub mod overlay;
 pub mod planefit;
 pub mod proj_pipeline;
 pub mod radialdensity;
+pub mod radiusassign;
 pub mod randomize;
 pub mod range;
 pub mod reciprocity;

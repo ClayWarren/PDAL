@@ -1,12 +1,16 @@
 #include "RadiusAssignFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
 #include <pdal/PipelineManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 
+#include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <utility>
 namespace pdal
 {
@@ -175,6 +179,86 @@ bool RadiusAssignFilter::doOne(PointRef& pointSrc)
 
 void RadiusAssignFilter::filter(PointView& view)
 {
+    std::vector<std::string> assignmentNames;
+    std::vector<pdal_assign_range_t> assignments;
+    bool rustSupported = true;
+
+    for (expr::AssignStatement& expr : m_updateExpr)
+    {
+        if (!expr.conditionalExpr().print().empty())
+        {
+            rustSupported = false;
+            break;
+        }
+
+        std::string valueText = expr.valueExpr().print();
+        char* end = nullptr;
+        double value = std::strtod(valueText.c_str(), &end);
+        if (!end || *end != '\0')
+        {
+            rustSupported = false;
+            break;
+        }
+
+        assignmentNames.push_back(expr.identExpr().name());
+        if (assignmentNames.back().empty())
+        {
+            rustSupported = false;
+            break;
+        }
+
+        pdal_assign_range_t assignment;
+        assignment.dim_name = assignmentNames.back().c_str();
+        assignment.value = value;
+        assignment.lower_bound = -std::numeric_limits<double>::infinity();
+        assignment.upper_bound = std::numeric_limits<double>::infinity();
+        assignment.inclusive_lower = true;
+        assignment.inclusive_upper = true;
+        assignment.negate = false;
+        assignments.push_back(assignment);
+    }
+
+    if (rustSupported && !assignments.empty())
+    {
+        std::vector<pdal_range_limit_t> srcLimits;
+        for (const DimRange& r : m_srcDomain)
+        {
+            pdal_range_limit_t limit;
+            limit.dim_name = r.m_name.c_str();
+            limit.lower_bound = r.m_lower_bound;
+            limit.upper_bound = r.m_upper_bound;
+            limit.inclusive_lower = r.m_inclusive_lower_bound;
+            limit.inclusive_upper = r.m_inclusive_upper_bound;
+            limit.negate = r.m_negate;
+            srcLimits.push_back(limit);
+        }
+
+        std::vector<pdal_range_limit_t> referenceLimits;
+        for (const DimRange& r : m_referenceDomain)
+        {
+            pdal_range_limit_t limit;
+            limit.dim_name = r.m_name.c_str();
+            limit.lower_bound = r.m_lower_bound;
+            limit.upper_bound = r.m_upper_bound;
+            limit.inclusive_lower = r.m_inclusive_lower_bound;
+            limit.inclusive_upper = r.m_inclusive_upper_bound;
+            limit.negate = r.m_negate;
+            referenceLimits.push_back(limit);
+        }
+
+        pdal_stage_t* stage = pdal_stage_create_radiusassign(
+            srcLimits.empty() ? nullptr : srcLimits.data(), srcLimits.size(),
+            referenceLimits.empty() ? nullptr : referenceLimits.data(),
+            referenceLimits.size(), assignments.data(), assignments.size(),
+            m_radius, m_search3d, m_max2dAbove, m_max2dBelow);
+        if (!stage)
+            throwError("Failed to create Rust radiusassign stage.");
+
+        rust_view_converter::runInPlace(stage, view);
+        pdal_stage_destroy(stage);
+        return;
+    }
+
     PointRef pointTemp(view, 0);
 
     // Create reference domain view

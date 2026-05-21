@@ -584,6 +584,12 @@ extern "C"
         double cond_upper, bool cond_inclusive_lower, bool cond_inclusive_upper,
         bool cond_negate, const pdal_assign_range_t* assignments,
         uint64_t count);
+    pdal_stage_t* pdal_stage_create_radiusassign(
+        const pdal_range_limit_t* src_limits, uint64_t src_count,
+        const pdal_range_limit_t* reference_limits, uint64_t reference_count,
+        const pdal_assign_range_t* assignments, uint64_t assignment_count,
+        double radius, bool search_3d, double max_2d_above,
+        double max_2d_below);
 
     typedef struct
     {
