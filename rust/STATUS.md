@@ -29,7 +29,7 @@ Status definitions:
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
-| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 40 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
+| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 41 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, and installed-PDAL regression coverage exists for scoped workflows. |
@@ -49,7 +49,8 @@ Status definitions:
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Optech CSD fixture data and localized WGS84 georeference math. |
 | BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
-| GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Writer support is Rust-side only so far and covers Float64 GDAL output for core grid statistics; the C++ writer remains the legacy GDAL implementation. This is not broad GDAL/PROJ permission. |
+| GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Writer support is Rust-side/C-ABI only so far and covers Float64 GDAL output for core grid statistics; the C++ writer remains the legacy GDAL implementation. This is not broad GDAL/PROJ permission. |
+| Raster writer | in progress | Raster attachments on Rust point views can write through the Rust C ABI, and `pdal_filters_faceraster_test` now exercises the Rust-backed `writers.raster` wrapper. Named/multi-raster behavior is narrow and broader GDAL raster data-type parity remains open. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
@@ -270,6 +271,9 @@ Known mixed binaries:
   through the Rust C ABI. Stage creation remains C++ factory behavior.
 - `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry
   distance calculation routes through the Rust C ABI.
+- `pdal_filters_faceraster_test`: all 2 tests count; mesh rasterization and
+  raster attachment writing route through the Rust C ABI. The C++ test still
+  uses GDAL to read the output fixture for verification.
 - `pdal_filters_overlay_test`: all 2 tests count; overlay point mutation
   routes through the Rust C ABI after C++/GDAL datasource setup.
 - `pdal_filters_reprojection_test`: all 3 tests count; coordinate
@@ -343,6 +347,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `eigenvalues`
 - `elm`
 - `estimaterank`
+- `faceraster`
 - `gpstimeconvert`
 - `groupby`
 - `hag_nn`
@@ -387,10 +392,10 @@ algorithm decision.
 
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
-- Private or specialized algorithms: `CS`, `Delaunay`, `FaceRaster`,
-  `Georeference`, `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`,
-  `Miniball`, `Normal`, `PMF`, `Poisson`, `Straighten`, `Supervoxel`,
-  `GreedyProjection`, `IterativeClosestPoint`, `RelaxationDartThrowing`.
+- Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
+  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `Miniball`, `Normal`, `PMF`,
+  `Poisson`, `Straighten`, `Supervoxel`, `GreedyProjection`,
+  `IterativeClosestPoint`, `RelaxationDartThrowing`.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,
   `NeighborClassifier`, `CovarianceFeatures`.

@@ -32,11 +32,10 @@
  ****************************************************************************/
 
 #include "RasterWriter.hpp"
-
-#include <sstream>
+#include "../filters/private/RustViewConverter.hpp"
 
 #include <pdal/PointView.hpp>
-#include <pdal/private/gdal/Raster.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -54,9 +53,36 @@ std::string RasterWriter::getName() const
     return s_info.name;
 }
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key,
+               Dimension::Type value)
+{
+    pdal_options_add_str(options, key.c_str(),
+                         Dimension::interpretationName(value).c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
+} // unnamed namespace
+
 RasterWriter::RasterWriter() {}
 
-RasterWriter::~RasterWriter() {}
+RasterWriter::~RasterWriter()
+{
+    for (pdal_point_view_t* view : m_rustViews)
+        pdal_point_view_destroy(view);
+}
 
 void RasterWriter::addArgs(ProgramArgs& args)
 {
@@ -76,82 +102,44 @@ void RasterWriter::addArgs(ProgramArgs& args)
 
 void RasterWriter::write(const PointViewPtr view)
 {
-    // If we're using the default raster, check if this view has one and use it
-    // unless we already have one.
-    if (m_rasterNames.empty())
-    {
-        if (m_rasters.empty() && view->raster())
-            m_rasters.push_back(view->raster());
-    }
-    else
-    {
-        for (std::string& name : m_rasterNames)
-        {
-            Rasterd* r = view->raster(name);
-            if (r)
-                m_rasters.push_back(r);
-        }
-    }
+    m_rustViews.push_back(rust_view_converter::toRust(view));
 }
 
-void RasterWriter::done(PointTableRef table)
+void RasterWriter::done(PointTableRef)
 {
-    if (m_rasters.empty())
+    if (m_rustViews.empty())
         return;
 
-    if (m_rasterNames.size() == 1 && m_rasterNames[0] == "")
-        m_rasterNames.clear();
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", filename());
+    addOption(options, "gdaldriver", m_drivername);
+    for (const std::string& option : m_options)
+        addOption(options, "gdalopts", option);
+    for (const std::string& rasterName : m_rasterNames)
+        addOption(options, "rasters", rasterName);
+    addOption(options, "data_type", m_dataType);
+    addOption(options, "nodata", m_noData);
 
-    for (const std::string& name : m_rasterNames)
-        if (std::find_if(m_rasters.begin(), m_rasters.end(),
-                         [name](const Rasterd* r)
-                         { return r->name() == name; }) == m_rasters.end())
-        {
-            throwError("Raster '" + name + "' not found.");
-        }
-
-    // Stick rasters whose limits match the first raster in our final raster
-    // list.
-    std::vector<Rasterd*> rasters;
-    for (Rasterd* r : m_rasters)
+    pdal_writer_t* writer = pdal_writer_create_raster(options);
+    if (!writer)
     {
-        if (r->limits() != m_rasters.front()->limits())
-        {
-            log()->get(LogLevel::Error)
-                << getName() << ": Ignoring raster '" << r->name()
-                << "'.  Raster limits don't match that of raster '"
-                << m_rasters.front()->name() << "'." << '\n';
-            continue;
-        }
-        rasters.push_back(r);
+        pdal_options_destroy(options);
+        rust_view_converter::throwLastError(
+            "Failed to create Rust raster writer.");
     }
 
-    std::array<double, 6> pixelToPos;
-    RasterLimits limits = rasters.front()->limits();
-    pixelToPos[0] = limits.xOrigin;
-    pixelToPos[1] = limits.edgeLength;
-    pixelToPos[2] = 0;
-    pixelToPos[3] = limits.yOrigin + (limits.edgeLength * limits.height);
-    pixelToPos[4] = 0;
-    pixelToPos[5] = -limits.edgeLength;
-    gdal::Raster rasterFile(filename(), m_drivername,
-                            table.anySpatialReference(), pixelToPos);
+    std::vector<const pdal_point_view_t*> rustViews(m_rustViews.begin(),
+                                                    m_rustViews.end());
+    bool ok =
+        pdal_writer_write_views(writer, rustViews.data(), rustViews.size());
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        rust_view_converter::throwLastError("Rust raster writer failed.");
 
-    gdal::GDALError err =
-        rasterFile.open(limits.width, limits.height, rasters.size(), m_dataType,
-                        m_noData, m_options);
-
-    if (err != gdal::GDALError::None)
-        throwError(rasterFile.errorMsg());
-    int bandNum = 1;
-
-    for (Rasterd* r : rasters)
-    {
-        err = rasterFile.writeBand(r->begin(), r->initializer(), bandNum++,
-                                   r->name());
-        if (err != gdal::GDALError::None)
-            throwError(rasterFile.errorMsg());
-    }
+    for (pdal_point_view_t* view : m_rustViews)
+        pdal_point_view_destroy(view);
+    m_rustViews.clear();
 
     getMetadata().addList("filename", filename());
 }

@@ -78,17 +78,14 @@ impl Writer for RasterWriter {
         .map_err(StageError)?;
 
         for (idx, raster) in rasters.iter().enumerate() {
-            let no_data = if self.no_data.is_nan() {
-                raster.initializer()
-            } else {
-                self.no_data
-            };
+            let no_data = output_no_data(self.no_data);
+            let band_data = convert_no_data(raster.data(), raster.initializer(), no_data);
             output
                 .write_band_f64(
                     idx as i32 + 1,
                     limits.width,
                     limits.height,
-                    raster.data(),
+                    &band_data,
                     no_data,
                     raster.name(),
                 )
@@ -134,6 +131,27 @@ impl RasterWriter {
     }
 }
 
+fn output_no_data(requested: f64) -> f64 {
+    if requested.is_nan() {
+        -9999.0
+    } else {
+        requested
+    }
+}
+
+fn convert_no_data(values: &[f64], source_no_data: f64, output_no_data: f64) -> Vec<f64> {
+    values
+        .iter()
+        .map(|value| {
+            if *value == source_no_data || (value.is_nan() && source_no_data.is_nan()) {
+                output_no_data
+            } else {
+                *value
+            }
+        })
+        .collect()
+}
+
 fn raster_names(options: &Options) -> Vec<String> {
     options
         .values("rasters")
@@ -156,8 +174,12 @@ mod tests {
 
     fn temp_path(name: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(
-            "pdal-rust-raster-writer-{}-{name}",
-            std::process::id()
+            "pdal-rust-raster-writer-{}-{}-{name}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let _ = fs::remove_file(&path);
         path
@@ -188,6 +210,29 @@ mod tests {
         let mut values = vec![0.0; 4];
         raster.read_band(1, 2, 2, &mut values).unwrap();
         assert_eq!(values, vec![1.0, 2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn default_nan_no_data_writes_cpp_float64_default() {
+        let output = temp_path("nan-default.tif");
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let limits = RasterLimits::new(10.0, 20.0, 2, 2, 1.0);
+        view.add_raster(
+            RasterData::from_data("", limits, vec![1.0, f64::NAN, 3.0, f64::NAN], f64::NAN)
+                .unwrap(),
+        );
+        let mut options = Options::new();
+        options.add("filename", output.display());
+        let mut writer = RasterWriter::new(&options);
+
+        writer.write(&[view]).unwrap();
+
+        let raster = pdal_core::gdal::Raster::open(output.to_str().unwrap()).unwrap();
+        let mut values = vec![0.0; 4];
+        raster.read_band(1, 2, 2, &mut values).unwrap();
+        assert_eq!(values, vec![1.0, -9999.0, 3.0, -9999.0]);
     }
 
     #[test]

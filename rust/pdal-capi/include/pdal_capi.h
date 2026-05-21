@@ -747,6 +747,9 @@ extern "C"
     pdal_writer_t* pdal_writer_create_raster(const pdal_options_t* ops);
     bool pdal_writer_write_view(pdal_writer_t* writer,
                                 const pdal_point_view_t* view);
+    bool pdal_writer_write_views(pdal_writer_t* writer,
+                                 const pdal_point_view_t* const* views,
+                                 uint64_t count);
     void pdal_writer_destroy(pdal_writer_t* writer);
 
     // Pipeline

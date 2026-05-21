@@ -636,6 +636,49 @@ pub unsafe extern "C" fn pdal_writer_write_view(
     }
 }
 
+/// Write multiple point views with a writer.
+///
+/// # Safety
+/// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
+/// `views` must point to `count` valid pointers returned by
+/// `pdal_point_view_create` or `pdal_reader_read_first`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_write_views(
+    writer: *mut WriterHandle,
+    views: *const *const PointView,
+    count: u64,
+) -> bool {
+    let Some(writer) = writer.as_mut() else {
+        set_last_error("null writer");
+        return false;
+    };
+    if views.is_null() && count != 0 {
+        set_last_error("null views");
+        return false;
+    }
+
+    let raw_views = std::slice::from_raw_parts(views, count as usize);
+    let mut owned_views = Vec::with_capacity(raw_views.len());
+    for view in raw_views {
+        let Some(view) = view.as_ref() else {
+            set_last_error("null view");
+            return false;
+        };
+        owned_views.push(view.clone());
+    }
+
+    match writer.writer.write(&owned_views) {
+        Ok(()) => {
+            clear_last_error();
+            true
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            false
+        }
+    }
+}
+
 /// Destroy a writer handle.
 ///
 /// # Safety

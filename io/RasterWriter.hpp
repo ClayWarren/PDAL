@@ -36,7 +36,7 @@
 
 #include <pdal/PointView.hpp>
 #include <pdal/Writer.hpp>
-#include <pdal/private/Raster.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -59,7 +59,7 @@ private:
     StringList m_rasterNames;
     Dimension::Type m_dataType;
     double m_noData;
-    std::vector<Rasterd*> m_rasters;
+    std::vector<pdal_point_view_t*> m_rustViews;
 };
 
 } // namespace pdal
