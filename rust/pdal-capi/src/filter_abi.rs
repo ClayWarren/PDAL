@@ -16,6 +16,7 @@ use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
+use pdal_filters::faceraster::FaceRasterFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::geom_distance::GeomDistanceFilter;
@@ -751,6 +752,21 @@ pub unsafe extern "C" fn pdal_stage_create_voxeldownsize(ops: *const Options) ->
 pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let filter = Box::new(SampleFilter::new(options));
+        Box::into_raw(Box::new(StageWrapper { filter }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a faceraster filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_faceraster(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let filter = Box::new(FaceRasterFilter::new(options));
         Box::into_raw(Box::new(StageWrapper { filter }))
     } else {
         std::ptr::null_mut()

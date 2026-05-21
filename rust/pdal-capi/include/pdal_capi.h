@@ -496,6 +496,7 @@ extern "C"
 
     pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_sample(const pdal_options_t* ops);
+    pdal_stage_t* pdal_stage_create_faceraster(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_radialdensity(double radius);
     pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);
     pdal_stage_t* pdal_stage_create_zsmooth(double radius, double position,

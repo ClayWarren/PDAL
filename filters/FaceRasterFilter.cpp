@@ -33,10 +33,10 @@
  ****************************************************************************/
 
 #include "FaceRasterFilter.hpp"
+#include "private/RustViewConverter.hpp"
 
-#include <pdal/private/MathUtils.hpp>
 #include <pdal/private/Raster.hpp>
-#include <pdal/util/Utils.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -77,109 +77,31 @@ void FaceRasterFilter::prepared(PointTableRef)
 
 void FaceRasterFilter::filter(PointView& v)
 {
-    double halfEdge = m_limits->edgeLength / 2;
-    double edgeBit = m_limits->edgeLength * .000001;
-
-    // If the user hasn't set bounds, set them based on the data.
-    if (m_computeLimits)
+    pdal_options_t* ops = pdal_options_create();
+    pdal_options_add_f64(ops, "resolution", m_limits->edgeLength);
+    if (!m_computeLimits)
     {
-        BOX2D bounds;
-        v.calculateBounds(bounds);
-        m_limits->xOrigin = bounds.minx - halfEdge;
-        m_limits->yOrigin = bounds.miny - halfEdge;
-        m_limits->width =
-            (int)(((bounds.maxx - m_limits->xOrigin) / m_limits->edgeLength) +
-                  1);
-        m_limits->height =
-            (int)(((bounds.maxy - m_limits->yOrigin) / m_limits->edgeLength) +
-                  1);
+        pdal_options_add_f64(ops, "origin_x", m_limits->xOrigin);
+        pdal_options_add_f64(ops, "origin_y", m_limits->yOrigin);
+        pdal_options_add_u64(ops, "width", m_limits->width);
+        pdal_options_add_u64(ops, "height", m_limits->height);
     }
-    Rasterd* raster = v.createRaster("faceraster", *m_limits, m_noData);
-    if (!raster)
-        throwError("Raster already exists");
+    if (!m_meshName.empty())
+        pdal_options_add_str(ops, "mesh", m_meshName.c_str());
+    pdal_options_add_f64(ops, "nodata", m_noData);
+    pdal_options_add_f64(ops, "max_triangle_edge_length",
+                         m_maxTriangleEdgeLength);
 
-    TriangularMesh* m = v.mesh(m_meshName);
-    if (!m)
-        throwError("Mesh '" + m_meshName + "' does not exist.");
-
-    for (const Triangle& t : *m)
+    pdal_stage_t* stage = pdal_stage_create_faceraster(ops);
+    if (!stage)
     {
-        double x1 = v.getFieldAs<double>(Dimension::Id::X, t.m_a);
-        double y1 = v.getFieldAs<double>(Dimension::Id::Y, t.m_a);
-        double z1 = v.getFieldAs<double>(Dimension::Id::Z, t.m_a);
-
-        double x2 = v.getFieldAs<double>(Dimension::Id::X, t.m_b);
-        double y2 = v.getFieldAs<double>(Dimension::Id::Y, t.m_b);
-        double z2 = v.getFieldAs<double>(Dimension::Id::Z, t.m_b);
-
-        if (!std::isinf(m_maxTriangleEdgeLength) &&
-            std::hypot(x2 - x1, y2 - y1) > m_maxTriangleEdgeLength)
-            continue;
-
-        double x3 = v.getFieldAs<double>(Dimension::Id::X, t.m_c);
-        double y3 = v.getFieldAs<double>(Dimension::Id::Y, t.m_c);
-        double z3 = v.getFieldAs<double>(Dimension::Id::Z, t.m_c);
-
-        if (!std::isinf(m_maxTriangleEdgeLength) &&
-            (std::hypot(x2 - x3, y2 - y3) > m_maxTriangleEdgeLength ||
-             std::hypot(x1 - x3, y1 - y3) > m_maxTriangleEdgeLength))
-            continue;
-
-        double xmax = (std::max)((std::max)(x1, x2), x3);
-        double xmin = (std::min)((std::min)(x1, x2), x3);
-        double ymax = (std::max)((std::max)(y1, y2), y3);
-        double ymin = (std::min)((std::min)(y1, y2), y3);
-
-        // Since we're checking cell centers, we add 1/2 the edge length to
-        // avoid testing cells where we know the limiting position can't
-        // intersect the cell center.  The subtraction of edgeBit for the lower
-        // bound is to allow for the case where the minimum position is exactly
-        // aligned with a cell center (we could simply start one cell lower and
-        // to the left, but this small adjustment eliminates that extra row/col
-        // in most cases).
-        bool okX, okY;
-        int ax = raster->xCell(xmin + halfEdge - edgeBit, okX);
-        int ay = raster->yCell(ymin + halfEdge - edgeBit, okY);
-        if (!okX)
-            throwError("X value out of range for raster.");
-        if (!okY)
-            throwError("Y value out of range for raster.");
-
-        // edgeBit adjustment not necessary here since we're rounding up for
-        // exact values.
-        int bx = raster->xCell(xmax + halfEdge, okX);
-        int by = raster->yCell(ymax + halfEdge, okY);
-        if (!okX)
-            throwError("X value out of range for raster.");
-        if (!okY)
-            throwError("Y value out of range for raster.");
-
-        ax = Utils::clamp(ax, 0, (int)m_limits->width);
-        bx = Utils::clamp(bx, 0, (int)m_limits->width);
-        ay = Utils::clamp(ay, 0, (int)m_limits->height);
-        by = Utils::clamp(by, 0, (int)m_limits->height);
-
-        for (int xi = ax; xi < bx; ++xi)
-            for (int yi = ay; yi < by; ++yi)
-            {
-                double v = raster->at(xi, yi);
-                if (std::isnan(m_noData))
-                {
-                    if (!std::isnan(v))
-                        continue;
-                }
-                else if (v != m_noData)
-                    continue;
-
-                double x = raster->xCellPos(xi);
-                double y = raster->yCellPos(yi);
-
-                double val = math::barycentricInterpolation(
-                    x1, y1, z1, x2, y2, z2, x3, y3, z3, x, y);
-                if (val != std::numeric_limits<double>::infinity())
-                    raster->at(xi, yi) = val;
-            }
+        pdal_options_destroy(ops);
+        throwError("Failed to create Rust faceraster stage.");
     }
+
+    rust_view_converter::runInPlace(stage, v);
+    pdal_stage_destroy(stage);
+    pdal_options_destroy(ops);
 }
 
 } // namespace pdal
