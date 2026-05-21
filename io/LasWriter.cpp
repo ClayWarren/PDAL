@@ -208,6 +208,12 @@ void addExtraDimsToOptions(pdal_options_t* options,
     }
 }
 
+size_t maxReturnCount(uint8_t minorVersion)
+{
+    return minorVersion >= 4 ? las::Header::ReturnCount
+                             : las::Header::LegacyReturnCount;
+}
+
 } // unnamed namespace
 
 std::string LasWriter::getName() const
@@ -1388,8 +1394,6 @@ const las::Header& LasWriter::header() const
 
 bool LasWriter::useRustWriter() const
 {
-    if (d->opts.discardHighReturnNumbers)
-        return false;
     return true;
 }
 
@@ -1423,12 +1427,31 @@ bool LasWriter::appendRustPoint(PointRef& point)
     if (!m_rustView || !m_rustLayout)
         throwError("Rust LAS writer missing output view.");
 
+    using namespace Dimension;
+
+    uint8_t returnNumber(1);
+    uint8_t numberOfReturns(1);
+    if (point.hasDim(Id::ReturnNumber))
+        returnNumber = point.getFieldAs<uint8_t>(Id::ReturnNumber);
+    if (point.hasDim(Id::NumberOfReturns))
+        numberOfReturns = point.getFieldAs<uint8_t>(Id::NumberOfReturns);
+
+    const size_t maxReturns = maxReturnCount(d->opts.minorVersion.val());
+    if (d->opts.discardHighReturnNumbers && numberOfReturns > maxReturns)
+    {
+        if (returnNumber > maxReturns)
+            return false;
+    }
+
     PointId outIdx = pdal_point_view_add_point(m_rustView);
     for (auto dim : m_rustLayout->dims())
     {
+        double val = point.getFieldAs<double>(dim);
+        if (d->opts.discardHighReturnNumbers && dim == Id::NumberOfReturns &&
+            numberOfReturns > maxReturns)
+            val = static_cast<double>(maxReturns);
         pdal_point_view_set_f64(m_rustView, outIdx,
-                                m_rustLayout->dimName(dim).c_str(),
-                                point.getFieldAs<double>(dim));
+                                m_rustLayout->dimName(dim).c_str(), val);
     }
     return true;
 }
@@ -1508,6 +1531,8 @@ void LasWriter::writeRustOutput()
     }
     if (!m_extraDims.empty())
         addExtraDimsToOptions(options, m_extraDims);
+    if (d->opts.discardHighReturnNumbers)
+        addOption(options, "discard_high_return_numbers", "true");
 
     std::string ext = FileUtils::extension(d->curFilename);
     pdal_writer_t* writer = (d->opts.compression == las::Compression::True ||

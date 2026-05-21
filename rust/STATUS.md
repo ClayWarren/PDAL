@@ -322,7 +322,7 @@ Known mixed binaries:
   `extra_dims`, `all_extra_dims`, and the four LAS 1.0/1.4 classification roundtrip tests count.
   Rust LAS/LAZ point materialization, scaled header bounds, format 6+ uncompressed and compressed
   writes, header and VLR forwarding, PDAL metadata/pipeline VLRs, user-specified VLRs/EVLRs,
-  enhanced SRS VLRs, configured extra bytes, auto scale/offset, legacy header count zeroing, and
+  enhanced SRS VLRs, configured extra bytes, discard-high-return handling, auto scale/offset, legacy header count zeroing, and
   supported header options route through the Rust C ABI for the gated subset. C++ header inspection
   tests remain legacy.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,

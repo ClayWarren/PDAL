@@ -29,6 +29,8 @@ const LIBLAS_USER_ID: &str = "liblas";
 const WKT_RECORD_ID: u16 = 2112;
 const WKT2_RECORD_ID: u16 = 4224;
 const PROJJSON_RECORD_ID: u16 = 4225;
+const LEGACY_MAX_RETURN_COUNT: u8 = 5;
+const LAS14_MAX_RETURN_COUNT: u8 = 15;
 
 pub struct LasWriter {
     filename: String,
@@ -57,6 +59,7 @@ pub struct LasWriter {
     srs_wkt1_vlr: Option<Vec<u8>>,
     user_vlrs: Vec<UserVlr>,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
+    discard_high_return_numbers: bool,
     forward_vlrs: Vec<ForwardedVlr>,
 }
 
@@ -130,6 +133,7 @@ impl LasWriter {
             srs_wkt1_vlr: binary_option(options, "srs_wkt1_vlr"),
             user_vlrs: user_vlrs_from_options(options),
             configured_extra_dims: configured_extra_dims_from_options(options),
+            discard_high_return_numbers: options.get_bool("discard_high_return_numbers", false),
             forward_vlrs: forward_vlrs_from_options(options),
         }
     }
@@ -254,7 +258,14 @@ impl Writer for LasWriter {
         let mut writer = las::Writer::new(file, header)
             .map_err(|e| StageError(format!("Failed to create LAS/LAZ writer: {}", e)))?;
 
-        write_las_points(&mut writer, views, &extra_dims, self.point_format)?;
+        write_las_points(
+            &mut writer,
+            views,
+            &extra_dims,
+            self.point_format,
+            self.discard_high_return_numbers,
+            self.minor_version.unwrap_or(2),
+        )?;
 
         let transforms = *writer.header().transforms();
         writer
@@ -645,17 +656,35 @@ fn las_inverse_floor(value: f64, transform: &Transform) -> f64 {
     ((value - transform.offset) / transform.scale).floor()
 }
 
+fn max_return_count(minor_version: u8) -> u8 {
+    if minor_version >= 4 {
+        LAS14_MAX_RETURN_COUNT
+    } else {
+        LEGACY_MAX_RETURN_COUNT
+    }
+}
+
 fn write_las_points(
     writer: &mut las::Writer<BufWriter<File>>,
     views: &[PointView],
     extra_dims: &[ExtraDim],
     point_format: u8,
+    discard_high_return_numbers: bool,
+    minor_version: u8,
 ) -> Result<(), StageError> {
     let has_gps_time = writer.header().point_format().has_gps_time;
     let has_color = writer.header().point_format().has_color;
     let transforms = *writer.header().transforms();
+    let max_returns = max_return_count(minor_version);
     for view in views {
         for i in 0..view.len() {
+            if discard_high_return_numbers {
+                let return_number = dim_u8(view, i, &DimId::ReturnNumber, 1);
+                let number_of_returns = dim_u8(view, i, &DimId::NumberOfReturns, 1);
+                if number_of_returns > max_returns && return_number > max_returns {
+                    continue;
+                }
+            }
             let point = point_from_view(
                 view,
                 i,
@@ -664,6 +693,8 @@ fn write_las_points(
                 has_color,
                 point_format,
                 &transforms,
+                discard_high_return_numbers,
+                max_returns,
             )?;
             writer
                 .write_point(point)
@@ -693,6 +724,7 @@ fn scan_angle_f32_for_i16(target: i16) -> f32 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn point_from_view(
     view: &PointView,
     i: u64,
@@ -701,14 +733,22 @@ fn point_from_view(
     has_color: bool,
     point_format: u8,
     transforms: &las::Vector<Transform>,
+    discard_high_return_numbers: bool,
+    max_returns: u8,
 ) -> Result<Point, StageError> {
+    let return_number = dim_u8(view, i, &DimId::ReturnNumber, 1);
+    let mut number_of_returns = dim_u8(view, i, &DimId::NumberOfReturns, 1);
+    if discard_high_return_numbers && number_of_returns > max_returns {
+        number_of_returns = max_returns;
+    }
+
     let mut point = Point {
         x: quantize_coord(view.get_f64(i, &DimId::X), &transforms.x),
         y: quantize_coord(view.get_f64(i, &DimId::Y), &transforms.y),
         z: quantize_coord(view.get_f64(i, &DimId::Z), &transforms.z),
         intensity: dim_u16(view, i, &DimId::Intensity),
-        return_number: dim_u8(view, i, &DimId::ReturnNumber, 1),
-        number_of_returns: dim_u8(view, i, &DimId::NumberOfReturns, 1),
+        return_number,
+        number_of_returns,
         scan_direction: scan_direction(view, i),
         is_edge_of_flight_line: dim_flag(view, i, &DimId::EdgeOfFlightLine),
         classification: classification(dim_u8(view, i, &DimId::Classification, 0)),
@@ -1230,5 +1270,60 @@ mod tests {
         view.set_f64(id, &DimId::Classification, 2.0);
         view.set_f64(id, &DimId::Synthetic, 1.0);
         view
+    }
+
+    #[test]
+    fn writer_discards_high_return_numbers_when_requested() {
+        let temp = std::env::temp_dir().join(format!(
+            "pdal-las-writer-discard-{}-{}.las",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        let mut options = Options::new();
+        options.add("filename", temp.display().to_string());
+        options.add("minor_version", "2");
+        options.add("dataformat_id", "0");
+        options.add("discard_high_return_numbers", "true");
+
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        layout.register(DimId::NumberOfReturns, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+
+        let keep = view.add_point();
+        view.set_f64(keep, &DimId::X, 1.0);
+        view.set_f64(keep, &DimId::Y, 2.0);
+        view.set_f64(keep, &DimId::Z, 3.0);
+        view.set_f64(keep, &DimId::ReturnNumber, 5.0);
+        view.set_f64(keep, &DimId::NumberOfReturns, 7.0);
+
+        let drop = view.add_point();
+        view.set_f64(drop, &DimId::X, 4.0);
+        view.set_f64(drop, &DimId::Y, 5.0);
+        view.set_f64(drop, &DimId::Z, 6.0);
+        view.set_f64(drop, &DimId::ReturnNumber, 6.0);
+        view.set_f64(drop, &DimId::NumberOfReturns, 7.0);
+
+        LasWriter::new(&options)
+            .write(&[view])
+            .expect("write las with discard");
+
+        let mut read_options = Options::new();
+        read_options.add("filename", temp.display().to_string());
+        let views = LasReader::new(&read_options)
+            .read()
+            .expect("read las with discard");
+        assert_eq!(views[0].len(), 1);
+        assert_eq!(views[0].get_f64(0, &DimId::ReturnNumber), 5.0);
+        assert_eq!(views[0].get_f64(0, &DimId::NumberOfReturns), 5.0);
+
+        let _ = std::fs::remove_file(temp);
     }
 }
