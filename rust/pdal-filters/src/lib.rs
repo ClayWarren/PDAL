@@ -36,6 +36,7 @@ pub mod math;
 pub mod merge;
 pub mod mongo;
 pub mod mortonorder;
+pub mod neighborclassifier;
 pub mod nndistance;
 pub mod optimal_neighborhood;
 pub mod outlier;

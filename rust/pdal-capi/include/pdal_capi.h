@@ -468,6 +468,10 @@ extern "C"
                                    uint64_t idx);
     pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage,
                                       pdal_point_view_t* input);
+    pdal_point_view_t*
+    pdal_stage_run_with_reference(pdal_stage_t* stage,
+                                  pdal_point_view_t* input,
+                                  pdal_point_view_t* reference);
     uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input,
                                   pdal_point_view_t** outputs,
                                   uint64_t max_outputs);
@@ -590,6 +594,9 @@ extern "C"
         const pdal_assign_range_t* assignments, uint64_t assignment_count,
         double radius, bool search_3d, double max_2d_above,
         double max_2d_below);
+    pdal_stage_t* pdal_stage_create_neighborclassifier(
+        const pdal_range_limit_t* domain, uint64_t domain_count, uint64_t k,
+        const char* dim_name);
 
     typedef struct
     {

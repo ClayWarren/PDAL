@@ -33,6 +33,7 @@ use pdal_filters::lof::LofFilter;
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
+use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
@@ -1365,6 +1366,60 @@ pub unsafe extern "C" fn pdal_stage_create_radiusassign(
             search_3d,
             max_2d_above,
             max_2d_below,
+        )),
+    }))
+}
+
+/// Create a neighborclassifier filter stage.
+///
+/// # Safety
+///
+/// `domain` must be valid for `domain_count` entries, or null with a zero
+/// count. `dim_name` must be null or a valid C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
+    domain: *const pdal_range_limit_t,
+    domain_count: u64,
+    k: u64,
+    dim_name: *const c_char,
+) -> *mut StageWrapper {
+    let mut rust_domain = Vec::new();
+    if domain.is_null() {
+        if domain_count != 0 {
+            set_last_error("invalid domain passed to pdal_stage_create_neighborclassifier");
+            return std::ptr::null_mut();
+        }
+    } else {
+        for idx in 0..domain_count {
+            let limit = &*domain.add(idx as usize);
+            if limit.dim_name.is_null() {
+                set_last_error("invalid domain passed to pdal_stage_create_neighborclassifier");
+                return std::ptr::null_mut();
+            }
+            rust_domain.push(RangeLimit {
+                dim_name: CStr::from_ptr(limit.dim_name)
+                    .to_string_lossy()
+                    .into_owned(),
+                lower_bound: limit.lower_bound,
+                upper_bound: limit.upper_bound,
+                inclusive_lower: limit.inclusive_lower,
+                inclusive_upper: limit.inclusive_upper,
+                negate: limit.negate,
+            });
+        }
+    }
+
+    let dim_name = if dim_name.is_null() {
+        "Classification".to_string()
+    } else {
+        CStr::from_ptr(dim_name).to_string_lossy().into_owned()
+    };
+
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(NeighborClassifierFilter::new(
+            rust_domain,
+            k as usize,
+            dim_name,
         )),
     }))
 }

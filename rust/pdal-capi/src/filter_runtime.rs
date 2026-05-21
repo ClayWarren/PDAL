@@ -102,6 +102,40 @@ pub unsafe extern "C" fn pdal_stage_run(
     })
 }
 
+/// Run the filter over an input view and an auxiliary reference view. Returns a
+/// new output view (caller owns it), or null on error.
+///
+/// # Safety
+///
+/// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
+/// `input` and `reference` must be valid pointers returned by
+/// `pdal_point_view_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_run_with_reference(
+    stage: *mut StageWrapper,
+    input: *mut PointView,
+    reference: *mut PointView,
+) -> *mut PointView {
+    ffi_catch(std::ptr::null_mut(), || {
+        clear_last_error();
+        if let (Some(stage), Some(input), Some(reference)) =
+            (stage.as_mut(), input.as_ref(), reference.as_ref())
+        {
+            match stage.filter.run(&[input.clone(), reference.clone()]) {
+                Ok(mut outputs) => {
+                    if !outputs.is_empty() {
+                        return Box::into_raw(Box::new(outputs.remove(0)));
+                    }
+                }
+                Err(err) => set_last_error(err.to_string()),
+            }
+        } else {
+            set_last_error("null stage, input view, or reference view");
+        }
+        std::ptr::null_mut()
+    })
+}
+
 /// Run the filter over a complete input view, returning multiple output views.
 /// Returns the actual number of output views produced.
 ///

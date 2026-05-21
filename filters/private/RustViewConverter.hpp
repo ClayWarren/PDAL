@@ -363,6 +363,23 @@ inline void runInPlace(pdal_stage_t* stage, PointView& view)
     pdal_point_view_destroy(rustOut);
 }
 
+inline void runInPlaceWithReference(pdal_stage_t* stage, PointView& view,
+                                    PointView& referenceView)
+{
+    pdal_point_view_t* rustIn = toRust(view);
+    pdal_point_view_t* rustReference = toRust(referenceView);
+    pdal_point_view_t* rustOut =
+        pdal_stage_run_with_reference(stage, rustIn, rustReference);
+    pdal_point_view_destroy(rustIn);
+    pdal_point_view_destroy(rustReference);
+
+    if (!rustOut)
+        throwLastError("Rust stage failed.");
+
+    fromRust(rustOut, view);
+    pdal_point_view_destroy(rustOut);
+}
+
 inline void runInto(pdal_stage_t* stage, PointViewPtr inView,
                     PointView& outView)
 {

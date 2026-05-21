@@ -34,9 +34,11 @@
 
 #include "NeighborClassifierFilter.hpp"
 
+#include "private/RustViewConverter.hpp"
 #include <pdal/KDIndex.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 
@@ -175,32 +177,36 @@ PointViewPtr NeighborClassifierFilter::loadSet(const std::string& filename,
 
 void NeighborClassifierFilter::filter(PointView& view)
 {
-    PointRef point_src(view, 0);
+    std::vector<pdal_range_limit_t> domain;
+    for (const DimRange& r : m_domain)
+    {
+        pdal_range_limit_t limit;
+        limit.dim_name = r.m_name.c_str();
+        limit.lower_bound = r.m_lower_bound;
+        limit.upper_bound = r.m_upper_bound;
+        limit.inclusive_lower = r.m_inclusive_lower_bound;
+        limit.inclusive_upper = r.m_inclusive_upper_bound;
+        limit.negate = r.m_negate;
+        domain.push_back(limit);
+    }
+
+    pdal_stage_t* stage = pdal_stage_create_neighborclassifier(
+        domain.empty() ? nullptr : domain.data(), domain.size(), m_k,
+        m_dimName.c_str());
+    if (!stage)
+        throwError("Failed to create Rust neighborclassifier stage.");
+
     if (m_candidateFile.empty())
     { // No candidate file so NN comes from src file
-        KD3Index& kdiSrc = view.build3dIndex();
-        PointRef point_nn(view, 0);
-        for (PointId id = 0; id < view.size(); ++id)
-        {
-            point_src.setPointId(id);
-            doOne(point_src, point_nn, kdiSrc);
-        }
+        rust_view_converter::runInPlace(stage, view);
     }
     else
     { // NN comes from candidate file
         ColumnPointTable candTable;
         PointViewPtr candView = loadSet(m_candidateFile, candTable);
-        KD3Index& kdiCand = candView->build3dIndex();
-        PointRef point_nn(*candView, 0);
-        for (PointId id = 0; id < view.size(); ++id)
-        {
-            point_src.setPointId(id);
-            doOne(point_src, point_nn, kdiCand);
-        }
+        rust_view_converter::runInPlaceWithReference(stage, view, *candView);
     }
-
-    for (auto& [pointId, classification] : m_newClass)
-        view.setField(m_dimId, pointId, classification);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal
