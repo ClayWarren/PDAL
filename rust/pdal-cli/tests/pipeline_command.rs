@@ -563,7 +563,7 @@ fn list_commands_reports_rust_commands() {
     assert!(result.status.success());
     assert_eq!(
         String::from_utf8_lossy(&result.stdout),
-        "chamfer\ndelta\ndensity\neval\nground\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
+        "chamfer\ndelta\ndensity\neval\nfauxplugin\nground\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
     );
 }
 
@@ -599,6 +599,26 @@ fn list_commands_supports_json() {
     assert_eq!(json[0]["full_name"], "kernels.chamfer");
     assert_eq!(json[1]["name"], "delta");
     assert_eq!(json[1]["full_name"], "kernels.delta");
+    assert!(json
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kernel| kernel["full_name"] == "kernels.fauxplugin"));
+}
+
+#[test]
+fn fauxplugin_kernel_matches_existing_plugin_output() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("fauxplugin")
+        .arg("7")
+        .output()
+        .unwrap();
+
+    assert!(result.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&result.stdout),
+        "FauxPluginKernel running.\n"
+    );
 }
 
 #[test]

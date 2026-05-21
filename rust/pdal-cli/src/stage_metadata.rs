@@ -28,6 +28,11 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             description: "score predicted classification labels against a truth file",
         },
         KernelInfo {
+            name: "fauxplugin",
+            full_name: "kernels.fauxplugin",
+            description: "Faux Plugin Kernel",
+        },
+        KernelInfo {
             name: "ground",
             full_name: "kernels.ground",
             description: "classify ground points with the simple morphological filter",

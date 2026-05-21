@@ -5,8 +5,10 @@
 //! contract while most concrete commands still delegate to the existing C++
 //! implementation.
 
+mod fauxplugin;
 mod registry;
 mod text;
 
+pub use fauxplugin::FauxPluginKernel;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec};
 pub use text::word_wrap;

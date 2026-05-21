@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::path::{Path, PathBuf};
 
 use crate::stage_metadata::{all_stage_options, kernel_list, stage_list, stage_options};
-use pdal_kernels::word_wrap;
+use pdal_kernels::{word_wrap, FauxPluginKernel, Kernel, KernelArgs};
 
 #[path = "analysis_commands.rs"]
 mod analysis_commands;
@@ -333,6 +333,16 @@ impl App {
             }
             if command == "eval" {
                 return self.run_eval();
+            }
+            if command == "fauxplugin" {
+                let mut kernel = FauxPluginKernel::default();
+                return match kernel.run(&KernelArgs::new(self.command_args.clone())) {
+                    Ok(code) => code,
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        1
+                    }
+                };
             }
             if command == "tindex" {
                 return self.run_tindex();
