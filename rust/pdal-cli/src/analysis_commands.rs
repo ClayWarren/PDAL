@@ -42,6 +42,225 @@ fn parse_source_candidate_args<'a>(
     }
 }
 
+struct TindexCreateArgs {
+    tindex_file: String,
+    files: Vec<String>,
+    driver_name: String,
+    path_prefix: Option<String>,
+    write_absolute_path: bool,
+    layer_name: String,
+    location_field: String,
+}
+
+struct TindexEntry {
+    location: String,
+    wkt: String,
+    minx: f64,
+    miny: f64,
+    maxx: f64,
+    maxy: f64,
+}
+
+fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, String> {
+    let mut parsed = TindexCreateArgs {
+        tindex_file: String::new(),
+        files: Vec::new(),
+        driver_name: "ESRI Shapefile".to_string(),
+        path_prefix: None,
+        write_absolute_path: false,
+        layer_name: "pdal".to_string(),
+        location_field: "location".to_string(),
+    };
+
+    let mut args_iter = args.iter();
+    while let Some(arg) = args_iter.next() {
+        parse_tindex_create_arg(arg, &mut args_iter, &mut parsed)?;
+    }
+    if parsed.tindex_file.is_empty() {
+        return Err("tindex create requires --tindex <output>".to_string());
+    }
+    if parsed.files.is_empty() {
+        return Err("tindex create needs at least one input file".to_string());
+    }
+    Ok(parsed)
+}
+
+fn parse_tindex_create_arg<'a, I>(
+    arg: &str,
+    args_iter: &mut I,
+    parsed: &mut TindexCreateArgs,
+) -> Result<(), String>
+where
+    I: Iterator<Item = &'a String>,
+{
+    match arg {
+        "--tindex" => parsed.tindex_file = next_tindex_value(args_iter, "--tindex")?.clone(),
+        "--filelist" => {
+            let path = next_tindex_value(args_iter, "--filelist")?;
+            parsed.files.extend(read_tindex_filelist(path)?);
+        }
+        "--glob" => {
+            let pattern = next_tindex_value(args_iter, "--glob")?;
+            parsed.files.extend(read_tindex_glob(pattern)?);
+        }
+        "--stdin" | "-s" => parsed.files.extend(read_tindex_stdin()?),
+        "--path_prefix" => {
+            parsed.path_prefix = Some(next_tindex_value(args_iter, "--path_prefix")?.clone());
+        }
+        "--write_absolute_path" => parsed.write_absolute_path = true,
+        "--lyr_name" => parsed.layer_name = next_tindex_value(args_iter, "--lyr_name")?.clone(),
+        "--tindex_name" => {
+            parsed.location_field = next_tindex_value(args_iter, "--tindex_name")?.clone();
+        }
+        "--fast_boundary" => {}
+        "-f" | "--ogrdriver" => {
+            parsed.driver_name = next_tindex_value(args_iter, arg)?.clone();
+        }
+        _ if arg.starts_with('-') => return Err(format!("unknown tindex option '{arg}'")),
+        _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.to_string(),
+        _ => parsed.files.push(arg.to_string()),
+    }
+    Ok(())
+}
+
+fn next_tindex_value<'a, I>(args_iter: &mut I, arg: &str) -> Result<&'a String, String>
+where
+    I: Iterator<Item = &'a String>,
+{
+    args_iter
+        .next()
+        .ok_or_else(|| format!("{arg} requires a value"))
+}
+
+fn read_tindex_filelist(path: &str) -> Result<Vec<String>, String> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|err| format!("unable to read file list '{path}': {err}"))?;
+    Ok(nonempty_lines(&contents))
+}
+
+fn read_tindex_glob(pattern: &str) -> Result<Vec<String>, String> {
+    let entries =
+        glob::glob(pattern).map_err(|err| format!("invalid glob pattern '{pattern}': {err}"))?;
+    let mut files = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(path) => files.push(path.to_string_lossy().into_owned()),
+            Err(err) => return Err(format!("reading glob match for '{pattern}': {err}")),
+        }
+    }
+    if files.is_empty() {
+        return Err(format!("glob pattern '{pattern}' did not match any files"));
+    }
+    Ok(files)
+}
+
+fn read_tindex_stdin() -> Result<Vec<String>, String> {
+    let mut contents = String::new();
+    std::io::stdin()
+        .read_to_string(&mut contents)
+        .map_err(|err| format!("unable to read tindex input list from stdin: {err}"))?;
+    Ok(nonempty_lines(&contents))
+}
+
+fn nonempty_lines(contents: &str) -> Vec<String> {
+    contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn tindex_bounds(file: &str, summary: &serde_json::Value) -> Result<(f64, f64, f64, f64), ()> {
+    let Some(bounds) = summary.get("bounds_2d") else {
+        eprintln!("Error: '{file}' produced no 2D bounds");
+        return Err(());
+    };
+    let Some(minx) = bounds["minx"].as_f64() else {
+        eprintln!("Error: '{file}' produced invalid minx bounds");
+        return Err(());
+    };
+    let Some(maxx) = bounds["maxx"].as_f64() else {
+        eprintln!("Error: '{file}' produced invalid maxx bounds");
+        return Err(());
+    };
+    let Some(miny) = bounds["miny"].as_f64() else {
+        eprintln!("Error: '{file}' produced invalid miny bounds");
+        return Err(());
+    };
+    let Some(maxy) = bounds["maxy"].as_f64() else {
+        eprintln!("Error: '{file}' produced invalid maxy bounds");
+        return Err(());
+    };
+    Ok((minx, miny, maxx, maxy))
+}
+
+fn tindex_location(file: &str, write_absolute_path: bool) -> Result<String, ()> {
+    if !write_absolute_path {
+        return Ok(file.to_string());
+    }
+    Path::new(file)
+        .canonicalize()
+        .map(|path| path.to_string_lossy().into_owned())
+        .map_err(|err| {
+            eprintln!("Error: unable to resolve absolute path for '{file}': {err}");
+        })
+}
+
+fn create_tindex_fields(
+    layer: pdal_core::gdal::LayerHandle,
+    location_field: &str,
+) -> Result<(), ()> {
+    unsafe {
+        for result in [
+            pdal_core::gdal::Vector::create_string_field(layer, location_field),
+            pdal_core::gdal::Vector::create_string_field(layer, "srs"),
+            pdal_core::gdal::Vector::create_datetime_field(layer, "created"),
+            pdal_core::gdal::Vector::create_datetime_field(layer, "modified"),
+        ] {
+            if let Err(err) = result {
+                eprintln!("Error creating tindex field: {err}");
+                return Err(());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn add_tindex_features(
+    layer: pdal_core::gdal::LayerHandle,
+    location_field: &str,
+    entries: Vec<TindexEntry>,
+) -> i32 {
+    for entry in entries {
+        let poly_wkt = format!(
+            "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
+            entry.minx,
+            entry.miny,
+            entry.maxx,
+            entry.miny,
+            entry.maxx,
+            entry.maxy,
+            entry.minx,
+            entry.maxy,
+            entry.minx,
+            entry.miny
+        );
+        let fields = vec![
+            (location_field, entry.location.as_str()),
+            ("srs", entry.wkt.as_str()),
+        ];
+        unsafe {
+            if let Err(e) = pdal_core::gdal::Vector::add_feature(layer, &poly_wkt, &fields) {
+                eprintln!("Error adding feature for {}: {}", entry.location, e);
+                return 1;
+            }
+        }
+        println!("Indexed file {}", entry.location);
+    }
+    0
+}
+
 impl App {
     pub(super) fn run_tile(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
@@ -316,135 +535,20 @@ impl App {
             return 1;
         }
 
-        let mut tindex_file: Option<String> = None;
-        let mut files = Vec::new();
-        let mut driver_name = "ESRI Shapefile".to_string();
-        let mut path_prefix: Option<String> = None;
-        let mut write_absolute_path = false;
-        let mut layer_name = "pdal".to_string();
-        let mut location_field = "location".to_string();
+        self.run_tindex_create()
+    }
 
-        let mut args_iter = self.command_args[1..].iter();
-        while let Some(arg) = args_iter.next() {
-            if arg == "--tindex" {
-                let Some(path) = args_iter.next() else {
-                    eprintln!("Error: --tindex requires an output path");
-                    return 1;
-                };
-                tindex_file = Some(path.clone());
-            } else if arg == "--filelist" {
-                let Some(path) = args_iter.next() else {
-                    eprintln!("Error: --filelist requires a path");
-                    return 1;
-                };
-                let contents = match std::fs::read_to_string(path) {
-                    Ok(contents) => contents,
-                    Err(err) => {
-                        eprintln!("Error: unable to read file list '{path}': {err}");
-                        return 1;
-                    }
-                };
-                files.extend(
-                    contents
-                        .lines()
-                        .map(str::trim)
-                        .filter(|line| !line.is_empty())
-                        .map(str::to_string),
-                );
-            } else if arg == "--glob" {
-                let Some(pattern) = args_iter.next() else {
-                    eprintln!("Error: --glob requires a pattern");
-                    return 1;
-                };
-                let entries = match glob::glob(pattern) {
-                    Ok(entries) => entries,
-                    Err(err) => {
-                        eprintln!("Error: invalid glob pattern '{pattern}': {err}");
-                        return 1;
-                    }
-                };
-                let mut matched = false;
-                for entry in entries {
-                    match entry {
-                        Ok(path) => {
-                            matched = true;
-                            files.push(path.to_string_lossy().into_owned());
-                        }
-                        Err(err) => {
-                            eprintln!("Error reading glob match for '{pattern}': {err}");
-                            return 1;
-                        }
-                    }
-                }
-                if !matched {
-                    eprintln!("Error: glob pattern '{pattern}' did not match any files");
-                    return 1;
-                }
-            } else if arg == "--stdin" || arg == "-s" {
-                let mut contents = String::new();
-                if let Err(err) = std::io::stdin().read_to_string(&mut contents) {
-                    eprintln!("Error: unable to read tindex input list from stdin: {err}");
-                    return 1;
-                }
-                files.extend(
-                    contents
-                        .lines()
-                        .map(str::trim)
-                        .filter(|line| !line.is_empty())
-                        .map(str::to_string),
-                );
-            } else if arg == "--path_prefix" {
-                let Some(prefix) = args_iter.next() else {
-                    eprintln!("Error: --path_prefix requires a prefix");
-                    return 1;
-                };
-                path_prefix = Some(prefix.clone());
-            } else if arg == "--write_absolute_path" {
-                write_absolute_path = true;
-            } else if arg == "--lyr_name" {
-                let Some(name) = args_iter.next() else {
-                    eprintln!("Error: --lyr_name requires a layer name");
-                    return 1;
-                };
-                layer_name = name.clone();
-            } else if arg == "--tindex_name" {
-                let Some(name) = args_iter.next() else {
-                    eprintln!("Error: --tindex_name requires a field name");
-                    return 1;
-                };
-                location_field = name.clone();
-            } else if arg == "--fast_boundary" {
-                // The Rust tindex implementation currently writes extent
-                // polygons, matching PDAL's fast-boundary mode.
-            } else if arg == "-f" || arg == "--ogrdriver" {
-                let Some(d) = args_iter.next() else {
-                    eprintln!("Error: {arg} requires an OGR driver name");
-                    return 1;
-                };
-                driver_name = d.clone();
-            } else if arg.starts_with('-') {
-                eprintln!("Error: unknown tindex option '{arg}'");
+    fn run_tindex_create(&self) -> i32 {
+        let args = match parse_tindex_create_args(&self.command_args[1..]) {
+            Ok(args) => args,
+            Err(message) => {
+                eprintln!("Error: {message}");
                 return 1;
-            } else if tindex_file.is_none() {
-                tindex_file = Some(arg.clone());
-            } else {
-                files.push(arg.clone());
             }
-        }
-        let Some(tindex_file) = tindex_file else {
-            eprintln!("Error: tindex create requires --tindex <output>");
-            return 1;
         };
-        if files.is_empty() {
-            eprintln!("Error: tindex create needs at least one input file");
-            return 1;
-        }
 
-        // Register drivers
         pdal_core::gdal::register_drivers();
-
-        // Create OGR dataset
-        let dataset = match pdal_core::gdal::Vector::create(&tindex_file, &driver_name) {
+        let dataset = match pdal_core::gdal::Vector::create(&args.tindex_file, &args.driver_name) {
             Ok(ds) => ds,
             Err(e) => {
                 eprintln!("Error creating tindex dataset: {}", e);
@@ -452,150 +556,97 @@ impl App {
             }
         };
 
-        // For first file, we get its SRS to define the layer
-        let mut first_srs = String::new();
-        let mut valid_files = Vec::new();
-
-        for file in files {
-            let driver = match pdal_core::driver::infer_reader_driver(&file) {
-                Some(driver) => driver,
-                None => {
-                    eprintln!("Error: unable to infer a reader driver for '{file}'");
-                    return 1;
-                }
-            };
-
-            let pipeline_json =
-                serde_json::json!([{ "type": driver, "filename": file }]).to_string();
-            let c_json = match CString::new(pipeline_json) {
-                Ok(json) => json,
-                Err(_) => {
-                    eprintln!("Error: input path '{file}' contains an interior NUL byte");
-                    return 1;
-                }
-            };
-
-            let pipeline = unsafe { pdal_capi::pdal_pipeline_create_json(c_json.as_ptr()) };
-            if pipeline.is_null() {
-                self.output_last_error();
-                return 1;
-            }
-
-            let json_ptr = unsafe {
-                pdal_capi::pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut())
-            };
-            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
-
-            if json_ptr.is_null() {
-                self.output_last_error();
-                return 1;
-            }
-
-            let summary_str = safe_cstr(json_ptr).unwrap_or_default();
-            unsafe { pdal_capi::pdal_string_free(json_ptr) };
-
-            let summary = match serde_json::from_str::<serde_json::Value>(&summary_str) {
-                Ok(summary) => summary,
-                Err(err) => {
-                    eprintln!("Error: unable to parse pipeline summary for '{file}': {err}");
-                    return 1;
-                }
-            };
-            let Some(bounds) = summary.get("bounds_2d") else {
-                eprintln!("Error: '{file}' produced no 2D bounds");
-                return 1;
-            };
-            let Some(minx) = bounds["minx"].as_f64() else {
-                eprintln!("Error: '{file}' produced invalid minx bounds");
-                return 1;
-            };
-            let Some(maxx) = bounds["maxx"].as_f64() else {
-                eprintln!("Error: '{file}' produced invalid maxx bounds");
-                return 1;
-            };
-            let Some(miny) = bounds["miny"].as_f64() else {
-                eprintln!("Error: '{file}' produced invalid miny bounds");
-                return 1;
-            };
-            let Some(maxy) = bounds["maxy"].as_f64() else {
-                eprintln!("Error: '{file}' produced invalid maxy bounds");
-                return 1;
-            };
-            let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
-
-            if first_srs.is_empty() && !wkt.is_empty() {
-                first_srs = wkt.clone();
-            }
-            let mut location = if write_absolute_path {
-                match Path::new(&file).canonicalize() {
-                    Ok(path) => path.to_string_lossy().into_owned(),
-                    Err(err) => {
-                        eprintln!("Error: unable to resolve absolute path for '{file}': {err}");
-                        return 1;
-                    }
-                }
-            } else {
-                file.clone()
-            };
-            if let Some(prefix) = &path_prefix {
-                location = format!("{prefix}{location}");
-            }
-            valid_files.push((location, wkt, minx, miny, maxx, maxy));
-        }
-
-        if valid_files.is_empty() {
-            eprintln!("Error: no valid files to index");
-            return 1;
-        }
-
-        let layer = match dataset.open_or_create_layer(&layer_name, &first_srs) {
+        let (first_srs, entries) = match self.tindex_entries(&args) {
+            Ok(entries) => entries,
+            Err(()) => return 1,
+        };
+        let layer = match dataset.open_or_create_layer(&args.layer_name, &first_srs) {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("Error creating layer: {}", e);
                 return 1;
             }
         };
+        if create_tindex_fields(layer, &args.location_field).is_err() {
+            return 1;
+        }
+        add_tindex_features(layer, &args.location_field, entries)
+    }
 
-        unsafe {
-            for result in [
-                pdal_core::gdal::Vector::create_string_field(layer, &location_field),
-                pdal_core::gdal::Vector::create_string_field(layer, "srs"),
-                pdal_core::gdal::Vector::create_datetime_field(layer, "created"),
-                pdal_core::gdal::Vector::create_datetime_field(layer, "modified"),
-            ] {
-                if let Err(err) = result {
-                    eprintln!("Error creating tindex field: {err}");
-                    return 1;
-                }
+    fn tindex_entries(&self, args: &TindexCreateArgs) -> Result<(String, Vec<TindexEntry>), ()> {
+        let mut first_srs = String::new();
+        let mut entries = Vec::new();
+        for file in &args.files {
+            let mut entry = self.tindex_entry(file, args)?;
+            if first_srs.is_empty() && !entry.wkt.is_empty() {
+                first_srs.clone_from(&entry.wkt);
             }
+            if let Some(prefix) = &args.path_prefix {
+                entry.location = format!("{prefix}{}", entry.location);
+            }
+            entries.push(entry);
+        }
+        Ok((first_srs, entries))
+    }
+
+    fn tindex_entry(&self, file: &str, args: &TindexCreateArgs) -> Result<TindexEntry, ()> {
+        let summary = match self.tindex_summary(file) {
+            Ok(summary) => summary,
+            Err(()) => return Err(()),
+        };
+        let (minx, miny, maxx, maxy) = tindex_bounds(file, &summary)?;
+        let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let location = tindex_location(file, args.write_absolute_path)?;
+        Ok(TindexEntry {
+            location,
+            wkt,
+            minx,
+            miny,
+            maxx,
+            maxy,
+        })
+    }
+
+    fn tindex_summary(&self, file: &str) -> Result<serde_json::Value, ()> {
+        let Some(driver) = pdal_core::driver::infer_reader_driver(file) else {
+            eprintln!("Error: unable to infer a reader driver for '{file}'");
+            return Err(());
+        };
+
+        let pipeline_json = serde_json::json!([{ "type": driver, "filename": file }]).to_string();
+        let c_json = match CString::new(pipeline_json) {
+            Ok(json) => json,
+            Err(_) => {
+                eprintln!("Error: input path '{file}' contains an interior NUL byte");
+                return Err(());
+            }
+        };
+
+        let pipeline = unsafe { pdal_capi::pdal_pipeline_create_json(c_json.as_ptr()) };
+        if pipeline.is_null() {
+            self.output_last_error();
+            return Err(());
         }
 
-        for (file, wkt, minx, miny, maxx, maxy) in valid_files {
-            // WKT for POLYGON
-            let poly_wkt = format!(
-                "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
-                minx, miny, maxx, miny, maxx, maxy, minx, maxy, minx, miny
-            );
+        let json_ptr = unsafe {
+            pdal_capi::pdal_pipeline_execute_summary_json(pipeline, std::ptr::null_mut())
+        };
+        unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
 
-            let fields = vec![
-                (location_field.as_str(), file.as_str()),
-                ("srs", wkt.as_str()),
-            ];
-
-            unsafe {
-                if let Err(e) = pdal_core::gdal::Vector::add_feature(layer, &poly_wkt, &fields) {
-                    eprintln!("Error adding feature for {}: {}", file, e);
-                    return 1;
-                } else {
-                    println!("Indexed file {}", file);
-                }
-            }
+        if json_ptr.is_null() {
+            self.output_last_error();
+            return Err(());
         }
 
-        0
+        let summary_str = safe_cstr(json_ptr).unwrap_or_default();
+        unsafe { pdal_capi::pdal_string_free(json_ptr) };
+
+        serde_json::from_str::<serde_json::Value>(&summary_str).map_err(|err| {
+            eprintln!("Error: unable to parse pipeline summary for '{file}': {err}");
+        })
     }
 
     fn run_tindex_merge(&self) -> i32 {

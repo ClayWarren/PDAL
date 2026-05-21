@@ -33,7 +33,7 @@ Status definitions:
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | `readers.text` and `writers.text` cover deterministic local text behavior and installed-PDAL regression coverage. |
-| PCD I/O | in progress | ASCII and binary PCD read/write are covered for deterministic local fixtures. Binary-compressed PCD is deferred. |
+| PCD I/O | in progress | ASCII, binary, and binary-compressed PCD read/write are covered for deterministic local fixtures. Broader fixture and installed-PDAL parity coverage can still grow. |
 | PTS/PTX readers | in progress | Deterministic Leica ASCII fixture behavior is covered, including installed-PDAL regressions. |
 | ILVIS2 reader | in progress | Deterministic ASCII point path and fixture-shaped XML sidecar metadata are covered. |
 | PLY I/O | in progress | ASCII and binary PLY read paths plus ASCII/binary write coverage exist for deterministic local fixtures. Broader writer parity remains incomplete. |
@@ -57,8 +57,9 @@ Status definitions:
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
-| Vendor/native strategy | in progress | `rust/VENDOR.md` is the source of truth. Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
-| Plugins | prototype | `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
+| Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
+| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
+| Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
 | Broad kernels/apps/tools migration | deferred | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels, `apps/pdal.cpp`, `lasdump`, and `nitfwrap` wait on lower-layer parity. |
 
@@ -80,6 +81,54 @@ the Rust-backed shape of PDAL.
 | `package.sh` and release packaging | not ready | Release packaging still assumes C++ build tools only and must learn the Rust toolchain, Rust sources, licenses, and generated artifacts before release use. |
 | `examples/` | deferred | Examples should prove installed Rust-backed PDAL works after the C ABI, C++ wrapper, and install/export story stabilizes. |
 | `doc/` | deferred | Public docs should be updated once build, install, plugin, and ABI boundaries are stable enough to describe accurately. |
+
+## Plugin Status
+
+These are optional PDAL plugin directories, not the core static stage surface.
+Do not start a broad plugin sweep until local core, I/O, and command parity are
+farther along. One-off checkpoints are allowed when they prove a dependency or
+ABI pattern without forcing a plugin SDK decision.
+
+| Plugin | Status | Notes |
+|---|---|---|
+| `plugins/arrow` | deferred | Arrow/Parquet integration waits on the native/vendor and columnar data strategy. |
+| `plugins/cpd` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
+| `plugins/draco` | deferred | Draco mesh/point-cloud codec integration waits on a codec FFI or replacement decision. |
+| `plugins/e57` | deferred | E57 reader/writer is a major external-format plugin and waits on broader I/O parity. |
+| `plugins/faux` | prototype | `kernels.fauxplugin` is ported as a compatibility marker to prove plugin command discovery. |
+| `plugins/hdf` | deferred | HDF integration waits on native dependency and multidimensional-array I/O strategy. |
+| `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
+| `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
+| `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
+| `plugins/nitf` | deferred | NITF tooling and reader behavior wait on plugin I/O and tool migration decisions. |
+| `plugins/openscenegraph` | deferred | OSG reader/writer waits on 3D scene dependency and mesh I/O strategy. |
+| `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
+| `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
+| `plugins/rxp` | deferred | RIEGL RXP integration waits on proprietary/native dependency availability. |
+| `plugins/spz` | in progress | `readers.spz` and `writers.spz` have a Rust fixture-backed checkpoint through `pdal-io`. Broader plugin packaging remains open. |
+| `plugins/teaser` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
+| `plugins/tiledb` | deferred | TileDB I/O waits on native dependency, array storage, and remote/service I/O policy. |
+| `plugins/trajectory` | deferred | Trajectory filter plugin waits until trajectory/SBET/SMRMSG behavior is more complete. |
+
+## Vendor Status
+
+`vendor/` is third-party code kept in-tree by C++ PDAL. The Rust port should not
+rewrite these directories wholesale. Bind, replace, or leave each dependency in
+place only when a ported stage needs it.
+
+| Vendor directory | Role in the port |
+|---|---|
+| `vendor/arbiter` | Leave until remote/object-store I/O is ready. |
+| `vendor/eigen` | Replace with Rust linear algebra where practical; do not port Eigen itself. |
+| `vendor/gtest` | Keep for C++ parity tests. |
+| `vendor/h3` | Prefer the Rust H3 crate already used by Rust-backed H3 work. |
+| `vendor/kazhdan` | Decide per Poisson/reconstruction work; likely private algorithm port or FFI. |
+| `vendor/lazperf` | Keep available for C++ compatibility; Rust LAS/LAZ currently uses Rust crates. |
+| `vendor/lepcc` | Defer until EPT/COPC compression parity requires it. |
+| `vendor/nanoflann` | Replace with the Rust spatial-index API rather than porting nanoflann. |
+| `vendor/nlohmann` | C++ JSON dependency; Rust uses Rust JSON tooling. |
+| `vendor/schema-validator` | Defer until schema validation parity needs it. |
+| `vendor/utfcpp` | C++ Unicode helper dependency; do not port directly unless a real gap appears. |
 
 ## C++ Test Parity Accounting
 
@@ -391,3 +440,7 @@ existing filter tests. Do not reapply it wholesale.
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`
   `rust/scripts/measure_guardrails.sh`
+- Rust mutation testing:
+  `cargo install --locked cargo-mutants`
+  `pixi run -e dev rust-mutants`
+  `pixi run -e dev rust-mutants --package pdal-core`

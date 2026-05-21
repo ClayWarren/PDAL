@@ -1,9 +1,9 @@
 //! Minimal GDAL adapter using gdal-sys directly.
 
-use gdal_sys::OGRDataSourceH;
 use gdal_sys::{
     CPLErr, GDALAccess, GDALDataType, GDALDatasetH, GDALGetRasterBand, GDALRWFlag, GDALRasterIO,
 };
+use gdal_sys::{OGRDataSourceH, OGRLayerH};
 use std::ffi::{CStr, CString};
 
 pub struct Raster {
@@ -250,6 +250,8 @@ impl Drop for Raster {
 pub struct Vector {
     ds: OGRDataSourceH,
 }
+
+pub type LayerHandle = OGRLayerH;
 
 impl Vector {
     pub fn open(path: &str) -> Result<Self, String> {

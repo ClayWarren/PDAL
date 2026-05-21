@@ -76,20 +76,8 @@ impl LasWriter {
                 .and_then(|value| uuid::Uuid::parse_str(value.trim()).ok()),
         }
     }
-}
 
-impl Writer for LasWriter {
-    fn name(&self) -> &str {
-        "writers.las"
-    }
-
-    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
-        if self.filename.is_empty() {
-            return Err(StageError(
-                "LasWriter requires a filename option.".to_string(),
-            ));
-        }
-
+    fn initial_builder(&self, views: &[PointView]) -> Result<Builder, StageError> {
         let mut builder = Builder::from(Header::default());
         builder.point_format = Format::new(self.point_format)
             .map_err(|e| StageError(format!("Invalid point format: {}", e)))?;
@@ -111,134 +99,60 @@ impl Writer for LasWriter {
         if let (Some(year), Some(doy)) = (self.creation_year, self.creation_doy) {
             builder.date = NaiveDate::from_yo_opt(year, doy);
         }
-
-        // If an SRS is present, we must use LAS 1.4 for WKT support
         if !views.is_empty() && !views[0].spatial_reference().is_empty() {
             builder.version = las::Version { major: 1, minor: 4 };
         }
+        if let Some(bounds) = min_xyz(views) {
+            builder.transforms = las::Vector {
+                x: las::Transform {
+                    scale: self.scale_x.unwrap_or(0.01),
+                    offset: self.offset_x.unwrap_or(bounds[0]),
+                },
+                y: las::Transform {
+                    scale: self.scale_y.unwrap_or(0.01),
+                    offset: self.offset_y.unwrap_or(bounds[1]),
+                },
+                z: las::Transform {
+                    scale: self.scale_z.unwrap_or(0.01),
+                    offset: self.offset_z.unwrap_or(bounds[2]),
+                },
+            };
+        }
+        Ok(builder)
+    }
 
-        let path = Path::new(&self.filename);
+    fn should_compress(&self, path: &Path) -> bool {
         let extension_requests_laz = path
             .extension()
             .and_then(|ext| ext.to_str())
             .is_some_and(|ext| ext.eq_ignore_ascii_case("laz"));
-        let should_compress = self.compression || extension_requests_laz;
+        self.compression || extension_requests_laz
+    }
+}
 
-        // Calculate bounds and offsets based on input views
-        let mut min_x = f64::MAX;
-        let mut min_y = f64::MAX;
-        let mut min_z = f64::MAX;
+impl Writer for LasWriter {
+    fn name(&self) -> &str {
+        "writers.las"
+    }
 
-        let mut has_points = false;
-        for view in views {
-            for i in 0..view.len() {
-                let x = view.get_f64(i, &DimId::X);
-                let y = view.get_f64(i, &DimId::Y);
-                let z = view.get_f64(i, &DimId::Z);
-                if x < min_x {
-                    min_x = x;
-                }
-                if y < min_y {
-                    min_y = y;
-                }
-                if z < min_z {
-                    min_z = z;
-                }
-                has_points = true;
-            }
+    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "LasWriter requires a filename option.".to_string(),
+            ));
         }
 
-        if has_points {
-            builder.transforms = las::Vector {
-                x: las::Transform {
-                    scale: self.scale_x.unwrap_or(0.01),
-                    offset: self.offset_x.unwrap_or(min_x),
-                },
-                y: las::Transform {
-                    scale: self.scale_y.unwrap_or(0.01),
-                    offset: self.offset_y.unwrap_or(min_y),
-                },
-                z: las::Transform {
-                    scale: self.scale_z.unwrap_or(0.01),
-                    offset: self.offset_z.unwrap_or(min_z),
-                },
-            };
-        }
-
-        // Identify extra dimensions
-        let mut extra_dims = Vec::new();
-        if !views.is_empty() {
-            let layout = views[0].layout();
-            let standard_dims = pdrf_dims(self.point_format);
-            for i in 0..layout.dim_count() {
-                let (dim_id, dim_ty) = layout.dim_at(i).unwrap();
-                if !standard_dims.contains(dim_id) {
-                    extra_dims.push(ExtraDim {
-                        id: dim_id.clone(),
-                        ty: dim_ty,
-                        size: dim_ty.size(),
-                    });
-                }
-            }
-        }
-
-        // Create Extra Bytes VLR
-        if !extra_dims.is_empty() {
-            let mut vlr_data = Vec::new();
-            for ed in &extra_dims {
-                vlr_data.write_u16::<LittleEndian>(0).unwrap(); // reserved
-                vlr_data.write_u8(pdal_to_las_type(ed.ty)).unwrap();
-                vlr_data.write_u8(0).unwrap(); // options
-                let mut name_buf = [0u8; 32];
-                let name = ed.id.name();
-                let bytes = name.as_bytes();
-                let len = bytes.len().min(32);
-                name_buf[..len].copy_from_slice(&bytes[..len]);
-                vlr_data.extend_from_slice(&name_buf);
-                vlr_data.write_u32::<LittleEndian>(0).unwrap(); // reserved2
-                for _ in 0..24 {
-                    vlr_data.write_u8(0).unwrap();
-                } // no_data
-                for _ in 0..24 {
-                    vlr_data.write_u8(0).unwrap();
-                } // min
-                for _ in 0..24 {
-                    vlr_data.write_u8(0).unwrap();
-                } // max
-                for _ in 0..3 {
-                    vlr_data.write_f64::<LittleEndian>(0.0).unwrap();
-                } // scales
-                for _ in 0..3 {
-                    vlr_data.write_f64::<LittleEndian>(0.0).unwrap();
-                } // offsets
-                let desc_buf = [0u8; 32];
-                vlr_data.extend_from_slice(&desc_buf);
-            }
-            builder.vlrs.push(Vlr {
-                user_id: "LASF_Spec".to_string(),
-                record_id: 4,
-                description: "Extra Bytes Record".to_string(),
-                data: vlr_data,
-            });
-            builder.point_format.extra_bytes =
-                extra_dims.iter().map(|ed| ed.size).sum::<usize>() as u16;
-        }
-
+        let path = Path::new(&self.filename);
+        let should_compress = self.should_compress(path);
+        let mut builder = self.initial_builder(views)?;
+        let extra_dims = extra_dims_from_views(views, self.point_format);
+        add_extra_bytes_vlr(&mut builder, &extra_dims)?;
         builder.point_format.is_compressed = should_compress;
 
         let mut header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
-
-        // Set SRS on header
-        if !views.is_empty() {
-            let srs = views[0].spatial_reference();
-            if !srs.is_empty() && header.version().major == 1 && header.version().minor == 4 {
-                header
-                    .set_wkt_crs(srs.wkt().as_bytes().to_vec())
-                    .unwrap_or(());
-            }
-        }
+        set_header_srs(&mut header, views);
 
         let file = File::create(path)
             .map(BufWriter::new)
@@ -246,78 +160,7 @@ impl Writer for LasWriter {
         let mut writer = las::Writer::new(file, header)
             .map_err(|e| StageError(format!("Failed to create LAS/LAZ writer: {}", e)))?;
 
-        for view in views {
-            for i in 0..view.len() {
-                let scan_direction = if view.get_f64(i, &DimId::ScanDirectionFlag) > 0.0 {
-                    ScanDirection::LeftToRight
-                } else {
-                    ScanDirection::RightToLeft
-                };
-
-                let class_val = view.get_f64(i, &DimId::Classification) as u8;
-                let classification = match class_val {
-                    0 => Classification::CreatedNeverClassified,
-                    1 => Classification::Unclassified,
-                    2 => Classification::Ground,
-                    3 => Classification::LowVegetation,
-                    4 => Classification::MediumVegetation,
-                    5 => Classification::HighVegetation,
-                    6 => Classification::Building,
-                    7 => Classification::LowPoint,
-                    8 => Classification::ModelKeyPoint,
-                    9 => Classification::Water,
-                    v => Classification::Reserved(v),
-                };
-
-                let mut point = Point {
-                    x: view.get_f64(i, &DimId::X),
-                    y: view.get_f64(i, &DimId::Y),
-                    z: view.get_f64(i, &DimId::Z),
-                    intensity: view.get_f64(i, &DimId::Intensity) as u16,
-                    return_number: view.get_f64(i, &DimId::ReturnNumber) as u8,
-                    number_of_returns: view.get_f64(i, &DimId::NumberOfReturns) as u8,
-                    scan_direction,
-                    is_edge_of_flight_line: view.get_f64(i, &DimId::EdgeOfFlightLine) > 0.0,
-                    classification,
-                    scan_angle: view.get_f64(i, &DimId::ScanAngleRank) as f32,
-                    user_data: view.get_f64(i, &DimId::UserData) as u8,
-                    point_source_id: view.get_f64(i, &DimId::PointSourceId) as u16,
-                    ..Default::default()
-                };
-
-                if view.layout().dim(&DimId::GpsTime).is_some() {
-                    point.gps_time = Some(view.get_f64(i, &DimId::GpsTime));
-                } else if writer.header().point_format().has_gps_time {
-                    point.gps_time = Some(0.0);
-                }
-                if view.layout().dim(&DimId::Red).is_some() {
-                    point.color = Some(las::Color {
-                        red: view.get_f64(i, &DimId::Red) as u16,
-                        green: view.get_f64(i, &DimId::Green) as u16,
-                        blue: view.get_f64(i, &DimId::Blue) as u16,
-                    });
-                } else if writer.header().point_format().has_color {
-                    point.color = Some(las::Color {
-                        red: 0,
-                        green: 0,
-                        blue: 0,
-                    });
-                }
-
-                // Pack extra bytes
-                if !extra_dims.is_empty() {
-                    let mut eb = Vec::new();
-                    for ed in &extra_dims {
-                        write_pdal_val(&mut eb, view.get_f64(i, &ed.id), ed.ty).unwrap();
-                    }
-                    point.extra_bytes = eb;
-                }
-
-                writer
-                    .write_point(point)
-                    .map_err(|e| StageError(format!("Failed to write LAS point: {}", e)))?;
-            }
-        }
+        write_las_points(&mut writer, views, &extra_dims)?;
 
         writer
             .close()
@@ -329,6 +172,208 @@ impl Writer for LasWriter {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("writers.las")
     }
+}
+
+fn min_xyz(views: &[PointView]) -> Option<[f64; 3]> {
+    let mut min = [f64::MAX; 3];
+    let mut has_points = false;
+    for view in views {
+        for i in 0..view.len() {
+            min[0] = min[0].min(view.get_f64(i, &DimId::X));
+            min[1] = min[1].min(view.get_f64(i, &DimId::Y));
+            min[2] = min[2].min(view.get_f64(i, &DimId::Z));
+            has_points = true;
+        }
+    }
+    has_points.then_some(min)
+}
+
+fn extra_dims_from_views(views: &[PointView], point_format: u8) -> Vec<ExtraDim> {
+    let Some(view) = views.first() else {
+        return Vec::new();
+    };
+
+    let layout = view.layout();
+    let standard_dims = pdrf_dims(point_format);
+    let mut extra_dims = Vec::new();
+    for i in 0..layout.dim_count() {
+        let (dim_id, dim_ty) = layout.dim_at(i).unwrap();
+        if !standard_dims.contains(dim_id) {
+            extra_dims.push(ExtraDim {
+                id: dim_id.clone(),
+                ty: dim_ty,
+                size: dim_ty.size(),
+            });
+        }
+    }
+    extra_dims
+}
+
+fn add_extra_bytes_vlr(builder: &mut Builder, extra_dims: &[ExtraDim]) -> Result<(), StageError> {
+    if extra_dims.is_empty() {
+        return Ok(());
+    }
+
+    let mut vlr_data = Vec::new();
+    for ed in extra_dims {
+        write_extra_dim_vlr_record(&mut vlr_data, ed)?;
+    }
+    builder.vlrs.push(Vlr {
+        user_id: "LASF_Spec".to_string(),
+        record_id: 4,
+        description: "Extra Bytes Record".to_string(),
+        data: vlr_data,
+    });
+    builder.point_format.extra_bytes = extra_dims.iter().map(|ed| ed.size).sum::<usize>() as u16;
+    Ok(())
+}
+
+fn write_extra_dim_vlr_record(output: &mut Vec<u8>, ed: &ExtraDim) -> Result<(), StageError> {
+    output
+        .write_u16::<LittleEndian>(0)
+        .map_err(|e| StageError(e.to_string()))?;
+    output
+        .write_u8(pdal_to_las_type(ed.ty))
+        .map_err(|e| StageError(e.to_string()))?;
+    output.write_u8(0).map_err(|e| StageError(e.to_string()))?;
+    let mut name_buf = [0u8; 32];
+    let bytes = ed.id.name().as_bytes();
+    let len = bytes.len().min(32);
+    name_buf[..len].copy_from_slice(&bytes[..len]);
+    output.extend_from_slice(&name_buf);
+    output
+        .write_u32::<LittleEndian>(0)
+        .map_err(|e| StageError(e.to_string()))?;
+    output.extend_from_slice(&[0u8; 72]);
+    for _ in 0..6 {
+        output
+            .write_f64::<LittleEndian>(0.0)
+            .map_err(|e| StageError(e.to_string()))?;
+    }
+    output.extend_from_slice(&[0u8; 32]);
+    Ok(())
+}
+
+fn set_header_srs(header: &mut Header, views: &[PointView]) {
+    let Some(view) = views.first() else {
+        return;
+    };
+
+    let srs = view.spatial_reference();
+    if !srs.is_empty() && header.version().major == 1 && header.version().minor == 4 {
+        header
+            .set_wkt_crs(srs.wkt().as_bytes().to_vec())
+            .unwrap_or(());
+    }
+}
+
+fn write_las_points(
+    writer: &mut las::Writer<BufWriter<File>>,
+    views: &[PointView],
+    extra_dims: &[ExtraDim],
+) -> Result<(), StageError> {
+    let has_gps_time = writer.header().point_format().has_gps_time;
+    let has_color = writer.header().point_format().has_color;
+    for view in views {
+        for i in 0..view.len() {
+            let point = point_from_view(view, i, extra_dims, has_gps_time, has_color)?;
+            writer
+                .write_point(point)
+                .map_err(|e| StageError(format!("Failed to write LAS point: {}", e)))?;
+        }
+    }
+    Ok(())
+}
+
+fn point_from_view(
+    view: &PointView,
+    i: u64,
+    extra_dims: &[ExtraDim],
+    has_gps_time: bool,
+    has_color: bool,
+) -> Result<Point, StageError> {
+    let mut point = Point {
+        x: view.get_f64(i, &DimId::X),
+        y: view.get_f64(i, &DimId::Y),
+        z: view.get_f64(i, &DimId::Z),
+        intensity: view.get_f64(i, &DimId::Intensity) as u16,
+        return_number: view.get_f64(i, &DimId::ReturnNumber) as u8,
+        number_of_returns: view.get_f64(i, &DimId::NumberOfReturns) as u8,
+        scan_direction: scan_direction(view, i),
+        is_edge_of_flight_line: view.get_f64(i, &DimId::EdgeOfFlightLine) > 0.0,
+        classification: classification(view.get_f64(i, &DimId::Classification) as u8),
+        scan_angle: view.get_f64(i, &DimId::ScanAngleRank) as f32,
+        user_data: view.get_f64(i, &DimId::UserData) as u8,
+        point_source_id: view.get_f64(i, &DimId::PointSourceId) as u16,
+        ..Default::default()
+    };
+    add_optional_point_dims(&mut point, view, i, has_gps_time, has_color);
+    point.extra_bytes = extra_bytes_from_view(view, i, extra_dims)?;
+    Ok(point)
+}
+
+fn scan_direction(view: &PointView, i: u64) -> ScanDirection {
+    if view.get_f64(i, &DimId::ScanDirectionFlag) > 0.0 {
+        ScanDirection::LeftToRight
+    } else {
+        ScanDirection::RightToLeft
+    }
+}
+
+fn classification(value: u8) -> Classification {
+    match value {
+        0 => Classification::CreatedNeverClassified,
+        1 => Classification::Unclassified,
+        2 => Classification::Ground,
+        3 => Classification::LowVegetation,
+        4 => Classification::MediumVegetation,
+        5 => Classification::HighVegetation,
+        6 => Classification::Building,
+        7 => Classification::LowPoint,
+        8 => Classification::ModelKeyPoint,
+        9 => Classification::Water,
+        v => Classification::Reserved(v),
+    }
+}
+
+fn add_optional_point_dims(
+    point: &mut Point,
+    view: &PointView,
+    i: u64,
+    has_gps_time: bool,
+    has_color: bool,
+) {
+    if view.layout().dim(&DimId::GpsTime).is_some() {
+        point.gps_time = Some(view.get_f64(i, &DimId::GpsTime));
+    } else if has_gps_time {
+        point.gps_time = Some(0.0);
+    }
+    if view.layout().dim(&DimId::Red).is_some() {
+        point.color = Some(las::Color {
+            red: view.get_f64(i, &DimId::Red) as u16,
+            green: view.get_f64(i, &DimId::Green) as u16,
+            blue: view.get_f64(i, &DimId::Blue) as u16,
+        });
+    } else if has_color {
+        point.color = Some(las::Color {
+            red: 0,
+            green: 0,
+            blue: 0,
+        });
+    }
+}
+
+fn extra_bytes_from_view(
+    view: &PointView,
+    i: u64,
+    extra_dims: &[ExtraDim],
+) -> Result<Vec<u8>, StageError> {
+    let mut bytes = Vec::new();
+    for ed in extra_dims {
+        write_pdal_val(&mut bytes, view.get_f64(i, &ed.id), ed.ty)
+            .map_err(|e| StageError(e.to_string()))?;
+    }
+    Ok(bytes)
 }
 
 fn pdrf_dims(pdrf: u8) -> Vec<DimId> {

@@ -60,12 +60,6 @@ impl Reader for PcdReader {
         let bytes = fs::read(Path::new(&self.filename))
             .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
         let header = parse_header(&bytes)?;
-        if header.storage == "binary_compressed" {
-            return Err(StageError(format!(
-                "PCD data storage '{}' is not supported by the Rust slice.",
-                header.storage
-            )));
-        }
 
         let mut layout = PointLayout::new();
         for field in &header.fields {
@@ -93,18 +87,10 @@ impl Reader for PcdReader {
                 }
             }
         } else if header.storage == "binary" {
-            let mut offset = header.data_start;
-            for _ in 0..header.points {
-                let point = view.add_point();
-                for field in &header.fields {
-                    for count in 0..field.count {
-                        let value = read_binary_value(&bytes, &mut offset, field)?;
-                        if count == 0 {
-                            view.set_f64(point, &field.id, value);
-                        }
-                    }
-                }
-            }
+            read_interleaved_binary_points(&mut view, &header, &bytes[header.data_start..])?;
+        } else if header.storage == "binary_compressed" {
+            let payload = read_compressed_payload(&header, &bytes[header.data_start..])?;
+            read_transposed_binary_points(&mut view, &header, &payload)?;
         } else {
             return Err(StageError(format!(
                 "Unrecognized PCD data storage '{}'.",
@@ -215,9 +201,12 @@ impl Writer for PcdWriter {
                 "PcdWriter requires a filename option.".to_string(),
             ));
         }
-        if self.compression != "ascii" && self.compression != "binary" {
+        if !matches!(
+            self.compression.as_str(),
+            "ascii" | "binary" | "compressed" | "binary_compressed"
+        ) {
             return Err(StageError(format!(
-                "PCD compression '{}' is not supported by the Rust slice.",
+                "PCD compression '{}' is not supported by the Rust port.",
                 self.compression
             )));
         }
@@ -259,7 +248,10 @@ impl Writer for PcdWriter {
         header.push_str(&format!("\nWIDTH {count}\nHEIGHT 1\n"));
         header
             .push_str("VIEWPOINT 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000\n");
-        header.push_str(&format!("POINTS {count}\nDATA {}\n", self.compression));
+        header.push_str(&format!(
+            "POINTS {count}\nDATA {}\n",
+            data_storage_label(&self.compression)
+        ));
         output.extend_from_slice(header.as_bytes());
 
         if self.compression == "ascii" {
@@ -280,19 +272,11 @@ impl Writer for PcdWriter {
                     output.push(b'\n');
                 }
             }
+        } else if self.compression == "binary" {
+            write_interleaved_binary_points(&mut output, views, &specs)?;
         } else {
-            for view in views {
-                for point in 0..view.len() {
-                    for field in &specs {
-                        write_binary_value(
-                            &mut output,
-                            view.get_f64(point, &field.id),
-                            field.ty,
-                            field.size,
-                        )?;
-                    }
-                }
-            }
+            let payload = compressed_payload(views, &specs)?;
+            output.extend_from_slice(&payload);
         }
 
         fs::write(Path::new(&self.filename), output)
@@ -447,6 +431,88 @@ fn read_binary_value(bytes: &[u8], offset: &mut usize, field: &Field) -> Result<
     }
 }
 
+fn read_interleaved_binary_points(
+    view: &mut PointView,
+    header: &Header,
+    bytes: &[u8],
+) -> Result<(), StageError> {
+    let mut offset = 0;
+    for _ in 0..header.points {
+        let point = view.add_point();
+        for field in &header.fields {
+            for count in 0..field.count {
+                let value = read_binary_value(bytes, &mut offset, field)?;
+                if count == 0 {
+                    view.set_f64(point, &field.id, value);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn read_transposed_binary_points(
+    view: &mut PointView,
+    header: &Header,
+    bytes: &[u8],
+) -> Result<(), StageError> {
+    let expected = binary_payload_size(header)?;
+    if bytes.len() != expected {
+        return Err(StageError(
+            "Unexpected binary-compressed PCD size.".to_string(),
+        ));
+    }
+
+    let mut offset = 0;
+    for (field_idx, field) in header.fields.iter().enumerate() {
+        for point_id in 0..header.points {
+            let point = if field_idx == 0 {
+                view.add_point()
+            } else {
+                point_id
+            };
+            for count in 0..field.count {
+                let value = read_binary_value(bytes, &mut offset, field)?;
+                if count == 0 {
+                    view.set_f64(point, &field.id, value);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn read_compressed_payload(header: &Header, bytes: &[u8]) -> Result<Vec<u8>, StageError> {
+    if bytes.len() < 8 {
+        return Err(StageError(
+            "Unexpected end of binary-compressed PCD data.".to_string(),
+        ));
+    }
+
+    let compressed_size = u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as usize;
+    let uncompressed_size = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+    let expected = binary_payload_size(header)?;
+    if uncompressed_size != expected {
+        return Err(StageError(format!(
+            "Binary-compressed PCD payload size {uncompressed_size} did not match header size {expected}."
+        )));
+    }
+    let end = 8usize
+        .checked_add(compressed_size)
+        .ok_or_else(|| StageError("Binary-compressed PCD payload is too large.".to_string()))?;
+    if end > bytes.len() {
+        return Err(StageError(
+            "Unexpected end of binary-compressed PCD data.".to_string(),
+        ));
+    }
+
+    lzf_rust::decompress_into_vec(&bytes[8..end], uncompressed_size).map_err(|err| {
+        StageError(format!(
+            "Failed to decompress binary-compressed PCD data: {err}"
+        ))
+    })
+}
+
 fn write_binary_value(
     output: &mut Vec<u8>,
     value: f64,
@@ -471,6 +537,71 @@ fn write_binary_value(
         }
     }
     Ok(())
+}
+
+fn write_interleaved_binary_points(
+    output: &mut Vec<u8>,
+    views: &[PointView],
+    specs: &[Field],
+) -> Result<(), StageError> {
+    for view in views {
+        for point in 0..view.len() {
+            for field in specs {
+                write_binary_value(output, view.get_f64(point, &field.id), field.ty, field.size)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn compressed_payload(views: &[PointView], specs: &[Field]) -> Result<Vec<u8>, StageError> {
+    let mut uncompressed = Vec::new();
+    for field in specs {
+        for view in views {
+            for point in 0..view.len() {
+                write_binary_value(
+                    &mut uncompressed,
+                    view.get_f64(point, &field.id),
+                    field.ty,
+                    field.size,
+                )?;
+            }
+        }
+    }
+
+    let uncompressed_size = u32::try_from(uncompressed.len())
+        .map_err(|_| StageError("PCD payload is too large to compress.".to_string()))?;
+    let mut compressed = vec![0; lzf_rust::max_compressed_size(uncompressed.len())];
+    let compressed_len = lzf_rust::compress(&uncompressed, &mut compressed)
+        .map_err(|err| StageError(format!("Failed to compress PCD payload: {err}")))?;
+    compressed.truncate(compressed_len);
+    let compressed_size = u32::try_from(compressed.len())
+        .map_err(|_| StageError("Compressed PCD payload is too large.".to_string()))?;
+
+    let mut output = Vec::with_capacity(8 + compressed.len());
+    output.extend_from_slice(&compressed_size.to_le_bytes());
+    output.extend_from_slice(&uncompressed_size.to_le_bytes());
+    output.extend_from_slice(&compressed);
+    Ok(output)
+}
+
+fn binary_payload_size(header: &Header) -> Result<usize, StageError> {
+    let point_size = header.fields.iter().try_fold(0u64, |total, field| {
+        total
+            .checked_add(u64::from(field.size) * u64::from(field.count))
+            .ok_or(())
+    });
+    let size = point_size
+        .and_then(|point_size| point_size.checked_mul(header.points).ok_or(()))
+        .map_err(|()| StageError("PCD binary payload is too large.".to_string()))?;
+    usize::try_from(size).map_err(|_| StageError("PCD binary payload is too large.".to_string()))
+}
+
+fn data_storage_label(compression: &str) -> &str {
+    match compression {
+        "compressed" | "binary_compressed" => "binary_compressed",
+        other => other,
+    }
 }
 
 fn parse_numbers(values: &[&str], label: &str) -> Result<Vec<u32>, StageError> {
@@ -811,6 +942,69 @@ mod tests {
         assert_eq!(roundtrip.get_f64(2, &DimId::Intensity), 3.0);
         assert!((roundtrip.get_f64(1, &DimId::X) - 2.222_222_222_2).abs() < 0.0001);
         assert!((roundtrip.get_f64(2, &DimId::Z) - 3.33).abs() < 0.0001);
+    }
+
+    #[test]
+    fn writes_compressed_pcd_that_reader_roundtrips_typed_fields() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for values in [
+            [1.0, 2.0, 3.0, 42.0],
+            [4.5, 5.5, 6.5, 43.0],
+            [7.25, 8.25, 9.25, 44.0],
+        ] {
+            let point = view.add_point();
+            view.set_f64(point, &DimId::X, values[0]);
+            view.set_f64(point, &DimId::Y, values[1]);
+            view.set_f64(point, &DimId::Z, values[2]);
+            view.set_f64(point, &DimId::Intensity, values[3]);
+        }
+
+        let output = temp_path("compressed.pcd");
+        let mut options = Options::new();
+        options
+            .add("filename", &output)
+            .add("order", "X=Float,Y=Float,Z=Float,Intensity=Unsigned16")
+            .add("compression", "compressed");
+        let mut writer = PcdWriter::new(&options);
+        writer.write(std::slice::from_ref(&view)).unwrap();
+
+        let written = fs::read(&output).unwrap();
+        let marker = b"DATA binary_compressed\n";
+        let marker_start = written
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
+        let payload_start = marker_start + marker.len();
+        let compressed_size = u32::from_le_bytes(
+            written[payload_start..payload_start + 4]
+                .try_into()
+                .unwrap(),
+        );
+        let uncompressed_size = u32::from_le_bytes(
+            written[payload_start + 4..payload_start + 8]
+                .try_into()
+                .unwrap(),
+        );
+        assert!(compressed_size > 0);
+        assert_eq!(uncompressed_size, 42);
+
+        let mut read_options = Options::new();
+        read_options.add("filename", &output);
+        let mut reader = PcdReader::new(&read_options);
+        let roundtrip = reader.read().unwrap().pop().unwrap();
+
+        assert_eq!(roundtrip.len(), 3);
+        assert!((roundtrip.get_f64(0, &DimId::X) - 1.0).abs() < 0.0001);
+        assert!((roundtrip.get_f64(1, &DimId::Y) - 5.5).abs() < 0.0001);
+        assert!((roundtrip.get_f64(2, &DimId::Z) - 9.25).abs() < 0.0001);
+        assert_eq!(roundtrip.get_f64(0, &DimId::Intensity), 42.0);
+        assert_eq!(roundtrip.get_f64(2, &DimId::Intensity), 44.0);
     }
 
     #[test]
