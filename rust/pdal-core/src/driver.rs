@@ -50,6 +50,7 @@ const READER_EXTENSIONS: &[(&str, &str)] = &[
     ("slpk", "readers.slpk"),
     ("i3s", "readers.i3s"),
     ("obj", "readers.obj"),
+    ("spz", "readers.spz"),
     ("vpc", "readers.stac"),
     ("e57", "readers.e57"),
 ];
@@ -76,6 +77,7 @@ const WRITER_EXTENSIONS: &[(&str, &str)] = &[
     ("glb", "writers.gltf"),
     ("gltf", "writers.gltf"),
     ("geojson", "writers.ogr"),
+    ("spz", "writers.spz"),
     ("feather", "writers.arrow"),
     ("parquet", "writers.arrow"),
     ("drc", "writers.draco"),
@@ -163,6 +165,7 @@ mod tests {
         assert_eq!(infer_reader_driver("tile.las"), Some("readers.las"));
         assert_eq!(infer_reader_driver("tile.laz"), Some("readers.las"));
         assert_eq!(infer_reader_driver("flight.sbet"), Some("readers.sbet"));
+        assert_eq!(infer_reader_driver("gaussians.spz"), Some("readers.spz"));
     }
 
     #[test]
@@ -205,6 +208,7 @@ mod tests {
         assert_eq!(infer_writer_driver("out.txt"), Some("writers.text"));
         assert_eq!(infer_writer_driver("out.las"), Some("writers.las"));
         assert_eq!(infer_writer_driver("out.geojson"), Some("writers.ogr"));
+        assert_eq!(infer_writer_driver("out.spz"), Some("writers.spz"));
         assert_eq!(infer_writer_driver("out.tif"), Some("writers.gdal"));
         assert_eq!(infer_writer_driver("out.tiff"), Some("writers.gdal"));
         assert_eq!(infer_writer_driver("out.vrt"), Some("writers.gdal"));

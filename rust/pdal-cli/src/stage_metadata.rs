@@ -144,7 +144,7 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         ],
         "readers.bpf" | "readers.fbi" | "readers.obj" | "readers.optech" | "readers.pcd"
         | "readers.ply" | "readers.pts" | "readers.ptx" | "readers.qfit" | "readers.smrmsg"
-        | "readers.terrasolid" => vec![filename()],
+        | "readers.spz" | "readers.terrasolid" => vec![filename()],
         "readers.las" | "readers.laz" => vec![
             filename(),
             option(
@@ -627,6 +627,19 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "angles_are_degrees",
                 "Convert angular fields from degrees to radians.",
                 Some(json!(true)),
+            ),
+        ],
+        "writers.spz" => vec![
+            filename(),
+            option(
+                "antialiased",
+                "Mark the output Gaussian splats as antialiased.",
+                Some(json!(false)),
+            ),
+            option(
+                "coordinate_orientation",
+                "Input coordinate orientation name.",
+                None,
             ),
         ],
         "writers.las" | "writers.laz" => vec![

@@ -235,6 +235,45 @@ fn gdal_reader_honors_header_dimensions_through_c_abi() {
 }
 
 #[test]
+fn spz_reader_returns_points_through_c_abi() {
+    unsafe {
+        let options = pdal_options_create();
+        {
+            let (key, value) = ("filename", data_path("spz/fourth_st.spz"));
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let reader = pdal_reader_create_spz(options);
+        assert!(!reader.is_null());
+        let view = pdal_reader_read_first(reader);
+        assert!(!view.is_null());
+        assert_eq!(pdal_point_view_length(view), 131_199);
+
+        let x = CString::new("X").unwrap();
+        let rot0 = CString::new("rot_0").unwrap();
+        let color2 = CString::new("f_dc_2").unwrap();
+        assert!(pdal_point_view_get_f64(view, 0, x.as_ptr()).is_finite());
+        assert!(pdal_point_view_get_f64(view, 0, rot0.as_ptr()).is_finite());
+        assert!(pdal_point_view_get_f64(view, 0, color2.as_ptr()).is_finite());
+
+        let metadata = pdal_reader_metadata(reader);
+        assert!(!metadata.is_null());
+        let orientation = CString::new("coordinate_orientation").unwrap();
+        assert_eq!(
+            pdal_metadata_node_child_named_count(metadata, orientation.as_ptr()),
+            1
+        );
+
+        pdal_metadata_node_destroy(metadata);
+        pdal_point_view_destroy(view);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn writer_write_view_consumes_point_view_through_c_abi() {
     unsafe {
         let mut filename = std::env::temp_dir();
@@ -278,6 +317,54 @@ fn writer_write_view_consumes_point_view_through_c_abi() {
             std::fs::read_to_string(&filename).unwrap(),
             "\"X\",\"Y\",\"Z\"\n1.2,2.5,3.8\n"
         );
+
+        let _ = std::fs::remove_file(&filename);
+        pdal_writer_destroy(writer);
+        pdal_point_view_destroy(view);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
+fn spz_writer_writes_view_through_c_abi() {
+    unsafe {
+        let mut filename = std::env::temp_dir();
+        filename.push(format!(
+            "pdal-capi-spz-writer-{}-{}.spz",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let filename_text = filename.display().to_string();
+
+        let options = pdal_options_create();
+        for (key, value) in [
+            ("filename", filename_text.as_str()),
+            ("coordinate_orientation", "RDF"),
+        ] {
+            let key = CString::new(key).unwrap();
+            let value = CString::new(value).unwrap();
+            pdal_options_add_str(options, key.as_ptr(), value.as_ptr());
+        }
+
+        let layout = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z"] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        let view = pdal_point_view_create(layout);
+        let point = pdal_point_view_add_point(view);
+        for (dim, value) in [("X", 1.0), ("Y", 2.0), ("Z", 3.0)] {
+            let name = CString::new(dim).unwrap();
+            pdal_point_view_set_f64(view, point, name.as_ptr(), value);
+        }
+
+        let writer = pdal_writer_create_spz(options);
+        assert!(!writer.is_null());
+        assert!(pdal_writer_write_view(writer, view));
+        assert!(std::fs::metadata(&filename).unwrap().len() > 0);
 
         let _ = std::fs::remove_file(&filename);
         pdal_writer_destroy(writer);

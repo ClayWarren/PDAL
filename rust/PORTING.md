@@ -23,12 +23,15 @@ Off limits unless the user explicitly revises this plan:
   builds.
 - Do not replace the C ABI with Rust/C++ direct object sharing.
 - Do not pass C++ object pointers across the C ABI as Rust handles.
-- Do not port optional plugins or design a Rust plugin loading SDK yet.
+- Do not design a Rust plugin loading SDK yet. Optional plugin ports are allowed
+  only as narrow compatibility checkpoints after the equivalent first-party
+  reader/writer/filter/kernel path exists and the work has fixture or parity
+  coverage.
 - Do not copy vendored C/C++ code into Rust crates. Follow `rust/VENDOR.md`.
-- Do not start remote I/O, optional plugin work, or broad vendor-heavy work
-  without a concrete parity milestone. LAS/LAZ, the first GDAL reader path,
-  and simple command work have started; new work in those families must stay
-  narrow and regression-backed.
+- Do not start remote I/O, broad optional plugin work, or broad vendor-heavy
+  work without a concrete parity milestone. LAS/LAZ, the first GDAL reader
+  path, simple command work, and narrow plugin checkpoints have started; new
+  work in those families must stay narrow and regression-backed.
 - Do not add new concrete CLI commands just because `pdal-cli` can dispatch
   them. User-visible commands must satisfy the command readiness checkpoint
   below and include installed-PDAL regression coverage.
@@ -80,10 +83,13 @@ roadmap as permission to sweep a directory.
    migration closes only after the lower library surface is stable. `lasdump`
    waits on LAS/LAZ strategy; `nitfwrap` waits on NITF/plugin strategy; broad
    kernels stay late.
-7. Define plugin compatibility last.
-   Keep optional plugins in C++ until the first-party library, command surface,
-   C ABI versioning, ownership/lifetime rules, dynamic loading, and metadata
-   behavior are stable. `pdal-plugins` may hold discovery metadata earlier, but
+7. Define plugin compatibility after the first-party surface.
+   Keep broad optional plugins in C++ until the first-party library, command
+   surface, C ABI versioning, ownership/lifetime rules, dynamic loading, and
+   metadata behavior are stable. Tiny compatibility checkpoints such as
+   `kernels.fauxplugin`, or a single plugin reader/writer that reuses an
+   already-proven first-party path, may land earlier when they are
+   regression-backed. `pdal-plugins` may hold discovery metadata earlier, but
    not a new plugin SDK.
 8. Prove final replacement readiness.
    The port is not "done" until the Rust-backed stack can run the agreed
@@ -98,9 +104,11 @@ Current active milestone:
    error/output shape.
 2. Prove reader -> filter -> writer pipeline behavior through the Rust core
    boundary for each new format or command path.
-3. New I/O should still be narrow and fixture-scoped. Remote paths,
-   plugin-backed paths, and broad GDAL/PROJ coverage remain deferred until the
-   local pipeline and command loop is reliable.
+3. New I/O should still be narrow and fixture-scoped. Remote paths and broad
+   GDAL/PROJ coverage remain deferred until the local pipeline and command loop
+   is reliable. Plugin-backed readers/writers may be added only one at a time
+   when they reuse the existing Rust I/O/C ABI shape and come with fixture
+   coverage.
 
 Every commit should say which checkpoint it advances. If the answer is "none",
 it probably should not be part of this port.
@@ -270,22 +278,23 @@ Do not start a broad `vendor/` compatibility pass. Each vendor decision should
 name the user-visible stage or core behavior it unlocks, cite the parity test
 that will hold it honest, and follow `rust/VENDOR.md`.
 
-Plugin implementation work is allowed only after the first-party Rust surface
-can run real command and pipeline workflows:
+Plugin implementation work is mostly late, but narrow compatibility checkpoints
+are now allowed when they exercise an already-proven Rust family:
 
 - `pdal-plugins` may keep metadata and filename-discovery helpers that mirror
   stable parts of the existing C++ plugin convention.
-- Do not port optional plugin readers, writers, filters, or kernels until the
-  equivalent first-party reader/writer/filter/kernel family is already proven.
+- Do not port optional plugin readers, writers, filters, or kernels unless the
+  equivalent first-party reader/writer/filter/kernel family is already proven
+  and the plugin is covered by focused fixtures or installed-PDAL parity.
 - Do not design a Rust plugin loading SDK until the C ABI, stage registry,
   ownership/lifetime rules, metadata, errors, versioning, and dynamic library
   compatibility story are stable.
 - Plugin-by-plugin ports should be driven by demand and parity tests, not by
   sweeping the `plugins/` directory.
 
-In practice, plugins are after first-party filters, core, I/O, apps/tools, and
-commands. The likely first plugin work is compatibility/discovery validation,
-then a single low-risk plugin port if it proves the SDK boundary. Heavy
+In practice, most plugins are after first-party filters, core, I/O, apps/tools,
+and commands. Early plugin work should stay to compatibility/discovery
+validation, then a single low-risk plugin port that proves the boundary. Heavy
 database, HDF/E57/NITF/TileDB, registration, trajectory, and format-specific
 plugins remain later or stay C++ behind the ABI.
 

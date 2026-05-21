@@ -238,6 +238,20 @@ pub unsafe extern "C" fn pdal_reader_create_gdal(ops: *const Options) -> *mut Re
     }
 }
 
+/// Create an SpzReader from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_reader_create_spz(ops: *const Options) -> *mut ReaderHandle {
+    if let Some(options) = ops.as_ref() {
+        let reader = Box::new(pdal_io::spz::SpzReader::new(options));
+        Box::into_raw(Box::new(ReaderHandle { reader }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 /// Create a StacReader from options.
 ///
 /// # Safety
@@ -481,6 +495,20 @@ pub unsafe extern "C" fn pdal_writer_create_gltf(ops: *const Options) -> *mut Wr
 pub unsafe extern "C" fn pdal_writer_create_sbet(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::sbet_writer::SbetWriter::new(options));
+        Box::into_raw(Box::new(WriterHandle { writer }))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create an SpzWriter from options.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_writer_create_spz(ops: *const Options) -> *mut WriterHandle {
+    if let Some(options) = ops.as_ref() {
+        let writer = Box::new(pdal_io::spz::SpzWriter::new(options));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()
