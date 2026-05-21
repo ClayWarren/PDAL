@@ -434,6 +434,76 @@ fn get_pdal_info(path: &Path) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).expect("failed to parse pdal info JSON")
 }
 
+#[test]
+fn las_reader_honors_srs_vlr_order() {
+    use pdal_core::utils::base64_encode;
+
+    let temp = make_temp_dir("las-srs-vlr-order");
+    let output = temp.join("srs-order.las");
+
+    let mut writer_options = Options::new();
+    writer_options.add("filename", output.display());
+    writer_options.add("a_srs", "EPSG:32634");
+    writer_options.add("minor_version", 4);
+    push_user_vlr(
+        &mut writer_options,
+        "LASF_Projection",
+        4224,
+        "created wkt2 vlr",
+        base64_encode(b"EPSG:32632"),
+    );
+    push_user_vlr(
+        &mut writer_options,
+        "PDAL",
+        4225,
+        "created projjson vlr",
+        base64_encode(br#"{"type":"ProjectedCRS","id":{"authority":"EPSG","code":32633}}"#),
+    );
+
+    let mut writer = LasWriter::new(&writer_options);
+    writer.write(&[single_point_view()]).unwrap();
+
+    let read_srs = |order: &str| -> String {
+        let mut reader_options = Options::new();
+        reader_options.add("filename", output.display());
+        if !order.is_empty() {
+            reader_options.add("srs_vlr_order", order);
+        }
+        let mut reader = LasReader::new(&reader_options);
+        reader.read().unwrap()[0]
+            .spatial_reference()
+            .wkt()
+            .to_string()
+    };
+
+    assert!(
+        read_srs("projjson, wkt2, wkt1, geotiff").contains("32633"),
+        "expected projjson VLR to win"
+    );
+    assert!(
+        read_srs("wkt2, projjson, wkt1, geotiff").contains("32632"),
+        "expected wkt2 VLR to win"
+    );
+    assert!(
+        read_srs("").contains("32632"),
+        "expected default order to prefer wkt2"
+    );
+}
+
+fn push_user_vlr(
+    options: &mut Options,
+    user_id: &str,
+    record_id: u16,
+    description: &str,
+    data: String,
+) {
+    options.add("user_vlr_user_id", user_id);
+    options.add("user_vlr_record_id", record_id);
+    options.add("user_vlr_description", description);
+    options.add("user_vlr_data", data);
+    options.add("user_vlr_evlr", "false");
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

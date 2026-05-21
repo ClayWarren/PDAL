@@ -19,6 +19,20 @@ use std::rc::Rc;
 
 const SCAN_ANGLE_SCALE_FACTOR: f64 = 0.006;
 const VLR_HEADER_SIZE: u64 = 54;
+const TRANSFORM_USER_ID: &str = "LASF_Projection";
+const PDAL_USER_ID: &str = "PDAL";
+const LIBLAS_USER_ID: &str = "liblas";
+const WKT_RECORD_ID: u16 = 2112;
+const WKT2_RECORD_ID: u16 = 4224;
+const PROJJSON_RECORD_ID: u16 = 4225;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SrsVlrKind {
+    Wkt1,
+    Geotiff,
+    Proj,
+    Wkt2,
+}
 
 struct ConfiguredExtraDim {
     name: String,
@@ -32,6 +46,7 @@ pub struct LasReader {
     nosrs: bool,
     ignore_missing_vlrs: bool,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
+    srs_vlr_order: Vec<SrsVlrKind>,
     metadata: MetadataNode,
 }
 
@@ -53,6 +68,7 @@ impl LasReader {
             nosrs: options.get_bool("nosrs", false),
             ignore_missing_vlrs: options.get_bool("ignore_missing_vlrs", false),
             configured_extra_dims: configured_extra_dims_from_options(options),
+            srs_vlr_order: srs_vlr_order_from_options(options),
             metadata: MetadataNode::new("readers.las"),
         }
     }
@@ -101,6 +117,11 @@ impl LasReader {
 
     fn set_spatial_reference(&self, view: &mut PointView, header: &Header) {
         if self.nosrs {
+            return;
+        }
+
+        if let Some(srs) = resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order) {
+            view.set_spatial_reference(srs);
             return;
         }
 
@@ -382,6 +403,101 @@ fn append_point(
     set_standard_dims(view, id, point, point_format);
     set_optional_dims(view, id, point);
     set_extra_dims(view, id, point, extra_dims)
+}
+
+fn srs_vlr_order_from_options(options: &Options) -> Vec<SrsVlrKind> {
+    let spec = options.get_str("srs_vlr_order", "");
+    if spec.trim().is_empty() {
+        return Vec::new();
+    }
+
+    spec.split(',')
+        .filter_map(|part| parse_srs_vlr_kind(part.trim()))
+        .collect()
+}
+
+fn parse_srs_vlr_kind(name: &str) -> Option<SrsVlrKind> {
+    match name.to_ascii_lowercase().as_str() {
+        "wkt1" => Some(SrsVlrKind::Wkt1),
+        "geotiff" => Some(SrsVlrKind::Geotiff),
+        "projjson" => Some(SrsVlrKind::Proj),
+        "wkt2" | "wkt" => Some(SrsVlrKind::Wkt2),
+        _ => None,
+    }
+}
+
+fn header_must_use_wkt(header: &Header) -> bool {
+    header.version().minor >= 4 || header.point_format().is_extended
+}
+
+fn default_srs_vlr_order(header: &Header) -> Vec<SrsVlrKind> {
+    if header_must_use_wkt(header) {
+        vec![SrsVlrKind::Wkt2, SrsVlrKind::Proj, SrsVlrKind::Wkt1]
+    } else {
+        vec![SrsVlrKind::Wkt2, SrsVlrKind::Proj, SrsVlrKind::Geotiff]
+    }
+}
+
+fn find_vlr<'a>(header: &'a Header, user_id: &str, record_id: u16) -> Option<&'a las::Vlr> {
+    header
+        .vlrs()
+        .iter()
+        .chain(header.evlrs().iter())
+        .find(|vlr| vlr.user_id == user_id && vlr.record_id == record_id)
+}
+
+fn vlr_as_string(data: &[u8]) -> String {
+    let len = data
+        .iter()
+        .rposition(|byte| *byte != 0)
+        .map(|idx| idx + 1)
+        .unwrap_or(0);
+    String::from_utf8_lossy(&data[..len]).trim().to_string()
+}
+
+fn resolve_spatial_reference_from_vlrs(
+    header: &Header,
+    order: &[SrsVlrKind],
+) -> Option<pdal_core::srs::SpatialReference> {
+    let order = if order.is_empty() {
+        default_srs_vlr_order(header)
+    } else {
+        order.to_vec()
+    };
+
+    for kind in order {
+        match kind {
+            SrsVlrKind::Wkt2 => {
+                if let Some(vlr) = find_vlr(header, TRANSFORM_USER_ID, WKT2_RECORD_ID) {
+                    let wkt = vlr_as_string(&vlr.data);
+                    if !wkt.is_empty() {
+                        return Some(pdal_core::srs::SpatialReference::new(&wkt));
+                    }
+                }
+            }
+            SrsVlrKind::Proj => {
+                if let Some(vlr) = find_vlr(header, PDAL_USER_ID, PROJJSON_RECORD_ID) {
+                    let text = vlr_as_string(&vlr.data);
+                    if !text.is_empty() {
+                        return Some(pdal_core::srs::SpatialReference::new(&text));
+                    }
+                }
+            }
+            SrsVlrKind::Wkt1 => {
+                let vlr = find_vlr(header, TRANSFORM_USER_ID, WKT_RECORD_ID)
+                    .or_else(|| find_vlr(header, LIBLAS_USER_ID, WKT_RECORD_ID));
+                if let Some(vlr) = vlr {
+                    let wkt = vlr_as_string(&vlr.data);
+                    if !wkt.is_empty() {
+                        return Some(pdal_core::srs::SpatialReference::new(&wkt));
+                    }
+                }
+            }
+            SrsVlrKind::Geotiff => {}
+        }
+    }
+
+    None
 }
 
 fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {

@@ -523,6 +523,11 @@ void LasReader::ready(PointTableRef table)
                          d->opts.ignoreMissingVLRs ? "true" : "false");
     if (!d->opts.extraDimSpec.empty())
         addExtraDimsToOptions(options, d->extraDims);
+    if (!d->opts.srsVlrOrder.types.empty())
+    {
+        pdal_options_add_str(options, "srs_vlr_order",
+                             Utils::toString(d->opts.srsVlrOrder).c_str());
+    }
 
     pdal_reader_t* reader = pdal_reader_create_las(options);
     if (!reader)
