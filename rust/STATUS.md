@@ -138,7 +138,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `501 / 917` built C++ GoogleTest cases, or `54.63%`, are
+Current checkpoint: `503 / 917` built C++ GoogleTest cases, or `54.85%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. This is
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
@@ -319,11 +319,12 @@ Known mixed binaries:
   `compressed1_4`, `auto_offset`, `auto_offset2`, `auto_scale_with_auto_offset`, `issue1940`,
   `forwardvlr`, `forward_spec_3`, `issue2663`, `pdal_metadata`, `flex_vlr`, `pdal_add_vlr`,
   `srsWkt2`, `pdal_wkt2_vlr`, `pdal_wkt2_with_derivedprojcrs_vlr`, `pdal_wkt2_read_as_projjson`,
-  and the four LAS 1.0/1.4 classification roundtrip tests count. Rust LAS/LAZ point materialization,
-  scaled header bounds, format 6+ uncompressed and compressed writes, header and VLR forwarding,
-  PDAL metadata/pipeline VLRs, user-specified VLRs/EVLRs, enhanced SRS VLRs, auto scale/offset, legacy header count
-  zeroing, and supported header options route through the Rust C ABI for the gated subset.
-  C++ header inspection tests remain legacy.
+  `extra_dims`, `all_extra_dims`, and the four LAS 1.0/1.4 classification roundtrip tests count.
+  Rust LAS/LAZ point materialization, scaled header bounds, format 6+ uncompressed and compressed
+  writes, header and VLR forwarding, PDAL metadata/pipeline VLRs, user-specified VLRs/EVLRs,
+  enhanced SRS VLRs, configured extra bytes, auto scale/offset, legacy header count zeroing, and
+  supported header options route through the Rust C ABI for the gated subset. C++ header inspection
+  tests remain legacy.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`

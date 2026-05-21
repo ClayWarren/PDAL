@@ -401,6 +401,8 @@ COVERED: dict[str, object] = {
         "pdal_wkt2_vlr",
         "pdal_wkt2_with_derivedprojcrs_vlr",
         "pdal_wkt2_read_as_projjson",
+        "extra_dims",
+        "all_extra_dims",
     },
     "pdal_io_ilvis2_test": ALL,
     "pdal_io_ilvis2_metadata_test": ALL,

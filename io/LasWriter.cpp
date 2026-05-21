@@ -197,6 +197,17 @@ void addEnhancedSrsVlrsToOptions(pdal_options_t* options,
     addNullTerminatedVlrOption(options, "srs_wkt1_vlr", wkt1);
 }
 
+void addExtraDimsToOptions(pdal_options_t* options,
+                           const std::vector<las::ExtraDim>& extraDims)
+{
+    for (const las::ExtraDim& dim : extraDims)
+    {
+        addOption(options, "extra_dim_name", dim.m_name);
+        addOption(options, "extra_dim_type",
+                  Dimension::interpretationName(dim.m_dimType.m_type));
+    }
+}
+
 } // unnamed namespace
 
 std::string LasWriter::getName() const
@@ -1377,8 +1388,6 @@ const las::Header& LasWriter::header() const
 
 bool LasWriter::useRustWriter() const
 {
-    if (!d->opts.extraDimSpec.empty())
-        return false;
     if (d->opts.discardHighReturnNumbers)
         return false;
     return true;
@@ -1497,6 +1506,8 @@ void LasWriter::writeRustOutput()
         addUserVlrsToOptions(options, d->opts.userVlrs, m_tableMetadata,
                              d->opts.minorVersion.val());
     }
+    if (!m_extraDims.empty())
+        addExtraDimsToOptions(options, m_extraDims);
 
     std::string ext = FileUtils::extension(d->curFilename);
     pdal_writer_t* writer = (d->opts.compression == las::Compression::True ||

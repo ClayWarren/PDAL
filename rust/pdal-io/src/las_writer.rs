@@ -56,7 +56,13 @@ pub struct LasWriter {
     srs_projjson_vlr: Option<Vec<u8>>,
     srs_wkt1_vlr: Option<Vec<u8>>,
     user_vlrs: Vec<UserVlr>,
+    configured_extra_dims: Vec<ConfiguredExtraDim>,
     forward_vlrs: Vec<ForwardedVlr>,
+}
+
+struct ConfiguredExtraDim {
+    name: String,
+    type_name: String,
 }
 
 struct UserVlr {
@@ -123,6 +129,7 @@ impl LasWriter {
             srs_projjson_vlr: binary_option(options, "srs_projjson_vlr"),
             srs_wkt1_vlr: binary_option(options, "srs_wkt1_vlr"),
             user_vlrs: user_vlrs_from_options(options),
+            configured_extra_dims: configured_extra_dims_from_options(options),
             forward_vlrs: forward_vlrs_from_options(options),
         }
     }
@@ -220,7 +227,7 @@ impl Writer for LasWriter {
             self.pdal_metadata_json.as_deref(),
             self.pdal_pipeline_json.as_deref(),
         );
-        let extra_dims = extra_dims_from_views(views, self.point_format);
+        let extra_dims = resolve_extra_dims(views, self.point_format, &self.configured_extra_dims)?;
         add_extra_bytes_vlr(&mut builder, &extra_dims)?;
         add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
@@ -282,6 +289,84 @@ fn min_xyz(views: &[PointView]) -> Option<[f64; 3]> {
         }
     }
     has_points.then_some(min)
+}
+
+fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {
+    let names = options.values("extra_dim_name");
+    let types = options.values("extra_dim_type");
+    let count = names.len().min(types.len());
+
+    (0..count)
+        .map(|idx| ConfiguredExtraDim {
+            name: names[idx].clone(),
+            type_name: types[idx].clone(),
+        })
+        .collect()
+}
+
+fn resolve_extra_dims(
+    views: &[PointView],
+    point_format: u8,
+    configured_extra_dims: &[ConfiguredExtraDim],
+) -> Result<Vec<ExtraDim>, StageError> {
+    if configured_extra_dims.is_empty() {
+        return Ok(extra_dims_from_views(views, point_format));
+    }
+
+    let view = views.first().ok_or_else(|| {
+        StageError("LasWriter requires at least one point view for extra_dims.".to_string())
+    })?;
+
+    configured_extra_dims
+        .iter()
+        .map(|spec| {
+            let id = DimId::from_name(&spec.name);
+            let ty = dim_type_from_interpretation(&spec.type_name).ok_or_else(|| {
+                StageError(format!(
+                    "Invalid extra_dim type '{}' for dimension '{}'.",
+                    spec.type_name, spec.name
+                ))
+            })?;
+            if view.layout().dim(&id).is_none() {
+                return Err(StageError(format!(
+                    "Dimension '{}' specified in extra_dim option not found.",
+                    spec.name
+                )));
+            }
+            Ok(ExtraDim {
+                id,
+                ty,
+                size: ty.size(),
+            })
+        })
+        .collect()
+}
+
+fn dim_type_from_interpretation(name: &str) -> Option<DimType> {
+    let normalized = name.trim().to_ascii_lowercase();
+    if normalized.contains("int8") {
+        Some(DimType::I8)
+    } else if normalized.contains("int16") {
+        Some(DimType::I16)
+    } else if normalized.contains("int32") {
+        Some(DimType::I32)
+    } else if normalized.contains("int64") {
+        Some(DimType::I64)
+    } else if normalized.contains("uint8") || normalized.contains("unsigned8") {
+        Some(DimType::U8)
+    } else if normalized.contains("uint16") || normalized.contains("unsigned16") {
+        Some(DimType::U16)
+    } else if normalized.contains("uint32") || normalized.contains("unsigned32") {
+        Some(DimType::U32)
+    } else if normalized.contains("uint64") || normalized.contains("unsigned64") {
+        Some(DimType::U64)
+    } else if normalized.contains("float") {
+        Some(DimType::F32)
+    } else if normalized.contains("double") {
+        Some(DimType::F64)
+    } else {
+        None
+    }
 }
 
 fn extra_dims_from_views(views: &[PointView], point_format: u8) -> Vec<ExtraDim> {
