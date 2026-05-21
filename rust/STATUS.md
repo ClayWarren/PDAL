@@ -58,7 +58,7 @@ Status definitions:
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
-| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
+| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
 | Broad kernels/apps/tools migration | deferred | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels, `apps/pdal.cpp`, `lasdump`, and `nitfwrap` wait on lower-layer parity. |
@@ -118,17 +118,17 @@ place only when a ported stage needs it.
 
 | Vendor directory | Role in the port |
 |---|---|
-| `vendor/arbiter` | Leave until remote/object-store I/O is ready. |
-| `vendor/eigen` | Replace with Rust linear algebra where practical; do not port Eigen itself. |
-| `vendor/gtest` | Keep for C++ parity tests. |
-| `vendor/h3` | Prefer the Rust H3 crate already used by Rust-backed H3 work. |
-| `vendor/kazhdan` | Decide per Poisson/reconstruction work; likely private algorithm port or FFI. |
-| `vendor/lazperf` | Keep available for C++ compatibility; Rust LAS/LAZ currently uses Rust crates. |
-| `vendor/lepcc` | Defer until EPT/COPC compression parity requires it. |
-| `vendor/nanoflann` | Replace with the Rust spatial-index API rather than porting nanoflann. |
-| `vendor/nlohmann` | C++ JSON dependency; Rust uses Rust JSON tooling. |
-| `vendor/schema-validator` | Defer until schema validation parity needs it. |
-| `vendor/utfcpp` | C++ Unicode helper dependency; do not port directly unless a real gap appears. |
+| `vendor/arbiter` | Deferred | Leave until remote/object-store I/O is ready. |
+| `vendor/eigen` | No direct port | Use Rust linear algebra where practical; do not port Eigen itself. Current covered math uses local small-matrix routines. |
+| `vendor/gtest` | No Rust role | Keep for C++ parity tests. Rust uses Cargo tests. |
+| `vendor/h3` | Replaced in Rust | Rust-backed H3 work uses the `h3o` crate. Do not bind vendored C H3 unless parity requires behavior `h3o` cannot provide. |
+| `vendor/kazhdan` | Deferred | Decide per Poisson/reconstruction work; likely private algorithm port, FFI, or leave C++ depending on tests. |
+| `vendor/lazperf` | Replaced in Rust | Current Rust LAS/LAZ path uses the `las` crate with its `laz` feature. Keep lazperf available for C++ compatibility. |
+| `vendor/lepcc` | Deferred | Defer until EPT/COPC compression parity requires it. |
+| `vendor/nanoflann` | No direct port | Use the Rust spatial-index API rather than porting nanoflann; internals can be swapped later. |
+| `vendor/nlohmann` | No Rust role | C++ JSON dependency; Rust uses `serde_json`. |
+| `vendor/schema-validator` | Deferred | Defer until schema validation parity needs it. |
+| `vendor/utfcpp` | Deferred | C++ Unicode helper dependency; use Rust string/UTF-8 APIs unless a concrete parity gap appears. |
 
 ## C++ Test Parity Accounting
 
