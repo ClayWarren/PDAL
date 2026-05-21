@@ -249,6 +249,7 @@ COVERED: dict[str, object] = {
         "t2",
         "assignment_parse",
         "test_condition",
+        "test_creation",
     },
     "pdal_filters_transformation_test": {
         "NoChange",
@@ -406,6 +407,8 @@ COVERED: dict[str, object] = {
         "pdal_wkt2_read_as_projjson",
         "extra_dims",
         "all_extra_dims",
+        "evlrOffset",
+        "read_srs_order",
     },
     "pdal_io_ilvis2_test": ALL,
     "pdal_io_ilvis2_metadata_test": ALL,
