@@ -46,6 +46,7 @@ mod deflate_abi;
 mod filter_abi;
 mod io_abi;
 mod math_abi;
+mod obb_abi;
 mod pipeline_metadata_abi;
 mod point_abi;
 mod utility_abi;

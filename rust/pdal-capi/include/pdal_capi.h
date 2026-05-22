@@ -180,6 +180,11 @@ extern "C"
     void pdal_math_erode_diamond(double* data, size_t rows, size_t cols,
                                  int32_t iterations);
 
+    // Oriented bounding box intersection
+    bool pdal_obb_intersect(const double* center_a, const double* half_a,
+                            const double* quat_a, const double* center_b,
+                            const double* half_b, const double* quat_b);
+
     // OGRSpec
     char* pdal_ogr_spec_parse_json(const char* input);
 

@@ -48,7 +48,6 @@ class SrsTransform;
 
 namespace i3s
 {
-using Segment = std::pair<Eigen::Vector3d, Eigen::Vector3d>;
 
 class Obb
 {
@@ -68,10 +67,6 @@ public:
 
 private:
     void verifyArray(const NL::json& spec, const std::string& name, size_t cnt);
-    bool intersectNormalized(const Segment& seg) const;
-    Eigen::Vector3d corner(size_t pos);
-    static bool halfIntersect(const Obb& a, Obb b);
-    Segment segment(size_t pos);
     // Test support
     void setCenter(const Eigen::Vector3d& center);
 
