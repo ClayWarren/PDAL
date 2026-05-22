@@ -64,6 +64,7 @@ extern "C"
     char* pdal_utils_trim_trailing(const char* value);
     char* pdal_utils_replace_all(const char* value, const char* replace_what,
                                  const char* replace_with);
+    int pdal_utils_run_shell_command(const char* command, char** out_output);
     char* pdal_utils_to_lower(const char* value);
     char* pdal_utils_to_upper(const char* value);
     bool pdal_utils_iequals(const char* left, const char* right);

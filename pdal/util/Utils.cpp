@@ -513,6 +513,12 @@ int Utils::portable_pclose(FILE* fp)
 
 int Utils::run_shell_command(const std::string& cmd, std::string& output)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    char* rustOutput = nullptr;
+    int rustStatus = pdal_utils_run_shell_command(cmd.c_str(), &rustOutput);
+    output = takeRustString(rustOutput);
+    return rustStatus;
+#else
     const int maxbuf = 4096;
     char buf[maxbuf];
 
@@ -535,6 +541,7 @@ int Utils::run_shell_command(const std::string& cmd, std::string& output)
         output += buf;
     }
     return portable_pclose(fp);
+#endif
 }
 
 std::string Utils::replaceAll(std::string result,

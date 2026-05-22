@@ -1,9 +1,9 @@
 use pdal_core::utils::{
     base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, escape_json,
     escape_nonprinting_bytes, format_f64, format_i32, get_env, iequals, looks_like_json,
-    normalize_longitude, parse_f64, parse_i32, random, random_seed, replace_all, set_env,
-    simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper, trim_leading,
-    trim_trailing, unset_env, word_wrap, word_wrap2,
+    normalize_longitude, parse_f64, parse_i32, random, random_seed, replace_all, run_shell_command,
+    set_env, simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper,
+    trim_leading, trim_trailing, unset_env, word_wrap, word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -67,6 +67,25 @@ pub unsafe extern "C" fn pdal_utils_replace_all(
         &c_string(replace_what),
         &c_string(replace_with),
     ))
+}
+
+/// Run a shell command, returning the exit status and writing captured stdout
+/// to `*out_output` (a heap C string the caller frees with `pdal_string_free`).
+///
+/// # Safety
+///
+/// `command` must be a valid NUL-terminated C string. `out_output`, when
+/// non-null, must be a valid pointer to write the output string handle to.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_run_shell_command(
+    command: *const c_char,
+    out_output: *mut *mut c_char,
+) -> i32 {
+    let (status, output) = run_shell_command(&c_string(command));
+    if !out_output.is_null() {
+        *out_output = string_to_c(output);
+    }
+    status
 }
 
 #[no_mangle]
