@@ -40,6 +40,7 @@ use pdal_filters::miniball::MiniballFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
+use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::overlay::OverlayFilter;
@@ -1433,6 +1434,29 @@ pub unsafe extern "C" fn pdal_stage_create_covariancefeatures(
         CovarianceMode::from_u32(u32::from(mode)),
         optimal,
         &feature_set,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a normal-estimation filter stage.
+///
+/// `knn` is the effective neighbor count (including the query point).
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_normal(
+    knn: u64,
+    has_radius: bool,
+    radius: f64,
+    has_viewpoint: bool,
+    viewpoint_x: f64,
+    viewpoint_y: f64,
+    viewpoint_z: f64,
+    always_up: bool,
+) -> *mut StageWrapper {
+    let filter = Box::new(NormalFilter::new(
+        knn as usize,
+        has_radius.then_some(radius),
+        has_viewpoint.then_some([viewpoint_x, viewpoint_y, viewpoint_z]),
+        always_up,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

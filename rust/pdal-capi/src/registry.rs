@@ -35,6 +35,7 @@ use pdal_filters::merge::MergeFilter;
 use pdal_filters::miniball::MiniballFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
+use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
@@ -111,6 +112,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.miniball",
     "filters.mortonorder",
     "filters.nndistance",
+    "filters.normal",
     "filters.optimalneighborhood",
     "filters.outlier",
     "filters.planefit",
@@ -314,6 +316,15 @@ pub fn create_filter(
         "filters.nndistance" => Ok(Box::new(FilterWrapper::new(NNDistanceFilter::new(
             get_u64(options, "knn", get_u64(options, "k", 8)?)? as usize,
             nn_distance_mode(&options.get_str("mode", "kth"))?,
+        )))),
+        "filters.normal" => Ok(Box::new(FilterWrapper::new(NormalFilter::new(
+            get_u64(options, "knn", 8)? as usize + 1,
+            options
+                .has("radius")
+                .then(|| get_f64(options, "radius", 0.0))
+                .transpose()?,
+            None,
+            get_bool(options, "always_up", true)?,
         )))),
         "filters.optimalneighborhood" => Ok(Box::new(FilterWrapper::new(
             OptimalNeighborhoodFilter::new(

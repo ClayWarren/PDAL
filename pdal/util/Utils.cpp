@@ -108,6 +108,9 @@ bool Utils::compare_approx(double v1, double v2, double tolerance)
 
 std::string Utils::toString(double from, size_t precision)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_to_string_f64(from, precision));
+#else
     OStringStreamClassicLocale oss;
     if (std::isnan(from))
         return "NaN";
@@ -115,6 +118,7 @@ std::string Utils::toString(double from, size_t precision)
         return (from < 0 ? "-Infinity" : "Infinity");
     oss << std::setprecision(precision) << from;
     return oss.str();
+#endif
 }
 
 std::string Utils::toString(int from)

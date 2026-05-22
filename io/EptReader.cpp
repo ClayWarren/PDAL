@@ -148,6 +148,11 @@ void addOption(pdal_options_t* options, const std::string& key,
     pdal_options_add_str(options, key.c_str(), value.c_str());
 }
 
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
 std::string boundsOption(const SrsBounds& bounds)
 {
     if (bounds.to3d().valid())
@@ -641,7 +646,6 @@ void EptReader::ready(PointTableRef table)
     }
 
     if (table.supportsView() && !Utils::isRemote(m_filename) &&
-        m_args->m_resolution == 0 &&
         m_args->m_bounds.spatialReference().empty() &&
         m_args->m_polys.empty() && m_args->m_addons.empty() &&
         m_args->m_ogr.empty() && !m_args->m_ignoreUnreadable)
@@ -653,6 +657,8 @@ void EptReader::ready(PointTableRef table)
             addOption(options, "bounds", bounds);
         if (!m_args->m_origin.empty())
             addOption(options, "origin", m_args->m_origin);
+        if (m_args->m_resolution > 0)
+            addOption(options, "resolution", m_args->m_resolution);
         pdal_reader_t* reader = pdal_reader_create_ept(options);
         if (!reader)
         {

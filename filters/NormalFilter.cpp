@@ -46,7 +46,10 @@
 
 #include <pdal/KDIndex.hpp>
 #include <pdal/private/MathUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+
+#include <pdal_capi.h>
 
 #include <Eigen/Dense>
 
@@ -137,52 +140,6 @@ void NormalFilter::prepared(PointTableRef table)
         // The query point is returned as a neighbor of itself, so we must
         // increase k by one to get the desired number of neighbors.
         ++m_args->m_knn;
-    }
-}
-
-void NormalFilter::compute(PointView& view, KD3Index& kdi)
-{
-    log()->get(LogLevel::Debug) << "Computing normal vectors\n";
-    for (auto&& p : view)
-    {
-        math::NormalResult result;
-
-        // Perform eigen decomposition of covariance matrix computed from
-        // neighborhood composed of k-nearest neighbors, or within radius.
-        if (m_radiusArg->set())
-            result = math::findNormal(
-                view, kdi.radius(p.pointId(), m_args->m_radius));
-        else
-            result = math::findNormal(
-                view, kdi.neighbors(p.pointId(), m_args->m_knn));
-
-        if (result.normal.isZero())
-        {
-            log()->get(LogLevel::Info) << "Skipping point " << p.pointId()
-                                       << ": " << result.msg << "\n";
-            continue;
-        }
-
-        if (m_viewpointArg->set())
-        {
-            // If a viewpoint has been specified, orient the normals to face the
-            // viewpoint by taking the dot product of the vector connecting the
-            // point with the viewpoint and the normal. Flip the normal, where
-            // the dot product is negative.
-            double dx = m_args->m_viewpoint.x() - p.getFieldAs<double>(Id::X);
-            double dy = m_args->m_viewpoint.y() - p.getFieldAs<double>(Id::Y);
-            double dz = m_args->m_viewpoint.z() - p.getFieldAs<double>(Id::Z);
-            result.normal =
-                math::orientToViewpoint({dx, dy, dz}, result.normal);
-        }
-        else if (m_args->m_up)
-            result.normal = math::orientUp(result.normal);
-
-        // Set the computed normal and curvature dimensions.
-        p.setField(Id::NormalX, result.normal[0]);
-        p.setField(Id::NormalY, result.normal[1]);
-        p.setField(Id::NormalZ, result.normal[2]);
-        p.setField(Id::Curvature, result.curvature);
     }
 }
 
@@ -292,15 +249,33 @@ void NormalFilter::refine(PointView& view, KD3Index& kdi)
 
 void NormalFilter::filter(PointView& view)
 {
-    KD3Index& kdi = view.build3dIndex();
+    // Compute the normal/curvature and optional viewpoint/up orientation
+    // through the Rust C ABI.
+    bool hasViewpoint = m_viewpointArg->set();
+    double vx = 0.0, vy = 0.0, vz = 0.0;
+    if (hasViewpoint)
+    {
+        vx = m_args->m_viewpoint.x();
+        vy = m_args->m_viewpoint.y();
+        vz = m_args->m_viewpoint.z();
+    }
 
-    // Compute the normal/curvature and optionally orient toward viewpoint or
-    // positive Z.
-    compute(view, kdi);
+    pdal_stage_t* stage = pdal_stage_create_normal(
+        m_args->m_knn, m_radiusArg->set(), m_args->m_radius, hasViewpoint, vx,
+        vy, vz, m_args->m_up);
+    if (!stage)
+        throwError("Failed to create Rust normal stage.");
+
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 
     // If requested, refine normals through minimum spanning tree propagation.
+    // This step deliberately remains in C++.
     if (m_args->m_refine)
+    {
+        KD3Index& kdi = view.build3dIndex();
         refine(view, kdi);
+    }
 }
 
 } // namespace pdal

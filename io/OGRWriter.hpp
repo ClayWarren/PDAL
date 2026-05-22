@@ -40,6 +40,8 @@
 #include <gdal_priv.h>
 #include <ogr_feature.h>
 
+struct pdal_point_view;
+
 namespace pdal
 {
 
@@ -49,6 +51,7 @@ public:
     std::string getName() const override;
 
     OGRWriter();
+    ~OGRWriter() override;
 
 private:
     void addArgs(ProgramArgs& args) override;
@@ -60,6 +63,9 @@ private:
     void writeView(const PointViewPtr view) override;
     bool processOne(PointRef& point) override;
     void doneFile() override;
+    bool useRustWriter() const;
+    void writeRustOutput();
+    void clearRustViews();
 
     // I don't think this needs to be deleted.
     GDALDriver* m_driver;
@@ -80,6 +86,8 @@ private:
     using Attribute = std::tuple<Dimension::Id, Dimension::Type, OGRFieldDefn>;
     std::deque<Attribute> m_attrs;
     bool m_inTransaction;
+    bool m_rustWriter = false;
+    std::vector<pdal_point_view*> m_rustViews;
 };
 
 } // namespace pdal

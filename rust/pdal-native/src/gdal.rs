@@ -31,7 +31,16 @@ impl Raster {
         geo_transform: [f64; 6],
         srs_wkt: &str,
     ) -> Result<Self, String> {
-        Self::create(path, driver_name, width, height, band_count, geo_transform, srs_wkt, GDALDataType::GDT_Float64)
+        Self::create(
+            path,
+            driver_name,
+            width,
+            height,
+            band_count,
+            geo_transform,
+            srs_wkt,
+            GDALDataType::GDT_Float64,
+        )
     }
 
     pub fn create_int32(
@@ -43,9 +52,19 @@ impl Raster {
         geo_transform: [f64; 6],
         srs_wkt: &str,
     ) -> Result<Self, String> {
-        Self::create(path, driver_name, width, height, band_count, geo_transform, srs_wkt, GDALDataType::GDT_Int32)
+        Self::create(
+            path,
+            driver_name,
+            width,
+            height,
+            band_count,
+            geo_transform,
+            srs_wkt,
+            GDALDataType::GDT_Int32,
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create(
         path: &str,
         driver_name: &str,

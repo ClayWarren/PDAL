@@ -653,6 +653,11 @@ extern "C"
                                                 uint64_t min_k);
     pdal_stage_t* pdal_stage_create_optimalneighborhood(uint64_t min_k,
                                                         uint64_t max_k);
+    pdal_stage_t* pdal_stage_create_normal(uint64_t knn, bool has_radius,
+                                           double radius, bool has_viewpoint,
+                                           double viewpoint_x,
+                                           double viewpoint_y,
+                                           double viewpoint_z, bool always_up);
 
     char* pdal_grid_decimation_validate(double resolution, const char* output_type);
     uint64_t* pdal_grid_decimation_get_kept_indices(

@@ -137,7 +137,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_hag_test": {"dem", "dem_clamps", "neighbors", "closest", "delaunay"},
     "pdal_filters_h3_test": {"createStage", "stream_test_2"},
     "pdal_filters_geomdistance_test": {"create", "test_polygon"},
-    "pdal_filters_hexbin_test": {"HexbinFilterTest_test_1"},
+    "pdal_filters_hexbin_test": {"HexbinFilterTest_test_1", "HexbinFilterTest_test_2", "issue_4899"},
     "pdal_filters_faceraster_test": ALL,
     "pdal_filters_overlay_test": ALL,
     "pdal_filters_reprojection_test": ALL,
@@ -493,6 +493,7 @@ COVERED: dict[str, object] = {
         "fullRead",
         "boundedRead2d",
         "boundedRead3d",
+        "multipleInputs",
     },
     "pdal_io_ept_reader_test": {
         "fullReadLaszip",
@@ -502,7 +503,6 @@ COVERED: dict[str, object] = {
         "boundedRead3d",
         "originReadVersion1_0_0",
         "originRead",
-        "badOriginQuery",
         "unreadableDataFailure",
         "duplicateInputs",
     },
@@ -581,6 +581,9 @@ COVERED: dict[str, object] = {
         "testValidMetadataFile",
         "testNoMetadataFile",
         "testInvalidMetadataFile",
+    },
+    "pdal_io_ogr_writer_test": {
+        "json",
     },
     "pdal_io_optech_test": {
         "Constructor",

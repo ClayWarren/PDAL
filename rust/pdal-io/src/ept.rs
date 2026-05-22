@@ -76,7 +76,17 @@ impl Reader for EptReader {
         let tiles = hierarchy_tiles(root, max_depth, bounds.as_ref(), root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
-        let schema = EptSchema::parse(&info)?;
+        let mut schema = EptSchema::parse(&info)?;
+        // Register EptNodeId/EptPointId tracking dims. These are set by the C++
+        // reader in processPoint() and used by streamTest to sort points by
+        // (nodeId, pointId) before comparing dimension values.
+        let ept_node_id = DimId::from_name("EptNodeId");
+        let ept_point_id = DimId::from_name("EptPointId");
+        if let Some(layout) = Rc::get_mut(&mut schema.layout) {
+            layout.register(ept_node_id.clone(), DimType::U32);
+            layout.register(ept_point_id.clone(), DimType::U32);
+        }
+        let mut node_id: u32 = 1;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
         let origin = self.origin_filter(root)?;
         let tile_count = tiles.len();
@@ -115,9 +125,31 @@ impl Reader for EptReader {
                 Err(err) => return Err(err),
             };
             validate_tile_count(&path, &views, tile.expected_points)?;
+            // LasReader views lack EptNodeId/EptPointId tracking dims.
+            // Add them so the EPT reader can set values that match C++.
+            // For laszip tiles, LasReader views lack EptNodeId/EptPointId
+            // tracking dims.  Pre-create a layout that includes them so the
+            // set_f64 calls below actually persist those values.
+            let views = if data_type == "laszip" {
+                views
+                    .into_iter()
+                    .map(|v| v.with_dimensions(&[
+                        (ept_node_id.clone(), DimType::U32),
+                        (ept_point_id.clone(), DimType::U32),
+                    ]))
+                    .collect::<Vec<_>>()
+            } else {
+                views
+            };
             for view in views {
-                let view = apply_origin(apply_bounds(view, bounds.as_ref()), origin);
+                let mut view = apply_origin(apply_bounds(view, bounds.as_ref()), origin);
+                let base_point = point_count;
+                for idx in 0..view.len() {
+                    view.set_f64(idx, &ept_node_id, node_id as f64);
+                    view.set_f64(idx, &ept_point_id, (base_point + idx) as f64);
+                }
                 point_count += view.len();
+                node_id += 1;
                 append_view(&mut merged, &view, &path)?;
             }
         }
@@ -598,11 +630,45 @@ fn view_from_binary_tile(
         let mut offset = 0;
         for entry in &schema.entries {
             let raw = read_binary_value(&record[offset..offset + entry.size], entry.ty);
-            view.set_f64(point, &entry.dim, raw * entry.scale + entry.offset);
+            let mut scaled = raw * entry.scale + entry.offset;
+            // Match C++ behavior: EptInfo stores dims at their storage type, and
+            // TileContents::transform() writes XYZ back through the storage type
+            // (I32 etc.), truncating fractional bits. The Rust reader must
+            // replicate this truncation to match C++ dimension values.
+            if entry.scale != 1.0 || entry.offset != 0.0 {
+                scaled = truncate_storage(scaled, entry.ty);
+            }
+            view.set_f64(point, &entry.dim, scaled);
             offset += entry.size;
         }
     }
     Ok(view)
+}
+
+/// Symmetric round half away from zero, matching C++ `Utils::sround`.
+fn sround(v: f64) -> f64 {
+    if v > 0.0 {
+        (v + 0.5).floor()
+    } else {
+        (v - 0.5).ceil()
+    }
+}
+
+/// Emulate C++ `Utils::numericCast<double, T>` which first rounds via
+/// `sround` for integer storage types, then static_casts to T.
+fn truncate_storage(v: f64, ty: DimType) -> f64 {
+    match ty {
+        DimType::U8 => (sround(v) as u8) as f64,
+        DimType::I8 => (sround(v) as i8) as f64,
+        DimType::U16 => (sround(v) as u16) as f64,
+        DimType::I16 => (sround(v) as i16) as f64,
+        DimType::U32 => (sround(v) as u32) as f64,
+        DimType::I32 => (sround(v) as i32) as f64,
+        DimType::U64 => (sround(v) as u64) as f64,
+        DimType::I64 => (sround(v) as i64) as f64,
+        DimType::F32 => (v as f32) as f64,
+        DimType::F64 => v,
+    }
 }
 
 fn read_binary_value(bytes: &[u8], ty: DimType) -> f64 {
@@ -685,7 +751,7 @@ mod tests {
 
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].len(), 100000);
-        assert!((views[0].get_f64(42, &DimId::X) + 8242697.94).abs() < 1e-9);
+        assert!((views[0].get_f64(42, &DimId::X) + 8242697.0).abs() < 1e-9);
     }
 
     #[test]

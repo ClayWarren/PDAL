@@ -39,7 +39,7 @@ Status definitions:
 | PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
 | OBJ reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Wavefront OBJ ASCII data, mesh faces, and VTN de-duplication. |
 | GLTF writer | in progress | Existing C++ writer unit-test shapes pass through the Rust-backed path for deterministic local GLB output from mesh-backed views. |
-| OGR writer | prototype | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
+| OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. The C++ `OGRWriter` now delegates to the Rust C ABI for GeoJSON output without `ogr_options` or `measure_dim`. The C++ `json` test routes through Rust. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
@@ -138,12 +138,23 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `662 / 926` built C++ GoogleTest cases, or `71.49%`, are
+Current checkpoint: `665 / 926` built C++ GoogleTest cases, or `71.81%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit PointTable layout limits and LAS userView reads, metadata
-construction/update, buffer stats execution, and XMLSchema round-trip parsing.
-This remains a conservative lower bound, not a final port-completion percentage:
-42 built test binaries remain unclassified by the audit script. The previous
+gains audit PointTable layout limits, LAS userView reads, metadata
+construction/update, buffer stats execution, XMLSchema round-trip parsing,
+hexbin filter execution cases, COPC reader multi-input handling, EPT reader
+audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
+confirmed; badOriginQuery corrected), and OGR writer GeoJSON output through the Rust C ABI. `Utils::toString(double)` now routes
+through the Rust C ABI via the existing `pdal_utils_to_string_f64` function,
+matching C++ `setprecision` behavior for NaN, Inf, zero, scientific, and fixed-point
+notation. This remains a conservative lower bound, not a final port-completion percentage:
+35 built test binaries remain unclassified by the audit script. Of these:
+   - 15 are private/specialized C++ algorithms with no Rust port planned (covariancefeatures, csf, delaunay, icp, litree, lloydkmeans, m3c2, normal, pmf, relaxation_dart_throwing, straighten, supervoxel, slpk_reader)
+   - 14 are infrastructure/utility/tooling tests, not pipeline stages (app_plugin, app, artifact, eval, info cmd, merge cmd, oldpclblock, pipeline_manager, program_arg, support, thread_pool, tile cmd, tindex cmd, vsi)
+   - 4 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, shell, where)
+   - 3 are explicitly deferred (copc_remote_reader, copc_writer, ept_addon_writer)
+  No easy audit wins remain among the 35 uncounted binaries — all require
+  substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.
 
@@ -364,15 +375,22 @@ Known mixed binaries:
   route through the Rust C ABI. Resolution, streaming, preview,
   polygon/OGR/reprojection crops, and multi-input behavior remain C++.
 - `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
-  `boundedRead2d`, `boundedRead3d`, `originReadVersion1_0_0`, and `originRead`
-  count. Local EPT point materialization, simple dataset-coordinate bounds, and
-  origin selection route through the Rust C ABI. Resolution, streaming,
-  unreadable-data tolerance, SRS-bound reprojection, polygon/OGR crops, addons,
-  preview behavior, and prepare-time bad-origin validation remain C++.
+  `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`,
+  `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`, and
+  `duplicateInputs` count. Local EPT point materialization, simple
+  dataset-coordinate bounds, origin selection, zstandard decompression,
+  missing-tile error handling, and multi-input diamond pipelines route through
+  the Rust C ABI. Resolution, streaming, SRS-bound reprojection, polygon/OGR
+  crops, addons, preview behavior, and prepare-time bad-origin validation
+  remain C++.
 - `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.
   Local STAC Feature/Collection traversal with direct asset reads routes through
   the Rust C ABI. Catalog/FeatureCollection preview metadata, filters, schema
   validation, remote assets, and mixed-reader option behavior remain C++.
+- `pdal_io_ogr_writer_test`: `json` counts. GeoJSON point and MultiPoint
+  output routes through the Rust C ABI when the driver is GeoJSON without
+  `ogr_options` or `measure_dim`. Shapefile, GeoPackage, and advanced options
+  remain C++/GDAL.
 - `pdal_io_obj_reader_test`: `NoFace`, `NoVertex`, `Read`,
   `FourDimensionRead`, `TexturesAndNormals`, and `LargeFile` count. OBJ point
   and mesh extraction route through the Rust C ABI.

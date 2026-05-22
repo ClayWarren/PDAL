@@ -141,18 +141,29 @@ pub fn compare_approx(v1: f64, v2: f64, tolerance: f64) -> bool {
     (v1 - v2).abs() <= tolerance.abs()
 }
 
-fn trim_fractional_zeros(value: &mut String) {
-    if !value.contains('.') {
-        return;
-    }
-    while value.ends_with('0') {
-        value.pop();
-    }
-    if value.ends_with('.') {
-        value.pop();
+fn trim_trailing_zeros(s: &str) -> String {
+    if s.contains('.') {
+        let trimmed = s.trim_end_matches('0').trim_end_matches('.');
+        if trimmed.is_empty() {
+            "0".to_string()
+        } else {
+            trimmed.to_string()
+        }
+    } else {
+        s.to_string()
     }
 }
 
+/// Format `value` to match C++ `std::setprecision(precision) << value` with
+/// default float formatting (equivalent to `defaultfloat`).
+///
+/// C++ rules:
+/// - NaN → "NaN"
+/// - Inf → "Infinity" / "-Infinity"
+/// - Zero → "0"
+/// - Scientific notation when exponent < -4 or exponent >= precision
+/// - Exponent zero-padded to 2 digits with sign (e.g. "e-05", "e+10")
+/// - Trailing zeros and trailing decimal points removed from mantissa
 pub fn format_f64(value: f64, precision: u32) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -168,29 +179,36 @@ pub fn format_f64(value: f64, precision: u32) -> String {
         return "0".to_string();
     }
 
-    let precision = precision.max(1) as i32;
+    let prec = precision.max(1) as usize;
+    let abs_val = value.abs();
     let negative = value.is_sign_negative();
-    let value = value.abs();
-    let order = value.log10().floor() as i32;
 
-    if order >= precision || order < -4 {
-        let prec_usize = precision as usize;
-        let mut s = format!("{value:.prec_usize$e}");
-        trim_fractional_zeros(&mut s);
-        return if negative { format!("-{s}") } else { s };
-    }
+    // Format in scientific with (precision-1) digits after decimal
+    // to get `precision` significant digits. This gives the correctly-rounded
+    // representation that C++ defaultfloat would use.
+    let sci = format!("{:.prec$e}", abs_val, prec = prec - 1);
+    let e_pos = sci.rfind('e').unwrap();
+    let mantissa = &sci[..e_pos];
+    let exponent: i32 = sci[e_pos + 1..].parse().unwrap_or(0);
 
-    let decimals = (precision - order - 1).max(0) as usize;
-    let mut s = if decimals == 0 {
-        format!("{value:.0}")
+    // C++ defaultfloat rule: scientific if exponent < -4 or exponent >= precision
+    let use_sci = exponent < -4 || exponent >= precision as i32;
+
+    let result = if use_sci {
+        let sign = if exponent >= 0 { "+" } else { "-" };
+        let exp_str = format!("{}{:02}", sign, exponent.abs());
+        let trimmed_mantissa = trim_trailing_zeros(mantissa);
+        format!("{}e{}", trimmed_mantissa, exp_str)
     } else {
-        format!("{value:.decimals$}")
+        let decimals = ((precision as i32) - 1 - exponent).max(0) as usize;
+        let formatted = format!("{:.decimals$}", abs_val);
+        trim_trailing_zeros(&formatted)
     };
-    trim_fractional_zeros(&mut s);
+
     if negative {
-        format!("-{s}")
+        format!("-{result}")
     } else {
-        s
+        result
     }
 }
 

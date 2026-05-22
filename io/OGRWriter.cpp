@@ -43,6 +43,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wredundant-decls"
 #include <pdal/PointView.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/ErrorHandler.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
@@ -51,8 +52,26 @@
 #include <ogrsf_frmts.h>
 #pragma GCC diagnostic pop
 
+#include <pdal_capi.h>
+
 namespace pdal
 {
+
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void addOption(pdal_options_t* options, const std::string& key, size_t value)
+{
+    pdal_options_add_u64(options, key.c_str(), value);
+}
+
+} // unnamed namespace
 
 static StaticPluginInfo const s_info{
     "writers.ogr",
@@ -67,6 +86,11 @@ OGRWriter::OGRWriter()
       m_curCount(0), m_measureDim(Dimension::Id::Unknown),
       m_inTransaction(false)
 {
+}
+
+OGRWriter::~OGRWriter()
+{
+    clearRustViews();
 }
 
 std::string OGRWriter::getName() const
@@ -211,6 +235,11 @@ void OGRWriter::readyFile(const std::string& filename,
     m_curCount = 0;
     m_outputFilename = filename;
 
+    m_rustWriter = useRustWriter();
+    clearRustViews();
+    if (m_rustWriter)
+        return;
+
     // Dataset
     m_ds = m_driver->Create(filename.data(), 0, 0, 0, GDT_Unknown, nullptr);
     if (!m_ds)
@@ -263,6 +292,12 @@ void OGRWriter::readyFile(const std::string& filename,
 
 void OGRWriter::writeView(const PointViewPtr view)
 {
+    if (m_rustWriter)
+    {
+        m_rustViews.push_back(rust_view_converter::toRust(view));
+        return;
+    }
+
     m_curCount = 0;
     PointRef point(*view, 0);
     for (PointId idx = 0; idx < view->size(); ++idx)
@@ -347,6 +382,14 @@ bool OGRWriter::processOne(PointRef& point)
 
 void OGRWriter::doneFile()
 {
+    if (m_rustWriter)
+    {
+        writeRustOutput();
+        clearRustViews();
+        getMetadata().addList("filename", filename());
+        return;
+    }
+
     if (m_curCount % m_multiCount > 0)
     {
         m_feature->Reset();
@@ -367,6 +410,59 @@ void OGRWriter::doneFile()
     GDALClose(m_ds);
     m_layer = nullptr;
     m_ds = nullptr;
+}
+
+bool OGRWriter::useRustWriter() const
+{
+    return m_driverName == "GeoJSON" && m_ogrOptions.empty() &&
+        m_measureDimName.empty();
+}
+
+void OGRWriter::writeRustOutput()
+{
+    if (m_rustViews.empty())
+        return;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_outputFilename);
+    addOption(options, "ogrdriver", m_driverName);
+    if (m_multiCount > 1)
+        addOption(options, "multicount", m_multiCount);
+    if (!m_attrDimNames.empty())
+    {
+        std::string joined;
+        for (const auto& name : m_attrDimNames)
+        {
+            if (!joined.empty())
+                joined += ",";
+            joined += name;
+        }
+        addOption(options, "attr_dims", joined);
+    }
+
+    pdal_writer_t* writer = pdal_writer_create_ogr(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        rust_view_converter::throwLastError(
+            "Failed to create Rust OGR writer.");
+    }
+
+    std::vector<const pdal_point_view_t*> rustViews(m_rustViews.begin(),
+                                                     m_rustViews.end());
+    bool ok =
+        pdal_writer_write_views(writer, rustViews.data(), rustViews.size());
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    if (!ok)
+        rust_view_converter::throwLastError("Rust OGR writer failed.");
+}
+
+void OGRWriter::clearRustViews()
+{
+    for (pdal_point_view_t* view : m_rustViews)
+        pdal_point_view_destroy(view);
+    m_rustViews.clear();
 }
 
 } // namespace pdal

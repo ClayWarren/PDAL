@@ -194,10 +194,7 @@ pub fn detect_copc(path: &Path) -> bool {
     let Ok(mut file) = std::fs::File::open(path) else {
         return false;
     };
-    if file
-        .seek(SeekFrom::Start(COPC_SIGNATURE_OFFSET))
-        .is_err()
-    {
+    if file.seek(SeekFrom::Start(COPC_SIGNATURE_OFFSET)).is_err() {
         return false;
     }
     let mut signature = [0u8; 4];
