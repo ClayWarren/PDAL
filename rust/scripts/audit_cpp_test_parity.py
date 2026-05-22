@@ -98,7 +98,7 @@ COVERED: dict[str, object] = {
     },
     "pdal_polygon_test": {"valid"},
     "pdal_quad_index_test": ALL,
-    "pdal_xml_schema_test": {"legacyNames"},
+    "pdal_xml_schema_test": {"legacyNames", "roundTrip"},
     "pdal_uuid_test": ALL,
     "pdal_ogr_arg_test": {"parseErrors", "createFromFile"},
     "pdal_filters_crop_test": {
@@ -384,7 +384,13 @@ COVERED: dict[str, object] = {
     "pdal_filters_labelduplicates_test": ALL,
     "pdal_filters_neighborclassifier_test": ALL,
     "pdal_filters_separatescanline_test": ALL,
-    "pdal_metadata_test": {"typed_value", "test_float", "infnan"},
+    "pdal_metadata_test": {
+        "typed_value",
+        "test_float",
+        "infnan",
+        "test_construction",
+        "update",
+    },
     "pdal_io_text_reader_test": {
         "t1",
         "t1a",
@@ -429,6 +435,7 @@ COVERED: dict[str, object] = {
         "rejectsMalformedShape",
         "synthesizesRowMajorShapeCoordinates",
     },
+    "pdal_io_buffer_test": {"test_basic"},
     "pdal_io_faux_test": {
         "test_constant_mode_sequential_iter",
         "test_random_mode",
