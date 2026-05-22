@@ -140,22 +140,15 @@ fn memoryview_shape_parse_rejects_malformed_values() {
         let mut depth = 0;
         let mut rows = 0;
         let mut columns = 0;
-        assert!(pdal_memoryview_shape_parse(
-            valid.as_ptr(),
-            &mut depth,
-            &mut rows,
-            &mut columns
-        )
-        .is_null());
+        assert!(
+            pdal_memoryview_shape_parse(valid.as_ptr(), &mut depth, &mut rows, &mut columns)
+                .is_null()
+        );
         assert_eq!((depth, rows, columns), (1, 2, 3));
 
         let too_short = CString::new("1, 2").unwrap();
-        let err = pdal_memoryview_shape_parse(
-            too_short.as_ptr(),
-            &mut depth,
-            &mut rows,
-            &mut columns,
-        );
+        let err =
+            pdal_memoryview_shape_parse(too_short.as_ptr(), &mut depth, &mut rows, &mut columns);
         assert!(!err.is_null());
         let message = CStr::from_ptr(err).to_string_lossy();
         assert!(message.contains("three integers"));

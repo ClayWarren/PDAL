@@ -1072,7 +1072,6 @@ mod tests {
 
     #[test]
     fn binary_storage_rejects_precision_like_cpp_writer() {
-        let view = xyz_view(&[(1.0, 1.0, 1.0)]);
         let output = temp_path("binary-precision.ply");
         let mut options = Options::new();
         options

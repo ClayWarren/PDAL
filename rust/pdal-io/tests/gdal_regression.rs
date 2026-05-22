@@ -205,9 +205,7 @@ fn gdal_writer_writes_raster_metadata() {
         "metadata",
         "AREA_OR_PIXEL=Pixel,empty=,equals=some_more_equals===",
     );
-    GdalWriter::new(&writer_options)
-        .write(&views)
-        .unwrap();
+    GdalWriter::new(&writer_options).write(&views).unwrap();
 
     pdal_core::gdal::register_drivers();
     let raster = pdal_core::gdal::Raster::open(output.to_str().unwrap()).unwrap();

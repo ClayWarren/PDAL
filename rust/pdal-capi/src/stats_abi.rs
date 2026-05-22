@@ -289,7 +289,9 @@ fn summary_from_merge_state(state: &pdal_summary_merge_state_t) -> Option<stats:
     if state.name.is_null() {
         return None;
     }
-    let name = unsafe { CStr::from_ptr(state.name) }.to_string_lossy().into_owned();
+    let name = unsafe { CStr::from_ptr(state.name) }
+        .to_string_lossy()
+        .into_owned();
     let mut summary = stats::Summary::new(name, state.enumerate, state.advanced);
     summary.cnt = state.count;
     summary.min = state.min;
@@ -304,16 +306,13 @@ fn summary_from_merge_state(state: &pdal_summary_merge_state_t) -> Option<stats:
     if !state.values.is_null() {
         for idx in 0..state.values_len {
             let entry = unsafe { *state.values.add(idx as usize) };
-            summary
-                .values
-                .insert(entry.value.to_bits(), entry.count);
+            summary.values.insert(entry.value.to_bits(), entry.count);
         }
     }
 
     if !state.data.is_null() && state.enumerate == 3 {
-        summary.data = unsafe {
-            std::slice::from_raw_parts(state.data, state.data_len as usize).to_vec()
-        };
+        summary.data =
+            unsafe { std::slice::from_raw_parts(state.data, state.data_len as usize).to_vec() };
     }
 
     Some(summary)
@@ -349,7 +348,7 @@ fn write_merge_state(summary: &stats::Summary, state: &mut pdal_summary_merge_st
             }
             idx += 1;
         }
-        state.values_len = idx as u64;
+        state.values_len = idx;
     }
 
     if !state.data.is_null() && summary.enumerate == 3 {

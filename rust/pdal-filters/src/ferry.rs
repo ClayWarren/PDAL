@@ -15,8 +15,7 @@ impl FerryFilter {
     pub fn parse_specs(specs: &[String]) -> Result<Vec<(String, String)>, String> {
         if specs.is_empty() {
             return Err(
-                "Must specify at least one dimension to ferry using option 'dimensions'."
-                    .into(),
+                "Must specify at least one dimension to ferry using option 'dimensions'.".into(),
             );
         }
         let mut to_names = Vec::new();
@@ -31,7 +30,7 @@ impl FerryFilter {
                     dim
                 ));
             }
-            let mut from = parts[0].trim().to_string();
+            let from = parts[0].trim().to_string();
             let mut to = parts[1].trim().to_string();
             if let Some(stripped) = to.strip_prefix('>') {
                 to = stripped.trim().to_string();
@@ -41,8 +40,7 @@ impl FerryFilter {
             }
             if to_names.iter().any(|name| name == &to) {
                 return Err(
-                    "Can't ferry two source dimensions to the same destination dimension."
-                        .into(),
+                    "Can't ferry two source dimensions to the same destination dimension.".into(),
                 );
             }
             to_names.push(to.clone());

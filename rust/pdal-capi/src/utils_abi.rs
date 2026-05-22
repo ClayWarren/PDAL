@@ -1,7 +1,7 @@
 use pdal_core::utils::{
-    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx,
-    escape_json, escape_nonprinting_bytes, format_f64, format_i32, get_env, iequals,
-    looks_like_json, normalize_longitude, parse_f64, parse_i32, random, random_seed, replace_all, set_env,
+    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, escape_json,
+    escape_nonprinting_bytes, format_f64, format_i32, get_env, iequals, looks_like_json,
+    normalize_longitude, parse_f64, parse_i32, random, random_seed, replace_all, set_env,
     simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper, trim_leading,
     trim_trailing, unset_env, word_wrap, word_wrap2,
 };
@@ -259,10 +259,7 @@ pub extern "C" fn pdal_utils_to_string_i32(value: i32) -> *mut c_char {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pdal_utils_from_string_i32(
-    value: *const c_char,
-    out: *mut i32,
-) -> i32 {
+pub unsafe extern "C" fn pdal_utils_from_string_i32(value: *const c_char, out: *mut i32) -> i32 {
     if value.is_null() || out.is_null() {
         return -1;
     }
@@ -279,14 +276,12 @@ pub unsafe extern "C" fn pdal_utils_from_string_i32(
 }
 
 #[no_mangle]
-pub extern "C" fn pdal_utils_numeric_cast_f32_to_f64(value: f32, out: *mut f64) -> bool {
+pub unsafe extern "C" fn pdal_utils_numeric_cast_f32_to_f64(value: f32, out: *mut f64) -> bool {
     if out.is_null() {
         return false;
     }
     if let Some(converted) = pdal_core::utils::numeric_cast_f32_to_f64(value) {
-        unsafe {
-            *out = converted;
-        }
+        *out = converted;
         true
     } else {
         false
@@ -294,14 +289,12 @@ pub extern "C" fn pdal_utils_numeric_cast_f32_to_f64(value: f32, out: *mut f64) 
 }
 
 #[no_mangle]
-pub extern "C" fn pdal_utils_numeric_cast_f64_to_f32(value: f64, out: *mut f32) -> bool {
+pub unsafe extern "C" fn pdal_utils_numeric_cast_f64_to_f32(value: f64, out: *mut f32) -> bool {
     if out.is_null() {
         return false;
     }
     if let Some(converted) = pdal_core::utils::numeric_cast_f64_to_f32(value) {
-        unsafe {
-            *out = converted;
-        }
+        *out = converted;
         true
     } else {
         false
@@ -309,10 +302,7 @@ pub extern "C" fn pdal_utils_numeric_cast_f64_to_f32(value: f64, out: *mut f32) 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pdal_utils_from_string_f64(
-    value: *const c_char,
-    out: *mut f64,
-) -> i32 {
+pub unsafe extern "C" fn pdal_utils_from_string_f64(value: *const c_char, out: *mut f64) -> i32 {
     if value.is_null() || out.is_null() {
         return -1;
     }
@@ -499,7 +489,6 @@ pub unsafe extern "C" fn pdal_file_utils_rename_file(dest: *const c_char, src: *
     let src_str = c_string(src);
     let _ = std::fs::rename(Path::new(&src_str), Path::new(&dest_str));
 }
-
 
 #[repr(C)]
 pub struct pdal_xyz_t {

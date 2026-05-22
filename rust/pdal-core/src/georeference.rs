@@ -123,11 +123,9 @@ pub fn validate_transform_beam_layout(
         "BeamDirectionZ",
     ] {
         if layout.dim(&DimId::from_name(name)).is_none() {
-            return Err(
-                "transform_beam option requires BeamOriginX/Y/Z and \
+            return Err("transform_beam option requires BeamOriginX/Y/Z and \
                  BeamDirectionX/Y/Z dimensions to be present in the point data."
-                    .to_string(),
-            );
+                .to_string());
         }
     }
 
@@ -178,7 +176,9 @@ mod tests {
     fn rejects_invalid_coordinate_systems() {
         assert!(validate_coordinate_system("NED").is_ok());
         assert!(validate_coordinate_system("enu").is_ok());
-        assert!(validate_coordinate_system("INVALID").unwrap_err().contains("not allowed"));
+        assert!(validate_coordinate_system("INVALID")
+            .unwrap_err()
+            .contains("not allowed"));
     }
 
     #[test]

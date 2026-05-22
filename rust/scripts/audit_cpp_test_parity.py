@@ -60,7 +60,6 @@ COVERED: dict[str, object] = {
         "test_env",
         "test_comparators",
         "naninf",
-        "toString",
         "fromString",
         "numeric_cast",
     },

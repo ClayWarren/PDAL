@@ -8,9 +8,9 @@ const MATRIX_COL_SIZE: usize = 4;
 pub fn parse_transformation_matrix(input: &str) -> Result<[f64; 16], String> {
     let mut values = Vec::new();
     for token in input.split_whitespace() {
-        let entry: f64 = token.parse().map_err(|_| {
-            format!("Invalid entry in transformation matrix: '{token}'")
-        })?;
+        let entry: f64 = token
+            .parse()
+            .map_err(|_| format!("Invalid entry in transformation matrix: '{token}'"))?;
         if values.len() + 1 > MATRIX_SIZE {
             return Err(format!(
                 "Too many entries in transformation matrix, should be {MATRIX_SIZE}"
@@ -162,14 +162,16 @@ mod tests {
 
     #[test]
     fn rejects_short_and_long_matrices() {
-        assert!(parse_transformation_matrix("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0")
-            .unwrap_err()
-            .contains("Too few entries"));
-        assert!(parse_transformation_matrix(
-            "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1 0"
-        )
-        .unwrap_err()
-        .contains("Too many entries"));
+        assert!(
+            parse_transformation_matrix("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0")
+                .unwrap_err()
+                .contains("Too few entries")
+        );
+        assert!(
+            parse_transformation_matrix("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1 0")
+                .unwrap_err()
+                .contains("Too many entries")
+        );
     }
 
     #[test]

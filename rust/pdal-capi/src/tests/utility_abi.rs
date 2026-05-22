@@ -588,7 +588,7 @@ fn utility_abi_environment_and_random() {
 
         pdal_utils_random_seed(12345);
         let r1 = pdal_utils_random(0.0, 100.0);
-        assert!(r1 >= 0.0 && r1 <= 100.0);
+        assert!((0.0..=100.0).contains(&r1));
 
         pdal_utils_random_seed(12345);
         let r2 = pdal_utils_random(0.0, 100.0);

@@ -1,12 +1,10 @@
 use crate::error::{set_last_error, string_to_c_ptr};
 use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
+use pdal_core::georeference::{validate_coordinate_system, validate_transform_beam_layout};
 use pdal_core::options::Options;
-use pdal_core::georeference::{
-    validate_coordinate_system, validate_transform_beam_layout,
-};
-use pdal_core::point::PointView;
 use pdal_core::point::PointLayout;
+use pdal_core::point::PointView;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::chipper::ChipperFilter;

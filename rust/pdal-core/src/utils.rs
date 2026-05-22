@@ -579,10 +579,7 @@ mod tests {
         let nan_f32 = f32::NAN;
         assert!(numeric_cast_f32_to_f64(nan_f32).unwrap().is_nan());
         assert!(numeric_cast_f64_to_f32(f64::NAN).unwrap().is_nan());
-        assert_eq!(
-            numeric_cast_f32_to_f64(1.5).unwrap(),
-            1.5
-        );
+        assert_eq!(numeric_cast_f32_to_f64(1.5).unwrap(), 1.5);
 
         let too_large = f64::from(f32::MAX) * 2.0;
         assert!(numeric_cast_f64_to_f32(too_large).is_none());
@@ -604,7 +601,7 @@ mod tests {
     fn test_random_helpers() {
         random_seed(42);
         let first = random(0.0, 100.0);
-        assert!(first >= 0.0 && first <= 100.0);
+        assert!((0.0..=100.0).contains(&first));
 
         random_seed(42);
         let second = random(0.0, 100.0);
@@ -613,11 +610,11 @@ mod tests {
         let mut sum = 0.0;
         for _ in 0..100 {
             let val = random(-10.0, 10.0);
-            assert!(val >= -10.0 && val <= 10.0);
+            assert!((-10.0..=10.0).contains(&val));
             sum += val;
         }
         let avg = sum / 100.0;
-        assert!(avg >= -5.0 && avg <= 5.0); // Simple statistical check
+        assert!((-5.0..=5.0).contains(&avg));
     }
 
     #[test]

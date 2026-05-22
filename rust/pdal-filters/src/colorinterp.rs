@@ -15,9 +15,7 @@ pub fn validate_prepared(
         return Err(format!("Dimension '{dim_name}' does not exist."));
     }
     if !min.is_nan() && !max.is_nan() && max <= min {
-        return Err(
-            "Specified 'minimum' value must be less than 'maximum' value.".to_string(),
-        );
+        return Err("Specified 'minimum' value must be less than 'maximum' value.".to_string());
     }
     Ok(())
 }

@@ -53,8 +53,6 @@ fn parse_number(input: &str, mut pos: usize) -> Result<(f64, usize), String> {
 
 pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
     let mut pos = skip_spaces(input, 0);
-    let mut inclusive_lower = true;
-    let mut inclusive_upper = true;
     let mut negate = false;
 
     let name_start = pos;
@@ -77,11 +75,11 @@ pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
         pos += 1;
     }
 
-    match input.as_bytes().get(pos) {
-        Some(b'(') => inclusive_lower = false,
-        Some(b'[') => inclusive_lower = true,
+    let inclusive_lower = match input.as_bytes().get(pos) {
+        Some(b'(') => false,
+        Some(b'[') => true,
         _ => return Err("Missing '(' or '['.".to_string()),
-    }
+    };
     pos += 1;
 
     let (lower_bound, next_pos) = parse_number(input, pos)?;
@@ -99,11 +97,11 @@ pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
     pos = next_pos;
     pos = skip_spaces(input, pos);
 
-    match input.as_bytes().get(pos) {
-        Some(b')') => inclusive_upper = false,
-        Some(b']') => inclusive_upper = true,
+    let inclusive_upper = match input.as_bytes().get(pos) {
+        Some(b')') => false,
+        Some(b']') => true,
         _ => return Err("Missing ')' or ']'.".to_string()),
-    }
+    };
     pos += 1;
     pos = skip_spaces(input, pos);
 

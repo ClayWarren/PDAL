@@ -252,7 +252,8 @@ mod tests {
     #[test]
     fn dimension_mode_marks_every_point_instead_of_culling() {
         let input = view(&[(0.0, 0.0, 0.0), (0.25, 0.0, 0.0), (2.0, 0.0, 0.0)]);
-        let mut filter = SampleFilter::new(&options(&[("radius", "1.0"), ("dimension", "Flag")])).unwrap();
+        let mut filter =
+            SampleFilter::new(&options(&[("radius", "1.0"), ("dimension", "Flag")])).unwrap();
 
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.len(), 3);
@@ -269,7 +270,8 @@ mod tests {
             ("origin_x", "0.0"),
             ("origin_y", "0.0"),
             ("origin_z", "0.0"),
-        ])).unwrap();
+        ]))
+        .unwrap();
 
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.len(), 2);

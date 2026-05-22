@@ -369,11 +369,11 @@ pub fn bounds2d_to_geojson(bounds: &Bounds2D, precision: u32) -> String {
         return String::new();
     }
     format!(
-        "{{\"bbox\":[{}, {}, {}{}]}}",
+        "{{\"bbox\":[{}, {}, {},{}]}}",
         format_fixed(bounds.minx, precision),
         format_fixed(bounds.miny, precision),
         format_fixed(bounds.maxx, precision),
-        format!(",{}", format_fixed(bounds.maxy, precision))
+        format_fixed(bounds.maxy, precision)
     )
 }
 
