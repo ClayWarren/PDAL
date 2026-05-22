@@ -33,6 +33,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <io/BufferReader.hpp>
+#include <filters/FarthestPointSamplingFilter.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/Stage.hpp>

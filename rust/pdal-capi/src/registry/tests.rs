@@ -362,6 +362,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.sort" => {
             options.add("dimension", "X");
         }
+        "filters.sample" => {
+            options.add("radius", 1.0);
+        }
         _ => {}
     }
     options

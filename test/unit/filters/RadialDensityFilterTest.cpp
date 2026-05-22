@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <io/BufferReader.hpp>
+#include <filters/RadialDensityFilter.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/Stage.hpp>

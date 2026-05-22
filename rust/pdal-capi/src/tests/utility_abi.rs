@@ -561,3 +561,37 @@ fn metrics_c_abi_reports_distances_and_eval_errors() {
         .is_null());
     }
 }
+
+#[test]
+fn utility_abi_environment_and_random() {
+    unsafe {
+        let key = cstring("PDAL_RUST_ABI_TEST_VAR");
+        let val1 = cstring("value_abi_1");
+        let val2 = cstring("value_abi_2");
+
+        let initial = pdal_utils_getenv(key.as_ptr());
+        assert!(initial.is_null());
+
+        assert_eq!(pdal_utils_setenv(key.as_ptr(), val1.as_ptr()), 0);
+        let ret1 = pdal_utils_getenv(key.as_ptr());
+        assert!(!ret1.is_null());
+        assert_eq!(take_string(ret1), "value_abi_1");
+
+        assert_eq!(pdal_utils_setenv(key.as_ptr(), val2.as_ptr()), 0);
+        let ret2 = pdal_utils_getenv(key.as_ptr());
+        assert!(!ret2.is_null());
+        assert_eq!(take_string(ret2), "value_abi_2");
+
+        assert_eq!(pdal_utils_unsetenv(key.as_ptr()), 0);
+        let final_val = pdal_utils_getenv(key.as_ptr());
+        assert!(final_val.is_null());
+
+        pdal_utils_random_seed(12345);
+        let r1 = pdal_utils_random(0.0, 100.0);
+        assert!(r1 >= 0.0 && r1 <= 100.0);
+
+        pdal_utils_random_seed(12345);
+        let r2 = pdal_utils_random(0.0, 100.0);
+        assert_eq!(r1, r2);
+    }
+}

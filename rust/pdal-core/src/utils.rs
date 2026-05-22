@@ -137,6 +137,28 @@ pub fn normalize_longitude(mut longitude: f64) -> f64 {
     longitude
 }
 
+pub fn compare_approx(v1: f64, v2: f64, tolerance: f64) -> bool {
+    (v1 - v2).abs() <= tolerance.abs()
+}
+
+pub fn format_f64(value: f64, precision: u32) -> String {
+    if value.is_nan() {
+        "NaN".to_string()
+    } else if value.is_infinite() {
+        if value.is_sign_negative() {
+            "-Infinity".to_string()
+        } else {
+            "Infinity".to_string()
+        }
+    } else {
+        format!("{value:.precision$}")
+    }
+}
+
+pub fn format_i32(value: i32) -> String {
+    value.to_string()
+}
+
 pub fn base64_encode(bytes: &[u8]) -> String {
     const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
@@ -358,9 +380,112 @@ pub fn charbuf_seekoff(off: i64, dir: u8, offset: i64, len: i64, current: i64) -
     (0..=len).contains(&target).then_some(target)
 }
 
+use std::sync::{Mutex, OnceLock};
+
+static RNG_STATE: OnceLock<Mutex<u64>> = OnceLock::new();
+
+fn get_rng_state() -> &'static Mutex<u64> {
+    RNG_STATE.get_or_init(|| Mutex::new(1))
+}
+
+pub fn get_env(key: &str) -> Option<String> {
+    if key.is_empty() || key.contains('=') || key.contains('\0') {
+        return None;
+    }
+    std::env::var(key).ok()
+}
+
+pub fn set_env(key: &str, value: &str) -> i32 {
+    if key.is_empty() || key.contains('=') || key.contains('\0') || value.contains('\0') {
+        return -1;
+    }
+    std::env::set_var(key, value);
+    0
+}
+
+pub fn unset_env(key: &str) -> i32 {
+    if key.is_empty() || key.contains('=') || key.contains('\0') {
+        return -1;
+    }
+    std::env::remove_var(key);
+    0
+}
+
+pub fn random_seed(seed: u32) {
+    let mut state = get_rng_state().lock().unwrap();
+    *state = seed as u64;
+}
+
+pub fn random(minimum: f64, maximum: f64) -> f64 {
+    let mut state = get_rng_state().lock().unwrap();
+    let next = state.wrapping_mul(1103515245).wrapping_add(12345);
+    *state = next;
+
+    let r = next as f64 / u64::MAX as f64;
+    let val = minimum + r * (maximum - minimum);
+    val.clamp(minimum, maximum)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_environment_variable_helpers() {
+        let var_name = "PDAL_RUST_TEST_VAR";
+        assert_eq!(get_env(var_name), None);
+        assert_eq!(set_env(var_name, "value1"), 0);
+        assert_eq!(get_env(var_name), Some("value1".to_string()));
+        assert_eq!(set_env(var_name, "value2"), 0);
+        assert_eq!(get_env(var_name), Some("value2".to_string()));
+        assert_eq!(unset_env(var_name), 0);
+        assert_eq!(get_env(var_name), None);
+
+        // Invalid key checks
+        assert_eq!(set_env("", "val"), -1);
+        assert_eq!(set_env("A=B", "val"), -1);
+        assert_eq!(set_env("A\0B", "val"), -1);
+        assert_eq!(set_env("A", "val\0"), -1);
+        assert_eq!(get_env(""), None);
+        assert_eq!(get_env("A=B"), None);
+        assert_eq!(get_env("A\0B"), None);
+    }
+
+    #[test]
+    fn compare_approx_respects_tolerance() {
+        assert!(!compare_approx(1.001, 1.0, 0.0001));
+        assert!(compare_approx(1.001, 1.0, 0.01));
+        assert!(compare_approx(10.0, 12.0, 2.0));
+    }
+
+    #[test]
+    fn formats_nan_inf_and_numbers() {
+        assert_eq!(format_f64(f64::NAN, 10), "NaN");
+        assert_eq!(format_f64(f64::INFINITY, 10), "Infinity");
+        assert_eq!(format_f64(-f64::INFINITY, 10), "-Infinity");
+        assert_eq!(format_f64(1.2365, 10), "1.2365000000");
+        assert_eq!(format_i32(12_365_565), "12365565");
+    }
+
+    #[test]
+    fn test_random_helpers() {
+        random_seed(42);
+        let first = random(0.0, 100.0);
+        assert!(first >= 0.0 && first <= 100.0);
+
+        random_seed(42);
+        let second = random(0.0, 100.0);
+        assert_eq!(first, second); // Seed determinism
+
+        let mut sum = 0.0;
+        for _ in 0..100 {
+            let val = random(-10.0, 10.0);
+            assert!(val >= -10.0 && val <= 10.0);
+            sum += val;
+        }
+        let avg = sum / 100.0;
+        assert!(avg >= -5.0 && avg <= 5.0); // Simple statistical check
+    }
 
     #[test]
     fn identifies_json_like_strings() {

@@ -36,6 +36,8 @@
 #include <pdal/Writer.hpp>
 #include <pdal/util/Uuid.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 #include "../filters/private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 
@@ -111,41 +113,24 @@ void Writer::l_prepared(PointTableRef table)
 
 std::string Writer::replaceTags(std::string filename)
 {
-    // Replace '#uuid# placeholder with actual uuid.
-    while (true)
-    {
-        auto pos = filename.find("#uuid#");
-        if (pos == std::string::npos)
-            break;
-        filename.replace(pos, 6, Utils::tolower(RandomUuid().toString()));
-    }
-    return filename;
+    // Replace '#uuid#' placeholder with an actual uuid (routed through Rust).
+    char* replaced = pdal_writer_replace_tags(filename.c_str());
+    if (!replaced)
+        throw pdal_error(pdal_last_error());
+    std::string result(replaced);
+    pdal_string_free(replaced);
+    return result;
 }
 
 std::string::size_type
 Writer::handleFilenameTemplate(const std::string& filename)
 {
-    std::string::size_type suffixPos = filename.find_last_of('.');
-    std::string::size_type hashPos = filename.find_first_of('#');
-    if (hashPos == std::string::npos)
-        return hashPos;
-
-    if (hashPos > suffixPos)
-    {
-        std::ostringstream oss;
-        oss << "Filename template placeholder ('#') is not "
-               "allowed in filename suffix.";
-        throw pdal_error(oss.str());
-    }
-
-    if (filename.find_first_of('#', hashPos + 1) != std::string::npos)
-    {
-        std::ostringstream oss;
-        oss << "Filename specification can only contain "
-               "a single '#' template placeholder.";
-        throw pdal_error(oss.str());
-    }
-    return hashPos;
+    // Locate and validate the '#' template placeholder (routed through Rust).
+    // PDAL_WRITER_NO_TEMPLATE matches std::string::npos.
+    size_t pos = 0;
+    if (!pdal_writer_handle_filename_template(filename.c_str(), &pos))
+        throw pdal_error(pdal_last_error());
+    return pos;
 }
 
 std::string Writer::filename() const

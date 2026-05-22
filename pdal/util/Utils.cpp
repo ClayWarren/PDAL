@@ -98,11 +98,18 @@ StringList takeRustStringList(char* value)
 
 void Utils::random_seed(unsigned int seed)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    pdal_utils_random_seed(seed);
+#else
     srand(seed);
+#endif
 }
 
 double Utils::random(double minimum, double maximum)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_random(minimum, maximum);
+#else
     double r = (double)rand(); // [0..32767]
     double v = (maximum - minimum) / (double)RAND_MAX;
     double s = r * v;       // [0..(max-min)]
@@ -112,6 +119,7 @@ double Utils::random(double minimum, double maximum)
     assert(t <= maximum);
 
     return t;
+#endif
 }
 
 std::string Utils::tolower(const std::string& s)
@@ -167,29 +175,52 @@ bool Utils::startsWith(const std::string& s, const std::string& prefix)
 
 int Utils::getenv(const std::string& name, std::string& val)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    char* value = pdal_utils_getenv(name.c_str());
+    if (value)
+    {
+        val = value;
+        pdal_string_free(value);
+        return 0;
+    }
+    else
+    {
+        val.clear();
+        return -1;
+    }
+#else
     char* value = ::getenv(name.c_str());
     if (value)
         val = value;
     else
         val.clear();
     return value ? 0 : -1;
+#endif
 }
 
 int Utils::setenv(const std::string& env, const std::string& val)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_setenv(env.c_str(), val.c_str());
+#else
 #ifdef _WIN32
     return ::_putenv_s(env.c_str(), val.c_str()) ? -1 : 0;
 #else
     return ::setenv(env.c_str(), val.c_str(), 1);
 #endif
+#endif
 }
 
 int Utils::unsetenv(const std::string& env)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_unsetenv(env.c_str());
+#else
 #ifdef _WIN32
     return ::_putenv_s(env.c_str(), "") ? -1 : 0;
 #else
     return ::unsetenv(env.c_str());
+#endif
 #endif
 }
 

@@ -77,6 +77,27 @@ TEST(UtilsTest, test_random)
     EXPECT_TRUE(sum >= avg - 0.1 * avg);
 }
 
+TEST(UtilsTest, test_env)
+{
+    const std::string varName = "PDAL_RUST_TEST_VAR_CPP";
+    std::string val;
+    
+    EXPECT_EQ(Utils::getenv(varName, val), -1);
+    EXPECT_TRUE(val.empty());
+
+    EXPECT_EQ(Utils::setenv(varName, "value1"), 0);
+    EXPECT_EQ(Utils::getenv(varName, val), 0);
+    EXPECT_EQ(val, "value1");
+
+    EXPECT_EQ(Utils::setenv(varName, "value2"), 0);
+    EXPECT_EQ(Utils::getenv(varName, val), 0);
+    EXPECT_EQ(val, "value2");
+
+    EXPECT_EQ(Utils::unsetenv(varName), 0);
+    EXPECT_EQ(Utils::getenv(varName, val), -1);
+    EXPECT_TRUE(val.empty());
+}
+
 TEST(UtilsTest, test_comparators)
 {
     bool ok;

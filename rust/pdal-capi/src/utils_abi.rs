@@ -1,8 +1,9 @@
 use pdal_core::utils::{
-    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, escape_json,
-    escape_nonprinting_bytes, iequals, looks_like_json, normalize_longitude, replace_all,
+    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx,
+    escape_json, escape_nonprinting_bytes, format_f64, format_i32, get_env, iequals,
+    looks_like_json, normalize_longitude, random, random_seed, replace_all, set_env,
     simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper, trim_leading,
-    trim_trailing, word_wrap, word_wrap2,
+    trim_trailing, unset_env, word_wrap, word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -203,6 +204,58 @@ pub extern "C" fn pdal_charbuf_seekoff(
     current: i64,
 ) -> i64 {
     charbuf_seekoff(off, dir, offset, len, current).unwrap_or(-1)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_getenv(name: *const c_char) -> *mut c_char {
+    if name.is_null() {
+        return ptr::null_mut();
+    }
+    match get_env(&c_string(name)) {
+        Some(value) => string_to_c(value),
+        None => ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_setenv(name: *const c_char, value: *const c_char) -> i32 {
+    if name.is_null() || value.is_null() {
+        return -1;
+    }
+    set_env(&c_string(name), &c_string(value))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_unsetenv(name: *const c_char) -> i32 {
+    if name.is_null() {
+        return -1;
+    }
+    unset_env(&c_string(name))
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_utils_random_seed(seed: u32) {
+    random_seed(seed);
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_utils_random(minimum: f64, maximum: f64) -> f64 {
+    random(minimum, maximum)
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_utils_compare_approx(v1: f64, v2: f64, tolerance: f64) -> bool {
+    compare_approx(v1, v2, tolerance)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_to_string_f64(value: f64, precision: u32) -> *mut c_char {
+    string_to_c(format_f64(value, precision))
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_utils_to_string_i32(value: i32) -> *mut c_char {
+    string_to_c(format_i32(value))
 }
 
 fn path_string(path: PathBuf) -> String {

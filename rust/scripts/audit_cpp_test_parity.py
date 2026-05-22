@@ -593,7 +593,11 @@ COVERED: dict[str, object] = {
     },
     "pdal_io_bpf_base_test": ALL,
     "pdal_io_bpf_zlib_test": ALL,
-    "pdal_io_writer_test": {"nullWriterConsumesInput"},
+    "pdal_io_writer_test": {
+        "nullWriterConsumesInput",
+        "issue4261",
+        "filenameTemplate",
+    },
     "pdal_pipeline_writer_test": {"issue_2458"},
     "pdal_streaming_test": {"filter"},
 }

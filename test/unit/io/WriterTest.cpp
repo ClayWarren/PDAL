@@ -115,4 +115,30 @@ TEST(WriterTest, nullWriterConsumesInput)
     EXPECT_TRUE(writer.filename().empty());
 }
 
+TEST(WriterTest, filenameTemplate)
+{
+    // No '#' placeholder resolves to npos.
+    EXPECT_EQ(Writer::handleFilenameTemplate("output.las"),
+              std::string::npos);
+
+    // A single placeholder resolves to its position.
+    EXPECT_EQ(Writer::handleFilenameTemplate("out_#.las"), 4u);
+    EXPECT_EQ(Writer::handleFilenameTemplate("#_foo.txt"), 0u);
+
+    // A placeholder in the filename suffix is rejected.
+    EXPECT_THROW(Writer::handleFilenameTemplate("output.la#s"), pdal_error);
+
+    // More than one placeholder is rejected.
+    EXPECT_THROW(Writer::handleFilenameTemplate("out_#_#.las"), pdal_error);
+
+    // replaceTags leaves an untagged filename unchanged.
+    EXPECT_EQ(Writer::replaceTags("output_#.las"), "output_#.las");
+
+    // replaceTags swaps each '#uuid#' tag for a lowercase UUID.
+    std::string replaced = Writer::replaceTags("#_#uuid#_foo.txt");
+    std::regex re("#_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                  "[0-9a-f]{12}_foo.txt");
+    EXPECT_TRUE(std::regex_match(replaced, re));
+}
+
 } // namespace pdal

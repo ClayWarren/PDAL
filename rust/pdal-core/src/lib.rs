@@ -28,4 +28,5 @@ pub mod srs;
 pub mod stage;
 pub mod utils;
 pub mod uuid;
+pub mod writer;
 pub mod xml_schema;

@@ -65,6 +65,7 @@ struct EigenvalueArgs
 };
 
 EigenvaluesFilter::EigenvaluesFilter() : m_args(new EigenvalueArgs) {}
+EigenvaluesFilter::~EigenvaluesFilter() = default;
 
 std::string EigenvaluesFilter::getName() const
 {

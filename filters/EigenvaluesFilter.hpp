@@ -49,6 +49,7 @@ class PDAL_EXPORT EigenvaluesFilter : public Filter
 {
 public:
     EigenvaluesFilter();
+    ~EigenvaluesFilter() override;
     EigenvaluesFilter& operator=(const EigenvaluesFilter&) = delete;
     EigenvaluesFilter(const EigenvaluesFilter&) = delete;
 
