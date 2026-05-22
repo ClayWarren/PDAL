@@ -109,6 +109,9 @@ extern "C"
     int32_t pdal_utils_unsetenv(const char* name);
     void pdal_utils_random_seed(uint32_t seed);
     double pdal_utils_random(double minimum, double maximum);
+    bool pdal_utils_compare_approx(double v1, double v2, double tolerance);
+    char* pdal_utils_to_string_f64(double value, uint32_t precision);
+    char* pdal_utils_to_string_i32(int32_t value);
 
     // Writer filename templates
     bool pdal_writer_handle_filename_template(const char* filename,
