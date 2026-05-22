@@ -138,22 +138,24 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `681 / 926` built C++ GoogleTest cases, or `73.54%`, are
+Current checkpoint: `708 / 926` built C++ GoogleTest cases, or `76.46%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains audit PointTable layout limits, LAS userView reads, metadata
 construction/update, buffer stats execution, XMLSchema round-trip parsing,
 hexbin filter execution cases, COPC reader multi-input handling, EPT reader
 audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
-confirmed; badOriginQuery corrected), OGR writer GeoJSON output, and streaming execution through the Rust C ABI. `Utils::toString(double)` now routes
-through the Rust C ABI via the existing `pdal_utils_to_string_f64` function,
-matching C++ `setprecision` behavior for NaN, Inf, zero, scientific, and fixed-point
-notation. This remains a conservative lower bound, not a final port-completion percentage:
-35 built test binaries remain unclassified by the audit script. Of these:
-   - 13 are private/specialized C++ algorithms — 11 with no Rust port planned (csf, delaunay, icp, litree, lloydkmeans, m3c2, pmf, relaxation_dart_throwing, straighten, supervoxel, slpk_reader) and 2 now Rust C ABI-backed (covariancefeatures, normal)
+confirmed; badOriginQuery corrected), OGR writer GeoJSON output, streaming
+execution, private filter ports for Delaunay, ICP, Lloyd K-means, relaxation
+dart throwing, and Straighten, and ShellFilter command execution through Rust.
+`Utils::toString(double)` and `Utils::run_shell_command()` now route through
+the Rust C ABI. This remains a conservative lower bound, not a final
+port-completion percentage:
+26 built test binaries remain unclassified by the audit script. Of these:
+   - 6 are private/specialized C++ algorithms with no Rust-backed count yet (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
    - 14 are infrastructure/utility/tooling tests, not pipeline stages (app_plugin, app, artifact, eval, info cmd, merge cmd, oldpclblock, pipeline_manager, program_arg, support, thread_pool, tile cmd, tindex cmd, vsi)
-   - 4 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, shell, where)
+   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, where)
    - 3 are explicitly deferred (copc_remote_reader, copc_writer, ept_addon_writer)
-  No easy audit wins remain among the 35 uncounted binaries — all require
+  No easy audit wins remain among the 26 uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.
