@@ -30,6 +30,7 @@ pub mod head;
 pub mod hexbin;
 pub mod iqr;
 pub mod labelduplicates;
+pub mod lloydkmeans;
 pub mod locate;
 pub mod lof;
 pub mod mad;

@@ -1,5 +1,62 @@
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
+
+/// Pick `count` points that are mutually far apart in XYZ space, seeding from
+/// point 0 and greedily adding the point farthest from the current selection.
+///
+/// Mirrors `pdal::Segmentation::farthestPointSampling`. `count` is expected not
+/// to exceed `view.len()`; callers that cannot guarantee that should clamp it.
+pub fn farthest_point_sampling(view: &PointView, count: u64) -> Vec<PointId> {
+    let size = view.len();
+    let mut ids = vec![0u64; count as usize];
+    if size == 0 || count == 0 {
+        return ids;
+    }
+
+    // Squared distance from each point to the nearest selected point so far.
+    let mut min_dists = vec![0.0f64; size as usize];
+    let (x0, y0, z0) = (
+        view.get_f64(0, &DimId::X),
+        view.get_f64(0, &DimId::Y),
+        view.get_f64(0, &DimId::Z),
+    );
+    for j in 0..size {
+        let dx = view.get_f64(j, &DimId::X) - x0;
+        let dy = view.get_f64(j, &DimId::Y) - y0;
+        let dz = view.get_f64(j, &DimId::Z) - z0;
+        min_dists[j as usize] = dx * dx + dy * dy + dz * dz;
+    }
+
+    for id in ids.iter_mut().skip(1) {
+        // The farthest point from the current selection (first max on ties).
+        let mut max_idx = 0usize;
+        let mut max_val = -1.0;
+        for (j, &d) in min_dists.iter().enumerate() {
+            if d > max_val {
+                max_val = d;
+                max_idx = j;
+            }
+        }
+        *id = max_idx as u64;
+
+        let (xi, yi, zi) = (
+            view.get_f64(max_idx as u64, &DimId::X),
+            view.get_f64(max_idx as u64, &DimId::Y),
+            view.get_f64(max_idx as u64, &DimId::Z),
+        );
+        for j in 0..size {
+            let dx = view.get_f64(j, &DimId::X) - xi;
+            let dy = view.get_f64(j, &DimId::Y) - yi;
+            let dz = view.get_f64(j, &DimId::Z) - zi;
+            let d2 = dx * dx + dy * dy + dz * dz;
+            if d2 < min_dists[j as usize] {
+                min_dists[j as usize] = d2;
+            }
+        }
+    }
+
+    ids
+}
 
 pub struct FarthestPointSamplingFilter {
     pub count: u64,

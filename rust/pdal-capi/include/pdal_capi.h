@@ -661,6 +661,9 @@ extern "C"
     pdal_stage_t* pdal_stage_create_relaxationdartthrowing(
         double decay, double radius, double terminal_radius, uint64_t count,
         bool shuffle, bool has_seed, uint32_t seed);
+    pdal_stage_t* pdal_stage_create_lloydkmeans(uint64_t k, uint64_t maxiters,
+                                                const char* const* dims,
+                                                uint64_t dim_count);
 
     char* pdal_grid_decimation_validate(double resolution, const char* output_type);
     uint64_t* pdal_grid_decimation_get_kept_indices(

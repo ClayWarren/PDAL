@@ -527,6 +527,37 @@ pub extern "C" fn pdal_stage_create_relaxationdartthrowing(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a Lloyd's k-means clustering filter stage.
+///
+/// # Safety
+///
+/// `dims` must be null with `dim_count` zero, or point to `dim_count` valid
+/// C strings naming the clustering dimensions.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_lloydkmeans(
+    k: u64,
+    maxiters: u64,
+    dims: *const *const c_char,
+    dim_count: u64,
+) -> *mut StageWrapper {
+    let mut dim_ids: Vec<DimId> = Vec::new();
+    if !dims.is_null() {
+        for i in 0..dim_count as usize {
+            let ptr = *dims.add(i);
+            if !ptr.is_null() {
+                let name = CStr::from_ptr(ptr).to_string_lossy();
+                dim_ids.push(DimId::from_name(&name));
+            }
+        }
+    }
+    let filter = Box::new(LloydKMeansFilter::new(
+        k as usize,
+        maxiters as usize,
+        dim_ids,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
 /// Create an optimal neighborhood filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_optimalneighborhood(

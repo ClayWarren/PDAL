@@ -28,6 +28,7 @@ use pdal_filters::head::HeadFilter;
 use pdal_filters::hexbin::HexBinFilter;
 use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
+use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
 use pdal_filters::mad::MadFilter;
@@ -106,6 +107,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.hexbin",
     "filters.iqr",
     "filters.label_duplicates",
+    "filters.lloydkmeans",
     "filters.locate",
     "filters.lof",
     "filters.mad",
@@ -291,6 +293,14 @@ pub fn create_filter(
         "filters.iqr" => Ok(Box::new(FilterWrapper::new(IqrFilter::new(
             get_f64(options, "multiplier", 1.5)?,
             DimId::from_name(&options.get_str("dimension", "Z")),
+        )))),
+        "filters.lloydkmeans" => Ok(Box::new(FilterWrapper::new(LloydKMeansFilter::new(
+            get_u64(options, "k", 10)? as usize,
+            get_u64(options, "maxiters", 10)? as usize,
+            comma_list(&options.get_str("dimensions", "X,Y,Z"))
+                .iter()
+                .map(|s| DimId::from_name(s))
+                .collect(),
         )))),
         "filters.locate" => Ok(Box::new(FilterWrapper::new(LocateFilter::new(
             options.get_str("dimension", ""),
