@@ -29,6 +29,7 @@ pub mod hag_dem;
 pub mod hagnn;
 pub mod head;
 pub mod hexbin;
+pub mod icp;
 pub mod iqr;
 pub mod labelduplicates;
 pub mod lloydkmeans;

@@ -34,13 +34,14 @@
 
 #include "IterativeClosestPoint.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
-#include <pdal/util/Utils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal/util/ProgramArgs.hpp>
+
+#include <pdal_capi.h>
 
 #include <Eigen/Dense>
 
-#include <numeric>
+#include <sstream>
 
 namespace pdal
 {
@@ -123,189 +124,44 @@ void IterativeClosestPoint::done(PointTableRef _)
 PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
                                         PointViewPtr moving) const
 {
-    // Compute centroid of fixed PointView such that both the fixed an moving
-    // PointViews can be centered.
-    PointIdList ids(fixed->size());
-    std::iota(ids.begin(), ids.end(), 0);
-    auto centroid = math::computeCentroid(*fixed, ids);
+    // The ICP registration core runs through the Rust C ABI. C++ retains the
+    // multi-view orchestration (run/done) and metadata reporting.
+    pdal_point_view_t* rustFixed = rust_view_converter::toRust(fixed);
+    pdal_point_view_t* rustMoving = rust_view_converter::toRust(moving);
 
-    // Demean the fixed and moving PointViews.
-    PointViewPtr tempFixed = math::demeanPointView(*fixed, centroid.data());
-    PointViewPtr tempMoving = math::demeanPointView(*moving, centroid.data());
+    double transform[16] = {0.0};
+    double centroidVals[3] = {0.0};
+    bool converged = false;
+    double mse = 0.0;
+    const double* init = m_matrixArg->set() ? m_vec.data() : nullptr;
 
-    // Initialize the final_transformation to identity. In the future, it would
-    // be reasonable to alternately accept an initial guess.
+    pdal_point_view_t* rustResult = pdal_icp_register(
+        rustFixed, rustMoving, m_max_iters, m_max_similar, m_rotation_threshold,
+        m_translation_threshold, m_mse_abs, m_maxdistArg->set(), m_maxdist,
+        m_matrixArg->set(), init, transform, centroidVals, &converged, &mse);
+
+    pdal_point_view_destroy(rustFixed);
+    pdal_point_view_destroy(rustMoving);
+
+    if (!rustResult)
+        throw pdal_error("filters.icp: Rust registration failed.");
+
+    PointViewPtr result = rust_view_converter::fromRust(rustResult, moving);
+    pdal_point_view_destroy(rustResult);
+
+    // The final transformation is returned in row-major order.
     Matrix4d final_transformation;
-    if (m_matrixArg->set())
-        final_transformation = Eigen::Map<const Matrix4d>(m_vec.data());
-    else
-        final_transformation = Matrix4d::Identity();
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c)
+            final_transformation(r, c) = transform[r * 4 + c];
 
-    // Construct 3D KD-tree of the centered, fixed PointView to facilitate
-    // nearest neighbor searches in each iteration.
-    KD3Index& kd_fixed = tempFixed->build3dIndex();
+    Vector3d centroid(centroidVals[0], centroidVals[1], centroidVals[2]);
 
-    // Iterate to the max number of iterations or until converged.
-    bool converged(false);
-    double prev_mse(0.0);
-    int num_similar(0);
-    for (int iter = 0; iter < m_max_iters; ++iter)
-    {
-        // At the beginning of each iteration, transform our centered, moving
-        // PointView by the current final_transformation.
-        PointViewPtr tempMovingTransformed =
-            math::transform(*tempMoving, final_transformation.data());
-
-        // Create empty lists to hold point correspondences, and initialize MSE
-        // to zero.
-        PointIdList fixed_idx, moving_idx;
-        fixed_idx.reserve(tempMovingTransformed->size());
-        moving_idx.reserve(tempMovingTransformed->size());
-        double mse(0.0);
-        double sqr_maxdist;
-        if (m_maxdistArg->set())
-            sqr_maxdist = m_maxdist * m_maxdist;
-        else
-            sqr_maxdist = (std::numeric_limits<double>::max)();
-
-        // For every point in the centered, moving PointView, find the nearest
-        // neighbor in the centered fixed PointView. Record the indices of each
-        // and update the MSE.
-        for (PointRef p : *tempMovingTransformed)
-        {
-            // Find the index of the nearest neighbor, and the square distance
-            // between each point.
-            PointIdList indices(1);
-            std::vector<double> sqr_dists(1);
-            kd_fixed.knnSearch(p, 1, &indices, &sqr_dists);
-
-            // Check that the square distance does not exceed threshold value.
-            if (sqr_dists[0] < sqr_maxdist)
-            {
-                // Store the indices of the correspondence and update the MSE.
-                moving_idx.push_back(p.pointId());
-                fixed_idx.push_back(indices[0]);
-                mse += std::sqrt(sqr_dists[0]);
-            }
-        }
-
-        // Finalize and log the MSE.
-        mse /= moving_idx.size();
-        log()->get(LogLevel::Debug2) << "MSE: " << mse << '\n';
-
-        // Estimate rigid transformation using Umeyama method, logging the
-        // current translation in X and Y.
-        auto A = math::pointViewToEigen(*tempFixed, fixed_idx);
-        auto B = math::pointViewToEigen(*tempMovingTransformed, moving_idx);
-        auto T = Eigen::umeyama(B.transpose(), A.transpose(), false);
-        log()->get(LogLevel::Debug2) << "Current dx: " << T.coeff(0, 3) << ", "
-                                     << "dy: " << T.coeff(1, 3) << '\n';
-
-        // Update the final_transformation and log the X and Y translations.
-        final_transformation = final_transformation * T;
-        log()->get(LogLevel::Debug2)
-            << "Cumulative dx: " << final_transformation.coeff(0, 3) << ", "
-            << "dy: " << final_transformation.coeff(1, 3) << '\n';
-
-        bool is_similar = false;
-
-        // Compute and log the rotation and translation of the current
-        // transformation (not cumulative).
-        double cos_angle =
-            0.5 * (T.coeff(0, 0) + T.coeff(1, 1) + T.coeff(2, 2) - 1);
-        double translation_sqr = T.coeff(0, 3) * T.coeff(0, 3) +
-                                 T.coeff(1, 3) * T.coeff(1, 3) +
-                                 T.coeff(2, 3) * T.coeff(2, 3);
-        log()->get(LogLevel::Debug2) << "Rotation: " << cos_angle << '\n';
-        log()->get(LogLevel::Debug2)
-            << "Translation: " << translation_sqr << '\n';
-
-        // Check for change in MSE.
-        if (std::fabs(mse - prev_mse) < m_mse_abs)
-        {
-            if (num_similar >= m_max_similar)
-            {
-                converged = true;
-                log()->get(LogLevel::Debug2) << "converged via absolute MSE\n";
-                break;
-            }
-            is_similar = true;
-        }
-
-        // If the rotation and translation satisfy the specified thresholds,
-        // mark as converged, and exit the for loop.
-        if ((cos_angle >= m_rotation_threshold) &&
-            (translation_sqr <= m_translation_threshold))
-        {
-            if (num_similar >= m_max_similar)
-            {
-                converged = true;
-                log()->get(LogLevel::Debug2)
-                    << "converged via rotation/translation thresholds\n";
-                break;
-            }
-            is_similar = true;
-        }
-
-        if (is_similar)
-            ++num_similar;
-        else
-            num_similar = 0;
-
-        prev_mse = mse;
-    }
-
-    // Apply the final_transformation to the moving PointView.
-    for (PointRef p : *moving)
-    {
-        double x = p.getFieldAs<double>(Id::X) - centroid.x();
-        double y = p.getFieldAs<double>(Id::Y) - centroid.y();
-        double z = p.getFieldAs<double>(Id::Z) - centroid.z();
-        p.setField(Id::X, x * final_transformation.coeff(0, 0) +
-                              y * final_transformation.coeff(0, 1) +
-                              z * final_transformation.coeff(0, 2) +
-                              final_transformation.coeff(0, 3) + centroid.x());
-        p.setField(Id::Y, x * final_transformation.coeff(1, 0) +
-                              y * final_transformation.coeff(1, 1) +
-                              z * final_transformation.coeff(1, 2) +
-                              final_transformation.coeff(1, 3) + centroid.y());
-        p.setField(Id::Z, x * final_transformation.coeff(2, 0) +
-                              y * final_transformation.coeff(2, 1) +
-                              z * final_transformation.coeff(2, 2) +
-                              final_transformation.coeff(2, 3) + centroid.z());
-    }
-
-    // Compute the MSE one last time, using the unaltered, fixed PointView and
-    // the transformed, moving PointView.
-    double mse(0.0);
-    size_t mse_n(0);
-    double sqr_maxdist;
-    if (m_maxdistArg->set())
-        sqr_maxdist = m_maxdist * m_maxdist;
-    else
-        sqr_maxdist = (std::numeric_limits<double>::max)();
-    KD3Index& kd_fixed_orig = fixed->build3dIndex();
-    for (PointRef p : *moving)
-    {
-        PointIdList indices(1);
-        std::vector<double> sqr_dists(1);
-        kd_fixed_orig.knnSearch(p, 1, &indices, &sqr_dists);
-
-        // Check that the square distance does not exceed threshold value.
-        if (sqr_dists[0] < sqr_maxdist)
-        {
-            mse_n++;
-            mse += std::sqrt(sqr_dists[0]);
-        }
-    }
-    mse /= mse_n;
-    log()->get(LogLevel::Debug2) << "MSE: " << mse << '\n';
-
-    // Transformation to demean coords
+    // Transformation to demean coords.
     Matrix4d pretrans = Matrix4d::Identity();
     pretrans.block<3, 1>(0, 3) = -centroid;
 
-    // Transformation to return to global coords
+    // Transformation to return to global coords.
     Matrix4d posttrans = Matrix4d::Identity();
     posttrans.block<3, 1>(0, 3) = centroid;
 
@@ -331,7 +187,7 @@ PointViewPtr IterativeClosestPoint::icp(PointViewPtr fixed,
     root.add("converged", converged);
     root.add("fitness", mse);
 
-    return moving;
+    return result;
 }
 
 } // namespace pdal

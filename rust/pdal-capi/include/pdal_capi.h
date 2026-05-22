@@ -672,6 +672,13 @@ extern "C"
     void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
     uint64_t* pdal_delaunay_triangulate(const pdal_point_view_t* view,
                                         uint64_t* out_len);
+    pdal_point_view_t* pdal_icp_register(
+        const pdal_point_view_t* fixed, const pdal_point_view_t* moving,
+        int32_t max_iters, int32_t max_similar, double rotation_threshold,
+        double translation_threshold, double mse_abs, bool has_maxdist,
+        double maxdist, bool has_init, const double* init,
+        double* out_transform, double* out_centroid, bool* out_converged,
+        double* out_mse);
 
     pdal_stage_t* pdal_stage_create_divider(int32_t mode, int32_t size_mode,
                                             uint64_t size, const uint8_t* evals,
