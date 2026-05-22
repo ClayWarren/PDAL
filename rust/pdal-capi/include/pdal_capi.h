@@ -179,6 +179,8 @@ extern "C"
                                   int32_t iterations);
     void pdal_math_erode_diamond(double* data, size_t rows, size_t cols,
                                  int32_t iterations);
+    void pdal_math_compute_centroid(const double* xyz, size_t count,
+                                    double* out_xyz);
 
     // Oriented bounding box intersection
     bool pdal_obb_intersect(const double* center_a, const double* half_a,

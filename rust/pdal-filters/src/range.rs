@@ -31,6 +31,9 @@ fn skip_spaces(input: &str, mut pos: usize) -> usize {
     pos
 }
 
+const UNBOUNDED_LOWER: f64 = -f64::MAX;
+const UNBOUNDED_UPPER: f64 = f64::MAX;
+
 fn parse_number(input: &str, mut pos: usize) -> Result<(f64, usize), String> {
     pos = skip_spaces(input, pos);
     let start = pos;
@@ -82,7 +85,10 @@ pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
     };
     pos += 1;
 
-    let (lower_bound, next_pos) = parse_number(input, pos)?;
+    let (lower_bound, next_pos) = match parse_number(input, pos) {
+        Ok(value) => value,
+        Err(_) => (UNBOUNDED_LOWER, pos),
+    };
     pos = next_pos;
     pos = skip_spaces(input, pos);
     if input.as_bytes().get(pos) != Some(&b':') {
@@ -92,7 +98,7 @@ pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
 
     let (upper_bound, next_pos) = match parse_number(input, pos) {
         Ok(value) => value,
-        Err(_) => (f64::MAX, pos),
+        Err(_) => (UNBOUNDED_UPPER, pos),
     };
     pos = next_pos;
     pos = skip_spaces(input, pos);
@@ -104,10 +110,6 @@ pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
     };
     pos += 1;
     pos = skip_spaces(input, pos);
-
-    if pos != input.len() {
-        return Err("Invalid characters following valid range.".to_string());
-    }
 
     Ok(ParsedRangeLimit {
         dim_name,
@@ -220,5 +222,29 @@ mod tests {
     fn rejects_malformed_limit_strings() {
         assert!(parse_range_limit("Y[4.00e0").is_err());
         assert!(parse_range_limit("Z[4:6]").is_ok());
+    }
+
+    #[test]
+    fn accepts_open_ended_and_unbounded_ranges() {
+        let full = parse_range_limit("Classification[:]").unwrap();
+        assert_eq!(full.dim_name, "Classification");
+        assert_eq!(full.lower_bound, UNBOUNDED_LOWER);
+        assert_eq!(full.upper_bound, UNBOUNDED_UPPER);
+        assert_eq!(full.consumed, "Classification[:]".len());
+
+        let upper_only = parse_range_limit("Intensity[:250]").unwrap();
+        assert_eq!(upper_only.lower_bound, UNBOUNDED_LOWER);
+        assert_eq!(upper_only.upper_bound, 250.0);
+
+        let lower_only = parse_range_limit("Intensity[272:]").unwrap();
+        assert_eq!(lower_only.lower_bound, 272.0);
+        assert_eq!(lower_only.upper_bound, UNBOUNDED_UPPER);
+    }
+
+    #[test]
+    fn allows_trailing_assignment_suffix() {
+        let parsed = parse_range_limit("Classification[:]=0").unwrap();
+        assert_eq!(parsed.dim_name, "Classification");
+        assert_eq!(parsed.consumed, "Classification[:]".len());
     }
 }

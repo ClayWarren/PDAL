@@ -53,12 +53,30 @@ fn math_abi_dilate_then_erode_diamond() {
 }
 
 #[test]
+fn math_abi_compute_centroid() {
+    let xyz = [0.0, 0.0, 0.0, 2.0, 4.0, 6.0, 4.0, 8.0, 12.0];
+    let mut out = [0.0f64; 3];
+    unsafe {
+        pdal_math_compute_centroid(xyz.as_ptr(), 3, out.as_mut_ptr());
+    }
+    assert_eq!(out, [2.0, 4.0, 6.0]);
+
+    // A zero count yields the origin.
+    out = [9.0, 9.0, 9.0];
+    unsafe {
+        pdal_math_compute_centroid(xyz.as_ptr(), 0, out.as_mut_ptr());
+    }
+    assert_eq!(out, [0.0, 0.0, 0.0]);
+}
+
+#[test]
 fn math_abi_tolerates_null_and_empty() {
     let mut out = [0.0f64; 4];
     unsafe {
         // Null pointers are ignored rather than dereferenced.
         pdal_math_grad_x(std::ptr::null(), 2, 2, out.as_mut_ptr());
         pdal_math_dilate_diamond(std::ptr::null_mut(), 2, 2, 1);
+        pdal_math_compute_centroid(std::ptr::null(), 3, out.as_mut_ptr());
         // A zero-size raster is a no-op.
         pdal_math_grad_x(A.as_ptr(), 0, 0, out.as_mut_ptr());
     }

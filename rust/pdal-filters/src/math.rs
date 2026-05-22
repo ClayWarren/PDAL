@@ -121,6 +121,23 @@ pub fn centroid(view: &PointView, ids: &[PointId]) -> [f64; 3] {
     centroid
 }
 
+/// Compute the centroid of interleaved `[x, y, z]` points.
+///
+/// Uses the running-mean update of `pdal::math::computeCentroid` so the result
+/// matches the C++ helper bit-for-bit.
+pub fn compute_centroid(xyz: &[f64], count: usize) -> [f64; 3] {
+    let mut mean = [0.0f64; 3];
+    let mut n = 0.0f64;
+    for i in 0..count {
+        n += 1.0;
+        for (k, m) in mean.iter_mut().enumerate() {
+            let value = xyz[3 * i + k];
+            *m += (value - *m) / n;
+        }
+    }
+    mean
+}
+
 fn largest_off_diagonal(matrix: [[f64; 3]; 3]) -> (usize, usize) {
     let pairs = [(0, 1), (0, 2), (1, 2)];
     *pairs

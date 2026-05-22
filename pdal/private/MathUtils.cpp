@@ -144,28 +144,21 @@ Eigen::Vector3d computeCentroid(const PointView& view, const PointIdList& ids)
 {
     using namespace Eigen;
 
-    double mx, my, mz;
-    mx = my = mz = 0.0;
-    point_count_t n(0);
+    if (ids.empty())
+        return Vector3d::Zero();
+
+    std::vector<double> xyz;
+    xyz.reserve(ids.size() * 3);
     for (auto const& j : ids)
     {
-        auto update = [&n](double value, double average)
-        {
-            double delta, delta_n;
-            delta = value - average;
-            delta_n = delta / n;
-            return average + delta_n;
-        };
-        n++;
-        mx = update(view.getFieldAs<double>(Dimension::Id::X, j), mx);
-        my = update(view.getFieldAs<double>(Dimension::Id::Y, j), my);
-        mz = update(view.getFieldAs<double>(Dimension::Id::Z, j), mz);
+        xyz.push_back(view.getFieldAs<double>(Dimension::Id::X, j));
+        xyz.push_back(view.getFieldAs<double>(Dimension::Id::Y, j));
+        xyz.push_back(view.getFieldAs<double>(Dimension::Id::Z, j));
     }
 
-    Vector3d centroid;
-    centroid << mx, my, mz;
-
-    return centroid;
+    double centroid[3] = {0.0, 0.0, 0.0};
+    pdal_math_compute_centroid(xyz.data(), ids.size(), centroid);
+    return Vector3d(centroid[0], centroid[1], centroid[2]);
 }
 
 Eigen::Matrix3d computeCovariance(const PointView& view, const PointIdList& ids)

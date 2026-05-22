@@ -87,3 +87,24 @@ pub unsafe extern "C" fn pdal_math_erode_diamond(
     let raster = std::slice::from_raw_parts_mut(data, count);
     math::erode_diamond(raster, rows, cols, iterations.max(0) as usize);
 }
+
+/// Compute the centroid of `count` interleaved `[x, y, z]` points.
+///
+/// Writes the centroid `[x, y, z]` to `out_xyz`. A zero count yields the
+/// origin.
+///
+/// # Safety
+/// `xyz` must be valid for `count * 3` `f64` values and `out_xyz` for 3.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_math_compute_centroid(
+    xyz: *const f64,
+    count: usize,
+    out_xyz: *mut f64,
+) {
+    if xyz.is_null() || out_xyz.is_null() {
+        return;
+    }
+    let points = std::slice::from_raw_parts(xyz, count.saturating_mul(3));
+    let centroid = math::compute_centroid(points, count);
+    std::ptr::copy_nonoverlapping(centroid.as_ptr(), out_xyz, 3);
+}
