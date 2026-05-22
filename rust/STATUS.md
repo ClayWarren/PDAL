@@ -138,10 +138,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `653 / 926` built C++ GoogleTest cases, or `70.52%`, are
+Current checkpoint: `654 / 926` built C++ GoogleTest cases, or `70.63%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route segmentation cluster extraction and return classification through
-the Rust C ABI after LAS COPC detection and Utils toString audit restoration.
+gains restore empty-range DimRange parsing for assign options, route
+`computeCentroid` through the Rust C ABI, and audit `EigenTest.computeCentroid`.
 This remains a conservative lower bound, not a final port-completion percentage:
 42 built test binaries remain unclassified by the audit script. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
