@@ -441,7 +441,8 @@ void GDALWriter::doneFile()
 bool GDALWriter::useRustWriter() const
 {
     return m_supportsView && m_options.empty() && !m_writePDALMetadata &&
-           m_dataType == Dimension::Type::Double;
+           (m_dataType == Dimension::Type::Double ||
+            m_dataType == Dimension::Type::Signed32);
 }
 
 void GDALWriter::writeRustOutput()
@@ -461,6 +462,7 @@ void GDALWriter::writeRustOutput()
     if (std::isfinite(m_noData))
         addOption(options, "nodata", m_noData);
     addOption(options, "dimension", Dimension::name(m_interpDim));
+    addOption(options, "data_type", Dimension::interpretationName(m_dataType));
     addOption(options, "binmode", m_binMode);
     addOption(options, "allow_empty", m_allowEmpty);
     addOption(options, "window_size", m_windowSize);

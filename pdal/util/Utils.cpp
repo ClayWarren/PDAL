@@ -108,10 +108,6 @@ bool Utils::compare_approx(double v1, double v2, double tolerance)
 
 std::string Utils::toString(double from, size_t precision)
 {
-#ifndef PDAL_UTILS_NO_RUST_CAPI
-    return takeRustString(pdal_utils_to_string_f64(from,
-        static_cast<uint32_t>(precision)));
-#else
     OStringStreamClassicLocale oss;
     if (std::isnan(from))
         return "NaN";
@@ -119,7 +115,6 @@ std::string Utils::toString(double from, size_t precision)
         return (from < 0 ? "-Infinity" : "Infinity");
     oss << std::setprecision(precision) << from;
     return oss.str();
-#endif
 }
 
 std::string Utils::toString(int from)
@@ -155,8 +150,7 @@ Utils::StatusWithReason Utils::fromString(const std::string& from, int& to)
 #endif
 }
 
-template <>
-bool Utils::numericCast(float in, double& out)
+template <> bool Utils::numericCast(float in, double& out)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI
     return pdal_utils_numeric_cast_f32_to_f64(in, &out);
@@ -166,8 +160,7 @@ bool Utils::numericCast(float in, double& out)
 #endif
 }
 
-template <>
-bool Utils::numericCast(double in, float& out)
+template <> bool Utils::numericCast(double in, float& out)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI
     return pdal_utils_numeric_cast_f64_to_f32(in, &out);

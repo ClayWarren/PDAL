@@ -17,12 +17,19 @@ enum OutputStat {
     Percentile(u8),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutputDataType {
+    Float64,
+    Int32,
+}
+
 pub struct GdalWriter {
     filename: String,
     driver_name: String,
     output_types: Vec<OutputStat>,
     output_type_error: Option<String>,
     dimension: DimId,
+    data_type: OutputDataType,
     resolution: f64,
     radius: Option<f64>,
     power: f64,
@@ -70,6 +77,7 @@ impl GdalWriter {
             output_types,
             output_type_error,
             dimension: DimId::from_name(&options.get_str("dimension", "Z")),
+            data_type: parse_data_type(&options.get_str("data_type", "float64")),
             resolution,
             radius: options
                 .has("radius")
@@ -145,38 +153,85 @@ impl Writer for GdalWriter {
         let srs_wkt = resolve_srs(views, &self.override_srs, &self.default_srs);
 
         pdal_core::gdal::register_drivers();
-        let mut raster = pdal_core::gdal::Raster::create_float64(
-            &self.filename,
-            &self.driver_name,
-            grid.width as i32,
-            grid.height as i32,
-            bands.len() as i32,
-            geo_transform,
-            &srs_wkt,
-        )
-        .map_err(StageError)?;
-        for (idx, (name, data)) in bands.iter().enumerate() {
-            raster
-                .write_band_f64(
-                    idx as i32 + 1,
-                    grid.width,
-                    grid.height,
-                    data,
-                    self.no_data,
-                    name,
+        match self.data_type {
+            OutputDataType::Float64 => {
+                let mut raster = pdal_core::gdal::Raster::create_float64(
+                    &self.filename,
+                    &self.driver_name,
+                    grid.width as i32,
+                    grid.height as i32,
+                    bands.len() as i32,
+                    geo_transform,
+                    &srs_wkt,
                 )
                 .map_err(StageError)?;
-        }
-        for (key, value) in &self.metadata {
-            raster
-                .set_metadata_item(key, value)
+                for (idx, (name, data)) in bands.iter().enumerate() {
+                    raster
+                        .write_band_f64(
+                            idx as i32 + 1,
+                            grid.width,
+                            grid.height,
+                            data,
+                            self.no_data,
+                            name,
+                        )
+                        .map_err(StageError)?;
+                }
+                for (key, value) in &self.metadata {
+                    raster.set_metadata_item(key, value).map_err(StageError)?;
+                }
+            }
+            OutputDataType::Int32 => {
+                let no_data = self.no_data.round() as i32;
+                let mut raster = pdal_core::gdal::Raster::create_int32(
+                    &self.filename,
+                    &self.driver_name,
+                    grid.width as i32,
+                    grid.height as i32,
+                    bands.len() as i32,
+                    geo_transform,
+                    &srs_wkt,
+                )
                 .map_err(StageError)?;
+                for (idx, (name, data)) in bands.iter().enumerate() {
+                    let int_data: Vec<i32> = data
+                        .iter()
+                        .map(|value| {
+                            if (*value - self.no_data).abs() < f64::EPSILON {
+                                no_data
+                            } else {
+                                value.round() as i32
+                            }
+                        })
+                        .collect();
+                    raster
+                        .write_band_i32(
+                            idx as i32 + 1,
+                            grid.width,
+                            grid.height,
+                            &int_data,
+                            no_data,
+                            name,
+                        )
+                        .map_err(StageError)?;
+                }
+                for (key, value) in &self.metadata {
+                    raster.set_metadata_item(key, value).map_err(StageError)?;
+                }
+            }
         }
         Ok(())
     }
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("writers.gdal")
+    }
+}
+
+fn parse_data_type(value: &str) -> OutputDataType {
+    match value.to_ascii_lowercase().as_str() {
+        "int32" | "int32_t" | "signed32" | "int" => OutputDataType::Int32,
+        _ => OutputDataType::Float64,
     }
 }
 
@@ -586,18 +641,9 @@ mod tests {
         let mut view = PointView::new(layout);
         view.set_spatial_reference(pdal_core::srs::SpatialReference::new("EPSG:2030"));
 
-        assert_eq!(
-            resolve_srs(&[view.clone()], "EPSG:4326", ""),
-            "EPSG:4326"
-        );
-        assert_eq!(
-            resolve_srs(&[view.clone()], "", "EPSG:4326"),
-            "EPSG:2030"
-        );
-        assert_eq!(
-            resolve_srs(&[], "", "EPSG:4326"),
-            "EPSG:4326"
-        );
+        assert_eq!(resolve_srs(&[view.clone()], "EPSG:4326", ""), "EPSG:4326");
+        assert_eq!(resolve_srs(&[view.clone()], "", "EPSG:4326"), "EPSG:2030");
+        assert_eq!(resolve_srs(&[], "", "EPSG:4326"), "EPSG:4326");
     }
 
     #[test]

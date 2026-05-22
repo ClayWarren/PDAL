@@ -31,6 +31,31 @@ impl Raster {
         geo_transform: [f64; 6],
         srs_wkt: &str,
     ) -> Result<Self, String> {
+        Self::create(path, driver_name, width, height, band_count, geo_transform, srs_wkt, GDALDataType::GDT_Float64)
+    }
+
+    pub fn create_int32(
+        path: &str,
+        driver_name: &str,
+        width: i32,
+        height: i32,
+        band_count: i32,
+        geo_transform: [f64; 6],
+        srs_wkt: &str,
+    ) -> Result<Self, String> {
+        Self::create(path, driver_name, width, height, band_count, geo_transform, srs_wkt, GDALDataType::GDT_Int32)
+    }
+
+    fn create(
+        path: &str,
+        driver_name: &str,
+        width: i32,
+        height: i32,
+        band_count: i32,
+        geo_transform: [f64; 6],
+        srs_wkt: &str,
+        pixel_type: gdal_sys::GDALDataType::Type,
+    ) -> Result<Self, String> {
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let driver_name_c = CString::new(driver_name).map_err(|e| e.to_string())?;
         unsafe {
@@ -44,7 +69,7 @@ impl Raster {
                 width,
                 height,
                 band_count,
-                GDALDataType::GDT_Float64,
+                pixel_type,
                 std::ptr::null_mut(),
             );
             if ds.is_null() {
@@ -187,6 +212,54 @@ impl Raster {
         }
     }
 
+    pub fn write_band_i32(
+        &mut self,
+        band_idx: i32,
+        width: usize,
+        height: usize,
+        buffer: &[i32],
+        no_data: i32,
+        description: &str,
+    ) -> Result<(), String> {
+        if buffer.len() != width * height {
+            return Err("GDAL band buffer size does not match raster dimensions.".to_string());
+        }
+        let description_c = CString::new(description).map_err(|e| e.to_string())?;
+        unsafe {
+            let band = GDALGetRasterBand(self.ds, band_idx);
+            if band.is_null() {
+                return Err(format!("Failed to get band {}", band_idx));
+            }
+            if gdal_sys::GDALSetRasterNoDataValue(band, no_data as f64) != CPLErr::CE_None {
+                return Err(format!("Failed to set no-data value for band {}", band_idx));
+            }
+            gdal_sys::GDALSetDescription(
+                band as gdal_sys::GDALMajorObjectH,
+                description_c.as_ptr(),
+            );
+
+            let res = GDALRasterIO(
+                band,
+                GDALRWFlag::GF_Write,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                buffer.as_ptr() as *mut _,
+                width as i32,
+                height as i32,
+                GDALDataType::GDT_Int32,
+                0,
+                0,
+            );
+
+            if res != CPLErr::CE_None {
+                return Err("GDAL RasterIO write failed".to_string());
+            }
+            Ok(())
+        }
+    }
+
     pub fn set_metadata_item(&mut self, key: &str, value: &str) -> Result<(), String> {
         let key_c = CString::new(key).map_err(|e| e.to_string())?;
         let value_c = CString::new(value).map_err(|e| e.to_string())?;
@@ -219,10 +292,8 @@ impl Raster {
             }
 
             // GDALGetMetadataItem returns null for empty values; scan the list instead.
-            let items = gdal_sys::GDALGetMetadata(
-                self.ds as gdal_sys::GDALMajorObjectH,
-                domain_c.as_ptr(),
-            );
+            let items =
+                gdal_sys::GDALGetMetadata(self.ds as gdal_sys::GDALMajorObjectH, domain_c.as_ptr());
             if items.is_null() {
                 return None;
             }
@@ -501,6 +572,24 @@ pub fn register_drivers() {
     }
 }
 
+pub fn version() -> String {
+    version_info("RELEASE_NAME")
+}
+
+pub fn version_info(key: &str) -> String {
+    let Ok(key) = CString::new(key) else {
+        return String::new();
+    };
+    unsafe {
+        let value = gdal_sys::GDALVersionInfo(key.as_ptr());
+        if value.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(value).to_string_lossy().into_owned()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,7 +597,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn temp_tif(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("pdal-native-{name}-{}.tif", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("pdal-native-{name}-{}.tif", std::process::id()));
         let _ = fs::remove_file(&path);
         path
     }
@@ -527,10 +617,10 @@ mod tests {
             "",
         )
         .unwrap();
-        raster.write_band_f64(1, 1, 1, &[1.0], -9999.0, "Z").unwrap();
         raster
-            .set_metadata_item("AREA_OR_PIXEL", "Pixel")
+            .write_band_f64(1, 1, 1, &[1.0], -9999.0, "Z")
             .unwrap();
+        raster.set_metadata_item("AREA_OR_PIXEL", "Pixel").unwrap();
         raster.set_metadata_item("empty", "").unwrap();
         raster
             .set_metadata_item("equals", "some_more_equals===")
@@ -550,23 +640,5 @@ mod tests {
         );
         // GTiff does not persist empty metadata values when the dataset is closed.
         assert!(raster.metadata_item("empty").is_none());
-    }
-}
-
-pub fn version() -> String {
-    version_info("RELEASE_NAME")
-}
-
-pub fn version_info(key: &str) -> String {
-    let Ok(key) = CString::new(key) else {
-        return String::new();
-    };
-    unsafe {
-        let value = gdal_sys::GDALVersionInfo(key.as_ptr());
-        if value.is_null() {
-            String::new()
-        } else {
-            CStr::from_ptr(value).to_string_lossy().into_owned()
-        }
     }
 }
