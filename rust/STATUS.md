@@ -138,13 +138,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `668 / 926` built C++ GoogleTest cases, or `72.14%`, are
+Current checkpoint: `681 / 926` built C++ GoogleTest cases, or `73.54%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains audit PointTable layout limits, LAS userView reads, metadata
 construction/update, buffer stats execution, XMLSchema round-trip parsing,
 hexbin filter execution cases, COPC reader multi-input handling, EPT reader
 audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
-confirmed; badOriginQuery corrected), and OGR writer GeoJSON output through the Rust C ABI. `Utils::toString(double)` now routes
+confirmed; badOriginQuery corrected), OGR writer GeoJSON output, and streaming execution through the Rust C ABI. `Utils::toString(double)` now routes
 through the Rust C ABI via the existing `pdal_utils_to_string_f64` function,
 matching C++ `setprecision` behavior for NaN, Inf, zero, scientific, and fixed-point
 notation. This remains a conservative lower bound, not a final port-completion percentage:
@@ -333,6 +333,7 @@ Known mixed binaries:
   miniball scoring routes through the Rust C ABI.
 - `pdal_metadata_test`: all 12 tests count. Scalar conversion and JSON scalar formatting
   route through Rust helpers. The metadata tree implementation is still C++.
+- `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
 - `pdal_io_las_reader_test`: `test_sequential`, `test_different_formats`,
   `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, `Start`,
   `SyntheticPoints`, `extraBytes`, and `IgnoreBadVLRs` count. LAS point
