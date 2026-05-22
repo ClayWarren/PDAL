@@ -158,6 +158,17 @@ void ColorinterpFilter::prepared(PointTableRef table)
     if (!std::isnan(m_min) && !std::isnan(m_max) && m_max <= m_min)
         throwError("Specified 'minimum' value must be less than "
                    "'maximum' value.");
+
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_colorinterp(
+        Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min, m_max,
+        m_clamp, m_invertRamp);
+    if (!m_rustStage)
+        rust_view_converter::throwLastError(
+            "Unable to create Rust colorinterp stage.");
+    pdal_stage_destroy(m_rustStage);
+    m_rustStage = nullptr;
 }
 
 /**

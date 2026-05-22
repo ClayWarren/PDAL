@@ -1,4 +1,4 @@
-use crate::error::set_last_error;
+use crate::error::{set_last_error, string_to_c_ptr};
 use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
 use pdal_core::options::Options;
@@ -44,7 +44,7 @@ use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::radiusassign::{RadiusAssignFilter, RadiusAssignment};
 use pdal_filters::randomize::RandomizeFilter;
-use pdal_filters::range::{RangeFilter, RangeLimit};
+use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
@@ -485,6 +485,56 @@ pub struct pdal_range_limit_t {
     pub negate: bool,
 }
 
+/// Parse a PDAL range limit expression such as `Z[1:5]`.
+///
+/// # Safety
+///
+/// Output pointers must be valid when non-null. `out_dim_name` receives an
+/// allocated string that must be freed with `pdal_string_free`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_range_limit_parse(
+    input: *const c_char,
+    out_dim_name: *mut *mut c_char,
+    lower_bound: *mut f64,
+    upper_bound: *mut f64,
+    inclusive_lower: *mut bool,
+    inclusive_upper: *mut bool,
+    negate: *mut bool,
+    consumed: *mut u64,
+) -> *mut c_char {
+    if input.is_null() {
+        return string_to_c_ptr("Missing range limit.".to_string());
+    }
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_range_limit(&input) {
+        Ok(parsed) => {
+            if let Some(out_dim_name) = out_dim_name.as_mut() {
+                *out_dim_name = string_to_c_ptr(parsed.dim_name);
+            }
+            if let Some(lower_bound) = lower_bound.as_mut() {
+                *lower_bound = parsed.lower_bound;
+            }
+            if let Some(upper_bound) = upper_bound.as_mut() {
+                *upper_bound = parsed.upper_bound;
+            }
+            if let Some(inclusive_lower) = inclusive_lower.as_mut() {
+                *inclusive_lower = parsed.inclusive_lower;
+            }
+            if let Some(inclusive_upper) = inclusive_upper.as_mut() {
+                *inclusive_upper = parsed.inclusive_upper;
+            }
+            if let Some(negate) = negate.as_mut() {
+                *negate = parsed.negate;
+            }
+            if let Some(consumed) = consumed.as_mut() {
+                *consumed = parsed.consumed as u64;
+            }
+            std::ptr::null_mut()
+        }
+        Err(error) => string_to_c_ptr(error),
+    }
+}
+
 /// Create a range filter stage.
 ///
 /// # Safety
@@ -566,17 +616,23 @@ pub unsafe extern "C" fn pdal_stage_create_sort(
     }
 
     let order_str = CStr::from_ptr(order).to_string_lossy();
-    let order_enum = if order_str.eq_ignore_ascii_case("desc") {
-        SortOrder::Desc
-    } else {
-        SortOrder::Asc
+    let order_enum = match order_str.to_ascii_lowercase().as_str() {
+        "asc" => SortOrder::Asc,
+        "desc" => SortOrder::Desc,
+        _ => {
+            set_last_error(format!("Invalid sort order '{order_str}'."));
+            return std::ptr::null_mut();
+        }
     };
 
     let alg_str = CStr::from_ptr(algorithm).to_string_lossy();
-    let alg_enum = if alg_str.eq_ignore_ascii_case("stable") {
-        SortAlgorithm::Stable
-    } else {
-        SortAlgorithm::Normal
+    let alg_enum = match alg_str.to_ascii_lowercase().as_str() {
+        "normal" => SortAlgorithm::Normal,
+        "stable" => SortAlgorithm::Stable,
+        _ => {
+            set_last_error(format!("Invalid sort algorithm '{alg_str}'."));
+            return std::ptr::null_mut();
+        }
     };
 
     let filter = Box::new(SortFilter::new(dim_names, order_enum, alg_enum));

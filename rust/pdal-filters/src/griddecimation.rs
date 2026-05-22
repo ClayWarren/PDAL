@@ -94,6 +94,16 @@ pub fn get_kept_indices(view: &PointView, resolution: f64, output_type: &str) ->
     kept
 }
 
+pub fn validate_options(resolution: f64, output_type: &str) -> Result<(), String> {
+    if resolution <= 0.0 {
+        return Err("resolution must be positive.".to_string());
+    }
+    match output_type {
+        "max" | "min" => Ok(()),
+        _ => Err("The output_type must be 'max' or 'min'.".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

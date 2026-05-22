@@ -206,6 +206,177 @@ pub fn parse_bounds2d(input: &str, pos: usize) -> Result<ParsedBounds2D, String>
     })
 }
 
+pub fn bounds2d_equal(a: &Bounds2D, b: &Bounds2D) -> bool {
+    a == b
+}
+
+pub fn bounds3d_equal(a: &Bounds3D, b: &Bounds3D) -> bool {
+    a == b
+}
+
+pub fn default_bounds2d() -> Bounds2D {
+    Bounds2D {
+        minx: f64::MIN,
+        miny: f64::MIN,
+        maxx: f64::MAX,
+        maxy: f64::MAX,
+    }
+}
+
+pub fn default_bounds3d() -> Bounds3D {
+    Bounds3D {
+        minx: f64::MIN,
+        miny: f64::MIN,
+        minz: f64::MIN,
+        maxx: f64::MAX,
+        maxy: f64::MAX,
+        maxz: f64::MAX,
+    }
+}
+
+fn format_fixed(value: f64, precision: u32) -> String {
+    format!("{value:.prec$}", prec = precision as usize)
+}
+
+fn format_stream(value: f64) -> String {
+    format!("{value}")
+}
+
+pub fn format_bounds2d(bounds: &Bounds2D, _precision: u32) -> String {
+    if bounds.is_empty() {
+        return "()".to_string();
+    }
+    format!(
+        "([{}, {}], [{}, {}])",
+        format_stream(bounds.minx),
+        format_stream(bounds.maxx),
+        format_stream(bounds.miny),
+        format_stream(bounds.maxy)
+    )
+}
+
+pub fn format_bounds3d(bounds: &Bounds3D, _precision: u32) -> String {
+    if bounds.is_empty() {
+        return "()".to_string();
+    }
+    format!(
+        "([{}, {}], [{}, {}], [{}, {}])",
+        format_stream(bounds.minx),
+        format_stream(bounds.maxx),
+        format_stream(bounds.miny),
+        format_stream(bounds.maxy),
+        format_stream(bounds.minz),
+        format_stream(bounds.maxz)
+    )
+}
+
+pub fn bounds2d_to_wkt(bounds: &Bounds2D, precision: u32) -> String {
+    if bounds.is_empty() {
+        return String::new();
+    }
+    format!(
+        "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
+        format_fixed(bounds.minx, precision),
+        format_fixed(bounds.miny, precision),
+        format_fixed(bounds.minx, precision),
+        format_fixed(bounds.maxy, precision),
+        format_fixed(bounds.maxx, precision),
+        format_fixed(bounds.maxy, precision),
+        format_fixed(bounds.maxx, precision),
+        format_fixed(bounds.miny, precision),
+        format_fixed(bounds.minx, precision),
+        format_fixed(bounds.miny, precision)
+    )
+}
+
+pub fn bounds3d_to_wkt(bounds: &Bounds3D, precision: u32) -> String {
+    if bounds.is_empty() {
+        return String::new();
+    }
+
+    let face = |points: [(&str, &str, &str); 5]| {
+        let mut out = String::from("((");
+        for (idx, (x, y, z)) in points.iter().enumerate() {
+            if idx > 0 {
+                out.push_str(", ");
+            }
+            out.push_str(x);
+            out.push(' ');
+            out.push_str(y);
+            out.push(' ');
+            out.push_str(z);
+        }
+        out.push_str(", ))");
+        out
+    };
+
+    let minx = format_fixed(bounds.minx, precision);
+    let maxx = format_fixed(bounds.maxx, precision);
+    let miny = format_fixed(bounds.miny, precision);
+    let maxy = format_fixed(bounds.maxy, precision);
+    let minz = format_fixed(bounds.minz, precision);
+    let maxz = format_fixed(bounds.maxz, precision);
+
+    format!(
+        "POLYHEDRON Z ( {}, {}, {}, {}, {}, {} )",
+        face([
+            (&minx, &miny, &minz),
+            (&maxx, &miny, &minz),
+            (&maxx, &maxy, &minz),
+            (&minx, &maxy, &minz),
+            (&minx, &miny, &minz),
+        ]),
+        face([
+            (&minx, &miny, &minz),
+            (&maxx, &miny, &minz),
+            (&maxx, &miny, &maxz),
+            (&minx, &miny, &maxz),
+            (&minx, &miny, &minz),
+        ]),
+        face([
+            (&maxx, &miny, &minz),
+            (&maxx, &maxy, &minz),
+            (&maxx, &maxy, &maxz),
+            (&maxx, &miny, &maxz),
+            (&maxx, &miny, &minz),
+        ]),
+        face([
+            (&maxx, &maxy, &minz),
+            (&minx, &maxy, &minz),
+            (&minx, &maxy, &maxz),
+            (&maxx, &maxy, &maxz),
+            (&maxx, &maxy, &minz),
+        ]),
+        face([
+            (&minx, &maxy, &minz),
+            (&minx, &miny, &minz),
+            (&minx, &miny, &maxz),
+            (&minx, &maxy, &maxz),
+            (&minx, &maxy, &minz),
+        ]),
+        face([
+            (&minx, &miny, &maxz),
+            (&maxx, &miny, &maxz),
+            (&maxx, &maxy, &maxz),
+            (&minx, &maxy, &maxz),
+            (&minx, &miny, &maxz),
+        ])
+    )
+}
+
+pub fn bounds2d_to_geojson(bounds: &Bounds2D, precision: u32) -> String {
+    if bounds.is_empty() {
+        return String::new();
+    }
+    format!(
+        "{{\"bbox\":[{}, {}, {}{}]}}",
+        format_fixed(bounds.minx, precision),
+        format_fixed(bounds.miny, precision),
+        format_fixed(bounds.maxx, precision),
+        format!(",{}", format_fixed(bounds.maxy, precision))
+    )
+}
+
 pub fn parse_bounds3d(input: &str, pos: usize) -> Result<ParsedBounds3D, String> {
     if pos == 0 {
         if let Some(parsed) = parse_json_bounds3d(input)? {

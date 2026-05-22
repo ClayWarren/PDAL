@@ -209,6 +209,18 @@ extern "C"
     char* pdal_bounds3d_parse(const char* input, uint64_t pos,
                               pdal_bounds3d_t* out_bounds, char** out_wkt,
                               uint64_t* out_pos);
+    bool pdal_bounds2d_equal(const pdal_bounds2d_t* left,
+                             const pdal_bounds2d_t* right);
+    bool pdal_bounds3d_equal(const pdal_bounds3d_t* left,
+                             const pdal_bounds3d_t* right);
+    void pdal_bounds2d_default(pdal_bounds2d_t* out_bounds);
+    void pdal_bounds3d_default(pdal_bounds3d_t* out_bounds);
+    char* pdal_bounds2d_format(const pdal_bounds2d_t* bounds, uint32_t precision);
+    char* pdal_bounds3d_format(const pdal_bounds3d_t* bounds, uint32_t precision);
+    char* pdal_bounds2d_to_wkt(const pdal_bounds2d_t* bounds, uint32_t precision);
+    char* pdal_bounds3d_to_wkt(const pdal_bounds3d_t* bounds, uint32_t precision);
+    char* pdal_bounds2d_to_geojson(const pdal_bounds2d_t* bounds,
+                                   uint32_t precision);
 
     typedef struct
     {
@@ -458,6 +470,10 @@ extern "C"
         bool negate;
     } pdal_range_limit_t;
 
+    char* pdal_range_limit_parse(const char* input, char** out_dim_name,
+                                 double* lower_bound, double* upper_bound,
+                                 bool* inclusive_lower, bool* inclusive_upper,
+                                 bool* negate, uint64_t* consumed);
     pdal_stage_t* pdal_stage_create_range(const pdal_range_limit_t* limits,
                                           uint64_t count);
     bool pdal_stage_range_point_passes(pdal_stage_t* stage,
@@ -562,6 +578,7 @@ extern "C"
     pdal_stage_t* pdal_stage_create_optimalneighborhood(uint64_t min_k,
                                                         uint64_t max_k);
 
+    char* pdal_grid_decimation_validate(double resolution, const char* output_type);
     uint64_t* pdal_grid_decimation_get_kept_indices(
         const pdal_point_view_t* view, double resolution,
         const char* output_type, uint64_t* out_len);

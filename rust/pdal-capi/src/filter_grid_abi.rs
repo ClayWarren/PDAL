@@ -3,6 +3,28 @@ use pdal_filters::griddecimation;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
+use crate::error::string_to_c_ptr;
+
+/// Validate grid decimation options.
+///
+/// # Safety
+///
+/// `output_type` must be a valid NUL-terminated C-string when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_grid_decimation_validate(
+    resolution: f64,
+    output_type: *const c_char,
+) -> *mut c_char {
+    if output_type.is_null() {
+        return string_to_c_ptr("The output_type must be 'max' or 'min'.".to_string());
+    }
+    let output_type_str = CStr::from_ptr(output_type).to_string_lossy();
+    match griddecimation::validate_options(resolution, &output_type_str) {
+        Ok(()) => std::ptr::null_mut(),
+        Err(error) => string_to_c_ptr(error),
+    }
+}
+
 /// Get the indices of the kept points in grid decimation.
 /// Caller is responsible for freeing the returned buffer with pdal_free_u64_array.
 ///

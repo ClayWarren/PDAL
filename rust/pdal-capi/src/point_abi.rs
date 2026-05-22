@@ -1,5 +1,9 @@
 use crate::error::string_to_c_ptr;
-use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
+use pdal_core::bounds::{
+    bounds2d_to_geojson, bounds2d_to_wkt, bounds3d_to_wkt, default_bounds2d, default_bounds3d,
+    format_bounds2d, format_bounds3d, parse_bounds2d, parse_bounds3d, bounds2d_equal,
+    bounds3d_equal, Bounds2D, Bounds3D,
+};
 use pdal_core::point::{
     fix_dimension_name, pdal_dimension_interpretation_name as core_dimension_interpretation_name,
     pdal_dimension_type_from_base_and_size as core_dimension_type_from_base_and_size,
@@ -377,6 +381,97 @@ pub unsafe extern "C" fn pdal_bounds3d_parse(
         }
         Err(error) => string_to_c_ptr(error),
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_equal(
+    left: *const pdal_bounds2d_t,
+    right: *const pdal_bounds2d_t,
+) -> bool {
+    match (left.as_ref(), right.as_ref()) {
+        (Some(left), Some(right)) => bounds2d_equal(&Bounds2D::from(*left), &Bounds2D::from(*right)),
+        _ => false,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds3d_equal(
+    left: *const pdal_bounds3d_t,
+    right: *const pdal_bounds3d_t,
+) -> bool {
+    match (left.as_ref(), right.as_ref()) {
+        (Some(left), Some(right)) => bounds3d_equal(&Bounds3D::from(*left), &Bounds3D::from(*right)),
+        _ => false,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_default(out_bounds: *mut pdal_bounds2d_t) {
+    if let Some(out_bounds) = out_bounds.as_mut() {
+        *out_bounds = default_bounds2d().into();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds3d_default(out_bounds: *mut pdal_bounds3d_t) {
+    if let Some(out_bounds) = out_bounds.as_mut() {
+        *out_bounds = default_bounds3d().into();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_format(
+    bounds: *const pdal_bounds2d_t,
+    precision: u32,
+) -> *mut c_char {
+    bounds
+        .as_ref()
+        .map(|bounds| string_to_c_ptr(format_bounds2d(&Bounds2D::from(*bounds), precision)))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds3d_format(
+    bounds: *const pdal_bounds3d_t,
+    precision: u32,
+) -> *mut c_char {
+    bounds
+        .as_ref()
+        .map(|bounds| string_to_c_ptr(format_bounds3d(&Bounds3D::from(*bounds), precision)))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_to_wkt(
+    bounds: *const pdal_bounds2d_t,
+    precision: u32,
+) -> *mut c_char {
+    bounds
+        .as_ref()
+        .map(|bounds| string_to_c_ptr(bounds2d_to_wkt(&Bounds2D::from(*bounds), precision)))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds3d_to_wkt(
+    bounds: *const pdal_bounds3d_t,
+    precision: u32,
+) -> *mut c_char {
+    bounds
+        .as_ref()
+        .map(|bounds| string_to_c_ptr(bounds3d_to_wkt(&Bounds3D::from(*bounds), precision)))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_bounds2d_to_geojson(
+    bounds: *const pdal_bounds2d_t,
+    precision: u32,
+) -> *mut c_char {
+    bounds
+        .as_ref()
+        .map(|bounds| string_to_c_ptr(bounds2d_to_geojson(&Bounds2D::from(*bounds), precision)))
+        .unwrap_or(std::ptr::null_mut())
 }
 
 /// Map a C string dimension name to the Rust `DimId` enum.

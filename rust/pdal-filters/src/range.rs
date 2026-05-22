@@ -13,6 +13,115 @@ pub struct RangeLimit {
     pub negate: bool,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedRangeLimit {
+    pub dim_name: String,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub inclusive_lower: bool,
+    pub inclusive_upper: bool,
+    pub negate: bool,
+    pub consumed: usize,
+}
+
+fn skip_spaces(input: &str, mut pos: usize) -> usize {
+    while pos < input.len() && input.as_bytes()[pos].is_ascii_whitespace() {
+        pos += 1;
+    }
+    pos
+}
+
+fn parse_number(input: &str, mut pos: usize) -> Result<(f64, usize), String> {
+    pos = skip_spaces(input, pos);
+    let start = pos;
+    while pos < input.len() {
+        let ch = input.as_bytes()[pos];
+        if ch.is_ascii_digit() || matches!(ch, b'+' | b'-' | b'.' | b'e' | b'E') {
+            pos += 1;
+        } else {
+            break;
+        }
+    }
+    if start == pos {
+        return Err("No valid minimum value for range.".to_string());
+    }
+    let value = input[start..pos]
+        .parse::<f64>()
+        .map_err(|_| "No valid minimum value for range.".to_string())?;
+    Ok((value, pos))
+}
+
+pub fn parse_range_limit(input: &str) -> Result<ParsedRangeLimit, String> {
+    let mut pos = skip_spaces(input, 0);
+    let mut inclusive_lower = true;
+    let mut inclusive_upper = true;
+    let mut negate = false;
+
+    let name_start = pos;
+    while pos < input.len() {
+        let ch = input.as_bytes()[pos];
+        if ch.is_ascii_alphanumeric() || matches!(ch, b'_') {
+            pos += 1;
+        } else {
+            break;
+        }
+    }
+    if pos == name_start {
+        return Err("No dimension name.".to_string());
+    }
+    let dim_name = input[name_start..pos].to_string();
+    pos = skip_spaces(input, pos);
+
+    if input.as_bytes().get(pos) == Some(&b'!') {
+        negate = true;
+        pos += 1;
+    }
+
+    match input.as_bytes().get(pos) {
+        Some(b'(') => inclusive_lower = false,
+        Some(b'[') => inclusive_lower = true,
+        _ => return Err("Missing '(' or '['.".to_string()),
+    }
+    pos += 1;
+
+    let (lower_bound, next_pos) = parse_number(input, pos)?;
+    pos = next_pos;
+    pos = skip_spaces(input, pos);
+    if input.as_bytes().get(pos) != Some(&b':') {
+        return Err("Missing ':' limit separator.".to_string());
+    }
+    pos += 1;
+
+    let (upper_bound, next_pos) = match parse_number(input, pos) {
+        Ok(value) => value,
+        Err(_) => (f64::MAX, pos),
+    };
+    pos = next_pos;
+    pos = skip_spaces(input, pos);
+
+    match input.as_bytes().get(pos) {
+        Some(b')') => inclusive_upper = false,
+        Some(b']') => inclusive_upper = true,
+        _ => return Err("Missing ')' or ']'.".to_string()),
+    }
+    pos += 1;
+    pos = skip_spaces(input, pos);
+
+    if pos != input.len() {
+        return Err("Invalid characters following valid range.".to_string());
+    }
+
+    Ok(ParsedRangeLimit {
+        dim_name,
+        lower_bound,
+        upper_bound,
+        inclusive_lower,
+        inclusive_upper,
+        negate,
+        consumed: pos,
+    })
+}
+
 impl RangeLimit {
     pub fn value_passes(&self, v: f64) -> bool {
         let mut fail = (self.inclusive_lower && v < self.lower_bound)
@@ -103,4 +212,15 @@ impl Streamable for RangeFilter {
     }
 
     fn reset(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_malformed_limit_strings() {
+        assert!(parse_range_limit("Y[4.00e0").is_err());
+        assert!(parse_range_limit("Z[4:6]").is_ok());
+    }
 }

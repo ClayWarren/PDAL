@@ -44,6 +44,15 @@
 namespace pdal
 {
 
+class BOX2D;
+class BOX3D;
+
+PDAL_EXPORT std::string box2dToString(const BOX2D& bounds, uint32_t precision);
+PDAL_EXPORT std::string box3dToString(const BOX3D& bounds, uint32_t precision);
+PDAL_EXPORT std::string box2dToWkt(const BOX2D& bounds, uint32_t precision);
+PDAL_EXPORT std::string box3dToWkt(const BOX3D& bounds, uint32_t precision);
+PDAL_EXPORT std::string box2dToGeoJson(const BOX2D& bounds, uint32_t precision);
+
 /**
   BOX2D represents a two-dimensional box with double-precision bounds.
 */
@@ -134,11 +143,7 @@ public:
       \return \c true if the provided box has equal limits to this box,
         \c false otherwise.
     */
-    bool equal(const BOX2D& other) const
-    {
-        return minx == other.minx && maxx == other.maxx && miny == other.miny &&
-               maxy == other.maxy;
-    }
+    bool equal(const BOX2D& other) const;
 
     /**
       Determine if the bounds of this box are the same as that of another
@@ -224,26 +229,7 @@ public:
       \param precision  Precision for output [default: 8]
       \return  String format of this box.
     */
-    std::string toWKT(uint32_t precision = 8) const
-    {
-        if (empty())
-            return std::string();
-
-        Utils::StringStreamClassicLocale oss;
-
-        oss.precision(precision);
-        oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
-
-        oss << "POLYGON ((";
-        oss << minx << " " << miny << ", ";
-        oss << minx << " " << maxy << ", ";
-        oss << maxx << " " << maxy << ", ";
-        oss << maxx << " " << miny << ", ";
-        oss << minx << " " << miny;
-        oss << "))";
-
-        return oss.str();
-    }
+    std::string toWKT(uint32_t precision = 8) const;
 
     /**
       Convert this box to a GeoJSON text string.
@@ -251,19 +237,7 @@ public:
       \param precision  Precision for output [default: 8]
       \return  String format of this box.
     */
-    std::string toGeoJSON(uint32_t precision = 8) const
-    {
-        if (empty())
-            return std::string();
-
-        Utils::StringStreamClassicLocale oss;
-
-        oss.precision(precision);
-        oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
-        oss << "{\"bbox\":[" << minx << ", " << miny << ", " << maxx << ","
-            << maxy << "]}";
-        return oss.str();
-    }
+    std::string toGeoJSON(uint32_t precision = 8) const;
 
     /**
       Return a statically-allocated Bounds extent that represents infinity
@@ -392,10 +366,7 @@ public:
       \return \c true if the provided box has equal limits to this box,
         \c false otherwise.
     */
-    bool equal(const BOX3D& other) const
-    {
-        return BOX2D::equal(other) && minz == other.minz && maxz == other.maxz;
-    }
+    bool equal(const BOX3D& other) const;
 
     /**
       Determine if the bounds of this box are the same as that of another
@@ -487,47 +458,7 @@ public:
       \param precision  Precision for output [default: 8]
       \return  String format of this box.
     */
-    std::string toWKT(uint32_t precision = 8) const
-    {
-        if (empty())
-            return std::string();
-
-        Utils::StringStreamClassicLocale oss;
-
-        oss.precision(precision);
-        oss.setf(std::ios_base::fixed, std::ios_base::floatfield);
-
-        oss << "POLYHEDRON Z ( ";
-
-        oss << "((" << minx << " " << miny << " " << minz << ", " << maxx << " "
-            << miny << " " << minz << ", " << maxx << " " << maxy << " " << minz
-            << ", " << minx << " " << maxy << " " << minz << ", " << minx << " "
-            << miny << " " << minz << ", " << ")), ";
-        oss << "((" << minx << " " << miny << " " << minz << ", " << maxx << " "
-            << miny << " " << minz << ", " << maxx << " " << miny << " " << maxz
-            << ", " << minx << " " << miny << " " << maxz << ", " << minx << " "
-            << miny << " " << minz << ", " << ")), ";
-        oss << "((" << maxx << " " << miny << " " << minz << ", " << maxx << " "
-            << maxy << " " << minz << ", " << maxx << " " << maxy << " " << maxz
-            << ", " << maxx << " " << miny << " " << maxz << ", " << maxx << " "
-            << miny << " " << minz << ", " << ")), ";
-        oss << "((" << maxx << " " << maxy << " " << minz << ", " << minx << " "
-            << maxy << " " << minz << ", " << minx << " " << maxy << " " << maxz
-            << ", " << maxx << " " << maxy << " " << maxz << ", " << maxx << " "
-            << maxy << " " << minz << ", " << ")), ";
-        oss << "((" << minx << " " << maxy << " " << minz << ", " << minx << " "
-            << miny << " " << minz << ", " << minx << " " << miny << " " << maxz
-            << ", " << minx << " " << maxy << " " << maxz << ", " << minx << " "
-            << maxy << " " << minz << ", " << ")), ";
-        oss << "((" << minx << " " << miny << " " << maxz << ", " << maxx << " "
-            << miny << " " << maxz << ", " << maxx << " " << maxy << " " << maxz
-            << ", " << minx << " " << maxy << " " << maxz << ", " << minx << " "
-            << miny << " " << maxz << ", " << "))";
-
-        oss << " )";
-
-        return oss.str();
-    }
+    std::string toWKT(uint32_t precision = 8) const;
 
     /**
       Return a statically-allocated Bounds extent that represents infinity
@@ -595,18 +526,7 @@ private:
 */
 inline std::ostream& operator<<(std::ostream& ostr, const BOX2D& bounds)
 {
-    if (bounds.empty())
-    {
-        ostr << "()";
-        return ostr;
-    }
-    Utils::StringStreamClassicLocale ss;
-    ss.precision(16); // or..?
-    ss << "(";
-    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " << "["
-       << bounds.miny << ", " << bounds.maxy << "]";
-    ss << ")";
-    ostr << ss.str();
+    ostr << box2dToString(bounds, 16);
     return ostr;
 }
 
@@ -618,19 +538,7 @@ inline std::ostream& operator<<(std::ostream& ostr, const BOX2D& bounds)
 */
 inline std::ostream& operator<<(std::ostream& ostr, const BOX3D& bounds)
 {
-    if (bounds.empty())
-    {
-        ostr << "()";
-        return ostr;
-    }
-    Utils::StringStreamClassicLocale ss;
-    ss.precision(16); // or..?
-    ss << "(";
-    ss << "[" << bounds.minx << ", " << bounds.maxx << "], " << "["
-       << bounds.miny << ", " << bounds.maxy << "], " << "[" << bounds.minz
-       << ", " << bounds.maxz << "]";
-    ss << ")";
-    ostr << ss.str();
+    ostr << box3dToString(bounds, 16);
     return ostr;
 }
 

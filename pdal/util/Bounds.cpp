@@ -52,7 +52,86 @@ namespace
 const double LOWEST = (std::numeric_limits<double>::lowest)();
 const double HIGHEST = (std::numeric_limits<double>::max)();
 
+pdal_bounds2d_t toRust(const BOX2D& box)
+{
+    return pdal_bounds2d_t{box.minx, box.maxx, box.miny, box.maxy};
+}
+
+pdal_bounds3d_t toRust(const BOX3D& box)
+{
+    return pdal_bounds3d_t{box.minx, box.maxx, box.miny, box.maxy, box.minz,
+                           box.maxz};
+}
+
+std::string takeRustString(char* value)
+{
+    if (!value)
+        return std::string();
+    std::string out(value);
+    pdal_string_free(value);
+    return out;
+}
+
 } // namespace
+
+bool BOX2D::equal(const BOX2D& other) const
+{
+    pdal_bounds2d_t left = toRust(*this);
+    pdal_bounds2d_t right = toRust(other);
+    return pdal_bounds2d_equal(&left, &right);
+}
+
+bool BOX3D::equal(const BOX3D& other) const
+{
+    pdal_bounds3d_t left = toRust(*this);
+    pdal_bounds3d_t right = toRust(other);
+    return pdal_bounds3d_equal(&left, &right);
+}
+
+std::string box2dToString(const BOX2D& bounds, uint32_t precision)
+{
+    pdal_bounds2d_t rustBounds = toRust(bounds);
+    return takeRustString(pdal_bounds2d_format(&rustBounds, precision));
+}
+
+std::string box3dToString(const BOX3D& bounds, uint32_t precision)
+{
+    pdal_bounds3d_t rustBounds = toRust(bounds);
+    return takeRustString(pdal_bounds3d_format(&rustBounds, precision));
+}
+
+std::string box2dToWkt(const BOX2D& bounds, uint32_t precision)
+{
+    pdal_bounds2d_t rustBounds = toRust(bounds);
+    return takeRustString(pdal_bounds2d_to_wkt(&rustBounds, precision));
+}
+
+std::string box3dToWkt(const BOX3D& bounds, uint32_t precision)
+{
+    pdal_bounds3d_t rustBounds = toRust(bounds);
+    return takeRustString(pdal_bounds3d_to_wkt(&rustBounds, precision));
+}
+
+std::string box2dToGeoJson(const BOX2D& bounds, uint32_t precision)
+{
+    pdal_bounds2d_t rustBounds = toRust(bounds);
+    return takeRustString(pdal_bounds2d_to_geojson(&rustBounds, precision));
+}
+
+std::string BOX2D::toWKT(uint32_t precision) const
+{
+    return box2dToWkt(*this, precision);
+}
+
+std::string BOX2D::toGeoJSON(uint32_t precision) const
+{
+    return box2dToGeoJson(*this, precision);
+}
+
+std::string BOX3D::toWKT(uint32_t precision) const
+{
+    return box3dToWkt(*this, precision);
+}
 
 void BOX2D::clear()
 {
@@ -246,13 +325,37 @@ bool BOX3D::overlaps(const BOX3D& other) const
 
 const BOX2D& BOX2D::getDefaultSpatialExtent()
 {
-    static BOX2D v(LOWEST, LOWEST, HIGHEST, HIGHEST);
+    static BOX2D v;
+    static bool initialized = false;
+    if (!initialized)
+    {
+        pdal_bounds2d_t bounds;
+        pdal_bounds2d_default(&bounds);
+        v.minx = bounds.minx;
+        v.maxx = bounds.maxx;
+        v.miny = bounds.miny;
+        v.maxy = bounds.maxy;
+        initialized = true;
+    }
     return v;
 }
 
 const BOX3D& BOX3D::getDefaultSpatialExtent()
 {
-    static BOX3D v(LOWEST, LOWEST, LOWEST, HIGHEST, HIGHEST, HIGHEST);
+    static BOX3D v;
+    static bool initialized = false;
+    if (!initialized)
+    {
+        pdal_bounds3d_t bounds;
+        pdal_bounds3d_default(&bounds);
+        v.minx = bounds.minx;
+        v.maxx = bounds.maxx;
+        v.miny = bounds.miny;
+        v.maxy = bounds.maxy;
+        v.minz = bounds.minz;
+        v.maxz = bounds.maxz;
+        initialized = true;
+    }
     return v;
 }
 

@@ -35,90 +35,30 @@
 #include "DimRange.hpp"
 
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 
 std::string::size_type DimRange::subParse(const std::string& r)
 {
-    bool& ilb(m_inclusive_lower_bound);
-    bool& iub(m_inclusive_upper_bound);
-    bool& negate(m_negate);
-    double& ub(m_upper_bound);
-    double& lb(m_lower_bound);
-    std::string& name(m_name);
-
-    std::string::size_type pos, count;
-    std::streampos start;
-
-    ilb = true;
-    iub = true;
-    negate = false;
-    pos = 0;
-    // Skip leading whitespace.
-    count = Utils::extractSpaces(r, pos);
-    pos += count;
-
-    count = Dimension::extractName(r, pos);
-    if (count == 0)
-        throw error("No dimension name.");
-    name = r.substr(pos, count);
-    pos += count;
-
-    if (r[pos] == '!')
+    char* dimName = nullptr;
+    uint64_t consumed = 0;
+    char* error = pdal_range_limit_parse(
+        r.c_str(), &dimName, &m_lower_bound, &m_upper_bound,
+        &m_inclusive_lower_bound, &m_inclusive_upper_bound, &m_negate, &consumed);
+    if (error)
     {
-        negate = true;
-        pos++;
+        std::string message(error);
+        pdal_string_free(error);
+        throw DimRange::error(message);
     }
 
-    if (r[pos] == '(')
-        ilb = false;
-    else if (r[pos] != '[')
-        throw error("Missing '(' or '['.");
-    pos++;
+    m_name = dimName ? dimName : "";
+    if (dimName)
+        pdal_string_free(dimName);
 
-    // Extract lower bound.
-    Utils::StringStreamClassicLocale ss(r.data() + pos);
-    start = ss.tellg();
-    ss >> lb;
-    if (ss.fail())
-        lb = std::numeric_limits<double>::lowest();
-    else if (ss.eof())
-        throw error("Missing ':' limit separator.");
-    else
-        pos += (ss.tellg() - start);
-
-    count = Utils::extractSpaces(r, pos);
-    pos += count;
-
-    if (r[pos] != ':')
-        throw error("Missing ':' limit separator.");
-    pos++;
-
-    // Extract upper bound.
-    ss.str(r.data() + pos);
-    ss.clear();
-    start = ss.tellg();
-    ss >> ub;
-    if (ss.fail())
-        ub = (std::numeric_limits<double>::max)();
-    else if (ss.eof())
-        throw error("Missing ')' or ']'.");
-    else
-        pos += (ss.tellg() - start);
-
-    count = Utils::extractSpaces(r, pos);
-    pos += count;
-
-    if (r[pos] == ')')
-        iub = false;
-    else if (r[pos] != ']')
-        throw error("Missing ')' or ']'.");
-    pos++;
-
-    count = Utils::extractSpaces(r, pos);
-    pos += count;
-    return pos;
+    return consumed;
 }
 
 bool DimRange::valuePasses(double v) const

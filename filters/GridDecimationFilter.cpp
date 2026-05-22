@@ -51,6 +51,7 @@
 extern "C" {
     uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
     void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
+    char* pdal_grid_decimation_validate(double resolution, const char* output_type);
 }
 
 namespace pdal
@@ -96,15 +97,25 @@ void GridDecimationFilter::prepared(PointTableRef table)
         if (!status)
             throwError(status.what());
     }
+
+    if (char* error = pdal_grid_decimation_validate(m_args->m_edgeLength,
+                                                    m_args->m_methodKeep.c_str()))
+    {
+        std::string message(error);
+        pdal_string_free(error);
+        throwError(message);
+    }
 }
 
 void GridDecimationFilter::ready(PointTableRef table)
 {
-    if (m_args->m_edgeLength <= 0)
-        throwError("resolution must be positive.");
-
-    if (m_args->m_methodKeep != "max" && m_args->m_methodKeep != "min")
-        throwError("The output_type must be 'max' or 'min'.");
+    if (char* error = pdal_grid_decimation_validate(m_args->m_edgeLength,
+                                                    m_args->m_methodKeep.c_str()))
+    {
+        std::string message(error);
+        pdal_string_free(error);
+        throwError(message);
+    }
 }
 
 void GridDecimationFilter::processOne(BOX2D bounds, PointRef& point,

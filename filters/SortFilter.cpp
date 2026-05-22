@@ -58,11 +58,9 @@ void SortFilter::addArgs(ProgramArgs& args)
 
     args.addSynonym("dimensions", "dimension");
 
-    args.add("order", "Sort order ASC(ending) or DESC(ending)", m_order,
-             SortOrder::ASC);
+    args.add("order", "Sort order ASC(ending) or DESC(ending)", m_order);
 
-    args.add("algorithm", "NORMAL (default) or STABLE", m_algorithm,
-             SortAlgorithm::Normal);
+    args.add("algorithm", "NORMAL (default) or STABLE", m_algorithm);
 }
 
 void SortFilter::prepared(PointTableRef table)
@@ -83,9 +81,8 @@ void SortFilter::prepared(PointTableRef table)
     std::vector<const char*> dims;
     for (const auto& s : m_dimNames)
         dims.push_back(s.c_str());
-    const char* orderStr = (m_order == SortOrder::DESC) ? "desc" : "asc";
-    const char* algStr =
-        (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
+    const char* orderStr = m_order.c_str();
+    const char* algStr = m_algorithm.c_str();
 
     pdal_stage_t* stage =
         pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);
@@ -100,9 +97,8 @@ void SortFilter::filter(PointView& view)
     for (const auto& s : m_dimNames)
         dims.push_back(s.c_str());
 
-    const char* orderStr = (m_order == SortOrder::DESC) ? "desc" : "asc";
-    const char* algStr =
-        (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
+    const char* orderStr = m_order.c_str();
+    const char* algStr = m_algorithm.c_str();
 
     pdal_stage_t* stage =
         pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);

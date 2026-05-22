@@ -47,9 +47,15 @@ using namespace pdal;
 
 TEST(GridDecimationFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.gridDecimation"));
-    EXPECT_TRUE(filter);
+    Options ops;
+    ops.add("resolution", 1.0);
+    ops.add("output_type", "max");
+
+    GridDecimationFilter filter;
+    filter.setOptions(ops);
+
+    PointTable table;
+    filter.prepare(table);
 }
 
 // to be coherent with the grid decimation algorithm

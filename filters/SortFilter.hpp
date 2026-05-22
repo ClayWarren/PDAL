@@ -70,8 +70,8 @@ private:
     Dimension::IdList m_dims;
 
     // Sort order.
-    SortOrder m_order;
-    SortAlgorithm m_algorithm;
+    std::string m_order{"asc"};
+    std::string m_algorithm{"normal"};
 
     void addArgs(ProgramArgs& args) override;
     void prepared(PointTableRef table) override;
