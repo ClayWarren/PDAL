@@ -21,13 +21,13 @@ Status definitions:
 |---|---|---|
 | Rust core point model | in progress | `PointLayout`, `PointView`, dimension IDs/types, source indices, per-view SRS text, mesh faces, and 2D/3D bounds exist. Continue expanding only for real stage/I/O/command needs. |
 | Rust stage model | in progress | Filter and streamable traits exist. Multi-input `run()` behavior is present and `filters.merge` handles DAG inputs without redundant points. |
-| Rust pipeline graph | in progress | Reader/filter/writer DAG execution, tags, dependencies, metadata aggregation, summaries, and error propagation exist. Not a full C++ `PipelineManager` replacement. |
+| Rust pipeline graph | in progress | Reader/filter/writer DAG execution, tags, dependencies, `where`/`where_merge` splitting, metadata aggregation, summaries, and error propagation exist. Not a full C++ `PipelineManager` replacement. |
 | Options | in progress | String-keyed typed getters match the current Rust option flow. Full C++ `Options` parity is not claimed. |
 | Metadata | in progress | Typed scalar metadata trees and JSON serialization exist. C++ descriptions, arrays/list kind preservation, JSON/base64 typed nodes, and full pipeline serialization remain incomplete. |
 | Spatial reference | prototype | Text plus coordinate epoch are stored and exported. No full GDAL/PROJ-backed normalization, reprojection, authority lookup, WKT conversion, axis ordering, or unit handling yet. |
 | Spatial index | in progress | Exact brute-force neighbor queries sit behind a replaceable API. Do not bake one-off neighbor searches into new filters. |
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
-| C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
+| C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
 | Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 41 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
@@ -53,7 +53,7 @@ Status definitions:
 | Raster writer | in progress | Raster attachments on Rust point views can write through the Rust C ABI, and `pdal_filters_faceraster_test` now exercises the Rust-backed `writers.raster` wrapper. Named/multi-raster behavior is narrow and broader GDAL raster data-type parity remains open. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
-| Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, and optional `tag`/`inputs` work for command readiness. |
+| Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
@@ -153,7 +153,7 @@ port-completion percentage:
 26 built test binaries remain unclassified by the audit script. Of these:
    - 6 are private/specialized C++ algorithms with no Rust-backed count yet (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
    - 14 are infrastructure/utility/tooling tests, not pipeline stages (app_plugin, app, artifact, eval, info cmd, merge cmd, oldpclblock, pipeline_manager, program_arg, support, thread_pool, tile cmd, tindex cmd, vsi)
-   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, where)
+   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, where). `pdal_where_test` now exercises Rust-backed `where` splitting for non-streaming Stage execution, but the binary remains uncounted because it still bundles C++ dynamic test stages and streaming writer paths.
    - 3 are explicitly deferred (copc_remote_reader, copc_writer, ept_addon_writer)
   No easy audit wins remain among the 26 uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous

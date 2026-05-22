@@ -37,6 +37,7 @@
 #include <pdal/PipelineManager.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/Stage.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/ErrorHandler.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/ProgramArgs.hpp>
@@ -61,13 +62,21 @@ void Stage::splitView(const PointViewPtr& view, PointViewPtr& keep,
     const expr::ConditionalExpression* where = whereExpr();
     if (where)
     {
-        PointView* k = keep.get();
-        PointView* s = skip.get();
-        for (PointRef p : *view)
+        pdal_point_view_t* rustView = rust_view_converter::toRust(view);
+        pdal_point_view_t* rustKeep = nullptr;
+        pdal_point_view_t* rustSkip = nullptr;
+        if (!pdal_point_view_split_where(rustView, where->print().c_str(),
+                                         &rustKeep, &rustSkip))
         {
-            PointView* active = where->eval(p) ? k : s;
-            active->appendPoint(*view, p.pointId());
+            pdal_point_view_destroy(rustView);
+            rust_view_converter::throwLastError("Rust where split failed.");
         }
+
+        pdal_point_view_destroy(rustView);
+        rust_view_converter::fromRust(rustKeep, view, *keep);
+        rust_view_converter::fromRust(rustSkip, view, *skip);
+        pdal_point_view_destroy(rustKeep);
+        pdal_point_view_destroy(rustSkip);
     }
     else
         keep = view;

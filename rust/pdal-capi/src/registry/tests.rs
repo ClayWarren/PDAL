@@ -365,6 +365,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.sample" => {
             options.add("radius", 1.0);
         }
+        "filters.straighten" => {
+            options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
+        }
         _ => {}
     }
     options

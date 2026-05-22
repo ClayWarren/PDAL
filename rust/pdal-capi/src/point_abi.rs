@@ -1,4 +1,5 @@
-use crate::error::string_to_c_ptr;
+use crate::error::{set_last_error, string_to_c_ptr};
+use pdal_core::expr::ConditionalExpression;
 use pdal_core::point::{
     fix_dimension_name, pdal_dimension_interpretation_name as core_dimension_interpretation_name,
     pdal_dimension_type_from_base_and_size as core_dimension_type_from_base_and_size,
@@ -770,6 +771,55 @@ pub unsafe extern "C" fn pdal_point_view_set_raster_cell(
         return false;
     }
     raster.set_cell(x as usize, y as usize, value);
+    true
+}
+
+/// Split a point view into points matching and not matching a where expression.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`. `expression` must be a valid, NUL-terminated C
+/// string. `out_keep` and `out_skip` must be valid output pointers and each
+/// returned non-null view must be destroyed with `pdal_point_view_destroy`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_split_where(
+    view: *const PointView,
+    expression: *const c_char,
+    out_keep: *mut *mut PointView,
+    out_skip: *mut *mut PointView,
+) -> bool {
+    if view.is_null() || expression.is_null() || out_keep.is_null() || out_skip.is_null() {
+        set_last_error("null argument to pdal_point_view_split_where");
+        return false;
+    }
+
+    let input = &*view;
+    let expression = CStr::from_ptr(expression).to_string_lossy();
+    let mut where_expr = match ConditionalExpression::parse(&expression) {
+        Ok(expr) => expr,
+        Err(err) => {
+            set_last_error(format!("Invalid 'where': {err}"));
+            return false;
+        }
+    };
+    if let Err(err) = where_expr.prepare(input.layout().as_ref()) {
+        set_last_error(format!("Invalid 'where': {err}"));
+        return false;
+    }
+
+    let mut keep = input.make_new();
+    let mut skip = input.make_new();
+    for idx in 0..input.len() {
+        if where_expr.eval(input, idx) {
+            keep.append_point(input, idx);
+        } else {
+            skip.append_point(input, idx);
+        }
+    }
+
+    *out_keep = Box::into_raw(Box::new(keep));
+    *out_skip = Box::into_raw(Box::new(skip));
     true
 }
 

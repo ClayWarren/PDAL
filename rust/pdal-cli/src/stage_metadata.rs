@@ -454,6 +454,19 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Comma-separated dimensions used to identify adjacent duplicates.",
             Some(json!("X,Y,Z")),
         )],
+        "filters.lloydkmeans" => vec![
+            option("k", "Number of clusters to segment.", Some(json!(10))),
+            option(
+                "dimensions",
+                "Comma-separated dimensions used for clustering.",
+                Some(json!("X,Y,Z")),
+            ),
+            option(
+                "maxiters",
+                "Maximum number of Lloyd iterations.",
+                Some(json!(10)),
+            ),
+        ],
         "filters.locate" => vec![
             option("dimension", "Dimension to inspect.", None),
             option("minmax", "Select the min or max point.", Some(json!("max"))),
@@ -552,6 +565,30 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Number of nearest neighbors to inspect.",
             Some(json!(8)),
         )],
+        "filters.relaxationdartthrowing" => vec![
+            option(
+                "decay",
+                "Radius decay rate after each pass.",
+                Some(json!(0.9)),
+            ),
+            option("radius", "Initial exclusion radius.", Some(json!(1.0))),
+            option(
+                "terminal_radius",
+                "Smallest exclusion radius before termination.",
+                Some(json!(0.001)),
+            ),
+            option(
+                "count",
+                "Target number of output points.",
+                Some(json!(1000)),
+            ),
+            option(
+                "shuffle",
+                "Shuffle points before sampling.",
+                Some(json!(true)),
+            ),
+            option("seed", "Optional deterministic shuffle seed.", None),
+        ],
         "filters.reprojection" => vec![
             option("out_srs", "Spatial reference for output data.", None),
             option("in_srs", "Override spatial reference for input data.", None),
@@ -620,6 +657,23 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "algorithm",
                 "Sort algorithm: normal or stable.",
                 Some(json!("normal")),
+            ),
+        ],
+        "filters.straighten" => vec![
+            option(
+                "polyline",
+                "Track polyline as LINESTRING ZM, with M as roll in radians.",
+                None,
+            ),
+            option(
+                "reverse",
+                "Map from straightened coordinates back to world coordinates.",
+                Some(json!(false)),
+            ),
+            option(
+                "offset",
+                "Global offset for the straightened X coordinate.",
+                Some(json!(0.0)),
             ),
         ],
         "filters.stats" => vec![

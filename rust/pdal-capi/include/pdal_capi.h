@@ -139,8 +139,8 @@ extern "C"
     bool
     pdal_deflate_decompressor_finish(pdal_deflate_decompressor_t* decompressor,
                                      uint8_t** out_buf, size_t* out_len);
-    void
-    pdal_deflate_decompressor_destroy(pdal_deflate_decompressor_t* decompressor);
+    void pdal_deflate_decompressor_destroy(
+        pdal_deflate_decompressor_t* decompressor);
 
     typedef struct
     {
@@ -194,10 +194,12 @@ extern "C"
         uint64_t max_points, double tolerance, bool is_3d,
         uint64_t** out_cluster_sizes, uint64_t* out_cluster_count,
         uint64_t** out_point_ids, uint64_t* out_point_count);
-    void pdal_segmentation_segment_returns(
-        const uint8_t* return_number, const uint8_t* number_of_returns,
-        size_t count, bool want_first, bool want_intermediate, bool want_last,
-        bool want_only, uint8_t* out_to_first);
+    void pdal_segmentation_segment_returns(const uint8_t* return_number,
+                                           const uint8_t* number_of_returns,
+                                           size_t count, bool want_first,
+                                           bool want_intermediate,
+                                           bool want_last, bool want_only,
+                                           uint8_t* out_to_first);
 
     // OGRSpec
     char* pdal_ogr_spec_parse_json(const char* input);
@@ -289,10 +291,14 @@ extern "C"
                              const pdal_bounds3d_t* right);
     void pdal_bounds2d_default(pdal_bounds2d_t* out_bounds);
     void pdal_bounds3d_default(pdal_bounds3d_t* out_bounds);
-    char* pdal_bounds2d_format(const pdal_bounds2d_t* bounds, uint32_t precision);
-    char* pdal_bounds3d_format(const pdal_bounds3d_t* bounds, uint32_t precision);
-    char* pdal_bounds2d_to_wkt(const pdal_bounds2d_t* bounds, uint32_t precision);
-    char* pdal_bounds3d_to_wkt(const pdal_bounds3d_t* bounds, uint32_t precision);
+    char* pdal_bounds2d_format(const pdal_bounds2d_t* bounds,
+                               uint32_t precision);
+    char* pdal_bounds3d_format(const pdal_bounds3d_t* bounds,
+                               uint32_t precision);
+    char* pdal_bounds2d_to_wkt(const pdal_bounds2d_t* bounds,
+                               uint32_t precision);
+    char* pdal_bounds3d_to_wkt(const pdal_bounds3d_t* bounds,
+                               uint32_t precision);
     char* pdal_bounds2d_to_geojson(const pdal_bounds2d_t* bounds,
                                    uint32_t precision);
 
@@ -381,6 +387,10 @@ extern "C"
     void pdal_spatial_results_free(pdal_spatial_result_t* ptr, uint64_t len);
     char*
     pdal_point_view_dimension_summaries_json(const pdal_point_view_t* view);
+    bool pdal_point_view_split_where(const pdal_point_view_t* view,
+                                     const char* expression,
+                                     pdal_point_view_t** out_keep,
+                                     pdal_point_view_t** out_skip);
     void pdal_point_view_destroy(pdal_point_view_t* view);
 
     // QuadIndex
@@ -562,8 +572,7 @@ extern "C"
     pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage,
                                       pdal_point_view_t* input);
     pdal_point_view_t*
-    pdal_stage_run_with_reference(pdal_stage_t* stage,
-                                  pdal_point_view_t* input,
+    pdal_stage_run_with_reference(pdal_stage_t* stage, pdal_point_view_t* input,
                                   pdal_point_view_t* reference);
     uint64_t pdal_stage_run_multi(pdal_stage_t* stage, pdal_point_view_t* input,
                                   pdal_point_view_t** outputs,
@@ -590,7 +599,8 @@ extern "C"
     pdal_stage_t* pdal_stage_create_transformation(const double* matrix);
     void pdal_stage_transformation_point(pdal_stage_t* stage,
                                          pdal_point_view_t* view, uint64_t idx);
-    char* pdal_transformation_matrix_parse(const char* input, double* out_matrix);
+    char* pdal_transformation_matrix_parse(const char* input,
+                                           double* out_matrix);
     char* pdal_transformation_matrix_format(const double* matrix);
 
     pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
@@ -668,7 +678,8 @@ extern "C"
     pdal_stage_t* pdal_stage_create_straighten(const char* polyline,
                                                bool reverse, double offset);
 
-    char* pdal_grid_decimation_validate(double resolution, const char* output_type);
+    char* pdal_grid_decimation_validate(double resolution,
+                                        const char* output_type);
     uint64_t* pdal_grid_decimation_get_kept_indices(
         const pdal_point_view_t* view, double resolution,
         const char* output_type, uint64_t* out_len);
@@ -714,9 +725,10 @@ extern "C"
         const pdal_assign_range_t* assignments, uint64_t assignment_count,
         double radius, bool search_3d, double max_2d_above,
         double max_2d_below);
-    pdal_stage_t* pdal_stage_create_neighborclassifier(
-        const pdal_range_limit_t* domain, uint64_t domain_count, uint64_t k,
-        const char* dim_name);
+    pdal_stage_t*
+    pdal_stage_create_neighborclassifier(const pdal_range_limit_t* domain,
+                                         uint64_t domain_count, uint64_t k,
+                                         const char* dim_name);
 
     typedef struct
     {
@@ -791,8 +803,11 @@ extern "C"
                                             const char* datasource,
                                             const char* column);
     pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
-    char* pdal_georeference_validate_coordinate_system(const char* coordinate_system);
-    char* pdal_georeference_validate_transform_beam(const pdal_point_layout_t* layout, bool transform_beam);
+    char*
+    pdal_georeference_validate_coordinate_system(const char* coordinate_system);
+    char*
+    pdal_georeference_validate_transform_beam(const pdal_point_layout_t* layout,
+                                              bool transform_beam);
     pdal_stage_t* pdal_stage_create_projpipeline(const char* out_srs,
                                                  const char* coord_op,
                                                  bool reverse);
@@ -891,7 +906,8 @@ extern "C"
         pdal_memoryview_incrementer_t incrementer, void* user_data,
         uint64_t depth, uint64_t rows, uint64_t columns, bool column_major);
     char* pdal_memoryview_shape_parse(const char* input, uint64_t* out_depth,
-                                      uint64_t* out_rows, uint64_t* out_columns);
+                                      uint64_t* out_rows,
+                                      uint64_t* out_columns);
 
     // Stage registry: construct implemented stages from PDAL driver names.
     pdal_reader_t* pdal_create_reader(const char* name,

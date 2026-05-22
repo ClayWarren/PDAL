@@ -77,6 +77,34 @@ impl Streamable for DuplicateFilter {
     }
 }
 
+struct AppendOneFilter;
+
+impl Filter for AppendOneFilter {
+    fn name(&self) -> &str {
+        "filters.appendone"
+    }
+
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        let mut out = input.make_new();
+        for i in 0..input.len() {
+            out.append_point(input, i);
+        }
+        let idx = out.add_point();
+        out.set_f64(idx, &DimId::X, 999.0);
+        Ok(vec![out])
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Streamable for AppendOneFilter {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+        true
+    }
+}
+
 struct ErrorFilter;
 
 impl Filter for ErrorFilter {
@@ -185,6 +213,15 @@ fn make_test_view(count: u64) -> PointView {
     view
 }
 
+fn where_options(expr: &str, merge_mode: Option<&str>) -> Options {
+    let mut options = Options::new();
+    options.add("where", expr);
+    if let Some(mode) = merge_mode {
+        options.add("where_merge", mode);
+    }
+    options
+}
+
 fn make_xyz_view(points: &[(f64, f64, f64)]) -> PointView {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);
@@ -222,6 +259,109 @@ fn test_single_stage_pipeline() {
     let result = pipeline.execute(views).unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].len(), 10);
+}
+
+#[test]
+fn test_where_auto_merges_skips_when_filter_preserves_kept_view_size() {
+    let mut pipeline = Pipeline::new();
+    pipeline.add_stage(
+        "filters.passthrough",
+        Box::new(FilterWrapper::new(PassThroughFilter::new())),
+        where_options("X < 3", None),
+    );
+
+    let result = pipeline
+        .execute(vec![make_xyz_view(&[
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (2.0, 0.0, 0.0),
+            (3.0, 0.0, 0.0),
+            (4.0, 0.0, 0.0),
+        ])])
+        .unwrap();
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].len(), 5);
+}
+
+#[test]
+fn test_where_auto_keeps_skips_separate_when_filter_changes_kept_view_size() {
+    let mut pipeline = Pipeline::new();
+    pipeline.add_stage(
+        "filters.appendone",
+        Box::new(FilterWrapper::new(AppendOneFilter)),
+        where_options("X < 3", None),
+    );
+
+    let result = pipeline
+        .execute(vec![make_xyz_view(&[
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (2.0, 0.0, 0.0),
+            (3.0, 0.0, 0.0),
+            (4.0, 0.0, 0.0),
+        ])])
+        .unwrap();
+
+    assert_eq!(result.len(), 2);
+    assert_eq!(result.iter().map(PointView::len).sum::<u64>(), 6);
+}
+
+#[test]
+fn test_where_merge_modes_match_stage_runner_shape() {
+    let view = make_xyz_view(&[
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (2.0, 0.0, 0.0),
+        (3.0, 0.0, 0.0),
+        (4.0, 0.0, 0.0),
+    ]);
+
+    let mut true_pipeline = Pipeline::new();
+    true_pipeline.add_stage(
+        "filters.duplicate",
+        Box::new(FilterWrapper::new(DuplicateFilter::new())),
+        where_options("X < 3", Some("true")),
+    );
+    let true_result = true_pipeline.execute(vec![view.clone()]).unwrap();
+    assert_eq!(true_result.len(), 2);
+    assert_eq!(true_result.iter().map(PointView::len).sum::<u64>(), 8);
+
+    let mut false_pipeline = Pipeline::new();
+    false_pipeline.add_stage(
+        "filters.duplicate",
+        Box::new(FilterWrapper::new(DuplicateFilter::new())),
+        where_options("X < 3", Some("false")),
+    );
+    let false_result = false_pipeline.execute(vec![view]).unwrap();
+    assert_eq!(false_result.len(), 3);
+    assert_eq!(false_result.iter().map(PointView::len).sum::<u64>(), 8);
+}
+
+#[test]
+fn test_where_filters_writer_inputs() {
+    let mut pipeline = Pipeline::new();
+    let reader = pipeline.add_reader("readers.test", Box::new(TestReader::new(5)), Options::new());
+    let writer = pipeline.add_writer(
+        "writers.test",
+        Box::new(TestWriter::new()),
+        where_options("Z > 2", None),
+    );
+    pipeline.add_dependency(writer, reader).unwrap();
+
+    let result = pipeline.execute(Vec::new()).unwrap();
+    assert!(result.is_empty());
+    let metadata = pipeline.metadata();
+    let writer_meta = metadata.find_child("stage_1").unwrap();
+    assert_eq!(
+        writer_meta
+            .find_child("point_count")
+            .unwrap()
+            .value()
+            .unwrap()
+            .as_u64(),
+        3
+    );
 }
 
 #[test]

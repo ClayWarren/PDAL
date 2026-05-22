@@ -553,3 +553,41 @@ fn point_view_raster_roundtrips_through_c_abi() {
         pdal_point_view_destroy(view);
     }
 }
+
+#[test]
+fn point_view_split_where_partitions_points_through_c_abi() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let x = CString::new("X").unwrap();
+        pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        let view = pdal_point_view_create(layout);
+
+        for value in [0.0, 1.0, 2.0, 3.0, 4.0] {
+            let point = pdal_point_view_add_point(view);
+            pdal_point_view_set_f64(view, point, x.as_ptr(), value);
+        }
+
+        let expression = CString::new("X < 3").unwrap();
+        let mut keep = std::ptr::null_mut();
+        let mut skip = std::ptr::null_mut();
+        assert!(pdal_point_view_split_where(
+            view,
+            expression.as_ptr(),
+            &mut keep,
+            &mut skip
+        ));
+
+        assert_eq!(pdal_point_view_length(keep), 3);
+        assert_eq!(pdal_point_view_length(skip), 2);
+        assert_eq!(pdal_point_view_get_f64(keep, 0, x.as_ptr()), 0.0);
+        assert_eq!(pdal_point_view_get_f64(keep, 2, x.as_ptr()), 2.0);
+        assert_eq!(pdal_point_view_get_f64(skip, 0, x.as_ptr()), 3.0);
+        assert_eq!(pdal_point_view_get_f64(skip, 1, x.as_ptr()), 4.0);
+        assert_eq!(pdal_point_view_source_index(keep, 2), 2);
+        assert_eq!(pdal_point_view_source_index(skip, 0), 3);
+
+        pdal_point_view_destroy(keep);
+        pdal_point_view_destroy(skip);
+        pdal_point_view_destroy(view);
+    }
+}

@@ -44,6 +44,13 @@ pub struct Pipeline {
     tags: HashMap<String, usize>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WhereMergeMode {
+    Auto,
+    True,
+    False,
+}
+
 pub fn generate_stage_tag(stage_name: &str, explicit_tag: &str, existing_tags: &[&str]) -> String {
     if !explicit_tag.is_empty() {
         return explicit_tag.to_string();
@@ -293,7 +300,7 @@ impl Pipeline {
 
                     let output_dims = node.stage.output_dimensions();
                     let prepared_inputs = prepare_filter_inputs(inputs_for_node, &output_dims);
-                    let node_outputs = node.stage.run(&prepared_inputs)?;
+                    let node_outputs = run_stage_with_where(node, prepared_inputs)?;
                     outputs.insert(node_idx, node_outputs);
                 }
                 StageKind::Writer => {
@@ -309,7 +316,8 @@ impl Pipeline {
                         merged
                     };
 
-                    node.stage.write(&inputs_for_node)?;
+                    let writer_inputs = apply_writer_where(node, inputs_for_node)?;
+                    node.stage.write(&writer_inputs)?;
                     outputs.insert(node_idx, Vec::new());
                 }
             }
@@ -371,6 +379,114 @@ impl Pipeline {
 
     pub fn stage_mut(&mut self, idx: usize) -> Option<&mut StageNode> {
         self.nodes.get_mut(idx)
+    }
+}
+
+fn run_stage_with_where(
+    node: &mut StageNode,
+    inputs: Vec<PointView>,
+) -> Result<Vec<PointView>, StageError> {
+    let where_expr = node.options.get_str("where", "");
+    if where_expr.trim().is_empty() {
+        return node.stage.run(&inputs);
+    }
+    let merge_mode = where_merge_mode(&node.options)?;
+    let mut outputs = Vec::new();
+
+    for input in inputs {
+        let (keeps, skips) = split_where(&input, &where_expr)?;
+        let keep_size = keeps.len();
+        let mut view_outputs = if keep_size == 0 && node.kind == StageKind::Filter {
+            Vec::new()
+        } else {
+            node.stage.run(&[keeps])?
+        };
+        merge_where_skips(&mut view_outputs, skips, keep_size, merge_mode);
+        outputs.extend(view_outputs);
+    }
+
+    Ok(outputs)
+}
+
+fn apply_writer_where(
+    node: &StageNode,
+    inputs: Vec<PointView>,
+) -> Result<Vec<PointView>, StageError> {
+    let where_expr = node.options.get_str("where", "");
+    if where_expr.trim().is_empty() {
+        return Ok(inputs);
+    }
+    let mut outputs = Vec::new();
+    for input in inputs {
+        let (keeps, _) = split_where(&input, &where_expr)?;
+        outputs.push(keeps);
+    }
+    Ok(outputs)
+}
+
+fn split_where(input: &PointView, where_expr: &str) -> Result<(PointView, PointView), StageError> {
+    let mut expr = crate::expr::ConditionalExpression::parse(where_expr)
+        .map_err(|err| StageError(format!("Invalid 'where': {err}")))?;
+    expr.prepare(input.layout().as_ref())
+        .map_err(|err| StageError(format!("Invalid 'where': {err}")))?;
+
+    let mut keeps = input.make_new();
+    let mut skips = input.make_new();
+    for idx in 0..input.len() {
+        if expr.eval(input, idx) {
+            keeps.append_point(input, idx);
+        } else {
+            skips.append_point(input, idx);
+        }
+    }
+    Ok((keeps, skips))
+}
+
+fn merge_where_skips(
+    outputs: &mut Vec<PointView>,
+    skips: PointView,
+    keep_size: u64,
+    merge_mode: WhereMergeMode,
+) {
+    if skips.is_empty() {
+        return;
+    }
+
+    match merge_mode {
+        WhereMergeMode::True => {
+            if let Some(first) = outputs.first_mut() {
+                append_view(first, &skips);
+                return;
+            }
+        }
+        WhereMergeMode::Auto => {
+            if outputs.len() == 1 && outputs[0].len() == keep_size {
+                append_view(&mut outputs[0], &skips);
+                return;
+            }
+        }
+        WhereMergeMode::False => {}
+    }
+
+    outputs.push(skips);
+}
+
+fn append_view(dst: &mut PointView, src: &PointView) {
+    for idx in 0..src.len() {
+        dst.append_point(src, idx);
+    }
+}
+
+fn where_merge_mode(options: &Options) -> Result<WhereMergeMode, StageError> {
+    match options
+        .get_str("where_merge", "auto")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "" | "auto" => Ok(WhereMergeMode::Auto),
+        "true" => Ok(WhereMergeMode::True),
+        "false" => Ok(WhereMergeMode::False),
+        value => Err(StageError(format!("Invalid 'where_merge': {value}"))),
     }
 }
 
