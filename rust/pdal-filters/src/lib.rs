@@ -51,6 +51,7 @@ pub mod radiusassign;
 pub mod randomize;
 pub mod range;
 pub mod reciprocity;
+pub mod relaxation_dart_throwing;
 pub mod reprojection;
 pub mod returns;
 pub mod sample;

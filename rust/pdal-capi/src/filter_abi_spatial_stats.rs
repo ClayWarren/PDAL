@@ -502,6 +502,31 @@ pub extern "C" fn pdal_stage_create_normal(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a relaxation dart-throwing subsampling filter stage.
+///
+/// `count` is the target output point count. When `has_seed` is false the
+/// shuffle is seeded from the wall clock, matching the C++ default.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_relaxationdartthrowing(
+    decay: f64,
+    radius: f64,
+    terminal_radius: f64,
+    count: u64,
+    shuffle: bool,
+    has_seed: bool,
+    seed: u32,
+) -> *mut StageWrapper {
+    let filter = Box::new(RelaxationDartThrowingFilter::new(
+        decay,
+        radius,
+        terminal_radius,
+        count,
+        shuffle,
+        has_seed.then_some(seed),
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
 /// Create an optimal neighborhood filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_optimalneighborhood(

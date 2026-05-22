@@ -42,6 +42,7 @@ use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::reciprocity::ReciprocityFilter;
+use pdal_filters::relaxation_dart_throwing::RelaxationDartThrowingFilter;
 use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
@@ -119,6 +120,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.radialdensity",
     "filters.randomize",
     "filters.reciprocity",
+    "filters.relaxationdartthrowing",
     "filters.reprojection",
     "filters.returns",
     "filters.smrf",
@@ -364,6 +366,20 @@ pub fn create_filter(
         "filters.reciprocity" => Ok(Box::new(FilterWrapper::new(ReciprocityFilter::new(
             get_u64(options, "knn", 8)? as usize,
         )))),
+        "filters.relaxationdartthrowing" => Ok(Box::new(FilterWrapper::new(
+            RelaxationDartThrowingFilter::new(
+                get_f64(options, "decay", 0.9)?,
+                get_f64(options, "radius", 1.0)?,
+                get_f64(options, "terminal_radius", 0.001)?,
+                get_u64(options, "count", 1000)?,
+                get_bool(options, "shuffle", true)?,
+                options
+                    .has("seed")
+                    .then(|| get_u64(options, "seed", 0))
+                    .transpose()?
+                    .map(|s| s as u32),
+            ),
+        ))),
         "filters.reprojection" => Ok(Box::new(FilterWrapper::new(ReprojectionFilter::new(
             &options.get_str("out_srs", ""),
             options.has("in_srs").then(|| options.get_str("in_srs", "")),

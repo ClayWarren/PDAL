@@ -658,6 +658,9 @@ extern "C"
                                            double viewpoint_x,
                                            double viewpoint_y,
                                            double viewpoint_z, bool always_up);
+    pdal_stage_t* pdal_stage_create_relaxationdartthrowing(
+        double decay, double radius, double terminal_radius, uint64_t count,
+        bool shuffle, bool has_seed, uint32_t seed);
 
     char* pdal_grid_decimation_validate(double resolution, const char* output_type);
     uint64_t* pdal_grid_decimation_get_kept_indices(

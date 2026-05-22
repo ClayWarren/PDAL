@@ -51,6 +51,7 @@ use pdal_filters::radiusassign::{RadiusAssignFilter, RadiusAssignment};
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
+use pdal_filters::relaxation_dart_throwing::RelaxationDartThrowingFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;

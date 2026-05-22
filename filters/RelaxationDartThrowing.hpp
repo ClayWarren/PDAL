@@ -38,6 +38,8 @@
 
 #include <string>
 
+struct pdal_stage; // forward declaration for Rust stage
+
 namespace pdal
 {
 
@@ -47,6 +49,7 @@ class PDAL_EXPORT RelaxationDartThrowing : public pdal::Filter
 {
 public:
     RelaxationDartThrowing() : Filter() {}
+    ~RelaxationDartThrowing() override;
     RelaxationDartThrowing& operator=(const RelaxationDartThrowing&) = delete;
     RelaxationDartThrowing(const RelaxationDartThrowing&) = delete;
 
@@ -59,9 +62,13 @@ private:
     point_count_t m_maxSize;
     bool m_shuffle;
     Arg* m_seedArg;
-    unsigned m_seed;
+    unsigned m_seed = 0;
+
+    // Rust stage instance
+    pdal_stage* m_rust_stage = nullptr;
 
     void addArgs(ProgramArgs& args) override;
+    void initialize() override;
     PointViewSet run(PointViewPtr view) override;
 };
 
