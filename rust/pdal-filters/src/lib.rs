@@ -4,6 +4,7 @@ pub mod chipper;
 pub mod cluster;
 pub mod colorinterp;
 pub mod colorization;
+pub mod covariancefeatures;
 pub mod crop;
 pub mod dbscan;
 pub mod decimation;

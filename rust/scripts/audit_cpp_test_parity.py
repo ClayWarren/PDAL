@@ -132,6 +132,7 @@ COVERED: dict[str, object] = {
         "test4",
         "test5",
     },
+    "pdal_filters_covariancefeatures_test": ALL,
     "pdal_filters_additional_merge_test": ALL,
     "pdal_filters_hag_test": {"dem", "dem_clamps", "neighbors", "closest", "delaunay"},
     "pdal_filters_h3_test": {"createStage", "stream_test_2"},

@@ -11,6 +11,7 @@ use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::colorinterp::{pipeline_streamable, validate_prepared, ColorinterpFilter};
 use pdal_filters::colorization::{BandInfo, ColorizationFilter};
+use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
 use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
@@ -1393,6 +1394,45 @@ pub extern "C" fn pdal_stage_create_eigenvalues(
         stride as usize,
         has_radius.then_some(radius),
         min_k as usize,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
+/// Create a covariance-features filter stage.
+///
+/// # Safety
+/// `dims` must be a valid array of `dim_count` NUL-terminated C strings, or
+/// null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_covariancefeatures(
+    knn: u64,
+    has_radius: bool,
+    radius: f64,
+    min_k: u64,
+    stride: u64,
+    mode: u8,
+    optimal: bool,
+    dims: *const *const c_char,
+    dim_count: u64,
+) -> *mut StageWrapper {
+    let mut tokens: Vec<String> = Vec::new();
+    if !dims.is_null() {
+        for i in 0..dim_count as usize {
+            let ptr = *dims.add(i);
+            if !ptr.is_null() {
+                tokens.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+            }
+        }
+    }
+    let feature_set = tokens.join(",");
+    let filter = Box::new(CovarianceFeaturesFilter::new(
+        knn as usize,
+        stride as usize,
+        has_radius.then_some(radius),
+        min_k as usize,
+        CovarianceMode::from_u32(u32::from(mode)),
+        optimal,
+        &feature_set,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

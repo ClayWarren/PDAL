@@ -38,14 +38,12 @@
 
 #include "CovarianceFeaturesFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
-#include <Eigen/Dense>
+#include <pdal_capi.h>
 
-#include <cmath>
-#include <numeric>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -178,199 +176,18 @@ void CovarianceFeaturesFilter::prepared(PointTableRef table)
 
 void CovarianceFeaturesFilter::filter(PointView& view)
 {
-    KD3Index& kdi = view.build3dIndex();
+    std::vector<const char*> dims;
+    for (auto const& feat : m_featureSetString)
+        dims.push_back(feat.c_str());
 
-    point_count_t npoints = view.size();
-    point_count_t chunk_size = npoints / m_threads;
-    if (npoints % m_threads)
-        chunk_size++;
-    std::vector<std::thread> threadList(m_threads);
+    pdal_stage_t* stage = pdal_stage_create_covariancefeatures(
+        m_knn, m_radiusArg->set(), m_radius, m_minK, m_stride,
+        static_cast<uint8_t>(m_mode), m_optimal, dims.data(), dims.size());
+    if (!stage)
+        throwError("Failed to create Rust covariancefeatures stage.");
 
-    log()->get(LogLevel::Debug) << "Processing " << npoints << " points in "
-                                << m_threads << " threads.\n";
-
-    for (int t = 0; t < m_threads; t++)
-    {
-        threadList[t] = std::thread(
-            [&](const PointId start, const PointId end)
-            {
-                for (PointId i = start; i < end; i++)
-                    setDimensionality(view, i, kdi);
-            },
-            t * chunk_size,
-            (t + 1) == m_threads ? npoints : (t + 1) * chunk_size);
-    }
-
-    for (auto& t : threadList)
-        t.join();
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
-void CovarianceFeaturesFilter::setDimensionality(PointView& view,
-                                                 const PointId& id,
-                                                 const KD3Index& kdi)
-{
-    using namespace Eigen;
-
-    PointRef p = view.point(id);
-
-    // find neighbors, either by radius or k nearest neighbors
-    PointIdList ids;
-    if (m_optimal)
-    {
-        ids = kdi.neighbors(p, p.getFieldAs<uint64_t>(Id::OptimalKNN), 1);
-    }
-    else if (m_radiusArg->set())
-    {
-        ids = kdi.radius(p, m_radius);
-        if (ids.size() < (size_t)m_minK)
-        {
-            log()->get(LogLevel::Info)
-                << "Skipping point " << id << ". Found " << ids.size()
-                << " neighbors but required " << m_minK << ".\n";
-            return;
-        }
-    }
-    else
-    {
-        ids = kdi.neighbors(p, m_knn + 1, m_stride);
-    }
-
-    // compute covariance of the neighborhood
-    auto B = math::computeCovariance(view, ids);
-
-    // Check if the covariance matrix is all zeros
-    if (B.isZero())
-    {
-        log()->get(LogLevel::Info)
-            << "Skipping point " << id
-            << ". Covariance matrix is all zeros. This suggests a large number "
-               "of redundant points. Consider using filters.sample with a "
-               "small radius to remove redundant points.\n";
-        return;
-    }
-
-    // perform the eigen decomposition
-    SelfAdjointEigenSolver<Matrix3d> solver(B);
-    if (solver.info() != Success)
-        throwError("Cannot perform eigen decomposition.");
-
-    // Extract eigenvalues and eigenvectors in decreasing order (largest
-    // eigenvalue first)
-    auto ev = solver.eigenvalues();
-    std::vector<double> lambda = {((std::max)(ev[2], 0.0)),
-                                  ((std::max)(ev[1], 0.0)),
-                                  ((std::max)(ev[0], 0.0))};
-    double sum = std::accumulate(lambda.begin(), lambda.end(), 0.0);
-
-    if (lambda[0] == 0)
-        throwError("Eigenvalues are all 0. Can't compute local features.");
-
-    if (m_mode == Mode::SQRT)
-    {
-        // Gressin, Adrien, Clément Mallet, and N. David. "Improving 3d lidar
-        // point cloud registration using optimal neighborhood knowledge."
-        // Proceedings of ISPRS Annals of the Photogrammetry, Remote Sensing
-        // and Spatial Information Sciences, Melbourne, Australia 5.111-116
-        // (2012): 2.
-        std::transform(lambda.begin(), lambda.end(), lambda.begin(),
-                       [](double v) -> double { return std::sqrt(v); });
-    }
-    else if (m_mode == Mode::Normalized)
-    {
-        std::transform(lambda.begin(), lambda.end(), lambda.begin(),
-                       [&sum](double v) -> double { return v / sum; });
-    }
-
-    auto eigenVectors = solver.eigenvectors();
-    std::vector<double> v1(3), v2(3), v3(3);
-    for (int i = 0; i < 3; i++)
-    {
-        v1[i] = eigenVectors.col(2)(i);
-        v2[i] = eigenVectors.col(1)(i);
-        v3[i] = eigenVectors.col(0)(i);
-    }
-
-    for (auto const& dim : m_extraDims)
-    {
-        if (dim == Id::Linearity)
-        {
-            double linearity = (lambda[0] - lambda[1]) / lambda[0];
-            p.setField(Id::Linearity, linearity);
-        }
-
-        if (dim == Id::Planarity)
-        {
-            double planarity = (lambda[1] - lambda[2]) / lambda[0];
-            p.setField(Id::Planarity, planarity);
-        }
-
-        if (dim == Id::Scattering)
-        {
-            double scattering = lambda[2] / lambda[0];
-            p.setField(Id::Scattering, scattering);
-        }
-
-        if (dim == Id::Verticality)
-        {
-            std::vector<double> unary_vector(3);
-            double norm = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                unary_vector[i] = lambda[0] * fabs(v1[i]) +
-                                  lambda[1] * fabs(v2[i]) +
-                                  lambda[2] * fabs(v3[i]);
-                norm += unary_vector[i] * unary_vector[i];
-            }
-            norm = sqrt(norm);
-            p.setField(Id::Verticality, unary_vector[2] / norm);
-        }
-
-        if (dim == Id::Omnivariance)
-        {
-            double omnivariance = std::cbrt(lambda[2] * lambda[1] * lambda[0]);
-            p.setField(Id::Omnivariance, omnivariance);
-        }
-
-        if (dim == Id::EigenvalueSum)
-        {
-            p.setField(Id::EigenvalueSum, sum);
-        }
-
-        if (dim == Id::Eigenentropy)
-        {
-            double eigenentropy = -(lambda[2] * std::log(lambda[2]) +
-                                    lambda[1] * std::log(lambda[1]) +
-                                    lambda[0] * std::log(lambda[0]));
-            p.setField(Id::Eigenentropy, eigenentropy);
-        }
-
-        if (dim == Id::Anisotropy)
-        {
-            double anisotropy = (lambda[0] - lambda[2]) / lambda[0];
-            p.setField(Id::Anisotropy, anisotropy);
-        }
-
-        if (dim == Id::SurfaceVariation)
-        {
-            double surfaceVariation = lambda[2] / sum;
-            p.setField(Id::SurfaceVariation, surfaceVariation);
-        }
-
-        if (dim == Id::DemantkeVerticality)
-        {
-            auto e3 = solver.eigenvectors().col(0);
-            double verticality = 1 - std::fabs(e3[2]);
-            p.setField(Id::DemantkeVerticality, verticality);
-        }
-
-        if (dim == Id::Density)
-        {
-            double kopt = p.getFieldAs<double>(Id::OptimalKNN);
-            double ropt = p.getFieldAs<double>(Id::OptimalRadius);
-            double pi = 3.14159265;
-            p.setField(Id::Density,
-                       (kopt + 1.0) / ((4.0 / 3.0) * pi * std::pow(ropt, 3)));
-        }
-    }
-}
 } // namespace pdal

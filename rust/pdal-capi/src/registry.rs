@@ -14,6 +14,7 @@ use pdal_core::stage::StageError;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
+use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
@@ -89,6 +90,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.approximatecoplanar",
     "filters.chipper",
     "filters.cluster",
+    "filters.covariancefeatures",
     "filters.dbscan",
     "filters.decimation",
     "filters.eigenvalues",
@@ -210,6 +212,20 @@ pub fn create_filter(
             get_f64(options, "tolerance", 1.0)?,
             get_bool(options, "is3d", true)?,
         )))),
+        "filters.covariancefeatures" => Ok(Box::new(FilterWrapper::new(
+            CovarianceFeaturesFilter::new(
+                get_u64(options, "knn", 10)? as usize,
+                get_u64(options, "stride", 1)? as usize,
+                options
+                    .has("radius")
+                    .then(|| get_f64(options, "radius", 0.0))
+                    .transpose()?,
+                get_u64(options, "min_k", 3)? as usize,
+                covariance_mode(&options.get_str("mode", "sqrt")),
+                get_bool(options, "optimized", false)?,
+                &options.get_str("feature_set", "dimensionality"),
+            ),
+        ))),
         "filters.dbscan" => Ok(Box::new(FilterWrapper::new(DbscanFilter::new(
             get_u64(options, "min_points", 6)? as usize,
             get_f64(options, "eps", 1.0)?,
@@ -442,6 +458,14 @@ fn sort_algorithm(value: &str) -> Result<SortAlgorithm, StageError> {
         _ => Err(StageError(format!(
             "filters.sort algorithm must be 'normal' or 'stable', got '{value}'."
         ))),
+    }
+}
+
+fn covariance_mode(value: &str) -> CovarianceMode {
+    match value.to_ascii_lowercase().as_str() {
+        "raw" => CovarianceMode::Raw,
+        "normalized" => CovarianceMode::Normalized,
+        _ => CovarianceMode::Sqrt,
     }
 }
 
