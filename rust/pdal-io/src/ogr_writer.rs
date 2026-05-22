@@ -51,6 +51,7 @@ impl Writer for OgrWriter {
         let features = self.features(views)?;
         let output = json!({
             "type": "FeatureCollection",
+            "name": "points",
             "features": features,
         });
         let text = serde_json::to_string_pretty(&output)

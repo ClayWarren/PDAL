@@ -214,8 +214,8 @@ pub fn create_filter(
             get_f64(options, "tolerance", 1.0)?,
             get_bool(options, "is3d", true)?,
         )))),
-        "filters.covariancefeatures" => Ok(Box::new(FilterWrapper::new(
-            CovarianceFeaturesFilter::new(
+        "filters.covariancefeatures" => {
+            Ok(Box::new(FilterWrapper::new(CovarianceFeaturesFilter::new(
                 get_u64(options, "knn", 10)? as usize,
                 get_u64(options, "stride", 1)? as usize,
                 options
@@ -226,8 +226,8 @@ pub fn create_filter(
                 covariance_mode(&options.get_str("mode", "sqrt")),
                 get_bool(options, "optimized", false)?,
                 &options.get_str("feature_set", "dimensionality"),
-            ),
-        ))),
+            ))))
+        }
         "filters.dbscan" => Ok(Box::new(FilterWrapper::new(DbscanFilter::new(
             get_u64(options, "min_points", 6)? as usize,
             get_f64(options, "eps", 1.0)?,
@@ -465,36 +465,32 @@ fn get_bool(options: &Options, key: &str, default: bool) -> Result<bool, StageEr
 /// Returns an error if the string is not a valid WKT point.
 fn parse_wkt_point(wkt: &str) -> Result<[f64; 3], StageError> {
     let s = wkt.trim();
-    let s = s.strip_prefix("POINT").ok_or_else(|| {
-        StageError(format!(
-            "viewpoint must be a WKT POINT string, got '{wkt}'"
-        ))
-    })?;
+    let s = s
+        .strip_prefix("POINT")
+        .ok_or_else(|| StageError(format!("viewpoint must be a WKT POINT string, got '{wkt}'")))?;
     // Skip optional Z / ZM dimensionality keyword.
     let s = s.trim_start();
     let s = s
-        .strip_prefix("Z")
-        .or_else(|| s.strip_prefix("ZM"))
+        .strip_prefix("ZM")
+        .or_else(|| s.strip_prefix("Z"))
         .or_else(|| s.strip_prefix("M"))
         .map(|s| s.trim_start())
         .unwrap_or(s);
-    let s = s.strip_prefix('(').ok_or_else(|| {
-        StageError(format!(
-            "viewpoint must be a WKT POINT string, got '{wkt}'"
-        ))
-    })?;
-    let s = s.strip_suffix(')').ok_or_else(|| {
-        StageError(format!(
-            "viewpoint must be a WKT POINT string, got '{wkt}'"
-        ))
-    })?;
+    let s = s
+        .strip_prefix('(')
+        .ok_or_else(|| StageError(format!("viewpoint must be a WKT POINT string, got '{wkt}'")))?;
+    let s = s
+        .strip_suffix(')')
+        .ok_or_else(|| StageError(format!("viewpoint must be a WKT POINT string, got '{wkt}'")))?;
     let parts: Vec<f64> = s
         .split_whitespace()
-        .map(|p| p.parse().map_err(|_| {
-            StageError(format!(
-                "viewpoint must be a WKT POINT string with numeric coordinates, got '{wkt}'"
-            ))
-        }))
+        .map(|p| {
+            p.parse().map_err(|_| {
+                StageError(format!(
+                    "viewpoint must be a WKT POINT string with numeric coordinates, got '{wkt}'"
+                ))
+            })
+        })
         .collect::<Result<Vec<f64>, StageError>>()?;
     match parts.len() {
         2 => Ok([parts[0], parts[1], 0.0]),
@@ -508,7 +504,7 @@ fn parse_wkt_point(wkt: &str) -> Result<[f64; 3], StageError> {
 
 fn sort_order(value: &str) -> Result<SortOrder, StageError> {
     match value.to_ascii_lowercase().as_str() {
-        "asc" | "ascending" => Ok(SortOrder::Asc),
+        "" | "asc" | "ascending" => Ok(SortOrder::Asc),
         "desc" | "descending" => Ok(SortOrder::Desc),
         _ => Err(StageError(format!(
             "filters.sort order must be 'asc' or 'desc', got '{value}'."
@@ -518,7 +514,7 @@ fn sort_order(value: &str) -> Result<SortOrder, StageError> {
 
 fn sort_algorithm(value: &str) -> Result<SortAlgorithm, StageError> {
     match value.to_ascii_lowercase().as_str() {
-        "normal" => Ok(SortAlgorithm::Normal),
+        "" | "normal" => Ok(SortAlgorithm::Normal),
         "stable" => Ok(SortAlgorithm::Stable),
         _ => Err(StageError(format!(
             "filters.sort algorithm must be 'normal' or 'stable', got '{value}'."

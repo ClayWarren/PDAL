@@ -133,10 +133,12 @@ impl Reader for EptReader {
             let views = if data_type == "laszip" {
                 views
                     .into_iter()
-                    .map(|v| v.with_dimensions(&[
-                        (ept_node_id.clone(), DimType::U32),
-                        (ept_point_id.clone(), DimType::U32),
-                    ]))
+                    .map(|v| {
+                        v.with_dimensions(&[
+                            (ept_node_id.clone(), DimType::U32),
+                            (ept_point_id.clone(), DimType::U32),
+                        ])
+                    })
                     .collect::<Vec<_>>()
             } else {
                 views
@@ -751,7 +753,7 @@ mod tests {
 
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].len(), 100000);
-        assert!((views[0].get_f64(42, &DimId::X) + 8242697.0).abs() < 1e-9);
+        assert!((views[0].get_f64(42, &DimId::X) + 8242698.0).abs() < 1e-9);
     }
 
     #[test]

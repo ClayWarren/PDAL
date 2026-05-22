@@ -270,6 +270,39 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
             option("is3d", "Use X/Y/Z instead of X/Y.", Some(json!(true))),
         ],
+        "filters.covariancefeatures" => vec![
+            option(
+                "knn",
+                "Number of nearest neighbors to inspect.",
+                Some(json!(10)),
+            ),
+            option(
+                "stride",
+                "Point stride for neighbor selection.",
+                Some(json!(1)),
+            ),
+            option("radius", "Optional radius search distance.", None),
+            option(
+                "min_k",
+                "Minimum neighbors required for radius mode.",
+                Some(json!(3)),
+            ),
+            option(
+                "mode",
+                "Eigenvalue scaling mode: raw, sqrt, or normalized.",
+                Some(json!("sqrt")),
+            ),
+            option(
+                "optimized",
+                "Use per-point optimal neighborhood dimensions.",
+                Some(json!(false)),
+            ),
+            option(
+                "feature_set",
+                "Comma-separated covariance feature set.",
+                Some(json!("dimensionality")),
+            ),
+        ],
         "filters.dbscan" => vec![
             option(
                 "min_points",
@@ -448,6 +481,25 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
         "filters.nndistance" => vec![
             option("knn", "Neighbor rank or count.", Some(json!(8))),
             option("mode", "Distance mode: kth or avg.", Some(json!("kth"))),
+        ],
+        "filters.normal" => vec![
+            option(
+                "knn",
+                "Number of nearest neighbors used to estimate normals.",
+                Some(json!(8)),
+            ),
+            option("radius", "Optional radius search distance.", None),
+            option("viewpoint", "WKT viewpoint used to orient normals.", None),
+            option(
+                "always_up",
+                "Orient normals toward positive Z when no viewpoint is set.",
+                Some(json!(true)),
+            ),
+            option(
+                "refine",
+                "Refine normals using minimum-spanning-tree propagation.",
+                Some(json!(false)),
+            ),
         ],
         "filters.optimalneighborhood" => vec![
             option("min_k", "Minimum neighborhood size.", Some(json!(3))),

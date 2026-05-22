@@ -17,7 +17,12 @@ pub struct NormalFilter {
 }
 
 impl NormalFilter {
-    pub fn new(knn: usize, radius: Option<f64>, viewpoint: Option<[f64; 3]>, always_up: bool) -> Self {
+    pub fn new(
+        knn: usize,
+        radius: Option<f64>,
+        viewpoint: Option<[f64; 3]>,
+        always_up: bool,
+    ) -> Self {
         Self {
             knn,
             radius,
