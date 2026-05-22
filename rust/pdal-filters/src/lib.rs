@@ -8,6 +8,7 @@ pub mod covariancefeatures;
 pub mod crop;
 pub mod dbscan;
 pub mod decimation;
+pub mod delaunay;
 pub mod dem;
 pub mod divider;
 pub mod eigenvalues;

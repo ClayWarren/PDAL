@@ -33,8 +33,9 @@
  ****************************************************************************/
 
 #include "DelaunayFilter.hpp"
-#include "private/delaunator.hpp"
-#include <cstddef> // NULL
+
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -70,21 +71,18 @@ void DelaunayFilter::filter(PointView& pointView)
         return;
     }
 
-    std::vector<double> delaunayPoints;
-    for (PointId i = 0; i < pointView.size(); i++)
+    // Perform the triangulation through the Rust C ABI.
+    pdal_point_view_t* rustIn = rust_view_converter::toRust(pointView);
+    uint64_t triLen = 0;
+    uint64_t* triangles = pdal_delaunay_triangulate(rustIn, &triLen);
+    pdal_point_view_destroy(rustIn);
+
+    if (triangles)
     {
-        delaunayPoints.push_back(
-            pointView.getFieldAs<double>(Dimension::Id::X, i));
-        delaunayPoints.push_back(
-            pointView.getFieldAs<double>(Dimension::Id::Y, i));
+        for (uint64_t i = 0; i + 2 < triLen; i += 3)
+            mesh->add(triangles[i + 2], triangles[i + 1], triangles[i]);
+        pdal_free_u64_array(triangles, triLen);
     }
-
-    // Actually perform the triangulation
-    delaunator::Delaunator triangulation(delaunayPoints);
-
-    for (std::size_t i = 0; i < triangulation.triangles.size(); i += 3)
-        mesh->add(triangulation.triangles[i + 2],
-                  triangulation.triangles[i + 1], triangulation.triangles[i]);
 }
 
 } // namespace pdal
