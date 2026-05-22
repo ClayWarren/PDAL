@@ -55,13 +55,14 @@ use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::tail::TailFilter;
-use pdal_filters::transformation::TransformationFilter;
+use pdal_filters::transformation::{
+    format_transformation_matrix, parse_transformation_matrix, TransformationFilter,
+};
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
 use pdal_filters::voxel_centroid_nearest_neighbor::VoxelCentroidNearestNeighborFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 use pdal_filters::zsmooth::ZsmoothFilter;
-use std::ffi::CStr;
-use std::os::raw::c_char;
+use std::ffi::{c_char, CStr};
 
 #[repr(C)]
 pub struct pdal_box3d_t {
@@ -842,6 +843,46 @@ pub unsafe extern "C" fn pdal_stage_transformation_point(
             xform.transform_point(pt_view, idx);
         }
     }
+}
+
+/// Parse a 4x4 transformation matrix from whitespace-separated text.
+///
+/// # Safety
+///
+/// `out_matrix` must point to at least 16 float64 values when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_transformation_matrix_parse(
+    input: *const c_char,
+    out_matrix: *mut f64,
+) -> *mut c_char {
+    if input.is_null() || out_matrix.is_null() {
+        return string_to_c_ptr("Missing transformation matrix.".to_string());
+    }
+
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_transformation_matrix(&input) {
+        Ok(matrix) => {
+            std::ptr::copy_nonoverlapping(matrix.as_ptr(), out_matrix, 16);
+            std::ptr::null_mut()
+        }
+        Err(err) => string_to_c_ptr(err),
+    }
+}
+
+/// Format a 4x4 transformation matrix for PDAL option streams.
+///
+/// # Safety
+///
+/// `matrix` must point to at least 16 float64 values when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_transformation_matrix_format(matrix: *const f64) -> *mut c_char {
+    if matrix.is_null() {
+        return string_to_c_ptr(String::new());
+    }
+
+    let mut values = [0.0f64; 16];
+    std::ptr::copy_nonoverlapping(matrix, values.as_mut_ptr(), 16);
+    string_to_c_ptr(format_transformation_matrix(&values))
 }
 
 /// Create a voxeldownsize filter stage from options.

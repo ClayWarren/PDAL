@@ -53,6 +53,8 @@ COVERED: dict[str, object] = {
         "case",
         "starts",
         "iequals",
+        "test_random",
+        "test_env",
     },
     "pdal_file_utils_test": {
         "test_toAbsolutePath",
@@ -327,12 +329,18 @@ COVERED: dict[str, object] = {
     },
     "pdal_filters_transformation_test": {
         "create",
+        "init",
+        "TooShort",
+        "TooLong",
+        "init_file_oneline",
+        "init_file_multiline",
         "NoChange",
         "Translation",
         "InvertTranslation",
         "Rotation",
         "InvertRotation",
         "SrsReset",
+        "StreamsTest",
     },
     "pdal_filters_returns_test": ALL,
     "pdal_morton_order_test": ALL,
@@ -393,6 +401,7 @@ COVERED: dict[str, object] = {
     "pdal_io_gltf_writer_test": ALL,
     "pdal_io_memoryview_reader_test": {
         "readsFieldsFromMemory",
+        "rejectsMalformedShape",
         "synthesizesRowMajorShapeCoordinates",
     },
     "pdal_io_faux_test": {

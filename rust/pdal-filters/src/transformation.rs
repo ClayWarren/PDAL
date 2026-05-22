@@ -1,6 +1,50 @@
 use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
+const MATRIX_SIZE: usize = 16;
+const MATRIX_ROW_SIZE: usize = 4;
+const MATRIX_COL_SIZE: usize = 4;
+
+pub fn parse_transformation_matrix(input: &str) -> Result<[f64; 16], String> {
+    let mut values = Vec::new();
+    for token in input.split_whitespace() {
+        let entry: f64 = token.parse().map_err(|_| {
+            format!("Invalid entry in transformation matrix: '{token}'")
+        })?;
+        if values.len() + 1 > MATRIX_SIZE {
+            return Err(format!(
+                "Too many entries in transformation matrix, should be {MATRIX_SIZE}"
+            ));
+        }
+        values.push(entry);
+    }
+
+    if values.len() != MATRIX_SIZE {
+        return Err(format!(
+            "Too few entries in transformation matrix: {} (should be {MATRIX_SIZE})",
+            values.len()
+        ));
+    }
+
+    let mut matrix = [0.0; MATRIX_SIZE];
+    matrix.copy_from_slice(&values);
+    Ok(matrix)
+}
+
+pub fn format_transformation_matrix(matrix: &[f64; 16]) -> String {
+    let mut out = String::new();
+    for row in 0..MATRIX_ROW_SIZE {
+        for col in 0..MATRIX_COL_SIZE {
+            if col != 0 {
+                out.push_str("  ");
+            }
+            out.push_str(&format!("{}", matrix[row * MATRIX_COL_SIZE + col]));
+        }
+        out.push('\n');
+    }
+    out
+}
+
 pub struct TransformationFilter {
     pub matrix: [f64; 16],
 }
@@ -102,6 +146,30 @@ mod tests {
         assert_eq!(out.get_f64(1, &DimId::X), 14.0);
         assert_eq!(out.get_f64(1, &DimId::Y), 30.0);
         assert_eq!(out.get_f64(1, &DimId::Z), 48.0);
+    }
+
+    #[test]
+    fn parses_and_formats_matrix_text() {
+        let input = "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1";
+        let matrix = parse_transformation_matrix(input).unwrap();
+        assert_eq!(matrix[0], 1.0);
+        assert_eq!(matrix[15], 1.0);
+
+        let formatted = format_transformation_matrix(&matrix);
+        let reparsed = parse_transformation_matrix(&formatted).unwrap();
+        assert_eq!(matrix, reparsed);
+    }
+
+    #[test]
+    fn rejects_short_and_long_matrices() {
+        assert!(parse_transformation_matrix("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0")
+            .unwrap_err()
+            .contains("Too few entries"));
+        assert!(parse_transformation_matrix(
+            "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1 0"
+        )
+        .unwrap_err()
+        .contains("Too many entries"));
     }
 
     #[test]

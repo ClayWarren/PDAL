@@ -63,40 +63,22 @@ std::istream& operator>>(std::istream& in,
                          pdal::TransformationFilter::Transform& xform)
 {
     std::string arg(std::istreambuf_iterator<char>(in), {});
-    Utils::StringStreamClassicLocale matrix;
-    matrix.str(arg);
 
-    std::string matrix_str;
+    std::string matrix_str(arg);
     if (pdal::FileUtils::fileExists(arg))
-    {
         matrix_str = pdal::FileUtils::readFileIntoString(arg);
-        matrix.str(matrix_str);
-    }
 
-    matrix.seekg(0);
-
-    double entry;
-
-    size_t i = 0;
-    while (matrix >> entry)
+    double matrix[TransformationFilter::Transform::Size] {};
+    char* error = pdal_transformation_matrix_parse(matrix_str.c_str(), matrix);
+    if (error)
     {
-        if (i + 1 > xform.Size)
-        {
-            std::stringstream msg;
-            msg << "Too many entries in transformation matrix, should be "
-                << xform.Size;
-            throw pdal_error("filters.transformation: " + msg.str());
-        }
-        xform[i++] = entry;
+        std::string message(error);
+        pdal_string_free(error);
+        throw pdal_error("filters.transformation: " + message);
     }
 
-    if (i != xform.Size)
-    {
-        std::stringstream msg;
-        msg << "Too few entries in transformation matrix: " << i
-            << " (should be " << xform.Size << ")";
-        throw pdal_error("filters.transformation: " + msg.str());
-    }
+    for (size_t i = 0; i < xform.Size; ++i)
+        xform[i] = matrix[i];
     in.clear();
 
     return in;
@@ -105,16 +87,13 @@ std::istream& operator>>(std::istream& in,
 std::ostream& operator<<(std::ostream& out,
                          const pdal::TransformationFilter::Transform& xform)
 {
-    for (size_t r = 0; r < xform.RowSize; ++r)
-    {
-        for (size_t c = 0; c < xform.ColSize; ++c)
-        {
-            if (c != 0)
-                out << "  ";
-            out << xform[r * xform.ColSize + c];
-        }
-        out << "\n";
-    }
+    double matrix[TransformationFilter::Transform::Size] {};
+    for (size_t i = 0; i < xform.Size; ++i)
+        matrix[i] = xform[i];
+
+    char* formatted = pdal_transformation_matrix_format(matrix);
+    out << formatted;
+    pdal_string_free(formatted);
     return out;
 }
 

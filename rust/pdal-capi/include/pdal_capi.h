@@ -95,6 +95,11 @@ extern "C"
     char* pdal_file_utils_stem(const char* path);
     char* pdal_file_utils_extension(const char* path);
     bool pdal_file_utils_is_absolute_path(const char* path);
+    char* pdal_utils_getenv(const char* name);
+    int32_t pdal_utils_setenv(const char* name, const char* value);
+    int32_t pdal_utils_unsetenv(const char* name);
+    void pdal_utils_random_seed(uint32_t seed);
+    double pdal_utils_random(double minimum, double maximum);
 
     typedef struct
     {
@@ -516,6 +521,8 @@ extern "C"
     pdal_stage_t* pdal_stage_create_transformation(const double* matrix);
     void pdal_stage_transformation_point(pdal_stage_t* stage,
                                          pdal_point_view_t* view, uint64_t idx);
+    char* pdal_transformation_matrix_parse(const char* input, double* out_matrix);
+    char* pdal_transformation_matrix_format(const double* matrix);
 
     pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_sample(const pdal_options_t* ops);
@@ -753,6 +760,8 @@ extern "C"
         const pdal_memoryview_field_t* fields, uint64_t field_count,
         pdal_memoryview_incrementer_t incrementer, void* user_data,
         uint64_t depth, uint64_t rows, uint64_t columns, bool column_major);
+    char* pdal_memoryview_shape_parse(const char* input, uint64_t* out_depth,
+                                      uint64_t* out_rows, uint64_t* out_columns);
 
     // Stage registry: construct implemented stages from PDAL driver names.
     pdal_reader_t* pdal_create_reader(const char* name,

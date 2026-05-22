@@ -1,4 +1,4 @@
-use crate::error::{clear_last_error, set_last_error};
+use crate::error::{clear_last_error, set_last_error, string_to_c_ptr};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
@@ -373,6 +373,67 @@ pub struct pdal_memoryview_field_t {
     pub name: *const c_char,
     pub type_id: i32,
     pub offset: u64,
+}
+
+fn parse_memoryview_shape(input: &str) -> Result<(u64, u64, u64), String> {
+    let values: Vec<&str> = input.split(',').collect();
+    if values.len() != 3 {
+        return Err(
+            "Shape must be specified as three integers: 'depth, rows, columns'.".to_string(),
+        );
+    }
+
+    fn parse_field(label: &str, value: &str) -> Result<u64, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() || !trimmed.chars().all(|ch| ch.is_ascii_digit()) {
+            return Err(format!("Invalid {label} value in shape: '{trimmed}'."));
+        }
+        trimmed
+            .parse()
+            .map_err(|_| format!("Invalid {label} value in shape: '{trimmed}'."))
+    }
+
+    let depth = parse_field("depth", values[0])?;
+    let rows = parse_field("rows", values[1])?;
+    let columns = parse_field("rows", values[2])?;
+
+    Ok((depth, rows, columns))
+}
+
+/// Parse a memory-view shape option such as `1, 2, 3`.
+///
+/// # Safety
+///
+/// Output pointers must be valid when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_memoryview_shape_parse(
+    input: *const c_char,
+    out_depth: *mut u64,
+    out_rows: *mut u64,
+    out_columns: *mut u64,
+) -> *mut c_char {
+    if input.is_null() {
+        return string_to_c_ptr(
+            "Shape must be specified as three integers: 'depth, rows, columns'.".to_string(),
+        );
+    }
+
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_memoryview_shape(&input) {
+        Ok((depth, rows, columns)) => {
+            if let Some(out_depth) = out_depth.as_mut() {
+                *out_depth = depth;
+            }
+            if let Some(out_rows) = out_rows.as_mut() {
+                *out_rows = rows;
+            }
+            if let Some(out_columns) = out_columns.as_mut() {
+                *out_columns = columns;
+            }
+            std::ptr::null_mut()
+        }
+        Err(err) => string_to_c_ptr(err),
+    }
 }
 
 pub type MemoryViewIncrementer =

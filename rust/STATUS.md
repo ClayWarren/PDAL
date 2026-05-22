@@ -138,13 +138,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `609 / 924` built C++ GoogleTest cases, or `65.91%`, are
+Current checkpoint: `617 / 924` built C++ GoogleTest cases, or `66.77%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route bounds formatting/equality/default-extent, grid-decimation option
-validation, sort order validation, and range-limit parsing through the Rust C
-ABI. The prior `597 / 924` checkpoint matched the earlier 65% target on the
-919-case baseline; five new create/constructor smoke tests expanded the built
-suite to 924 cases. This is
+gains route transformation matrix parse/format, memory-view shape parsing,
+bounds formatting/equality/default-extent, grid-decimation option validation,
+sort order validation, and range-limit parsing through the Rust C ABI. The
+prior `609 / 924` checkpoint added bounds and validation wins; the earlier
+`597 / 924` checkpoint matched the 65% target on the 919-case baseline.
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
 claim was withdrawn because it mixed a hand-maintained numerator with a

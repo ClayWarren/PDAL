@@ -231,26 +231,20 @@ inline std::istream& operator>>(std::istream& in,
                                 MemoryViewReader::Shape& shape)
 {
     std::string s(std::istreambuf_iterator<char>(in), {});
-    StringList values = Utils::split2(s, ',');
-    if (values.size() != 3)
-        throw pdal_error("Shape must be specified as three integers: "
-                         "'depth, rows, columns'.");
-    Utils::trim(values[0]);
-    Utils::trim(values[1]);
-    Utils::trim(values[2]);
 
-    size_t len;
-    size_t depth = std::stol(values[0], &len);
-    if (len != values[0].size())
-        throw pdal_error("Invalid depth value in shape: '" + values[0] + "'.");
-    size_t rows = std::stol(values[1], &len);
-    if (len != values[1].size())
-        throw pdal_error("Invalid rows value in shape: '" + values[1] + "'.");
-    size_t cols = std::stol(values[2], &len);
-    if (len != values[2].size())
-        throw pdal_error("Invalid rows value in shape: '" + values[2] + "'.");
+    uint64_t depth {};
+    uint64_t rows {};
+    uint64_t columns {};
+    char* error =
+        pdal_memoryview_shape_parse(s.c_str(), &depth, &rows, &columns);
+    if (error)
+    {
+        std::string message(error);
+        pdal_string_free(error);
+        throw pdal_error(message);
+    }
 
-    shape = {{depth, rows, cols}};
+    shape = {{depth, rows, columns}};
 
     return in;
 }
