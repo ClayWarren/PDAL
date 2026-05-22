@@ -185,6 +185,25 @@ impl LasReader {
     }
 }
 
+const COPC_SIGNATURE_OFFSET: u64 = 377;
+
+/// Return true when the LAS file at `path` contains a COPC VLR signature.
+pub fn detect_copc(path: &Path) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    if file
+        .seek(SeekFrom::Start(COPC_SIGNATURE_OFFSET))
+        .is_err()
+    {
+        return false;
+    }
+    let mut signature = [0u8; 4];
+    file.read_exact(&mut signature).is_ok() && signature == *b"copc"
+}
+
 impl Reader for LasReader {
     fn name(&self) -> &str {
         "readers.las"
@@ -949,6 +968,7 @@ fn read_pdal_val(reader: &mut dyn std::io::Read, ty: DimType) -> Result<f64, Sta
 mod tests {
     use super::*;
     use pdal_core::options::Options;
+    use std::io::{Seek, SeekFrom, Write};
 
     #[test]
     fn reader_preserves_legacy_synthetic_flag() {
@@ -994,5 +1014,19 @@ mod tests {
             .collect();
         assert!(names.iter().any(|name| name == "Flags0"));
         assert!(names.iter().any(|name| name == "Time"));
+    }
+
+    #[test]
+    fn detect_copc_matches_signature_at_offset_377() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        let mut data = vec![0u8; 381];
+        data[377..381].copy_from_slice(b"copc");
+        file.write_all(&data).unwrap();
+        assert!(detect_copc(file.path()));
+
+        data[377..381].copy_from_slice(b"las ");
+        file.seek(SeekFrom::Start(0)).unwrap();
+        file.write_all(&data).unwrap();
+        assert!(!detect_copc(file.path()));
     }
 }

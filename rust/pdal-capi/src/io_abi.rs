@@ -260,6 +260,19 @@ pub unsafe extern "C" fn pdal_reader_create_las(ops: *const Options) -> *mut Rea
     }
 }
 
+/// Return true when the LAS file at `path` contains a COPC VLR signature.
+///
+/// # Safety
+/// `path` must be a valid null-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_detect_copc(path: *const c_char) -> bool {
+    if path.is_null() {
+        return false;
+    }
+    let path = CStr::from_ptr(path).to_string_lossy();
+    pdal_io::las::detect_copc(Path::new(path.as_ref()))
+}
+
 /// Create a LazReader from options.
 ///
 /// # Safety

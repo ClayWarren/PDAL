@@ -1112,6 +1112,26 @@ fn las_writer_writes_view_through_c_abi() {
 }
 
 #[test]
+fn las_detect_copc_matches_fixture_signature() {
+    unsafe {
+        let copc = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/copc/1.2-with-color.copc.laz"
+        ))
+        .unwrap();
+        assert!(pdal_las_detect_copc(copc.as_ptr()));
+
+        let las = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/synthetic_test.las"
+        ))
+        .unwrap();
+        assert!(!pdal_las_detect_copc(las.as_ptr()));
+        assert!(!pdal_las_detect_copc(std::ptr::null()));
+    }
+}
+
+#[test]
 fn spz_writer_writes_view_through_c_abi() {
     unsafe {
         let mut filename = std::env::temp_dir();

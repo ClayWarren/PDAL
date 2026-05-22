@@ -60,6 +60,7 @@ COVERED: dict[str, object] = {
         "test_env",
         "test_comparators",
         "naninf",
+        "toString",
         "fromString",
         "numeric_cast",
     },
@@ -520,6 +521,7 @@ COVERED: dict[str, object] = {
         "multi_eb",
         "vlr",
         "test_vlr",
+        "Copc",
     },
     "pdal_io_las_writer_test": {
         "srs",

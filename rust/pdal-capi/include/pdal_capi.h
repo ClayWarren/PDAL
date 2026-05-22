@@ -185,6 +185,17 @@ extern "C"
                             const double* quat_a, const double* center_b,
                             const double* half_b, const double* quat_b);
 
+    // Point segmentation
+    bool pdal_segmentation_extract_clusters(
+        const double* xyz, size_t count, uint64_t min_points,
+        uint64_t max_points, double tolerance, bool is_3d,
+        uint64_t** out_cluster_sizes, uint64_t* out_cluster_count,
+        uint64_t** out_point_ids, uint64_t* out_point_count);
+    void pdal_segmentation_segment_returns(
+        const uint8_t* return_number, const uint8_t* number_of_returns,
+        size_t count, bool want_first, bool want_intermediate, bool want_last,
+        bool want_only, uint8_t* out_to_first);
+
     // OGRSpec
     char* pdal_ogr_spec_parse_json(const char* input);
 
@@ -830,6 +841,7 @@ extern "C"
     pdal_reader_t* pdal_reader_create_gdal(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_las(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_laz(const pdal_options_t* ops);
+    bool pdal_las_detect_copc(const char* path);
     pdal_reader_t* pdal_reader_create_spz(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_stac(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_copc(const pdal_options_t* ops);

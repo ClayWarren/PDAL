@@ -375,14 +375,8 @@ void LasReader::initializeLocal(PointTableRef table, MetadataNode& m)
                        ? std::bind(&LasReader::loadPointV14, this, _1, _2, _3)
                        : std::bind(&LasReader::loadPointV10, this, _1, _2, _3);
 
-    // Go peek into header and see if we are COPC
-    // If we over-read the file, the error state will be set, but things are
-    // really fine for a zero-point file, so clear the error.
-    stream.clear();
-    stream.seekg(377);
-    char copcBuf[4]{};
-    stream.read(copcBuf, 4);
-    m.add("copc", ::memcmp(copcBuf, "copc", 4) == 0);
+    // Go peek into header and see if we are COPC.
+    m.add("copc", pdal_las_detect_copc(m_filename.c_str()));
 
     // Read VLRs.
     // Clear the error state since the seek or read above may have failed but
