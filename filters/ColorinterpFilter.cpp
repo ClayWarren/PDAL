@@ -37,6 +37,7 @@
 #include <pdal/PointView.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/private/gdal/Raster.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal_capi.h>
@@ -152,12 +153,26 @@ void ColorinterpFilter::prepared(PointTableRef table)
 {
     PointLayoutPtr layout(table.layout());
     m_layout = layout;
+
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto dim : layout->dims())
+    {
+        pdal_point_layout_register_dim(
+            rustLayout, layout->dimName(dim).c_str(),
+            rust_view_converter::typeId(layout->dimType(dim)));
+    }
+
+    char* error = pdal_colorinterp_validate_prepared(
+        rustLayout, m_interpDimString.c_str(), m_min, m_max);
+    pdal_point_layout_destroy(rustLayout);
+    if (error)
+    {
+        std::string message(error);
+        pdal_string_free(error);
+        throwError(message);
+    }
+
     m_interpDim = layout->findDim(m_interpDimString);
-    if (m_interpDim == Dimension::Id::Unknown)
-        throwError("Dimension '" + m_interpDimString + "' does not exist.");
-    if (!std::isnan(m_min) && !std::isnan(m_max) && m_max <= m_min)
-        throwError("Specified 'minimum' value must be less than "
-                   "'maximum' value.");
 
     if (m_rustStage)
         pdal_stage_destroy(m_rustStage);
@@ -290,7 +305,7 @@ void ColorinterpFilter::filter(PointView& view)
 
 bool ColorinterpFilter::pipelineStreamable() const
 {
-    if (std::isnan(m_min) || std::isnan(m_max))
+    if (!pdal_colorinterp_pipeline_streamable(m_min, m_max))
         return false;
     return Streamable::pipelineStreamable();
 }

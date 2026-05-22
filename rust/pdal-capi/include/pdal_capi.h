@@ -683,6 +683,10 @@ extern "C"
                                                 const char* ramp, double min,
                                                 double max, bool clamp,
                                                 bool invert);
+    char* pdal_colorinterp_validate_prepared(const pdal_point_layout_t* layout,
+                                             const char* dim_name, double min,
+                                             double max);
+    bool pdal_colorinterp_pipeline_streamable(double min, double max);
     pdal_stage_t* pdal_stage_create_colorization(const char* raster_path,
                                                  const pdal_band_info_t* bands,
                                                  uint64_t count);

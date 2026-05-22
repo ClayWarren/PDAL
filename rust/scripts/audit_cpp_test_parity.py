@@ -103,7 +103,15 @@ COVERED: dict[str, object] = {
         "stream",
         "bounds_inside_outside",
     },
-    "pdal_filters_colorinterp_test": {"minmax", "badramp", "autorange", "k", "mad"},
+    "pdal_filters_colorinterp_test": {
+        "minmax",
+        "badramp",
+        "autorange",
+        "k",
+        "mad",
+        "missingz",
+        "cantstream",
+    },
     "pdal_filters_colorization_test": {
         "test1",
         "test2",

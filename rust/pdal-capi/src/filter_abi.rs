@@ -3,11 +3,12 @@ use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
+use pdal_core::point::PointLayout;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
-use pdal_filters::colorinterp::ColorinterpFilter;
+use pdal_filters::colorinterp::{pipeline_streamable, validate_prepared, ColorinterpFilter};
 use pdal_filters::colorization::{BandInfo, ColorizationFilter};
 use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::dbscan::DbscanFilter;
@@ -210,6 +211,35 @@ pub unsafe extern "C" fn pdal_stage_create_colorinterp(
             &dim_name, &ramp, min, max, clamp, invert,
         )),
     }))
+}
+
+/// Validate colorinterp options against a point layout.
+///
+/// # Safety
+///
+/// `layout` must be a valid pointer when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_colorinterp_validate_prepared(
+    layout: *const PointLayout,
+    dim_name: *const c_char,
+    min: f64,
+    max: f64,
+) -> *mut c_char {
+    if layout.is_null() || dim_name.is_null() {
+        return string_to_c_ptr("Missing colorinterp layout.".to_string());
+    }
+
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy();
+    match validate_prepared(&dim_name, min, max, &*layout) {
+        Ok(()) => std::ptr::null_mut(),
+        Err(err) => string_to_c_ptr(err),
+    }
+}
+
+/// Return whether a colorinterp stage can run in streaming mode.
+#[no_mangle]
+pub extern "C" fn pdal_colorinterp_pipeline_streamable(min: f64, max: f64) -> bool {
+    pipeline_streamable(min, max)
 }
 
 #[repr(C)]

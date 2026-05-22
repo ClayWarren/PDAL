@@ -1,8 +1,30 @@
 //! `filters.colorinterp` -- assigns RGB colors based on a dimension and a ramp.
 
 use pdal_core::gdal::{self, Raster};
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
+
+pub fn validate_prepared(
+    dim_name: &str,
+    min: f64,
+    max: f64,
+    layout: &PointLayout,
+) -> Result<(), String> {
+    let dim = DimId::from_name(dim_name);
+    if layout.dim(&dim).is_none() {
+        return Err(format!("Dimension '{dim_name}' does not exist."));
+    }
+    if !min.is_nan() && !max.is_nan() && max <= min {
+        return Err(
+            "Specified 'minimum' value must be less than 'maximum' value.".to_string(),
+        );
+    }
+    Ok(())
+}
+
+pub fn pipeline_streamable(min: f64, max: f64) -> bool {
+    !min.is_nan() && !max.is_nan()
+}
 
 pub struct ColorinterpFilter {
     dim_name: String,
@@ -168,6 +190,26 @@ mod tests {
         assert_eq!(output.get_f64(0, &DimId::Blue), 60.0);
         assert_eq!(output.get_f64(1, &DimId::Red), 10.0);
         filter.reset();
+    }
+
+    #[test]
+    fn rejects_missing_dimension_and_invalid_bounds() {
+        let layout = PointLayout::new();
+        assert!(validate_prepared("Z", 0.0, 0.0, &layout)
+            .unwrap_err()
+            .contains("does not exist"));
+
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Z, pdal_core::point::DimType::F64);
+        assert!(validate_prepared("Z", 1.0, 1.0, &layout)
+            .unwrap_err()
+            .contains("minimum"));
+    }
+
+    #[test]
+    fn requires_finite_bounds_for_streaming() {
+        assert!(!pipeline_streamable(0.0, f64::NAN));
+        assert!(pipeline_streamable(0.0, 1.0));
     }
 
     #[test]
