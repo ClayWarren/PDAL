@@ -441,7 +441,6 @@ void GDALWriter::doneFile()
 bool GDALWriter::useRustWriter() const
 {
     return m_supportsView && m_options.empty() && !m_writePDALMetadata &&
-           !m_overrideSrs.valid() && !m_defaultSrs.valid() &&
            m_dataType == Dimension::Type::Double;
 }
 
@@ -467,6 +466,10 @@ void GDALWriter::writeRustOutput()
     addOption(options, "window_size", m_windowSize);
     if (!m_GDAL_metadata.empty())
         addOption(options, "metadata", m_GDAL_metadata);
+    if (m_overrideSrs.valid())
+        addOption(options, "override_srs", m_overrideSrs.getWKT());
+    if (m_defaultSrs.valid())
+        addOption(options, "default_srs", m_defaultSrs.getWKT());
     if (m_fixedGrid)
     {
         addOption(options, "origin_x", m_bounds.to2d().minx);

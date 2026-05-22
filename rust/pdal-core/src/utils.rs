@@ -141,17 +141,56 @@ pub fn compare_approx(v1: f64, v2: f64, tolerance: f64) -> bool {
     (v1 - v2).abs() <= tolerance.abs()
 }
 
+fn trim_fractional_zeros(value: &mut String) {
+    if !value.contains('.') {
+        return;
+    }
+    while value.ends_with('0') {
+        value.pop();
+    }
+    if value.ends_with('.') {
+        value.pop();
+    }
+}
+
 pub fn format_f64(value: f64, precision: u32) -> String {
     if value.is_nan() {
-        "NaN".to_string()
-    } else if value.is_infinite() {
-        if value.is_sign_negative() {
+        return "NaN".to_string();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_negative() {
             "-Infinity".to_string()
         } else {
             "Infinity".to_string()
-        }
+        };
+    }
+    if value == 0.0 {
+        return "0".to_string();
+    }
+
+    let precision = precision.max(1) as i32;
+    let negative = value.is_sign_negative();
+    let value = value.abs();
+    let order = value.log10().floor() as i32;
+
+    if order >= precision || order < -4 {
+        let prec_usize = precision as usize;
+        let mut s = format!("{value:.prec_usize$e}");
+        trim_fractional_zeros(&mut s);
+        return if negative { format!("-{s}") } else { s };
+    }
+
+    let decimals = (precision - order - 1).max(0) as usize;
+    let mut s = if decimals == 0 {
+        format!("{value:.0}")
     } else {
-        format!("{value:.precision$}")
+        format!("{value:.decimals$}")
+    };
+    trim_fractional_zeros(&mut s);
+    if negative {
+        format!("-{s}")
+    } else {
+        s
     }
 }
 
@@ -463,7 +502,7 @@ mod tests {
         assert_eq!(format_f64(f64::NAN, 10), "NaN");
         assert_eq!(format_f64(f64::INFINITY, 10), "Infinity");
         assert_eq!(format_f64(-f64::INFINITY, 10), "-Infinity");
-        assert_eq!(format_f64(1.2365, 10), "1.2365000000");
+        assert_eq!(format_f64(1.2365, 10), "1.2365");
         assert_eq!(format_i32(12_365_565), "12365565");
     }
 

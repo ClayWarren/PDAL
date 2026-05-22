@@ -154,11 +154,7 @@ PDAL_EXPORT double random(double minimum, double maximum);
   \param v2  Second value to compare.
   \param tolerance  Maximum difference between \ref v1 and \ref v2
 */
-PDAL_EXPORT inline bool compare_approx(double v1, double v2, double tolerance)
-{
-    double diff = std::abs(v1 - v2);
-    return diff <= std::abs(tolerance);
-}
+PDAL_EXPORT bool compare_approx(double v1, double v2, double tolerance);
 
 /**
   Round double value to nearest integral value.
@@ -806,18 +802,8 @@ inline std::string toString(bool from)
   \param from  Value to convert.
   \return  String representation of numeric value.
 */
-inline std::string toString(double from, size_t precision = 10)
-{
-    OStringStreamClassicLocale oss;
-    // Standardize nan/inf output to the JAVA property names because
-    // when we convert to a string, we usually convert to JSON.
-    if (std::isnan(from))
-        return "NaN";
-    if (std::isinf(from))
-        return (from < 0 ? "-Infinity" : "Infinity");
-    oss << std::setprecision(precision) << from;
-    return oss.str();
-}
+PDAL_EXPORT std::string toString(double from, size_t precision = 10);
+
 
 /**
   Convert a float to string with a precision of 10 decimal places.
@@ -882,10 +868,7 @@ inline std::string toString(unsigned int from)
   \param from  Value to convert.
   \return  String representation of numeric value.
 */
-inline std::string toString(int from)
-{
-    return std::to_string(from);
-}
+PDAL_EXPORT std::string toString(int from);
 
 /**
   Convert an unsigned short to string.

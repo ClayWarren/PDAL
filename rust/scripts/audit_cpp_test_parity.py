@@ -68,6 +68,7 @@ COVERED: dict[str, object] = {
     },
     "pdal_georeference_test": ALL,
     "pdal_charbuf_test": ALL,
+    "pdal_deflate_test": ALL,
     "pdal_math_utils_test": ALL,
     "pdal_scaling_test": ALL,
     "pdal_filespec_test": ALL,

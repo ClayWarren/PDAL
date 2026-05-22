@@ -6,6 +6,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod config_abi;
+mod deflate_abi;
 mod driver_abi;
 mod error;
 mod file_spec_abi;
@@ -36,6 +37,7 @@ mod writer_abi;
 mod xml_schema_abi;
 
 pub use config_abi::*;
+pub use deflate_abi::*;
 pub use driver_abi::*;
 pub use error::*;
 pub use file_spec_abi::*;

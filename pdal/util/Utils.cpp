@@ -96,6 +96,41 @@ StringList takeRustStringList(char* value)
 } // unnamed namespace
 #endif
 
+bool Utils::compare_approx(double v1, double v2, double tolerance)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_compare_approx(v1, v2, tolerance);
+#else
+    double diff = std::abs(v1 - v2);
+    return diff <= std::abs(tolerance);
+#endif
+}
+
+std::string Utils::toString(double from, size_t precision)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_to_string_f64(from,
+        static_cast<uint32_t>(precision)));
+#else
+    OStringStreamClassicLocale oss;
+    if (std::isnan(from))
+        return "NaN";
+    if (std::isinf(from))
+        return (from < 0 ? "-Infinity" : "Infinity");
+    oss << std::setprecision(precision) << from;
+    return oss.str();
+#endif
+}
+
+std::string Utils::toString(int from)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return takeRustString(pdal_utils_to_string_i32(from));
+#else
+    return std::to_string(from);
+#endif
+}
+
 void Utils::random_seed(unsigned int seed)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI

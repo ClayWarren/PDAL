@@ -19,6 +19,8 @@ extern "C"
     typedef struct pdal_reader pdal_reader_t;
     typedef struct pdal_writer pdal_writer_t;
     typedef struct pdal_quad_index pdal_quad_index_t;
+    typedef struct pdal_deflate_compressor pdal_deflate_compressor_t;
+    typedef struct pdal_deflate_decompressor pdal_deflate_decompressor_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -112,6 +114,25 @@ extern "C"
     bool pdal_writer_handle_filename_template(const char* filename,
                                               size_t* out_pos);
     char* pdal_writer_replace_tags(const char* filename);
+
+    // Streaming zlib (DEFLATE) compression
+    pdal_deflate_compressor_t* pdal_deflate_compressor_create();
+    bool pdal_deflate_compressor_update(pdal_deflate_compressor_t* compressor,
+                                        const char* buf, size_t len,
+                                        uint8_t** out_buf, size_t* out_len);
+    bool pdal_deflate_compressor_finish(pdal_deflate_compressor_t* compressor,
+                                        uint8_t** out_buf, size_t* out_len);
+    void pdal_deflate_compressor_destroy(pdal_deflate_compressor_t* compressor);
+    pdal_deflate_decompressor_t* pdal_deflate_decompressor_create();
+    bool
+    pdal_deflate_decompressor_update(pdal_deflate_decompressor_t* decompressor,
+                                     const char* buf, size_t len,
+                                     uint8_t** out_buf, size_t* out_len);
+    bool
+    pdal_deflate_decompressor_finish(pdal_deflate_decompressor_t* decompressor,
+                                     uint8_t** out_buf, size_t* out_len);
+    void
+    pdal_deflate_decompressor_destroy(pdal_deflate_decompressor_t* decompressor);
 
     typedef struct
     {

@@ -33,6 +33,8 @@ pub struct GdalWriter {
     fixed_grid: Option<FixedGrid>,
     fixed_grid_arg_count: usize,
     metadata: Vec<(String, String)>,
+    override_srs: String,
+    default_srs: String,
 }
 
 #[derive(Clone, Copy)]
@@ -80,6 +82,8 @@ impl GdalWriter {
             fixed_grid: fixed_grid(options),
             fixed_grid_arg_count: fixed_grid_arg_count(options),
             metadata: parse_metadata(options),
+            override_srs: options.get_str("override_srs", ""),
+            default_srs: options.get_str("default_srs", ""),
         }
     }
 }
@@ -138,12 +142,7 @@ impl Writer for GdalWriter {
             0.0,
             -self.resolution,
         ];
-        let srs_wkt = views
-            .iter()
-            .map(PointView::spatial_reference)
-            .find(|srs| !srs.is_empty())
-            .map(|srs| srs.wkt().to_string())
-            .unwrap_or_default();
+        let srs_wkt = resolve_srs(views, &self.override_srs, &self.default_srs);
 
         pdal_core::gdal::register_drivers();
         let mut raster = pdal_core::gdal::Raster::create_float64(
@@ -536,6 +535,23 @@ fn is_percentile(stat: &OutputStat) -> bool {
     matches!(stat, OutputStat::Percentile(_))
 }
 
+fn resolve_srs(views: &[PointView], override_srs: &str, default_srs: &str) -> String {
+    let mut srs = views
+        .iter()
+        .map(PointView::spatial_reference)
+        .find(|srs| !srs.is_empty())
+        .map(|srs| srs.wkt().to_string())
+        .unwrap_or_default();
+
+    if !override_srs.is_empty() {
+        srs = override_srs.to_string();
+    }
+    if srs.is_empty() && !default_srs.is_empty() {
+        srs = default_srs.to_string();
+    }
+    srs
+}
+
 fn parse_metadata(options: &Options) -> Vec<(String, String)> {
     let spec = options.get_str("metadata", "");
     if spec.is_empty() {
@@ -559,6 +575,30 @@ mod tests {
     use super::*;
     use pdal_core::point::{DimType, PointLayout};
     use std::rc::Rc;
+
+    #[test]
+    fn resolves_writer_srs_overrides() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+        view.set_spatial_reference(pdal_core::srs::SpatialReference::new("EPSG:2030"));
+
+        assert_eq!(
+            resolve_srs(&[view.clone()], "EPSG:4326", ""),
+            "EPSG:4326"
+        );
+        assert_eq!(
+            resolve_srs(&[view.clone()], "", "EPSG:4326"),
+            "EPSG:2030"
+        );
+        assert_eq!(
+            resolve_srs(&[], "", "EPSG:4326"),
+            "EPSG:4326"
+        );
+    }
 
     #[test]
     fn parses_output_types_and_percentiles() {

@@ -6,6 +6,7 @@
 
 pub mod bounds;
 pub mod config;
+pub mod deflate;
 pub mod driver;
 pub mod expr;
 pub mod file_spec;
