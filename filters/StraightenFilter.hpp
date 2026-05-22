@@ -38,12 +38,15 @@
 #include <pdal/pdal_internal.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+struct pdal_stage; // forward declaration for Rust stage
+
 namespace pdal
 {
 class PDAL_EXPORT StraightenFilter : public Filter, public Streamable
 {
 public:
     StraightenFilter();
+    ~StraightenFilter() override;
 
     StraightenFilter& operator=(const StraightenFilter&) = delete;
     StraightenFilter(const StraightenFilter&) = delete;
@@ -53,11 +56,17 @@ public:
 private:
     void addArgs(ProgramArgs& args) override;
     void initialize() override;
+    void prepared(PointTableRef table) override;
+    void ready(PointTableRef table) override;
     bool processOne(PointRef& point) override;
     void filter(PointView& view) override;
 
     struct Args;
     std::unique_ptr<Args> m_args;
+
+    // Rust stage instance
+    pdal_stage* m_rust_stage = nullptr;
+    PointLayoutPtr m_layout;
 };
 
 } // namespace pdal

@@ -52,6 +52,7 @@ use pdal_filters::smrf::SmrfFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats::StatsFilter;
+use pdal_filters::straighten::StraightenFilter;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
 use pdal_filters::voxel_centroid_nearest_neighbor::VoxelCentroidNearestNeighborFilter;
@@ -131,6 +132,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.splitter",
     "filters.sort",
     "filters.stats",
+    "filters.straighten",
     "filters.tail",
     "filters.voxelcenternearestneighbor",
     "filters.voxelcentroidnearestneighbor",
@@ -437,6 +439,16 @@ pub fn create_filter(
             sort_order(&options.get_str("order", "asc"))?,
             sort_algorithm(&options.get_str("algorithm", "normal"))?,
         )))),
+        "filters.straighten" => Ok(Box::new(FilterWrapper::new(
+            StraightenFilter::new(
+                &options.get_str("polyline", ""),
+                get_bool(options, "reverse", false)?,
+                get_f64(options, "offset", 0.0)?,
+            )
+            .ok_or_else(|| {
+                StageError("Invalid polyline specification in option 'polyline'.".to_string())
+            })?,
+        ))),
         "filters.stats" => Ok(Box::new(FilterWrapper::new(StatsFilter::from_options(
             options,
         )))),

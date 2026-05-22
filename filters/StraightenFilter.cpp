@@ -33,10 +33,11 @@
  ****************************************************************************/
 
 #include "StraightenFilter.hpp"
-#include "private/straighten/Polyline.hpp"
-#include "private/straighten/Utils.hpp"
 
-#include <pdal/pdal_internal.hpp>
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal/util/ProgramArgs.hpp>
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -48,8 +49,7 @@ CREATE_STATIC_STAGE(StraightenFilter, s_info)
 
 struct StraightenFilter::Args
 {
-public:
-    straighten::Polyline m_polyline;
+    std::string m_polyline;
     bool m_unstraighten;
     double m_offset;
 };
@@ -57,6 +57,12 @@ public:
 StraightenFilter::StraightenFilter()
     : Filter(), Streamable(), m_args(new StraightenFilter::Args)
 {
+}
+
+StraightenFilter::~StraightenFilter()
+{
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
 }
 
 std::string StraightenFilter::getName() const
@@ -69,9 +75,7 @@ void StraightenFilter::addArgs(ProgramArgs& args)
     args.add("polyline",
              "Track polyline to straigthen, LineStringZM, with m value is roll "
              "in radians",
-             m_args->m_polyline)
-        .setErrorText("Invalid polyline specification. "
-                      "Must be valid GeoJSON/WKT");
+             m_args->m_polyline);
     args.add("reverse", "Set to true if you the to unstraighten.",
              m_args->m_unstraighten, false);
     args.add("offset",
@@ -81,73 +85,42 @@ void StraightenFilter::addArgs(ProgramArgs& args)
 
 void StraightenFilter::initialize()
 {
-    if (!m_args->m_polyline.valid())
-        throwError("Geometrically invalid polygon in option 'polyline'.");
+    // The straightening transform runs through the Rust C ABI; a null stage
+    // means the polyline could not be parsed as a LINESTRING ZM.
+    if (m_rust_stage)
+        pdal_stage_destroy(m_rust_stage);
+
+    m_rust_stage = pdal_stage_create_straighten(
+        m_args->m_polyline.c_str(), m_args->m_unstraighten, m_args->m_offset);
+    if (!m_rust_stage)
+        throwError("Geometrically invalid polyline in option 'polyline'.");
+}
+
+void StraightenFilter::prepared(PointTableRef table)
+{
+    m_layout = table.layout();
+}
+
+void StraightenFilter::ready(PointTableRef)
+{
+    if (m_rust_stage)
+        pdal_stage_reset(m_rust_stage);
 }
 
 bool StraightenFilter::processOne(PointRef& point)
 {
-
-    double segmentX, segmentY, segmentZ, segmentM, segmentAzimuth,
-        segmentOffset;
-    if (m_args->m_unstraighten)
-    {
-        m_args->m_polyline.interpolate(point, segmentX, segmentY, segmentZ,
-                                       segmentM, segmentAzimuth, segmentOffset);
-
-        const Eigen::Vector3d straight(
-            0.0, point.getFieldAs<double>(Dimension::Id::Y),
-            point.getFieldAs<double>(Dimension::Id::Z));
-
-        Eigen::Affine3d t;
-        straighten::Utils::getTransformation(segmentX, segmentY, segmentZ,
-                                             segmentM, 0.0,
-                                             M_PI_2 - segmentAzimuth, t);
-
-        const Eigen::Vector3d world = t * straight;
-
-        point.setField(Dimension::Id::X, world.x());
-        point.setField(Dimension::Id::Y, world.y());
-        point.setField(Dimension::Id::Z, world.z());
-        return true;
-    }
-    else
-    {
-
-        if (m_args->m_polyline.closestSegment(
-                point, segmentX, segmentY, segmentZ, segmentM, segmentAzimuth,
-                segmentOffset) >= 0.0)
-        {
-            const Eigen::Vector3d world(
-                point.getFieldAs<double>(Dimension::Id::X),
-                point.getFieldAs<double>(Dimension::Id::Y),
-                point.getFieldAs<double>(Dimension::Id::Z));
-
-            Eigen::Affine3d t;
-            straighten::Utils::getTransformation(segmentX, segmentY, segmentZ,
-                                                 segmentM, 0.0,
-                                                 M_PI_2 - segmentAzimuth, t);
-
-            const Eigen::Vector3d straight = t.inverse() * world;
-
-            point.setField(Dimension::Id::X,
-                           straight.x() + segmentOffset + m_args->m_offset);
-            point.setField(Dimension::Id::Y, straight.y());
-            point.setField(Dimension::Id::Z, straight.z());
-            return true;
-        }
-    }
-    return false;
+    pdal_point_view_t* rustPoint =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool keep = pdal_stage_process_one_at(m_rust_stage, rustPoint, 0);
+    if (keep)
+        rust_view_converter::fromRustPoint(rustPoint, 0, point);
+    pdal_point_view_destroy(rustPoint);
+    return keep;
 }
 
 void StraightenFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        point.setPointId(idx);
-        processOne(point);
-    }
+    rust_view_converter::runInPlace(m_rust_stage, view);
     view.invalidateProducts();
 }
 

@@ -65,6 +65,7 @@ pub mod sort;
 pub mod sparse_surface;
 pub mod splitter;
 pub mod stats;
+pub mod straighten;
 pub mod tail;
 pub mod transformation;
 pub mod voxel_center_nearest_neighbor;

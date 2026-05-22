@@ -527,6 +527,32 @@ pub extern "C" fn pdal_stage_create_relaxationdartthrowing(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a straighten filter stage.
+///
+/// Returns null when the polyline WKT cannot be parsed as a `LINESTRING ZM`.
+///
+/// # Safety
+///
+/// `polyline` must be a valid NUL-terminated C string when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_straighten(
+    polyline: *const c_char,
+    reverse: bool,
+    offset: f64,
+) -> *mut StageWrapper {
+    if polyline.is_null() {
+        return std::ptr::null_mut();
+    }
+    let wkt = CStr::from_ptr(polyline).to_string_lossy();
+    match StraightenFilter::new(&wkt, reverse, offset) {
+        Some(f) => {
+            let filter = Box::new(f);
+            Box::into_raw(Box::new(StageWrapper { filter }))
+        }
+        None => std::ptr::null_mut(),
+    }
+}
+
 /// Create a Lloyd's k-means clustering filter stage.
 ///
 /// # Safety
