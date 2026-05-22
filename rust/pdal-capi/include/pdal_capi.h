@@ -96,6 +96,12 @@ extern "C"
     char* pdal_file_utils_stem(const char* path);
     char* pdal_file_utils_extension(const char* path);
     bool pdal_file_utils_is_absolute_path(const char* path);
+    bool pdal_file_utils_directory_exists(const char* dirname);
+    int32_t pdal_file_utils_create_directory(const char* dirname);
+    int32_t pdal_file_utils_create_directories(const char* path);
+    void pdal_file_utils_delete_directory(const char* dirname);
+    bool pdal_file_utils_delete_file(const char* filename);
+    void pdal_file_utils_rename_file(const char* dest, const char* src);
     char* pdal_utils_getenv(const char* name);
     int32_t pdal_utils_setenv(const char* name, const char* value);
     int32_t pdal_utils_unsetenv(const char* name);

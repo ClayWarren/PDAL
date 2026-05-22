@@ -63,6 +63,8 @@ COVERED: dict[str, object] = {
         "filename",
         "extension",
         "stem",
+        "test_file_ops",
+        "test_file_ops_with_unicode_paths",
     },
     "pdal_georeference_test": ALL,
     "pdal_charbuf_test": ALL,

@@ -211,6 +211,9 @@ std::ostream* openExisting(const std::string& name, bool asBinary)
 
 bool directoryExists(const std::string& dirname)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_file_utils_directory_exists(dirname.c_str());
+#else
     VSIStatBufL sStat;
     if (VSIStatL(dirname.c_str(), &sStat) == 0)
     {
@@ -220,10 +223,25 @@ bool directoryExists(const std::string& dirname)
     {
         return false;
     }
+#endif
 }
 
 bool createDirectory(const std::string& dirname)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    int32_t res = pdal_file_utils_create_directory(dirname.c_str());
+    if (res == 1)
+        return true;
+    else if (res == 0)
+        return false;
+    else
+    {
+        std::stringstream ss;
+        ss << "Unable to create directory " << dirname << '\n'
+           << pdal_last_error();
+        throw std::runtime_error(ss.str());
+    }
+#else
     std::string pth = CPLCleanTrailingSlash(dirname.c_str());
     if (VSIMkdir(pth.c_str(), 0755) != 0)
     {
@@ -239,10 +257,25 @@ bool createDirectory(const std::string& dirname)
     }
     else
         return true;
+#endif
 }
 
 bool createDirectories(const std::string& dirname)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    int32_t res = pdal_file_utils_create_directories(dirname.c_str());
+    if (res == 1)
+        return true;
+    else if (res == 0)
+        return false;
+    else
+    {
+        std::stringstream ss;
+        ss << "Unable to create directories " << dirname << '\n'
+           << pdal_last_error();
+        throw std::runtime_error(ss.str());
+    }
+#else
     std::string pth = CPLCleanTrailingSlash(dirname.c_str());
     if (VSIMkdirRecursive(pth.c_str(), 0755) != 0)
     {
@@ -258,11 +291,16 @@ bool createDirectories(const std::string& dirname)
     }
     else
         return true;
+#endif
 }
 
 void deleteDirectory(const std::string& dirname)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    pdal_file_utils_delete_directory(dirname.c_str());
+#else
     VSIRmdirRecursive(dirname.c_str());
+#endif
 }
 
 std::vector<std::string> directoryList(const std::string& dir)
@@ -295,12 +333,20 @@ void closeFile(std::istream* in)
 
 bool deleteFile(const std::string& file)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_file_utils_delete_file(file.c_str());
+#else
     return (VSIUnlink(file.c_str()) == 0) ? true : false;
+#endif
 }
 
 void renameFile(const std::string& dest, const std::string& src)
 {
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    pdal_file_utils_rename_file(dest.c_str(), src.c_str());
+#else
     VSIRename(src.c_str(), dest.c_str());
+#endif
 }
 
 bool fileExists(const std::string& name)

@@ -365,6 +365,72 @@ pub unsafe extern "C" fn pdal_file_utils_is_absolute_path(path: *const c_char) -
     path.contains("://") || Path::new(&path).is_absolute()
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_directory_exists(dirname: *const c_char) -> bool {
+    let path_str = c_string(dirname);
+    let path = Path::new(&path_str);
+    path.is_dir()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_create_directory(dirname: *const c_char) -> i32 {
+    let path_str = c_string(dirname);
+    let path = Path::new(&path_str);
+    match std::fs::create_dir(path) {
+        Ok(_) => 1,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                0
+            } else {
+                crate::error::set_last_error(e.to_string());
+                -1
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_create_directories(path: *const c_char) -> i32 {
+    let path_str = c_string(path);
+    let path = Path::new(&path_str);
+    if path.is_dir() {
+        return 0;
+    }
+    match std::fs::create_dir_all(path) {
+        Ok(_) => 1,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                0
+            } else {
+                crate::error::set_last_error(e.to_string());
+                -1
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_delete_directory(dirname: *const c_char) {
+    let path_str = c_string(dirname);
+    let path = Path::new(&path_str);
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_delete_file(filename: *const c_char) -> bool {
+    let path_str = c_string(filename);
+    let path = Path::new(&path_str);
+    std::fs::remove_file(path).is_ok()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_rename_file(dest: *const c_char, src: *const c_char) {
+    let dest_str = c_string(dest);
+    let src_str = c_string(src);
+    let _ = std::fs::rename(Path::new(&src_str), Path::new(&dest_str));
+}
+
+
 #[repr(C)]
 pub struct pdal_xyz_t {
     pub x: f64,
