@@ -69,6 +69,16 @@ void ClusterFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Dimension::Id::ClusterID);
 }
 
+void ClusterFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_cluster(m_minPoints, m_maxPoints,
+                                                    m_tolerance, m_is3d);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void ClusterFilter::filter(PointView& view)
 {
     pdal_stage_t* stage = pdal_stage_create_cluster(m_minPoints, m_maxPoints,

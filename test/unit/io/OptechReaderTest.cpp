@@ -65,11 +65,14 @@ public:
 
 TEST(OptechReader, Constructor)
 {
-    OptechReader reader1;
+    OptechReader reader;
+    Options options;
+    options.add("filename", getTestfilePath());
+    reader.setOptions(options);
 
-    StageFactory f;
-    Stage* reader2 = f.createStage("readers.optech");
-    EXPECT_TRUE(reader2);
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.optech");
 }
 
 TEST_F(OptechReaderTest, Header)

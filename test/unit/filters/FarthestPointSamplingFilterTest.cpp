@@ -73,10 +73,14 @@ PointViewPtr run(PointTable& table, PointId inputCount, const Options& opts)
 
 TEST(FarthestPointSamplingFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.fps"));
-    EXPECT_TRUE(filter);
-    EXPECT_EQ(filter->getName(), "filters.fps");
+    FarthestPointSamplingFilter filter;
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.fps");
 }
 
 TEST(FarthestPointSamplingFilterTest, samples_to_count)

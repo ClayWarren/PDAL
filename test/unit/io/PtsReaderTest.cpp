@@ -42,11 +42,14 @@ namespace pdal
 
 TEST(PtsReader, Constructor)
 {
-    PtsReader reader1;
+    PtsReader reader;
+    Options options;
+    options.add("filename", Support::datapath("pts/test.pts"));
+    reader.setOptions(options);
 
-    StageFactory f;
-    Stage* reader2(f.createStage("readers.pts"));
-    EXPECT_TRUE(reader2);
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.pts");
 }
 
 TEST(PtsReader, ReadPtsExtraDims)

@@ -90,6 +90,15 @@ void H3Filter::addDimensions(PointLayoutPtr layout)
     m_layout = layout;
 }
 
+void H3Filter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_h3(m_args->m_resolution);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 bool H3Filter::processOne(PointRef& point)
 {
     if (!m_rustStage)

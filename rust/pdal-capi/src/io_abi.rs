@@ -646,8 +646,15 @@ pub unsafe extern "C" fn pdal_writer_create_pcd(ops: *const Options) -> *mut Wri
 #[no_mangle]
 pub unsafe extern "C" fn pdal_writer_create_ply(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
-        let writer = Box::new(pdal_io::ply::PlyWriter::new(options));
-        Box::into_raw(Box::new(WriterHandle { writer }))
+        match pdal_io::ply::PlyWriter::new(options) {
+            Ok(writer) => Box::into_raw(Box::new(WriterHandle {
+                writer: Box::new(writer),
+            })),
+            Err(err) => {
+                set_last_error(err.to_string());
+                std::ptr::null_mut()
+            }
+        }
     } else {
         std::ptr::null_mut()
     }

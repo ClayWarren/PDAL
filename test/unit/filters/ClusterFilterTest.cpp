@@ -82,11 +82,16 @@ PointViewPtr run(PointTable& table,
 
 TEST(ClusterFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.cluster"));
-    EXPECT_TRUE(filter);
-    ClusterFilter c;
-    EXPECT_EQ(c.getName(), "filters.cluster");
+    ClusterFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.cluster");
 }
 
 TEST(ClusterFilterTest, two_clusters)

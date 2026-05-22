@@ -65,10 +65,14 @@ public:
 
 TEST(TerrasolidReader, Constructor)
 {
-    TerrasolidReader reader1;
+    TerrasolidReader reader;
+    Options options;
+    options.add("filename", getTestfilePath());
+    reader.setOptions(options);
 
-    StageFactory f;
-    Stage* reader2(f.createStage("readers.terrasolid"));
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.terrasolid");
 }
 
 TEST_F(TerrasolidReaderTest, Header)

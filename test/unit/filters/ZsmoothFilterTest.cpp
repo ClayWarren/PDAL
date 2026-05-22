@@ -35,6 +35,7 @@
 #include <array>
 #include <vector>
 
+#include <filters/ZsmoothFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
@@ -75,10 +76,18 @@ PointViewPtr run(PointTable& table,
 
 TEST(ZsmoothFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.zsmooth"));
-    EXPECT_TRUE(filter);
-    EXPECT_EQ(filter->getName(), "filters.zsmooth");
+    ZsmoothFilter filter;
+    Options opts;
+    opts.add("radius", 1.0);
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.zsmooth");
 }
 
 TEST(ZsmoothFilterTest, medianpercent_selects_neighbor_z)

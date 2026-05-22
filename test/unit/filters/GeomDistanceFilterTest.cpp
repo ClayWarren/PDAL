@@ -43,16 +43,20 @@
 #include <io/FauxReader.hpp>
 #include <io/LasReader.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
 
 using namespace pdal;
 
 TEST(GeomDistanceFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.geomdistance"));
-    EXPECT_TRUE(filter);
+    GeomDistanceFilter filter;
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.geomdistance");
 }
 
 TEST(GeomDistanceFilterTest, test_polygon)

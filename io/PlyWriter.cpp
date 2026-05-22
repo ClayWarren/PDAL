@@ -200,10 +200,6 @@ void PlyWriter::prepared(PointTableRef table)
 
     PointLayoutPtr layout = table.layout();
 
-    if (m_precisionArg->set() && m_format != Format::Ascii)
-        throwError("Option 'precision' can only be set of the 'storage_mode' "
-                   "is ascii.");
-
     m_dims.clear();
     if (m_dimNames.size())
     {
@@ -241,6 +237,25 @@ void PlyWriter::prepared(PointTableRef table)
         for (const auto& dim : m_dims)
             m_dimNames.push_back(Utils::tolower(layout->dimName(dim.m_id)));
     }
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename",
+              m_curFilename.empty() ? "out.ply" : m_curFilename);
+    addOption(options, "storage_mode", storageMode(m_format));
+    addOption(options, "faces", boolString(m_faces));
+    addOption(options, "sized_types", boolString(m_sizedTypes));
+    addOption(options, "dims", rustDimSpecs(m_dimNames, m_dims));
+    if (m_precisionArg->set())
+        addOption(options, "precision", std::to_string(m_precision));
+
+    pdal_writer_t* writer = pdal_writer_create_ply(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust PLY writer.");
+    }
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
 }
 
 std::string PlyWriter::getType(Dimension::Type type) const

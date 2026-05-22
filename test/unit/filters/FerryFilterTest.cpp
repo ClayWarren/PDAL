@@ -47,9 +47,22 @@ using namespace pdal;
 
 TEST(FerryFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.ferry"));
-    EXPECT_TRUE(filter);
+    FerryFilter filter;
+    Options opts;
+    opts.add("dimensions", "X=>FooX");
+    filter.setOptions(opts);
+
+    FauxReader reader;
+    Options ro;
+    ro.add("mode", "ramp");
+    ro.add("bounds", BOX3D(0, 0, 0, 9, 9, 9));
+    ro.add("count", 10);
+    reader.setOptions(ro);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.ferry");
 }
 
 TEST(FerryFilterTest, stream)

@@ -48,9 +48,22 @@ using namespace pdal;
 
 TEST(ExpressionFilterTest, createStage)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.expression"));
-    EXPECT_TRUE(filter);
+    ExpressionFilter filter;
+    Options opts;
+    opts.add("expression", "Z >= 5");
+    filter.setOptions(opts);
+
+    FauxReader reader;
+    Options ro;
+    ro.add("bounds", BOX3D(0, 0, 0, 10, 10, 10));
+    ro.add("mode", "ramp");
+    ro.add("count", 10);
+    reader.setOptions(ro);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.expression");
 }
 
 TEST(ExpressionFilterTest, noLimits)

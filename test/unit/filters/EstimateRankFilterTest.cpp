@@ -52,9 +52,16 @@ PointViewPtr makeView(PointTable& table)
 
 TEST(EstimateRankFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.estimaterank"));
-    EXPECT_TRUE(filter);
+    EstimateRankFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.estimaterank");
 }
 
 TEST(EstimateRankFilterTest, planar)

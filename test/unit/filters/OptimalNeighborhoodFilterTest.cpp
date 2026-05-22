@@ -77,11 +77,16 @@ PointViewPtr run(PointTable& table, PointId n, const Options& opts)
 
 TEST(OptimalNeighborhoodFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.optimalneighborhood"));
-    EXPECT_TRUE(filter);
-    OptimalNeighborhood s;
-    EXPECT_EQ(s.getName(), "filters.optimalneighborhood");
+    OptimalNeighborhood filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.optimalneighborhood");
 }
 
 TEST(OptimalNeighborhoodFilterTest, k_within_bounds)

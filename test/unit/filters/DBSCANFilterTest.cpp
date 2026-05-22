@@ -91,11 +91,16 @@ std::vector<std::array<double, 3>> cube(double cx, double cy, double cz)
 
 TEST(DBSCANFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.dbscan"));
-    EXPECT_TRUE(filter);
-    DBSCANFilter d;
-    EXPECT_EQ(d.getName(), "filters.dbscan");
+    DBSCANFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.dbscan");
 }
 
 TEST(DBSCANFilterTest, two_clusters_and_noise)

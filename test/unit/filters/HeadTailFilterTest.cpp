@@ -84,6 +84,46 @@ void testFilter(bool head, bool invert)
     }
 }
 
+TEST(HeadTailFilterTest, createHead)
+{
+    FauxReader reader;
+    Options ro;
+    ro.add("count", 10);
+    ro.add("mode", "ramp");
+    ro.add("bounds", BOX3D(0, 0, 0, 9, 9, 9));
+    reader.setOptions(ro);
+
+    HeadFilter filter;
+    Options fo;
+    fo.add("count", 4);
+    filter.setOptions(fo);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.head");
+}
+
+TEST(HeadTailFilterTest, createTail)
+{
+    FauxReader reader;
+    Options ro;
+    ro.add("count", 10);
+    ro.add("mode", "ramp");
+    ro.add("bounds", BOX3D(0, 0, 0, 9, 9, 9));
+    reader.setOptions(ro);
+
+    TailFilter filter;
+    Options fo;
+    fo.add("count", 4);
+    filter.setOptions(fo);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.tail");
+}
+
 TEST(HeadTailFilterTest, t1)
 {
     testFilter(true, true);

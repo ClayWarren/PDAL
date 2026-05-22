@@ -63,6 +63,15 @@ void FarthestPointSamplingFilter::addArgs(ProgramArgs& args)
              point_count_t(1000));
 }
 
+void FarthestPointSamplingFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_farthestpointsampling(m_count);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 PointViewSet FarthestPointSamplingFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;

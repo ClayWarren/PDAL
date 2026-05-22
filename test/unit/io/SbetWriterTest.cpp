@@ -65,6 +65,8 @@ TEST(SbetWriterTest, testConstructor)
     writer.setOptions(makeWriterOptions());
     writer.setInput(reader);
 
+    PointTable table;
+    writer.prepare(table);
     EXPECT_EQ(writer.getName(), "writers.sbet");
 }
 

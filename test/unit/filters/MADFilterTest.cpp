@@ -70,11 +70,19 @@ point_count_t runSize(PointTable& table, const PointViewPtr& view,
 
 TEST(MADFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.mad"));
-    EXPECT_TRUE(filter);
-    MADFilter m;
-    EXPECT_EQ(m.getName(), "filters.mad");
+    MADFilter filter;
+    Options opts;
+    opts.add("dimension", "X");
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDim(Dimension::Id::X);
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.mad");
 }
 
 TEST(MADFilterTest, drops_outlier)

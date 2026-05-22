@@ -54,6 +54,7 @@ private:
     point_count_t m_count;
 
     void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
 };
 

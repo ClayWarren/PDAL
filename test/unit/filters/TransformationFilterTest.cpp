@@ -36,6 +36,7 @@
 
 #include "Support.hpp"
 #include <filters/TransformationFilter.hpp>
+#include <io/BufferReader.hpp>
 #include <io/FauxReader.hpp>
 #include <pdal/StageFactory.hpp>
 
@@ -85,9 +86,18 @@ public:
 
 TEST(TransformationMatrix, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.transformation"));
-    EXPECT_TRUE(filter);
+    TransformationFilter filter;
+    Options opts;
+    opts.add("matrix", "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.transformation");
 }
 
 TEST(TransformationMatrix, init)

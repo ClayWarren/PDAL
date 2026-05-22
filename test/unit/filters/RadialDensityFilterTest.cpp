@@ -75,10 +75,16 @@ PointViewPtr run(PointTable& table,
 
 TEST(RadialDensityFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.radialdensity"));
-    EXPECT_TRUE(filter);
-    EXPECT_EQ(filter->getName(), "filters.radialdensity");
+    RadialDensityFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.radialdensity");
 }
 
 TEST(RadialDensityFilterTest, density)

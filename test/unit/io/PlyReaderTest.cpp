@@ -51,11 +51,14 @@ void checkPoint(const PointViewPtr& view, point_count_t idx, double x, double y,
 
 TEST(PlyReader, Constructor)
 {
-    PlyReader reader1;
+    PlyReader reader;
+    Options options;
+    options.add("filename", Support::datapath("ply/simple_text.ply"));
+    reader.setOptions(options);
 
-    StageFactory f;
-    Stage* reader2(f.createStage("readers.ply"));
-    EXPECT_TRUE(reader2);
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.ply");
 }
 
 TEST(PlyReader, ReadText)

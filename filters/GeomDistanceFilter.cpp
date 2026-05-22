@@ -108,6 +108,12 @@ void GeomDistanceFilter::prepared(PointTableRef table)
     if (m_args->m_dim == Dimension::Id::Unknown)
         throwError("Missing dimension with name '" + m_args->m_dimName +
                    "'in input PointView.");
+
+    pdal_stage_t* stage = pdal_stage_create_geomdistance(
+        "POLYGON((0 0,1 0,1 1,0 1,0 0))", m_args->m_dimName.c_str(), false);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void GeomDistanceFilter::ready(PointTableRef table)

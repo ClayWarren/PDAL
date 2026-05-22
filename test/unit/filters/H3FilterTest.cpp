@@ -34,23 +34,29 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/FauxReader.hpp>
-#include <io/LasReader.hpp>
-#include <io/TextReader.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/StageFactory.hpp>
-
-#include "filters/H3Filter.hpp"
-
 #include "Support.hpp"
+#include <filters/H3Filter.hpp>
+#include <io/LasReader.hpp>
+#include <pdal/PointView.hpp>
 
 using namespace pdal;
 
 TEST(H3FilterTest, createStage)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.h3"));
-    EXPECT_TRUE(filter);
+    Options ro;
+    ro.add("filename", Support::datapath("las/test_utm17.las"));
+    LasReader reader;
+    reader.setOptions(ro);
+
+    H3Filter filter;
+    Options fo;
+    fo.add("resolution", 12);
+    filter.setOptions(fo);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.h3");
 }
 
 TEST(H3FilterTest, stream_test_2)

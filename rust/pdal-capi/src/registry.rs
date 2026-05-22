@@ -466,7 +466,7 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
         "writers.las" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
         "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new_laz(options))),
-        "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options))),
+        "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options)?)),
         "writers.ogr" => Ok(Box::new(pdal_io::ogr_writer::OgrWriter::new(options))),
         "writers.gdal" => Ok(Box::new(pdal_io::gdal_writer::GdalWriter::new(options))),
         "writers.raster" => Ok(Box::new(pdal_io::raster_writer::RasterWriter::new(options))),

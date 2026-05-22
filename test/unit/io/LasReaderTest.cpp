@@ -85,10 +85,15 @@ TEST(LasReaderTest, string_header_val)
 
 TEST(LasReaderTest, create)
 {
-    StageFactory f;
+    Options ops;
+    ops.add("filename", Support::datapath("las/simple.las"));
 
-    auto s = f.createStage("readers.las");
-    EXPECT_TRUE(s);
+    LasReader reader;
+    reader.setOptions(ops);
+
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.las");
 }
 
 TEST(LasReaderTest, header)

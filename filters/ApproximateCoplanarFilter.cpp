@@ -69,6 +69,16 @@ void ApproximateCoplanarFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::Coplanar);
 }
 
+void ApproximateCoplanarFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage =
+        pdal_stage_create_approximatecoplanar(m_knn, m_thresh1, m_thresh2);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void ApproximateCoplanarFilter::filter(PointView& view)
 {
     pdal_stage_t* stage =

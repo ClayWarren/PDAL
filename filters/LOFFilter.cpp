@@ -67,6 +67,15 @@ void LOFFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::LocalOutlierFactor);
 }
 
+void LOFFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_lof(m_minpts);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void LOFFilter::filter(PointView& view)
 {
     log()->get(LogLevel::Debug) << "Computing k-distances...\n";

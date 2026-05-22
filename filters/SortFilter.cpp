@@ -34,6 +34,7 @@
 
 #include "SortFilter.hpp"
 #include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -78,6 +79,19 @@ void SortFilter::prepared(PointTableRef table)
 
     if (!m_dimNames.size())
         throwError("At least one valid dimension name must be provided!");
+
+    std::vector<const char*> dims;
+    for (const auto& s : m_dimNames)
+        dims.push_back(s.c_str());
+    const char* orderStr = (m_order == SortOrder::DESC) ? "desc" : "asc";
+    const char* algStr =
+        (m_algorithm == SortAlgorithm::Stable) ? "stable" : "normal";
+
+    pdal_stage_t* stage =
+        pdal_stage_create_sort(dims.data(), dims.size(), orderStr, algStr);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void SortFilter::filter(PointView& view)

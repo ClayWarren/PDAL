@@ -53,9 +53,24 @@ using namespace pdal;
 
 TEST(CropFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.crop"));
-    EXPECT_TRUE(filter);
+    BOX3D bounds(0, 0, 0, 10, 10, 10);
+    Options cropOpts;
+    cropOpts.add("bounds", bounds);
+
+    FauxReader reader;
+    Options ro;
+    ro.add("bounds", bounds);
+    ro.add("count", 10);
+    ro.add("mode", "ramp");
+    reader.setOptions(ro);
+
+    CropFilter filter;
+    filter.setOptions(cropOpts);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.crop");
 }
 
 TEST(CropFilterTest, test_crop)

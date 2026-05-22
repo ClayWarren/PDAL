@@ -106,6 +106,13 @@ void EigenvaluesFilter::prepared(PointTableRef table)
                                          "knn and stride, but ignoring min_k."
                                       << '\n';
     }
+
+    pdal_stage_t* stage = pdal_stage_create_eigenvalues(
+        m_args->m_knn, m_args->m_normalize, m_args->m_stride,
+        m_args->m_radiusArg->set(), m_args->m_radius, m_args->m_minK);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void EigenvaluesFilter::filter(PointView& view)

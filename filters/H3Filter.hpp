@@ -64,6 +64,7 @@ private:
     void addArgs(ProgramArgs& args) override;
     bool processOne(PointRef& point) override;
     void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
     void spatialReferenceChanged(const SpatialReference& srs) override;
     void filter(PointView& view) override;
 

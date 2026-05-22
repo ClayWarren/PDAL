@@ -80,7 +80,7 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     );
     let writer = pipeline.add_writer(
         "writers.ply",
-        Box::new(PlyWriter::new(&writer_options)),
+        Box::new(PlyWriter::new(&writer_options)?),
         writer_options,
     );
     pipeline.add_dependency(filter, reader).unwrap();

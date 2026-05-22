@@ -69,6 +69,12 @@ void MADFilter::prepared(PointTableRef table)
     m_dimId = layout->findDim(m_dimName);
     if (m_dimId == Dimension::Id::Unknown)
         throwError("Dimension '" + m_dimName + "' does not exist.");
+
+    pdal_stage_t* stage = pdal_stage_create_mad(
+        m_multiplier, m_dimName.c_str(), m_madMultiplier);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 PointViewSet MADFilter::run(PointViewPtr view)

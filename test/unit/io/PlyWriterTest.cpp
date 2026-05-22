@@ -47,11 +47,21 @@ namespace pdal
 
 TEST(PlyWriter, Constructor)
 {
-    PlyWriter writer1;
+    Options readerOptions;
+    readerOptions.add("count", 10);
+    readerOptions.add("mode", "ramp");
+    FauxReader reader;
+    reader.setOptions(readerOptions);
 
-    StageFactory f;
-    Stage* writer2(f.createStage("writers.ply"));
-    EXPECT_TRUE(writer2);
+    Options writerOptions;
+    writerOptions.add("filename", Support::temppath("constructor.ply"));
+    PlyWriter writer;
+    writer.setOptions(writerOptions);
+    writer.setInput(reader);
+
+    PointTable table;
+    writer.prepare(table);
+    EXPECT_EQ(writer.getName(), "writers.ply");
 }
 
 TEST(PlyWriter, Write)

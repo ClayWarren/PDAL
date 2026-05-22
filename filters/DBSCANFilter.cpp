@@ -92,6 +92,17 @@ void DBSCANFilter::prepared(PointTableRef table)
             m_dimIdList.push_back(id);
         }
     }
+
+    std::vector<const char*> dimNamePtrs;
+    dimNamePtrs.reserve(m_dimStringList.size());
+    for (const std::string& s : m_dimStringList)
+        dimNamePtrs.push_back(s.c_str());
+
+    pdal_stage_t* stage = pdal_stage_create_dbscan(
+        m_minPoints, m_eps, dimNamePtrs.data(), dimNamePtrs.size());
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void DBSCANFilter::filter(PointView& view)

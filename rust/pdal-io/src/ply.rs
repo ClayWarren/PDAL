@@ -450,7 +450,7 @@ pub struct PlyWriter {
 }
 
 impl PlyWriter {
-    pub fn new(options: &Options) -> Self {
+    pub fn new(options: &Options) -> Result<Self, StageError> {
         let dim_specs = options
             .get_str("dims", "")
             .split(',')
@@ -468,6 +468,19 @@ impl PlyWriter {
             faces: options.get_bool("faces", false),
             point_count: 0,
         }
+        .validate_options()
+    }
+
+    fn validate_options(self) -> Result<Self, StageError> {
+        let format = self
+            .format
+            .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
+        if format != PlyFormat::Ascii && self.precision.is_some() {
+            return Err(StageError(
+                "Option 'precision' can only be set of the 'storage_mode' is ascii.".to_string(),
+            ));
+        }
+        Ok(self)
     }
 
     /// Resolve the `(dimension, write type, property name)` triples to write.
@@ -602,11 +615,6 @@ impl Writer for PlyWriter {
         let format = self
             .format
             .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
-        if format != PlyFormat::Ascii && self.precision.is_some() {
-            return Err(StageError(
-                "Option 'precision' can only be set of the 'storage_mode' is ascii.".to_string(),
-            ));
-        }
 
         if self.filename.contains('#') {
             let mut count = 0;
@@ -940,7 +948,7 @@ mod tests {
 
         let mut options = Options::new();
         options.add("filename", &output).add("precision", 6);
-        PlyWriter::new(&options).write(&[view]).unwrap();
+        PlyWriter::new(&options).unwrap().write(&[view]).unwrap();
 
         let back = read_back(&output);
         assert_eq!(back.len(), 3);
@@ -965,7 +973,7 @@ mod tests {
         let output = temp_path("mesh.ply");
         let mut options = Options::new();
         options.add("filename", &output).add("faces", true);
-        PlyWriter::new(&options).write(&[view]).unwrap();
+        PlyWriter::new(&options).unwrap().write(&[view]).unwrap();
 
         let written = fs::read_to_string(&output).unwrap();
         let expected = fs::read_to_string(data_path("ply/mesh.ply")).unwrap();
@@ -990,7 +998,7 @@ mod tests {
             .add("filename", &output)
             .add("faces", true)
             .add("precision", 3);
-        PlyWriter::new(&options).write(&[view]).unwrap();
+        PlyWriter::new(&options).unwrap().write(&[view]).unwrap();
 
         let written = fs::read_to_string(&output).unwrap();
         let expected = fs::read_to_string(data_path("ply/mesh_fixed.ply")).unwrap();
@@ -1007,7 +1015,7 @@ mod tests {
             .add("filename", &output)
             .add("precision", 3)
             .add("dims", "Z,X");
-        PlyWriter::new(&options).write(&[view]).unwrap();
+        PlyWriter::new(&options).unwrap().write(&[view]).unwrap();
 
         let written = fs::read_to_string(&output).unwrap();
         let header: Vec<&str> = written.lines().collect();
@@ -1028,7 +1036,7 @@ mod tests {
         options
             .add("filename", &output)
             .add("storage_mode", "binary_little_endian");
-        PlyWriter::new(&options).write(&[view]).unwrap();
+        PlyWriter::new(&options).unwrap().write(&[view]).unwrap();
 
         let back = read_back(&output);
         assert_eq!(back.len(), 1);
@@ -1051,7 +1059,7 @@ mod tests {
 
         let mut options = Options::new();
         options.add("filename", &output);
-        PlyWriter::new(&options).write(&views).unwrap();
+        PlyWriter::new(&options).unwrap().write(&views).unwrap();
 
         assert!(!Path::new(&output).exists());
         for (idx, expected_len) in [1, 2, 3].into_iter().enumerate() {
@@ -1072,7 +1080,7 @@ mod tests {
             .add("storage_mode", "little endian")
             .add("precision", 3);
 
-        let err = PlyWriter::new(&options).write(&[view]).unwrap_err();
+        let err = PlyWriter::new(&options).err().unwrap();
         assert!(err.0.contains("precision"));
         assert!(err.0.contains("storage_mode"));
     }

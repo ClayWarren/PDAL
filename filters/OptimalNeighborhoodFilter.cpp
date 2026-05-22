@@ -67,6 +67,15 @@ void OptimalNeighborhood::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::OptimalRadius);
 }
 
+void OptimalNeighborhood::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_optimalneighborhood(m_kMin, m_kMax);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void OptimalNeighborhood::filter(PointView& view)
 {
     pdal_stage_t* stage = pdal_stage_create_optimalneighborhood(m_kMin, m_kMax);

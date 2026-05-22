@@ -35,6 +35,7 @@
 #include <array>
 #include <vector>
 
+#include <filters/SparseSurfaceFilter.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
@@ -76,10 +77,18 @@ PointViewPtr run(PointTable& table,
 
 TEST(SparseSurfaceFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.sparsesurface"));
-    EXPECT_TRUE(filter);
-    EXPECT_EQ(filter->getName(), "filters.sparsesurface");
+    SparseSurfaceFilter filter;
+    Options opts;
+    opts.add("radius", 1.0);
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.sparsesurface");
 }
 
 TEST(SparseSurfaceFilterTest, lowest_is_ground_rest_low_noise)

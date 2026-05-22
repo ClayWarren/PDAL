@@ -78,11 +78,16 @@ PointViewPtr run(PointTable& table, const Options& opts)
 
 TEST(LOFFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.lof"));
-    EXPECT_TRUE(filter);
-    LOFFilter l;
-    EXPECT_EQ(l.getName(), "filters.lof");
+    LOFFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.lof");
 }
 
 TEST(LOFFilterTest, flags_outlier)

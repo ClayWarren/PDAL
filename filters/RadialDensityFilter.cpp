@@ -65,6 +65,15 @@ void RadialDensityFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::RadialDensity);
 }
 
+void RadialDensityFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_radialdensity(m_rad);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void RadialDensityFilter::filter(PointView& view)
 {
     log()->get(LogLevel::Debug) << "Computing densities...\n";

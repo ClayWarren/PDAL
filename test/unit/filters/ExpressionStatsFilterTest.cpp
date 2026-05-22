@@ -75,11 +75,20 @@ point_count_t countForValue(const MetadataNode& statistic, double value)
 
 TEST(ExpressionStatsFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.expressionstats"));
-    EXPECT_TRUE(filter);
-    ExpressionStatsFilter s;
-    EXPECT_EQ(s.getName(), "filters.expressionstats");
+    ExpressionStatsFilter filter;
+    Options opts;
+    opts.add("dimension", "X");
+    opts.add("where", "X > 0");
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDim(Dimension::Id::X);
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.expressionstats");
 }
 
 TEST(ExpressionStatsFilterTest, metadata_bins_by_expression)

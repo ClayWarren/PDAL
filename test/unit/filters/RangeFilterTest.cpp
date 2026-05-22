@@ -48,9 +48,22 @@ using namespace pdal;
 
 TEST(RangeFilterTest, createStage)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.range"));
-    EXPECT_TRUE(filter);
+    RangeFilter filter;
+    Options rangeOps;
+    rangeOps.add("limits", "Z[1:10]");
+    filter.setOptions(rangeOps);
+
+    FauxReader reader;
+    Options ops;
+    ops.add("bounds", BOX3D(0, 0, 0, 10, 10, 10));
+    ops.add("mode", "ramp");
+    ops.add("count", 10);
+    reader.setOptions(ops);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.range");
 }
 
 TEST(RangeFilterTest, noLimits)

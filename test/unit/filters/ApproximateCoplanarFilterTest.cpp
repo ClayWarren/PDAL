@@ -97,11 +97,16 @@ PointViewPtr run(PointTable& table, ViewMaker makeView)
 
 TEST(ApproximateCoplanarFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.approximatecoplanar"));
-    EXPECT_TRUE(filter);
-    ApproximateCoplanarFilter c;
-    EXPECT_EQ(c.getName(), "filters.approximatecoplanar");
+    ApproximateCoplanarFilter filter;
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.approximatecoplanar");
 }
 
 TEST(ApproximateCoplanarFilterTest, labels_plane)

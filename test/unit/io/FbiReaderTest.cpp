@@ -68,10 +68,9 @@ public:
 
 TEST_F(FbiReaderTest, Constructor)
 {
-    FbiReader reader1;
-
-    StageFactory f;
-    Stage* reader2(f.createStage("readers.fbi"));
+    PointTable table;
+    m_reader.prepare(table);
+    EXPECT_EQ(m_reader.getName(), "readers.fbi");
 }
 
 TEST_F(FbiReaderTest, Header)

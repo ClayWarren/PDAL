@@ -79,11 +79,18 @@ PointViewPtr runSample(PointTable& table,
 
 TEST(SampleFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.sample"));
-    EXPECT_TRUE(filter);
-    SampleFilter s;
-    EXPECT_EQ(s.getName(), "filters.sample");
+    SampleFilter filter;
+    Options opts;
+    opts.add("radius", 1.0);
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.sample");
 }
 
 TEST(SampleFilterTest, culls_close_points)

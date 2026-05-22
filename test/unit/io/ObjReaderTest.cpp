@@ -70,11 +70,14 @@ void checkPoint(const PointViewPtr& view, point_count_t idx, double x, double y,
 
 TEST(ObjReader, Constructor)
 {
-    ObjReader reader1;
+    ObjReader reader;
+    Options options;
+    options.add("filename", Support::datapath("obj/simple_binary.obj"));
+    reader.setOptions(options);
 
-    StageFactory f;
-    Stage* reader2(f.createStage("readers.obj"));
-    EXPECT_TRUE(reader2);
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_EQ(reader.getName(), "readers.obj");
 }
 
 TEST(ObjReader, NoFace)

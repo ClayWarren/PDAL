@@ -40,6 +40,26 @@
 
 using namespace pdal;
 
+TEST(RandomizeFilterTest, create)
+{
+    RandomizeFilter filter;
+    Options opts;
+    opts.add("seed", 1);
+    filter.setOptions(opts);
+
+    FauxReader reader;
+    Options ro;
+    ro.add("count", 10);
+    ro.add("mode", "ramp");
+    ro.add("bounds", BOX3D(0, 0, 0, 9, 9, 9));
+    reader.setOptions(ro);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.randomize");
+}
+
 TEST(RandomizeFilterTest, simple)
 {
     // This isn't a real test.  It's just here to allow easy debugging.

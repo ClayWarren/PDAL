@@ -68,6 +68,15 @@ void EstimateRankFilter::addDimensions(PointLayoutPtr layout)
     layout->registerDim(Id::Rank);
 }
 
+void EstimateRankFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_estimaterank(m_knn, m_thresh);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
+}
+
 void EstimateRankFilter::filter(PointView& view)
 {
     pdal_stage_t* stage = pdal_stage_create_estimaterank(m_knn, m_thresh);

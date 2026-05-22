@@ -60,6 +60,7 @@ private:
 
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
+    void prepared(PointTableRef table) override;
     void filter(PointView& view) override;
 };
 

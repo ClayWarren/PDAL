@@ -75,9 +75,14 @@ std::unique_ptr<MongoExpressionFilter> makeFilter(BasePointTable& table,
 
 TEST(MongoExpressionFilterTest, createStage)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.mongo"));
-    EXPECT_TRUE(filter);
+    MongoExpressionFilter filter;
+    Options opts;
+    opts.add("expression", R"({"X": {"$gt": 0}})");
+    filter.setOptions(opts);
+
+    auto table = makeTable();
+    filter.prepare(*table);
+    EXPECT_EQ(filter.getName(), "filters.mongo");
 }
 
 TEST(MongoExpressionFilterTest, noExpression)

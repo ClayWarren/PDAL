@@ -38,6 +38,7 @@
 
 #include "Support.hpp"
 #include <filters/SortFilter.hpp>
+#include <io/BufferReader.hpp>
 #include <io/LasReader.hpp>
 #include <io/LasWriter.hpp>
 #include <pdal/PipelineManager.hpp>
@@ -91,6 +92,23 @@ void doSort(point_count_t count, Dimension::Id dim, const std::string& order,
 }
 
 } // unnamed namespace
+
+TEST(SortFilterTest, create)
+{
+    SortFilter filter;
+    Options opts;
+    opts.add("dimension", "X");
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDim(Dimension::Id::X);
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.sort");
+}
 
 TEST(SortFilterTest, simple)
 {

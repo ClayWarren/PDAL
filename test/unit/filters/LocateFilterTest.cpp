@@ -42,6 +42,25 @@
 
 using namespace pdal;
 
+TEST(LocateTest, create)
+{
+    Options ro;
+    ro.add("filename", Support::datapath("las/1.2-with-color.las"));
+    LasReader reader;
+    reader.setOptions(ro);
+
+    LocateFilter filter;
+    Options fo;
+    fo.add("dimension", "Z");
+    fo.add("minmax", "max");
+    filter.setOptions(fo);
+    filter.setInput(reader);
+
+    PointTable table;
+    filter.prepare(table);
+    EXPECT_EQ(filter.getName(), "filters.locate");
+}
+
 TEST(LocateTest, locate_max)
 {
     PointTable table;

@@ -35,6 +35,7 @@
 #include "TransformationFilter.hpp"
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <pdal_capi.h>
 
 #include <Eigen/Dense>
 
@@ -172,6 +173,19 @@ void TransformationFilter::initialize()
         matrix[10] = Tinv.matrix()(2, 2);
         matrix[11] = Tinv.matrix()(2, 3);
     }
+}
+
+void TransformationFilter::prepared(PointTableRef table)
+{
+    (void)table;
+    std::vector<double> mat_vals(16);
+    for (size_t i = 0; i < 16; ++i)
+        mat_vals[i] = (*m_matrix)[i];
+
+    pdal_stage_t* stage = pdal_stage_create_transformation(mat_vals.data());
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void TransformationFilter::doFilter(

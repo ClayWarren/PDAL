@@ -79,11 +79,19 @@ Options dimX(double k = -1.0)
 
 TEST(IQRFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.iqr"));
-    EXPECT_TRUE(filter);
-    IQRFilter i;
-    EXPECT_EQ(i.getName(), "filters.iqr");
+    IQRFilter filter;
+    Options opts;
+    opts.add("dimension", "X");
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    table.layout()->registerDim(Dimension::Id::X);
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.iqr");
 }
 
 TEST(IQRFilterTest, drops_high_outlier)

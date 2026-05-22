@@ -46,9 +46,18 @@ using namespace pdal;
 
 TEST(DecimationFilterTest, create)
 {
-    StageFactory f;
-    Stage* filter(f.createStage("filters.decimation"));
-    EXPECT_TRUE(filter);
+    DecimationFilter filter;
+    Options opts;
+    opts.add("step", 2.0);
+    filter.setOptions(opts);
+
+    BufferReader reader;
+    PointTable table;
+    reader.addView(PointViewPtr(new PointView(table)));
+    filter.setInput(reader);
+    filter.prepare(table);
+
+    EXPECT_EQ(filter.getName(), "filters.decimation");
 }
 
 TEST(DecimationFilterTest, test1)
