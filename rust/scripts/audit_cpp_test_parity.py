@@ -14,7 +14,7 @@ COVERED: dict[str, object] = {
     "pdal_kdindex_test": ALL,
     "pdal_spatial_reference_test": {"calcZone", "wgs84FromZone"},
     "pdal_point_view_test": {"calculateBounds"},
-    "pdal_eigen_test": {"calcBounds"},
+    "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological"},
     "pdal_bounds_test": {
         "test_ctor",
         "test_equals",

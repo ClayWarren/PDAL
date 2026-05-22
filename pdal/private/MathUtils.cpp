@@ -262,75 +262,29 @@ Eigen::MatrixXd extendedLocalMinimum(const PointView& view, int rows, int cols,
 void dilateDiamond(std::vector<double>& data, size_t rows, size_t cols,
                    int iterations)
 {
-    std::vector<double> out(data.size(), std::numeric_limits<double>::lowest());
-    std::array<size_t, 5> idx;
-
-    for (int iter = 0; iter < iterations; ++iter)
-    {
-        for (size_t col = 0; col < cols; ++col)
-        {
-            size_t index = col * rows;
-            for (size_t row = 0; row < rows; ++row)
-            {
-                // Find the index into the vector of the current cell.  Then
-                // find the index of the cells to the right/left/above/below
-                // if they exist.
-                size_t j = 0;
-                idx[j++] = index + row;
-                if (row > 0)
-                    idx[j++] = idx[0] - 1;
-                if (row < rows - 1)
-                    idx[j++] = idx[0] + 1;
-                if (col > 0)
-                    idx[j++] = idx[0] - rows;
-                if (col < cols - 1)
-                    idx[j++] = idx[0] + rows;
-                // If the data at the test cell pos is greater than that
-                // from the last iteration, set the value to the maximum of
-                // the value of those cells.
-                for (size_t i = 0; i < j; ++i)
-                {
-                    if (data[idx[i]] > out[index + row])
-                        out[index + row] = data[idx[i]];
-                }
-            }
-        }
-        data.swap(out);
-    }
+    pdal_math_dilate_diamond(data.data(), rows, cols, iterations);
 }
 
 void erodeDiamond(std::vector<double>& data, size_t rows, size_t cols,
                   int iterations)
 {
-    std::vector<double> out(data.size(), (std::numeric_limits<double>::max)());
-    std::array<size_t, 5> idx;
+    pdal_math_erode_diamond(data.data(), rows, cols, iterations);
+}
 
-    for (int iter = 0; iter < iterations; ++iter)
-    {
-        for (size_t col = 0; col < cols; ++col)
-        {
-            size_t index = col * rows;
-            for (size_t row = 0; row < rows; ++row)
-            {
-                size_t j = 0;
-                idx[j++] = index + row;
-                if (row > 0)
-                    idx[j++] = idx[0] - 1;
-                if (row < rows - 1)
-                    idx[j++] = idx[0] + 1;
-                if (col > 0)
-                    idx[j++] = idx[0] - rows;
-                if (col < cols - 1)
-                    idx[j++] = idx[0] + rows;
-                for (size_t i = 0; i < j; ++i)
-                {
-                    if (data[idx[i]] < out[index + row])
-                        out[index + row] = data[idx[i]];
-                }
-            }
-        }
-        data.swap(out);
-    }
+Eigen::MatrixXd gradX(const Eigen::MatrixXd& A)
+{
+    Eigen::MatrixXd out(A.rows(), A.cols());
+    pdal_math_grad_x(A.data(), static_cast<size_t>(A.rows()),
+                     static_cast<size_t>(A.cols()), out.data());
+    return out;
+}
+
+Eigen::MatrixXd gradY(const Eigen::MatrixXd& A)
+{
+    Eigen::MatrixXd out(A.rows(), A.cols());
+    pdal_math_grad_y(A.data(), static_cast<size_t>(A.rows()),
+                     static_cast<size_t>(A.cols()), out.data());
+    return out;
 }
 
 Eigen::MatrixXd pointViewToEigen(const PointView& view)

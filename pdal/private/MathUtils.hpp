@@ -248,23 +248,10 @@ void writeMatrix(Eigen::MatrixXd data, const std::string& filename,
   This is meant to mimic MATLAB's gradient function. The spacing between points
   in each direction is assumed to be one.
 
-  \param data the input matrix.
+  \param A the input matrix.
   \return the X component of the two-dimensional gradient.
 */
-template <typename Derived> Derived gradX(const Eigen::MatrixBase<Derived>& A)
-{
-    Derived out = Derived::Zero(A.rows(), A.cols());
-
-    // Interior points are obtained by central differences.
-    out.block(0, 1, A.rows(), A.cols() - 2) =
-        0.5 * (A.rightCols(A.cols() - 2) - A.leftCols(A.cols() - 2));
-
-    // Edge columns are obtained by single-sided differences.
-    out.col(0) = A.col(1) - A.col(0);
-    out.col(out.cols() - 1) = A.col(A.cols() - 1) - A.col(A.cols() - 2);
-
-    return out;
-}
+Eigen::MatrixXd gradX(const Eigen::MatrixXd& A);
 
 /**
   Compute the numerical gradient in the Y direction.
@@ -272,23 +259,10 @@ template <typename Derived> Derived gradX(const Eigen::MatrixBase<Derived>& A)
   This is meant to mimic MATLAB's gradient function. The spacing between points
   in each direction is assumed to be one.
 
-  \param data the input matrix.
+  \param A the input matrix.
   \return the Y component of the two-dimensional gradient.
 */
-template <typename Derived> Derived gradY(const Eigen::MatrixBase<Derived>& A)
-{
-    Derived out = Derived::Zero(A.rows(), A.cols());
-
-    // Interior points are obtained by central differences.
-    out.block(1, 0, A.rows() - 2, A.cols()) =
-        0.5 * (A.bottomRows(A.rows() - 2) - A.topRows(A.rows() - 2));
-
-    // Edge rows are obtained by single-sided differences.
-    out.row(0) = A.row(1) - A.row(0);
-    out.row(out.rows() - 1) = A.row(A.rows() - 1) - A.row(A.rows() - 2);
-
-    return out;
-}
+Eigen::MatrixXd gradY(const Eigen::MatrixXd& A);
 
 struct NormalResult
 {

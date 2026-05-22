@@ -170,6 +170,16 @@ extern "C"
                                           double x3, double y3, double z3,
                                           double x, double y);
 
+    // Raster math (column-major buffers)
+    void pdal_math_grad_x(const double* data, size_t rows, size_t cols,
+                          double* out);
+    void pdal_math_grad_y(const double* data, size_t rows, size_t cols,
+                          double* out);
+    void pdal_math_dilate_diamond(double* data, size_t rows, size_t cols,
+                                  int32_t iterations);
+    void pdal_math_erode_diamond(double* data, size_t rows, size_t cols,
+                                 int32_t iterations);
+
     // OGRSpec
     char* pdal_ogr_spec_parse_json(const char* input);
 
