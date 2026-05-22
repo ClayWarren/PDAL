@@ -151,7 +151,12 @@ void FauxReader::initialize()
             m_seed = (uint32_t)std::time(nullptr);
     }
 
-    if (usesRustReader())
+    // Only use Rust when the reader has valid configuration.  Stage::prepare()
+    // calls initialize() before prepared(), so validation hasn't run yet and
+    // unconfigured readers (e.g. no count) would produce garbage/memory
+    // corruption through the Rust C ABI.
+    bool countValid = m_countArg->set() || m_mode == Mode::Grid;
+    if (usesRustReader() && countValid)
     {
         createRustView();
         return;

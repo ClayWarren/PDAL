@@ -149,7 +149,7 @@ through the Rust C ABI via the existing `pdal_utils_to_string_f64` function,
 matching C++ `setprecision` behavior for NaN, Inf, zero, scientific, and fixed-point
 notation. This remains a conservative lower bound, not a final port-completion percentage:
 35 built test binaries remain unclassified by the audit script. Of these:
-   - 15 are private/specialized C++ algorithms with no Rust port planned (covariancefeatures, csf, delaunay, icp, litree, lloydkmeans, m3c2, normal, pmf, relaxation_dart_throwing, straighten, supervoxel, slpk_reader)
+   - 13 are private/specialized C++ algorithms — 11 with no Rust port planned (csf, delaunay, icp, litree, lloydkmeans, m3c2, pmf, relaxation_dart_throwing, straighten, supervoxel, slpk_reader) and 2 now Rust C ABI-backed (covariancefeatures, normal)
    - 14 are infrastructure/utility/tooling tests, not pipeline stages (app_plugin, app, artifact, eval, info cmd, merge cmd, oldpclblock, pipeline_manager, program_arg, support, thread_pool, tile cmd, tindex cmd, vsi)
    - 4 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, shell, where)
    - 3 are explicitly deferred (copc_remote_reader, copc_writer, ept_addon_writer)
@@ -434,6 +434,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `miniball`
 - `mortonorder`
 - `nndistance`
+- `normal`
 - `optimalneighborhood`
 - `outlier`
 - `planefit`
@@ -466,9 +467,10 @@ algorithm decision.
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
 - Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
-  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `Normal`, `PMF`, `Poisson`,
+  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `PMF`, `Poisson`,
   `Straighten`, `Supervoxel`, `GreedyProjection`,
   `IterativeClosestPoint`, `RelaxationDartThrowing`.
+- Now Rust C ABI-backed: `Normal` (compute path only; MST refinement remains C++).
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,
   `NeighborClassifier`, `CovarianceFeatures`.

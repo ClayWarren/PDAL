@@ -317,15 +317,22 @@ pub fn create_filter(
             get_u64(options, "knn", get_u64(options, "k", 8)?)? as usize,
             nn_distance_mode(&options.get_str("mode", "kth"))?,
         )))),
-        "filters.normal" => Ok(Box::new(FilterWrapper::new(NormalFilter::new(
-            get_u64(options, "knn", 8)? as usize + 1,
-            options
-                .has("radius")
-                .then(|| get_f64(options, "radius", 0.0))
-                .transpose()?,
-            None,
-            get_bool(options, "always_up", true)?,
-        )))),
+        "filters.normal" => {
+            let viewpoint = if options.has("viewpoint") {
+                Some(parse_wkt_point(&options.get_str("viewpoint", ""))?)
+            } else {
+                None
+            };
+            Ok(Box::new(FilterWrapper::new(NormalFilter::new(
+                get_u64(options, "knn", 8)? as usize + 1,
+                options
+                    .has("radius")
+                    .then(|| get_f64(options, "radius", 0.0))
+                    .transpose()?,
+                viewpoint,
+                get_bool(options, "always_up", true)?,
+            ))))
+        }
         "filters.optimalneighborhood" => Ok(Box::new(FilterWrapper::new(
             OptimalNeighborhoodFilter::new(
                 get_u64(options, "min_k", 3)? as usize,
@@ -450,6 +457,53 @@ fn get_u64(options: &Options, key: &str, default: u64) -> Result<u64, StageError
 
 fn get_bool(options: &Options, key: &str, default: bool) -> Result<bool, StageError> {
     options.try_get_bool(key, default).map_err(StageError)
+}
+
+/// Parse a WKT POINT string into `[x, y, z]`.
+///
+/// Accepts `"POINT Z (x y z)"`, `"POINT (x y z)"`, and `"POINT (x y)"` (z=0).
+/// Returns an error if the string is not a valid WKT point.
+fn parse_wkt_point(wkt: &str) -> Result<[f64; 3], StageError> {
+    let s = wkt.trim();
+    let s = s.strip_prefix("POINT").ok_or_else(|| {
+        StageError(format!(
+            "viewpoint must be a WKT POINT string, got '{wkt}'"
+        ))
+    })?;
+    // Skip optional Z / ZM dimensionality keyword.
+    let s = s.trim_start();
+    let s = s
+        .strip_prefix("Z")
+        .or_else(|| s.strip_prefix("ZM"))
+        .or_else(|| s.strip_prefix("M"))
+        .map(|s| s.trim_start())
+        .unwrap_or(s);
+    let s = s.strip_prefix('(').ok_or_else(|| {
+        StageError(format!(
+            "viewpoint must be a WKT POINT string, got '{wkt}'"
+        ))
+    })?;
+    let s = s.strip_suffix(')').ok_or_else(|| {
+        StageError(format!(
+            "viewpoint must be a WKT POINT string, got '{wkt}'"
+        ))
+    })?;
+    let parts: Vec<f64> = s
+        .split_whitespace()
+        .map(|p| p.parse().map_err(|_| {
+            StageError(format!(
+                "viewpoint must be a WKT POINT string with numeric coordinates, got '{wkt}'"
+            ))
+        }))
+        .collect::<Result<Vec<f64>, StageError>>()?;
+    match parts.len() {
+        2 => Ok([parts[0], parts[1], 0.0]),
+        3 => Ok([parts[0], parts[1], parts[2]]),
+        _ => Err(StageError(format!(
+            "viewpoint must have 2 or 3 coordinates, got {} in '{wkt}'",
+            parts.len()
+        ))),
+    }
 }
 
 fn sort_order(value: &str) -> Result<SortOrder, StageError> {
