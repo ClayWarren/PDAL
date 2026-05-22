@@ -84,9 +84,29 @@ void RadiusAssignFilter::initialize()
     if (m_radius <= 0)
         throwError("Invalid 'radius' option: " + std::to_string(m_radius) +
                    ", must be > 0");
-    if (m_updateExpr.size() == 0)
-        throwError("Empty 'update_epxression' option, must be set to apply any "
-                   "change on the data");
+
+    std::vector<pdal_assign_range_t> assignments;
+    std::vector<std::string> assignment_dims;
+    assignment_dims.reserve(m_updateExpr.size());
+    for (expr::AssignStatement& expr : m_updateExpr)
+        assignment_dims.push_back(expr.identExpr().name());
+
+    assignments.reserve(assignment_dims.size());
+    for (const std::string& dim : assignment_dims)
+    {
+        pdal_assign_range_t assignment;
+        assignment.dim_name = dim.c_str();
+        assignment.value = 0;
+        assignments.push_back(assignment);
+    }
+
+    pdal_stage_t* stage = pdal_stage_create_radiusassign(
+        nullptr, 0, nullptr, 0,
+        assignments.empty() ? nullptr : assignments.data(), assignments.size(),
+        m_radius, m_search3d, m_max2dAbove, m_max2dBelow);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void RadiusAssignFilter::preparedDomain(std::vector<DimRange>& domain,

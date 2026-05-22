@@ -83,9 +83,6 @@ void ExpressionFilter::addArgs(ProgramArgs& args)
 
 void ExpressionFilter::initialize()
 {
-    if (m_args->m_expressions.empty())
-        throwError("No expressions provided.");
-
     std::vector<std::string> expressionStrings;
     expressionStrings.reserve(m_args->m_expressions.size());
     for (const auto& expression : m_args->m_expressions)

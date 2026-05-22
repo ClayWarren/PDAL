@@ -155,7 +155,9 @@ pub enum CreatedStage {
 
 pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, StageError> {
     match name {
-        "readers.faux" => Ok(Box::new(pdal_io::faux::FauxReader::new(options))),
+        "readers.faux" => pdal_io::faux::FauxReader::new(options)
+            .map(|reader| Box::new(reader) as Box<dyn Reader>)
+            .map_err(StageError),
         "readers.bpf" => Ok(Box::new(pdal_io::bpf::BpfReader::new(options))),
         "readers.fbi" => Ok(Box::new(pdal_io::fbi::FbiReader::new(options))),
         "readers.gdal" => Ok(Box::new(pdal_io::gdal_reader::GdalReader::new(options))),
@@ -350,7 +352,9 @@ pub fn create_filter(
             get_bool(options, "only_ground", true)?,
             comma_list(&options.get_str("returns", "last,only")),
         )))),
-        "filters.sample" => Ok(Box::new(FilterWrapper::new(SampleFilter::new(options)))),
+        "filters.sample" => Ok(Box::new(FilterWrapper::new(
+            SampleFilter::new(options).map_err(StageError)?,
+        ))),
         "filters.separatescanline" => Ok(Box::new(FilterWrapper::new(
             SeparateScanLineFilter::new(get_u64(options, "groupby", 1)?),
         ))),

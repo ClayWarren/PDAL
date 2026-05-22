@@ -149,6 +149,22 @@ void DividerFilter::prepared(PointTableRef table)
         if (!status)
             throwError(status.what());
     }
+
+    int32_t mode_val = 0;
+    if (m_args->m_mode == Mode::RoundRobin)
+        mode_val = 1;
+    else if (m_args->m_mode == Mode::Expression)
+        mode_val = 2;
+
+    int32_t size_mode_val = 0;
+    if (m_args->m_sizeMode == SizeMode::Capacity)
+        size_mode_val = 1;
+
+    pdal_stage_t* stage = pdal_stage_create_divider(
+        mode_val, size_mode_val, m_args->m_size, nullptr, 0);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void DividerFilter::initialize()
@@ -181,8 +197,6 @@ void DividerFilter::initialize()
         if (m_args->m_capArg->set())
         {
             m_args->m_sizeMode = SizeMode::Capacity;
-            if (m_args->m_size == 0)
-                throwError("Option 'capacity' must be greater than 0.");
         }
     }
 }

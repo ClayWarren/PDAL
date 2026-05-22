@@ -22,7 +22,7 @@ pub struct SampleFilter {
 }
 
 impl SampleFilter {
-    pub fn new(ops: &Options) -> Self {
+    pub fn new(ops: &Options) -> Result<Self, String> {
         let cell = if ops.has("cell") {
             Some(ops.get_f64("cell", 0.0))
         } else {
@@ -33,6 +33,12 @@ impl SampleFilter {
         } else {
             None
         };
+        if cell.is_some() && radius.is_some() {
+            return Err("Must set only one of 'cell' or 'radius'.".into());
+        }
+        if cell.is_none() && radius.is_none() {
+            return Err("Must set 'cell' or 'radius' but not both.".into());
+        }
         let dimension_name = if ops.has("dimension") {
             Some(ops.get_str("dimension", ""))
         } else {
@@ -54,7 +60,7 @@ impl SampleFilter {
             None
         };
 
-        Self {
+        Ok(Self {
             cell,
             radius,
             dimension_name,
@@ -65,7 +71,7 @@ impl SampleFilter {
             radius_sqr: 0.0,
             origin: None,
             populated_voxels: HashMap::new(),
-        }
+        })
     }
 
     pub fn prepare_runtime(&mut self) {
@@ -235,7 +241,7 @@ mod tests {
     #[test]
     fn radius_mode_keeps_points_outside_the_poisson_radius() {
         let input = view(&[(0.0, 0.0, 0.0), (0.25, 0.0, 0.0), (2.0, 0.0, 0.0)]);
-        let mut filter = SampleFilter::new(&options(&[("radius", "1.0")]));
+        let mut filter = SampleFilter::new(&options(&[("radius", "1.0")])).unwrap();
 
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.len(), 2);
@@ -246,7 +252,7 @@ mod tests {
     #[test]
     fn dimension_mode_marks_every_point_instead_of_culling() {
         let input = view(&[(0.0, 0.0, 0.0), (0.25, 0.0, 0.0), (2.0, 0.0, 0.0)]);
-        let mut filter = SampleFilter::new(&options(&[("radius", "1.0"), ("dimension", "Flag")]));
+        let mut filter = SampleFilter::new(&options(&[("radius", "1.0"), ("dimension", "Flag")])).unwrap();
 
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.len(), 3);
@@ -263,7 +269,7 @@ mod tests {
             ("origin_x", "0.0"),
             ("origin_y", "0.0"),
             ("origin_z", "0.0"),
-        ]));
+        ])).unwrap();
 
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.len(), 2);
@@ -277,7 +283,7 @@ mod tests {
 
     #[test]
     fn streaming_is_not_supported() {
-        let mut filter = SampleFilter::new(&options(&[("radius", "1.0")]));
+        let mut filter = SampleFilter::new(&options(&[("radius", "1.0")])).unwrap();
         let mut input = view(&[(0.0, 0.0, 0.0)]);
 
         assert!(!filter.process_one(&mut input, 0));

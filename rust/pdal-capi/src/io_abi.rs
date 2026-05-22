@@ -22,8 +22,15 @@ pub struct ReaderHandle {
 #[no_mangle]
 pub unsafe extern "C" fn pdal_reader_create_faux(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
-        let reader = Box::new(pdal_io::faux::FauxReader::new(options));
-        Box::into_raw(Box::new(ReaderHandle { reader }))
+        match pdal_io::faux::FauxReader::new(options) {
+            Ok(reader) => Box::into_raw(Box::new(ReaderHandle {
+                reader: Box::new(reader),
+            })),
+            Err(err) => {
+                set_last_error(&err);
+                std::ptr::null_mut()
+            }
+        }
     } else {
         std::ptr::null_mut()
     }

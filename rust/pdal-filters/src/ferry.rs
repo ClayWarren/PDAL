@@ -12,6 +12,45 @@ impl FerryFilter {
         Self { dims }
     }
 
+    pub fn parse_specs(specs: &[String]) -> Result<Vec<(String, String)>, String> {
+        if specs.is_empty() {
+            return Err(
+                "Must specify at least one dimension to ferry using option 'dimensions'."
+                    .into(),
+            );
+        }
+        let mut to_names = Vec::new();
+        let mut dims = Vec::new();
+        for dim in specs {
+            let parts: Vec<&str> = dim.split('=').collect();
+            if parts.len() != 2 {
+                return Err(format!(
+                    "Invalid dimension specified '{}'.  Need \
+                     <from dimension>=><to dimension>.  See documentation for \
+                     details.",
+                    dim
+                ));
+            }
+            let mut from = parts[0].trim().to_string();
+            let mut to = parts[1].trim().to_string();
+            if let Some(stripped) = to.strip_prefix('>') {
+                to = stripped.trim().to_string();
+            }
+            if from == to {
+                return Err(format!("Can't ferry dimension '{}' to itself.", from));
+            }
+            if to_names.iter().any(|name| name == &to) {
+                return Err(
+                    "Can't ferry two source dimensions to the same destination dimension."
+                        .into(),
+                );
+            }
+            to_names.push(to.clone());
+            dims.push((from, to));
+        }
+        Ok(dims)
+    }
+
     pub fn ferry_point(&self, view: &mut PointView, idx: u64) {
         for (from_name, to_name) in &self.dims {
             let from_id = parse_dim_id(from_name);

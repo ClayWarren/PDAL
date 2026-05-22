@@ -131,7 +131,22 @@ TEST(SampleFilterTest, cell_mode)
     PointViewPtr out = runSample(table, pts, opts);
 
     EXPECT_EQ(out->size(), 2u);
+}
 
+TEST(SampleFilterTest, requires_cell_or_radius)
+{
+    PointTable bad;
+    bad.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    BufferReader r;
+    SampleFilter neither;
+    neither.setInput(r);
+    neither.setOptions(Options());
+    EXPECT_THROW(neither.prepare(bad), pdal_error);
+}
+
+TEST(SampleFilterTest, rejects_cell_and_radius)
+{
     PointTable bad;
     bad.layout()->registerDims(
         {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
@@ -143,11 +158,6 @@ TEST(SampleFilterTest, cell_mode)
     bo.add("radius", 1.0);
     both.setOptions(bo);
     EXPECT_THROW(both.prepare(bad), pdal_error);
-
-    SampleFilter neither;
-    neither.setInput(r);
-    neither.setOptions(Options());
-    EXPECT_THROW(neither.prepare(bad), pdal_error);
 }
 
 TEST(SampleFilterTest, culls_across_voxels)

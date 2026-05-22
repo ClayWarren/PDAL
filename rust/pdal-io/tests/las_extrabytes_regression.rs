@@ -23,7 +23,7 @@ fn rust_las_preserves_extra_bytes() {
     let mut pipeline = Pipeline::new();
     let _reader = pipeline.add_reader(
         "readers.faux",
-        Box::new(FauxReader::new(&reader_options)),
+        Box::new(FauxReader::new(&reader_options).unwrap()),
         reader_options,
     );
 

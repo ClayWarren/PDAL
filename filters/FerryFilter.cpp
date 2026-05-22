@@ -70,44 +70,31 @@ void FerryFilter::addArgs(ProgramArgs& args)
 
 void FerryFilter::initialize()
 {
-    std::vector<std::string> toNames;
-    for (auto& dim : m_dimSpec)
-    {
-        StringList s = Utils::split(dim, '=');
-        if (s.size() != 2)
-            throwError(
-                "Invalid dimension specified '" + dim +
-                "'.  Need "
-                "<from dimension>=><to dimension>.  See documentation for "
-                "details.");
-        // Allow new '=>' syntax
-        if (s[1][0] == '>')
-            s[1].erase(s[1].begin());
-
-        Utils::trim(s[0]);
-        Utils::trim(s[1]);
-        if (s[0] == s[1])
-            throwError("Can't ferry dimension '" + s[0] + "' to itself.");
-        if (Utils::contains(toNames, s[1]))
-            throwError("Can't ferry two source dimensions to the same "
-                       "destination dimension.");
-        toNames.push_back(s[1]);
-        m_dims.emplace_back(s[0], s[1]);
-    }
-
-    std::vector<const char*> fromDims;
-    std::vector<const char*> toDims;
-    for (auto const& info : m_dims)
-    {
-        fromDims.push_back(info.m_fromName.c_str());
-        toDims.push_back(info.m_toName.c_str());
-    }
+    std::vector<const char*> specs;
+    specs.reserve(m_dimSpec.size());
+    for (const std::string& dim : m_dimSpec)
+        specs.push_back(dim.c_str());
 
     if (m_rust_stage)
         pdal_stage_destroy(m_rust_stage);
 
-    m_rust_stage =
-        pdal_stage_create_ferry(fromDims.data(), toDims.data(), m_dims.size());
+    m_rust_stage = pdal_stage_create_ferry_specs(
+        specs.empty() ? nullptr : specs.data(), specs.size());
+    if (!m_rust_stage)
+        throwError(pdal_last_error());
+
+    m_dims.clear();
+    for (const std::string& dim : m_dimSpec)
+    {
+        StringList s = Utils::split(dim, '=');
+        if (s.size() != 2)
+            throwError(pdal_last_error());
+        if (s[1][0] == '>')
+            s[1].erase(s[1].begin());
+        Utils::trim(s[0]);
+        Utils::trim(s[1]);
+        m_dims.emplace_back(s[0], s[1]);
+    }
 }
 
 void FerryFilter::addDimensions(PointLayoutPtr layout)

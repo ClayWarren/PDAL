@@ -131,17 +131,26 @@ void FauxReader::prepared(PointTableRef table)
 
     if (!(m_mode == Mode::Normal || m_mode == Mode::Uniform))
     {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "mode", modeName(m_mode));
         if (m_seedArg->set())
-        {
-            std::ostringstream out;
-            out << "Option 'seed' not supported with mode '" << m_mode << "'.";
-            throwError(out.str());
-        }
+            addOption(options, "seed", (uint64_t)m_seed);
+        pdal_reader_t* reader = pdal_reader_create_faux(options);
+        pdal_options_destroy(options);
+        if (!reader)
+            throwError(pdal_last_error());
+        pdal_reader_destroy(reader);
     }
 }
 
 void FauxReader::initialize()
 {
+    if (m_mode == Mode::Uniform || m_mode == Mode::Normal)
+    {
+        if (!m_seedArg->set())
+            m_seed = (uint32_t)std::time(nullptr);
+    }
+
     if (usesRustReader())
     {
         createRustView();
@@ -149,11 +158,7 @@ void FauxReader::initialize()
     }
 
     if (m_mode == Mode::Uniform || m_mode == Mode::Normal)
-    {
-        if (!m_seedArg->set())
-            m_seed = (uint32_t)std::time(nullptr);
         m_generator.seed(m_seed);
-    }
     if (m_mode == Mode::Grid)
     {
         m_bounds.minx = ceil(m_bounds.minx);
@@ -348,6 +353,7 @@ bool FauxReader::processOne(PointRef& point)
 bool FauxReader::usesRustReader() const
 {
     return m_mode == Mode::Constant || m_mode == Mode::Ramp ||
+           m_mode == Mode::Uniform || m_mode == Mode::Normal ||
            m_mode == Mode::Grid || m_mode == Mode::Invalid;
 }
 
@@ -369,6 +375,17 @@ void FauxReader::createRustView()
     addOption(options, "minz", m_bounds.minz);
     addOption(options, "maxz", m_bounds.maxz);
     addOption(options, "number_of_returns", (uint64_t)m_numReturns);
+    if (m_mode == Mode::Uniform || m_mode == Mode::Normal)
+        addOption(options, "seed", (uint64_t)m_seed);
+    if (m_mode == Mode::Normal)
+    {
+        addOption(options, "mean_x", m_mean_x);
+        addOption(options, "mean_y", m_mean_y);
+        addOption(options, "mean_z", m_mean_z);
+        addOption(options, "stdev_x", m_stdev_x);
+        addOption(options, "stdev_y", m_stdev_y);
+        addOption(options, "stdev_z", m_stdev_z);
+    }
 
     pdal_reader_t* reader = pdal_reader_create_faux(options);
     if (!reader)

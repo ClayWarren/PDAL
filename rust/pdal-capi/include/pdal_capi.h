@@ -440,6 +440,9 @@ extern "C"
     pdal_stage_t* pdal_stage_create_ferry(const char* const* from_dims,
                                           const char* const* to_dims,
                                           uint64_t count);
+    pdal_stage_t* pdal_stage_create_ferry_specs(const char* const* specs,
+                                                uint64_t count);
+    bool pdal_stage_validate_assign_statement(const char* statement);
     void pdal_stage_ferry_point(pdal_stage_t* stage, pdal_point_view_t* view,
                                 uint64_t idx);
 

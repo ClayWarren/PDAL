@@ -69,10 +69,12 @@ void SparseSurfaceFilter::addArgs(ProgramArgs& args)
 
 void SparseSurfaceFilter::prepared(PointTableRef table)
 {
-    if (m_groundClass == m_lowPointClass)
-    {
-        throwError("Ground and low point class cannot be equal.");
-    }
+    (void)table;
+    pdal_stage_t* stage = pdal_stage_create_sparsesurface(
+        m_radius, m_groundClass, m_lowPointClass);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void SparseSurfaceFilter::filter(PointView& view)

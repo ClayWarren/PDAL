@@ -78,8 +78,6 @@ void ZsmoothFilter::addDimensions(PointLayoutPtr layout)
 {
     m_p->statDim =
         layout->registerOrAssignDim(m_p->dimName, Dimension::Type::Double);
-    if (m_p->statDim == Dimension::Id::Z)
-        throwError("Can't use 'Z' as output dimension.");
 }
 
 void ZsmoothFilter::prepared(PointTableRef)
@@ -87,6 +85,12 @@ void ZsmoothFilter::prepared(PointTableRef)
     if (m_p->pos < 0.0 || m_p->pos > 100.0)
         throwError("'medicanpercent' value must be in the range [0, 100]");
     m_p->pos /= 100.0;
+
+    pdal_stage_t* stage =
+        pdal_stage_create_zsmooth(m_p->radius, m_p->pos, m_p->dimName.c_str());
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void ZsmoothFilter::filter(PointView& view)

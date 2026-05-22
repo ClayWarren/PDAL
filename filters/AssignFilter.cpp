@@ -61,6 +61,7 @@ struct AssignArgs
 {
     std::vector<AssignRange> m_assignments;
     DimRange m_condition;
+    std::vector<std::string> m_valueStrings;
     std::vector<expr::AssignStatement> m_statements;
 };
 
@@ -132,7 +133,7 @@ void AssignFilter::addArgs(ProgramArgs& args)
     args.add("condition", "Condition for assignment based on range.",
              m_args->m_condition);
     args.add("value", "Value to assign to dimension based on expression.",
-             m_args->m_statements);
+             m_args->m_valueStrings);
 }
 
 void AssignFilter::prepared(PointTableRef table)
@@ -147,6 +148,20 @@ void AssignFilter::prepared(PointTableRef table)
             throwError("Invalid dimension name in 'assignment' option: '" +
                        r.m_name + "'.");
     }
+
+    m_args->m_statements.clear();
+    for (const std::string& value : m_args->m_valueStrings)
+    {
+        if (!pdal_stage_validate_assign_statement(value.c_str()))
+            throwError(pdal_last_error());
+
+        expr::AssignStatement stmt;
+        Utils::StatusWithReason status = Utils::fromString(value, stmt);
+        if (!status)
+            throwError(status.what());
+        m_args->m_statements.push_back(std::move(stmt));
+    }
+
     for (expr::AssignStatement& expr : m_args->m_statements)
     {
         expr::IdentExpression& ident = expr.identExpr();

@@ -378,6 +378,63 @@ pub unsafe extern "C" fn pdal_stage_create_ferry(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a ferry filter stage from dimension specification strings.
+///
+/// # Safety
+///
+/// `specs` must be a valid array of null-terminated strings of length `count`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_ferry_specs(
+    specs: *const *const std::os::raw::c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    if specs.is_null() {
+        set_last_error("null argument to pdal_stage_create_ferry_specs");
+        return std::ptr::null_mut();
+    }
+    let mut spec_strings = Vec::new();
+    for i in 0..count {
+        let spec_ptr = *specs.offset(i as isize);
+        if spec_ptr.is_null() {
+            set_last_error("null ferry dimension specification");
+            return std::ptr::null_mut();
+        }
+        spec_strings.push(CStr::from_ptr(spec_ptr).to_string_lossy().into_owned());
+    }
+    match FerryFilter::parse_specs(&spec_strings) {
+        Ok(dims) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(FerryFilter::new(dims)),
+        })),
+        Err(err) => {
+            set_last_error(&err);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Validate an assign filter value expression.
+///
+/// # Safety
+///
+/// `statement` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_validate_assign_statement(
+    statement: *const std::os::raw::c_char,
+) -> bool {
+    if statement.is_null() {
+        set_last_error("null assign statement");
+        return false;
+    }
+    let statement = CStr::from_ptr(statement).to_string_lossy();
+    match pdal_core::expr::AssignStatement::parse(&statement) {
+        Ok(_) => true,
+        Err(err) => {
+            set_last_error(&err);
+            false
+        }
+    }
+}
+
 /// Copy values between dimensions on a specific point in a PointView.
 ///
 /// # Safety
@@ -754,8 +811,15 @@ pub unsafe extern "C" fn pdal_stage_create_voxeldownsize(ops: *const Options) ->
 #[no_mangle]
 pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
-        let filter = Box::new(SampleFilter::new(options));
-        Box::into_raw(Box::new(StageWrapper { filter }))
+        match SampleFilter::new(options) {
+            Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+                filter: Box::new(filter),
+            })),
+            Err(err) => {
+                set_last_error(&err);
+                std::ptr::null_mut()
+            }
+        }
     } else {
         std::ptr::null_mut()
     }
@@ -825,6 +889,10 @@ pub unsafe extern "C" fn pdal_stage_create_zsmooth(
         return std::ptr::null_mut();
     }
     let dim_name = CStr::from_ptr(dim_name).to_string_lossy().into_owned();
+    if dim_name.eq_ignore_ascii_case("Z") {
+        set_last_error("Can't use 'Z' as output dimension.");
+        return std::ptr::null_mut();
+    }
     let filter = Box::new(ZsmoothFilter::new(radius, position, dim_name));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
@@ -1041,6 +1109,10 @@ pub extern "C" fn pdal_stage_create_sparsesurface(
     ground_class: u8,
     low_point_class: u8,
 ) -> *mut StageWrapper {
+    if ground_class == low_point_class {
+        set_last_error("Ground and low point class cannot be equal.");
+        return std::ptr::null_mut();
+    }
     let filter = Box::new(SparseSurfaceFilter::new(
         radius,
         ground_class,
@@ -1161,6 +1233,10 @@ pub unsafe extern "C" fn pdal_stage_create_divider(
         1 => divider::DividerSizeMode::Capacity,
         _ => divider::DividerSizeMode::Count,
     };
+    if size_mode_enum == divider::DividerSizeMode::Capacity && size == 0 {
+        set_last_error("Option 'capacity' must be greater than 0.");
+        return std::ptr::null_mut();
+    }
     let mut vec_evals = Vec::new();
     if !evals.is_null() {
         let slice = std::slice::from_raw_parts(evals, evals_count as usize);
@@ -1363,6 +1439,13 @@ pub unsafe extern "C" fn pdal_stage_create_radiusassign(
                 value: assignment.value,
             });
         }
+    }
+
+    if assignment_count == 0 {
+        set_last_error(
+            "Empty 'update_epxression' option, must be set to apply any change on the data",
+        );
+        return std::ptr::null_mut();
     }
 
     Box::into_raw(Box::new(StageWrapper {

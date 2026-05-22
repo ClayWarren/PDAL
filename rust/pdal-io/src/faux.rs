@@ -136,9 +136,15 @@ pub struct FauxReader {
 }
 
 impl FauxReader {
-    pub fn new(options: &Options) -> Self {
+    pub fn new(options: &Options) -> Result<Self, String> {
         let mode_str = options.get_str("mode", "ramp");
         let mode = FauxMode::from_str(&mode_str);
+        if options.has("seed") && mode != FauxMode::Uniform && mode != FauxMode::Normal {
+            return Err(format!(
+                "Option 'seed' not supported with mode '{}'.",
+                mode_str
+            ));
+        }
         let mut bounds = Box3d::from_options(options);
         let mut grid_size = (0, 0, 0);
         let mut count = options.get_u64("count", 10);
@@ -154,7 +160,7 @@ impl FauxReader {
             count = grid_count(grid_size);
         }
 
-        Self {
+        Ok(Self {
             mode,
             count,
             bounds,
@@ -167,7 +173,7 @@ impl FauxReader {
             stdev_x: options.get_f64("stdev_x", 1.0),
             stdev_y: options.get_f64("stdev_y", 1.0),
             stdev_z: options.get_f64("stdev_z", 1.0),
-        }
+        })
     }
 
     fn generate_point(&self, idx: u64, rng: &mut SimpleRng) -> (f64, f64, f64) {
@@ -342,7 +348,7 @@ mod tests {
             .add("minz", "1.0")
             .add("maxz", "10.0");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].len(), 10);
@@ -366,7 +372,7 @@ mod tests {
             .add("miny", "2.5")
             .add("minz", "3.5");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         assert_eq!(views[0].len(), 5);
 
@@ -375,6 +381,70 @@ mod tests {
             assert!((views[0].get_f64(i, &DimId::Y) - 2.5).abs() < 1e-10);
             assert!((views[0].get_f64(i, &DimId::Z) - 3.5).abs() < 1e-10);
         }
+    }
+
+    #[test]
+    fn parity_uniform_histogram_seed_2121212() {
+        let mut opts = Options::new();
+        opts.add("count", "1000")
+            .add("mode", "uniform")
+            .add("minx", "0")
+            .add("maxx", "100")
+            .add("miny", "0")
+            .add("maxy", "100")
+            .add("minz", "0")
+            .add("maxz", "100")
+            .add("seed", "2121212");
+
+        let mut reader = FauxReader::new(&opts).unwrap();
+        let views = reader.read().unwrap();
+        let view = &views[0];
+        let mut hx = [0i32; 10];
+        let mut hy = [0i32; 10];
+        let mut hz = [0i32; 10];
+        for i in 0..1000u64 {
+            hx[(view.get_f64(i, &DimId::X) / 10.0) as usize] += 1;
+            hy[(view.get_f64(i, &DimId::Y) / 10.0) as usize] += 1;
+            hz[(view.get_f64(i, &DimId::Z) / 10.0) as usize] += 1;
+        }
+        assert_eq!(hx, [98, 106, 90, 103, 94, 121, 96, 110, 91, 91]);
+        assert_eq!(hy, [94, 114, 96, 99, 117, 97, 81, 101, 91, 110]);
+        assert_eq!(hz, [89, 104, 110, 97, 91, 98, 113, 105, 89, 104]);
+    }
+
+    #[test]
+    fn parity_normal_histogram_seed_2121212() {
+        let mut opts = Options::new();
+        opts.add("count", "1000")
+            .add("mode", "normal")
+            .add("mean_x", "50")
+            .add("mean_y", "100")
+            .add("mean_z", "150")
+            .add("stdev_x", "10")
+            .add("stdev_y", "10")
+            .add("stdev_z", "10")
+            .add("seed", "2121212");
+
+        let mut reader = FauxReader::new(&opts).unwrap();
+        let views = reader.read().unwrap();
+        let view = &views[0];
+        let mut hx = [0i32; 10];
+        let mut hy = [0i32; 10];
+        let mut hz = [0i32; 10];
+        for i in 0..1000u64 {
+            let x = view.get_f64(i, &DimId::X) as i32 / 10;
+            let y = (view.get_f64(i, &DimId::Y) as i32 - 50) / 10;
+            let z = (view.get_f64(i, &DimId::Z) as i32 - 100) / 10;
+            let x = x.clamp(0, 9);
+            let y = y.clamp(0, 9);
+            let z = z.clamp(0, 9);
+            hx[x as usize] += 1;
+            hy[y as usize] += 1;
+            hz[z as usize] += 1;
+        }
+        assert_eq!(hx, [0, 0, 23, 124, 342, 329, 153, 25, 4, 0]);
+        assert_eq!(hy, [0, 1, 26, 124, 347, 345, 128, 27, 2, 0]);
+        assert_eq!(hz, [0, 2, 21, 125, 359, 352, 126, 14, 1, 0]);
     }
 
     #[test]
@@ -390,7 +460,7 @@ mod tests {
             .add("maxz", "10.0")
             .add("seed", "12345");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         assert_eq!(views[0].len(), 100);
 
@@ -417,7 +487,7 @@ mod tests {
             .add("stdev_z", "1.0")
             .add("seed", "99999");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         assert_eq!(views[0].len(), 100);
 
@@ -434,7 +504,7 @@ mod tests {
         let mut opts = Options::new();
         opts.add("count", "5").add("mode", "ramp");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
 
         for i in 0..5u64 {
@@ -450,7 +520,7 @@ mod tests {
             .add("count", "3")
             .add("mode", "constant");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
 
         for i in 0..3u64 {
@@ -467,7 +537,7 @@ mod tests {
             .add("mode", "constant")
             .add("number_of_returns", "3");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         let view = &views[0];
 
@@ -483,7 +553,7 @@ mod tests {
         opts.add("bounds", "([0, 2],[0, 3],[0, 2])")
             .add("mode", "grid");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
         let view = &views[0];
         assert_eq!(view.len(), 12);
@@ -514,7 +584,7 @@ mod tests {
         let mut opts = Options::new();
         opts.add("count", "2").add("mode", "invalid");
 
-        let mut reader = FauxReader::new(&opts);
+        let mut reader = FauxReader::new(&opts).unwrap();
         let views = reader.read().unwrap();
 
         assert!(views[0].get_f64(0, &DimId::OffsetTime).is_nan());

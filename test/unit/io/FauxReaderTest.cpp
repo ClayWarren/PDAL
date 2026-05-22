@@ -263,9 +263,9 @@ TEST(FauxReaderTest, uniform)
         hz[z]++;
     }
 
-    int xtot[] = {117, 95, 94, 93, 90, 118, 102, 97, 102, 92};
-    int ytot[] = {92, 110, 105, 100, 98, 114, 83, 93, 108, 97};
-    int ztot[] = {92, 99, 106, 100, 105, 106, 109, 88, 84, 111};
+    int xtot[] = {98, 106, 90, 103, 94, 121, 96, 110, 91, 91};
+    int ytot[] = {94, 114, 96, 99, 117, 97, 81, 101, 91, 110};
+    int ztot[] = {89, 104, 110, 97, 91, 98, 113, 105, 89, 104};
 
     for (size_t i = 0; i < 10; ++i)
     {
@@ -302,9 +302,9 @@ TEST(FauxReaderTest, normal)
     double hz[10]{};
     for (size_t i = 0; i < 1000; ++i)
     {
-        int x = v->getFieldAs<int>(Dimension::Id::X, i) / 10;
-        int y = (v->getFieldAs<int>(Dimension::Id::Y, i) - 50) / 10;
-        int z = (v->getFieldAs<int>(Dimension::Id::Z, i) - 100) / 10;
+        int x = static_cast<int>(v->getFieldAs<double>(Dimension::Id::X, i)) / 10;
+        int y = (static_cast<int>(v->getFieldAs<double>(Dimension::Id::Y, i)) - 50) / 10;
+        int z = (static_cast<int>(v->getFieldAs<double>(Dimension::Id::Z, i)) - 100) / 10;
         x = Utils::clamp(x, 0, 9);
         y = Utils::clamp(y, 0, 9);
         z = Utils::clamp(z, 0, 9);
@@ -313,9 +313,9 @@ TEST(FauxReaderTest, normal)
         hz[z]++;
     }
 
-    int xtot[] = {0, 3, 19, 145, 313, 340, 156, 22, 2, 0};
-    int ytot[] = {0, 1, 23, 129, 355, 333, 134, 23, 2, 0};
-    int ztot[] = {0, 0, 20, 131, 339, 357, 118, 31, 4, 0};
+    int xtot[] = {0, 0, 23, 124, 342, 329, 153, 25, 4, 0};
+    int ytot[] = {0, 1, 26, 124, 347, 345, 128, 27, 2, 0};
+    int ztot[] = {0, 2, 21, 125, 359, 352, 126, 14, 1, 0};
 
     for (size_t i = 0; i < 10; ++i)
     {

@@ -16,7 +16,7 @@ fn test_reprojection_lat_lon_to_utm() {
     reader_options.add("minz", 0.0);
     reader_options.add("maxz", 0.0);
 
-    let mut reader = FauxReader::new(&reader_options);
+    let mut reader = FauxReader::new(&reader_options).unwrap();
     let mut views = reader.read().unwrap();
     let mut view = views.remove(0);
     view.set_spatial_reference(pdal_core::srs::SpatialReference::new("EPSG:4326"));

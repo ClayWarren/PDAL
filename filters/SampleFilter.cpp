@@ -77,12 +77,6 @@ void SampleFilter::addArgs(ProgramArgs& args)
 
 void SampleFilter::prepared(PointTableRef table)
 {
-    if (m_cellArg->set() && m_radiusArg->set())
-        throwError("Must set only one of 'cell' or 'radius'.");
-
-    if (!m_cellArg->set() && !m_radiusArg->set())
-        throwError("Must set 'cell' or 'radius' but not both.");
-
     PointLayoutPtr layout(table.layout());
 
     if (m_dimensionArg->set())
@@ -90,6 +84,26 @@ void SampleFilter::prepared(PointTableRef table)
         m_dimension = layout->registerOrAssignDim(m_dimensionName,
                                                   Dimension::Type::Unsigned8);
     }
+
+    pdal_options_t* ops = pdal_options_create();
+    if (m_cellArg->set())
+        pdal_options_add_f64(ops, "cell", m_cell);
+    if (m_radiusArg->set())
+        pdal_options_add_f64(ops, "radius", m_radius);
+    if (m_dimensionArg->set())
+        pdal_options_add_str(ops, "dimension", m_dimensionName.c_str());
+    if (m_originXArg->set())
+        pdal_options_add_f64(ops, "origin_x", m_originX);
+    if (m_originYArg->set())
+        pdal_options_add_f64(ops, "origin_y", m_originY);
+    if (m_originZArg->set())
+        pdal_options_add_f64(ops, "origin_z", m_originZ);
+
+    pdal_stage_t* stage = pdal_stage_create_sample(ops);
+    pdal_options_destroy(ops);
+    if (!stage)
+        throwError(pdal_last_error());
+    pdal_stage_destroy(stage);
 }
 
 void SampleFilter::ready(PointTableRef)
