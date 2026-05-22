@@ -81,7 +81,7 @@ COVERED: dict[str, object] = {
     "pdal_segmentation_test": ALL,
     "pdal_filespec_test": ALL,
     "pdal_dimension_test": ALL,
-    "pdal_point_table_test": {"resolveType"},
+    "pdal_point_table_test": {"resolveType", "layoutLimit", "userView"},
     "pdal_kernel_test": ALL,
     "pdal_config_test": ALL,
     "pdal_log_test": {"t1"},

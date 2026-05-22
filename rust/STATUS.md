@@ -138,10 +138,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `660 / 926` built C++ GoogleTest cases, or `71.27%`, are
+Current checkpoint: `662 / 926` built C++ GoogleTest cases, or `71.49%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit metadata construction/update paths, buffer stats execution,
-XMLSchema round-trip parsing helpers, and OGRSpec JSON validation.
+gains audit PointTable layout limits and LAS userView reads, metadata
+construction/update, buffer stats execution, and XMLSchema round-trip parsing.
 This remains a conservative lower bound, not a final port-completion percentage:
 42 built test binaries remain unclassified by the audit script. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
