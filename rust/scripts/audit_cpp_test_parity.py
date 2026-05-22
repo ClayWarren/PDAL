@@ -14,7 +14,7 @@ COVERED: dict[str, object] = {
     "pdal_kdindex_test": ALL,
     "pdal_spatial_reference_test": {"calcZone", "wgs84FromZone"},
     "pdal_point_view_test": {"calculateBounds"},
-    "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological", "computeCentroid"},
+    "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological", "computeCentroid", "demeanTest"},
     "pdal_bounds_test": {
         "test_ctor",
         "test_equals",
@@ -100,7 +100,7 @@ COVERED: dict[str, object] = {
     "pdal_quad_index_test": ALL,
     "pdal_xml_schema_test": {"legacyNames"},
     "pdal_uuid_test": ALL,
-    "pdal_ogr_arg_test": {"parseErrors"},
+    "pdal_ogr_arg_test": {"parseErrors", "createFromFile"},
     "pdal_filters_crop_test": {
         "create",
         "test_crop",
