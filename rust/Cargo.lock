@@ -857,6 +857,7 @@ dependencies = [
 name = "pdal-capi"
 version = "0.0.0"
 dependencies = [
+ "glob",
  "pdal-core",
  "pdal-filters",
  "pdal-io",

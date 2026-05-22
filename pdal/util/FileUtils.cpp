@@ -77,6 +77,11 @@ bool isStdout(std::string filename)
            Utils::toupper(filename) == "STDOUT";
 }
 
+bool isVsiPath(const std::string& path)
+{
+    return path.compare(0, 4, "/vsi") == 0;
+}
+
 std::string takeRustString(char* value)
 {
     if (!value)
@@ -211,6 +216,10 @@ std::ostream* openExisting(const std::string& name, bool asBinary)
 
 bool directoryExists(const std::string& dirname)
 {
+    if (!isVsiPath(dirname))
+    {
+        return pdal_file_utils_directory_exists(dirname.c_str());
+    }
     VSIStatBufL sStat;
     if (VSIStatL(dirname.c_str(), &sStat) == 0)
     {
@@ -224,6 +233,15 @@ bool directoryExists(const std::string& dirname)
 
 bool createDirectory(const std::string& dirname)
 {
+    if (!isVsiPath(dirname))
+    {
+        int32_t res = pdal_file_utils_create_directory(dirname.c_str());
+        if (res == -1)
+        {
+            throw std::runtime_error(pdal_last_error());
+        }
+        return res == 1;
+    }
     std::string pth = CPLCleanTrailingSlash(dirname.c_str());
     if (VSIMkdir(pth.c_str(), 0755) != 0)
     {
@@ -243,6 +261,15 @@ bool createDirectory(const std::string& dirname)
 
 bool createDirectories(const std::string& dirname)
 {
+    if (!isVsiPath(dirname))
+    {
+        int32_t res = pdal_file_utils_create_directories(dirname.c_str());
+        if (res == -1)
+        {
+            throw std::runtime_error(pdal_last_error());
+        }
+        return res == 1;
+    }
     std::string pth = CPLCleanTrailingSlash(dirname.c_str());
     if (VSIMkdirRecursive(pth.c_str(), 0755) != 0)
     {
@@ -262,11 +289,24 @@ bool createDirectories(const std::string& dirname)
 
 void deleteDirectory(const std::string& dirname)
 {
+    if (!isVsiPath(dirname))
+    {
+        pdal_file_utils_delete_directory(dirname.c_str());
+        return;
+    }
     VSIRmdirRecursive(dirname.c_str());
 }
 
 std::vector<std::string> directoryList(const std::string& dir)
 {
+    if (!isVsiPath(dir))
+    {
+        char* res = pdal_file_utils_directory_list(dir.c_str());
+        std::string s = takeRustString(res);
+        if (s.empty())
+            return {};
+        return Utils::split(s, '\n');
+    }
     std::vector<std::string> files;
     CPLStringList aosFileList(VSIReadDir(dir.c_str()));
     for (int i = 0; i < aosFileList.size(); i++)
@@ -295,11 +335,20 @@ void closeFile(std::istream* in)
 
 bool deleteFile(const std::string& file)
 {
+    if (!isVsiPath(file))
+    {
+        return pdal_file_utils_delete_file(file.c_str());
+    }
     return (VSIUnlink(file.c_str()) == 0) ? true : false;
 }
 
 void renameFile(const std::string& dest, const std::string& src)
 {
+    if (!isVsiPath(dest) && !isVsiPath(src))
+    {
+        pdal_file_utils_rename_file(dest.c_str(), src.c_str());
+        return;
+    }
     VSIRename(src.c_str(), dest.c_str());
 }
 
@@ -308,6 +357,10 @@ bool fileExists(const std::string& name)
     if (isStdin(name))
         return true;
 
+    if (!isVsiPath(name))
+    {
+        return pdal_file_utils_file_exists(name.c_str());
+    }
     VSIStatBufL sStat;
     return (VSIStatExL(name.c_str(), &sStat, VSI_STAT_EXISTS_FLAG) == 0)
                ? true
@@ -317,6 +370,10 @@ bool fileExists(const std::string& name)
 /// \return  0 on error or invalid file type.
 uintmax_t fileSize(const std::string& file)
 {
+    if (!isVsiPath(file))
+    {
+        return pdal_file_utils_file_size(file.c_str());
+    }
     VSIStatBufL sStat;
     if (VSIStatL(file.c_str(), &sStat) == 0)
     {
@@ -327,6 +384,11 @@ uintmax_t fileSize(const std::string& file)
 
 std::string readFileIntoString(const std::string& filename)
 {
+    if (!isVsiPath(filename))
+    {
+        char* res = pdal_file_utils_read_file_into_string(filename.c_str());
+        return takeRustString(res);
+    }
     std::string str;
 
     std::istream* stream = openFile(filename, false);
@@ -425,6 +487,15 @@ std::vector<std::string> glob(std::string path)
 
     if (path[0] == '~')
         throw pdal::pdal_error("PDAL does not support shell expansion");
+
+    if (!isVsiPath(path))
+    {
+        char* res = pdal_file_utils_glob(path.c_str());
+        std::string s = takeRustString(res);
+        if (s.empty())
+            return {};
+        return Utils::split(s, '\n');
+    }
 
 #ifdef _WIN32
 #ifdef PDAL_WIN32_STL

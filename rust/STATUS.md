@@ -138,9 +138,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `713 / 926` built C++ GoogleTest cases, or `77.00%`, are
+Current checkpoint: `719 / 926` built C++ GoogleTest cases, or `77.65%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit path-based Support::diff_files and Support::diff_text_files routing,
+gains audit file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
+path-based Support::diff_files and Support::diff_text_files routing,
 PointTable layout limits, LAS userView reads, metadata
 construction/update, buffer stats execution, XMLSchema round-trip parsing,
 hexbin filter execution cases, COPC reader multi-input handling, EPT reader
@@ -218,10 +219,9 @@ Known mixed binaries:
   `simpleWordexpTest`, `splitChar`, `split2Char`, `case`, `starts`, and
   `iequals` count. Other utility cases still test C++ templates, stream
   helpers, process helpers, or local formatting behavior.
-- `pdal_file_utils_test`: only `test_toAbsolutePath`, `test_getDirectory`,
-  `test_isAbsolute`, `filename`, `extension`, and `stem` count. Path
-  normalization helpers route through the Rust C ABI. Filesystem mutation,
-  VSI, glob, Unicode filesystem behavior, and mmap behavior remain C++/GDAL.
+- `pdal_file_utils_test`: all 12 tests count. Standard filesystem operations,
+  directory list/creation/deletion, globbing, and file size/existence queries route
+  through the Rust C ABI, while virtual filesystem (`/vsi`) paths fall back to C++/GDAL.
 - `pdal_georeference_test`: only the 5 `Georeference.*` tests count;
   WGS84 georeference math routes through the Rust C ABI. `RotationMatrix`
   construction tests remain C++.

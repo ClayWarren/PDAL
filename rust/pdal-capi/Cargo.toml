@@ -14,3 +14,4 @@ pdal-filters = { path = "../pdal-filters" }
 pdal-io = { path = "../pdal-io" }
 pdal-native = { path = "../pdal-native" }
 serde_json = "1"
+glob = "0.3"

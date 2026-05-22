@@ -105,6 +105,11 @@ extern "C"
     void pdal_file_utils_delete_directory(const char* dirname);
     bool pdal_file_utils_delete_file(const char* filename);
     void pdal_file_utils_rename_file(const char* dest, const char* src);
+    bool pdal_file_utils_file_exists(const char* filename);
+    uint64_t pdal_file_utils_file_size(const char* filename);
+    char* pdal_file_utils_read_file_into_string(const char* filename);
+    char* pdal_file_utils_directory_list(const char* dirname);
+    char* pdal_file_utils_glob(const char* pattern);
     char* pdal_utils_getenv(const char* name);
     int32_t pdal_utils_setenv(const char* name, const char* value);
     int32_t pdal_utils_unsetenv(const char* name);

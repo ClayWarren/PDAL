@@ -509,6 +509,62 @@ pub unsafe extern "C" fn pdal_file_utils_rename_file(dest: *const c_char, src: *
     let _ = std::fs::rename(Path::new(&src_str), Path::new(&dest_str));
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_file_exists(filename: *const c_char) -> bool {
+    let path_str = c_string(filename);
+    Path::new(&path_str).exists()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_file_size(filename: *const c_char) -> u64 {
+    let path_str = c_string(filename);
+    std::fs::metadata(Path::new(&path_str))
+        .map(|m| m.len())
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(filename: *const c_char) -> *mut c_char {
+    let path_str = c_string(filename);
+    match std::fs::read_to_string(Path::new(&path_str)) {
+        Ok(content) => string_to_c(content),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) -> *mut c_char {
+    let path_str = c_string(dirname);
+    if let Ok(entries) = std::fs::read_dir(Path::new(&path_str)) {
+        let mut paths = Vec::new();
+        for entry in entries {
+            if let Ok(entry) = entry {
+                paths.push(entry.path().to_string_lossy().into_owned());
+            }
+        }
+        string_to_c(paths.join("\n"))
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_file_utils_glob(pattern: *const c_char) -> *mut c_char {
+    let pat = c_string(pattern);
+    match glob::glob(&pat) {
+        Ok(entries) => {
+            let mut paths = Vec::new();
+            for entry in entries {
+                if let Ok(path) = entry {
+                    paths.push(path.to_string_lossy().into_owned());
+                }
+            }
+            string_to_c(paths.join("\n"))
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 #[repr(C)]
 pub struct pdal_xyz_t {
     pub x: f64,
