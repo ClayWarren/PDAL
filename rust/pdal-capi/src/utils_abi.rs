@@ -1,9 +1,9 @@
 use pdal_core::utils::{
-    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, escape_json,
-    escape_nonprinting_bytes, format_f64, format_i32, get_env, iequals, looks_like_json,
-    normalize_longitude, parse_f64, parse_i32, random, random_seed, replace_all, run_shell_command,
-    set_env, simple_wordexp, split2_char, split_char, starts_with, to_lower, to_upper,
-    trim_leading, trim_trailing, unset_env, word_wrap, word_wrap2,
+    base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, diff_files,
+    diff_text_files, escape_json, escape_nonprinting_bytes, format_f64, format_i32, get_env,
+    iequals, looks_like_json, normalize_longitude, parse_f64, parse_i32, random, random_seed,
+    replace_all, run_shell_command, set_env, simple_wordexp, split2_char, split_char, starts_with,
+    to_lower, to_upper, trim_leading, trim_trailing, unset_env, word_wrap, word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -627,4 +627,38 @@ pub extern "C" fn pdal_barycentric_interpolation(
     }
 
     (area12 * z3 + area23 * z1 + area31 * z2) / area_total
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_support_diff_files(
+    file1: *const c_char,
+    file2: *const c_char,
+    ignorable_starts: *const u32,
+    ignorable_lengths: *const u32,
+    num_ignorables: u32,
+) -> u32 {
+    let f1 = c_string(file1);
+    let f2 = c_string(file2);
+    let starts = if ignorable_starts.is_null() || num_ignorables == 0 {
+        &[]
+    } else {
+        std::slice::from_raw_parts(ignorable_starts, num_ignorables as usize)
+    };
+    let lengths = if ignorable_lengths.is_null() || num_ignorables == 0 {
+        &[]
+    } else {
+        std::slice::from_raw_parts(ignorable_lengths, num_ignorables as usize)
+    };
+    diff_files(&f1, &f2, starts, lengths)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_support_diff_text_files(
+    file1: *const c_char,
+    file2: *const c_char,
+    ignore_line: i32,
+) -> u32 {
+    let f1 = c_string(file1);
+    let f2 = c_string(file2);
+    diff_text_files(&f1, &f2, ignore_line)
 }

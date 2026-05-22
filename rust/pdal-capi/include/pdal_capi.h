@@ -123,6 +123,14 @@ extern "C"
                                               size_t* out_pos);
     char* pdal_writer_replace_tags(const char* filename);
 
+    // Support utils
+    uint32_t pdal_support_diff_files(
+        const char* file1, const char* file2,
+        const uint32_t* ignorable_start, const uint32_t* ignorable_length,
+        uint32_t num_ignorables);
+    uint32_t pdal_support_diff_text_files(const char* file1, const char* file2,
+                                          int32_t ignore_line);
+
     // Streaming zlib (DEFLATE) compression
     pdal_deflate_compressor_t* pdal_deflate_compressor_create();
     bool pdal_deflate_compressor_update(pdal_deflate_compressor_t* compressor,

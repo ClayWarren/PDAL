@@ -78,6 +78,7 @@ COVERED: dict[str, object] = {
     "pdal_i3s_obb_test": ALL,
     "pdal_math_utils_test": ALL,
     "pdal_scaling_test": ALL,
+    "pdal_support_test": ALL,
     "pdal_segmentation_test": ALL,
     "pdal_filespec_test": ALL,
     "pdal_dimension_test": ALL,
