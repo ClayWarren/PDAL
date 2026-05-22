@@ -131,6 +131,82 @@ std::string Utils::toString(int from)
 #endif
 }
 
+template <>
+Utils::StatusWithReason Utils::fromString(const std::string& from, int& to)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    pdal_clear_error();
+    if (pdal_utils_from_string_i32(from.c_str(), &to) == 0)
+        return true;
+    return {-1, pdal_last_error()};
+#else
+    static thread_local Utils::IStringStreamClassicLocale iss;
+    iss.clear();
+    iss.str(from);
+
+    iss >> to;
+    bool failure = iss.fail();
+    auto pos = iss.tellg();
+    if (pos > 0)
+        return {-1, "Found '" + from.substr(pos) +
+                        "' after valid integral value of '" +
+                        from.substr(0, pos) + "'."};
+    return !failure;
+#endif
+}
+
+template <>
+bool Utils::numericCast(float in, double& out)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_numeric_cast_f32_to_f64(in, &out);
+#else
+    out = static_cast<double>(in);
+    return true;
+#endif
+}
+
+template <>
+bool Utils::numericCast(double in, float& out)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    return pdal_utils_numeric_cast_f64_to_f32(in, &out);
+#else
+    if ((in <= static_cast<double>((std::numeric_limits<float>::max)()) &&
+         in >= static_cast<double>(std::numeric_limits<float>::lowest())) ||
+        std::isnan(in))
+    {
+        out = static_cast<float>(in);
+        return true;
+    }
+    return false;
+#endif
+}
+
+template <>
+Utils::StatusWithReason Utils::fromString(const std::string& s, double& d)
+{
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+    pdal_clear_error();
+    if (pdal_utils_from_string_f64(s.c_str(), &d) == 0)
+        return true;
+    return false;
+#else
+    if (s == "nan" || s == "NaN")
+    {
+        d = std::numeric_limits<double>::quiet_NaN();
+        return true;
+    }
+
+    static thread_local Utils::IStringStreamClassicLocale iss;
+    iss.clear();
+    iss.str(s);
+
+    iss >> d;
+    return !iss.fail();
+#endif
+}
+
 void Utils::random_seed(unsigned int seed)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI

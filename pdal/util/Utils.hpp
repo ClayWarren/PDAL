@@ -741,17 +741,8 @@ template <typename T_IN, typename T_OUT> bool numericCast(T_IN in, T_OUT& out)
   \return  \c true if the conversion was successful, \c false if the
     datatypes/input value don't allow conversion.
 */
-template <> inline bool numericCast(double in, float& out)
-{
-    if ((in <= static_cast<double>((std::numeric_limits<float>::max)()) &&
-         in >= static_cast<double>(std::numeric_limits<float>::lowest())) ||
-        std::isnan(in))
-    {
-        out = static_cast<float>(in);
-        return true;
-    }
-    return false;
-}
+template <> PDAL_EXPORT bool numericCast(float in, double& out);
+template <> PDAL_EXPORT bool numericCast(double in, float& out);
 
 /**
   Wrapper around a stream to be sure that uses classic locale.
@@ -983,6 +974,8 @@ StatusWithReason fromString(const std::string& from, T& to)
     return !failure;
 }
 
+template <> PDAL_EXPORT StatusWithReason fromString(const std::string& from, int& to);
+
 // Optimization of above.
 template <>
 inline StatusWithReason fromString(const std::string& from, std::string& to)
@@ -1091,21 +1084,7 @@ inline StatusWithReason fromString(const std::string& s, signed char& to)
   \param d  Converted value.
   \return  \c true if the conversion was successful, \c false otherwise.
 */
-template <> inline StatusWithReason fromString(const std::string& s, double& d)
-{
-    if (s == "nan" || s == "NaN")
-    {
-        d = std::numeric_limits<double>::quiet_NaN();
-        return true;
-    }
-
-    static thread_local Utils::IStringStreamClassicLocale iss;
-    iss.clear();
-    iss.str(s);
-
-    iss >> d;
-    return !iss.fail(); // should it be  iss.eof() && !iss.fail() ?
-}
+template <> PDAL_EXPORT StatusWithReason fromString(const std::string& s, double& d);
 
 /**
   Return the argument cast to its underlying type.  Typically used on

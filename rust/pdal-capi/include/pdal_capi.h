@@ -112,6 +112,10 @@ extern "C"
     bool pdal_utils_compare_approx(double v1, double v2, double tolerance);
     char* pdal_utils_to_string_f64(double value, uint32_t precision);
     char* pdal_utils_to_string_i32(int32_t value);
+    int32_t pdal_utils_from_string_i32(const char* value, int32_t* out);
+    int32_t pdal_utils_from_string_f64(const char* value, double* out);
+    bool pdal_utils_numeric_cast_f32_to_f64(float value, double* out);
+    bool pdal_utils_numeric_cast_f64_to_f32(double value, float* out);
 
     // Writer filename templates
     bool pdal_writer_handle_filename_template(const char* filename,
@@ -562,6 +566,7 @@ extern "C"
 
     pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_sample(const pdal_options_t* ops);
+    pdal_stage_t* pdal_stage_create_hexbin(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_faceraster(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_radialdensity(double radius);
     pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);

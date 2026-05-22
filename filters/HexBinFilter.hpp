@@ -38,6 +38,9 @@
 #include <pdal/Streamable.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
+struct pdal_stage;
+typedef struct pdal_stage pdal_stage_t;
+
 namespace hexer
 {
 class BaseGrid;
@@ -77,7 +80,12 @@ private:
     SpatialReference m_srs;
     std::string m_driver;
 
+    pdal_stage* m_rustStage;
+    bool m_usedRust;
+
     void addArgs(ProgramArgs& args) override;
+    bool useRustPath() const;
+    PointViewSet run(PointViewPtr view) override;
     void initialize() override;
     void ready(PointTableRef table) override;
     void filter(PointView& view) override;

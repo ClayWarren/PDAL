@@ -34,6 +34,9 @@
 
 #include "HexBinFilter.hpp"
 
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
+
 #include "private/hexer/H3grid.hpp"
 #include "private/hexer/HexGrid.hpp"
 
@@ -53,9 +56,13 @@ static PluginInfo const s_info =
 
 CREATE_STATIC_STAGE(HexBin, s_info)
 
-HexBin::HexBin() {}
+HexBin::HexBin() : m_rustStage(nullptr), m_usedRust(false) {}
 
-HexBin::~HexBin() {}
+HexBin::~HexBin()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 std::string HexBin::getName() const
 {
@@ -107,6 +114,46 @@ void HexBin::addArgs(ProgramArgs& args)
              "GDAL OGR vector driver for writing with 'density' or 'boundary' "
              "options.",
              m_driver, "GeoJSON");
+}
+
+bool HexBin::useRustPath() const
+{
+    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1;
+}
+
+PointViewSet HexBin::run(PointViewPtr view)
+{
+    if (useRustPath() && !view->empty())
+    {
+        if (m_rustStage)
+            pdal_stage_destroy(m_rustStage);
+
+        pdal_options_t* ops = pdal_options_create();
+        if (m_edgeLength > 0)
+            pdal_options_add_f64(ops, "edge_length", m_edgeLength);
+        pdal_options_add_u64(ops, "threshold", m_density);
+        pdal_options_add_u64(ops, "sample_size", m_sampleSize);
+        if (!m_DensityOutput.empty())
+            pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
+
+        m_rustStage = pdal_stage_create_hexbin(ops);
+        pdal_options_destroy(ops);
+        if (!m_rustStage)
+            throwError("Failed to create Rust hexbin stage.");
+
+        m_usedRust = true;
+        rust_view_converter::runInPlace(m_rustStage, *view);
+        PointViewSet viewSet;
+        viewSet.insert(view);
+        return viewSet;
+    }
+
+    m_usedRust = false;
+    PointViewSet viewSet;
+    if (!view->empty())
+        filter(*view);
+    viewSet.insert(view);
+    return viewSet;
 }
 
 void HexBin::initialize()
@@ -235,6 +282,25 @@ bool HexBin::createGrid()
 
 void HexBin::done(PointTableRef table)
 {
+    if (m_usedRust)
+    {
+        m_metadata.add("threshold", m_density,
+                       "Minimum number of points inside a hexagon to be "
+                       "considered full");
+        m_metadata.add(
+            "sample_size", m_sampleSize,
+            "Number of samples used for "
+            "estimating hexagon edge size. Only used if 'edge_length' or "
+            "'h3_resolution' is not set.");
+        if (m_rustStage)
+        {
+            pdal_stage_destroy(m_rustStage);
+            m_rustStage = nullptr;
+        }
+        m_usedRust = false;
+        return;
+    }
+
     if (!createGrid())
         return;
 

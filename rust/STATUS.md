@@ -138,13 +138,12 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `635 / 926` built C++ GoogleTest cases, or `68.57%`, are
+Current checkpoint: `647 / 926` built C++ GoogleTest cases, or `69.87%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route Utils compare_approx/toString, GDAL writer metadata and SRS
-override/default handling, DEFLATE compression, and additional Utils split audit
-entries through the Rust C ABI. The prior `623 / 925` checkpoint added
-georeference validation, stats summary merge, colorinterp prepared/streamability
-validation, transformation matrix parse/format, and memory-view shape parsing.
+gains route Utils fromString/numeric_cast, Options conditional/toCommandLine
+cases, EPT reader Rust error/full-read paths, pipeline writer tag generation,
+filters.hexbin (non-H3 pass-through), and restored Utils/GDAL/HAG audit entries
+through the Rust C ABI.
 a conservative lower bound, not a final port-completion percentage: 42 built
 test binaries remain unclassified by the audit script. The previous `927 / 927`
 claim was withdrawn because it mixed a hand-maintained numerator with a

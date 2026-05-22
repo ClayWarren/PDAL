@@ -30,6 +30,7 @@ use pdal_filters::h3::H3Filter;
 use pdal_filters::hag_dem::HagDemFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
+use pdal_filters::hexbin::HexBinFilter;
 use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
 use pdal_filters::locate::LocateFilter;
@@ -990,6 +991,36 @@ pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut S
                 std::ptr::null_mut()
             }
         }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// Create a hexbin filter stage from options.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut StageWrapper {
+    if let Some(options) = ops.as_ref() {
+        let edge = if options.has("edge_length") {
+            Some(options.get_f64("edge_length", 0.0))
+        } else if options.has("edge_size") {
+            Some(options.get_f64("edge_size", 0.0))
+        } else {
+            None
+        };
+        let density = options.get_str("density", "");
+        let filter = HexBinFilter::new(
+            edge,
+            options.get_u64("threshold", 15) as u32,
+            options.get_u64("sample_size", 5000) as usize,
+            (!density.is_empty()).then_some(density),
+        );
+        Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        }))
     } else {
         std::ptr::null_mut()
     }

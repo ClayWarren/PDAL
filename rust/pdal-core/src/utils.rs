@@ -198,6 +198,74 @@ pub fn format_i32(value: i32) -> String {
     value.to_string()
 }
 
+pub fn parse_i32(value: &str) -> Result<i32, String> {
+    let bytes = value.as_bytes();
+    let mut pos = 0usize;
+    while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
+        pos += 1;
+    }
+    if pos == bytes.len() {
+        return Err("empty input".to_string());
+    }
+
+    let start = pos;
+    if bytes[pos] == b'+' || bytes[pos] == b'-' {
+        pos += 1;
+    }
+    if pos == bytes.len() || !bytes[pos].is_ascii_digit() {
+        return Err(format!("invalid integer value '{}'", value));
+    }
+    while pos < bytes.len() && bytes[pos].is_ascii_digit() {
+        pos += 1;
+    }
+
+    let int_text = std::str::from_utf8(&bytes[start..pos])
+        .map_err(|_| format!("invalid integer value '{}'", value))?;
+    let parsed = int_text
+        .parse::<i32>()
+        .map_err(|_| format!("invalid integer value '{}'", value))?;
+
+    while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
+        pos += 1;
+    }
+    if pos != bytes.len() {
+        return Err(format!(
+            "Found '{}' after valid integral value of '{}'.",
+            &value[pos..],
+            &value[..pos]
+        ));
+    }
+
+    Ok(parsed)
+}
+
+pub fn numeric_cast_f32_to_f64(value: f32) -> Option<f64> {
+    Some(f64::from(value))
+}
+
+pub fn numeric_cast_f64_to_f32(value: f64) -> Option<f32> {
+    if value.is_nan() {
+        return Some(f32::NAN);
+    }
+    let max = f64::from(f32::MAX);
+    let min = f64::from(f32::MIN);
+    if value <= max && value >= min {
+        Some(value as f32)
+    } else {
+        None
+    }
+}
+
+pub fn parse_f64(value: &str) -> Result<f64, String> {
+    let trimmed = value.trim();
+    if trimmed.eq_ignore_ascii_case("nan") {
+        return Ok(f64::NAN);
+    }
+    trimmed
+        .parse::<f64>()
+        .map_err(|_| format!("invalid floating point value '{value}'"))
+}
+
 pub fn base64_encode(bytes: &[u8]) -> String {
     const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
@@ -504,6 +572,32 @@ mod tests {
         assert_eq!(format_f64(-f64::INFINITY, 10), "-Infinity");
         assert_eq!(format_f64(1.2365, 10), "1.2365");
         assert_eq!(format_i32(12_365_565), "12365565");
+    }
+
+    #[test]
+    fn numeric_cast_matches_cpp_utils() {
+        let nan_f32 = f32::NAN;
+        assert!(numeric_cast_f32_to_f64(nan_f32).unwrap().is_nan());
+        assert!(numeric_cast_f64_to_f32(f64::NAN).unwrap().is_nan());
+        assert_eq!(
+            numeric_cast_f32_to_f64(1.5).unwrap(),
+            1.5
+        );
+
+        let too_large = f64::from(f32::MAX) * 2.0;
+        assert!(numeric_cast_f64_to_f32(too_large).is_none());
+        assert!(numeric_cast_f64_to_f32(f64::from(f32::MAX) / 2.0).is_some());
+    }
+
+    #[test]
+    fn parses_numeric_strings_like_cpp_utils() {
+        assert_eq!(parse_i32("12345").unwrap(), 12345);
+        assert!(parse_i32("12345.123").is_err());
+        assert_eq!(parse_f64("12345.34").unwrap(), 12345.34);
+        assert_eq!(parse_f64("12345").unwrap(), 12345.0);
+        assert!(parse_f64("foo").is_err());
+        assert!(parse_f64("12345.34abc").is_err());
+        assert!(parse_f64("NaN").unwrap().is_nan());
     }
 
     #[test]
