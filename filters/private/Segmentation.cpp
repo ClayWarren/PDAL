@@ -160,47 +160,49 @@ void segmentReturns(PointViewPtr input, PointViewPtr first, PointViewPtr second,
 {
     using namespace Dimension;
 
+    if (!returns.size())
+    {
+        first->append(*input);
+        return;
+    }
+
     bool returnFirst = false;
     bool returnIntermediate = false;
     bool returnLast = false;
     bool returnOnly = false;
-
-    if (!returns.size())
+    for (auto& r : returns)
     {
-        first->append(*input);
+        Utils::trim(r);
+        if (r == "first")
+            returnFirst = true;
+        else if (r == "intermediate")
+            returnIntermediate = true;
+        else if (r == "last")
+            returnLast = true;
+        else if (r == "only")
+            returnOnly = true;
     }
-    else
+
+    // Classify each point's return type through the Rust C ABI.
+    const size_t count = input->size();
+    std::vector<uint8_t> rn(count);
+    std::vector<uint8_t> nr(count);
+    std::vector<uint8_t> toFirst(count, 0);
+    for (PointId i = 0; i < count; ++i)
     {
-        for (auto& r : returns)
-        {
-            Utils::trim(r);
-            if (r == "first")
-                returnFirst = true;
-            else if (r == "intermediate")
-                returnIntermediate = true;
-            else if (r == "last")
-                returnLast = true;
-            else if (r == "only")
-                returnOnly = true;
-        }
+        rn[i] = input->getFieldAs<uint8_t>(Id::ReturnNumber, i);
+        nr[i] = input->getFieldAs<uint8_t>(Id::NumberOfReturns, i);
+    }
+    pdal_segmentation_segment_returns(rn.data(), nr.data(), count, returnFirst,
+                                     returnIntermediate, returnLast, returnOnly,
+                                     toFirst.data());
 
-        for (PointId i = 0; i < input->size(); ++i)
-        {
-            uint8_t rn = input->getFieldAs<uint8_t>(Id::ReturnNumber, i);
-            uint8_t nr = input->getFieldAs<uint8_t>(Id::NumberOfReturns, i);
-
-            if ((((rn == 1) && (nr > 1)) && returnFirst) ||
-                (((rn > 1) && (rn < nr)) && returnIntermediate) ||
-                (((rn == nr) && (nr > 1)) && returnLast) ||
-                ((nr == 1) && returnOnly))
-            {
-                first->appendPoint(*input.get(), i);
-            }
-            else
-            {
-                second->appendPoint(*input.get(), i);
-            }
-        }
+    for (PointId i = 0; i < count; ++i)
+    {
+        if (toFirst[i])
+            first->appendPoint(*input.get(), i);
+        else
+            second->appendPoint(*input.get(), i);
     }
 }
 

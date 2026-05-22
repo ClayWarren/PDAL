@@ -49,5 +49,6 @@ mod math_abi;
 mod obb_abi;
 mod pipeline_metadata_abi;
 mod point_abi;
+mod segmentation_abi;
 mod utility_abi;
 mod writer_abi;

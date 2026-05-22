@@ -138,10 +138,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `650 / 926` built C++ GoogleTest cases, or `70.19%`, are
+Current checkpoint: `653 / 926` built C++ GoogleTest cases, or `70.52%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route LAS COPC signature detection through `pdal_las_detect_copc` and
-restore Utils toString audit coverage on top of the prior 648-case milestone.
+gains route segmentation cluster extraction and return classification through
+the Rust C ABI after LAS COPC detection and Utils toString audit restoration.
 This remains a conservative lower bound, not a final port-completion percentage:
 42 built test binaries remain unclassified by the audit script. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a

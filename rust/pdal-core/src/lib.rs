@@ -25,6 +25,7 @@ pub mod plugin;
 pub mod point;
 pub mod raster;
 pub mod scaling;
+pub mod segmentation;
 pub mod spatial;
 pub mod srs;
 pub mod stage;
