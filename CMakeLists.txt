@@ -189,9 +189,8 @@ add_subdirectory(vendor/lazperf)
 add_subdirectory(vendor/utfcpp)
 add_subdirectory(vendor/lepcc)
 add_subdirectory(vendor/h3)
-add_subdirectory(tools)
-
 include(${PDAL_CMAKE_DIR}/rust.cmake)
+add_subdirectory(tools)
 
 add_subdirectory(apps)
 
@@ -288,11 +287,6 @@ target_include_directories(${PDAL_LIB_NAME}
         ${GEOTIFF_INCLUDE_DIR}
         ${UTFCPP_INCLUDE_DIR}
 )
-
-find_library(GEOS_C_LIBRARY NAMES geos_c)
-if (APPLE)
-    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
-endif()
 
 target_link_libraries(${PDAL_LIB_NAME}
     PRIVATE

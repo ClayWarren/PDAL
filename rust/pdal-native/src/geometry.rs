@@ -1,6 +1,6 @@
 //! Geometry support via GEOS.
 
-use geos::{Geom, Geometry as GeosGeometry};
+use geos::{Geom, Geometry as GeosGeometry, CoordSeq};
 
 /// A geometry (PDAL's `Geometry`).
 pub struct Geometry {
@@ -19,18 +19,129 @@ impl Geometry {
     }
 
     pub fn distance(&self, x: f64, y: f64, z: f64) -> Result<f64, String> {
-        let point = GeosGeometry::new_from_wkt(&format!("POINT({} {} {})", x, y, z))
-            .map_err(|e| e.to_string())?;
+        let coords = CoordSeq::new_from_vec(&[&[x, y, z]]).map_err(|e| e.to_string())?;
+        let point = GeosGeometry::create_point(coords).map_err(|e| e.to_string())?;
 
         self.geos_geom.distance(&point).map_err(|e| e.to_string())
     }
 
     pub fn contains(&self, x: f64, y: f64) -> bool {
-        if let Ok(point) = GeosGeometry::new_from_wkt(&format!("POINT({} {})", x, y)) {
-            self.geos_geom.contains(&point).unwrap_or(false)
-        } else {
-            false
+        if let Ok(coords) = CoordSeq::new_from_vec(&[&[x, y]]) {
+            if let Ok(point) = GeosGeometry::create_point(coords) {
+                return self.geos_geom.contains(&point).unwrap_or(false);
+            }
         }
+        false
+    }
+
+    pub fn covers(&self, x: f64, y: f64) -> bool {
+        if let Ok(coords) = CoordSeq::new_from_vec(&[&[x, y]]) {
+            if let Ok(point) = GeosGeometry::create_point(coords) {
+                return self.geos_geom.covers(&point).unwrap_or(false);
+            }
+        }
+        false
+    }
+
+    pub fn area(&self) -> Result<f64, String> {
+        self.geos_geom.area().map_err(|e| e.to_string())
+    }
+
+    pub fn simplify(&self, tolerance: f64, preserve_topology: bool) -> Result<Self, String> {
+        let geos_geom = if preserve_topology {
+            self.geos_geom.topology_preserve_simplify(tolerance)
+        } else {
+            self.geos_geom.simplify(tolerance)
+        }.map_err(|e| e.to_string())?;
+        Ok(Self { geos_geom })
+    }
+
+    pub fn to_wkt(&self) -> Result<String, String> {
+        self.geos_geom.to_wkt().map_err(|e| e.to_string())
+    }
+
+    pub fn bounds(&self) -> Result<(f64, f64, f64, f64, f64, f64), String> {
+        fn get_coords(geom: &impl geos::Geom, coords: &mut Vec<(f64, f64, f64)>) -> Result<(), String> {
+            use geos::GeometryTypes;
+            let g_type = geom.geometry_type().map_err(|e| e.to_string())?;
+            match g_type {
+                GeometryTypes::Point |
+                GeometryTypes::LineString |
+                GeometryTypes::LinearRing => {
+                    if let Ok(coord_seq) = geom.get_coord_seq() {
+                        if let Ok(size) = coord_seq.size() {
+                            let has_z = if let Ok(dims) = coord_seq.dimensions() {
+                                let d: std::os::raw::c_int = dims.into();
+                                d >= 3
+                            } else {
+                                false
+                            };
+                            for i in 0..size {
+                                let x = coord_seq.get_x(i).unwrap_or(0.0);
+                                let y = coord_seq.get_y(i).unwrap_or(0.0);
+                                let cz = if has_z {
+                                    coord_seq.get_z(i).unwrap_or(f64::NAN)
+                                } else {
+                                    f64::NAN
+                                };
+                                coords.push((x, y, cz));
+                            }
+                        }
+                    }
+                }
+                GeometryTypes::Polygon => {
+                    if let Ok(ext) = geom.get_exterior_ring() {
+                        get_coords(&ext, coords)?;
+                    }
+                    if let Ok(num_int) = geom.get_num_interior_rings() {
+                        for i in 0..num_int {
+                            if let Ok(interior) = geom.get_interior_ring_n(i) {
+                                get_coords(&interior, coords)?;
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    if let Ok(num_geoms) = geom.get_num_geometries() {
+                        for i in 0..num_geoms {
+                            if let Ok(sub_geom) = geom.get_geometry_n(i) {
+                                get_coords(&sub_geom, coords)?;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        let mut coords = Vec::new();
+        get_coords(&self.geos_geom, &mut coords)?;
+
+        if coords.is_empty() {
+            return Ok((0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
+        }
+        let mut minx = f64::MAX;
+        let mut maxx = f64::MIN;
+        let mut miny = f64::MAX;
+        let mut maxy = f64::MIN;
+        let mut minz = f64::MAX;
+        let mut maxz = f64::MIN;
+        for coord in coords {
+            let cx = coord.0;
+            let cy = coord.1;
+            let cz = coord.2;
+            if cx < minx { minx = cx; }
+            if cx > maxx { maxx = cx; }
+            if cy < miny { miny = cy; }
+            if cy > maxy { maxy = cy; }
+            if !cz.is_nan() {
+                if cz < minz { minz = cz; }
+                if cz > maxz { maxz = cz; }
+            }
+        }
+        if minz.is_nan() || minz == f64::MAX { minz = 0.0; }
+        if maxz.is_nan() || maxz == f64::MIN { maxz = 0.0; }
+        Ok((minx, maxx, miny, maxy, minz, maxz))
     }
 
     /// Return the geometry's boundary (PDAL's `Geometry::getRing`). For a

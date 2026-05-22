@@ -13,12 +13,15 @@ add_executable(lasdump
     ${PDAL_UTIL_DIR}/Utils.cpp
 )
 
-# Explicitly link and tell CMake to link libstdc++
 target_link_libraries(lasdump PRIVATE
     ${PDAL_LAZPERF_LIB_NAME}
     GDAL::GDAL
+    PROJ::proj
+    ${GEOS_C_LIBRARY}
+    ${COREFOUNDATION_FRAMEWORK}
     "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++>"
+    ${RUST_CAPI_LIB}
 )
 
 target_include_directories(lasdump PRIVATE
@@ -26,6 +29,7 @@ target_include_directories(lasdump PRIVATE
     ${PDAL_INCLUDE_DIR}
     ${NLOHMANN_INCLUDE_DIR}
     ${UTFCPP_INCLUDE_DIR}
+    ${RUST_CAPI_HEADER_DIR}
 )
 
 #

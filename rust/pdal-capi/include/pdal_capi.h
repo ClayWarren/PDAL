@@ -485,6 +485,10 @@ extern "C"
                                              double* out_value);
     bool pdal_geometry_wkt_contains_point(const char* wkt, double x, double y,
                                           bool* out_value);
+    bool pdal_geometry_wkt_area(const char* wkt, double* out_value);
+    bool pdal_geometry_wkt_simplify(const char* wkt, double tolerance,
+                                    bool preserve_topology, char** out_wkt);
+    bool pdal_geometry_wkt_bounds(const char* wkt, pdal_bounds3d_t* out_bounds);
 
     // XML schema
     char* pdal_xml_schema_remap_old_name(const char* name);

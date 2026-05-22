@@ -236,9 +236,14 @@ SpatialReference Geometry::getSpatialReference() const
 
 BOX3D Geometry::bounds() const
 {
-    OGREnvelope3D env;
-    m_geom->getEnvelope(&env);
-    return BOX3D(env.MinX, env.MinY, env.MinZ, env.MaxX, env.MaxY, env.MaxZ);
+    throwNoGeos();
+    pdal_bounds3d_t rust_bounds;
+    if (pdal_geometry_wkt_bounds(wkt(20).c_str(), &rust_bounds))
+    {
+        return BOX3D(rust_bounds.minx, rust_bounds.miny, rust_bounds.minz,
+                     rust_bounds.maxx, rust_bounds.maxy, rust_bounds.maxz);
+    }
+    return BOX3D();
 }
 
 double Geometry::distance(double x, double y, double z) const
@@ -248,7 +253,7 @@ double Geometry::distance(double x, double y, double z) const
         throw pdal_error("Cannot compare distance of null geometry!");
 
     double distance(0.0);
-    if (pdal_geometry_wkt_distance_to_point(wkt().c_str(), x, y, z, &distance))
+    if (pdal_geometry_wkt_distance_to_point(wkt(20).c_str(), x, y, z, &distance))
         return distance;
 
     const char* message = pdal_last_error();
@@ -282,7 +287,7 @@ bool Geometry::valid() const
     throwNoGeos();
 
     bool valid(false);
-    if (pdal_geometry_wkt_is_valid(wkt().c_str(), &valid))
+    if (pdal_geometry_wkt_is_valid(wkt(20).c_str(), &valid))
         return valid;
 
     return false;

@@ -35,7 +35,7 @@ COVERED: dict[str, object] = {
     "pdal_stage_factory_test": ALL,
     "pdal_plugin_manager_test": ALL,
     "pdal_options_test": ALL,
-    "pdal_polygon_test": {"valid"},
+    "pdal_polygon_test": ALL,
     "pdal_quad_index_test": ALL,
     "pdal_xml_schema_test": {"legacyNames", "roundTrip"},
     "pdal_uuid_test": ALL,

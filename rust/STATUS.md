@@ -233,9 +233,7 @@ Known mixed binaries:
 - `pdal_stage_factory_test`: all 4 tests count. Driver loading, creation, and custom mapping overrides route through Rust C ABI driver inference.
 - `pdal_plugin_manager_test`: all 3 tests count. Dynamic plugin registration and object creation run compatibly alongside the Rust C ABI.
 - `pdal_options_test`: all 8 tests count. Option validation, parsing, json serialization, and conditional merging route through the Rust C ABI.
-- `pdal_polygon_test`: only `valid` counts; geometry validity routes through
-  the Rust native geometry ABI. Polygon construction, serialization, bounds,
-  simplification, and point coverage remain C++/GDAL.
+- `pdal_polygon_test`: all 12 tests count. Polygon construction, serialization, bounds, area, simplification, contains, covers, and validity are fully backed by the Rust C ABI and native geometry implementation.
 - `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
   fills, depth, and region queries route through the Rust C ABI.
 - `pdal_xml_schema_test`: only `legacyNames` counts; legacy dimension-name

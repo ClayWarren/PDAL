@@ -40,6 +40,7 @@
 
 #include <pdal/Polygon.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "../filters/private/pnp/GridPnp.hpp"
 
@@ -161,10 +162,15 @@ void Polygon::simplify(double distance_tolerance, double area_tolerance,
 {
     throwNoGeos();
 
-    if (preserve_topology)
-        m_geom.reset(m_geom->SimplifyPreserveTopology(distance_tolerance));
-    else
-        m_geom.reset(m_geom->Simplify(distance_tolerance));
+    char* out_wkt = nullptr;
+    if (pdal_geometry_wkt_simplify(wkt(20).c_str(), distance_tolerance, preserve_topology, &out_wkt))
+    {
+        if (out_wkt)
+        {
+            update(out_wkt);
+            pdal_string_free(out_wkt);
+        }
+    }
 
     removeSmallRings(area_tolerance);
     removeSmallHoles(area_tolerance);
@@ -222,24 +228,10 @@ double Polygon::area() const
 
     throwNoGeos();
 
-    OGRwkbGeometryType t = m_geom->getGeometryType();
-    // Not until GDAL 2.3
-    /**
-        if (t == wkbPolygon || t == wkbPolygon25D)
-            return m_geom->toPolygon()->get_Area();
-        else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
-            return m_geom->toMultiPolygon()->get_Area();
-    **/
-    if (t == wkbPolygon || t == wkbPolygon25D)
-    {
-        OGRPolygon* p = static_cast<OGRPolygon*>(m_geom.get());
-        return p->get_Area();
-    }
-    else if (t == wkbMultiPolygon || t == wkbMultiPolygon25D)
-    {
-        OGRMultiPolygon* p = static_cast<OGRMultiPolygon*>(m_geom.get());
-        return p->get_Area();
-    }
+    double area_val = 0.0;
+    if (pdal_geometry_wkt_area(wkt(20).c_str(), &area_val))
+        return area_val;
+
     return 0;
 }
 
@@ -249,10 +241,12 @@ bool Polygon::covers(const PointRef& ref) const
 
     double x = ref.getFieldAs<double>(Dimension::Id::X);
     double y = ref.getFieldAs<double>(Dimension::Id::Y);
-    double z = ref.getFieldAs<double>(Dimension::Id::Z);
 
-    OGRPoint p(x, y, z);
-    return m_geom->Contains(&p) || m_geom->Touches(&p);
+    bool inside = false;
+    if (pdal_geometry_wkt_contains_point(wkt(20).c_str(), x, y, &inside))
+        return inside;
+
+    return false;
 }
 
 bool Polygon::overlaps(const Polygon& p) const
@@ -289,11 +283,12 @@ bool Polygon::intersects(const Polygon& p) const
 /// \return  Whether the polygon contains the point or not.
 bool Polygon::contains(double x, double y) const
 {
-    if (m_pd->m_grids.empty())
-        initGrids();
-    for (auto& g : m_pd->m_grids)
-        if (g.inside(x, y))
-            return true;
+    throwNoGeos();
+
+    bool inside = false;
+    if (pdal_geometry_wkt_contains_point(wkt(20).c_str(), x, y, &inside))
+        return inside;
+
     return false;
 }
 

@@ -106,9 +106,121 @@ pub unsafe extern "C" fn pdal_geometry_wkt_contains_point(
             return false;
         };
         if let Some(out_value) = out_value.as_mut() {
-            *out_value = geometry.contains(x, y);
+            *out_value = geometry.covers(x, y);
         }
         true
+    })
+}
+
+/// Compute the area of WKT geometry using the native GEOS adapter.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_area(
+    wkt: *const c_char,
+    out_value: *mut f64,
+) -> bool {
+    ffi_catch(false, || {
+        let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
+            set_last_error("Failed to parse WKT geometry");
+            return false;
+        };
+        match geometry.area() {
+            Ok(area) => {
+                if let Some(out_value) = out_value.as_mut() {
+                    *out_value = area;
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
+/// Simplify WKT geometry using the native GEOS adapter.
+///
+/// Caller owns the returned WKT string and must free it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_simplify(
+    wkt: *const c_char,
+    tolerance: f64,
+    preserve_topology: bool,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || {
+        let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
+            set_last_error("Failed to parse WKT geometry");
+            return false;
+        };
+        match geometry.simplify(tolerance, preserve_topology) {
+            Ok(simplified) => {
+                match simplified.to_wkt() {
+                    Ok(wkt_str) => {
+                        if let Some(out_wkt) = out_wkt.as_mut() {
+                            *out_wkt = string_to_c_ptr(wkt_str);
+                        }
+                        true
+                    }
+                    Err(err) => {
+                        set_last_error(err);
+                        false
+                    }
+                }
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
+/// Compute the 3D bounding box bounds of WKT geometry using the native GEOS adapter.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_bounds` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_bounds(
+    wkt: *const c_char,
+    out_bounds: *mut crate::point_abi::pdal_bounds3d_t,
+) -> bool {
+    ffi_catch(false, || {
+        let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
+            set_last_error("Failed to parse WKT geometry");
+            return false;
+        };
+        match geometry.bounds() {
+            Ok((minx, maxx, miny, maxy, minz, maxz)) => {
+                if let Some(out_bounds) = out_bounds.as_mut() {
+                    *out_bounds = crate::point_abi::pdal_bounds3d_t {
+                        minx,
+                        maxx,
+                        miny,
+                        maxy,
+                        minz,
+                        maxz,
+                    };
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
     })
 }
 

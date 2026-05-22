@@ -28,3 +28,8 @@ find_program(CARGO_EXECUTABLE cargo)
 if(NOT CARGO_EXECUTABLE)
     message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
 endif()
+
+find_library(GEOS_C_LIBRARY NAMES geos_c)
+if(APPLE)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+endif()
