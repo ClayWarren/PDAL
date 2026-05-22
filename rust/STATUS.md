@@ -331,9 +331,8 @@ Known mixed binaries:
   wrapper behavior.
 - `pdal_filters_miniball_test`: all 2 tests count. K-nearest-neighbor
   miniball scoring routes through the Rust C ABI.
-- `pdal_metadata_test`: only `typed_value`, `test_float`, and `infnan` count.
-  Scalar conversion and JSON scalar formatting route through Rust helpers. The
-  metadata tree implementation is still C++.
+- `pdal_metadata_test`: all 12 tests count. Scalar conversion and JSON scalar formatting
+  route through Rust helpers. The metadata tree implementation is still C++.
 - `pdal_io_las_reader_test`: `test_sequential`, `test_different_formats`,
   `callback`, `lazperf`, `stream`, `EmptyGeotiffVlr`, `Start`,
   `SyntheticPoints`, `extraBytes`, and `IgnoreBadVLRs` count. LAS point

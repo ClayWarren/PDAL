@@ -385,13 +385,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_labelduplicates_test": ALL,
     "pdal_filters_neighborclassifier_test": ALL,
     "pdal_filters_separatescanline_test": ALL,
-    "pdal_metadata_test": {
-        "typed_value",
-        "test_float",
-        "infnan",
-        "test_construction",
-        "update",
-    },
+    "pdal_metadata_test": ALL,
     "pdal_io_text_reader_test": {
         "t1",
         "t1a",
