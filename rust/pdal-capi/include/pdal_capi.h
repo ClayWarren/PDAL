@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -100,6 +101,11 @@ extern "C"
     int32_t pdal_utils_unsetenv(const char* name);
     void pdal_utils_random_seed(uint32_t seed);
     double pdal_utils_random(double minimum, double maximum);
+
+    // Writer filename templates
+    bool pdal_writer_handle_filename_template(const char* filename,
+                                              size_t* out_pos);
+    char* pdal_writer_replace_tags(const char* filename);
 
     typedef struct
     {
@@ -651,6 +657,37 @@ extern "C"
 
     void pdal_free_stats_arrays(pdal_dim_stats_t* ptr, uint64_t dims_count);
 
+    typedef struct
+    {
+        double value;
+        uint64_t count;
+    } pdal_summary_merge_entry_t;
+
+    typedef struct
+    {
+        const char* name;
+        uint32_t enumerate;
+        bool advanced;
+        uint64_t count;
+        double min;
+        double max;
+        double m1;
+        double m2;
+        double m3;
+        double m4;
+        double median;
+        double mad;
+        pdal_summary_merge_entry_t* values;
+        uint64_t values_len;
+        uint64_t values_capacity;
+        double* data;
+        uint64_t data_len;
+        uint64_t data_capacity;
+    } pdal_summary_merge_state_t;
+
+    bool pdal_stats_summary_merge(pdal_summary_merge_state_t* target,
+                                  const pdal_summary_merge_state_t* other);
+
     pdal_metadata_node_t*
     pdal_expressionstats_metadata(pdal_point_view_t* view, const char* dim_name,
                                   const char* const* expressions,
@@ -668,6 +705,8 @@ extern "C"
                                             const char* datasource,
                                             const char* column);
     pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
+    char* pdal_georeference_validate_coordinate_system(const char* coordinate_system);
+    char* pdal_georeference_validate_transform_beam(const pdal_point_layout_t* layout, bool transform_beam);
     pdal_stage_t* pdal_stage_create_projpipeline(const char* out_srs,
                                                  const char* coord_op,
                                                  bool reverse);

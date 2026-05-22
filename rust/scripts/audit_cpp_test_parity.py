@@ -172,6 +172,7 @@ COVERED: dict[str, object] = {
         "enum",
         "global",
         "counts",
+        "merge",
     },
     "pdal_filters_sample_test": {
         "create",
@@ -320,6 +321,8 @@ COVERED: dict[str, object] = {
         "invalidLogicalOperators",
     },
     "pdal_filters_georeference_test": {
+        "MissingBeamDimensionsThrows",
+        "InvalidCoordinateSystemThrows",
         "TransformsPointAndBeamDirection",
         "PreservesDistancesBetweenPoints",
         "ForwardAndReverseRoundtrip",

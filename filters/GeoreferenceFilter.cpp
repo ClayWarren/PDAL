@@ -40,6 +40,9 @@
 
 #include "GeoreferenceFilter.hpp"
 
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
+
 namespace pdal
 {
 static PluginInfo const s_info{
@@ -80,14 +83,15 @@ public:
             m_matrix[10], m_matrix[11], m_matrix[12], m_matrix[13],
             m_matrix[14], m_matrix[15];
         m_scan2imu.matrix() = m;
-        std::string s = Utils::toupper(m_coordinateSystem);
-        if (s == "NED")
-            m_ned = true;
-        else if (s == "ENU")
-            m_ned = false;
-        else
-            throw pdal_error("Local Tangent Plane coordinate system " +
-                             m_coordinateSystem + " is not allowed.");
+        char* error =
+            pdal_georeference_validate_coordinate_system(m_coordinateSystem.c_str());
+        if (error)
+        {
+            std::string message(error);
+            pdal_string_free(error);
+            throw pdal_error(message);
+        }
+        m_ned = Utils::toupper(m_coordinateSystem) == "NED";
     }
 };
 
@@ -135,20 +139,22 @@ void GeoreferenceFilter::initialize()
 
 void GeoreferenceFilter::prepared(PointTableRef table)
 {
-    if (m_config->m_transformBeam)
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto dim : table.layout()->dims())
     {
-        // Verify all beam dimensions are present
-        if (!table.layout()->hasDim(DimId::BeamOriginX) ||
-            !table.layout()->hasDim(DimId::BeamOriginY) ||
-            !table.layout()->hasDim(DimId::BeamOriginZ) ||
-            !table.layout()->hasDim(DimId::BeamDirectionX) ||
-            !table.layout()->hasDim(DimId::BeamDirectionY) ||
-            !table.layout()->hasDim(DimId::BeamDirectionZ))
-        {
-            throwError("transform_beam option requires BeamOriginX/Y/Z and "
-                       "BeamDirectionX/Y/Z dimensions to be present in the "
-                       "point data.");
-        }
+        pdal_point_layout_register_dim(
+            rustLayout, table.layout()->dimName(dim).c_str(),
+            rust_view_converter::typeId(table.layout()->dimType(dim)));
+    }
+
+    char* error = pdal_georeference_validate_transform_beam(
+        rustLayout, m_config->m_transformBeam);
+    pdal_point_layout_destroy(rustLayout);
+    if (error)
+    {
+        std::string message(error);
+        pdal_string_free(error);
+        throwError(message);
     }
 }
 

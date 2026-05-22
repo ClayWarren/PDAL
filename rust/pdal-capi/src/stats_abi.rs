@@ -255,3 +255,143 @@ pub unsafe extern "C" fn pdal_stage_create_reprojection(
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct pdal_summary_merge_entry_t {
+    pub value: f64,
+    pub count: u64,
+}
+
+#[repr(C)]
+pub struct pdal_summary_merge_state_t {
+    pub name: *const c_char,
+    pub enumerate: u32,
+    pub advanced: bool,
+    pub count: u64,
+    pub min: f64,
+    pub max: f64,
+    pub m1: f64,
+    pub m2: f64,
+    pub m3: f64,
+    pub m4: f64,
+    pub median: f64,
+    pub mad: f64,
+    pub values: *mut pdal_summary_merge_entry_t,
+    pub values_len: u64,
+    pub values_capacity: u64,
+    pub data: *mut f64,
+    pub data_len: u64,
+    pub data_capacity: u64,
+}
+
+fn summary_from_merge_state(state: &pdal_summary_merge_state_t) -> Option<stats::Summary> {
+    if state.name.is_null() {
+        return None;
+    }
+    let name = unsafe { CStr::from_ptr(state.name) }.to_string_lossy().into_owned();
+    let mut summary = stats::Summary::new(name, state.enumerate, state.advanced);
+    summary.cnt = state.count;
+    summary.min = state.min;
+    summary.max = state.max;
+    summary.m1 = state.m1;
+    summary.m2 = state.m2;
+    summary.m3 = state.m3;
+    summary.m4 = state.m4;
+    summary.median = state.median;
+    summary.mad = state.mad;
+
+    if !state.values.is_null() {
+        for idx in 0..state.values_len {
+            let entry = unsafe { *state.values.add(idx as usize) };
+            summary
+                .values
+                .insert(entry.value.to_bits(), entry.count);
+        }
+    }
+
+    if !state.data.is_null() && state.enumerate == 3 {
+        summary.data = unsafe {
+            std::slice::from_raw_parts(state.data, state.data_len as usize).to_vec()
+        };
+    }
+
+    Some(summary)
+}
+
+fn write_merge_state(summary: &stats::Summary, state: &mut pdal_summary_merge_state_t) {
+    state.count = summary.cnt;
+    state.min = summary.min;
+    state.max = summary.max;
+    state.m1 = summary.m1;
+    state.m2 = summary.m2;
+    state.m3 = summary.m3;
+    state.m4 = summary.m4;
+    state.median = summary.median;
+    state.mad = summary.mad;
+
+    if !state.values.is_null() {
+        let mut idx = 0;
+        let capacity = if state.values_capacity > 0 {
+            state.values_capacity
+        } else {
+            state.values_len
+        };
+        for (value, count) in &summary.values {
+            if idx >= capacity {
+                break;
+            }
+            unsafe {
+                *state.values.add(idx as usize) = pdal_summary_merge_entry_t {
+                    value: f64::from_bits(*value),
+                    count: *count,
+                };
+            }
+            idx += 1;
+        }
+        state.values_len = idx as u64;
+    }
+
+    if !state.data.is_null() && summary.enumerate == 3 {
+        let capacity = if state.data_capacity > 0 {
+            state.data_capacity as usize
+        } else {
+            state.data_len as usize
+        };
+        let len = summary.data.len().min(capacity);
+        unsafe {
+            std::ptr::copy_nonoverlapping(summary.data.as_ptr(), state.data, len);
+        }
+        state.data_len = len as u64;
+    }
+}
+
+/// Merge one stats summary into another.
+///
+/// # Safety
+///
+/// Both state pointers must be valid. Value and data buffers must be large
+/// enough to hold the merged result.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stats_summary_merge(
+    target: *mut pdal_summary_merge_state_t,
+    other: *const pdal_summary_merge_state_t,
+) -> bool {
+    if target.is_null() || other.is_null() {
+        return false;
+    }
+
+    let Some(mut left) = summary_from_merge_state(&*target) else {
+        return false;
+    };
+    let Some(right) = summary_from_merge_state(&*other) else {
+        return false;
+    };
+
+    if !left.merge(&right) {
+        return false;
+    }
+
+    write_merge_state(&left, &mut *target);
+    true
+}

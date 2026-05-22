@@ -3,6 +3,8 @@
 //! Port of `pdal/util/Georeference.cpp` plus the Optech rotation helper from
 //! `io/OptechCommon.hpp`.
 
+use crate::point::{DimId, PointLayout};
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Xyz {
     pub x: f64,
@@ -95,9 +97,47 @@ fn cartesian_to_curvilinear(point: Xyz, latitude: f64) -> Xyz {
     }
 }
 
+pub fn validate_coordinate_system(coordinate_system: &str) -> Result<(), String> {
+    match coordinate_system.to_ascii_uppercase().as_str() {
+        "NED" | "ENU" => Ok(()),
+        _ => Err(format!(
+            "Local Tangent Plane coordinate system {coordinate_system} is not allowed."
+        )),
+    }
+}
+
+pub fn validate_transform_beam_layout(
+    layout: &PointLayout,
+    transform_beam: bool,
+) -> Result<(), String> {
+    if !transform_beam {
+        return Ok(());
+    }
+
+    for name in [
+        "BeamOriginX",
+        "BeamOriginY",
+        "BeamOriginZ",
+        "BeamDirectionX",
+        "BeamDirectionY",
+        "BeamDirectionZ",
+    ] {
+        if layout.dim(&DimId::from_name(name)).is_none() {
+            return Err(
+                "transform_beam option requires BeamOriginX/Y/Z and \
+                 BeamDirectionX/Y/Z dimensions to be present in the point data."
+                    .to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::point::PointLayout;
 
     #[test]
     fn identity_rotation_leaves_point_unchanged() {
@@ -132,5 +172,21 @@ mod tests {
         assert_eq!(point.x, 1.0);
         assert_eq!(point.y, 0.5);
         assert_eq!(point.z, 90.0);
+    }
+
+    #[test]
+    fn rejects_invalid_coordinate_systems() {
+        assert!(validate_coordinate_system("NED").is_ok());
+        assert!(validate_coordinate_system("enu").is_ok());
+        assert!(validate_coordinate_system("INVALID").unwrap_err().contains("not allowed"));
+    }
+
+    #[test]
+    fn requires_beam_dimensions_when_transform_beam_is_enabled() {
+        let layout = PointLayout::new();
+        assert!(validate_transform_beam_layout(&layout, false).is_ok());
+        assert!(validate_transform_beam_layout(&layout, true)
+            .unwrap_err()
+            .contains("BeamOriginX"));
     }
 }

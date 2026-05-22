@@ -34,6 +34,10 @@
  ****************************************************************************/
 
 #include "StatsFilter.hpp"
+
+#include <pdal_capi.h>
+
+#include <vector>
 #include <pdal/private/RustViewConverter.hpp>
 #include <cmath>
 #include <pdal/Options.hpp>
@@ -131,70 +135,80 @@ void Summary::computeGlobalStats()
 
 bool Summary::merge(const Summary& s)
 {
-    if (m_name != s.m_name || m_enumerate != s.m_enumerate ||
-        m_advanced != s.m_advanced)
+    std::vector<pdal_summary_merge_entry_t> leftValues;
+    leftValues.reserve(m_values.size() + s.m_values.size());
+    for (auto const& pair : m_values)
+        leftValues.push_back({pair.first, static_cast<uint64_t>(pair.second)});
+
+    std::vector<pdal_summary_merge_entry_t> rightValues;
+    rightValues.reserve(s.m_values.size());
+    for (auto const& pair : s.m_values)
+        rightValues.push_back({pair.first, static_cast<uint64_t>(pair.second)});
+
+    std::vector<double> leftData(m_data.size() + s.m_data.size());
+    if (!m_data.empty())
+        std::copy(m_data.begin(), m_data.end(), leftData.begin());
+    std::vector<double> rightData = s.m_data;
+
+    pdal_summary_merge_state_t left{};
+    left.name = m_name.c_str();
+    left.enumerate = static_cast<uint32_t>(m_enumerate);
+    left.advanced = m_advanced;
+    left.count = m_cnt;
+    left.min = m_min;
+    left.max = m_max;
+    left.m1 = M1;
+    left.m2 = M2;
+    left.m3 = M3;
+    left.m4 = M4;
+    left.median = m_median;
+    left.mad = m_mad;
+    left.values = leftValues.data();
+    left.values_len = leftValues.size();
+    left.values_capacity = leftValues.size();
+    left.data = leftData.data();
+    left.data_len = m_data.size();
+    left.data_capacity = leftData.size();
+
+    pdal_summary_merge_state_t right{};
+    right.name = s.m_name.c_str();
+    right.enumerate = static_cast<uint32_t>(s.m_enumerate);
+    right.advanced = s.m_advanced;
+    right.count = s.m_cnt;
+    right.min = s.m_min;
+    right.max = s.m_max;
+    right.m1 = s.M1;
+    right.m2 = s.M2;
+    right.m3 = s.M3;
+    right.m4 = s.M4;
+    right.median = s.m_median;
+    right.mad = s.m_mad;
+    right.values = rightValues.data();
+    right.values_len = rightValues.size();
+    right.values_capacity = rightValues.size();
+    right.data = rightData.data();
+    right.data_len = rightData.size();
+    right.data_capacity = rightData.size();
+
+    if (!pdal_stats_summary_merge(&left, &right))
         return false;
 
-    if (s.m_cnt == 0)
-        return true;
+    m_cnt = static_cast<point_count_t>(left.count);
+    m_min = left.min;
+    m_max = left.max;
+    M1 = left.m1;
+    M2 = left.m2;
+    M3 = left.m3;
+    M4 = left.m4;
+    m_median = left.median;
+    m_mad = left.mad;
 
-    if (m_cnt == 0)
-    {
-        m_min = s.m_min;
-        m_max = s.m_max;
-        m_cnt = s.m_cnt;
-        M1 = s.M1;
-        M2 = s.M2;
-        M3 = s.M3;
-        M4 = s.M4;
-        m_median = s.m_median;
-        m_mad = s.m_mad;
-        m_values = s.m_values;
-        m_data = s.m_data;
-        return true;
-    }
-
-    double n1 = m_cnt;
-    double n2 = s.m_cnt;
-    double n = n1 + n2;
-
-    double delta = s.M1 - M1;
-    double delta2 = delta * delta;
-    double delta3 = delta2 * delta;
-    double delta4 = delta3 * delta;
-
-    m_cnt = n;
-    m_min = std::min(m_min, s.m_min);
-    m_max = std::max(m_max, s.m_max);
-
-    M1 = (n1 * M1 + n2 * s.M1) / n;
-
-    if (m_advanced)
-    {
-        double new_M4 =
-            M4 + s.M4 +
-            delta4 * n1 * n2 * (n1 * n1 - n1 * n2 + n2 * n2) / (n * n * n) +
-            6.0 * delta2 * (n1 * n1 * s.M2 + n2 * n2 * M2) / (n * n) +
-            4.0 * delta * (n1 * s.M3 - n2 * M3) / n;
-        double new_M3 = M3 + s.M3 + delta3 * n1 * n2 * (n1 - n2) / (n * n) +
-                        3.0 * delta * (n1 * s.M2 - n2 * M2) / n;
-        M4 = new_M4;
-        M3 = new_M3;
-    }
-
-    M2 = M2 + s.M2 + delta2 * n1 * n2 / n;
-
-    if (m_enumerate != NoEnum)
-    {
-        for (auto const& pair : s.m_values)
-            m_values[pair.first] += pair.second;
-    }
+    m_values.clear();
+    for (uint64_t i = 0; i < left.values_len; ++i)
+        m_values[leftValues[i].value] = static_cast<point_count_t>(leftValues[i].count);
 
     if (m_enumerate == Global)
-    {
-        m_data.insert(m_data.end(), s.m_data.begin(), s.m_data.end());
-        computeGlobalStats();
-    }
+        m_data.assign(leftData.begin(), leftData.begin() + left.data_len);
 
     return true;
 }

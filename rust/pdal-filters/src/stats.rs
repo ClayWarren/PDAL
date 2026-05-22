@@ -116,6 +116,76 @@ impl Summary {
         diffs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         self.mad = diffs[mid];
     }
+
+    pub fn merge(&mut self, other: &Summary) -> bool {
+        if self.name != other.name
+            || self.enumerate != other.enumerate
+            || self.advanced != other.advanced
+        {
+            return false;
+        }
+
+        if other.cnt == 0 {
+            return true;
+        }
+
+        if self.cnt == 0 {
+            self.min = other.min;
+            self.max = other.max;
+            self.cnt = other.cnt;
+            self.m1 = other.m1;
+            self.m2 = other.m2;
+            self.m3 = other.m3;
+            self.m4 = other.m4;
+            self.median = other.median;
+            self.mad = other.mad;
+            self.values = other.values.clone();
+            self.data = other.data.clone();
+            return true;
+        }
+
+        let n1 = self.cnt as f64;
+        let n2 = other.cnt as f64;
+        let n = n1 + n2;
+        let delta = other.m1 - self.m1;
+        let delta2 = delta * delta;
+        let delta3 = delta2 * delta;
+        let delta4 = delta3 * delta;
+
+        self.cnt = n as u64;
+        self.min = self.min.min(other.min);
+        self.max = self.max.max(other.max);
+        self.m1 = (n1 * self.m1 + n2 * other.m1) / n;
+
+        if self.advanced {
+            let new_m4 = self.m4
+                + other.m4
+                + delta4 * n1 * n2 * (n1 * n1 - n1 * n2 + n2 * n2) / (n * n * n)
+                + 6.0 * delta2 * (n1 * n1 * other.m2 + n2 * n2 * self.m2) / (n * n)
+                + 4.0 * delta * (n1 * other.m3 - n2 * self.m3) / n;
+            let new_m3 = self.m3
+                + other.m3
+                + delta3 * n1 * n2 * (n1 - n2) / (n * n)
+                + 3.0 * delta * (n1 * other.m2 - n2 * self.m2) / n;
+            self.m4 = new_m4;
+            self.m3 = new_m3;
+        }
+
+        self.m2 = self.m2 + other.m2 + delta2 * n1 * n2 / n;
+
+        if self.enumerate != 0 {
+            for (value, count) in &other.values {
+                *self.values.entry(*value).or_insert(0) += count;
+            }
+        }
+
+        if self.enumerate == 3 {
+            self.data.extend_from_slice(&other.data);
+            self.compute_global_stats();
+        }
+
+        true
+    }
 }
 
 pub struct StatsFilter {
@@ -301,6 +371,22 @@ mod tests {
         assert_eq!(summary.values.get(&3.0f64.to_bits()), Some(&1));
         assert!(summary.skewness().abs() < 1e-12);
         assert!(summary.kurtosis().is_finite());
+    }
+
+    #[test]
+    fn merge_combines_compatible_summaries() {
+        let mut whole = Summary::new("test".to_string(), 0, true);
+        let mut part = Summary::new("test".to_string(), 0, true);
+        for value in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            whole.insert(value);
+            part.insert(value);
+        }
+
+        assert!(whole.merge(&part));
+        assert_eq!(whole.cnt, 10);
+        assert_eq!(whole.min, 1.0);
+        assert_eq!(whole.max, 5.0);
+        assert_eq!(whole.m1, 3.0);
     }
 
     #[test]

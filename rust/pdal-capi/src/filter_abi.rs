@@ -2,6 +2,9 @@ use crate::error::{set_last_error, string_to_c_ptr};
 use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
 use pdal_core::options::Options;
+use pdal_core::georeference::{
+    validate_coordinate_system, validate_transform_beam_layout,
+};
 use pdal_core::point::PointView;
 use pdal_core::point::PointLayout;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
@@ -913,6 +916,46 @@ pub unsafe extern "C" fn pdal_transformation_matrix_format(matrix: *const f64) -
     let mut values = [0.0f64; 16];
     std::ptr::copy_nonoverlapping(matrix, values.as_mut_ptr(), 16);
     string_to_c_ptr(format_transformation_matrix(&values))
+}
+
+/// Validate a georeference filter coordinate system option.
+///
+/// # Safety
+///
+/// `coordinate_system` must be a null-terminated string when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_georeference_validate_coordinate_system(
+    coordinate_system: *const c_char,
+) -> *mut c_char {
+    if coordinate_system.is_null() {
+        return string_to_c_ptr("Missing coordinate system.".to_string());
+    }
+
+    let coordinate_system = CStr::from_ptr(coordinate_system).to_string_lossy();
+    match validate_coordinate_system(&coordinate_system) {
+        Ok(()) => std::ptr::null_mut(),
+        Err(err) => string_to_c_ptr(err),
+    }
+}
+
+/// Validate georeference beam-dimension requirements against a layout.
+///
+/// # Safety
+///
+/// `layout` must be a valid pointer when non-null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_georeference_validate_transform_beam(
+    layout: *const PointLayout,
+    transform_beam: bool,
+) -> *mut c_char {
+    if layout.is_null() {
+        return string_to_c_ptr("Missing point layout.".to_string());
+    }
+
+    match validate_transform_beam_layout(&*layout, transform_beam) {
+        Ok(()) => std::ptr::null_mut(),
+        Err(err) => string_to_c_ptr(err),
+    }
 }
 
 /// Create a voxeldownsize filter stage from options.
