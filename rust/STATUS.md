@@ -139,10 +139,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `735 / 926` built C++ GoogleTest cases, or `79.37%`, are
+Current checkpoint: `736 / 926` built C++ GoogleTest cases, or `79.48%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route option JSON canonicalization through the Rust C ABI, route EPT
-reader `inspect` (no-spatial-filter preview) through a new
+gains route basic point storage and option JSON canonicalization through the
+Rust C ABI, route EPT reader `inspect` (no-spatial-filter preview) through a new
 Rust C ABI that reads `ept.json` and expands LASzip class-flag dims to
 match `EptInfo`, audit the EPT reader's `resolutionLimit` and corrupted-tile and
 bad-tile-point-count failure paths (`unreadableTileFailure`,
@@ -246,12 +246,12 @@ Known mixed binaries:
   validation route through the Rust C ABI.
 - `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
   through the Rust C ABI.
-- `pdal_point_table_test`: `resolveType`, `layoutLimit`, and `userView` count;
-  dimension type resolution routes through the Rust C ABI, layout-limited
-  dimension registration uses Rust-backed type resolution, and LAS user-view
-  reads route through the Rust LAS reader. Point table storage, SRS list
-  management, `ColumnPointTable` typed storage, and basic `PointView` set/get
-  remain C++.
+- `pdal_point_table_test`: `resolveType`, `layoutLimit`, `userView`, and
+  `simple` count; dimension type resolution routes through the Rust C ABI,
+  layout-limited dimension registration uses Rust-backed type resolution, LAS
+  user-view reads route through the Rust LAS reader, and basic point storage
+  uses Rust `PointView` storage through the C ABI. SRS list management and
+  `ColumnPointTable` typed storage remain C++.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
 - `pdal_config_test`: all 1 test counts; version integer and full-version

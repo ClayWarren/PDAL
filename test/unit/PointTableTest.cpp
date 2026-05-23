@@ -37,6 +37,7 @@
 #include "Support.hpp"
 #include <io/LasReader.hpp>
 #include <pdal/PointTable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -222,54 +223,60 @@ TEST(PointTable, srs)
     EXPECT_EQ(table.m_spatialRefs.size(), 2u);
 }
 
-void simpleTest(PointTableRef table)
+void simpleTest()
 {
-    PointLayoutPtr layout = table.layout();
+    constexpr int U16 = 1;
+    constexpr int F64 = 9;
 
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
-    layout->registerDim(Dimension::Id::Intensity);
-    layout->registerDim(Dimension::Id::Blue);
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", F64);
+    pdal_point_layout_register_dim(layout, "Y", F64);
+    pdal_point_layout_register_dim(layout, "Z", F64);
+    pdal_point_layout_register_dim(layout, "Intensity", U16);
+    pdal_point_layout_register_dim(layout, "Blue", U16);
 
-    PointView v(table);
+    pdal_point_view_t* v = pdal_point_view_create(layout);
+    ASSERT_NE(v, nullptr);
+
     for (PointId id = 0; id < 10000; id++)
     {
+        EXPECT_EQ(pdal_point_view_add_point(v), id);
         if (id % 200 < 100)
         {
-            v.setField(Dimension::Id::X, id, id);
-            v.setField(Dimension::Id::Y, id, id + 1);
-            v.setField(Dimension::Id::Z, id, id + 2);
-            v.setField(Dimension::Id::Intensity, id, (id * 100) % 6523);
+            pdal_point_view_set_f64(v, id, "X", id);
+            pdal_point_view_set_f64(v, id, "Y", id + 1);
+            pdal_point_view_set_f64(v, id, "Z", id + 2);
+            pdal_point_view_set_f64(v, id, "Intensity", (id * 100) % 6523);
         }
         else
-            v.setField(Dimension::Id::Blue, id, 0);
+            pdal_point_view_set_f64(v, id, "Blue", 0);
     }
 
     for (PointId id = 0; id < 10000; id++)
     {
         if (id % 200 < 100)
         {
-            EXPECT_EQ(id, v.getFieldAs<PointId>(Dimension::Id::X, id));
-            EXPECT_EQ(id + 1, v.getFieldAs<PointId>(Dimension::Id::Y, id));
-            EXPECT_EQ(id + 2, v.getFieldAs<PointId>(Dimension::Id::Z, id));
-            EXPECT_EQ((id * 100) % 6523,
-                      v.getFieldAs<PointId>(Dimension::Id::Intensity, id));
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "X"), id);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Y"), id + 1);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Z"), id + 2);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Intensity"),
+                             (id * 100) % 6523);
         }
         else
         {
-            EXPECT_EQ(0U, v.getFieldAs<PointId>(Dimension::Id::X, id));
-            EXPECT_EQ(0U, v.getFieldAs<PointId>(Dimension::Id::Y, id));
-            EXPECT_EQ(0U, v.getFieldAs<PointId>(Dimension::Id::Z, id));
-            EXPECT_EQ(0U, v.getFieldAs<PointId>(Dimension::Id::Intensity, id));
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "X"), 0);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Y"), 0);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Z"), 0);
+            EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(v, id, "Intensity"), 0);
         }
     }
+
+    pdal_point_view_destroy(v);
 }
 
 TEST(PointTable, simple)
 {
-    PointTable t;
-    simpleTest(t);
+    simpleTest();
 }
 
 TEST(ColumnPointTable, typedStorage)
