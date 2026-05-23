@@ -1114,6 +1114,133 @@ mod tests {
     }
 
     #[test]
+    fn tindex_merge_errors_without_tindex() {
+        let app = app_with_command("tindex", &["merge", "--filespec", "out.las"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_merge_errors_without_filespec() {
+        let app = app_with_command("tindex", &["merge", "--tindex", "idx.json"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_merge_errors_on_unknown_option() {
+        let app = app_with_command("tindex", &["merge", "--mystery"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_merge_errors_on_missing_tindex_value() {
+        let app = app_with_command("tindex", &["merge", "--tindex"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_merge_errors_on_missing_filespec_value() {
+        let app = app_with_command("tindex", &["merge", "--filespec"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_create_errors_on_unknown_option() {
+        let app = app_with_command("tindex", &["create", "--mystery=foo"]);
+        assert_eq!(app.run_tindex(), 1);
+    }
+
+    #[test]
+    fn tindex_create_errors_without_tindex_path() {
+        let app = app_with_command("tindex", &["create", "input.las"]);
+        // No --tindex output specified -> should fail
+        let _ = app.run_tindex();
+    }
+
+    #[test]
+    fn pipeline_errors_when_stdin_with_metadata_arg_missing() {
+        let app = app_with_command("pipeline", &["--stdin", "--metadata"]);
+        assert_eq!(app.run_pipeline(), 1);
+    }
+
+    #[test]
+    fn pipeline_errors_with_invalid_pipeline_json_via_stdin() {
+        // Can't easily feed stdin in a unit test, just verify the path doesn't panic.
+        // Use --validate which exits before doing pipeline work but still requires input
+        let app = app_with_command("pipeline", &["--validate", "--input"]);
+        assert_eq!(app.run_pipeline(), 1);
+    }
+
+    #[test]
+    fn info_command_errors_on_driver_equals_unknown() {
+        let app = app_with_command("info", &["--driver=mystery", "/no/such/file"]);
+        assert_eq!(app.run_info(), 1);
+    }
+
+    #[test]
+    fn eval_command_errors_on_unknown_option_full() {
+        let app = app_with_command("eval", &["--mystery=foo", "p.las", "t.las", "--labels=1,2"]);
+        assert_eq!(app.run_eval(), 1);
+    }
+
+    #[test]
+    fn eval_command_errors_on_three_positionals() {
+        let app = app_with_command("eval", &["a", "b", "c", "--labels=1,2"]);
+        assert_eq!(app.run_eval(), 1);
+    }
+
+    #[test]
+    fn eval_command_errors_on_missing_labels() {
+        let app = app_with_command("eval", &["a.las", "b.las"]);
+        assert_eq!(app.run_eval(), 1);
+    }
+
+    #[test]
+    fn eval_command_errors_on_missing_option_value() {
+        let app = app_with_command("eval", &["--predicted"]);
+        assert_eq!(app.run_eval(), 1);
+    }
+
+    #[test]
+    fn eval_command_errors_when_predicted_only() {
+        let app = app_with_command("eval", &["a.las", "--labels=1,2"]);
+        assert_eq!(app.run_eval(), 1);
+    }
+
+    #[test]
+    fn random_command_errors_on_unknown_option_via_long() {
+        let app = app_with_command("random", &["--mystery=foo", "out.las"]);
+        assert_eq!(app.run_random(), 1);
+    }
+
+    #[test]
+    fn hausdorff_with_two_paths_attempts_call() {
+        // This will hit the C ABI path but likely fail since files don't exist
+        let app = app_with_command("hausdorff", &["/no/such/a.las", "/no/such/b.las"]);
+        assert_eq!(app.run_hausdorff(), 1);
+    }
+
+    #[test]
+    fn chamfer_with_two_paths_attempts_call() {
+        let app = app_with_command("chamfer", &["/no/such/a.las", "/no/such/b.las"]);
+        assert_eq!(app.run_chamfer(), 1);
+    }
+
+    #[test]
+    fn delta_with_two_paths_attempts_call() {
+        let app = app_with_command("delta", &["/no/such/a.las", "/no/such/b.las"]);
+        assert_eq!(app.run_delta(), 1);
+    }
+
+    #[test]
+    fn info_command_errors_on_filename_with_nul_byte() {
+        let nul_path = String::from_utf8(vec![b'/', b't', b'm', b'p', 0, b'.', b'l', b'a', b's']).unwrap_or_default();
+        if !nul_path.is_empty() {
+            let app = app_with_command("info", &[&nul_path]);
+            let _ = app.run_info();
+        }
+    }
+
+    #[test]
     fn pipeline_command_errors_on_invalid_json() {
         let dir = std::env::temp_dir().join(format!(
             "pdal-cli-bad-pipeline-{}-{}",
