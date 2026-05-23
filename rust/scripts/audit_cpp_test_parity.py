@@ -12,7 +12,7 @@ ALL = object()
 
 COVERED: dict[str, object] = {
     "pdal_kdindex_test": ALL,
-    "pdal_spatial_reference_test": {"calcZone", "wgs84FromZone"},
+    "pdal_spatial_reference_test": {"test_ctor", "calcZone", "wgs84FromZone"},
     "pdal_point_view_test": {"calculateBounds"},
     "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological", "computeCentroid", "demeanTest"},
     "pdal_bounds_test": {

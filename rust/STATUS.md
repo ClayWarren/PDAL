@@ -139,13 +139,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `736 / 926` built C++ GoogleTest cases, or `79.48%`, are
+Current checkpoint: `737 / 926` built C++ GoogleTest cases, or `79.59%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route basic point storage and option JSON canonicalization through the
-Rust C ABI, route EPT reader `inspect` (no-spatial-filter preview) through a new
-Rust C ABI that reads `ept.json` and expands LASzip class-flag dims to
-match `EptInfo`, audit the EPT reader's `resolutionLimit` and corrupted-tile and
-bad-tile-point-count failure paths (`unreadableTileFailure`,
+gains route the default spatial-reference contract, basic point storage, and
+option JSON canonicalization through the Rust C ABI, route EPT reader `inspect`
+(no-spatial-filter preview) through a new Rust C ABI that reads `ept.json` and
+expands LASzip class-flag dims to match `EptInfo`, audit the EPT reader's
+`resolutionLimit` and corrupted-tile and bad-tile-point-count failure paths
+(`unreadableTileFailure`,
 `badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
 the wrapper now routes the non-streaming non-special-options path through
 Rust (the `resolution` option already flows through to the Rust EPT
@@ -213,9 +214,9 @@ Known mixed binaries:
 
 - `pdal_kdindex_test`: all 5 tests currently count; KNN/radius queries route
   through Rust spatial query ABI.
-- `pdal_spatial_reference_test`: only `calcZone` and `wgs84FromZone` count.
-  Most SRS normalization, authority lookup, WKT/PROJJSON, and LAS SRS behavior
-  remains C++ GDAL/OGR-backed.
+- `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, and
+  `wgs84FromZone` count. Most SRS normalization, authority lookup,
+  WKT/PROJJSON, and LAS SRS behavior remains C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: only `calculateBounds` counts. The broader point
   view/table data model is still C++.
 - `pdal_eigen_test`: `calcBounds`, `ComputeValues`, `Morphological`,

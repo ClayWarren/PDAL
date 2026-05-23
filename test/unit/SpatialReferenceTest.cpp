@@ -47,6 +47,7 @@
 #include <gdal_version.h>
 
 #include <pdal/pdal_features.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -55,11 +56,17 @@ namespace pdal
 
 TEST(SpatialReferenceTest, test_ctor)
 {
-    SpatialReference srs;
+    pdal_spatial_reference_t* srs = pdal_spatial_reference_create(nullptr);
+    ASSERT_NE(srs, nullptr);
 
-    EXPECT_EQ(srs.getProj4(), "");
-    EXPECT_EQ(srs.getWKT(), "");
-    EXPECT_TRUE(srs.empty());
+    char* text = pdal_spatial_reference_text(srs);
+    ASSERT_NE(text, nullptr);
+
+    EXPECT_STREQ(text, "");
+    EXPECT_TRUE(pdal_spatial_reference_empty(srs));
+
+    pdal_string_free(text);
+    pdal_spatial_reference_destroy(srs);
 }
 
 // Test round-tripping proj.4 string
