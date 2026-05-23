@@ -82,3 +82,59 @@ impl Streamable for H3Filter {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view_with_srs(srs: &str) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::H3, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        view.set_spatial_reference(SpatialReference::new(srs));
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, -122.0);
+        view.set_f64(idx, &DimId::Y, 47.0);
+        view.set_f64(idx, &DimId::Z, 0.0);
+        view
+    }
+
+    #[test]
+    fn run_one_errors_when_view_has_no_srs() {
+        let mut filter = H3Filter::new(8);
+        let view = view_with_srs("");
+        let result = filter.run_one(&view);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn run_one_assigns_h3_for_wgs84_points() {
+        let mut filter = H3Filter::new(8);
+        let view = view_with_srs("EPSG:4326");
+        let out = filter.run_one(&view).unwrap().remove(0);
+        let h3 = out.get_f64(0, &DimId::H3);
+        assert!(h3 > 0.0);
+    }
+
+    #[test]
+    fn process_one_returns_false_without_srs() {
+        let mut filter = H3Filter::new(8);
+        let mut view = view_with_srs("");
+        assert!(!filter.process_one(&mut view, 0));
+    }
+
+    #[test]
+    fn invalid_resolution_does_not_panic() {
+        // Resolution > 15 is invalid for H3
+        let mut filter = H3Filter::new(99);
+        let view = view_with_srs("EPSG:4326");
+        let out = filter.run_one(&view).unwrap().remove(0);
+        // Default H3 value should be 0 because Resolution::try_from(99) errors
+        assert_eq!(out.get_f64(0, &DimId::H3), 0.0);
+    }
+}

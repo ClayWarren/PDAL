@@ -358,4 +358,39 @@ mod tests {
             .display()
             .to_string()
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = SpzReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.spz");
+        let mut reader = SpzReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_name_returns_expected() {
+        let reader = SpzReader::new(&Options::new());
+        assert_eq!(reader.name(), "readers.spz");
+    }
+
+    #[test]
+    fn writer_errors_without_filename() {
+        let mut writer = SpzWriter::new(&Options::new());
+        let view = xyz_view();
+        let err = writer.write(&[view]).err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn writer_name_returns_expected() {
+        let writer = SpzWriter::new(&Options::new());
+        assert_eq!(writer.name(), "writers.spz");
+    }
 }

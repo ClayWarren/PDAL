@@ -415,4 +415,39 @@ mod tests {
         register_dimensions(&mut layout, &header);
         // OffsetTime, Red, Green, Blue, Alpha should be registered
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = TerrasolidReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.bin");
+        let mut reader = TerrasolidReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = TerrasolidReader::new(&Options::new());
+        assert_eq!(reader.metadata().name(), "readers.terrasolid");
+    }
+
+    #[test]
+    fn reads_terrasolid_fixture() {
+        let path = format!(
+            "{}/../../test/data/terrasolid/20020715-time-color.bin",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+        let mut reader = TerrasolidReader::new(&options);
+        let views = reader.read().expect("read terrasolid fixture");
+        assert!(!views.is_empty());
+        assert!(views[0].len() > 0);
+    }
 }

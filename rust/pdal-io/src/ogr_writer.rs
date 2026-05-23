@@ -342,4 +342,61 @@ mod tests {
 
         assert!(writer.write(&[test_view()]).is_err());
     }
+
+    #[test]
+    fn writer_errors_without_filename() {
+        let mut writer = OgrWriter::new(&Options::new());
+        assert!(writer.write(&[test_view()]).is_err());
+    }
+
+    #[test]
+    fn validate_multicount_and_attrs_branches() {
+        assert!(validate_multicount_and_attrs(0, 0).is_err());
+        assert!(validate_multicount_and_attrs(1, 0).is_ok());
+        assert!(validate_multicount_and_attrs(2, 0).is_ok());
+        assert!(validate_multicount_and_attrs(2, 1).is_err());
+    }
+
+    #[test]
+    fn format_attr_dim_not_found_includes_name() {
+        let msg = format_attr_dim_not_found("Intensity");
+        assert!(msg.contains("Intensity"));
+        assert!(msg.contains("attr_dims"));
+    }
+
+    #[test]
+    fn writer_metadata_includes_filename_and_count() {
+        let mut options = Options::new();
+        options.add("filename", "x.geojson");
+        let writer = OgrWriter::new(&options);
+        let metadata = writer.metadata();
+        assert_eq!(metadata.name(), "writers.ogr");
+        let filename = metadata
+            .find_child("filename")
+            .and_then(MetadataNode::value)
+            .map(MetadataValue::as_string);
+        assert_eq!(filename, Some("x.geojson".to_string()));
+    }
+
+    #[test]
+    fn writer_resolves_default_driver_from_filename_extension() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let path = temp.path().with_extension("shp");
+        let mut options = Options::new();
+        options.add("filename", path.display());
+        let mut writer = OgrWriter::new(&options);
+        // shp resolves to ESRI Shapefile, not supported -> error
+        assert!(writer.write(&[test_view()]).is_err());
+    }
+
+    #[test]
+    fn writer_with_measure_dim_errors() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let path = temp.path().with_extension("geojson");
+        let mut options = Options::new();
+        options.add("filename", path.display());
+        options.add("measure_dim", "Intensity");
+        let mut writer = OgrWriter::new(&options);
+        assert!(writer.write(&[test_view()]).is_err());
+    }
 }
