@@ -360,4 +360,123 @@ mod tests {
         assert_eq!(expand_features("Linearity, Density").len(), 2);
         assert_eq!(expand_features("bogus").len(), 0);
     }
+
+    #[test]
+    fn test_mode_from_u32_and_feature_expansion_more() {
+        assert!(matches!(Mode::from_u32(0), Mode::Raw));
+        assert!(matches!(Mode::from_u32(2), Mode::Normalized));
+        assert!(matches!(Mode::from_u32(1), Mode::Sqrt));
+        assert!(matches!(Mode::from_u32(99), Mode::Sqrt));
+
+        let feats = expand_features("planarity,scattering,verticality,omnivariance,anisotropy,eigenentropy,eigenvaluesum,surfacevariation,demantkeverticality,density");
+        assert_eq!(feats.len(), 10);
+    }
+
+    #[test]
+    fn test_optimal_neighborhood() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::OptimalKNN, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for i in 0..3 {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, i as f64);
+            view.set_f64(idx, &DimId::Y, 0.0);
+            view.set_f64(idx, &DimId::Z, 0.0);
+            view.set_f64(idx, &DimId::OptimalKNN, 2.0);
+        }
+
+        let filter = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, true, "all");
+        let index = SpatialIndex3d::new(&view);
+        let n = filter.neighbors(&index, &view, 0).unwrap();
+        assert_eq!(n.len(), 2);
+    }
+
+    #[test]
+    fn test_radius_and_stride_neighborhood() {
+        let view = view_with(&[
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (2.0, 0.0, 0.0),
+            (3.0, 0.0, 0.0),
+        ]);
+        let index = SpatialIndex3d::new(&view);
+
+        let filter = CovarianceFeaturesFilter::new(3, 1, Some(1.5), 2, Mode::Raw, false, "all");
+        let n = filter.neighbors(&index, &view, 1).unwrap();
+        assert!(n.len() >= 2);
+
+        let filter_less =
+            CovarianceFeaturesFilter::new(3, 1, Some(1.5), 10, Mode::Raw, false, "all");
+        assert!(filter_less.neighbors(&index, &view, 1).is_none());
+
+        let filter_stride = CovarianceFeaturesFilter::new(2, 2, None, 1, Mode::Raw, false, "all");
+        let n_stride = filter_stride.neighbors(&index, &view, 0).unwrap();
+        assert!(n_stride.len() <= 2);
+    }
+
+    #[test]
+    fn test_covariance_zero_and_eigenvalues_error() {
+        let view = view_with(&[(0.0, 0.0, 0.0)]);
+        let mut filter = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "all");
+        let res = filter.run_one(&view).unwrap();
+        assert_eq!(res[0].len(), 1);
+
+        let view_id = view_with(&[(1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)]);
+        let mut filter_err = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "all");
+        let res_err = filter_err.run_one(&view_id);
+        assert!(res_err.is_ok());
+    }
+
+    #[test]
+    fn test_all_features() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::OptimalKNN, DimType::F64);
+        layout.register(DimId::OptimalRadius, DimType::F64);
+        for feat in ALL_FEATURES {
+            layout.register(DimId::from_name(feat.dim_name()), DimType::F64);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        for i in 0..4 {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, i as f64);
+            view.set_f64(idx, &DimId::Y, i as f64 * 0.5);
+            view.set_f64(idx, &DimId::Z, i as f64 * 0.2);
+            view.set_f64(idx, &DimId::OptimalKNN, 3.0);
+            view.set_f64(idx, &DimId::OptimalRadius, 2.5);
+        }
+
+        let mut filter_raw = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "all");
+        let out_raw = filter_raw.run_one(&view).unwrap().pop().unwrap();
+        assert!(out_raw.len() > 0);
+
+        let mut filter_norm =
+            CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Normalized, false, "all");
+        let out_norm = filter_norm.run_one(&view).unwrap().pop().unwrap();
+        assert!(out_norm.len() > 0);
+    }
+
+    #[test]
+    fn test_trait_and_streamable_methods() {
+        let filter = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "linearity");
+        assert_eq!(filter.name(), "filters.covariancefeatures");
+        assert!(Filter::as_any(&filter)
+            .downcast_ref::<CovarianceFeaturesFilter>()
+            .is_some());
+
+        let dims = filter.output_dimensions();
+        assert_eq!(dims.len(), 1);
+        assert_eq!(dims[0].0, DimId::from_name("Linearity"));
+
+        let mut filter_mut =
+            CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "linearity");
+        let mut scratch = PointView::new(Rc::new(PointLayout::new()));
+        assert!(!Streamable::process_one(&mut filter_mut, &mut scratch, 0));
+    }
 }

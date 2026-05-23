@@ -42,4 +42,6 @@ exec cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \
     --all-targets \
+    --exclude-from-report pdal-capi \
     "${args[@]}"
+

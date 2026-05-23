@@ -205,4 +205,42 @@ mod tests {
             assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);
         }
     }
+
+    #[test]
+    fn statistical_mode_labels_outliers_correctly() {
+        let view = grid_with_outlier();
+        let mut filter = OutlierFilter::new("statistical".to_string(), 2, 1.0, 8, 2.0, 18);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
+
+        assert_eq!(out.get_f64(25, &DimId::Classification), 18.0);
+        for idx in 0..25 {
+            assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);
+        }
+    }
+
+    #[test]
+    fn inliers_empty_leaves_view_unmodified() {
+        let view = grid_with_outlier();
+        let mut filter = OutlierFilter::new("radius".to_string(), 100, 1.0, 8, 2.0, 18);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
+        for idx in 0..out.len() {
+            assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);
+        }
+    }
+
+    #[test]
+    fn test_outlier_trait_and_streamable_methods() {
+        let mut filter = OutlierFilter::new("statistical".to_string(), 2, 1.0, 8, 2.0, 18);
+        assert_eq!(filter.name(), "filters.outlier");
+        assert!(filter.as_any().downcast_ref::<OutlierFilter>().is_some());
+
+        let dims = filter.output_dimensions();
+        assert_eq!(dims.len(), 1);
+        assert_eq!(dims[0].0, DimId::Classification);
+        assert_eq!(dims[0].1, DimType::F64);
+
+        let mut scratch = PointView::new(Rc::new(PointLayout::new()));
+        assert!(!filter.process_one(&mut scratch, 0));
+        filter.reset();
+    }
 }

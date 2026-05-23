@@ -205,4 +205,95 @@ mod tests {
         assert_eq!(outputs[0].len(), 2);
         assert_eq!(outputs[0].get_f64(1, &DimId::X), 7.4);
     }
+
+    #[test]
+    fn invalid_polygon_wkt_returns_stage_error() {
+        let res = CropFilter::new(
+            false,
+            vec![],
+            vec!["NOT A VALID WKT".to_string()],
+            vec![],
+            0.0,
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn outside_crop_returns_inverted_selection() {
+        let input = view(&[(2.0, 2.0, 0.0), (6.0, 2.0, 0.0)]);
+        let mut filter = CropFilter::new(
+            true,
+            vec![(1.0, 1.0, f64::NEG_INFINITY, 3.0, 3.0, f64::INFINITY)],
+            vec![],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+
+        let outputs = filter.run_one(&input).unwrap();
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].len(), 1);
+        assert_eq!(outputs[0].get_f64(0, &DimId::X), 6.0);
+    }
+
+    #[test]
+    fn center_3d_crop_and_distance_checks() {
+        let input = view(&[
+            (5.0, 5.0, 5.0),
+            (5.0, 5.0, 7.4),
+            (5.0, 5.0, 8.0),
+            (10.0, 5.0, 5.0),
+            (5.0, 10.0, 5.0),
+        ]);
+        let mut filter = CropFilter::new(
+            false,
+            vec![],
+            vec![],
+            vec![CropCenter::new_3d(5.0, 5.0, 5.0)],
+            2.5,
+        )
+        .unwrap();
+
+        let outputs = filter.run_one(&input).unwrap();
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].len(), 2);
+        assert_eq!(outputs[0].get_f64(0, &DimId::Z), 5.0);
+        assert_eq!(outputs[0].get_f64(1, &DimId::Z), 7.4);
+    }
+
+    #[test]
+    fn streamable_crop_and_reset() {
+        let mut filter = CropFilter::new(
+            false,
+            vec![(1.0, 1.0, f64::NEG_INFINITY, 3.0, 3.0, f64::INFINITY)],
+            vec![],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, 2.0);
+        view.set_f64(idx, &DimId::Y, 2.0);
+        view.set_f64(idx, &DimId::Z, 0.0);
+
+        assert!(filter.process_one(&mut view, idx));
+
+        view.set_f64(idx, &DimId::X, 5.0);
+        assert!(!filter.process_one(&mut view, idx));
+
+        filter.reset();
+    }
+
+    #[test]
+    fn trait_methods() {
+        let filter = CropFilter::new(false, vec![], vec![], vec![], 0.0).unwrap();
+        assert_eq!(filter.name(), "filters.crop");
+        assert!(filter.as_any().downcast_ref::<CropFilter>().is_some());
+    }
 }

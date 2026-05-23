@@ -124,3 +124,10 @@ fn test_tail_reset() {
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs[0].len(), 4);
 }
+
+#[test]
+fn test_tail_trait_methods() {
+    let filter = TailFilter::new(4, false);
+    assert_eq!(filter.name(), "filters.tail");
+    assert!(filter.as_any().downcast_ref::<TailFilter>().is_some());
+}
