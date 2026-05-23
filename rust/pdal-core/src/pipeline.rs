@@ -42,6 +42,8 @@ pub struct ExecResult {
 pub struct Pipeline {
     nodes: Vec<StageNode>,
     tags: HashMap<String, usize>,
+    last_writer_point_count: u64,
+    last_writer_view_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,6 +78,8 @@ impl Pipeline {
         Self {
             nodes: Vec::new(),
             tags: HashMap::new(),
+            last_writer_point_count: 0,
+            last_writer_view_count: 0,
         }
     }
 
@@ -269,6 +273,8 @@ impl Pipeline {
         for node in &mut self.nodes {
             node.stage.reset();
         }
+        self.last_writer_point_count = 0;
+        self.last_writer_view_count = 0;
 
         let mut outputs: HashMap<usize, Vec<PointView>> = HashMap::new();
 
@@ -317,6 +323,9 @@ impl Pipeline {
                     };
 
                     let writer_inputs = apply_writer_where(node, inputs_for_node)?;
+                    self.last_writer_point_count +=
+                        writer_inputs.iter().map(PointView::len).sum::<u64>();
+                    self.last_writer_view_count += writer_inputs.len();
                     node.stage.write(&writer_inputs)?;
                     outputs.insert(node_idx, Vec::new());
                 }
@@ -340,10 +349,11 @@ impl Pipeline {
         input_views: Vec<PointView>,
     ) -> Result<ExecResult, StageError> {
         let views = self.execute(input_views)?;
-        let point_count: u64 = views.iter().map(|v| v.len()).sum();
+        let point_count: u64 =
+            views.iter().map(|v| v.len()).sum::<u64>() + self.last_writer_point_count;
         Ok(ExecResult {
             point_count,
-            view_count: views.len(),
+            view_count: views.len() + self.last_writer_view_count,
             bounds_2d: aggregate_bounds_2d(&views),
             bounds_3d: aggregate_bounds_3d(&views),
             dimension_summaries: aggregate_dimension_summaries(&views),

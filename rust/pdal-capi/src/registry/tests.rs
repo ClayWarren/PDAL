@@ -116,8 +116,8 @@ fn pipeline_json_runs_reader_filter_writer_with_inferred_drivers() {
 
     let mut pipeline = pipeline_from_json(&json).unwrap();
     let result = pipeline.execute_with_result(Vec::new()).unwrap();
-    assert_eq!(result.point_count, 0); // writers return empty
-    assert_eq!(result.view_count, 0);
+    assert_eq!(result.point_count, 5);
+    assert_eq!(result.view_count, 1);
 
     assert!(output.exists());
     let written = std::fs::read_to_string(&output).unwrap();
@@ -159,8 +159,8 @@ fn pipeline_json_accepts_filename_string_stages() {
 
     let mut pipeline = pipeline_from_json(&json).unwrap();
     let result = pipeline.execute_with_result(Vec::new()).unwrap();
-    assert_eq!(result.point_count, 0);
-    assert_eq!(result.view_count, 0);
+    assert_eq!(result.point_count, 5);
+    assert_eq!(result.view_count, 1);
     assert!(output.exists());
     let _ = std::fs::remove_file(&output);
 }

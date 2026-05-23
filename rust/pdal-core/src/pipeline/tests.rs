@@ -823,6 +823,23 @@ fn test_reader_filter_writer_pipeline() {
 }
 
 #[test]
+fn test_execute_result_counts_writer_inputs() {
+    let mut pipeline = Pipeline::new();
+
+    let reader = pipeline.add_reader(
+        "readers.test",
+        Box::new(TestReader::new(20)),
+        Options::new(),
+    );
+    let writer = pipeline.add_writer("writers.test", Box::new(TestWriter::new()), Options::new());
+    pipeline.add_dependency(writer, reader).unwrap();
+
+    let result = pipeline.execute_with_result(Vec::new()).unwrap();
+    assert_eq!(result.point_count, 20);
+    assert_eq!(result.view_count, 1);
+}
+
+#[test]
 fn test_reader_produces_correct_data() {
     let mut pipeline = Pipeline::new();
     pipeline.add_reader(

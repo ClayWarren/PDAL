@@ -638,6 +638,7 @@ COVERED: dict[str, object] = {
         "filenameTemplate",
     },
     "pdal_pipeline_writer_test": {"issue_2458", "serialize"},
+    "pdal_pipeline_manager_test": {"basic"},
     "pdal_streaming_test": ALL,
 }
 

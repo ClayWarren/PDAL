@@ -40,6 +40,7 @@
 #include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 using namespace pdal;
 
@@ -48,21 +49,16 @@ TEST(PipelineManagerTest, basic)
     std::string outfile = Support::temppath("temp.las");
     FileUtils::deleteFile(outfile);
 
-    PipelineManager mgr;
+    std::string json =
+        "{\"pipeline\":[{\"type\":\"readers.las\",\"filename\":\"" +
+        Support::datapath("las/1.2-with-color.las") +
+        "\"},{\"type\":\"writers.las\",\"filename\":\"" + outfile + "\"}]}";
+    pdal_pipeline_t* pipeline = pdal_pipeline_create_json(json.c_str());
+    ASSERT_NE(pipeline, nullptr);
 
-    Options optsR;
-    optsR.add("filename", Support::datapath("las/1.2-with-color.las"));
-    Stage& reader = mgr.addReader("readers.las");
-    reader.setOptions(optsR);
-
-    Options optsW;
-    optsW.add("filename", outfile);
-    Stage& writer = mgr.addWriter("writers.las");
-    writer.setInput(reader);
-    writer.setOptions(optsW);
-
-    point_count_t np = mgr.execute();
-    EXPECT_EQ(np, 1065U);
+    int64_t np = pdal_pipeline_execute_count(pipeline, nullptr);
+    EXPECT_EQ(np, 1065);
+    pdal_pipeline_destroy(pipeline);
 
     EXPECT_TRUE(!std::ifstream(outfile).fail());
     FileUtils::deleteFile(outfile);

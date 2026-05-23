@@ -139,13 +139,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `741 / 926` built C++ GoogleTest cases, or `80.02%`, are
+Current checkpoint: `742 / 926` built C++ GoogleTest cases, or `80.13%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route typed point-view reads, the default spatial-reference contract,
-basic point storage, and option JSON canonicalization through the Rust C ABI,
-route EPT reader `inspect` (no-spatial-filter preview) through a new Rust C ABI
-that reads `ept.json` and expands LASzip class-flag dims to match `EptInfo`,
-audit the EPT reader's `resolutionLimit` and corrupted-tile and
+gains route the basic pipeline manager execute path, typed point-view reads, the
+default spatial-reference contract, basic point storage, and option JSON
+canonicalization through the Rust C ABI, route EPT reader `inspect`
+(no-spatial-filter preview) through a new Rust C ABI that reads `ept.json` and
+expands LASzip class-flag dims to match `EptInfo`, audit the EPT reader's
+`resolutionLimit` and corrupted-tile and
 bad-tile-point-count failure paths (`unreadableTileFailure`,
 `badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
 the wrapper now routes the non-streaming non-special-options path through
@@ -357,6 +358,9 @@ Known mixed binaries:
   scalar conversion, JSON scalar formatting, child updates, and colon-path child
   lookup route through the Rust C ABI. Pointer round-tripping remains
   C++-specific and does not count.
+- `pdal_pipeline_manager_test`: `basic` counts. It executes a reader-to-writer
+  pipeline through the Rust C ABI. Command-line option ordering, input globbing,
+  object validation, and C++ stage replacement behavior remain C++.
 - `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
 - `pdal_io_las_reader_test`: all currently built cases count by explicit audit
   list. Point materialization, callbacks, lazperf stream decoding, VLR/SRS
