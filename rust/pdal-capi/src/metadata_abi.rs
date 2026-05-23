@@ -518,6 +518,35 @@ pub unsafe extern "C" fn pdal_metadata_node_child_named(
         .unwrap_or(std::ptr::null_mut())
 }
 
+#[no_mangle]
+/// Return a copy of the child selected by a colon-delimited path.
+/// Caller owns the returned pointer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `path` must be null or a valid
+/// NUL-terminated C string.
+pub unsafe extern "C" fn pdal_metadata_node_find_child_path(
+    node: *const MetadataNode,
+    path: *const c_char,
+) -> *mut MetadataNode {
+    let path = c_string_lossy(path);
+    if path.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let Some(mut current) = node.as_ref() else {
+        return std::ptr::null_mut();
+    };
+    for part in path.split(':') {
+        let Some(child) = current.find_child(part) else {
+            return std::ptr::null_mut();
+        };
+        current = child;
+    }
+    Box::into_raw(Box::new(current.clone()))
+}
+
 /// Serialize a metadata node tree as JSON. Caller must free with
 /// `pdal_string_free`.
 ///

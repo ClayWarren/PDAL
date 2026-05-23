@@ -139,7 +139,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `742 / 926` built C++ GoogleTest cases, or `80.13%`, are
+Current checkpoint: `741 / 926` built C++ GoogleTest cases, or `80.02%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains route typed point-view reads, the default spatial-reference contract,
 basic point storage, and option JSON canonicalization through the Rust C ABI,
@@ -353,8 +353,10 @@ Known mixed binaries:
   wrapper behavior.
 - `pdal_filters_miniball_test`: all 2 tests count. K-nearest-neighbor
   miniball scoring routes through the Rust C ABI.
-- `pdal_metadata_test`: all 12 tests count. Scalar conversion and JSON scalar formatting
-  route through Rust helpers. The metadata tree implementation is still C++.
+- `pdal_metadata_test`: 11 of 12 tests count. Metadata creation, cloning,
+  scalar conversion, JSON scalar formatting, child updates, and colon-path child
+  lookup route through the Rust C ABI. Pointer round-tripping remains
+  C++-specific and does not count.
 - `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
 - `pdal_io_las_reader_test`: all currently built cases count by explicit audit
   list. Point materialization, callbacks, lazperf stream decoding, VLR/SRS

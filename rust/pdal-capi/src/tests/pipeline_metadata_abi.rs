@@ -209,6 +209,12 @@ fn metadata_tree_roundtrips_through_c_abi() {
         assert_eq!(take_string(pdal_metadata_node_name(named)), "child");
         pdal_metadata_node_destroy(named);
 
+        let child_path = CString::new("child").unwrap();
+        let path_child = pdal_metadata_node_find_child_path(root, child_path.as_ptr());
+        assert_eq!(take_string(pdal_metadata_node_name(path_child)), "child");
+        pdal_metadata_node_destroy(path_child);
+        assert!(pdal_metadata_node_find_child_path(root, std::ptr::null()).is_null());
+
         pdal_metadata_node_destroy(root);
     }
 }

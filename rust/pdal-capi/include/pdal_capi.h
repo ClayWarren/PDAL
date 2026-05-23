@@ -551,6 +551,9 @@ extern "C"
     pdal_metadata_node_t*
     pdal_metadata_node_child_named(const pdal_metadata_node_t* node,
                                    const char* name, uint64_t idx);
+    pdal_metadata_node_t*
+    pdal_metadata_node_find_child_path(const pdal_metadata_node_t* node,
+                                       const char* path);
     void pdal_metadata_node_destroy(pdal_metadata_node_t* node);
 
     // Stage
