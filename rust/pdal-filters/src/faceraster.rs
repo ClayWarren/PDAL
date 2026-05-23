@@ -348,4 +348,55 @@ mod tests {
         let mut filter = FaceRasterFilter::new(&options);
         assert!(filter.run_one(&view).is_err());
     }
+
+    #[test]
+    fn filter_errors_when_raster_already_exists() {
+        let mut view = triangle_view();
+        let limits = pdal_core::raster::RasterLimits::new(0.0, 0.0, 2, 2, 1.0);
+        view.add_raster(pdal_core::raster::RasterData::new(
+            "faceraster",
+            limits,
+            0.0,
+        ));
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        let mut filter = FaceRasterFilter::new(&options);
+        assert!(filter.run_one(&view).is_err());
+    }
+
+    #[test]
+    fn streamable_process_one_returns_true() {
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        let mut filter = FaceRasterFilter::new(&options);
+        let mut view = triangle_view();
+        assert!(filter.process_one(&mut view, 0));
+    }
+
+    #[test]
+    fn filter_name_is_filters_faceraster() {
+        let f = FaceRasterFilter::new(&Options::new());
+        assert_eq!(f.name(), "filters.faceraster");
+    }
+
+    #[test]
+    fn barycentric_returns_infinity_for_degenerate_triangle() {
+        // Collinear points: area_total == 0
+        let v =
+            barycentric_interpolation((0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (2.0, 2.0, 2.0), 0.5, 0.5);
+        assert!(v.is_infinite());
+    }
+
+    #[test]
+    fn edge_length_computes_euclidean_distance() {
+        let d = edge_length((0.0, 0.0, 0.0), (3.0, 4.0, 0.0));
+        assert!((d - 5.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn clamp_cell_clamps_to_range() {
+        assert_eq!(clamp_cell(-1, 10), 0);
+        assert_eq!(clamp_cell(15, 10), 10);
+        assert_eq!(clamp_cell(5, 10), 5);
+    }
 }

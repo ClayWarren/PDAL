@@ -106,6 +106,31 @@ pub unsafe extern "C" fn pdal_geometry_wkt_contains_point(
             return false;
         };
         if let Some(out_value) = out_value.as_mut() {
+            *out_value = geometry.contains(x, y);
+        }
+        true
+    })
+}
+
+/// Evaluate whether WKT geometry covers a point using the native GEOS adapter.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_covers_point(
+    wkt: *const c_char,
+    x: f64,
+    y: f64,
+    out_value: *mut bool,
+) -> bool {
+    ffi_catch(false, || {
+        let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
+            set_last_error("Failed to parse WKT geometry");
+            return false;
+        };
+        if let Some(out_value) = out_value.as_mut() {
             *out_value = geometry.covers(x, y);
         }
         true

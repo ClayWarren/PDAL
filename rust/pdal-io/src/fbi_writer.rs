@@ -569,4 +569,36 @@ mod tests {
         FbiWriter::new(&options).write(&[view]).unwrap();
         assert_eq!(FbiReader::new(&options).read().unwrap()[0].len(), 0);
     }
+
+    #[test]
+    fn writer_metadata_and_name() {
+        let writer = FbiWriter::new(&Options::new());
+        assert_eq!(writer.name(), "writers.fbi");
+        assert_eq!(writer.metadata().name(), "writers.fbi");
+    }
+
+    #[test]
+    fn writer_errors_on_unwritable_path() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/directory/out.fbi");
+        let mut writer = FbiWriter::new(&options);
+        let view = make_view();
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn has_dim_returns_true_for_present_dim() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        assert!(has_dim(&view, &DimId::X));
+        assert!(!has_dim(&view, &DimId::Y));
+    }
+
+    #[test]
+    fn bits_if_returns_zero_when_dim_missing() {
+        let layout = PointLayout::new();
+        let view = PointView::new(Rc::new(layout));
+        assert_eq!(bits_if(&view, &DimId::X, 32), 0);
+    }
 }

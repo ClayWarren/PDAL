@@ -490,4 +490,114 @@ mod tests {
         assert_eq!(json_scalar_value("json", "{\"a\":1}"), "{\"a\":1}");
         assert_eq!(json_scalar_value("int32", "42"), "42");
     }
+
+    #[test]
+    fn scalar_as_i64_handles_base64_and_parse() {
+        // 8 little-endian bytes for i64(42)
+        let bytes = 42i64.to_ne_bytes();
+        // Base64 encode
+        let encoded = pdal_base64_encode(&bytes);
+        assert_eq!(scalar_as_i64("base64Binary", &encoded), Some(42));
+        // Truncated input -> None
+        assert_eq!(scalar_as_i64("base64Binary", "AAAA"), None);
+        // Plain string parse
+        assert_eq!(scalar_as_i64("int32", "123"), Some(123));
+        assert_eq!(scalar_as_i64("int32", "not"), None);
+    }
+
+    #[test]
+    fn scalar_as_u64_handles_base64_and_parse() {
+        let bytes = 42u64.to_ne_bytes();
+        let encoded = pdal_base64_encode(&bytes);
+        assert_eq!(scalar_as_u64("base64Binary", &encoded), Some(42));
+        assert_eq!(scalar_as_u64("base64Binary", "AAAA"), None);
+        assert_eq!(scalar_as_u64("uint32", "5"), Some(5));
+    }
+
+    #[test]
+    fn scalar_as_f64_handles_base64_and_parse() {
+        let bytes = 1.5_f64.to_ne_bytes();
+        let encoded = pdal_base64_encode(&bytes);
+        assert!((scalar_as_f64("base64Binary", &encoded).unwrap() - 1.5).abs() < 1e-12);
+        assert_eq!(scalar_as_f64("base64Binary", "AAAA"), None);
+        assert!((scalar_as_f64("double", "3.5").unwrap() - 3.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn scalar_as_bool_handles_boolean_and_numeric_str() {
+        assert_eq!(scalar_as_bool("boolean", "true"), Some(true));
+        assert_eq!(scalar_as_bool("boolean", "false"), Some(false));
+        assert_eq!(scalar_as_bool("boolean", "other"), None);
+        assert_eq!(scalar_as_bool("int32", "1"), Some(true));
+        assert_eq!(scalar_as_bool("int32", "0"), Some(false));
+        assert_eq!(scalar_as_bool("int32", "garbage"), None);
+    }
+
+    #[test]
+    fn decode_base64_rejects_invalid_chars() {
+        // Char outside base64 alphabet (excluding =) -> None
+        assert!(decode_base64("!!").is_none());
+        // Padding in disallowed positions
+        assert!(decode_base64("====").is_none());
+    }
+
+    #[test]
+    fn escape_json_handles_control_chars() {
+        assert!(escape_json("a\\b").contains("\\\\"));
+        assert!(escape_json("a\nb").contains("\\n"));
+        assert!(escape_json("a\tb").contains("\\t"));
+        assert!(escape_json("a\rb").contains("\\r"));
+        // backspace U+08, formfeed U+0C
+        assert!(escape_json("a\u{08}b").contains("\\b"));
+        assert!(escape_json("a\u{0c}b").contains("\\f"));
+        // Other control chars escaped as \uNNNN
+        let s = escape_json("a\u{01}b");
+        assert!(s.contains("\\u0001"));
+    }
+
+    #[test]
+    fn add_or_update_replaces_existing_child() {
+        let mut root = MetadataNode::new("root");
+        let mut a1 = MetadataNode::new("kid");
+        a1.add_value("v", MetadataValue::U64(1));
+        root.add_child(a1);
+        let mut a2 = MetadataNode::new("kid");
+        a2.add_value("v", MetadataValue::U64(2));
+        root.add_or_update(a2);
+        // Still only one "kid" child
+        assert_eq!(root.children_named("kid").len(), 1);
+    }
+
+    #[test]
+    fn add_or_update_inserts_when_missing() {
+        let mut root = MetadataNode::new("root");
+        let kid = MetadataNode::new("newkid");
+        root.add_or_update(kid);
+        assert!(root.find_child("newkid").is_some());
+    }
+
+    // Helper: tiny base64 encoder used only by these unit tests.
+    fn pdal_base64_encode(bytes: &[u8]) -> String {
+        const CHARS: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::new();
+        for chunk in bytes.chunks(3) {
+            let b0 = chunk[0];
+            let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
+            let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
+            out.push(CHARS[(b0 >> 2) as usize] as char);
+            out.push(CHARS[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+            if chunk.len() > 1 {
+                out.push(CHARS[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
+            } else {
+                out.push('=');
+            }
+            if chunk.len() > 2 {
+                out.push(CHARS[(b2 & 0x3f) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+        out
+    }
 }

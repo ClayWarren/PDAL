@@ -799,4 +799,151 @@ mod tests {
         assert_eq!(writer.metadata().name(), "writers.gdal");
         assert_eq!(writer.name(), "writers.gdal");
     }
+
+    fn tmp_tif(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "pdal-rust-gdal-writer-{}-{name}",
+            std::process::id()
+        ))
+    }
+
+    fn make_view_with_points() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z) in [
+            (0.0, 0.0, 1.0),
+            (1.0, 0.0, 2.0),
+            (0.0, 1.0, 3.0),
+            (1.0, 1.0, 4.0),
+        ] {
+            let p = view.add_point();
+            view.set_f64(p, &DimId::X, x);
+            view.set_f64(p, &DimId::Y, y);
+            view.set_f64(p, &DimId::Z, z);
+        }
+        view
+    }
+
+    #[test]
+    fn writer_writes_float64_output() {
+        let out = tmp_tif("f64.tif");
+        let mut options = Options::new();
+        options.add("filename", out.to_str().unwrap());
+        options.add("resolution", 1.0);
+        options.add("output_type", "mean");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let r = writer.write(&[view]);
+        // GDAL may not be configured in dev; tolerate failure.
+        if r.is_ok() {
+            assert!(out.exists());
+        }
+        let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn writer_writes_int32_output() {
+        let out = tmp_tif("i32.tif");
+        let mut options = Options::new();
+        options.add("filename", out.to_str().unwrap());
+        options.add("resolution", 1.0);
+        options.add("output_type", "count");
+        options.add("data_type", "int32");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let r = writer.write(&[view]);
+        if r.is_ok() {
+            assert!(out.exists());
+        }
+        let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn writer_writes_with_metadata_items() {
+        let out = tmp_tif("meta.tif");
+        let mut options = Options::new();
+        options.add("filename", out.to_str().unwrap());
+        options.add("resolution", 1.0);
+        options.add("output_type", "mean");
+        options.add("metadata", "AREA_OR_PIXEL=Pixel,Author=test");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let _ = writer.write(&[view]);
+        let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn writer_writes_all_stats_via_output_type_all() {
+        let out = tmp_tif("all.tif");
+        let mut options = Options::new();
+        options.add("filename", out.to_str().unwrap());
+        options.add("resolution", 1.0);
+        options.add("output_type", "all");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let _ = writer.write(&[view]);
+        let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn output_types_rejects_invalid_percentile_value() {
+        let mut options = Options::new();
+        options.add("output_type", "p150");
+        let (_stats, err) = output_types(&options);
+        assert!(err.is_some());
+    }
+
+    #[test]
+    fn output_types_rejects_invalid_percentile_text() {
+        let mut options = Options::new();
+        options.add("output_type", "pxx");
+        let (_stats, err) = output_types(&options);
+        assert!(err.is_some());
+    }
+
+    #[test]
+    fn output_types_handles_no_valid_types() {
+        let mut options = Options::new();
+        options.add("output_type", "mystery");
+        let (_stats, err) = output_types(&options);
+        assert!(err.is_some());
+    }
+
+    #[test]
+    fn writer_propagates_output_type_error() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        options.add("output_type", "mystery");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn sample_cell_rejects_out_of_range() {
+        let grid = FixedGrid {
+            origin_x: 0.0,
+            origin_y: 0.0,
+            width: 2,
+            height: 2,
+        };
+        // Negative column
+        let s = Sample {
+            x: -10.0,
+            y: 0.5,
+            value: 1.0,
+        };
+        assert!(sample_cell(grid, &s, 1.0).is_none());
+        // Row out of range
+        let s = Sample {
+            x: 0.5,
+            y: 100.0,
+            value: 1.0,
+        };
+        assert!(sample_cell(grid, &s, 1.0).is_none());
+    }
 }

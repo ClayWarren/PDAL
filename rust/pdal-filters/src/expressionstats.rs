@@ -177,4 +177,56 @@ mod tests {
             2
         );
     }
+
+    #[test]
+    fn errors_on_empty_expressions() {
+        let r = ExpressionStatsFilter::new("X", &[]);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn errors_on_invalid_expression() {
+        let r = ExpressionStatsFilter::new("X", &["X >".to_string()]);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn errors_when_dimension_not_in_layout() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Y, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        let mut filter = ExpressionStatsFilter::new("X", &["Y > 0".to_string()]).unwrap();
+        let r = filter.run(std::slice::from_ref(&view));
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn filter_metadata_name_and_streamable_paths() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, 1.0);
+
+        let mut filter = ExpressionStatsFilter::new("X", &["X > 0".to_string()]).unwrap();
+        assert_eq!(filter.name(), "filters.expressionstats");
+
+        // Streamable: process_one + reset
+        let kept = filter.process_one(&mut view, 0);
+        assert!(kept);
+        filter.reset();
+    }
+
+    #[test]
+    fn streamable_process_one_handles_unknown_dim_gracefully() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::Y, 1.0);
+
+        let mut filter = ExpressionStatsFilter::new("X", &["Y > 0".to_string()]).unwrap();
+        // process_one with an unknown dim in layout still returns true (keep point)
+        assert!(filter.process_one(&mut view, 0));
+    }
 }

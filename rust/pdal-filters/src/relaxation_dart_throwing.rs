@@ -211,4 +211,44 @@ mod tests {
         let out = filter.run_one(&v).unwrap().pop().unwrap();
         assert_eq!(out.len(), 1);
     }
+
+    #[test]
+    fn lcg_next_range_handles_small_n() {
+        let mut rng = Lcg::new(123);
+        assert_eq!(rng.next_range(0), 0);
+        assert_eq!(rng.next_range(1), 0);
+        let v = rng.next_range(10);
+        assert!(v < 10);
+    }
+
+    #[test]
+    fn visit_order_with_shuffle_uses_seed() {
+        let f = RelaxationDartThrowingFilter::new(0.9, 1.0, 0.001, 10, true, Some(7));
+        let order = f.visit_order(8);
+        assert_eq!(order.len(), 8);
+    }
+
+    #[test]
+    fn visit_order_with_shuffle_no_seed_uses_clock() {
+        let f = RelaxationDartThrowingFilter::new(0.9, 1.0, 0.001, 10, true, None);
+        let order = f.visit_order(4);
+        assert_eq!(order.len(), 4);
+    }
+
+    #[test]
+    fn subsamples_with_shuffle_via_seed() {
+        let v = grid(20);
+        let mut filter = RelaxationDartThrowingFilter::new(0.9, 1.0, 0.001, 8, true, Some(42));
+        let out = filter.run_one(&v).unwrap().pop().unwrap();
+        assert_eq!(out.len(), 8);
+    }
+
+    #[test]
+    fn filter_name_and_streamable_returns_false() {
+        let mut f = RelaxationDartThrowingFilter::new(0.9, 1.0, 0.001, 10, false, None);
+        assert_eq!(f.name(), "filters.relaxationdartthrowing");
+        let mut v = view(&[(0.0, 0.0, 0.0)]);
+        // process_one returns false (not streamable)
+        assert!(!f.process_one(&mut v, 0));
+    }
 }

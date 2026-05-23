@@ -267,4 +267,55 @@ mod tests {
         let resolved = resolve_location(base, "child.las");
         assert_eq!(resolved, Path::new("/base/child.las"));
     }
+
+    #[test]
+    fn reader_errors_on_feature_missing_location() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{"type":"FeatureCollection","features":[{"type":"Feature","properties":{}}]}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = TindexReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("location"));
+    }
+
+    #[test]
+    fn reader_returns_empty_for_empty_feature_collection() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{"type":"FeatureCollection","features":[]}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = TindexReader::new(&options);
+        let views = reader.read().unwrap();
+        assert!(views.is_empty());
+    }
+
+    #[test]
+    fn read_point_file_errors_on_unknown_extension() {
+        let p = std::path::PathBuf::from("/no/such/file.unknownext");
+        assert!(read_point_file(&p).is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_unknown_reader_extension() {
+        let temp = tempfile::tempdir().unwrap();
+        let index = temp.path().join("idx.geojson");
+        std::fs::write(
+            &index,
+            br#"{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"location":"file.unknownext"}}]}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        let mut reader = TindexReader::new(&options);
+        assert!(reader.read().is_err());
+    }
 }

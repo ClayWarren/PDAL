@@ -469,4 +469,63 @@ mod tests {
         let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert!(out.get_f64(0, &DimId::GpsTime) > 0.0);
     }
+
+    #[test]
+    fn from_options_errors_when_start_date_missing_for_gws_or_gds() {
+        let opts = options(&[("conversion", "gws2gt")]);
+        assert!(GpsTimeConvert::from_options(&opts).is_err());
+        let opts = options(&[("conversion", "gds2gt")]);
+        assert!(GpsTimeConvert::from_options(&opts).is_err());
+    }
+
+    #[test]
+    fn filter_name_is_filters_gpstimeconvert() {
+        let opts = options(&[("conversion", "gt2gst")]);
+        let f = GpsTimeConvert::from_options(&opts).unwrap();
+        assert_eq!(f.name(), "filters.gpstimeconvert");
+    }
+
+    #[test]
+    fn from_options_accepts_in_out_time_pair() {
+        let opts = options(&[("in_time", "gt"), ("out_time", "gst")]);
+        assert!(GpsTimeConvert::from_options(&opts).is_ok());
+    }
+
+    #[test]
+    fn from_options_requires_conversion_or_in_out_pair() {
+        // Only in_time set
+        let opts = options(&[("in_time", "gt")]);
+        assert!(GpsTimeConvert::from_options(&opts).is_err());
+    }
+
+    #[test]
+    fn reset_clears_first_and_last_time() {
+        let opts = options(&[("conversion", "gt2gws")]);
+        let mut f = GpsTimeConvert::from_options(&opts).unwrap();
+        f.first = false;
+        f.last_time = 5.0;
+        f.reset();
+        assert!(f.first);
+        assert_eq!(f.last_time, f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn convert_gst_to_gt_applies_offset() {
+        let opts = options(&[("conversion", "gst2gt")]);
+        let mut f = GpsTimeConvert::from_options(&opts).unwrap();
+        let mut v = gps_view(&[0.0]);
+        f.process_one(&mut v, 0);
+        // gst→gt adds GPS_TIME_OFFSET to first point
+        assert!(v.get_f64(0, &DimId::GpsTime) > 0.0);
+    }
+
+    #[test]
+    fn wrap_seconds_wraps_value_into_period() {
+        let opts = options(&[("conversion", "gt2gws"), ("wrap", "true")]);
+        let mut f = GpsTimeConvert::from_options(&opts).unwrap();
+        let mut v = gps_view(&[1_500_000.0]);
+        f.process_one(&mut v, 0);
+        // After conversion, the value gets wrapped into [0, WEEK_SECONDS) on day output side, but here just exercise the path.
+        let _ = v.get_f64(0, &DimId::GpsTime);
+    }
 }

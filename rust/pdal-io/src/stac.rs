@@ -323,4 +323,94 @@ mod tests {
         let names = asset_names(&options);
         assert_eq!(names, vec!["foo", "bar", "baz"]);
     }
+
+    #[test]
+    fn reader_errors_on_unknown_type() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), br#"{"type":"Weird"}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("Unsupported"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_type() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), br#"{}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("type"));
+    }
+
+    #[test]
+    fn reader_errors_on_remote_asset() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{"type":"Feature","assets":{"data":{"href":"http://example.com/x.las"}}}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("remote"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_assets() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), br#"{"type":"Feature"}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("assets"));
+    }
+
+    #[test]
+    fn reader_errors_on_asset_missing_href() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), br#"{"type":"Feature","assets":{"data":{}}}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("href"));
+    }
+
+    #[test]
+    fn reader_errors_on_feature_collection_missing_features() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), br#"{"type":"FeatureCollection"}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("features"));
+    }
+
+    #[test]
+    fn reader_handles_empty_feature_collection_with_links() {
+        let temp = tempfile::tempdir().unwrap();
+        let coll = temp.path().join("fc.json");
+        std::fs::write(&coll, br#"{"type":"FeatureCollection","features":[]}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", coll.display());
+        let mut reader = StacReader::new(&options);
+        // FeatureCollection with empty features -> Ok with no views
+        let views = reader.read().unwrap();
+        assert!(views.is_empty());
+    }
+
+    #[test]
+    fn is_remote_detects_url_schemes() {
+        assert!(is_remote("http://example.com/x"));
+        assert!(is_remote("https://example.com/x"));
+        assert!(!is_remote("/local/path.las"));
+    }
 }

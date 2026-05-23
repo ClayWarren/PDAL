@@ -234,4 +234,80 @@ mod tests {
         };
         assert_eq!(r.name(), "readers.qfit");
     }
+
+    #[test]
+    fn metadata_returns_readers_qfit() {
+        let r = QfitReader {
+            filename: "dummy".to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        assert_eq!(r.metadata().name(), "readers.qfit");
+    }
+
+    #[test]
+    fn reads_14_word_file() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/qfit/14-word.qi");
+        let mut r = QfitReader {
+            filename: input.display().to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        let views = r.read().unwrap();
+        assert!(!views.is_empty());
+        assert!(views[0].len() > 0);
+    }
+
+    #[test]
+    fn reads_10_word_without_flip() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/qfit/10-word.qi");
+        let mut r = QfitReader {
+            filename: input.display().to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        let views = r.read().unwrap();
+        assert!(!views.is_empty());
+    }
+
+    #[test]
+    fn errors_on_invalid_record_size() {
+        use std::io::Write;
+        // Build a tiny file with first i32 LE = 32 (not 40, 48, or 56)
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("pdal-qfit-bad-{}.qi", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(&32i32.to_le_bytes()).unwrap();
+        // pad
+        f.write_all(&[0u8; 64]).unwrap();
+        let mut r = QfitReader {
+            filename: path.display().to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        let err = r.read().err().unwrap();
+        assert!(err.0.contains("record size"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn errors_on_incomplete_header() {
+        use std::io::Write;
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("pdal-qfit-empty-{}.qi", std::process::id()));
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(b"a")
+            .unwrap();
+        let mut r = QfitReader {
+            filename: path.display().to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        let err = r.read().err().unwrap();
+        assert!(err.0.contains("Incomplete"));
+        std::fs::remove_file(&path).ok();
+    }
 }

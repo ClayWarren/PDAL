@@ -961,4 +961,69 @@ mod tests {
         };
         assert!(!bounds.overlaps(&disjoint));
     }
+
+    // ----- JSON bounds parsing branches -----
+
+    #[test]
+    fn parse_bounds2d_accepts_geojson_array() {
+        let p = parse_bounds2d("[1.0, 2.0, 3.0, 4.0]", 0).unwrap();
+        assert_eq!(p.bounds.minx, 1.0);
+        assert_eq!(p.bounds.miny, 2.0);
+        assert_eq!(p.bounds.maxx, 3.0);
+        assert_eq!(p.bounds.maxy, 4.0);
+    }
+
+    #[test]
+    fn parse_bounds2d_rejects_wrong_size_geojson_array() {
+        let r = parse_bounds2d("[1.0, 2.0]", 0);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn parse_bounds2d_accepts_object_form() {
+        let p = parse_bounds2d(
+            r#"{"minx":1,"miny":2,"maxx":3,"maxy":4,"srs":"EPSG:4326"}"#,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.bounds.minx, 1.0);
+        assert_eq!(p.wkt, "EPSG:4326");
+    }
+
+    #[test]
+    fn parse_bounds3d_accepts_geojson_array() {
+        let p = parse_bounds3d("[1, 2, 3, 4, 5, 6]", 0).unwrap();
+        assert_eq!(p.bounds.minx, 1.0);
+        assert_eq!(p.bounds.miny, 2.0);
+        assert_eq!(p.bounds.minz, 3.0);
+        assert_eq!(p.bounds.maxx, 4.0);
+        assert_eq!(p.bounds.maxy, 5.0);
+        assert_eq!(p.bounds.maxz, 6.0);
+    }
+
+    #[test]
+    fn parse_bounds3d_rejects_wrong_size_geojson_array() {
+        assert!(parse_bounds3d("[1, 2]", 0).is_err());
+    }
+
+    #[test]
+    fn parse_bounds3d_accepts_object_with_z() {
+        let p = parse_bounds3d(
+            r#"{"minx":1,"miny":2,"maxx":3,"maxy":4,"minz":5,"maxz":6,"crs":"foo"}"#,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.bounds.minz, 5.0);
+        assert_eq!(p.bounds.maxz, 6.0);
+        assert_eq!(p.wkt, "foo");
+    }
+
+    #[test]
+    fn parse_bounds3d_object_uses_empty_z_when_missing() {
+        let p = parse_bounds3d(r#"{"minx":1,"miny":2,"maxx":3,"maxy":4}"#, 0).unwrap();
+        // Z defaults to Bounds3D::empty() values
+        let empty = Bounds3D::empty();
+        assert_eq!(p.bounds.minz, empty.minz);
+        assert_eq!(p.bounds.maxz, empty.maxz);
+    }
 }

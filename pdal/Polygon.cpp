@@ -163,7 +163,8 @@ void Polygon::simplify(double distance_tolerance, double area_tolerance,
     throwNoGeos();
 
     char* out_wkt = nullptr;
-    if (pdal_geometry_wkt_simplify(wkt(20).c_str(), distance_tolerance, preserve_topology, &out_wkt))
+    if (pdal_geometry_wkt_simplify(wkt(20).c_str(), distance_tolerance,
+                                   preserve_topology, &out_wkt))
     {
         if (out_wkt)
         {
@@ -243,7 +244,7 @@ bool Polygon::covers(const PointRef& ref) const
     double y = ref.getFieldAs<double>(Dimension::Id::Y);
 
     bool inside = false;
-    if (pdal_geometry_wkt_contains_point(wkt(20).c_str(), x, y, &inside))
+    if (pdal_geometry_wkt_covers_point(wkt(20).c_str(), x, y, &inside))
         return inside;
 
     return false;

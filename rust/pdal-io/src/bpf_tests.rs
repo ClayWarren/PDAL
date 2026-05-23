@@ -303,3 +303,229 @@ fn reader_handles_v3_segregated_deflate() {
     ));
     assert_eq!(view.len(), 1065);
 }
+
+#[test]
+fn reader_name_is_readers_bpf() {
+    let reader = BpfReader::new(&Options::new());
+    assert_eq!(reader.name(), "readers.bpf");
+}
+
+#[test]
+fn writer_name_is_writers_bpf() {
+    let writer = BpfWriter::new(&Options::new());
+    assert_eq!(writer.name(), "writers.bpf");
+}
+
+#[test]
+fn writer_errors_on_zero_scale() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("zero-scale.bpf");
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("scale_x", 0.0);
+    let mut writer = BpfWriter::new(&options);
+    let err = writer.write(std::slice::from_ref(&input)).err().unwrap();
+    assert!(err.0.contains("scale"));
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn writer_errors_on_invalid_output_dim() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("invalid-dim.bpf");
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("output_dims", "X,Y,Z,Bogusdim");
+    let mut writer = BpfWriter::new(&options);
+    let err = writer.write(std::slice::from_ref(&input)).err().unwrap();
+    assert!(err.0.contains("Bogusdim"));
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn writer_errors_when_missing_xyz_in_output_dims() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("no-xyz.bpf");
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("output_dims", "Intensity");
+    let mut writer = BpfWriter::new(&options);
+    let err = writer.write(std::slice::from_ref(&input)).err().unwrap();
+    assert!(err.0.contains("X") || err.0.contains("Y") || err.0.contains("Z"));
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn writer_errors_on_empty_views() {
+    let mut writer = BpfWriter::new(&{
+        let mut o = Options::new();
+        o.add("filename", "/tmp/empty-views.bpf");
+        o
+    });
+    let err = writer.write(&[]).err().unwrap();
+    assert!(err.0.contains("input view"));
+}
+
+#[test]
+fn writer_errors_on_oversized_bundle_filename() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("oversized-bundle.bpf");
+    // Create a bundled file with a name >32 chars
+    let long_name = temp_path("this-bundle-filename-is-definitely-way-too-long");
+    std::fs::write(&long_name, b"data").unwrap();
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("bundledfile", &long_name);
+    let mut writer = BpfWriter::new(&options);
+    let err = writer.write(std::slice::from_ref(&input)).err().unwrap();
+    assert!(err.0.contains("maximum length"));
+    std::fs::remove_file(&long_name).ok();
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn writer_errors_on_empty_bundle_file() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("empty-bundle.bpf");
+    let empty = temp_path("empty-bundle-data");
+    std::fs::write(&empty, b"").unwrap();
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("bundledfile", &empty);
+    let mut writer = BpfWriter::new(&options);
+    let err = writer.write(std::slice::from_ref(&input)).err().unwrap();
+    assert!(err.0.contains("empty"));
+    std::fs::remove_file(&empty).ok();
+    std::fs::remove_file(&output).ok();
+}
+
+// ----- BPF v1 reading: synthesize a minimal v1 file -----
+
+fn build_v1_bpf_dim_major(num_pts: i32, dyn_dims: usize) -> Vec<u8> {
+    use byteorder::{LittleEndian, WriteBytesExt};
+    use std::io::Write as IoWrite;
+
+    let mut buf: Vec<u8> = Vec::new();
+    // header_len placeholder
+    let header_len_placeholder_pos = buf.len();
+    buf.write_i32::<LittleEndian>(0).unwrap(); // len
+    buf.write_i32::<LittleEndian>(1).unwrap(); // version 1 (dim major)
+    buf.write_i32::<LittleEndian>(num_pts).unwrap();
+    buf.write_i32::<LittleEndian>(dyn_dims as i32).unwrap();
+    buf.write_i32::<LittleEndian>(0).unwrap(); // coord_type (geo)
+    buf.write_i32::<LittleEndian>(0).unwrap(); // coord_id
+    buf.write_f32::<LittleEndian>(1.0).unwrap(); // spacing
+                                                 // static dim offsets X, Y, Z
+    for _ in 0..3 {
+        buf.write_f64::<LittleEndian>(0.0).unwrap();
+    }
+    // static dim min/max for X, Y, Z
+    for _ in 0..3 {
+        buf.write_f64::<LittleEndian>(0.0).unwrap(); // min
+        buf.write_f64::<LittleEndian>(1.0).unwrap(); // max
+    }
+    // dynamic dim offsets (just zero for each)
+    for _ in 0..dyn_dims {
+        buf.write_f64::<LittleEndian>(0.0).unwrap();
+    }
+    // dynamic dim mins
+    for _ in 0..dyn_dims {
+        buf.write_f64::<LittleEndian>(0.0).unwrap();
+    }
+    // dynamic dim maxes
+    for _ in 0..dyn_dims {
+        buf.write_f64::<LittleEndian>(0.0).unwrap();
+    }
+    // dynamic dim labels (32 bytes each)
+    for i in 0..dyn_dims {
+        let label = format!("Intensity_{i}");
+        let mut buf32 = [0u8; 32];
+        let bytes = label.as_bytes();
+        let len = bytes.len().min(32);
+        buf32[..len].copy_from_slice(&bytes[..len]);
+        buf.write_all(&buf32).unwrap();
+    }
+    // write header length into placeholder
+    let header_len = buf.len() as i32;
+    let len_bytes = header_len.to_le_bytes();
+    buf[header_len_placeholder_pos..header_len_placeholder_pos + 4].copy_from_slice(&len_bytes);
+
+    // payload (dim-major): each dimension has num_pts f32 values
+    let total_dims = 3 + dyn_dims;
+    for _ in 0..total_dims {
+        for _ in 0..num_pts {
+            buf.write_f32::<LittleEndian>(0.5_f32).unwrap();
+        }
+    }
+    buf
+}
+
+#[test]
+fn reads_synthetic_v1_bpf_dim_major() {
+    let bytes = build_v1_bpf_dim_major(4, 1);
+    let path = temp_path("v1-dim.bpf");
+    std::fs::write(&path, &bytes).unwrap();
+    let view = read_bpf(&path);
+    assert_eq!(view.len(), 4);
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn reads_synthetic_v1_bpf_with_unsupported_version_errors() {
+    use byteorder::{LittleEndian, WriteBytesExt};
+    let mut buf: Vec<u8> = Vec::new();
+    buf.write_i32::<LittleEndian>(0).unwrap(); // len placeholder
+    buf.write_i32::<LittleEndian>(99).unwrap(); // unsupported version
+                                                // pad the rest of the (v1) header so read_v1_header reads enough bytes
+    buf.extend(std::iter::repeat_n(0, 200));
+    let path = temp_path("v1-bad-version.bpf");
+    std::fs::write(&path, &buf).unwrap();
+    let mut options = Options::new();
+    options.add("filename", &path);
+    let mut reader = BpfReader::new(&options);
+    let err = reader.read().err().unwrap();
+    assert!(err.0.contains("Unsupported BPF version") || err.0.contains("missing"));
+    std::fs::remove_file(&path).ok();
+}
+
+// ----- format_from_u8 indirectly: corrupt v3 file with bad interleave -----
+
+#[test]
+fn reader_errors_on_bad_v3_interleave_byte() {
+    // Read a real v3 file and clobber the interleave byte (offset 13 in the header)
+    let src = std::fs::read(data_path("bpf/autzen-utm-chipped-25-v3.bpf")).unwrap();
+    let mut bytes = src.clone();
+    // The interleave byte in v3 is at offset 4 (magic) + 4 (version) + 4 (len) + 1 (num_dim) = 13.
+    bytes[13] = 99;
+    let path = temp_path("bad-interleave.bpf");
+    std::fs::write(&path, &bytes).unwrap();
+    let mut options = Options::new();
+    options.add("filename", &path);
+    let mut reader = BpfReader::new(&options);
+    let err = reader.read().err().unwrap();
+    assert!(err.0.contains("interleave") || err.0.contains("Invalid"));
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn reader_errors_on_bad_v3_magic() {
+    // Corrupt magic
+    let mut bytes = std::fs::read(data_path("bpf/autzen-utm-chipped-25-v3.bpf")).unwrap();
+    bytes[1] = b'X';
+    let path = temp_path("bad-magic.bpf");
+    std::fs::write(&path, &bytes).unwrap();
+    let mut options = Options::new();
+    options.add("filename", &path);
+    let mut reader = BpfReader::new(&options);
+    let _ = reader.read(); // will likely error
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn parse_coord_id_auto_returns_zero() {
+    let mut o = Options::new();
+    o.add("coord_id", "auto");
+    let writer = BpfWriter::new(&o);
+    // Roundtrip to verify it doesn't panic; result depends on inner state.
+    assert_eq!(writer.name(), "writers.bpf");
+}

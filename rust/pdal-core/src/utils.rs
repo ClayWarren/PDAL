@@ -1071,4 +1071,165 @@ mod tests {
         let v = format_f64(-1.5, 6);
         assert!(v.starts_with('-'));
     }
+
+    #[test]
+    fn trim_trailing_zeros_handles_branches() {
+        // Direct via format_f64 to exercise the helper
+        assert_eq!(format_f64(2.0, 3), "2");
+        // No decimal => returned as-is via trim_trailing_zeros's else branch
+        let v = format_f64(1.0e10, 3);
+        assert!(v.contains('e'));
+    }
+
+    #[test]
+    fn parse_i32_handles_empty_and_whitespace() {
+        assert!(parse_i32("").is_err());
+        assert!(parse_i32("   ").is_err());
+        assert!(parse_i32("-").is_err()); // sign with no digits
+        assert_eq!(parse_i32("  +12  ").unwrap(), 12);
+        assert_eq!(parse_i32("  -12  ").unwrap(), -12);
+        assert!(parse_i32("12x").is_err()); // trailing junk
+        assert!(parse_i32("notnum").is_err());
+    }
+
+    #[test]
+    fn numeric_cast_f64_to_f32_handles_overflow_and_nan() {
+        assert!(numeric_cast_f64_to_f32(f64::NAN).unwrap().is_nan());
+        // out of f32 range
+        assert!(numeric_cast_f64_to_f32(1e40).is_none());
+        assert!(numeric_cast_f64_to_f32(-1e40).is_none());
+        // normal value
+        assert!((numeric_cast_f64_to_f32(1.0).unwrap() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn word_wrap_empty_returns_empty() {
+        assert!(word_wrap("", 10, 5).is_empty());
+        assert!(word_wrap2("", 10, 5).is_empty());
+    }
+
+    #[test]
+    fn word_wrap_handles_first_length_zero() {
+        // first_length=0 -> uses line_length
+        let v = word_wrap("hello world", 10, 0);
+        assert!(!v.is_empty());
+    }
+
+    #[test]
+    fn word_wrap2_handles_first_length_zero() {
+        let v = word_wrap2("hello world", 10, 0);
+        assert!(!v.is_empty());
+    }
+
+    #[test]
+    fn base64_decode_handles_plus_and_slash() {
+        let bytes = base64_decode("ab+/");
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn base64_decode_handles_invalid_chars() {
+        // Invalid characters break out of the loop
+        let bytes = base64_decode("!@#$");
+        assert!(bytes.is_empty());
+    }
+
+    #[test]
+    fn env_helpers_handle_invalid_keys() {
+        // Empty key returns None / -1
+        assert_eq!(get_env(""), None);
+        assert_eq!(set_env("", "v"), -1);
+        assert_eq!(unset_env(""), -1);
+        // Key with '='
+        assert_eq!(get_env("a=b"), None);
+        assert_eq!(set_env("a=b", "v"), -1);
+        assert_eq!(unset_env("a=b"), -1);
+    }
+
+    #[test]
+    fn random_is_in_range() {
+        random_seed(42);
+        let v = random(0.0, 1.0);
+        assert!((0.0..=1.0).contains(&v));
+    }
+
+    #[test]
+    fn diff_files_returns_max_for_missing_files() {
+        assert_eq!(
+            diff_files("/no/such/file_a", "/no/such/file_b", &[], &[]),
+            u32::MAX
+        );
+    }
+
+    #[test]
+    fn diff_text_files_returns_max_for_missing_files() {
+        assert_eq!(diff_text_files("/no/such/a", "/no/such/b", -1), u32::MAX);
+    }
+
+    #[test]
+    fn diff_text_files_handles_extra_lines_in_first() {
+        use std::io::Write;
+        let dir = std::env::temp_dir();
+        let p1 = dir.join("pdal-rust-diff-extra-1.txt");
+        let p2 = dir.join("pdal-rust-diff-extra-2.txt");
+        std::fs::File::create(&p1)
+            .unwrap()
+            .write_all(b"a\nb\nc\nd\n")
+            .unwrap();
+        std::fs::File::create(&p2)
+            .unwrap()
+            .write_all(b"a\n")
+            .unwrap();
+        let d = diff_text_files(p1.to_str().unwrap(), p2.to_str().unwrap(), -1);
+        assert!(d > 0);
+        let _ = std::fs::remove_file(&p1);
+        let _ = std::fs::remove_file(&p2);
+    }
+
+    #[test]
+    fn diff_text_files_handles_extra_lines_in_second() {
+        use std::io::Write;
+        let dir = std::env::temp_dir();
+        let p1 = dir.join("pdal-rust-diff-extra-3.txt");
+        let p2 = dir.join("pdal-rust-diff-extra-4.txt");
+        std::fs::File::create(&p1)
+            .unwrap()
+            .write_all(b"a\n")
+            .unwrap();
+        std::fs::File::create(&p2)
+            .unwrap()
+            .write_all(b"a\nb\nc\nd\n")
+            .unwrap();
+        let d = diff_text_files(p1.to_str().unwrap(), p2.to_str().unwrap(), -1);
+        assert!(d > 0);
+        let _ = std::fs::remove_file(&p1);
+        let _ = std::fs::remove_file(&p2);
+    }
+
+    #[test]
+    fn charbuf_seekpos_branches() {
+        // Negative result
+        assert!(charbuf_seekpos(0, 10, 100, false).is_none());
+        // Within range for output
+        assert_eq!(charbuf_seekpos(10, 0, 10, true), Some(10));
+        // Equal-to-len for input is rejected
+        assert!(charbuf_seekpos(10, 0, 10, false).is_none());
+    }
+
+    #[test]
+    fn charbuf_seekoff_branches() {
+        assert_eq!(charbuf_seekoff(5, 0, 0, 10, 0), Some(5));
+        assert_eq!(charbuf_seekoff(2, 1, 0, 10, 3), Some(5));
+        assert_eq!(charbuf_seekoff(2, 2, 0, 10, 0), Some(8));
+        assert!(charbuf_seekoff(0, 99, 0, 10, 0).is_none());
+        // Out of range
+        assert!(charbuf_seekoff(100, 0, 0, 10, 0).is_none());
+    }
+
+    #[test]
+    fn run_shell_command_returns_output() {
+        let (status, output) = run_shell_command("echo hi");
+        assert_eq!(status, 0);
+        assert!(output.contains("hi"));
+    }
 }

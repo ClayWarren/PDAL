@@ -120,4 +120,76 @@ mod tests {
         assert_eq!(output[0].get_f64(0, &DimId::Intensity), 42.0);
         assert_eq!(output[0].source_index(0), 0);
     }
+
+    #[test]
+    fn filter_name_is_filters_projpipeline() {
+        let f = ProjPipelineFilter::new(
+            "",
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=deg",
+            false,
+        );
+        assert_eq!(f.name(), "filters.projpipeline");
+    }
+
+    #[test]
+    fn ensure_transform_errors_on_invalid_pipeline() {
+        let mut f = ProjPipelineFilter::new("", "not-a-real-pipeline", false);
+        let r = f.ensure_transform();
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn run_one_errors_on_invalid_pipeline() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let input = PointView::new(Rc::new(layout));
+        let mut f = ProjPipelineFilter::new("", "not-a-real-pipeline", false);
+        assert!(f.run_one(&input).is_err());
+    }
+
+    #[test]
+    fn streamable_process_one_returns_false_on_invalid_pipeline() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        view.add_point();
+        let mut f = ProjPipelineFilter::new("", "not-a-real-pipeline", false);
+        assert!(!f.process_one(&mut view, 0));
+    }
+
+    #[test]
+    fn streamable_process_one_transforms_point() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let p = view.add_point();
+        view.set_f64(p, &DimId::X, 1.0);
+        view.set_f64(p, &DimId::Y, 2.0);
+        view.set_f64(p, &DimId::Z, 3.0);
+        let mut f = ProjPipelineFilter::new(
+            "",
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=deg",
+            false,
+        );
+        assert!(f.process_one(&mut view, 0));
+    }
+
+    #[test]
+    fn reset_clears_transform() {
+        let mut f = ProjPipelineFilter::new(
+            "",
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=deg",
+            false,
+        );
+        f.ensure_transform().unwrap();
+        assert!(f.transform.is_some());
+        f.reset();
+        assert!(f.transform.is_none());
+    }
 }

@@ -293,6 +293,7 @@ fn split_where_partitions_view_or_reports_invalid_expression() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn test_point_abi_nulls_and_errors() {
     unsafe {
         // --- 1. Bounds 2D null & edge cases ---
@@ -801,6 +802,7 @@ fn test_uuid_abi() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn test_bounds_abi_happy_paths() {
     unsafe {
         // --- 2D happy paths ---

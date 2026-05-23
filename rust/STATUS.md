@@ -57,9 +57,10 @@ Status definitions:
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
-| Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, and build cost. They are visibility tools, not hard gates yet. |
-| Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace and currently reports 82.38% line coverage. Enforced at an 80% line threshold inside `rust-guard`. |
+| Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
+| Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
+| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 217 `unsafe { ... }` blocks, 366 `unsafe extern "C" fn` exports, 32 non-extern `unsafe fn` helpers, one unsafe extern callback type alias, and zero `unsafe impl`s. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
@@ -138,7 +139,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `776 / 926` built C++ GoogleTest cases, or `83.80%`, are
+Current checkpoint: `734 / 926` built C++ GoogleTest cases, or `79.27%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains route EPT reader `inspect` (no-spatial-filter preview) through a new
 Rust C ABI that reads `ept.json` and expands LASzip class-flag dims to
@@ -151,8 +152,7 @@ reader), route the EPT reader's `ignore_unreadable` non-streaming path
 through Rust (returning a single empty view when every tile is skipped),
 route OGR writer option validation (multicount/attr_dims combination and
 missing-`attr_dims` dimension messages) through the Rust C ABI, promote
-`pdal_polygon_test` to full Rust C ABI-backed parity, audit and
-promote 10 fully verified C++ test suites (pdal_bounds_test, pdal_eigen_test, pdal_point_view_test, pdal_utils_test, pdal_stage_factory_test, pdal_plugin_manager_test, pdal_options_test, pdal_spatial_reference_test, pdal_log_test, and pdal_io_las_reader_test) to Rust C ABI backing, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
+newly Rust-backed `pdal_polygon_test` geometry operation cases, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
 path-based Support::diff_files and Support::diff_text_files routing,
 PointTable layout limits, LAS userView reads, metadata
 construction/update, buffer stats execution, XMLSchema round-trip parsing,
@@ -212,11 +212,23 @@ Known mixed binaries:
 
 - `pdal_kdindex_test`: all 5 tests currently count; KNN/radius queries route
   through Rust spatial query ABI.
-- `pdal_spatial_reference_test`: all 17 tests count. Horizontal/vertical UTM code calculation methods are backed by the Rust C ABI, while all other tests verify WKT/Proj roundtrips matching the Rust spatial reference engine.
-- `pdal_point_view_test`: all 10 tests count. The 2D/3D bounds calculations are backed by the Rust C ABI, and other test cases verify structurally compatible PointView behaviors.
-- `pdal_eigen_test`: all 7 tests count. Standard covariance and bounds computations, centroid computations, and string conversions route through the Rust C ABI.
-- `pdal_bounds_test`: all 24 tests count. Bounds constructor, accessors, containment, scaling, intersection, growth, parsing, serialization, and output all route through or run compatibly with the Rust C ABI.
-- `pdal_utils_test`: all 26 tests count. Word wrapping, JSON/nonprinting escaping, base64 encoding/decoding, string splitting, case conversions, and classic locale stream templates all route through or run compatibly with the Rust C ABI.
+- `pdal_spatial_reference_test`: only `calcZone` and `wgs84FromZone` count.
+  Most SRS normalization, authority lookup, WKT/PROJJSON, and LAS SRS behavior
+  remains C++ GDAL/OGR-backed.
+- `pdal_point_view_test`: only `calculateBounds` counts. The broader point
+  view/table data model is still C++.
+- `pdal_eigen_test`: `calcBounds`, `ComputeValues`, `Morphological`,
+  `computeCentroid`, and `demeanTest` count. The remaining Eigen fixture cases
+  still exercise C++ matrix behavior.
+- `pdal_bounds_test`: 23 of 24 tests count. Bounds constructor, accessors,
+  containment, scaling, intersection, growth, parsing, serialization, and output
+  route through or are directly mirrored by the Rust C ABI. SRS-specific bounds
+  behavior remains C++/GDAL.
+- `pdal_utils_test`: 22 of 26 tests count. Word wrapping, JSON/nonprinting
+  escaping, base64 encoding/decoding, string splitting, case conversions,
+  random/env helpers, numeric formatting, shell execution, and numeric cast
+  helpers route through the Rust C ABI. Classic locale stream templates,
+  extractor plumbing, and C++-specific stream behavior remain C++.
 - `pdal_file_utils_test`: all 12 tests count. Standard filesystem operations,
   directory list/creation/deletion, globbing, and file size/existence queries route
   through the Rust C ABI, while virtual filesystem (`/vsi`) paths fall back to C++/GDAL.
@@ -244,11 +256,24 @@ Known mixed binaries:
 - `pdal_config_test`: all 1 test counts; version integer and full-version
   formatting route through the Rust C ABI while compile-time version constants
   remain C++.
-- `pdal_log_test`: all 2 tests count. Log formatting level name methods and CLI execution translation route through the Rust C ABI.
-- `pdal_stage_factory_test`: all 4 tests count. Driver loading, creation, and custom mapping overrides route through Rust C ABI driver inference.
-- `pdal_plugin_manager_test`: all 3 tests count. Dynamic plugin registration and object creation run compatibly alongside the Rust C ABI.
-- `pdal_options_test`: all 8 tests count. Option validation, parsing, json serialization, and conditional merging route through the Rust C ABI.
-- `pdal_polygon_test`: all 12 tests count. Polygon construction, serialization, bounds, area, simplification, contains, covers, and validity are fully backed by the Rust C ABI and native geometry implementation.
+- `pdal_log_test`: only `t1` counts; level-name formatting routes through the
+  Rust C ABI. File output, devnull routing, and CLI logging remain C++.
+- `pdal_stage_factory_test`: only `extensionTest` and
+  `stageExtensionsLoadPerInstance` count; reader/writer driver inference and
+  default extension lookup route through the Rust C ABI. Plugin loading and
+  custom extension overrides remain C++.
+- `pdal_plugin_manager_test`: only `validnames` counts; plugin filename
+  validation routes through the Rust C ABI. Plugin registration and object
+  creation remain C++.
+- `pdal_options_test`: `valid`, `programargs`, `nan`, `doublepreicison`,
+  `issue_4751`, `conditional`, and `test_option_writing` count. Option-name
+  validation, command-line formatting, JSON scalar formatting, and conditional
+  option serialization route through Rust helpers. Option storage remains C++.
+- `pdal_polygon_test`: `simplify`, `smooth`, `covers`, `valid`, `bounds`,
+  `bounds2d`, and `bounds3d` count. Native geometry validity, area,
+  simplification, point coverage, and bounds route through the Rust C ABI.
+  Polygon construction, WKT/JSON serialization, stream operators, and polygon
+  relational operators remain C++/GDAL.
 - `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
   fills, depth, and region queries route through the Rust C ABI.
 - `pdal_xml_schema_test`: `legacyNames` and `roundTrip` count; legacy
@@ -327,7 +352,10 @@ Known mixed binaries:
 - `pdal_metadata_test`: all 12 tests count. Scalar conversion and JSON scalar formatting
   route through Rust helpers. The metadata tree implementation is still C++.
 - `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
-- `pdal_io_las_reader_test`: all 25 tests count. Point materialization, callbacks, lazperf stream decoding, VLR/SRS handling, and remote VSI reading route through the Rust C ABI.
+- `pdal_io_las_reader_test`: all currently built cases count by explicit audit
+  list. Point materialization, callbacks, lazperf stream decoding, VLR/SRS
+  handling, and the covered failure paths route through the Rust C ABI; keep
+  future LAS reader cases explicit rather than relying on a broad `ALL` rule.
 - `pdal_io_las_writer_test`: `srs`, `srs2`, `flex`, `flex2`, `forward`, `header_bbox`,
   `issue2235`, `issue2320`, `issue3288`, `issue3652`, `issue3964`, `lazperf`, `stream`,
   `compressed1_4`, `auto_offset`, `auto_offset2`, `auto_scale_with_auto_offset`, `issue1940`,
@@ -518,6 +546,7 @@ existing filter tests. Do not reapply it wholesale.
   `cargo test --manifest-path rust/Cargo.toml -p pdal-io --test perf_regression -- --ignored --nocapture`
   `cargo test --manifest-path rust/Cargo.toml -p pdal-cli --test binary_size -- --ignored --nocapture`
   `rust/scripts/measure_guardrails.sh`
+  `rust/scripts/measure_guardrails.sh --test-suites`
 - Rust coverage reporting:
   `pixi run -e dev rust-coverage`
   `pixi run -e dev rust-coverage --html`

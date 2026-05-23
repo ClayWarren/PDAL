@@ -129,10 +129,10 @@ extern "C"
     char* pdal_writer_replace_tags(const char* filename);
 
     // Support utils
-    uint32_t pdal_support_diff_files(
-        const char* file1, const char* file2,
-        const uint32_t* ignorable_start, const uint32_t* ignorable_length,
-        uint32_t num_ignorables);
+    uint32_t pdal_support_diff_files(const char* file1, const char* file2,
+                                     const uint32_t* ignorable_start,
+                                     const uint32_t* ignorable_length,
+                                     uint32_t num_ignorables);
     uint32_t pdal_support_diff_text_files(const char* file1, const char* file2,
                                           int32_t ignore_line);
 
@@ -485,6 +485,8 @@ extern "C"
                                              double* out_value);
     bool pdal_geometry_wkt_contains_point(const char* wkt, double x, double y,
                                           bool* out_value);
+    bool pdal_geometry_wkt_covers_point(const char* wkt, double x, double y,
+                                        bool* out_value);
     bool pdal_geometry_wkt_area(const char* wkt, double* out_value);
     bool pdal_geometry_wkt_simplify(const char* wkt, double tolerance,
                                     bool preserve_topology, char** out_wkt);
@@ -953,21 +955,29 @@ extern "C"
     // EPT reader preview (header-only metadata): bounds_conforming, point
     // count, srs wkt, dim names. Returns null on error; call pdal_last_error.
     typedef struct pdal_ept_reader_preview_t pdal_ept_reader_preview_t;
-    pdal_ept_reader_preview_t* pdal_ept_reader_preview_create(const char* filename);
-    uint64_t pdal_ept_reader_preview_point_count(const pdal_ept_reader_preview_t* handle);
+    pdal_ept_reader_preview_t*
+    pdal_ept_reader_preview_create(const char* filename);
+    uint64_t pdal_ept_reader_preview_point_count(
+        const pdal_ept_reader_preview_t* handle);
     bool pdal_ept_reader_preview_bounds(const pdal_ept_reader_preview_t* handle,
-                                        double* out_minx, double* out_miny, double* out_minz,
-                                        double* out_maxx, double* out_maxy, double* out_maxz);
-    char* pdal_ept_reader_preview_srs_wkt(const pdal_ept_reader_preview_t* handle);
-    uint64_t pdal_ept_reader_preview_dim_count(const pdal_ept_reader_preview_t* handle);
-    char* pdal_ept_reader_preview_dim_name(const pdal_ept_reader_preview_t* handle, uint64_t index);
+                                        double* out_minx, double* out_miny,
+                                        double* out_minz, double* out_maxx,
+                                        double* out_maxy, double* out_maxz);
+    char*
+    pdal_ept_reader_preview_srs_wkt(const pdal_ept_reader_preview_t* handle);
+    uint64_t
+    pdal_ept_reader_preview_dim_count(const pdal_ept_reader_preview_t* handle);
+    char*
+    pdal_ept_reader_preview_dim_name(const pdal_ept_reader_preview_t* handle,
+                                     uint64_t index);
     void pdal_ept_reader_preview_destroy(pdal_ept_reader_preview_t* handle);
 
     pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);
     // OGR writer option validation. Returns null on success, otherwise an
     // owned heap string with the unprefixed error message. Caller frees with
     // pdal_string_free.
-    char* pdal_ogr_writer_validate(uint64_t multicount, uint64_t attr_dim_count);
+    char* pdal_ogr_writer_validate(uint64_t multicount,
+                                   uint64_t attr_dim_count);
     char* pdal_ogr_writer_dim_not_found(const char* name);
     pdal_writer_t* pdal_writer_create_gdal(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_raster(const pdal_options_t* ops);

@@ -10,6 +10,7 @@ fn cstring(value: &str) -> CString {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn reader_and_writer_ctors_handle_null_options_path() {
     unsafe {
         assert!(pdal_reader_create_faux(std::ptr::null()).is_null());

@@ -620,6 +620,7 @@ fn test_filters_abi_error_and_invalid_paths() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn test_filter_abi_nulls_and_errors() {
     unsafe {
         // --- filter_abi.rs ---

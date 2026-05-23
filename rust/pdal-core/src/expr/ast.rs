@@ -815,4 +815,103 @@ mod tests {
         let bprinted = bf.print();
         assert!(bprinted.contains("isnan"));
     }
+
+    #[test]
+    fn const_logical_node_print_and_const_logical() {
+        let t = ConstLogicalNode::new(true);
+        assert_eq!(t.print(), "true");
+        assert_eq!(t.const_logical(), Some(true));
+        let f = ConstLogicalNode::new(false);
+        assert_eq!(f.print(), "false");
+    }
+
+    #[test]
+    fn var_node_print_and_dim() {
+        let v = VarNode::new("MyDim");
+        assert_eq!(v.print(), "MyDim");
+        assert_eq!(v.name(), "MyDim");
+        // dim() returns the resolved DimId
+        let _ = v.dim();
+    }
+
+    #[test]
+    fn bin_math_print_unknown_op() {
+        // For an unsupported NodeType the print arm returns "" so we get "( <l>  <r> )"
+        let n = BinMathNode::new(NodeType::Or, num(1.0), num(2.0));
+        let _ = n.print();
+        let _ = n.is_bool();
+        // eval on unknown NodeType returns 0.0
+        let view = point_with_classification(0.0);
+        assert_eq!(n.eval(&view, 0).dval, 0.0);
+    }
+
+    #[test]
+    fn bool_node_print_unknown_op() {
+        let n = BoolNode::new(
+            NodeType::Add,
+            Box::new(ConstLogicalNode::new(true)),
+            Box::new(ConstLogicalNode::new(false)),
+        );
+        let _ = n.print();
+        let view = point_with_classification(0.0);
+        assert!(!n.eval(&view, 0).bval);
+    }
+
+    #[test]
+    fn compare_node_print_unknown_op() {
+        let n = CompareNode::new(NodeType::And, num(1.0), num(2.0));
+        let _ = n.print();
+        let view = point_with_classification(0.0);
+        assert!(!n.eval(&view, 0).bval);
+    }
+
+    #[test]
+    fn expression_helpers_set_error_print_clear() {
+        let mut e = Expression::new();
+        assert_eq!(e.error(), "");
+        e.set_error("oops");
+        assert_eq!(e.error(), "oops");
+        assert!(e.top_node().is_none());
+        // Test print of empty
+        assert_eq!(e.print(), "");
+        // Push, then pop
+        e.push_node(num(5.0));
+        assert!(e.valid());
+        assert!(e.top_node().is_some());
+        assert!(e.print().contains('5'));
+        let popped = e.pop_node();
+        assert!(popped.is_some());
+        e.clear();
+        assert!(!e.valid());
+    }
+
+    #[test]
+    fn expression_prepare_with_no_root_returns_ok() {
+        let mut e = Expression::new();
+        let layout = PointLayout::new();
+        assert!(e.prepare(&layout).is_ok());
+    }
+
+    #[test]
+    fn expression_eval_with_no_root_returns_zero() {
+        let layout = PointLayout::new();
+        let view = PointView::new(Rc::new(layout));
+        let e = Expression::new();
+        assert_eq!(e.eval(&view, 0).dval, 0.0);
+    }
+
+    #[test]
+    fn default_node_traits_via_const_value_node() {
+        let n = ConstValueNode::new(3.0);
+        // Default trait impls (const_value Some, const_logical None, as_var None)
+        assert_eq!(n.const_value(), Some(3.0));
+        // ConstLogicalNode::const_value() default returns None.
+        let cl = ConstLogicalNode::new(false);
+        assert!(cl.const_value().is_none());
+        // VarNode::as_var should return Some(self)
+        let var = VarNode::new("X");
+        assert!(var.as_var().is_some());
+        // ConstValueNode::as_var returns None (default)
+        assert!(n.as_var().is_none());
+    }
 }

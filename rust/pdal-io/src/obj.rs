@@ -360,4 +360,103 @@ mod tests {
         assert_eq!(view.len(), 1);
         assert_eq!(view.get_f64(0, &DimId::X), 10.0);
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = ObjReader::new(&Options::new());
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.obj");
+        let mut reader = ObjReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_coordinate() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v notanumber 1 2").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_face_with_too_few_vertices() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v 0 0 0").unwrap();
+        writeln!(file, "v 1 0 0").unwrap();
+        writeln!(file, "f 1 2").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_face_index_out_of_range() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v 0 0 0").unwrap();
+        writeln!(file, "v 1 0 0").unwrap();
+        writeln!(file, "v 0 1 0").unwrap();
+        writeln!(file, "f 1 2 99").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_zero_index() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v 0 0 0").unwrap();
+        writeln!(file, "v 1 0 0").unwrap();
+        writeln!(file, "v 0 1 0").unwrap();
+        writeln!(file, "f 0 1 2").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_ignores_comments_and_unknown_tags() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "# A comment").unwrap();
+        writeln!(file, "g group_name").unwrap();
+        writeln!(file, "mtllib unused.mtl").unwrap();
+        writeln!(file, "v 0 0 0").unwrap();
+        writeln!(file, "v 1 0 0").unwrap();
+        writeln!(file, "v 0 1 0").unwrap();
+        writeln!(file, "f 1 2 3").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        let view = &reader.read().unwrap()[0];
+        assert_eq!(view.len(), 3);
+    }
+
+    #[test]
+    fn reader_handles_vertex_with_w_component() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "v 1 2 3 4").unwrap();
+        writeln!(file, "v 5 6 7").unwrap();
+        writeln!(file, "v 8 9 0").unwrap();
+        writeln!(file, "f 1 2 3").unwrap();
+        let mut options = Options::new();
+        options.add("filename", file.path().to_str().unwrap());
+        let mut reader = ObjReader::new(&options);
+        let view = &reader.read().unwrap()[0];
+        assert_eq!(view.get_f64(0, &DimId::W), 4.0);
+    }
+
+    #[test]
+    fn reader_name_is_readers_obj() {
+        let r = ObjReader::new(&Options::new());
+        assert_eq!(r.name(), "readers.obj");
+    }
 }

@@ -422,4 +422,95 @@ mod tests {
             assert!((back.get_f64(i, &DimId::Z) - o[2]).abs() < 1e-6);
         }
     }
+
+    #[test]
+    fn polyline_parse_rejects_wrong_token_count() {
+        assert!(Polyline::parse("LINESTRING ZM (1 2 3)").is_none());
+        assert!(Polyline::parse("LINESTRING ZM (1 2 3 4 5)").is_none());
+    }
+
+    #[test]
+    fn polyline_parse_rejects_non_numeric() {
+        assert!(Polyline::parse("LINESTRING ZM (a b c d, e f g h)").is_none());
+    }
+
+    #[test]
+    fn polyline_parse_rejects_single_vertex() {
+        assert!(Polyline::parse("LINESTRING ZM (0 0 0 0)").is_none());
+    }
+
+    #[test]
+    fn polyline_parse_rejects_missing_zm_prefix() {
+        assert!(Polyline::parse("LINESTRING (0 0, 1 1)").is_none());
+    }
+
+    #[test]
+    fn polyline_parse_rejects_missing_parens() {
+        assert!(Polyline::parse("LINESTRING ZM 0 0 0 0, 1 1 0 0").is_none());
+    }
+
+    #[test]
+    fn double_near_handles_nan() {
+        assert!(double_near(f64::NAN, f64::NAN, 1e-6));
+        assert!(!double_near(f64::NAN, 1.0, 1e-6));
+        assert!(!double_near(1.0, f64::NAN, 1e-6));
+    }
+
+    #[test]
+    fn angular_ratio_handles_basic_interpolation() {
+        let r = angular_ratio(0.0, std::f64::consts::FRAC_PI_2, 0.5);
+        assert!(r > 0.0 && r < std::f64::consts::FRAC_PI_2);
+    }
+
+    #[test]
+    fn azimuth_returns_atan2_dx_dy() {
+        let az = azimuth(0.0, 0.0, 1.0, 0.0);
+        assert!((az - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn sqr_dist_to_line_handles_degenerate_segment() {
+        let mut out = (0.0, 0.0);
+        let d = sqr_dist_to_line(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, &mut out);
+        assert!(d > 0.0);
+    }
+
+    #[test]
+    fn sqr_dist_to_line_returns_zero_for_point_on_line() {
+        let mut out = (0.0, 0.0);
+        let d = sqr_dist_to_line(0.5, 0.0, 0.0, 0.0, 1.0, 0.0, &mut out);
+        assert!(d < 1e-10);
+    }
+
+    #[test]
+    fn straighten_streamable_process_one_works() {
+        let mut f =
+            StraightenFilter::new("LINESTRING ZM (0 0 0 0, 0 100 0 0)", false, 0.0).unwrap();
+        let mut v = view(&[[2.0, 25.0, 1.0]]);
+        assert!(f.process_one(&mut v, 0));
+        assert!(v.get_f64(0, &DimId::X) > 10.0);
+    }
+
+    #[test]
+    fn straighten_filter_name_is_filters_straighten() {
+        let f = StraightenFilter::new("LINESTRING ZM (0 0 0 0, 0 100 0 0)", false, 0.0).unwrap();
+        assert_eq!(f.name(), "filters.straighten");
+    }
+
+    #[test]
+    fn straighten_interpolate_handles_ratio_lt_zero_branch() {
+        // Use a polyline where the point's projected ratio goes below 0.
+        // Reverse mode + a small x value queries interpolate with pk < first vertex.w.
+        let mut f = StraightenFilter::new("LINESTRING ZM (0 0 0 0, 100 0 0 0)", true, 0.0).unwrap();
+        let mut v = view(&[[-5.0, 0.0, 0.0]]);
+        let _ = f.process_one(&mut v, 0);
+    }
+
+    #[test]
+    fn straighten_interpolate_handles_ratio_gt_one_branch() {
+        // A pk past the last vertex triggers the ratio > 1 branch.
+        let mut f = StraightenFilter::new("LINESTRING ZM (0 0 0 0, 100 0 0 0)", true, 0.0).unwrap();
+        let mut v = view(&[[200.0, 0.0, 0.0]]);
+        let _ = f.process_one(&mut v, 0);
+    }
 }

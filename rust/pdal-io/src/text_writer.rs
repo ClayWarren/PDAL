@@ -452,4 +452,100 @@ mod tests {
         assert_eq!(lines[1], "289814.15,4320978.61,170.76");
         assert_eq!(lines[5], "289818.01,4320980.38,170.61");
     }
+
+    #[test]
+    fn writer_errors_without_filename() {
+        let mut writer = TextWriter::new(&Options::new());
+        let view = make_precision_view();
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_errors_on_bad_output_directory() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/dir/out.csv");
+        let mut writer = TextWriter::new(&options);
+        let view = make_precision_view();
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_writes_geojson_with_empty_views() {
+        let path = temp_path("empty-geojson.json");
+        let mut options = Options::new();
+        options.add("filename", &path).add("format", "geojson");
+        let mut writer = TextWriter::new(&options);
+        // Pass no views -> early-return ""
+        writer.write(&[]).unwrap();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn writer_writes_geojson_with_jsonp_callback() {
+        let path = temp_path("jsonp.json");
+        let mut options = Options::new();
+        options
+            .add("filename", &path)
+            .add("format", "geojson")
+            .add("jscallback", "myCb");
+        let mut writer = TextWriter::new(&options);
+        let view = make_precision_view();
+        writer.write(&[view]).unwrap();
+        let written = fs::read_to_string(&path).unwrap();
+        assert!(written.starts_with("myCb("));
+        assert!(written.ends_with(")"));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn extract_dim_errors_on_bad_precision() {
+        let mut options = Options::new();
+        options
+            .add("filename", "/tmp/x.csv")
+            .add("order", "X:notanumber");
+        let writer = TextWriter::new(&options);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let r = writer.dimension_specs(&layout);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn extract_dim_errors_on_too_many_colons() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.csv").add("order", "X:2:3");
+        let writer = TextWriter::new(&options);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let r = writer.dimension_specs(&layout);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn extract_dim_errors_on_unknown_dim() {
+        let mut options = Options::new();
+        options
+            .add("filename", "/tmp/x.csv")
+            .add("order", "NotADim");
+        let writer = TextWriter::new(&options);
+        let layout = PointLayout::new();
+        let r = writer.dimension_specs(&layout);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn writer_name_is_writers_text() {
+        let writer = TextWriter::new(&Options::new());
+        assert_eq!(writer.name(), "writers.text");
+    }
+
+    #[test]
+    fn writer_writes_csv_with_empty_views() {
+        let path = temp_path("empty-csv.csv");
+        let mut options = Options::new();
+        options.add("filename", &path);
+        let mut writer = TextWriter::new(&options);
+        writer.write(&[]).unwrap();
+        let _ = std::fs::remove_file(&path);
+    }
 }

@@ -490,4 +490,77 @@ mod tests {
         assert_eq!(s.median, 0.0);
         assert_eq!(s.mad, 0.0);
     }
+
+    #[test]
+    fn from_options_handles_enumerate_count_global_and_dimensions() {
+        let mut o = Options::new();
+        o.add("dimensions", "X,Y")
+            .add("enumerate", "Classification");
+        o.add("count", "Intensity").add("global", "Z");
+        let f = StatsFilter::from_options(&o);
+        assert_eq!(f.summaries.get("Classification").unwrap().enumerate, 1);
+        assert_eq!(f.summaries.get("Intensity").unwrap().enumerate, 2);
+        assert_eq!(f.summaries.get("Z").unwrap().enumerate, 3);
+        assert_eq!(f.summaries.get("X").unwrap().enumerate, 0);
+        assert_eq!(f.summaries.get("Y").unwrap().enumerate, 0);
+    }
+
+    #[test]
+    fn from_options_handles_no_dims_with_only_enumerate() {
+        let mut o = Options::new();
+        o.add("enumerate", "Classification");
+        let f = StatsFilter::from_options(&o);
+        assert_eq!(f.summaries.get("Classification").unwrap().enumerate, 1);
+    }
+
+    #[test]
+    fn default_constructs_via_default_trait() {
+        let f: StatsFilter = Default::default();
+        assert!(f.summaries.is_empty());
+        assert!(!f.advanced);
+    }
+
+    #[test]
+    fn filter_name_via_trait() {
+        let f = StatsFilter::new();
+        assert_eq!(f.name(), "filters.stats");
+    }
+
+    #[test]
+    fn summary_merge_combines_enumerate_values_from_other() {
+        let mut a = Summary::new("X".to_string(), 1, false);
+        let mut b = Summary::new("X".to_string(), 1, false);
+        a.insert(1.0);
+        a.insert(2.0);
+        b.insert(2.0);
+        b.insert(3.0);
+        assert!(a.merge(&b));
+        assert_eq!(*a.values.get(&2.0_f64.to_bits()).unwrap_or(&0), 2);
+        assert_eq!(*a.values.get(&3.0_f64.to_bits()).unwrap_or(&0), 1);
+    }
+
+    #[test]
+    fn summary_merge_combines_global_data_and_recomputes() {
+        let mut a = Summary::new("X".to_string(), 3, false);
+        let mut b = Summary::new("X".to_string(), 3, false);
+        a.insert(1.0);
+        a.insert(2.0);
+        b.insert(3.0);
+        b.insert(4.0);
+        assert!(a.merge(&b));
+        assert_eq!(a.cnt, 4);
+        assert!(a.median > 0.0);
+    }
+
+    #[test]
+    fn run_one_through_global_path_triggers_compute_global_stats() {
+        let mut o = Options::new();
+        o.add("global", "X");
+        let mut filter = StatsFilter::from_options(&o);
+        let input = view(&[(1.0, 0.0), (3.0, 0.0), (5.0, 0.0)]);
+        let _ = filter.run(std::slice::from_ref(&input)).unwrap();
+        let x = filter.summaries.get("X").unwrap();
+        assert_eq!(x.cnt, 3);
+        assert!(x.median > 0.0);
+    }
 }

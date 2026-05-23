@@ -5,18 +5,21 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUST_DIR="${ROOT_DIR}/rust"
 ITERATIONS="${PDAL_RUST_PERF_ITERS:-5}"
 COLD_BUILD=0
+TEST_SUITES=0
 
 usage() {
     cat <<'EOF'
-Usage: rust/scripts/measure_guardrails.sh [--cold-build]
+Usage: rust/scripts/measure_guardrails.sh [--cold-build] [--test-suites]
 
 Reports opt-in Rust port guardrail measurements:
   - installed PDAL local I/O pipeline wall time and peak RSS
   - Rust local I/O performance harness wall time and peak RSS
   - Rust workspace incremental build wall time and peak RSS
+  - full C++ and Rust test-suite wall time and peak RSS when --test-suites is set
 
 Set PDAL_RUST_PERF_ITERS=<n> to control perf harness iterations.
 Use --cold-build only when you intentionally want to run cargo clean first.
+Use --test-suites only when you intentionally want the slower full-suite timing.
 EOF
 }
 
@@ -24,6 +27,9 @@ while (($#)); do
     case "$1" in
         --cold-build)
             COLD_BUILD=1
+            ;;
+        --test-suites)
+            TEST_SUITES=1
             ;;
         --help|-h)
             usage
@@ -153,4 +159,9 @@ if [[ "${COLD_BUILD}" == "1" ]]; then
     time_command "rust-workspace-cold-build" cargo build --manifest-path "${RUST_DIR}/Cargo.toml" --workspace
 else
     time_command "rust-workspace-incremental-build" cargo build --manifest-path "${RUST_DIR}/Cargo.toml" --workspace
+fi
+
+if [[ "${TEST_SUITES}" == "1" ]]; then
+    time_command "cpp-full-test-suite" ctest --test-dir "${ROOT_DIR}/build" --output-on-failure
+    time_command "rust-full-test-suite" cargo test --manifest-path "${RUST_DIR}/Cargo.toml" --workspace -- --test-threads=1
 fi

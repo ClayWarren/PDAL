@@ -142,9 +142,9 @@ test = { cmd = "cd .build && ctest -VV --output-on-failure", depends-on = ["buil
 install = { cmd = "cd .build && ninja install", depends-on = ["build"] }
 rust-fmt = { cmd = "cargo fmt --manifest-path rust/Cargo.toml --all --check" }
 rust-check = { cmd = "cargo check --manifest-path rust/Cargo.toml --workspace" }
-rust-clippy = { cmd = "cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -W clippy::cognitive_complexity -D warnings -A clippy::cognitive_complexity -A clippy::approx_constant -A clippy::cloned_ref_to_slice_refs -A clippy::len_zero -A clippy::err_expect -A clippy::field_reassign_with_default" }
+rust-clippy = { cmd = "cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -W clippy::cognitive_complexity -D warnings -A clippy::approx_constant -A clippy::cloned_ref_to_slice_refs -A clippy::len_zero -A clippy::err_expect -A clippy::field_reassign_with_default" }
 rust-test = { cmd = "cargo test --manifest-path rust/Cargo.toml --workspace -- --test-threads=1", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
-rust-coverage-check = { cmd = "rust/scripts/run_coverage.sh --fail-under-lines 90", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
+rust-coverage-check = { cmd = "rust/scripts/run_coverage.sh --fail-under-lines 94", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test", "rust-coverage-check"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }

@@ -450,4 +450,120 @@ mod tests {
         assert!(!views.is_empty());
         assert!(views[0].len() > 0);
     }
+
+    fn synth_terra_header(version: i32, pnt_cnt: i32, time: i32, color: i32) -> Vec<u8> {
+        use std::io::Write;
+        let mut buf = Vec::new();
+        buf.write_all(&(56i32).to_le_bytes()).unwrap();
+        buf.write_all(&version.to_le_bytes()).unwrap();
+        buf.write_all(&(970401i32).to_le_bytes()).unwrap();
+        buf.write_all(b"CXYZ").unwrap();
+        buf.write_all(&pnt_cnt.to_le_bytes()).unwrap();
+        buf.write_all(&(100i32).to_le_bytes()).unwrap();
+        buf.write_all(&0.0f64.to_le_bytes()).unwrap();
+        buf.write_all(&0.0f64.to_le_bytes()).unwrap();
+        buf.write_all(&0.0f64.to_le_bytes()).unwrap();
+        buf.write_all(&time.to_le_bytes()).unwrap();
+        buf.write_all(&color.to_le_bytes()).unwrap();
+        buf
+    }
+
+    fn write_synth_terra_file(name: &str, body: &[u8]) -> std::path::PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("pdal-terra-{}-{}.bin", name, std::process::id()));
+        std::fs::write(&path, body).unwrap();
+        path
+    }
+
+    #[test]
+    fn reads_synthetic_format1_no_time_no_color() {
+        let mut buf = synth_terra_header(FORMAT_1, 2, 0, 0);
+        // FORMAT_1 point: classification, flight_line, echo_int, x, y, z (6 bytes each)
+        buf.extend_from_slice(&[1, 2, 3, 10, 20, 30]);
+        buf.extend_from_slice(&[4, 5, 6, 40, 50, 60]);
+        let path = write_synth_terra_file("fmt1", &buf);
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = TerrasolidReader::new(&options);
+        let views = reader.read().expect("read fmt1");
+        assert_eq!(views[0].len(), 2);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reads_synthetic_format1_with_time_and_color() {
+        let mut buf = synth_terra_header(FORMAT_1, 2, 1, 1);
+        // FORMAT_1 point: 6 bytes + 4 time + 4 color
+        buf.extend_from_slice(&[1, 2, 3, 10, 20, 30]);
+        buf.extend_from_slice(&100u32.to_le_bytes());
+        buf.extend_from_slice(&[10, 20, 30, 0]);
+        buf.extend_from_slice(&[4, 5, 6, 40, 50, 60]);
+        buf.extend_from_slice(&200u32.to_le_bytes());
+        buf.extend_from_slice(&[40, 50, 60, 0]);
+        let path = write_synth_terra_file("fmt1-tc", &buf);
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = TerrasolidReader::new(&options);
+        let views = reader.read().expect("read fmt1 with time+color");
+        assert_eq!(views[0].len(), 2);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn errors_on_invalid_recog_val() {
+        use std::io::Write;
+        let mut buf = Vec::new();
+        buf.write_all(&(56i32).to_le_bytes()).unwrap();
+        buf.write_all(&FORMAT_1.to_le_bytes()).unwrap();
+        buf.write_all(&(999999i32).to_le_bytes()).unwrap(); // bad recog
+        buf.extend(std::iter::repeat_n(0, 52));
+        let path = write_synth_terra_file("badrecog", &buf);
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = TerrasolidReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn errors_on_invalid_version() {
+        use std::io::Write;
+        let mut buf = Vec::new();
+        buf.write_all(&(56i32).to_le_bytes()).unwrap();
+        buf.write_all(&(12345i32).to_le_bytes()).unwrap(); // bad version
+        buf.write_all(&(970401i32).to_le_bytes()).unwrap();
+        buf.extend(std::iter::repeat_n(0, 52));
+        let path = write_synth_terra_file("badver", &buf);
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = TerrasolidReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn errors_on_invalid_units_zero() {
+        // header validation: units == 0 fails
+        use std::io::Write;
+        let mut buf = Vec::new();
+        buf.write_all(&(56i32).to_le_bytes()).unwrap();
+        buf.write_all(&FORMAT_2.to_le_bytes()).unwrap();
+        buf.write_all(&(970401i32).to_le_bytes()).unwrap();
+        buf.write_all(b"CXYZ").unwrap();
+        buf.write_all(&(5i32).to_le_bytes()).unwrap();
+        buf.write_all(&(0i32).to_le_bytes()).unwrap(); // units = 0
+        buf.extend(std::iter::repeat_n(0, 8 * 3 + 8));
+        let path = write_synth_terra_file("zerounits", &buf);
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = TerrasolidReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reader_name_is_readers_terrasolid() {
+        let r = TerrasolidReader::new(&Options::new());
+        assert_eq!(r.name(), "readers.terrasolid");
+    }
 }

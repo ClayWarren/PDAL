@@ -786,4 +786,44 @@ mod tests {
         assert!(!views.is_empty());
         assert!(views[0].len() > 0);
     }
+
+    #[test]
+    fn reader_name_is_readers_fbi() {
+        let reader = FbiReader::new(&Options::new());
+        assert_eq!(reader.name(), "readers.fbi");
+    }
+
+    #[test]
+    fn reader_errors_on_truncated_header() {
+        use std::io::Write;
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("pdal-fbi-trunc-{}.fbi", std::process::id()));
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(b"short")
+            .unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = FbiReader::new(&options);
+        let r = reader.read();
+        assert!(r.is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_signature() {
+        use std::io::Write;
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("pdal-fbi-sig-{}.fbi", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        // 8 bytes "NOPENOPE" then garbage
+        f.write_all(b"NOPENOPE").unwrap();
+        f.write_all(&[0u8; 100]).unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = FbiReader::new(&options);
+        let r = reader.read();
+        assert!(r.is_err());
+        std::fs::remove_file(&path).ok();
+    }
 }

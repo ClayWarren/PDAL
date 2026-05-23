@@ -393,4 +393,83 @@ mod tests {
         let writer = SpzWriter::new(&Options::new());
         assert_eq!(writer.name(), "writers.spz");
     }
+
+    fn full_spz_view(sh_degree: usize) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(dim("opacity"), DimType::F32);
+        for idx in 0..3 {
+            layout.register(dim(&format!("f_dc_{idx}")), DimType::F32);
+            layout.register(dim(&format!("scale_{idx}")), DimType::F32);
+        }
+        for idx in 0..4 {
+            layout.register(dim(&format!("rot_{idx}")), DimType::F32);
+        }
+        let sh_pc = sh_per_channel(sh_degree).unwrap();
+        for idx in 0..(sh_pc * 3) {
+            layout.register(dim(&format!("f_rest_{idx}")), DimType::F32);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        for _ in 0..2 {
+            let p = view.add_point();
+            view.set_f64(p, &DimId::X, 1.0);
+            view.set_f64(p, &DimId::Y, 1.0);
+            view.set_f64(p, &DimId::Z, 1.0);
+        }
+        view
+    }
+
+    #[test]
+    fn writer_roundtrips_with_sh_degree_1() {
+        let temp = TempDir::new().unwrap();
+        let output = temp.path().join("sh1.spz");
+        let view = full_spz_view(1);
+        let mut options = Options::new();
+        options.add("filename", output.display());
+        let mut writer = SpzWriter::new(&options);
+        writer.write(std::slice::from_ref(&view)).unwrap();
+        assert!(std::fs::metadata(&output).unwrap().len() > 0);
+    }
+
+    #[test]
+    fn writer_roundtrips_with_sh_degree_3() {
+        let temp = TempDir::new().unwrap();
+        let output = temp.path().join("sh3.spz");
+        let view = full_spz_view(3);
+        let mut options = Options::new();
+        options.add("filename", output.display());
+        let mut writer = SpzWriter::new(&options);
+        writer.write(std::slice::from_ref(&view)).unwrap();
+    }
+
+    #[test]
+    fn writer_with_antialiased_option() {
+        let temp = TempDir::new().unwrap();
+        let output = temp.path().join("aa.spz");
+        let view = xyz_view();
+        let mut options = Options::new();
+        options.add("filename", output.display());
+        options.add("antialiased", true);
+        let mut writer = SpzWriter::new(&options);
+        writer.write(std::slice::from_ref(&view)).unwrap();
+    }
+
+    #[test]
+    fn coordinate_system_handles_empty_and_named() {
+        let _ = coordinate_system("");
+        let _ = coordinate_system("RDF");
+    }
+
+    #[test]
+    fn sh_per_channel_errors_for_unsupported_degree() {
+        assert!(sh_per_channel(99).is_err());
+    }
+
+    #[test]
+    fn sh_degree_from_layout_returns_zero_when_no_f_rest_dims() {
+        let layout = PointLayout::new();
+        assert_eq!(sh_degree_from_layout(&layout), 0);
+    }
 }

@@ -355,4 +355,83 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = PtxReader::new(&Options::new());
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.ptx");
+        let mut reader = PtxReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_columns() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("pdal-ptx-bad-{}.ptx", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(b"notanumber\n").unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = PtxReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_rows() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("pdal-ptx-rows-{}.ptx", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(b"3\nnotanumber\n").unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = PtxReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_field_count_in_transform() {
+        use std::io::Write;
+        let path =
+            std::env::temp_dir().join(format!("pdal-ptx-bad-xform-{}.ptx", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(b"1\n1\n0 0 0\n1 0 0\n0 1 0\n0 0 1\n1 2 3\n0 1 0 0\n0 0 1 0\n0 0 0 1\n")
+            .unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = PtxReader::new(&options);
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_field_count_for_first_point() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("pdal-ptx-bad-pt-{}.ptx", std::process::id()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(
+            b"1\n1\n0 0 0\n1 0 0\n0 1 0\n0 0 1\n1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n1 2 3 4 5\n",
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", path.to_str().unwrap());
+        let mut reader = PtxReader::new(&options);
+        // 5 fields doesn't match 4/7/8/9; should fail
+        assert!(reader.read().is_err());
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn metadata_name_is_readers_ptx() {
+        let r = PtxReader::new(&Options::new());
+        assert_eq!(r.name(), "readers.ptx");
+        assert_eq!(r.metadata().name(), "readers.ptx");
+    }
 }
