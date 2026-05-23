@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, DimType, PointId, PointLayout, PointView};
+use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 #[derive(Clone, Copy, Default)]
@@ -187,7 +187,7 @@ impl Streamable for ChipperFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdal_core::point::DimType;
+    use pdal_core::point::{DimType, PointLayout};
     use std::rc::Rc;
 
     fn make_xy_view(points: &[(f64, f64)]) -> PointView {

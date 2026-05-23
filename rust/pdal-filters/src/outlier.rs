@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 

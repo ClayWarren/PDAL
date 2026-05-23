@@ -786,4 +786,5 @@ fn test_io_abi_nulls_and_errors() {
 }
 
 mod ept_preview;
+mod gaps;
 mod writers;

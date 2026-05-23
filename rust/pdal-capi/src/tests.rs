@@ -53,4 +53,6 @@ mod point_extras_abi;
 mod segmentation_abi;
 mod utility_abi;
 mod utility_extras_abi;
+mod point_gaps_abi;
 mod writer_abi;
+mod zero_abi;

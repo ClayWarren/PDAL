@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct LabelDuplicatesFilter {
@@ -70,7 +70,7 @@ impl Streamable for LabelDuplicatesFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdal_core::point::DimType;
+    use pdal_core::point::{DimType, PointLayout};
     use std::rc::Rc;
 
     fn make_view(values: &[(f64, f64)]) -> PointView {

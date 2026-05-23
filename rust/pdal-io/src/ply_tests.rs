@@ -267,4 +267,402 @@ mod tests {
         assert!(err.0.contains("precision"));
         assert!(err.0.contains("storage_mode"));
     }
+
+    #[test]
+    fn read_binary_value_big_endian_and_integer_types() {
+        use std::io::Cursor;
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(-3_i16).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::I16).unwrap();
+        assert_eq!(val, -3.0);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(300_u16).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::U16).unwrap();
+        assert_eq!(val, 300.0);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(-100_000_i32).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::I32).unwrap();
+        assert_eq!(val, -100_000.0);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(400_000_u32).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::U32).unwrap();
+        assert_eq!(val, 400_000.0);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(3.14_f32).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::F32).unwrap();
+        assert!((val - 3.14).abs() < 0.001);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(std::f64::consts::PI).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::F64).unwrap();
+        assert!((val - std::f64::consts::PI).abs() < 0.0001);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(42_i8).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryBigEndian, DimType::I8).unwrap();
+        assert_eq!(val, 42.0);
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&(200_u8).to_be_bytes());
+        let mut cursor = Cursor::new(&buf[..]);
+        let val = read_binary_value(&mut cursor, PlyFormat::BinaryLittleEndian, DimType::U8).unwrap();
+        assert_eq!(val, 200.0);
+    }
+
+    #[test]
+    fn read_binary_value_unsupported_ascii_format_is_error() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&[0u8; 4]);
+        let mut cursor = Cursor::new(&buf[..]);
+        let err = read_binary_value(&mut cursor, PlyFormat::Ascii, DimType::F32);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn ply_reader_empty_filename_is_error() {
+        let opts = Options::new();
+        let mut reader = PlyReader::new(&opts);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn ply_reader_name_is_readers_ply() {
+        let opts = Options::new();
+        let reader = PlyReader::new(&opts);
+        assert_eq!((&reader as &dyn Reader).name(), "readers.ply");
+    }
+
+    #[test]
+    fn ply_writer_empty_filename_is_error() {
+        let opts = Options::new();
+        let mut writer = PlyWriter::new(&opts).unwrap();
+        assert!(writer.write(&[]).is_err());
+    }
+
+    #[test]
+    fn ply_writer_name_is_writers_ply() {
+        let mut opts = Options::new();
+        opts.add("filename", "test.ply");
+        let writer = PlyWriter::new(&opts).unwrap();
+        assert_eq!((&writer as &dyn Writer).name(), "writers.ply");
+    }
+
+    #[test]
+    fn parse_property_list_on_non_vertex_succeeds() {
+        let prop =
+            parse_property(&["property", "list", "uchar", "int32", "indices"], "face").unwrap();
+        match prop {
+            PlyProp::List {
+                ref name,
+                count_ty,
+                list_ty,
+            } => {
+                assert_eq!(name, "indices");
+                assert_eq!(count_ty, DimType::U8);
+                assert_eq!(list_ty, DimType::I32);
+            }
+            _ => panic!("expected List"),
+        }
+    }
+
+    #[test]
+    fn parse_property_list_invalid_type_is_error() {
+        assert!(parse_property(
+            &["property", "list", "badtype", "int32", "x"],
+            "face"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn parse_property_list_missing_name_is_error() {
+        assert!(parse_property(
+            &["property", "list", "uchar", "int32"],
+            "face"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn parse_property_list_extra_tokens_is_error() {
+        assert!(parse_property(
+            &["property", "list", "uchar", "int32", "indices", "extra"],
+            "face"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn parse_property_simple_missing_name_is_error() {
+        assert!(parse_property(&["property", "float32"], "vertex").is_err());
+    }
+
+    #[test]
+    fn parse_property_missing_all_is_error() {
+        assert!(parse_property(&["property"], "vertex").is_err());
+    }
+
+    #[test]
+    fn ply_type_string_full_coverage() {
+        assert_eq!(ply_type_string(DimType::I16, false), Some("short"));
+        assert_eq!(ply_type_string(DimType::U16, false), Some("ushort"));
+        assert_eq!(ply_type_string(DimType::I32, false), Some("int"));
+        assert_eq!(ply_type_string(DimType::U32, false), Some("uint"));
+        assert_eq!(ply_type_string(DimType::F32, false), Some("float"));
+        assert_eq!(ply_type_string(DimType::F64, false), Some("double"));
+        assert_eq!(ply_type_string(DimType::I64, true), None);
+        assert_eq!(ply_type_string(DimType::U64, true), None);
+    }
+
+    #[test]
+    fn format_value_binary_variants() {
+        assert_eq!(format_value(-5.7, DimType::I8, None), "-6");
+        assert_eq!(format_value(42.3, DimType::U16, None), "42");
+        assert_eq!(format_value(-1.0, DimType::U8, None), "0");
+        assert_eq!(format_value(3.1415, DimType::F32, None), "3.1414999961853027");
+        assert_eq!(format_value(3.1415, DimType::F32, Some(2)), "3.14");
+        assert_eq!(format_value(2.5, DimType::F64, None), "2.5");
+        assert_eq!(format_value(-200.0, DimType::I64, None), "-200");
+    }
+
+    #[test]
+    fn write_ply_value_ascii_success() {
+        let mut out = Vec::new();
+        write_ply_value(&mut out, PlyFormat::Ascii, 3.14, DimType::F64, None).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "3.14");
+    }
+
+    #[test]
+    fn write_ply_value_binary_success() {
+        let mut out = Vec::new();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, -3.0, DimType::I8, None)
+            .unwrap();
+        assert_eq!(out, vec![253u8]);
+
+        let mut out = Vec::new();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 200.0, DimType::U8, None)
+            .unwrap();
+        assert_eq!(out, vec![200]);
+
+        let mut out = Vec::new();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, -1.0, DimType::U8, None)
+            .unwrap();
+        assert_eq!(out, vec![0]);
+
+        let mut out = Vec::new();
+        write_ply_value(
+            &mut out,
+            PlyFormat::BinaryBigEndian,
+            3.14,
+            DimType::F32,
+            None,
+        )
+        .unwrap();
+        assert_eq!(out.len(), 4);
+
+        let mut out = Vec::new();
+        write_ply_value(
+            &mut out,
+            PlyFormat::BinaryBigEndian,
+            std::f64::consts::PI,
+            DimType::F64,
+            None,
+        )
+        .unwrap();
+        assert_eq!(out.len(), 8);
+    }
+
+    #[test]
+    fn write_ply_value_unsupported_type_is_error() {
+        let mut out = Vec::new();
+        let err =
+            write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 5.0, DimType::I64, None);
+        assert!(err.is_err());
+        let err =
+            write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 5.0, DimType::U64, None);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn write_triangle_ascii_and_binary() {
+        let tri = pdal_core::point::Triangle {
+            a: 0,
+            b: 1,
+            c: 2,
+        };
+
+        let mut out = Vec::new();
+        write_triangle(&mut out, PlyFormat::Ascii, &tri, 0).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "3 0 1 2\n");
+
+        let mut out = Vec::new();
+        write_triangle(&mut out, PlyFormat::BinaryLittleEndian, &tri, 0).unwrap();
+        assert_eq!(out.len(), 1 + 4 * 3);
+        assert_eq!(out[0], 3);
+
+        let mut out = Vec::new();
+        write_triangle(&mut out, PlyFormat::BinaryBigEndian, &tri, 10).unwrap();
+        assert_eq!(out.len(), 1 + 4 * 3);
+        assert_eq!(out[0], 3);
+        let a_val = u32::from_be_bytes(out[1..5].try_into().unwrap());
+        assert_eq!(a_val, 10);
+    }
+
+    #[test]
+    fn ply_writer_big_endian_binary_roundtrip() {
+        let view = xyz_view(&[(-1.5, 0.0, 0.25), (0.0, 1.0, 2.0)]);
+        let output = temp_path("bigendian.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output)
+            .add("storage_mode", "big endian");
+        PlyWriter::new(&opts).unwrap().write(&[view]).unwrap();
+        let back = read_back(&output);
+        assert_eq!(back.len(), 2);
+        assert_eq!(back.get_f64(0, &DimId::X), -1.5);
+    }
+
+    #[test]
+    fn ply_writer_rejects_precision_with_binary() {
+        let output = temp_path("bigendian-precision.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output)
+            .add("storage_mode", "big endian")
+            .add("precision", 3);
+        let result = PlyWriter::new(&opts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ply_writer_unknown_dim_in_dims_is_error() {
+        let view = xyz_view(&[(1.0, 2.0, 3.0)]);
+        let output = temp_path("uknown-dim.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output)
+            .add("dims", "UnknownDim");
+        let mut writer = PlyWriter::new(&opts).unwrap();
+        let err = writer.write(&[view]).unwrap_err();
+        assert!(err.0.contains("Unknown dimension"));
+    }
+
+    #[test]
+    fn ply_writer_invalid_type_in_dims_is_error() {
+        let view = xyz_view(&[(1.0, 2.0, 3.0)]);
+        let output = temp_path("invalid-type.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output)
+            .add("dims", "X=BadType");
+        let mut writer = PlyWriter::new(&opts).unwrap();
+        let err = writer.write(&[view]).unwrap_err();
+        assert!(err.0.contains("Invalid type"));
+    }
+
+    #[test]
+    fn ply_writer_faces_ascii_matches_expected() {
+        let mut view = xyz_view(&[(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]);
+        let mesh = view.create_mesh();
+        mesh.add(0, 1, 2);
+        let output = temp_path("face-only.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output).add("faces", true);
+        PlyWriter::new(&opts).unwrap().write(&[view]).unwrap();
+        let written = fs::read_to_string(&output).unwrap();
+        assert!(written.contains("element face 1"));
+        assert!(written.contains("property list uint8 uint32 vertex_indices"));
+        assert!(written.contains("3 0 1 2"));
+    }
+
+    #[test]
+    fn ply_writer_uses_hash_template_for_multi_view() {
+        let views = vec![
+            xyz_view(&[(1.0, 2.0, 3.0)]),
+            xyz_view(&[(4.0, 5.0, 6.0)]),
+        ];
+        let template = temp_path("multi-#.ply");
+        for i in 1..=2 {
+            let _ = fs::remove_file(template.replace('#', &i.to_string()));
+        }
+        let mut opts = Options::new();
+        opts.add("filename", &template);
+        PlyWriter::new(&opts).unwrap().write(&views).unwrap();
+        for i in 1..=2 {
+            let path = template.replace('#', &i.to_string());
+            assert!(Path::new(&path).exists(), "missing {path}");
+            let back = read_back(&path);
+            assert_eq!(back.len(), 1);
+        }
+    }
+
+    #[test]
+    fn ply_writer_zero_views_writes_empty_vertex() {
+        let output = temp_path("empty.ply");
+        let mut opts = Options::new();
+        opts.add("filename", &output);
+        PlyWriter::new(&opts).unwrap().write(&[]).unwrap();
+        let written = fs::read_to_string(&output).unwrap();
+        assert!(written.contains("element vertex 0"));
+    }
+
+    #[test]
+    fn ply_writer_metadata_contains_filename() {
+        let mut opts = Options::new();
+        opts.add("filename", "test.ply");
+        let writer = PlyWriter::new(&opts).unwrap();
+        let meta = writer.metadata();
+        let json = format!("{:?}", meta);
+        assert!(json.contains("test.ply"));
+    }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = PlyReader::new(&Options::new());
+        let result = reader.read();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.ply");
+        let mut reader = PlyReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = PlyReader::new(&Options::new());
+        let metadata = reader.metadata();
+        assert_eq!(metadata.name(), "readers.ply");
+    }
+
+    #[test]
+    fn writer_errors_without_filename() {
+        let mut options = Options::new();
+        options.add("storage_mode", "ascii");
+        let writer = PlyWriter::new(&options);
+        assert!(writer.is_ok());
+        let layout = PointLayout::new();
+        let view = PointView::new(Rc::new(layout));
+        let result = writer.unwrap().write(&[view]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn writer_errors_with_invalid_storage_mode() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.ply");
+        options.add("storage_mode", "alien-mode");
+        let result = PlyWriter::new(&options);
+        assert!(result.is_err());
+    }
 }

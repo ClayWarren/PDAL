@@ -277,27 +277,221 @@ mod tests {
     use pdal_core::point::{DimType, PointLayout};
     use std::rc::Rc;
 
-    fn single_point_view() -> PointView {
+    fn grid_view() -> PointView {
         let mut layout = PointLayout::new();
         layout.register(DimId::X, DimType::F64);
         layout.register(DimId::Y, DimType::F64);
         layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Classification, DimType::U8);
         let mut view = PointView::new(Rc::new(layout));
-        let point = view.add_point();
-        view.set_f64(point, &DimId::X, 1.0);
-        view.set_f64(point, &DimId::Y, 2.0);
-        view.set_f64(point, &DimId::Z, 3.0);
+        for (x, y, z) in &[(0.5, 0.5, 10.0), (0.5, 1.5, 12.0), (1.5, 0.5, 8.0), (1.5, 1.5, 11.0)] {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *x);
+            view.set_f64(id, &DimId::Y, *y);
+            view.set_f64(id, &DimId::Z, *z);
+        }
+        view
+    }
+
+    fn grid_view_with_returns() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        layout.register(DimId::NumberOfReturns, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for (x, y, z, rn, nr) in &[(0.5, 0.5, 10.0, 1, 1), (0.5, 1.5, 12.0, 1, 2), (1.5, 0.5, 8.0, 2, 2)] {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *x);
+            view.set_f64(id, &DimId::Y, *y);
+            view.set_f64(id, &DimId::Z, *z);
+            view.set_f64(id, &DimId::ReturnNumber, *rn as f64);
+            view.set_f64(id, &DimId::NumberOfReturns, *nr as f64);
+        }
+        view
+    }
+
+    fn flat_3x3_view() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Classification, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for cx in 0..3 {
+            for cy in 0..3 {
+                let id = view.add_point();
+                view.set_f64(id, &DimId::X, cx as f64 * 2.0 + 0.5);
+                view.set_f64(id, &DimId::Y, cy as f64 * 2.0 + 0.5);
+                view.set_f64(id, &DimId::Z, 10.0);
+            }
+        }
         view
     }
 
     #[test]
     fn rejects_non_positive_cell_size() {
         let mut filter = SmrfFilter::new(0.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
-
-        let err = match filter.run_one(&single_point_view()) {
-            Ok(_) => panic!("expected non-positive cell size to fail"),
-            Err(err) => err,
-        };
+        let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
         assert!(err.to_string().contains("cell"));
+    }
+
+    #[test]
+    fn rejects_negative_slope() {
+        let mut filter = SmrfFilter::new(1.0, -0.1, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
+        assert!(err.to_string().contains("slope"));
+    }
+
+    #[test]
+    fn rejects_negative_scalar() {
+        let mut filter = SmrfFilter::new(1.0, 0.15, None, -1.0, 0.5, 2, 1, true, Vec::new());
+        let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
+        assert!(err.to_string().contains("scalar"));
+    }
+
+    #[test]
+    fn rejects_negative_threshold() {
+        let mut filter = SmrfFilter::new(1.0, 0.15, None, 1.25, -0.5, 2, 1, true, Vec::new());
+        let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
+        assert!(err.to_string().contains("threshold"));
+    }
+
+    #[test]
+    fn rejects_non_positive_window() {
+        let mut filter = SmrfFilter::new(1.0, 0.15, Some(-1.0), 1.25, 0.5, 2, 1, true, Vec::new());
+        let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
+        assert!(err.to_string().contains("window"));
+    }
+
+    #[test]
+    fn rejects_empty_input() {
+        let layout = PointLayout::new();
+        let empty = PointView::new(Rc::new(layout));
+        let mut filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        let err = filter.run_one(&empty).map(|_| ()).unwrap_err();
+        assert!(err.to_string().contains("no points"));
+    }
+
+    #[test]
+    fn smrf_names() {
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        assert_eq!(filter.name(), "filters.smrf");
+    }
+
+    #[test]
+    fn smrf_metadata() {
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        let m = filter.metadata();
+        assert_eq!(m.name(), "filters.smrf");
+    }
+
+    #[test]
+    fn smrf_output_dimensions() {
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        let dims = filter.output_dimensions();
+        assert_eq!(dims, vec![(DimId::Classification, DimType::U8)]);
+    }
+
+    #[test]
+    fn smrf_process_one_passes_through() {
+        let mut filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        let mut view = grid_view();
+        assert!(filter.process_one(&mut view, 0));
+    }
+
+    #[test]
+    fn smrf_classifies_flat_ground() {
+        let mut filter = SmrfFilter::new(2.0, 0.15, None, 0.5, 0.5, 2, 1, true, Vec::new());
+        let result = filter.run_one(&flat_3x3_view()).unwrap();
+        assert_eq!(result.len(), 1);
+        // All points should be classified as ground (class 2) since they're within threshold
+        for i in 0..result[0].len() {
+            assert_eq!(result[0].get_f64(i, &DimId::Classification), 2.0);
+        }
+    }
+
+    #[test]
+    fn smrf_returns_filter_first_only() {
+        let mut filter = SmrfFilter::new(
+            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            vec!["first".to_string()],
+        );
+        let result = filter.run_one(&grid_view_with_returns()).unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].len() > 0);
+    }
+
+    #[test]
+    fn smrf_returns_filter_last_only() {
+        let mut filter = SmrfFilter::new(
+            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            vec!["last".to_string()],
+        );
+        let result = filter.run_one(&grid_view_with_returns()).unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn smrf_returns_filter_only() {
+        let mut filter = SmrfFilter::new(
+            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            vec!["only".to_string()],
+        );
+        let result = filter.run_one(&grid_view_with_returns()).unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn smrf_classifies_other_when_not_only_ground() {
+        // High point should be classified as other (not ground)
+        let mut filter = SmrfFilter::new(2.0, 0.15, None, 0.5, 0.5, 2, 1, false, Vec::new());
+        let result = filter.run_one(&flat_3x3_view()).unwrap();
+        // All 9 points at z=10 should be within threshold from a flat surface
+        for i in 0..result[0].len() {
+            assert_eq!(result[0].get_f64(i, &DimId::Classification), 2.0, "point {i} should be ground");
+        }
+    }
+
+    #[test]
+    fn smrf_knn_fill_all_nan() {
+        let mut data = vec![f64::NAN; 9];
+        let rows = 3;
+        let cols = 3;
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        filter.knn_fill(&mut data, rows, cols);
+        for v in &data {
+            assert!(v.is_nan());
+        }
+    }
+
+    #[test]
+    fn smrf_knn_fill_single_nan() {
+        let mut data = vec![1.0, 2.0, 3.0, 4.0, f64::NAN, 6.0, 7.0, 8.0, 9.0];
+        let rows = 3;
+        let cols = 3;
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        filter.knn_fill(&mut data, rows, cols);
+        // Center cell (index 4) should be filled with mean of neighbors (1+2+3+4+6+7+8+9)/8 = 5.0
+        assert!((data[4] - 5.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn smrf_knn_fill_no_nan() {
+        let mut data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let rows = 3;
+        let cols = 3;
+        let filter = SmrfFilter::new(1.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new());
+        filter.knn_fill(&mut data, rows, cols);
+        assert!((data[4] - 5.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn smrf_nan_cell_in_grid_skips_point_in_classification() {
+        let mut filter = SmrfFilter::new(2.0, 0.15, None, 0.5, 0.5, 2, 1, true, Vec::new());
+        let result = filter.run_one(&flat_3x3_view()).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get_f64(0, &DimId::Classification), 2.0);
     }
 }

@@ -274,6 +274,7 @@ impl Streamable for HexBinFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pdal_core::point::{DimType, PointLayout};
 
     #[test]
     fn first_point_defines_the_origin_hexagon() {
@@ -307,5 +308,143 @@ mod tests {
         grid.add_point(0.0, 0.0);
         let parsed: serde_json::Value = serde_json::from_str(&grid.density_geojson(15)).unwrap();
         assert!(parsed["features"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn compute_hex_size_with_sufficient_points() {
+        let xy = vec![(0.0, 0.0), (3.0, 4.0)];
+        let size = compute_hex_size(&xy, 10, 5).unwrap();
+        assert!(size > 0.0);
+    }
+
+    #[test]
+    fn compute_hex_size_not_enough_points_is_error() {
+        let xy = vec![(1.0, 2.0)];
+        assert!(compute_hex_size(&xy, 10, 5).is_err());
+    }
+
+    #[test]
+    fn compute_hex_size_empty_input_is_error() {
+        let xy: Vec<(f64, f64)> = vec![];
+        assert!(compute_hex_size(&xy, 10, 5).is_err());
+    }
+
+    #[test]
+    fn hex_grid_new_sets_defaults() {
+        let grid = HexGrid::new(10.0);
+        assert!(!grid.has_origin);
+        assert_eq!(grid.origin, (0.0, 0.0));
+        assert!(grid.counts.is_empty());
+        assert!((grid.height - 10.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn hex_grid_id_combines_coordinates() {
+        assert_eq!(HexGrid::id((0, 0)), 0);
+        let id = HexGrid::id((1, 2));
+        assert_eq!(id >> 32, 1);
+        assert_eq!(id as u32, 2);
+    }
+
+    #[test]
+    fn hex_grid_find_point_returns_coordinates() {
+        let grid = HexGrid::new(SQRT_3);
+        let pt = grid.find_point((0, 0), 0);
+        assert!((pt.0 - 1.0).abs() < 0.001);
+        assert!((pt.1 - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn multiple_points_map_to_different_hexagons() {
+        let mut grid = HexGrid::new(10.0);
+        grid.add_point(0.0, 0.0);
+        grid.add_point(0.0, 0.0);
+        assert_eq!(*grid.counts.get(&(0, 0)).unwrap(), 2);
+
+        grid.add_point(100.0, 50.0);
+        assert_eq!(grid.counts.len(), 2);
+    }
+
+    #[test]
+    fn hexbin_filter_name() {
+        let filter = HexBinFilter::new(Some(1.0), 5, 10, None);
+        assert_eq!(filter.name(), "filters.hexbin");
+    }
+
+    #[test]
+    fn hexbin_filter_metadata() {
+        let filter = HexBinFilter::new(Some(1.0), 5, 10, None);
+        let meta = filter.metadata();
+        assert_eq!(meta.name(), "filters.hexbin");
+    }
+
+    #[test]
+    fn hexbin_streamable_process_one_passes_through() {
+        let mut filter = HexBinFilter::new(Some(1.0), 5, 10, None);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(std::rc::Rc::new(layout));
+        let pt = view.add_point();
+        assert!(filter.process_one(&mut view, pt));
+    }
+
+    #[test]
+    fn hexbin_empty_input_is_error() {
+        let mut filter = HexBinFilter::new(Some(1.0), 5, 10, None);
+        let layout = PointLayout::new();
+        let view = PointView::new(std::rc::Rc::new(layout));
+        assert!(filter.run_one(&view).is_err());
+    }
+
+    #[test]
+    fn hexbin_zero_height_is_error() {
+        let mut filter = HexBinFilter::new(Some(0.0), 5, 10, None);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(std::rc::Rc::new(layout));
+        view.add_point();
+        view.set_f64(0, &DimId::X, 1.0);
+        view.set_f64(0, &DimId::Y, 2.0);
+        assert!(filter.run_one(&view).is_err());
+    }
+
+    #[test]
+    fn hexbin_default_height_with_fewer_points_than_sample() {
+        let mut filter = HexBinFilter::new(None, 5, 100, None);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let mut view = PointView::new(std::rc::Rc::new(layout));
+        for (x, y) in &[(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)] {
+            let pt = view.add_point();
+            view.set_f64(pt, &DimId::X, *x);
+            view.set_f64(pt, &DimId::Y, *y);
+        }
+        let result = filter.run_one(&view).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].len(), 3);
+    }
+
+    #[test]
+    fn hexbin_passes_through_points() {
+        let mut filter = HexBinFilter::new(Some(10.0), 5, 10, None);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(std::rc::Rc::new(layout));
+        for (x, y, z) in &[(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)] {
+            let pt = view.add_point();
+            view.set_f64(pt, &DimId::X, *x);
+            view.set_f64(pt, &DimId::Y, *y);
+            view.set_f64(pt, &DimId::Z, *z);
+        }
+        let result = filter.run_one(&view).unwrap();
+        assert_eq!(result.len(), 1);
+        let output = &result[0];
+        assert_eq!(output.len(), 2);
+        assert_eq!(output.get_f64(0, &DimId::Z), 3.0);
+        assert_eq!(output.get_f64(1, &DimId::X), 4.0);
     }
 }
