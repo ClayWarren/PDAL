@@ -7,6 +7,11 @@ ITERATIONS="${PDAL_RUST_PERF_ITERS:-5}"
 COLD_BUILD=0
 TEST_SUITES=0
 
+if [[ -n "${CONDA_PREFIX:-}" ]]; then
+    export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/lib}"
+    export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+fi
+
 usage() {
     cat <<'EOF'
 Usage: rust/scripts/measure_guardrails.sh [--cold-build] [--test-suites]
@@ -81,6 +86,35 @@ time_command() {
 
     local out="${TMP_DIR}/${label//[^A-Za-z0-9_.-]/_}.out"
     local err="${TMP_DIR}/${label//[^A-Za-z0-9_.-]/_}.err"
+
+    if [[ "$(uname -s)" == "Darwin" && "${label}" == rust-* ]]; then
+        python3 - "$label" "${out}" "${err}" "$@" <<'PY'
+import os
+import resource
+import subprocess
+import sys
+import time
+
+label, out_path, err_path, *cmd = sys.argv[1:]
+env = os.environ.copy()
+if cmd and cmd[0] == "env":
+    cmd = cmd[1:]
+    while cmd and "=" in cmd[0] and not cmd[0].startswith("-"):
+        key, value = cmd.pop(0).split("=", 1)
+        env[key] = value
+with open(out_path, "wb") as out, open(err_path, "wb") as err:
+    start = time.monotonic()
+    result = subprocess.run(cmd, stdout=out, stderr=err, env=env, check=False)
+    elapsed = time.monotonic() - start
+if result.returncode:
+    sys.stderr.write(open(err_path, encoding="utf-8", errors="replace").read())
+    raise SystemExit(result.returncode)
+
+rss_bytes = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+print(f"{label},{elapsed:.2f},{rss_bytes / (1024 * 1024):.2f}")
+PY
+        return
+    fi
 
     if /usr/bin/time -l true >/dev/null 2>&1; then
         /usr/bin/time -l "$@" >"${out}" 2>"${err}"
