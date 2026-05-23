@@ -303,4 +303,49 @@ mod tests {
 
         assert_eq!(output.raster("faceraster").unwrap().data(), &[-9999.0; 4]);
     }
+
+    #[test]
+    fn filter_errors_when_resolution_is_zero_or_negative() {
+        for res in [0.0_f64, -1.0_f64] {
+            let mut options = Options::new();
+            options.add("resolution", res);
+            let mut filter = FaceRasterFilter::new(&options);
+            assert!(filter.run_one(&triangle_view()).is_err());
+        }
+    }
+
+    #[test]
+    fn filter_errors_when_some_but_not_all_fixed_args_provided() {
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        options.add("origin_x", 0.0);
+        options.add("origin_y", 0.0);
+        let mut filter = FaceRasterFilter::new(&options);
+        assert!(filter.run_one(&triangle_view()).is_err());
+    }
+
+    #[test]
+    fn filter_computes_limits_from_point_bounds_when_unfixed() {
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        let mut filter = FaceRasterFilter::new(&options);
+        let view = triangle_view();
+        let output = filter.run_one(&view).unwrap().pop().unwrap();
+        let raster = output.raster("faceraster").unwrap();
+        assert!(raster.data().len() > 0);
+    }
+
+    #[test]
+    fn filter_errors_when_named_mesh_missing() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        let mut options = Options::new();
+        options.add("resolution", 1.0);
+        options.add("mesh", "nonexistent");
+        let mut filter = FaceRasterFilter::new(&options);
+        assert!(filter.run_one(&view).is_err());
+    }
 }

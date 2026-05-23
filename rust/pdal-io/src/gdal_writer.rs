@@ -722,4 +722,81 @@ mod tests {
         let bands = writer.render_bands(grid, &samples);
         assert_eq!(bands[0].1, vec![0.0, 1.0, 1.0, 0.0]);
     }
+
+    #[test]
+    fn writer_errors_without_filename() {
+        let mut writer = GdalWriter::new(&Options::new());
+        let layout = PointLayout::new();
+        let view = PointView::new(std::rc::Rc::new(layout));
+        let result = writer.write(&[view]);
+        assert!(result.is_err());
+        assert!(result.err().unwrap().0.contains("filename"));
+    }
+
+    #[test]
+    fn writer_errors_on_zero_resolution() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 0.0);
+        let mut writer = GdalWriter::new(&options);
+        let layout = PointLayout::new();
+        let view = PointView::new(std::rc::Rc::new(layout));
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_errors_on_partial_fixed_grid() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        options.add("origin_x", 0.0);
+        options.add("origin_y", 0.0);
+        let mut writer = GdalWriter::new(&options);
+        let layout = PointLayout::new();
+        let view = PointView::new(std::rc::Rc::new(layout));
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_errors_on_percentile_without_binmode() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        options.add("output_type", "p50");
+        let mut writer = GdalWriter::new(&options);
+        let layout = PointLayout::new();
+        let view = PointView::new(std::rc::Rc::new(layout));
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_errors_on_empty_view_without_allow_empty() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        let mut writer = GdalWriter::new(&options);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let view = PointView::new(std::rc::Rc::new(layout));
+        assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn parse_data_type_branches() {
+        assert_eq!(parse_data_type("float64"), OutputDataType::Float64);
+        assert_eq!(parse_data_type("int32"), OutputDataType::Int32);
+        assert_eq!(parse_data_type("int32_t"), OutputDataType::Int32);
+        assert_eq!(parse_data_type("signed32"), OutputDataType::Int32);
+        assert_eq!(parse_data_type("int"), OutputDataType::Int32);
+        assert_eq!(parse_data_type("mystery"), OutputDataType::Float64);
+    }
+
+    #[test]
+    fn writer_metadata_returns_expected_name() {
+        let writer = GdalWriter::new(&Options::new());
+        assert_eq!(writer.metadata().name(), "writers.gdal");
+        assert_eq!(writer.name(), "writers.gdal");
+    }
 }
