@@ -818,6 +818,37 @@ pub unsafe extern "C" fn pdal_writer_create_ogr(ops: *const Options) -> *mut Wri
     }
 }
 
+/// Validate the OGR writer multicount/attr_dims combination on behalf of the
+/// C++ wrapper. Returns null on success, otherwise an owned C string carrying
+/// the unprefixed error message. Caller frees with `pdal_string_free`.
+#[no_mangle]
+pub extern "C" fn pdal_ogr_writer_validate(
+    multicount: u64,
+    attr_dim_count: u64,
+) -> *mut c_char {
+    match pdal_io::ogr_writer::validate_multicount_and_attrs(multicount, attr_dim_count) {
+        Ok(()) => std::ptr::null_mut(),
+        Err(message) => string_to_c_ptr(message),
+    }
+}
+
+/// Format the "attr_dims dimension not found" error used by the C++ OGR
+/// writer wrapper. Returns an owned C string. Caller frees with
+/// `pdal_string_free`. Returns null when `name` is null or non-UTF8.
+///
+/// # Safety
+/// `name` must be a valid C string pointer or null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ogr_writer_dim_not_found(name: *const c_char) -> *mut c_char {
+    if name.is_null() {
+        return std::ptr::null_mut();
+    }
+    let Ok(name) = CStr::from_ptr(name).to_str() else {
+        return std::ptr::null_mut();
+    };
+    string_to_c_ptr(pdal_io::ogr_writer::format_attr_dim_not_found(name))
+}
+
 /// Create a GdalWriter from options.
 ///
 /// # Safety

@@ -72,6 +72,28 @@ impl Writer for OgrWriter {
     }
 }
 
+/// Validate the multicount/attr_dims combination used by the C++ OGR writer
+/// wrapper. The returned message is unprefixed so the caller can route it
+/// through `Stage::throwError`, which adds the `writers.ogr: ` prefix.
+pub fn validate_multicount_and_attrs(
+    multicount: u64,
+    attr_dim_count: u64,
+) -> Result<(), String> {
+    if multicount < 1 {
+        return Err("multicount must be greater than 0.".to_string());
+    }
+    if multicount > 1 && attr_dim_count > 0 {
+        return Err("multicount > 1 incompatible with attr_dims".to_string());
+    }
+    Ok(())
+}
+
+/// Format the "attr_dims dimension not found" error string used by the C++
+/// OGR writer wrapper. The returned message is unprefixed.
+pub fn format_attr_dim_not_found(name: &str) -> String {
+    format!("Dimension '{name}' (attr_dims) not found.")
+}
+
 impl OgrWriter {
     fn validate_options(&self) -> Result<(), StageError> {
         let driver = self.resolved_driver();

@@ -499,6 +499,8 @@ COVERED: dict[str, object] = {
     },
     "pdal_io_ogr_writer_test": {
         "json",
+        "error_multicount_attrs",
+        "error_unknown_attr",
     },
     "pdal_io_optech_test": {
         "Constructor",

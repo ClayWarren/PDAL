@@ -115,11 +115,14 @@ void OGRWriter::addArgs(ProgramArgs& args)
 void OGRWriter::initialize()
 {
     gdal::registerDrivers();
-    if (m_multiCount < 1)
-        throwError("multicount must be greater than 0.");
-    else if (m_multiCount > 1 && m_attrDimNames.size() > 0)
+    char* err = pdal_ogr_writer_validate(
+        static_cast<uint64_t>(m_multiCount),
+        static_cast<uint64_t>(m_attrDimNames.size()));
+    if (err)
     {
-        throwError("multicount > 1 incompatible with attr_dims");
+        std::string message(err);
+        pdal_string_free(err);
+        throwError(message);
     }
 }
 
@@ -172,7 +175,13 @@ void OGRWriter::prepared(PointTableRef table)
         {
             auto dim = table.layout()->findDim(name);
             if (dim == Dimension::Id::Unknown)
-                throwError("Dimension '" + name + "' (attr_dims) not found.");
+            {
+                char* err = pdal_ogr_writer_dim_not_found(name.c_str());
+                std::string message = err ? std::string(err)
+                    : "Dimension '" + name + "' (attr_dims) not found.";
+                pdal_string_free(err);
+                throwError(message);
+            }
         }
     }
 }
