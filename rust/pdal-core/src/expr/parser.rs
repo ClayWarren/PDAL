@@ -716,4 +716,74 @@ mod tests {
         assert!(parse_math("2 +").is_err());
         assert!(parse_math("(").is_err());
     }
+
+    #[test]
+    fn ismin_and_ismax_functions() {
+        let view = point(&[(DimId::X, f64::MIN), (DimId::Y, f64::MAX), (DimId::Z, 1.0)]);
+        assert!(eval_cond("ismin(X)", &view));
+        assert!(!eval_cond("ismin(Z)", &view));
+        assert!(eval_cond("ismax(Y)", &view));
+        assert!(!eval_cond("ismax(Z)", &view));
+        let nan_view = point(&[(DimId::X, f64::NAN)]);
+        assert!(eval_cond("isnan(X)", &nan_view));
+        assert!(!eval_cond("isnan(Z)", &view));
+    }
+
+    #[test]
+    fn unknown_function_fails_to_parse() {
+        assert!(parse_conditional("notreal(1)").is_err());
+        assert!(parse_math("notreal(1)").is_err());
+    }
+
+    #[test]
+    fn unary_negation_in_math() {
+        let view = point(&[(DimId::X, 3.0)]);
+        assert_eq!(eval_math("-X", &view), -3.0);
+        assert_eq!(eval_math("-(-X)", &view), 3.0);
+    }
+
+    #[test]
+    fn divide_in_math_with_dim_zero() {
+        let view = point(&[(DimId::X, 0.0)]);
+        let result = eval_math("1 / X", &view);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn assignment_with_where_clause() {
+        let (ident, value, cond) = parse_assign_parts("Classification = 7 WHERE X > 0").unwrap();
+        assert!(ident.valid());
+        assert!(value.valid());
+        assert!(cond.valid());
+    }
+
+    #[test]
+    fn assignment_without_where_clause() {
+        let (ident, value, cond) = parse_assign_parts("Classification = 2").unwrap();
+        assert!(ident.valid());
+        assert!(value.valid());
+        assert!(!cond.valid());
+    }
+
+    #[test]
+    fn assignment_missing_equal_fails() {
+        assert!(parse_assign_parts("Classification 2").is_err());
+    }
+
+    #[test]
+    fn parens_in_arithmetic() {
+        let view = point(&[(DimId::X, 5.0)]);
+        assert_eq!(eval_math("(X + 3) * 2", &view), 16.0);
+    }
+
+    #[test]
+    fn equality_with_floats_and_chained_comparisons() {
+        let view = point(&[(DimId::Intensity, 3.0)]);
+        assert!(eval_cond("Intensity == 3.0", &view));
+        assert!(eval_cond("Intensity >= 3", &view));
+        assert!(eval_cond("Intensity <= 3", &view));
+        assert!(!eval_cond("Intensity != 3", &view));
+        assert!(!eval_cond("Intensity < 3", &view));
+        assert!(!eval_cond("Intensity > 3", &view));
+    }
 }

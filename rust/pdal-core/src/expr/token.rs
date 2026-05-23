@@ -141,3 +141,56 @@ impl Default for Token {
         Token::of(TokenType::Error)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_is_error_token() {
+        let t = Token::default();
+        assert_eq!(t.ty(), TokenType::Error);
+        assert!(!t.valid());
+        assert!(!t.is_content());
+    }
+
+    #[test]
+    fn valid_and_is_content_distinguish_error_and_eof() {
+        let err = Token::of(TokenType::Error);
+        assert!(!err.valid());
+        assert!(!err.is_content());
+
+        let eof = Token::of(TokenType::Eof);
+        assert!(eof.valid());
+        assert!(!eof.is_content());
+
+        let plus = Token::new(TokenType::Plus, 0, 1, "+", 0.0);
+        assert!(plus.valid());
+        assert!(plus.is_content());
+    }
+
+    #[test]
+    fn matches_handles_identifier_case_and_other_types() {
+        let a = Token::new(TokenType::Identifier, 0, 5, "Class", 0.0);
+        let b = Token::new(TokenType::Identifier, 5, 10, "CLASS", 0.0);
+        let c = Token::new(TokenType::Identifier, 10, 15, "Other", 0.0);
+        assert!(a.matches(&b));
+        assert!(!a.matches(&c));
+
+        let plus_a = Token::new(TokenType::Plus, 0, 1, "+", 0.0);
+        let plus_b = Token::new(TokenType::Plus, 5, 6, "+", 0.0);
+        assert!(plus_a.matches(&plus_b));
+
+        let dash = Token::new(TokenType::Dash, 0, 1, "-", 0.0);
+        assert!(!plus_a.matches(&dash));
+    }
+
+    #[test]
+    fn accessor_helpers_round_trip() {
+        let t = Token::new(TokenType::Number, 1, 4, "42", 42.0);
+        assert_eq!(t.start(), 1);
+        assert_eq!(t.end(), 4);
+        assert_eq!(t.sval(), "42");
+        assert_eq!(t.dval(), 42.0);
+    }
+}
