@@ -278,4 +278,49 @@ mod tests {
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = StacReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/stac.json");
+        let mut reader = StacReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_json() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"{not-json").unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = StacReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = StacReader::new(&Options::new());
+        assert_eq!(reader.metadata().name(), "readers.stac");
+    }
+
+    #[test]
+    fn asset_names_defaults_to_data() {
+        let names = asset_names(&Options::new());
+        assert_eq!(names, vec!["data".to_string()]);
+    }
+
+    #[test]
+    fn asset_names_splits_comma_separated_and_trims() {
+        let mut options = Options::new();
+        options.add("asset_names", "foo, bar,baz,");
+        let names = asset_names(&options);
+        assert_eq!(names, vec!["foo", "bar", "baz"]);
+    }
 }

@@ -267,4 +267,34 @@ mod tests {
 
         assert!(OptechReader::new(&options).read().is_err());
     }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        assert_eq!(
+            OptechReader::new(&Options::new()).metadata().name(),
+            "readers.optech"
+        );
+    }
+
+    #[test]
+    fn reader_name_returns_expected() {
+        assert_eq!(
+            OptechReader::new(&Options::new()).name(),
+            "readers.optech"
+        );
+    }
+
+    #[test]
+    fn read_header_rejects_short_file() {
+        let mut cursor = std::io::Cursor::new(b"NOPE");
+        assert!(read_header(&mut cursor).is_err());
+    }
+
+    #[test]
+    fn read_header_rejects_bad_signature() {
+        let mut buf = vec![0u8; 256];
+        buf[0..4].copy_from_slice(b"NOPE");
+        let mut cursor = std::io::Cursor::new(buf);
+        assert!(read_header(&mut cursor).is_err());
+    }
 }

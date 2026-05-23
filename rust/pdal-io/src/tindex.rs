@@ -212,4 +212,59 @@ mod tests {
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = TindexReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/tindex.json");
+        let mut reader = TindexReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_json() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"{not json").unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = TindexReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_non_feature_collection() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temp.path(), b"{\"type\":\"Other\"}").unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        let mut reader = TindexReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = TindexReader::new(&Options::new());
+        assert_eq!(reader.metadata().name(), "readers.tindex");
+    }
+
+    #[test]
+    fn resolve_location_absolute_path_preserved() {
+        let base = Path::new("/base");
+        let resolved = resolve_location(base, "/absolute/file.las");
+        assert_eq!(resolved, Path::new("/absolute/file.las"));
+    }
+
+    #[test]
+    fn resolve_location_relative_path_uses_base() {
+        let base = Path::new("/base");
+        let resolved = resolve_location(base, "child.las");
+        assert_eq!(resolved, Path::new("/base/child.las"));
+    }
 }

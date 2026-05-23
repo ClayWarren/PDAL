@@ -335,4 +335,69 @@ mod tests {
         assert_eq!(lex.get().sval(), "A"); // re-read
         assert_eq!(lex.get().sval(), "B");
     }
+
+    #[test]
+    fn reset_repoints_lexer() {
+        let mut lex = Lexer::new("123");
+        let t = lex.get();
+        assert_eq!(t.dval(), 123.0);
+        lex.reset("4 + 5");
+        let t = lex.get();
+        assert_eq!(t.dval(), 4.0);
+    }
+
+    #[test]
+    fn pos_and_put_end_advance_helpers() {
+        let mut lex = Lexer::new("12 + 34");
+        let t = lex.get();
+        assert_eq!(t.dval(), 12.0);
+        let p_before = lex.pos();
+        lex.put_end(&t);
+        assert_eq!(lex.pos(), t.end());
+        assert_eq!(p_before, t.end());
+        lex.put(&t);
+        assert_eq!(lex.pos(), t.start());
+    }
+
+    #[test]
+    fn single_ampersand_is_error() {
+        let mut lex = Lexer::new("&");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::Error);
+    }
+
+    #[test]
+    fn single_bar_is_error() {
+        let mut lex = Lexer::new("|");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::Error);
+    }
+
+    #[test]
+    fn exclamation_alone_is_not() {
+        let mut lex = Lexer::new("!a");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::Not);
+    }
+
+    #[test]
+    fn double_ampersand_is_and() {
+        let mut lex = Lexer::new("&&");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::And);
+    }
+
+    #[test]
+    fn double_bar_is_or() {
+        let mut lex = Lexer::new("||");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::Or);
+    }
+
+    #[test]
+    fn unrecognized_character_is_error_token() {
+        let mut lex = Lexer::new("@");
+        let t = lex.get();
+        assert_eq!(t.ty(), TokenType::Error);
+    }
 }
