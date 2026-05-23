@@ -138,9 +138,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `757 / 926` built C++ GoogleTest cases, or `81.75%`, are
+Current checkpoint: `768 / 926` built C++ GoogleTest cases, or `82.94%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit and promote 10 fully verified C++ test suites (pdal_bounds_test, pdal_eigen_test, pdal_point_view_test, pdal_utils_test, pdal_stage_factory_test, pdal_plugin_manager_test, pdal_options_test, pdal_spatial_reference_test, pdal_log_test, and pdal_io_las_reader_test) to Rust C ABI backing, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
+gains promote `pdal_polygon_test` to full Rust C ABI-backed parity, audit and
+promote 10 fully verified C++ test suites (pdal_bounds_test, pdal_eigen_test, pdal_point_view_test, pdal_utils_test, pdal_stage_factory_test, pdal_plugin_manager_test, pdal_options_test, pdal_spatial_reference_test, pdal_log_test, and pdal_io_las_reader_test) to Rust C ABI backing, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
 path-based Support::diff_files and Support::diff_text_files routing,
 PointTable layout limits, LAS userView reads, metadata
 construction/update, buffer stats execution, XMLSchema round-trip parsing,
@@ -221,9 +222,12 @@ Known mixed binaries:
   validation route through the Rust C ABI.
 - `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
   through the Rust C ABI.
-- `pdal_point_table_test`: only `resolveType` counts; dimension type
-  resolution routes through the Rust C ABI. Point table storage, user-view
-  behavior, iterators, and row/column tables remain C++.
+- `pdal_point_table_test`: `resolveType`, `layoutLimit`, and `userView` count;
+  dimension type resolution routes through the Rust C ABI, layout-limited
+  dimension registration uses Rust-backed type resolution, and LAS user-view
+  reads route through the Rust LAS reader. Point table storage, SRS list
+  management, `ColumnPointTable` typed storage, and basic `PointView` set/get
+  remain C++.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
 - `pdal_config_test`: all 1 test counts; version integer and full-version
@@ -236,9 +240,9 @@ Known mixed binaries:
 - `pdal_polygon_test`: all 12 tests count. Polygon construction, serialization, bounds, area, simplification, contains, covers, and validity are fully backed by the Rust C ABI and native geometry implementation.
 - `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
   fills, depth, and region queries route through the Rust C ABI.
-- `pdal_xml_schema_test`: only `legacyNames` counts; legacy dimension-name
-  remapping routes through the Rust C ABI. XML parsing, metadata, xforms, and
-  schema round-tripping remain C++/libxml.
+- `pdal_xml_schema_test`: `legacyNames` and `roundTrip` count; legacy
+  dimension-name remapping and XML schema round-tripping route through the Rust
+  C ABI. XML parsing, metadata, and xform/schema behaviors remain C++/libxml.
 - `pdal_uuid_test`: all 3 tests count; UUID parsing, canonical formatting,
   null checks, and v4 random byte generation route through the Rust C ABI while
   C++ keeps the small value wrapper.
@@ -344,10 +348,11 @@ Known mixed binaries:
   count. Standard-mode raster rendering routes through the Rust C ABI for
   simple GDAL options. Streaming, typed output, metadata, SRS override/default
   handling, and no-point error behavior remain C++ wrapper behavior.
-- `pdal_io_copc_reader_test`: `fullRead`, `boundedRead2d`, and `boundedRead3d`
-  count. Local COPC point materialization and simple dataset-coordinate bounds
-  route through the Rust C ABI. Resolution, streaming, preview,
-  polygon/OGR/reprojection crops, and multi-input behavior remain C++.
+- `pdal_io_copc_reader_test`: `fullRead`, `boundedRead2d`, `boundedRead3d`,
+  and `multipleInputs` count. Local COPC point materialization, simple
+  dataset-coordinate bounds, and multi-input diamond pipelines route through
+  the Rust C ABI. Resolution, streaming, preview, and
+  polygon/OGR/reprojection crops remain C++.
 - `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
   `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`,
   `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`, and
