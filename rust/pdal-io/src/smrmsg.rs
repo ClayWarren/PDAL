@@ -96,7 +96,9 @@ impl Reader for SmrmsgReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use byteorder::WriteBytesExt;
     use pdal_core::pipeline::Reader;
+    use std::io::Write;
 
     fn data_path(path: &str) -> String {
         format!("{}/../../test/data/{path}", env!("CARGO_MANIFEST_DIR"))
@@ -135,5 +137,43 @@ mod tests {
 
         assert!(SmrmsgReader::new(&options).read().is_err());
         assert!(SmrmsgReader::new(&Options::new()).read().is_err());
+    }
+
+    #[test]
+    fn rejects_partial_record_smrmsg_input() {
+        let mut temp = tempfile::NamedTempFile::new().unwrap();
+        temp.write_all(&[0, 1, 2, 3]).unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+
+        let err = match SmrmsgReader::new(&options).read() {
+            Ok(_) => panic!("partial SMRMSG record should fail"),
+            Err(err) => err,
+        };
+        assert_eq!(err.0, "Invalid file size.");
+    }
+
+    #[test]
+    fn reads_single_record_and_reports_metadata() {
+        let mut temp = tempfile::NamedTempFile::new().unwrap();
+        let values = [1.0, 0.1, 0.2, 0.3, 4.0, 5.0, 6.0, 0.01, 0.02, 0.03];
+        for value in values {
+            temp.write_f64::<LittleEndian>(value).unwrap();
+        }
+
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().to_string());
+        let mut reader = SmrmsgReader::new(&options);
+
+        assert_eq!(reader.name(), "readers.smrmsg");
+        assert_eq!(reader.metadata().name(), "readers.smrmsg");
+
+        let views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+        let view = &views[0];
+        assert_eq!(view.len(), 1);
+        assert_eq!(view.get_f64(0, &DimId::GpsTime), 1.0);
+        assert_eq!(view.get_f64(0, &DimId::NorthPositionRMS), 0.1);
+        assert_eq!(view.get_f64(0, &DimId::HeadingRMS), 0.03);
     }
 }

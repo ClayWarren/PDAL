@@ -44,10 +44,34 @@ mod tests {
     }
 
     #[test]
+    fn wraps_multiple_short_words_across_many_lines() {
+        assert_eq!(
+            word_wrap("one two three four five six seven", 9),
+            vec!["one two", "three", "four five", "six seven"]
+        );
+        assert_eq!(
+            word_wrap("north east south west", 6),
+            vec!["north", "east", "south", "west"]
+        );
+    }
+
+    #[test]
     fn preserves_long_words() {
         assert_eq!(
             word_wrap("supercalifragilistic", 5),
             vec!["supercalifragilistic"]
         );
+    }
+
+    #[test]
+    fn exact_width_words_stay_on_the_current_line() {
+        assert_eq!(word_wrap("abc def", 7), vec!["abc def"]);
+        assert_eq!(word_wrap("abc def ghi", 7), vec!["abc def", "ghi"]);
+    }
+
+    #[test]
+    fn empty_and_whitespace_text_return_no_rendered_lines() {
+        assert_eq!(word_wrap("", 10), vec![""]);
+        assert_eq!(word_wrap("   ", 1), Vec::<String>::new());
     }
 }

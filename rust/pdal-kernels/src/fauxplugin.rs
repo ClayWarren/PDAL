@@ -31,6 +31,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn spec_matches_cpp_plugin_kernel_name() {
+        let kernel = FauxPluginKernel::default();
+        let spec = kernel.spec();
+
+        assert_eq!(spec.name, "kernels.fauxplugin");
+        assert_eq!(spec.description, "Faux Plugin Kernel");
+    }
+
+    #[test]
+    fn run_without_arguments_clears_fakearg() {
+        let mut kernel = FauxPluginKernel::default();
+
+        assert_eq!(kernel.run(&KernelArgs::new(["42"])).unwrap(), 0);
+        assert_eq!(kernel.fake_arg(), Some("42"));
+        assert_eq!(kernel.run(&KernelArgs::new([] as [&str; 0])).unwrap(), 0);
+        assert_eq!(kernel.fake_arg(), None);
+    }
+
+    #[test]
     fn preserves_optional_positional_fakearg() {
         let mut kernel = FauxPluginKernel::default();
         assert_eq!(kernel.run(&KernelArgs::new(["42"])).unwrap(), 0);

@@ -35,6 +35,44 @@ impl RasterLimits {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raster_limits_and_data_round_trip_cells() {
+        let limits = RasterLimits::new(10.0, 20.0, 2, 3, 0.5);
+        assert_eq!(limits.len(), 6);
+        assert!(!limits.is_empty());
+        assert_eq!(limits.x_cell(10.75), 1);
+        assert_eq!(limits.y_cell(21.25), 2);
+        assert_eq!(limits.x_cell_pos(1), 10.75);
+        assert_eq!(limits.y_cell_pos(2), 21.25);
+
+        let mut raster = RasterData::new("density", limits.clone(), -1.0);
+        assert_eq!(raster.name(), "density");
+        assert_eq!(raster.limits(), &limits);
+        assert_eq!(raster.initializer(), -1.0);
+        assert_eq!(raster.data(), &[-1.0; 6]);
+
+        raster.set_top_down(0, 1, 7.0);
+        raster.set_cell(0, 0, 3.0);
+        assert_eq!(raster.get_cell(0, 0), 3.0);
+        assert_eq!(raster.data()[1], 7.0);
+    }
+
+    #[test]
+    fn raster_from_data_validates_shape_and_empty_limits() {
+        assert!(RasterLimits::new(0.0, 0.0, 0, 3, 1.0).is_empty());
+        assert!(RasterLimits::new(0.0, 0.0, 3, 0, 1.0).is_empty());
+
+        let limits = RasterLimits::new(0.0, 0.0, 2, 1, 1.0);
+        let raster = RasterData::from_data("id", limits.clone(), vec![1.0, 2.0], 0.0).unwrap();
+        assert_eq!(raster.data(), &[1.0, 2.0]);
+        assert!(RasterData::from_data("bad", limits, vec![1.0], 0.0).is_err());
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct RasterData {
     name: String,

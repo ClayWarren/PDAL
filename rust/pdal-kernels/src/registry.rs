@@ -147,6 +147,20 @@ mod tests {
     }
 
     #[test]
+    fn args_default_to_empty_slice() {
+        let args = KernelArgs::default();
+        assert!(args.as_slice().is_empty());
+        assert!(!args.is_help_request());
+    }
+
+    #[test]
+    fn kernel_error_displays_message() {
+        let err = KernelError::new("kernel failed");
+        assert_eq!(err.message(), "kernel failed");
+        assert_eq!(err.to_string(), "kernel failed");
+    }
+
+    #[test]
     fn registry_normalizes_names_for_lookup_and_dispatch() {
         let mut registry = KernelRegistry::new();
         registry.insert(Box::new(RecordingKernel::new())).unwrap();

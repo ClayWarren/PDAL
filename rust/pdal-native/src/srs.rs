@@ -42,3 +42,39 @@ pub fn version() -> String {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proj_version_is_available() {
+        assert!(!version().is_empty());
+    }
+
+    #[test]
+    fn identity_transform_preserves_xy() {
+        let transform = SrsTransform::new("EPSG:4326", "EPSG:4326").unwrap();
+        let mut x = -93.265;
+        let mut y = 44.9778;
+        let mut z = 250.0;
+
+        assert!(transform.transform(&mut x, &mut y, &mut z));
+        assert_eq!(x, -93.265);
+        assert_eq!(y, 44.9778);
+        assert_eq!(z, 250.0);
+    }
+
+    #[test]
+    fn identity_pipeline_preserves_xy() {
+        let transform = SrsTransform::new_pipeline("+proj=noop").unwrap();
+        let mut x = 1.5;
+        let mut y = -2.5;
+        let mut z = 3.5;
+
+        assert!(transform.transform(&mut x, &mut y, &mut z));
+        assert_eq!(x, 1.5);
+        assert_eq!(y, -2.5);
+        assert_eq!(z, 3.5);
+    }
+}

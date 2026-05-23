@@ -110,6 +110,17 @@ mod tests {
     }
 
     #[test]
+    fn plugin_kind_display_and_parse_error_are_user_visible() {
+        assert_eq!(PluginKind::Reader.to_string(), "reader");
+        assert_eq!(PluginKind::Writer.to_string(), "writer");
+        assert_eq!(PluginKind::Filter.to_string(), "filter");
+        assert_eq!(PluginKind::Kernel.to_string(), "kernel");
+
+        let err = "stage".parse::<PluginKind>().unwrap_err();
+        assert_eq!(err.to_string(), "unknown plugin kind");
+    }
+
+    #[test]
     fn plugin_info_preserves_metadata() {
         let info = PluginInfo::new(
             "readers.example",

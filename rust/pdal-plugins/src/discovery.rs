@@ -102,6 +102,29 @@ mod tests {
     }
 
     #[test]
+    fn plugin_filename_accepts_cpp_short_name_characters() {
+        assert_eq!(
+            plugin_name_from_filename(filename("filter", "with-hyphen")),
+            Some("filters.with-hyphen".to_string())
+        );
+        assert_eq!(
+            plugin_name_from_filename(filename("filter", "with_underscore")),
+            Some("filters.with_underscore".to_string())
+        );
+    }
+
+    #[test]
+    fn plugin_filename_requires_kind_name_separator() {
+        assert_eq!(
+            plugin_name_from_filename(format!(
+                "/tmp/libpdal_plugin_reader.{}",
+                dynamic_library_extension()
+            )),
+            None
+        );
+    }
+
+    #[test]
     fn plugin_filename_must_use_supported_kind() {
         assert_eq!(
             plugin_name_from_filename(filename("stage", "example")),

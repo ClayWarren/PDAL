@@ -55,3 +55,38 @@ pub(super) fn decode_base64(value: &str) -> Option<Vec<u8>> {
 
     (len == 0).then_some(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encodes_empty_and_padding_lengths() {
+        assert_eq!(encode_base64(b""), "");
+        assert_eq!(encode_base64(b"f"), "Zg==");
+        assert_eq!(encode_base64(b"fo"), "Zm8=");
+        assert_eq!(encode_base64(b"foo"), "Zm9v");
+    }
+
+    #[test]
+    fn decodes_with_whitespace_and_padding() {
+        assert_eq!(decode_base64("").unwrap(), b"");
+        assert_eq!(decode_base64(" Z g = = \n").unwrap(), b"f");
+        assert_eq!(decode_base64("Zm8=").unwrap(), b"fo");
+        assert_eq!(decode_base64("Zm9v").unwrap(), b"foo");
+    }
+
+    #[test]
+    fn rejects_invalid_or_incomplete_base64() {
+        assert_eq!(decode_base64("!"), None);
+        assert_eq!(decode_base64("Z"), None);
+        assert_eq!(decode_base64("=m9v"), None);
+        assert_eq!(decode_base64("Z=9v"), None);
+    }
+
+    #[test]
+    fn round_trips_binary_bytes() {
+        let bytes = [0, 1, 2, 253, 254, 255];
+        assert_eq!(decode_base64(&encode_base64(&bytes)).unwrap(), bytes);
+    }
+}
