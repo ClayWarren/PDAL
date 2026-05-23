@@ -441,6 +441,7 @@ COVERED: dict[str, object] = {
         "fullReadZstandard",
         "boundedRead2d",
         "boundedRead3d",
+        "resolutionLimit",
         "originReadVersion1_0_0",
         "originRead",
         "unreadableDataFailure",

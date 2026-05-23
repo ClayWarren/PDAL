@@ -138,17 +138,18 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `774 / 926` built C++ GoogleTest cases, or `83.59%`, are
+Current checkpoint: `775 / 926` built C++ GoogleTest cases, or `83.69%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit the EPT reader's corrupted-tile and bad-tile-point-count
-failure paths (`unreadableTileFailure`, `badTilePointCountLaszip`,
-`badTilePointCountBinary`) as Rust-backed since the wrapper now routes the
-non-streaming non-special-options path through Rust, route the EPT reader's
-`ignore_unreadable` non-streaming path through Rust (returning a single
-empty view when every tile is skipped), route OGR writer option validation
-(multicount/attr_dims combination and missing-`attr_dims` dimension
-messages) through the Rust C ABI, promote `pdal_polygon_test` to full Rust
-C ABI-backed parity, audit and
+gains audit the EPT reader's `resolutionLimit` and corrupted-tile and
+bad-tile-point-count failure paths (`unreadableTileFailure`,
+`badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
+the wrapper now routes the non-streaming non-special-options path through
+Rust (the `resolution` option already flows through to the Rust EPT
+reader), route the EPT reader's `ignore_unreadable` non-streaming path
+through Rust (returning a single empty view when every tile is skipped),
+route OGR writer option validation (multicount/attr_dims combination and
+missing-`attr_dims` dimension messages) through the Rust C ABI, promote
+`pdal_polygon_test` to full Rust C ABI-backed parity, audit and
 promote 10 fully verified C++ test suites (pdal_bounds_test, pdal_eigen_test, pdal_point_view_test, pdal_utils_test, pdal_stage_factory_test, pdal_plugin_manager_test, pdal_options_test, pdal_spatial_reference_test, pdal_log_test, and pdal_io_las_reader_test) to Rust C ABI backing, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
 path-based Support::diff_files and Support::diff_text_files routing,
 PointTable layout limits, LAS userView reads, metadata
@@ -362,17 +363,18 @@ Known mixed binaries:
   the Rust C ABI. Resolution, streaming, preview, and
   polygon/OGR/reprojection crops remain C++.
 - `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
-  `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`,
+  `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`, `resolutionLimit`,
   `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`,
   `unreadableDataIgnored`, `unreadableTileFailure`,
   `badTilePointCountLaszip`, `badTilePointCountBinary`, and
   `duplicateInputs` count. Local EPT point materialization, simple
-  dataset-coordinate bounds, origin selection, zstandard decompression,
-  missing-tile error handling (both fail-fast and `ignore_unreadable`),
-  corrupted-tile and hierarchy-vs-actual point-count failure detection,
-  and multi-input diamond pipelines route through the Rust C ABI.
-  Resolution, streaming, SRS-bound reprojection, polygon/OGR crops, addons,
-  preview behavior, and prepare-time bad-origin validation remain C++.
+  dataset-coordinate bounds, depth pruning by `resolution`, origin
+  selection, zstandard decompression, missing-tile error handling (both
+  fail-fast and `ignore_unreadable`), corrupted-tile and hierarchy-vs-actual
+  point-count failure detection, and multi-input diamond pipelines route
+  through the Rust C ABI. Streaming, SRS-bound reprojection, polygon/OGR
+  crops, addons, preview behavior, and prepare-time bad-origin validation
+  remain C++.
 - `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.
   Local STAC Feature/Collection traversal with direct asset reads routes through
   the Rust C ABI. Catalog/FeatureCollection preview metadata, filters, schema
