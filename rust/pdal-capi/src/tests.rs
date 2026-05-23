@@ -50,6 +50,7 @@ mod obb_abi;
 mod pipeline_metadata_abi;
 mod point_abi;
 mod segmentation_abi;
+mod point_extras_abi;
 mod utility_abi;
 mod utility_extras_abi;
 mod writer_abi;
