@@ -39,6 +39,7 @@
 
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -86,76 +87,122 @@ void verifyTestView(const PointView& view, point_count_t cnt = 17)
     }
 }
 
+constexpr int RustU8 = 0;
+constexpr int RustF32 = 8;
+constexpr int RustF64 = 9;
+
+pdal_point_view_t* makeRustTestView(point_count_t cnt = 17)
+{
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "Classification", RustU8);
+    pdal_point_layout_register_dim(layout, "X", RustF64);
+    pdal_point_layout_register_dim(layout, "Y", RustF64);
+
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    EXPECT_NE(view, nullptr);
+
+    for (PointId i = 0; i < cnt; i++)
+    {
+        EXPECT_EQ(pdal_point_view_add_point(view), i);
+        pdal_point_view_set_f64(view, i, "Classification", i + 1);
+        pdal_point_view_set_f64(view, i, "X", i * 10);
+        pdal_point_view_set_f64(view, i, "Y", i * 100);
+    }
+    EXPECT_EQ(pdal_point_view_length(view), cnt);
+    return view;
+}
+
 TEST(PointViewTest, getSet)
 {
-    PointTable table;
-    PointViewPtr view = makeTestView(table, 1);
-    verifyTestView(*view.get(), 1);
+    pdal_point_view_t* view = makeRustTestView(1);
+    uint8_t classification = 0;
+    int32_t x = 0;
+    float y = 0;
+
+    ASSERT_TRUE(
+        pdal_point_view_get_u8(view, 0, "Classification", &classification));
+    ASSERT_TRUE(pdal_point_view_get_i32(view, 0, "X", &x));
+    ASSERT_TRUE(pdal_point_view_get_f32(view, 0, "Y", &y));
+    EXPECT_EQ(classification, 1u);
+    EXPECT_EQ(x, 0);
+    EXPECT_FLOAT_EQ(y, 0.0f);
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, getAsUint8)
 {
-    PointTable table;
-    PointViewPtr view = makeTestView(table);
+    pdal_point_view_t* view = makeRustTestView();
 
-    // read the view back out
     for (int i = 0; i < 3; i++)
     {
-        uint8_t x = view->getFieldAs<uint8_t>(Dimension::Id::Classification, i);
-        uint8_t y = view->getFieldAs<uint8_t>(Dimension::Id::X, i);
-        uint8_t z = view->getFieldAs<uint8_t>(Dimension::Id::Y, i);
+        uint8_t x = 0;
+        uint8_t y = 0;
+        uint8_t z = 0;
+        ASSERT_TRUE(pdal_point_view_get_u8(view, i, "Classification", &x));
+        ASSERT_TRUE(pdal_point_view_get_u8(view, i, "X", &y));
+        ASSERT_TRUE(pdal_point_view_get_u8(view, i, "Y", &z));
 
         EXPECT_EQ(x, i + 1u);
         EXPECT_EQ(y, i * 10u);
         EXPECT_EQ(z, i * 100u);
     }
 
-    // read the view back out
     for (int i = 3; i < 17; i++)
     {
-        uint8_t x = view->getFieldAs<uint8_t>(Dimension::Id::Classification, i);
-        uint8_t y = view->getFieldAs<uint8_t>(Dimension::Id::X, i);
-        EXPECT_THROW(view->getFieldAs<uint8_t>(Dimension::Id::Y, i),
-                     pdal_error);
+        uint8_t x = 0;
+        uint8_t y = 0;
+        uint8_t z = 0;
+        ASSERT_TRUE(pdal_point_view_get_u8(view, i, "Classification", &x));
+        ASSERT_TRUE(pdal_point_view_get_u8(view, i, "X", &y));
+        EXPECT_FALSE(pdal_point_view_get_u8(view, i, "Y", &z));
         EXPECT_EQ(x, i + 1u);
         EXPECT_EQ(y, i * 10u);
     }
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, getAsInt32)
 {
-    PointTable table;
-    PointViewPtr view = makeTestView(table);
+    pdal_point_view_t* view = makeRustTestView();
 
-    // read the view back out
     for (int i = 0; i < 17; i++)
     {
-        int32_t x = view->getFieldAs<int32_t>(Dimension::Id::Classification, i);
-        int32_t y = view->getFieldAs<int32_t>(Dimension::Id::X, i);
-        int32_t z = view->getFieldAs<int32_t>(Dimension::Id::Y, i);
+        int32_t x = 0;
+        int32_t y = 0;
+        int32_t z = 0;
+        ASSERT_TRUE(pdal_point_view_get_i32(view, i, "Classification", &x));
+        ASSERT_TRUE(pdal_point_view_get_i32(view, i, "X", &y));
+        ASSERT_TRUE(pdal_point_view_get_i32(view, i, "Y", &z));
 
         EXPECT_EQ(x, i + 1);
         EXPECT_EQ(y, i * 10);
         EXPECT_EQ(z, i * 100);
     }
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, getFloat)
 {
-    PointTable table;
-    PointViewPtr view = makeTestView(table);
+    pdal_point_view_t* view = makeRustTestView();
 
-    // read the view back out
     for (int i = 0; i < 17; i++)
     {
-        float x = view->getFieldAs<float>(Dimension::Id::Classification, i);
-        float y = view->getFieldAs<float>(Dimension::Id::X, i);
-        float z = view->getFieldAs<float>(Dimension::Id::Y, i);
+        float x = 0;
+        float y = 0;
+        float z = 0;
+        ASSERT_TRUE(pdal_point_view_get_f32(view, i, "Classification", &x));
+        ASSERT_TRUE(pdal_point_view_get_f32(view, i, "X", &y));
+        ASSERT_TRUE(pdal_point_view_get_f32(view, i, "Y", &z));
 
         EXPECT_FLOAT_EQ(x, i + 1.0f);
         EXPECT_FLOAT_EQ(y, i * 10.0f);
         EXPECT_FLOAT_EQ(z, i * 100.0f);
     }
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, calculateBounds)
@@ -282,9 +329,9 @@ TEST(PointViewTest, bigfile)
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
     {
         PointId y = distribution(generator);
-        PointId temp = std::move(ids[idx]);
-        ids[idx] = std::move(ids[y]);
-        ids[y] = std::move(temp);
+        PointId temp = ids[idx];
+        ids[idx] = ids[y];
+        ids[y] = temp;
     }
 
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
@@ -358,13 +405,20 @@ TEST(PointViewTest, issue1264)
 
 TEST(PointViewTest, getFloatNan)
 {
-    PointTable table;
-    PointLayoutPtr layout(table.layout());
-    layout->registerDim(Dimension::Id::ScanAngleRank, Dimension::Type::Float);
-    PointViewPtr view(new PointView(table));
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "ScanAngleRank", RustF32);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    ASSERT_NE(view, nullptr);
+
     const float scanAngleRank = std::numeric_limits<float>::quiet_NaN();
-    view->setField(Dimension::Id::ScanAngleRank, 0, scanAngleRank);
-    EXPECT_NO_THROW(view->getFieldAs<float>(Dimension::Id::ScanAngleRank, 0));
+    EXPECT_EQ(pdal_point_view_add_point(view), 0u);
+    pdal_point_view_set_f64(view, 0, "ScanAngleRank", scanAngleRank);
+
+    float value = 0.0f;
+    ASSERT_TRUE(pdal_point_view_get_f32(view, 0, "ScanAngleRank", &value));
+    EXPECT_TRUE(std::isnan(value));
+
+    pdal_point_view_destroy(view);
 }
 
 // Per discussions with @abellgithub

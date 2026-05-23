@@ -337,6 +337,12 @@ extern "C"
                                  const char* dim_name, double val);
     double pdal_point_view_get_f64(pdal_point_view_t* view, uint64_t idx,
                                    const char* dim_name);
+    bool pdal_point_view_get_u8(pdal_point_view_t* view, uint64_t idx,
+                                const char* dim_name, uint8_t* out);
+    bool pdal_point_view_get_i32(pdal_point_view_t* view, uint64_t idx,
+                                 const char* dim_name, int32_t* out);
+    bool pdal_point_view_get_f32(pdal_point_view_t* view, uint64_t idx,
+                                 const char* dim_name, float* out);
     uint64_t pdal_point_view_dim_count(const pdal_point_view_t* view);
     char* pdal_point_view_dim_name(const pdal_point_view_t* view, uint64_t idx);
     int pdal_point_view_dim_type(const pdal_point_view_t* view, uint64_t idx);

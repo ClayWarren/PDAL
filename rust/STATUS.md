@@ -139,14 +139,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `737 / 926` built C++ GoogleTest cases, or `79.59%`, are
+Current checkpoint: `742 / 926` built C++ GoogleTest cases, or `80.13%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route the default spatial-reference contract, basic point storage, and
-option JSON canonicalization through the Rust C ABI, route EPT reader `inspect`
-(no-spatial-filter preview) through a new Rust C ABI that reads `ept.json` and
-expands LASzip class-flag dims to match `EptInfo`, audit the EPT reader's
-`resolutionLimit` and corrupted-tile and bad-tile-point-count failure paths
-(`unreadableTileFailure`,
+gains route typed point-view reads, the default spatial-reference contract,
+basic point storage, and option JSON canonicalization through the Rust C ABI,
+route EPT reader `inspect` (no-spatial-filter preview) through a new Rust C ABI
+that reads `ept.json` and expands LASzip class-flag dims to match `EptInfo`,
+audit the EPT reader's `resolutionLimit` and corrupted-tile and
+bad-tile-point-count failure paths (`unreadableTileFailure`,
 `badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
 the wrapper now routes the non-streaming non-special-options path through
 Rust (the `resolution` option already flows through to the Rust EPT
@@ -217,8 +217,10 @@ Known mixed binaries:
 - `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, and
   `wgs84FromZone` count. Most SRS normalization, authority lookup,
   WKT/PROJJSON, and LAS SRS behavior remains C++ GDAL/OGR-backed.
-- `pdal_point_view_test`: only `calculateBounds` counts. The broader point
-  view/table data model is still C++.
+- `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
+  `calculateBounds`, and `getFloatNan` count. PointRef swapping, million-point
+  random-access stress, view ordering, and C++ debug death-test behavior remain
+  C++.
 - `pdal_eigen_test`: `calcBounds`, `ComputeValues`, `Morphological`,
   `computeCentroid`, and `demeanTest` count. The remaining Eigen fixture cases
   still exercise C++ matrix behavior.

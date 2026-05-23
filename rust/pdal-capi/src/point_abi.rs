@@ -268,6 +268,60 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_u8(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    out: *mut u8,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    let value = pdal_point_view_get_f64(view, idx, dim_name);
+    if !value.is_finite() || value < u8::MIN as f64 || value > u8::MAX as f64 {
+        return false;
+    }
+    *out = value as u8;
+    true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_i32(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    out: *mut i32,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    let value = pdal_point_view_get_f64(view, idx, dim_name);
+    if !value.is_finite() || value < i32::MIN as f64 || value > i32::MAX as f64 {
+        return false;
+    }
+    *out = value as i32;
+    true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_f32(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    out: *mut f32,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    let value = pdal_point_view_get_f64(view, idx, dim_name);
+    if value.is_finite() && value.abs() > f32::MAX as f64 {
+        return false;
+    }
+    *out = value as f32;
+    true
+}
+
 /// Return the number of dimensions in the view layout.
 ///
 /// # Safety

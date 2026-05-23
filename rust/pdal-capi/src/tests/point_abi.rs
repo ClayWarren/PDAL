@@ -48,6 +48,67 @@ fn point_view_exposes_layout_dimensions() {
 }
 
 #[test]
+fn point_view_typed_getters_match_pdal_cast_contract() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let classification = CString::new("Classification").unwrap();
+        let x = CString::new("X").unwrap();
+        let y = CString::new("Y").unwrap();
+        pdal_point_layout_register_dim(layout, classification.as_ptr(), 0);
+        pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        pdal_point_layout_register_dim(layout, y.as_ptr(), 9);
+        let view = pdal_point_view_create(layout);
+
+        let point = pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, point, classification.as_ptr(), 7.0);
+        pdal_point_view_set_f64(view, point, x.as_ptr(), 1234.0);
+        pdal_point_view_set_f64(view, point, y.as_ptr(), 300.0);
+
+        let mut out_u8 = 0;
+        assert!(pdal_point_view_get_u8(
+            view,
+            point,
+            classification.as_ptr(),
+            &mut out_u8
+        ));
+        assert_eq!(out_u8, 7);
+        assert!(!pdal_point_view_get_u8(
+            view,
+            point,
+            y.as_ptr(),
+            &mut out_u8
+        ));
+
+        let mut out_i32 = 0;
+        assert!(pdal_point_view_get_i32(
+            view,
+            point,
+            x.as_ptr(),
+            &mut out_i32
+        ));
+        assert_eq!(out_i32, 1234);
+
+        let mut out_f32 = 0.0;
+        assert!(pdal_point_view_get_f32(
+            view,
+            point,
+            y.as_ptr(),
+            &mut out_f32
+        ));
+        assert_eq!(out_f32, 300.0);
+
+        assert!(!pdal_point_view_get_f32(
+            view,
+            point,
+            y.as_ptr(),
+            std::ptr::null_mut()
+        ));
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
 fn point_view_bounds_roundtrip_through_c_abi() {
     unsafe {
         let layout = pdal_point_layout_create();
