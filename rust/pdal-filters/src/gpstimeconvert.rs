@@ -409,4 +409,64 @@ mod tests {
         let out = to_gst.run(std::slice::from_ref(&input)).unwrap().remove(0);
         assert_eq!(out.get_f64(0, &DimId::GpsTime), 100.0);
     }
+
+    #[test]
+    fn validate_time_type_accepts_known_and_rejects_unknown() {
+        for v in ["gt", "gst", "gws", "gds"] {
+            assert!(validate_time_type(v).is_ok());
+        }
+        assert!(validate_time_type("mystery").is_err());
+        assert!(validate_time_type("").is_err());
+    }
+
+    #[test]
+    fn parse_date_handles_valid_and_invalid_inputs() {
+        let d = parse_date("2020-01-08").unwrap();
+        assert_eq!(d.year, 2020);
+        assert_eq!(d.month, 1);
+        assert_eq!(d.day, 8);
+
+        assert!(parse_date("").is_err());
+        assert!(parse_date("not-a-date").is_err());
+        assert!(parse_date("2020/01/08").is_err());
+        assert!(parse_date("yyyy-mm-dd").is_err());
+    }
+
+    #[test]
+    fn from_options_rejects_bad_input_time() {
+        let result =
+            GpsTimeConvert::from_options(&options(&[("in_time", "mystery"), ("out_time", "gt")]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_options_rejects_bad_output_time() {
+        let result =
+            GpsTimeConvert::from_options(&options(&[("in_time", "gt"), ("out_time", "mystery")]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_options_rejects_bad_conversion() {
+        let result =
+            GpsTimeConvert::from_options(&options(&[("conversion", "not-real-conversion")]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_options_handles_explicit_conversions() {
+        for conv in ["gws2gt", "gt2gws", "gds2gt", "gt2gds", "gws2gds", "gds2gws"] {
+            let opts = options(&[("conversion", conv), ("start_date", "2020-01-08")]);
+            assert!(GpsTimeConvert::from_options(&opts).is_ok(), "{conv}");
+        }
+    }
+
+    #[test]
+    fn converts_day_seconds_to_gps_time_from_start_date() {
+        let options = options(&[("conversion", "gds2gt"), ("start_date", "2020-01-08")]);
+        let mut filter = GpsTimeConvert::from_options(&options).unwrap();
+        let input = gps_view(&[5.0]);
+        let out = filter.run(std::slice::from_ref(&input)).unwrap().remove(0);
+        assert!(out.get_f64(0, &DimId::GpsTime) > 0.0);
+    }
 }

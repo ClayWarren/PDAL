@@ -429,4 +429,65 @@ mod tests {
         assert_eq!(filter.summaries.get("X").unwrap().cnt, 0);
         assert_eq!(filter.summaries.get("Classification").unwrap().cnt, 0);
     }
+
+    #[test]
+    fn summary_empty_variance_and_skew_kurt_zero() {
+        let summary = Summary::new("X".to_string(), 0, true);
+        assert_eq!(summary.variance(), 0.0);
+        assert_eq!(summary.stddev(), 0.0);
+        assert_eq!(summary.skewness(), 0.0);
+        assert_eq!(summary.kurtosis(), 0.0);
+    }
+
+    #[test]
+    fn summary_skew_and_kurt_zero_without_advanced() {
+        let mut summary = Summary::new("X".to_string(), 0, false);
+        for v in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            summary.insert(v);
+        }
+        assert_eq!(summary.skewness(), 0.0);
+        assert_eq!(summary.kurtosis(), 0.0);
+    }
+
+    #[test]
+    fn summary_merge_rejects_incompatible_summaries() {
+        let mut a = Summary::new("alpha".to_string(), 0, true);
+        let b = Summary::new("beta".to_string(), 0, true);
+        assert!(!a.merge(&b));
+
+        let mut c = Summary::new("alpha".to_string(), 0, true);
+        let d = Summary::new("alpha".to_string(), 0, false);
+        assert!(!c.merge(&d));
+
+        let mut e = Summary::new("alpha".to_string(), 1, true);
+        let f = Summary::new("alpha".to_string(), 2, true);
+        assert!(!e.merge(&f));
+    }
+
+    #[test]
+    fn summary_merge_handles_zero_count_sides() {
+        let mut a = Summary::new("x".to_string(), 0, false);
+        let mut b = Summary::new("x".to_string(), 0, false);
+        for v in [1.0, 2.0, 3.0] {
+            b.insert(v);
+        }
+        assert!(a.merge(&b));
+        assert_eq!(a.cnt, 3);
+
+        let mut empty = Summary::new("x".to_string(), 0, false);
+        assert!(a.merge(&empty));
+        assert_eq!(a.cnt, 3);
+
+        // Other path: zero-count `b` doesn't change a
+        empty = Summary::new("x".to_string(), 0, false);
+        let _ = a.merge(&empty);
+    }
+
+    #[test]
+    fn summary_compute_global_stats_empty_does_nothing() {
+        let mut s = Summary::new("x".to_string(), 0, false);
+        s.compute_global_stats();
+        assert_eq!(s.median, 0.0);
+        assert_eq!(s.mad, 0.0);
+    }
 }
