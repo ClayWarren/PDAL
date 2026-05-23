@@ -72,6 +72,7 @@ extern "C"
     char* pdal_utils_split_char(const char* value, char split);
     char* pdal_utils_split2_char(const char* value, char split);
     char* pdal_utils_escape_json(const char* value);
+    char* pdal_utils_canonical_json(const char* value);
     char* pdal_utils_escape_nonprinting(const char* value);
     double pdal_utils_normalize_longitude(double longitude);
     char* pdal_utils_word_wrap(const char* value, uint64_t line_length,

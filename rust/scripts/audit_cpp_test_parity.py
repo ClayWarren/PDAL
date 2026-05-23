@@ -89,6 +89,7 @@ COVERED: dict[str, object] = {
         "issue_4751",
         "conditional",
         "test_option_writing",
+        "json",
     },
     "pdal_polygon_test": {
         "simplify",

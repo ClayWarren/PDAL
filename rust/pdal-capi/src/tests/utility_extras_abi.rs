@@ -64,6 +64,20 @@ fn utils_to_string_roundtrips_numbers() {
 }
 
 #[test]
+fn utils_canonical_json_roundtrips_json_values() {
+    unsafe {
+        let object = take_string(pdal_utils_canonical_json(cstring("{\"key\":42}").as_ptr()));
+        assert_eq!(object, "{\"key\":42}");
+
+        let array = take_string(pdal_utils_canonical_json(cstring("[1, true]").as_ptr()));
+        assert_eq!(array, "[1,true]");
+
+        assert!(pdal_utils_canonical_json(cstring("{not json").as_ptr()).is_null());
+        assert!(pdal_utils_canonical_json(std::ptr::null()).is_null());
+    }
+}
+
+#[test]
 fn utils_numeric_casts_round_trip_and_reject_null_out() {
     unsafe {
         let mut out_f64: f64 = 0.0;

@@ -135,6 +135,22 @@ pub unsafe extern "C" fn pdal_utils_escape_json(value: *const c_char) -> *mut c_
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn pdal_utils_canonical_json(value: *const c_char) -> *mut c_char {
+    if value.is_null() {
+        return ptr::null_mut();
+    }
+    match serde_json::from_str::<serde_json::Value>(&c_string(value))
+        .and_then(|json| serde_json::to_string(&json))
+    {
+        Ok(json) => string_to_c(json),
+        Err(message) => {
+            crate::error::set_last_error(message.to_string());
+            ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn pdal_utils_escape_nonprinting(value: *const c_char) -> *mut c_char {
     bytes_to_c(escape_nonprinting_bytes(&c_bytes(value)))
 }

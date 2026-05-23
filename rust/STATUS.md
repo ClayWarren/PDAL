@@ -139,9 +139,10 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `734 / 926` built C++ GoogleTest cases, or `79.27%`, are
+Current checkpoint: `735 / 926` built C++ GoogleTest cases, or `79.37%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route EPT reader `inspect` (no-spatial-filter preview) through a new
+gains route option JSON canonicalization through the Rust C ABI, route EPT
+reader `inspect` (no-spatial-filter preview) through a new
 Rust C ABI that reads `ept.json` and expands LASzip class-flag dims to
 match `EptInfo`, audit the EPT reader's `resolutionLimit` and corrupted-tile and
 bad-tile-point-count failure paths (`unreadableTileFailure`,

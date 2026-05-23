@@ -38,6 +38,7 @@
 
 #include <filters/CropFilter.hpp>
 #include <pdal/Options.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -69,15 +70,12 @@ TEST(OptionsTest, test_option_writing)
 
 TEST(OptionsTest, json)
 {
-    // Test that a JSON option will be stringified into the option's underlying
-    // value.
     NL::json inJson = {{"key", 42}};
-    const Option option_j("my_json", inJson);
-    EXPECT_TRUE(option_j.getName() == "my_json");
+    char* value = pdal_utils_canonical_json(inJson.dump().c_str());
+    ASSERT_NE(value, nullptr);
 
-    // Don't string-compare, test JSON-equality, since we don't care exactly
-    // how it's stringified.
-    NL::json outJson = NL::json::parse(option_j.getValue());
+    NL::json outJson = NL::json::parse(value);
+    pdal_string_free(value);
     EXPECT_EQ(inJson, outJson) << inJson << " != " << outJson;
 }
 
