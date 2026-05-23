@@ -863,6 +863,7 @@ dependencies = [
  "pdal-io",
  "pdal-native",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

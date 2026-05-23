@@ -15,3 +15,6 @@ pdal-io = { path = "../pdal-io" }
 pdal-native = { path = "../pdal-native" }
 serde_json = "1"
 glob = "0.3"
+
+[dev-dependencies]
+tempfile = "3.27.0"
