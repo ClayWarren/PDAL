@@ -138,9 +138,11 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `775 / 926` built C++ GoogleTest cases, or `83.69%`, are
+Current checkpoint: `776 / 926` built C++ GoogleTest cases, or `83.80%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains audit the EPT reader's `resolutionLimit` and corrupted-tile and
+gains route EPT reader `inspect` (no-spatial-filter preview) through a new
+Rust C ABI that reads `ept.json` and expands LASzip class-flag dims to
+match `EptInfo`, audit the EPT reader's `resolutionLimit` and corrupted-tile and
 bad-tile-point-count failure paths (`unreadableTileFailure`,
 `badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
 the wrapper now routes the non-streaming non-special-options path through
@@ -362,7 +364,7 @@ Known mixed binaries:
   dataset-coordinate bounds, and multi-input diamond pipelines route through
   the Rust C ABI. Resolution, streaming, preview, and
   polygon/OGR/reprojection crops remain C++.
-- `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
+- `pdal_io_ept_reader_test`: `inspect`, `fullReadLaszip`, `fullReadBinary`,
   `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`, `resolutionLimit`,
   `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`,
   `unreadableDataIgnored`, `unreadableTileFailure`,
@@ -371,10 +373,11 @@ Known mixed binaries:
   dataset-coordinate bounds, depth pruning by `resolution`, origin
   selection, zstandard decompression, missing-tile error handling (both
   fail-fast and `ignore_unreadable`), corrupted-tile and hierarchy-vs-actual
-  point-count failure detection, and multi-input diamond pipelines route
-  through the Rust C ABI. Streaming, SRS-bound reprojection, polygon/OGR
-  crops, addons, preview behavior, and prepare-time bad-origin validation
-  remain C++.
+  point-count failure detection, no-spatial-filter preview (bounds, point
+  count, srs, dim names with laszip class-flag expansion), and multi-input
+  diamond pipelines route through the Rust C ABI. Streaming, SRS-bound
+  reprojection, polygon/OGR crops, addons, spatial-filter preview, and
+  prepare-time bad-origin validation remain C++.
 - `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.
   Local STAC Feature/Collection traversal with direct asset reads routes through
   the Rust C ABI. Catalog/FeatureCollection preview metadata, filters, schema

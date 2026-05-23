@@ -504,6 +504,42 @@ QuickInfo EptReader::inspect()
 
     initialize();
 
+    // Without a spatial filter the preview is just the ept.json metadata.
+    // Route that path through Rust so the C++ EptInfo lookup is not the
+    // sole source of truth for boundsConforming/points/dim-name expansion.
+    if (!m_p->hasSpatialFilter() && !Utils::isRemote(m_filename))
+    {
+        pdal_ept_reader_preview_t* preview =
+            pdal_ept_reader_preview_create(m_filename.c_str());
+        if (preview)
+        {
+            double minx, miny, minz, maxx, maxy, maxz;
+            pdal_ept_reader_preview_bounds(preview, &minx, &miny, &minz,
+                                           &maxx, &maxy, &maxz);
+            qi.m_bounds = BOX3D(minx, miny, minz, maxx, maxy, maxz);
+            qi.m_pointCount = pdal_ept_reader_preview_point_count(preview);
+            char* srsWkt = pdal_ept_reader_preview_srs_wkt(preview);
+            qi.m_srs = SpatialReference(srsWkt ? srsWkt : "");
+            pdal_string_free(srsWkt);
+
+            uint64_t dimCount = pdal_ept_reader_preview_dim_count(preview);
+            qi.m_dimNames.reserve(dimCount);
+            for (uint64_t i = 0; i < dimCount; ++i)
+            {
+                char* name = pdal_ept_reader_preview_dim_name(preview, i);
+                if (name)
+                {
+                    qi.m_dimNames.emplace_back(name);
+                    pdal_string_free(name);
+                }
+            }
+            pdal_ept_reader_preview_destroy(preview);
+            qi.m_valid = true;
+            return qi;
+        }
+        // Fall through to the C++ path if Rust preview failed.
+    }
+
     qi.m_bounds = m_p->info->boundsConforming();
     qi.m_srs = m_p->info->srs();
     qi.m_pointCount = m_p->info->points();

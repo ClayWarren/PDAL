@@ -175,6 +175,100 @@ impl Reader for EptReader {
     }
 }
 
+/// Header-only EPT preview info, mirroring the fields that the C++
+/// `EptReader::inspect` path needs to populate a `QuickInfo`.
+pub struct EptPreview {
+    pub bounds_conforming: Bounds3D,
+    pub point_count: u64,
+    pub srs_wkt: String,
+    pub dim_names: Vec<String>,
+}
+
+/// Read EPT preview metadata from the `ept.json` at `filename`. Mirrors the
+/// dim-name expansion in `EptInfo::initialize` so laszip and `ClassFlags`
+/// datasets include the Withheld/KeyPoint/Synthetic/Overlap flags.
+pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
+    if filename.is_empty() {
+        return Err(StageError(
+            "EptReader requires a filename option.".to_string(),
+        ));
+    }
+    let path = Path::new(filename);
+    let info = read_json(path)?;
+
+    let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
+    let point_count = info["points"].as_u64().ok_or_else(|| {
+        StageError(format!(
+            "EPT file '{}' is missing points.",
+            path.display()
+        ))
+    })?;
+    let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
+
+    let data_type = info["dataType"].as_str().ok_or_else(|| {
+        StageError(format!(
+            "EPT file '{}' is missing dataType.",
+            path.display()
+        ))
+    })?;
+
+    let schema = info["schema"].as_array().ok_or_else(|| {
+        StageError(format!(
+            "EPT file '{}' is missing schema.",
+            path.display()
+        ))
+    })?;
+
+    let mut dim_names: Vec<String> = Vec::new();
+    let mut saw_class_flags = false;
+    for entry in schema {
+        let name = entry["name"].as_str().ok_or_else(|| {
+            StageError(format!(
+                "EPT file '{}' schema entry missing name.",
+                path.display()
+            ))
+        })?;
+        if name.eq_ignore_ascii_case("ClassFlags") {
+            saw_class_flags = true;
+            continue;
+        }
+        dim_names.push(name.to_string());
+    }
+    if data_type == "laszip" || saw_class_flags {
+        for flag in ["Withheld", "Overlap", "Synthetic", "KeyPoint"] {
+            if !dim_names.iter().any(|n| n == flag) {
+                dim_names.push(flag.to_string());
+            }
+        }
+    }
+
+    Ok(EptPreview {
+        bounds_conforming,
+        point_count,
+        srs_wkt,
+        dim_names,
+    })
+}
+
+fn ept_bounds_field(info: &Value, field: &str) -> Result<Bounds3D, StageError> {
+    let bounds = info[field].as_array().ok_or_else(|| {
+        StageError(format!("EPT file is missing {field}."))
+    })?;
+    if bounds.len() < 6 {
+        return Err(StageError(format!(
+            "EPT {field} must contain six coordinates."
+        )));
+    }
+    Ok(Bounds3D {
+        minx: ept_bound_value(bounds, 0, "min X")?,
+        miny: ept_bound_value(bounds, 1, "min Y")?,
+        minz: ept_bound_value(bounds, 2, "min Z")?,
+        maxx: ept_bound_value(bounds, 3, "max X")?,
+        maxy: ept_bound_value(bounds, 4, "max Y")?,
+        maxz: ept_bound_value(bounds, 5, "max Z")?,
+    })
+}
+
 impl EptReader {
     fn bounds_filter(&self) -> Result<Option<QueryBounds>, StageError> {
         if self.bounds.is_empty() {
@@ -949,5 +1043,59 @@ mod tests {
         let mut reader = EptReader::new(&options);
 
         assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn preview_returns_bounds_conforming_and_expanded_flags_for_laszip() {
+        let path = data_path("ept/lone-star-laszip/ept.json")
+            .to_string_lossy()
+            .into_owned();
+        let preview = read_ept_preview(&path).unwrap();
+
+        assert_eq!(preview.point_count, 518862);
+        assert_eq!(preview.bounds_conforming.minx, 515368.0);
+        assert_eq!(preview.bounds_conforming.miny, 4918340.0);
+        assert_eq!(preview.bounds_conforming.minz, 2322.0);
+        assert_eq!(preview.bounds_conforming.maxx, 515402.0);
+        assert_eq!(preview.bounds_conforming.maxy, 4918382.0);
+        assert_eq!(preview.bounds_conforming.maxz, 2339.0);
+
+        let mut names = preview.dim_names.clone();
+        names.sort();
+        let mut expected: Vec<String> = vec![
+            "Classification",
+            "EdgeOfFlightLine",
+            "GpsTime",
+            "Intensity",
+            "KeyPoint",
+            "NumberOfReturns",
+            "OriginId",
+            "Overlap",
+            "PointSourceId",
+            "ReturnNumber",
+            "ScanAngleRank",
+            "ScanDirectionFlag",
+            "Synthetic",
+            "UserData",
+            "Withheld",
+            "X",
+            "Y",
+            "Z",
+        ]
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+        expected.sort();
+        assert_eq!(names, expected);
+        assert!(preview.srs_wkt.contains("NAD83 / UTM zone 12N"));
+    }
+
+    #[test]
+    fn preview_for_binary_does_not_inject_class_flags() {
+        let path = data_path("ept/ellipsoid-binary/ept.json")
+            .to_string_lossy()
+            .into_owned();
+        let preview = read_ept_preview(&path).unwrap();
+        assert!(!preview.dim_names.iter().any(|n| n == "Withheld"));
     }
 }

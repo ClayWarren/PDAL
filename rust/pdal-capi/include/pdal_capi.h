@@ -950,6 +950,19 @@ extern "C"
     pdal_writer_t* pdal_writer_create_las(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_laz(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_spz(const pdal_options_t* ops);
+    // EPT reader preview (header-only metadata): bounds_conforming, point
+    // count, srs wkt, dim names. Returns null on error; call pdal_last_error.
+    typedef struct pdal_ept_reader_preview_t pdal_ept_reader_preview_t;
+    pdal_ept_reader_preview_t* pdal_ept_reader_preview_create(const char* filename);
+    uint64_t pdal_ept_reader_preview_point_count(const pdal_ept_reader_preview_t* handle);
+    bool pdal_ept_reader_preview_bounds(const pdal_ept_reader_preview_t* handle,
+                                        double* out_minx, double* out_miny, double* out_minz,
+                                        double* out_maxx, double* out_maxy, double* out_maxz);
+    char* pdal_ept_reader_preview_srs_wkt(const pdal_ept_reader_preview_t* handle);
+    uint64_t pdal_ept_reader_preview_dim_count(const pdal_ept_reader_preview_t* handle);
+    char* pdal_ept_reader_preview_dim_name(const pdal_ept_reader_preview_t* handle, uint64_t index);
+    void pdal_ept_reader_preview_destroy(pdal_ept_reader_preview_t* handle);
+
     pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);
     // OGR writer option validation. Returns null on success, otherwise an
     // owned heap string with the unprefixed error message. Caller frees with

@@ -436,6 +436,7 @@ COVERED: dict[str, object] = {
         "multipleInputs",
     },
     "pdal_io_ept_reader_test": {
+        "inspect",
         "fullReadLaszip",
         "fullReadBinary",
         "fullReadZstandard",

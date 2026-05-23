@@ -818,6 +818,145 @@ pub unsafe extern "C" fn pdal_writer_create_ogr(ops: *const Options) -> *mut Wri
     }
 }
 
+/// Opaque handle holding the result of a Rust EPT reader preview.
+pub struct EptReaderPreviewHandle {
+    pub(crate) preview: pdal_io::ept::EptPreview,
+}
+
+/// Read EPT preview metadata (boundsConforming, point count, srs wkt, dim
+/// names) from a local `ept.json` file. Returns null on error; call
+/// `pdal_last_error` for the message. Caller frees with
+/// `pdal_ept_reader_preview_destroy`.
+///
+/// # Safety
+/// `filename` must be a valid NUL-terminated C string pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_create(
+    filename: *const c_char,
+) -> *mut EptReaderPreviewHandle {
+    if filename.is_null() {
+        set_last_error("null filename");
+        return std::ptr::null_mut();
+    }
+    let Ok(filename) = CStr::from_ptr(filename).to_str() else {
+        set_last_error("non-UTF8 filename");
+        return std::ptr::null_mut();
+    };
+    match pdal_io::ept::read_ept_preview(filename) {
+        Ok(preview) => {
+            clear_last_error();
+            Box::into_raw(Box::new(EptReaderPreviewHandle { preview }))
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Get the preview's point count.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_point_count(
+    handle: *const EptReaderPreviewHandle,
+) -> u64 {
+    handle.as_ref().map_or(0, |h| h.preview.point_count)
+}
+
+/// Get the preview's bounds_conforming. Writes into `out` and returns true
+/// on success.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`. `out` must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_bounds(
+    handle: *const EptReaderPreviewHandle,
+    out_minx: *mut f64,
+    out_miny: *mut f64,
+    out_minz: *mut f64,
+    out_maxx: *mut f64,
+    out_maxy: *mut f64,
+    out_maxz: *mut f64,
+) -> bool {
+    let Some(handle) = handle.as_ref() else {
+        return false;
+    };
+    let b = &handle.preview.bounds_conforming;
+    *out_minx = b.minx;
+    *out_miny = b.miny;
+    *out_minz = b.minz;
+    *out_maxx = b.maxx;
+    *out_maxy = b.maxy;
+    *out_maxz = b.maxz;
+    true
+}
+
+/// Get the preview's SRS WKT string. Returns an owned C string (possibly
+/// empty). Caller frees with `pdal_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_srs_wkt(
+    handle: *const EptReaderPreviewHandle,
+) -> *mut c_char {
+    let Some(handle) = handle.as_ref() else {
+        return std::ptr::null_mut();
+    };
+    string_to_c_ptr(handle.preview.srs_wkt.clone())
+}
+
+/// Get the number of dim names.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_dim_count(
+    handle: *const EptReaderPreviewHandle,
+) -> u64 {
+    handle
+        .as_ref()
+        .map_or(0, |h| h.preview.dim_names.len() as u64)
+}
+
+/// Get a dim name by index. Returns an owned C string or null when the index
+/// is out of range. Caller frees with `pdal_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_dim_name(
+    handle: *const EptReaderPreviewHandle,
+    index: u64,
+) -> *mut c_char {
+    let Some(handle) = handle.as_ref() else {
+        return std::ptr::null_mut();
+    };
+    let Some(name) = handle.preview.dim_names.get(index as usize) else {
+        return std::ptr::null_mut();
+    };
+    string_to_c_ptr(name.clone())
+}
+
+/// Destroy an EPT preview handle.
+///
+/// # Safety
+/// `handle` must be a valid pointer returned by
+/// `pdal_ept_reader_preview_create`, or null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_destroy(handle: *mut EptReaderPreviewHandle) {
+    if !handle.is_null() {
+        drop(Box::from_raw(handle));
+    }
+}
+
 /// Validate the OGR writer multicount/attr_dims combination on behalf of the
 /// C++ wrapper. Returns null on success, otherwise an owned C string carrying
 /// the unprefixed error message. Caller frees with `pdal_string_free`.
