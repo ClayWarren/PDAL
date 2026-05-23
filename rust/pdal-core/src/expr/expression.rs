@@ -306,4 +306,87 @@ mod tests {
         assert!(AssignStatement::parse("Classification 2").is_err());
         assert!(AssignStatement::parse("Classification = 2 garbage").is_err());
     }
+
+    fn point_with_classification(cls: f64) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Classification, crate::point::DimType::U8);
+        let mut view = PointView::new(std::rc::Rc::new(layout));
+        let p = view.add_point();
+        view.set_f64(p, &DimId::Classification, cls);
+        view
+    }
+
+    #[test]
+    fn conditional_expression_valid_and_print() {
+        let expr = ConditionalExpression::parse("Classification == 2").unwrap();
+        assert!(expr.valid());
+        assert!(!expr.print().is_empty());
+    }
+
+    #[test]
+    fn conditional_expression_empty_evaluates_true() {
+        let expr = ConditionalExpression::default();
+        let view = point_with_classification(0.0);
+        assert!(expr.eval(&view, 0));
+    }
+
+    #[test]
+    fn conditional_expression_prepare_rejects_value() {
+        let mut expr = ConditionalExpression::parse("Classification").unwrap();
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Classification, crate::point::DimType::U8);
+        assert!(expr.prepare(&layout).is_err());
+    }
+
+    #[test]
+    fn conditional_expression_prepare_rejects_always_true() {
+        let mut expr = ConditionalExpression::parse("1 == 1").unwrap();
+        let layout = PointLayout::new();
+        assert!(expr.prepare(&layout).is_err());
+    }
+
+    #[test]
+    fn conditional_expression_prepare_rejects_always_false() {
+        let mut expr = ConditionalExpression::parse("1 == 2").unwrap();
+        let layout = PointLayout::new();
+        assert!(expr.prepare(&layout).is_err());
+    }
+
+    #[test]
+    fn math_expression_valid_print_eval() {
+        let mut expr = MathExpression::parse("1 + 2").unwrap();
+        assert!(expr.valid());
+        assert!(!expr.print().is_empty());
+        let layout = PointLayout::new();
+        expr.prepare(&layout).unwrap();
+        let view = point_with_classification(0.0);
+        assert_eq!(expr.eval(&view, 0), 3.0);
+    }
+
+    #[test]
+    fn math_expression_default_eval_is_zero() {
+        let expr = MathExpression::default();
+        let view = point_with_classification(0.0);
+        assert_eq!(expr.eval(&view, 0), 0.0);
+    }
+
+    #[test]
+    fn math_expression_parse_rejects_boolean_text() {
+        assert!(MathExpression::parse("Classification > 0").is_err());
+    }
+
+    #[test]
+    fn ident_expression_default_is_empty() {
+        let expr = IdentExpression::default();
+        assert!(!expr.valid());
+        assert!(expr.name().is_empty());
+        assert!(expr.dim().is_none());
+    }
+
+    #[test]
+    fn ident_expression_prepare_empty_errors() {
+        let mut expr = IdentExpression::default();
+        let layout = PointLayout::new();
+        assert!(expr.prepare(&layout).is_err());
+    }
 }

@@ -324,3 +324,82 @@ fn named_meshes_match_point_view_lookup_contract() {
     assert_eq!(view.mesh().unwrap().triangles()[0].a, 0);
     assert!(view.mesh_named("missing").is_none());
 }
+
+#[test]
+fn dim_id_name_covers_all_variants() {
+    let variants = [
+        DimId::X, DimId::Y, DimId::Z, DimId::Intensity, DimId::OffsetTime,
+        DimId::Classification, DimId::ClusterID, DimId::HeightAboveGround,
+        DimId::LocalOutlierFactor, DimId::LocalReachabilityDistance,
+        DimId::RadialDensity, DimId::NNDistance, DimId::Reciprocity,
+        DimId::Rank, DimId::Coplanar, DimId::PlaneFit,
+        DimId::Eigenvalue0, DimId::Eigenvalue1, DimId::Eigenvalue2,
+        DimId::OptimalKNN, DimId::OptimalRadius, DimId::H3,
+        DimId::GpsTime, DimId::W, DimId::TextureU, DimId::TextureV, DimId::TextureW,
+        DimId::NormalX, DimId::NormalY, DimId::NormalZ,
+        DimId::Dimension, DimId::StartPulse, DimId::ReflectedPulse,
+        DimId::Azimuth, DimId::Pitch, DimId::Roll, DimId::Pdop,
+        DimId::PulseWidth, DimId::PassiveSignal,
+        DimId::PassiveX, DimId::PassiveY, DimId::PassiveZ,
+        DimId::ReturnNumber, DimId::NumberOfReturns,
+        DimId::ScanDirectionFlag, DimId::EdgeOfFlightLine,
+        DimId::Synthetic, DimId::KeyPoint, DimId::Withheld, DimId::Overlap,
+        DimId::ScanAngleRank, DimId::PointSourceId, DimId::UserData,
+        DimId::EchoRange, DimId::EchoNorm, DimId::EchoPos,
+        DimId::Image, DimId::Reflectance, DimId::Deviation, DimId::Reliability,
+        DimId::Amplitude, DimId::Red, DimId::Green, DimId::Blue,
+        DimId::Infrared, DimId::Alpha, DimId::Flag, DimId::Mark,
+        DimId::XVelocity, DimId::YVelocity, DimId::ZVelocity,
+        DimId::WanderAngle,
+        DimId::XBodyAccel, DimId::YBodyAccel, DimId::ZBodyAccel,
+        DimId::XBodyAngRate, DimId::YBodyAngRate, DimId::ZBodyAngRate,
+        DimId::NorthPositionRMS, DimId::EastPositionRMS, DimId::DownPositionRMS,
+        DimId::NorthVelocityRMS,
+    ];
+    for v in variants {
+        let n = v.name();
+        assert!(!n.is_empty());
+        let resolved = DimId::from_name(n);
+        assert_eq!(resolved, v);
+    }
+}
+
+#[test]
+fn pdal_dimension_interpretation_name_covers_each_type() {
+    assert_eq!(pdal_dimension_interpretation_name(0x000), "unknown");
+    assert_eq!(pdal_dimension_interpretation_name(0x101), "int8_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x102), "int16_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x104), "int32_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x108), "int64_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x201), "uint8_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x202), "uint16_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x204), "uint32_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x208), "uint64_t");
+    assert_eq!(pdal_dimension_interpretation_name(0x404), "float");
+    assert_eq!(pdal_dimension_interpretation_name(0x408), "double");
+    assert_eq!(pdal_dimension_interpretation_name(0xdead), "unknown");
+}
+
+#[test]
+fn pdal_resolve_dimension_type_covers_branches() {
+    use super::resolve_pdal_dimension_type;
+    const NONE: u32 = 0x000;
+    const I8: u32 = 0x101;
+    const I16: u32 = 0x102;
+    const U8: u32 = 0x201;
+    const U16: u32 = 0x202;
+    const F32: u32 = 0x404;
+    const F64: u32 = 0x408;
+
+    assert_eq!(resolve_pdal_dimension_type(NONE, U8), U8);
+    assert_eq!(resolve_pdal_dimension_type(U8, NONE), U8);
+    assert_eq!(resolve_pdal_dimension_type(U8, U8), U8);
+    assert_eq!(resolve_pdal_dimension_type(U8, U16), U16);
+    assert_eq!(resolve_pdal_dimension_type(F32, I16), F32);
+    assert_eq!(resolve_pdal_dimension_type(I16, F32), F32);
+    let _u16_i8 = resolve_pdal_dimension_type(U16, I8);
+    let _i8_u16 = resolve_pdal_dimension_type(I8, U16);
+    assert_eq!(resolve_pdal_dimension_type(U8, I16), I16);
+    let big = resolve_pdal_dimension_type(F64, F32);
+    assert!(big == F64 || big == F32);
+}

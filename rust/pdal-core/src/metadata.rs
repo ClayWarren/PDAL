@@ -417,4 +417,77 @@ mod tests {
         let encoded = "zczMzMzcXkA=";
         assert_eq!(scalar_as_f64("base64Binary", encoded), Some(123.45));
     }
+
+    #[test]
+    fn metadata_value_kind_id_unique_per_variant() {
+        assert_eq!(MetadataValue::String("a".into()).kind_id(), 0);
+        assert_eq!(MetadataValue::I64(1).kind_id(), 1);
+        assert_eq!(MetadataValue::U64(1).kind_id(), 2);
+        assert_eq!(MetadataValue::F64(1.0).kind_id(), 3);
+        assert_eq!(MetadataValue::Bool(true).kind_id(), 4);
+    }
+
+    #[test]
+    fn metadata_value_as_string_covers_each_variant() {
+        assert_eq!(MetadataValue::String("hello".into()).as_string(), "hello");
+        assert_eq!(MetadataValue::I64(-7).as_string(), "-7");
+        assert_eq!(MetadataValue::U64(42).as_string(), "42");
+        assert_eq!(MetadataValue::F64(1.5).as_string(), "1.5");
+        assert_eq!(MetadataValue::Bool(true).as_string(), "true");
+    }
+
+    #[test]
+    fn metadata_value_as_i64_covers_each_variant() {
+        assert_eq!(MetadataValue::I64(-5).as_i64(), -5);
+        assert_eq!(MetadataValue::U64(7).as_i64(), 7);
+        assert_eq!(MetadataValue::F64(3.7).as_i64(), 3);
+        assert_eq!(MetadataValue::Bool(true).as_i64(), 1);
+        assert_eq!(MetadataValue::Bool(false).as_i64(), 0);
+        assert_eq!(MetadataValue::String("42".into()).as_i64(), 42);
+        assert_eq!(MetadataValue::String("nope".into()).as_i64(), 0);
+    }
+
+    #[test]
+    fn metadata_value_as_u64_covers_each_variant() {
+        assert_eq!(MetadataValue::I64(5).as_u64(), 5);
+        assert_eq!(MetadataValue::U64(7).as_u64(), 7);
+        assert_eq!(MetadataValue::F64(3.7).as_u64(), 3);
+        assert_eq!(MetadataValue::Bool(true).as_u64(), 1);
+        assert_eq!(MetadataValue::String("42".into()).as_u64(), 42);
+    }
+
+    #[test]
+    fn metadata_value_as_f64_covers_each_variant() {
+        assert_eq!(MetadataValue::I64(2).as_f64(), 2.0);
+        assert_eq!(MetadataValue::U64(7).as_f64(), 7.0);
+        assert_eq!(MetadataValue::F64(1.5).as_f64(), 1.5);
+        assert_eq!(MetadataValue::Bool(true).as_f64(), 1.0);
+        assert_eq!(MetadataValue::Bool(false).as_f64(), 0.0);
+        assert_eq!(MetadataValue::String("3.14".into()).as_f64(), 3.14);
+    }
+
+    #[test]
+    fn metadata_value_as_bool_covers_each_variant() {
+        assert!(MetadataValue::I64(1).as_bool());
+        assert!(!MetadataValue::I64(0).as_bool());
+        assert!(MetadataValue::U64(2).as_bool());
+        assert!(!MetadataValue::U64(0).as_bool());
+        assert!(MetadataValue::F64(0.1).as_bool());
+        assert!(!MetadataValue::F64(0.0).as_bool());
+        assert!(MetadataValue::Bool(true).as_bool());
+        assert!(MetadataValue::String("true".into()).as_bool());
+        assert!(MetadataValue::String("1".into()).as_bool());
+        assert!(!MetadataValue::String("nope".into()).as_bool());
+    }
+
+    #[test]
+    fn json_scalar_value_quotes_string_types() {
+        assert_eq!(json_scalar_value("string", "hi"), "\"hi\"");
+        assert_eq!(json_scalar_value("matrix", "[1,2]"), "\"[1,2]\"");
+        assert_eq!(json_scalar_value("double", "NaN"), "\"NaN\"");
+        assert_eq!(json_scalar_value("double", "Infinity"), "\"Infinity\"");
+        assert_eq!(json_scalar_value("double", "-Infinity"), "\"-Infinity\"");
+        assert_eq!(json_scalar_value("json", "{\"a\":1}"), "{\"a\":1}");
+        assert_eq!(json_scalar_value("int32", "42"), "42");
+    }
 }

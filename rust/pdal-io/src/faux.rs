@@ -590,4 +590,63 @@ mod tests {
         assert!(views[0].get_f64(0, &DimId::OffsetTime).is_nan());
         assert!(views[0].get_f64(1, &DimId::OffsetTime).is_nan());
     }
+
+    #[test]
+    fn faux_mode_from_str_covers_all_aliases() {
+        assert_eq!(FauxMode::from_str("constant"), FauxMode::Constant);
+        assert_eq!(FauxMode::from_str("random"), FauxMode::Uniform);
+        assert_eq!(FauxMode::from_str("uniform"), FauxMode::Uniform);
+        assert_eq!(FauxMode::from_str("ramp"), FauxMode::Ramp);
+        assert_eq!(FauxMode::from_str("normal"), FauxMode::Normal);
+        assert_eq!(FauxMode::from_str("grid"), FauxMode::Grid);
+        assert_eq!(FauxMode::from_str("invalid"), FauxMode::Invalid);
+        assert_eq!(FauxMode::from_str("MystEry"), FauxMode::Ramp);
+    }
+
+    #[test]
+    fn box3d_default_covers_unit_cube() {
+        let b = Box3d::default();
+        assert_eq!(b.minx, 0.0);
+        assert_eq!(b.maxx, 1.0);
+        assert_eq!(b.minz, 0.0);
+        assert_eq!(b.maxz, 1.0);
+    }
+
+    #[test]
+    fn box3d_from_options_uses_bounds_string() {
+        let mut opts = Options::new();
+        opts.add("bounds", "([1,2],[3,4],[5,6])");
+        let b = Box3d::from_options(&opts);
+        assert_eq!(b.minx, 1.0);
+        assert_eq!(b.maxz, 6.0);
+    }
+
+    #[test]
+    fn box3d_from_options_falls_back_to_min_max() {
+        let mut opts = Options::new();
+        opts.add("minx", 10.0);
+        opts.add("maxx", 20.0);
+        let b = Box3d::from_options(&opts);
+        assert_eq!(b.minx, 10.0);
+        assert_eq!(b.maxx, 20.0);
+    }
+
+    #[test]
+    fn faux_reader_seed_with_unsupported_mode_errors() {
+        let mut opts = Options::new();
+        opts.add("count", "5");
+        opts.add("mode", "ramp");
+        opts.add("seed", "42");
+        let result = FauxReader::new(&opts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn faux_reader_metadata_returns_expected_name() {
+        let mut opts = Options::new();
+        opts.add("count", "1");
+        opts.add("mode", "ramp");
+        let reader = FauxReader::new(&opts).unwrap();
+        assert_eq!(reader.metadata().name(), "readers.faux");
+    }
 }

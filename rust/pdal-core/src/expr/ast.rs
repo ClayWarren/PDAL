@@ -728,4 +728,91 @@ mod tests {
         expr.clear();
         assert!(!expr.valid());
     }
+
+    #[test]
+    fn print_and_node_type_round_trip() {
+        let view = point_with_classification(0.0);
+
+        let not = NotNode::new(Box::new(ConstLogicalNode::new(false)));
+        assert_eq!(not.node_type(), NodeType::Not);
+        assert!(not.is_bool());
+        assert!(not.print().contains("!("));
+
+        let neg = UnMathNode::new(num(2.0));
+        assert_eq!(neg.node_type(), NodeType::Negative);
+        assert!(!neg.is_bool());
+        assert_eq!(neg.eval(&view, 0).dval, -2.0);
+        assert!(neg.print().contains("-("));
+
+        for ty in [
+            NodeType::Add,
+            NodeType::Subtract,
+            NodeType::Multiply,
+            NodeType::Divide,
+        ] {
+            let node = BinMathNode::new(ty, num(6.0), num(2.0));
+            assert_eq!(node.node_type(), ty);
+            assert!(!node.is_bool());
+            let s = node.print();
+            assert!(s.contains('('));
+        }
+    }
+
+    #[test]
+    fn comparison_nodes_print_each_operator() {
+        for ty in [
+            NodeType::Greater,
+            NodeType::GreaterEqual,
+            NodeType::Less,
+            NodeType::LessEqual,
+            NodeType::Equal,
+            NodeType::NotEqual,
+        ] {
+            let n = CompareNode::new(ty, num(1.0), num(2.0));
+            assert!(n.print().contains('('));
+            assert!(n.is_bool());
+            assert_eq!(n.node_type(), ty);
+        }
+    }
+
+    #[test]
+    fn bool_nodes_handle_and_or_print() {
+        let true_n = || Box::new(ConstLogicalNode::new(true)) as NodePtr;
+        let false_n = || Box::new(ConstLogicalNode::new(false)) as NodePtr;
+        let or = BoolNode::new(NodeType::Or, true_n(), false_n());
+        assert!(or.print().contains('('));
+        assert!(or.is_bool());
+        assert_eq!(or.node_type(), NodeType::Or);
+    }
+
+    #[test]
+    fn const_value_node_round_trips_value() {
+        let n = ConstValueNode::new(42.5);
+        assert_eq!(n.value(), 42.5);
+        assert_eq!(n.node_type(), NodeType::Value);
+        assert!(!n.is_bool());
+    }
+
+    #[test]
+    fn const_logical_node_round_trips_value() {
+        let t = ConstLogicalNode::new(true);
+        let f = ConstLogicalNode::new(false);
+        assert!(t.value());
+        assert!(!f.value());
+        assert!(t.is_bool());
+    }
+
+    #[test]
+    fn func_and_bool_func_nodes_print_with_name() {
+        let f = FuncNode::new("sqrt", |v| v.sqrt(), num(9.0));
+        assert_eq!(f.node_type(), NodeType::Function);
+        assert!(!f.is_bool());
+        let printed = f.print();
+        assert!(printed.contains("sqrt"));
+
+        let bf = BoolFuncNode::new("isnan", |v| v.is_nan(), num(0.0));
+        assert!(bf.is_bool());
+        let bprinted = bf.print();
+        assert!(bprinted.contains("isnan"));
+    }
 }

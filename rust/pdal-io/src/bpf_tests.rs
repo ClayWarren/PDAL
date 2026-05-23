@@ -221,3 +221,83 @@ fn bundle_value(metadata: &MetadataNode, name: &str) -> Vec<u8> {
 fn file_name(path: &str) -> &str {
     Path::new(path).file_name().unwrap().to_str().unwrap()
 }
+
+#[test]
+fn reader_errors_without_filename() {
+    let mut reader = BpfReader::new(&Options::new());
+    let err = reader.read().err().expect("missing filename");
+    assert!(err.0.contains("filename"));
+}
+
+#[test]
+fn reader_errors_on_missing_file() {
+    let mut options = Options::new();
+    options.add("filename", "/no/such/file.bpf");
+    let mut reader = BpfReader::new(&options);
+    assert!(reader.read().is_err());
+}
+
+#[test]
+fn writer_errors_without_filename() {
+    let mut writer = BpfWriter::new(&Options::new());
+    let layout = PointLayout::new();
+    let view = PointView::new(Rc::new(layout));
+    assert!(writer.write(&[view]).is_err());
+}
+
+#[test]
+fn writer_with_bad_format_falls_back() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("bad-format.bpf");
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("format", "alien-format");
+    let mut writer = BpfWriter::new(&options);
+    let _ = writer.write(std::slice::from_ref(&input));
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn reader_metadata_returns_expected_name() {
+    let reader = BpfReader::new(&Options::new());
+    assert_eq!(reader.metadata().name(), "readers.bpf");
+}
+
+#[test]
+fn writer_metadata_returns_expected_name() {
+    let writer = BpfWriter::new(&Options::new());
+    assert_eq!(writer.metadata().name(), "writers.bpf");
+}
+
+#[test]
+fn writer_errors_on_invalid_output_path() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let mut options = Options::new();
+    options.add("filename", "/nonexistent-dir-xyz/output.bpf");
+    let mut writer = BpfWriter::new(&options);
+    assert!(writer.write(std::slice::from_ref(&input)).is_err());
+}
+
+#[test]
+fn writer_skips_invalid_bundled_files() {
+    let input = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
+    let output = temp_path("invalid-bundle.bpf");
+    let mut options = Options::new();
+    options.add("filename", &output);
+    options.add("bundledfile", "/no/such/bundle/file");
+    let mut writer = BpfWriter::new(&options);
+    let _ = writer.write(std::slice::from_ref(&input));
+    std::fs::remove_file(&output).ok();
+}
+
+#[test]
+fn read_autzen_dd_bpf() {
+    let view = read_bpf(&data_path("bpf/autzen-dd.bpf"));
+    assert!(view.len() > 0);
+}
+
+#[test]
+fn reader_handles_v3_segregated_deflate() {
+    let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-deflate-segregated.bpf"));
+    assert_eq!(view.len(), 1065);
+}

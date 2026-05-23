@@ -746,3 +746,44 @@ fn normal_vector(horz: u32, vert: u32) -> (f64, f64, f64) {
 fn io_error(error: std::io::Error) -> StageError {
     StageError(error.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::pipeline::Reader;
+
+    fn data_path(name: &str) -> String {
+        format!("{}/../../test/data/{name}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = FbiReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/file.fbi");
+        let mut reader = FbiReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = FbiReader::new(&Options::new());
+        assert_eq!(reader.metadata().name(), "readers.fbi");
+    }
+
+    #[test]
+    fn reads_fbi_fixture() {
+        let mut options = Options::new();
+        options.add("filename", data_path("fbi/1.2-with-color.fbi"));
+        let mut reader = FbiReader::new(&options);
+        let views = reader.read().expect("read fbi fixture");
+        assert!(!views.is_empty());
+        assert!(views[0].len() > 0);
+    }
+}

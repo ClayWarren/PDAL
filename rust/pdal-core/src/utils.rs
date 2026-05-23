@@ -957,4 +957,118 @@ mod tests {
         let _ = std::fs::remove_file(&file1_path);
         let _ = std::fs::remove_file(&file2_path);
     }
+
+    #[test]
+    fn looks_like_json_handles_all_branches() {
+        assert!(!looks_like_json(""));
+        assert!(!looks_like_json("a"));
+        assert!(looks_like_json("{x}"));
+        assert!(looks_like_json("[1]"));
+        assert!(looks_like_json("\"str\""));
+        assert!(!looks_like_json("hello"));
+        assert!(!looks_like_json("(1,2)"));
+    }
+
+    #[test]
+    fn trim_leading_trailing_round_trip() {
+        assert_eq!(trim_leading("  hi"), "hi");
+        assert_eq!(trim_trailing("hi  "), "hi");
+        assert_eq!(trim_leading(""), "");
+        assert_eq!(trim_trailing(""), "");
+    }
+
+    #[test]
+    fn replace_all_handles_empty_pattern() {
+        assert_eq!(replace_all("hello", "", "X"), "hello");
+        assert_eq!(replace_all("a-b-c", "-", "_"), "a_b_c");
+    }
+
+    #[test]
+    fn case_helpers_match() {
+        assert_eq!(to_lower("ABC"), "abc");
+        assert_eq!(to_upper("abc"), "ABC");
+        assert!(iequals("abc", "ABC"));
+        assert!(!iequals("abc", "abd"));
+        assert!(starts_with("hello", "he"));
+        assert!(!starts_with("hi", "x"));
+    }
+
+    #[test]
+    fn split_helpers_handle_empty() {
+        assert!(split_char("", ',').is_empty());
+        assert!(split2_char("", ',').is_empty());
+        assert_eq!(split_char("a,b,", ','), vec!["a", "b", ""]);
+        assert_eq!(split2_char("a,,b", ','), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn escape_json_covers_all_control_chars() {
+        let mut input = String::new();
+        for ch in 0u32..0x20 {
+            if let Some(c) = char::from_u32(ch) {
+                input.push(c);
+            }
+        }
+        input.push('"');
+        input.push('\\');
+        input.push('a');
+        let out = escape_json(&input);
+        assert!(out.contains("\\u0000"));
+        assert!(out.contains("\\t"));
+        assert!(out.contains("\\n"));
+        assert!(out.contains("\\r"));
+        assert!(out.contains("\\b"));
+        assert!(out.contains("\\f"));
+        assert!(out.contains("\\\""));
+        assert!(out.contains("\\\\"));
+        assert!(out.ends_with('a'));
+    }
+
+    #[test]
+    fn escape_nonprinting_bytes_covers_branches() {
+        let out = escape_nonprinting_bytes(b"\n\x07\x08\r\x0B\x01a");
+        assert!(out.starts_with(b"\\n\\a\\b\\r\\v\\x01"));
+        assert!(out.ends_with(b"a"));
+    }
+
+    #[test]
+    fn normalize_longitude_wraps_to_180_range() {
+        assert_eq!(normalize_longitude(0.0), 0.0);
+        assert_eq!(normalize_longitude(180.0), 180.0);
+        assert_eq!(normalize_longitude(190.0), -170.0);
+        assert_eq!(normalize_longitude(-190.0), 170.0);
+        let v = normalize_longitude(720.5);
+        assert!(v.abs() < 1.0);
+    }
+
+    #[test]
+    fn compare_approx_branches() {
+        assert!(compare_approx(1.0, 1.0001, 0.001));
+        assert!(!compare_approx(1.0, 1.5, 0.1));
+        assert!(compare_approx(0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn format_f64_special_values() {
+        assert_eq!(format_f64(f64::NAN, 6), "NaN");
+        assert_eq!(format_f64(f64::INFINITY, 6), "Infinity");
+        assert_eq!(format_f64(f64::NEG_INFINITY, 6), "-Infinity");
+        assert_eq!(format_f64(0.0, 6), "0");
+    }
+
+    #[test]
+    fn format_f64_uses_scientific_when_appropriate() {
+        let sci = format_f64(0.000001, 6);
+        assert!(sci.contains('e'));
+        let big = format_f64(1.23456789e10, 6);
+        assert!(big.contains('e'));
+        let normal = format_f64(123.456, 6);
+        assert!(!normal.contains('e'));
+    }
+
+    #[test]
+    fn format_f64_handles_negative() {
+        let v = format_f64(-1.5, 6);
+        assert!(v.starts_with('-'));
+    }
 }

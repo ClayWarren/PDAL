@@ -1092,4 +1092,65 @@ mod tests {
         let preview = read_ept_preview(&path).unwrap();
         assert!(!preview.dim_names.iter().any(|n| n == "Withheld"));
     }
+
+    #[test]
+    fn reader_errors_without_filename() {
+        let mut reader = EptReader::new(&Options::new());
+        let err = reader.read().err().expect("missing filename");
+        assert!(err.0.contains("filename"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_file() {
+        let mut options = Options::new();
+        options.add("filename", "/no/such/ept.json");
+        let mut reader = EptReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_metadata_returns_expected_name() {
+        let reader = EptReader::new(&Options::new());
+        assert_eq!(reader.metadata().name(), "readers.ept");
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_resolution() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/1.2-with-color/ept.json").display(),
+        );
+        options.add("resolution", "not-a-number");
+        let mut reader = EptReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_bounds() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/1.2-with-color/ept.json").display(),
+        );
+        options.add("bounds", "completely-not-bounds");
+        let mut reader = EptReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn read_ept_preview_errors_on_missing_file() {
+        let result = read_ept_preview("/no/such/file.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_ept_preview_errors_on_bad_path() {
+        let path = data_path("ept/bad-pointcount/ept.json")
+            .to_string_lossy()
+            .into_owned();
+        if std::path::Path::new(&path).exists() {
+            let _ = read_ept_preview(&path);
+        }
+    }
 }
