@@ -44,7 +44,7 @@ Status definitions:
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
 | COPC reader | prototype | Local `.copc.laz` full-file reads route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
-| EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles. Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
+| EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Optech CSD fixture data and localized WGS84 georeference math. |
@@ -138,10 +138,12 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `770 / 926` built C++ GoogleTest cases, or `83.15%`, are
+Current checkpoint: `771 / 926` built C++ GoogleTest cases, or `83.26%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route OGR writer option validation (multicount/attr_dims combination
-and missing-`attr_dims` dimension messages) through the Rust C ABI, promote
+gains route the EPT reader's `ignore_unreadable` non-streaming path through
+Rust (returning a single empty view when every tile is skipped), route OGR
+writer option validation (multicount/attr_dims combination and missing-
+`attr_dims` dimension messages) through the Rust C ABI, promote
 `pdal_polygon_test` to full Rust C ABI-backed parity, audit and
 promote 10 fully verified C++ test suites (pdal_bounds_test, pdal_eigen_test, pdal_point_view_test, pdal_utils_test, pdal_stage_factory_test, pdal_plugin_manager_test, pdal_options_test, pdal_spatial_reference_test, pdal_log_test, and pdal_io_las_reader_test) to Rust C ABI backing, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
 path-based Support::diff_files and Support::diff_text_files routing,
@@ -357,11 +359,12 @@ Known mixed binaries:
   polygon/OGR/reprojection crops remain C++.
 - `pdal_io_ept_reader_test`: `fullReadLaszip`, `fullReadBinary`,
   `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`,
-  `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`, and
-  `duplicateInputs` count. Local EPT point materialization, simple
-  dataset-coordinate bounds, origin selection, zstandard decompression,
-  missing-tile error handling, and multi-input diamond pipelines route through
-  the Rust C ABI. Resolution, streaming, SRS-bound reprojection, polygon/OGR
+  `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`,
+  `unreadableDataIgnored`, and `duplicateInputs` count. Local EPT point
+  materialization, simple dataset-coordinate bounds, origin selection,
+  zstandard decompression, missing-tile error handling (both fail-fast and
+  `ignore_unreadable`), and multi-input diamond pipelines route through the
+  Rust C ABI. Resolution, streaming, SRS-bound reprojection, polygon/OGR
   crops, addons, preview behavior, and prepare-time bad-origin validation
   remain C++.
 - `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.

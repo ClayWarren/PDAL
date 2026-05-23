@@ -160,7 +160,14 @@ impl Reader for EptReader {
         self.metadata
             .add_value("tiles", MetadataValue::U64(tile_count as u64));
 
-        Ok(merged.into_iter().collect())
+        // Return at least one (possibly empty) view so wrappers don't
+        // mis-treat a clean ignore_unreadable run as a reader failure.
+        let merged = merged.unwrap_or_else(|| {
+            let mut view = PointView::new(Rc::clone(&schema.layout));
+            view.set_spatial_reference(SpatialReference::new(srs));
+            view
+        });
+        Ok(vec![merged])
     }
 
     fn metadata(&self) -> MetadataNode {
@@ -852,7 +859,8 @@ mod tests {
         let mut reader = EptReader::new(&options);
 
         let views = reader.read().unwrap();
-        assert!(views.is_empty());
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 0);
     }
 
     #[test]
@@ -918,7 +926,8 @@ mod tests {
 
         let views = reader.read().unwrap();
 
-        assert!(views.is_empty());
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 0);
         let metadata = reader.metadata();
         assert_eq!(
             metadata.find_child("tiles").and_then(MetadataNode::value),

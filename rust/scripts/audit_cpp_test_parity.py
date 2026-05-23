@@ -444,6 +444,7 @@ COVERED: dict[str, object] = {
         "originReadVersion1_0_0",
         "originRead",
         "unreadableDataFailure",
+        "unreadableDataIgnored",
         "duplicateInputs",
     },
     "pdal_io_las_reader_test": ALL,
