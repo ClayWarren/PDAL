@@ -178,6 +178,54 @@ fn config_helpers_roundtrip_through_c_abi() {
             )),
             "2.10.1 (git-version: abcdef)"
         );
+
+        // null version defaults to empty string
+        assert_eq!(
+            take_string(pdal_config_full_version_string(
+                std::ptr::null(),
+                sha.as_ptr()
+            )),
+            " (git-version: abcdef)"
+        );
+
+        // null sha defaults to empty string
+        assert_eq!(
+            take_string(pdal_config_full_version_string(
+                version.as_ptr(),
+                std::ptr::null()
+            )),
+            "2.10.1 (git-version: )"
+        );
+
+        // both null
+        assert_eq!(
+            take_string(pdal_config_full_version_string(
+                std::ptr::null(),
+                std::ptr::null()
+            )),
+            " (git-version: )"
+        );
+    }
+}
+
+#[test]
+fn config_clear_error_clears_last_error() {
+    unsafe {
+        // Trigger an error first (infer reader with null should set error)
+        pdal_infer_reader_driver(std::ptr::null());
+        // Non-null error after inference
+        pdal_clear_error();
+        // After clear, the last error should be an empty string
+        let last = CStr::from_ptr(pdal_last_error()).to_string_lossy().to_string();
+        assert_eq!(last, "");
+    }
+}
+
+#[test]
+fn config_string_free_handles_null() {
+    unsafe {
+        // Should not panic
+        pdal_string_free(std::ptr::null_mut());
     }
 }
 
@@ -244,6 +292,20 @@ fn pipeline_stage_tag_generation_roundtrips_through_c_abi() {
                 tags.len() as u64,
             )),
             "readers_las2"
+        );
+    }
+}
+
+#[test]
+fn driver_inference_handles_null_filename() {
+    unsafe {
+        assert_eq!(
+            take_string(pdal_infer_reader_driver(std::ptr::null())),
+            ""
+        );
+        assert_eq!(
+            take_string(pdal_infer_writer_driver(std::ptr::null())),
+            ""
         );
     }
 }

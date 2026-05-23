@@ -265,3 +265,154 @@ fn scaled(value: f64, origin: f64, units: i32) -> f64 {
 fn io_error(error: std::io::Error) -> StageError {
     StageError(error.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn scaled_positive_units() {
+        assert_eq!(scaled(1000.0, 500.0, 100), 5.0);
+    }
+
+    #[test]
+    fn scaled_negative_units() {
+        assert_eq!(scaled(500.0, 1000.0, 250), -2.0);
+    }
+
+    #[test]
+    fn set_echo_dims_zero_is_single_return() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        layout.register(DimId::NumberOfReturns, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        set_echo_dims(&mut view, idx, 0);
+        assert_eq!(view.get_f64(idx, &DimId::ReturnNumber), 1.0);
+        assert_eq!(view.get_f64(idx, &DimId::NumberOfReturns), 1.0);
+    }
+
+    #[test]
+    fn set_echo_dims_one_sets_return_number_only() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        set_echo_dims(&mut view, idx, 1);
+        assert_eq!(view.get_f64(idx, &DimId::ReturnNumber), 1.0);
+    }
+
+    #[test]
+    fn set_echo_dims_other_does_nothing() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        set_echo_dims(&mut view, idx, 2);
+        assert_eq!(view.get_f64(idx, &DimId::ReturnNumber), 0.0);
+    }
+
+    #[test]
+    fn read_header_rejects_missing_magic() {
+        let buf = [0u8; 56];
+        let result = read_header(&mut Cursor::new(&buf));
+        match result.err() {
+            Some(e) => assert!(e.0.contains("970401")),
+            None => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn read_header_rejects_unknown_version() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&56i32.to_le_bytes());
+        buf.extend_from_slice(&9999i32.to_le_bytes());
+        buf.extend_from_slice(&970401i32.to_le_bytes());
+        buf.extend_from_slice(b"abcd");
+        buf.extend_from_slice(&0i32.to_le_bytes());
+        buf.extend_from_slice(&1i32.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0i32.to_le_bytes());
+        buf.extend_from_slice(&0i32.to_le_bytes());
+        let result = read_header(&mut Cursor::new(&buf));
+        match result.err() {
+            Some(e) => assert!(e.0.contains("Version")),
+            None => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn read_header_rejects_invalid_header_size() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&10i32.to_le_bytes()); // hdr_size < 56
+        buf.extend_from_slice(&20020715i32.to_le_bytes());
+        buf.extend_from_slice(&970401i32.to_le_bytes());
+        buf.extend_from_slice(b"abcd");
+        buf.extend_from_slice(&1i32.to_le_bytes());
+        buf.extend_from_slice(&1i32.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0f64.to_le_bytes());
+        buf.extend_from_slice(&0i32.to_le_bytes());
+        buf.extend_from_slice(&0i32.to_le_bytes());
+        let result = read_header(&mut Cursor::new(&buf));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn empty_filename_is_error() {
+        let mut r = TerrasolidReader {
+            filename: String::new(),
+        };
+        match r.read().err() {
+            Some(e) => assert!(e.0.contains("requires a filename")),
+            None => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn name_returns_readers_terrasolid() {
+        let r = TerrasolidReader {
+            filename: "dummy".to_string(),
+        };
+        assert_eq!(r.name(), "readers.terrasolid");
+    }
+
+    #[test]
+    fn register_dimensions_format_2() {
+        let mut layout = PointLayout::new();
+        let header = Header {
+            hdr_version: FORMAT_2,
+            pnt_cnt: 0,
+            units: 1,
+            org_x: 0.0,
+            org_y: 0.0,
+            org_z: 0.0,
+            time: 0,
+            color: 0,
+        };
+        register_dimensions(&mut layout, &header);
+        // Flag and Mark should be registered
+        // We can't easily inspect the layout, but we can verify no panic
+    }
+
+    #[test]
+    fn register_dimensions_with_time_and_color() {
+        let mut layout = PointLayout::new();
+        let header = Header {
+            hdr_version: FORMAT_2,
+            pnt_cnt: 0,
+            units: 1,
+            org_x: 0.0,
+            org_y: 0.0,
+            org_z: 0.0,
+            time: 1,
+            color: 1,
+        };
+        register_dimensions(&mut layout, &header);
+        // OffsetTime, Red, Green, Blue, Alpha should be registered
+    }
+}

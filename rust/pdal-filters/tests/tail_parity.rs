@@ -62,3 +62,65 @@ fn test_tail_stream() {
         pdal_core::point::PointView::new(std::rc::Rc::new(pdal_core::point::PointLayout::new()));
     assert!(!filter.process_one(&mut scratch, 0));
 }
+
+#[test]
+fn test_tail_count_zero_returns_empty() {
+    let view = make_ramp_view(10);
+    let mut filter = TailFilter::new(0, false);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 0);
+}
+
+#[test]
+fn test_tail_invert_count_zero_returns_all() {
+    let view = make_ramp_view(10);
+    let mut filter = TailFilter::new(0, true);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 10);
+}
+
+#[test]
+fn test_tail_count_exceeds_len_returns_all_or_none() {
+    let view = make_ramp_view(3);
+    // count > len, non-invert: returns all (saturated to len)
+    let mut filter = TailFilter::new(5, false);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 3);
+
+    // count > len, invert: returns 0
+    let mut filter = TailFilter::new(5, true);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 0);
+}
+
+#[test]
+fn test_tail_empty_view() {
+    let view = make_ramp_view(0);
+    let mut filter = TailFilter::new(4, false);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 0);
+
+    let mut filter = TailFilter::new(4, true);
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].len(), 0);
+}
+
+#[test]
+fn test_tail_reset() {
+    let view = make_ramp_view(10);
+    let mut filter = TailFilter::new(4, false);
+
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs[0].len(), 4);
+
+    filter.reset();
+
+    let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+    assert_eq!(outputs[0].len(), 4);
+}

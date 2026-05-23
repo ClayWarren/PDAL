@@ -106,3 +106,53 @@ impl Streamable for FerryFilter {
 
     fn reset(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_specs_empty_is_error() {
+        let result = FerryFilter::parse_specs(&[]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("at least one dimension"));
+    }
+
+    #[test]
+    fn parse_specs_invalid_format_is_error() {
+        let result = FerryFilter::parse_specs(&["X=Z".to_string(), "bad".to_string()]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid dimension"));
+    }
+
+    #[test]
+    fn parse_specs_self_ferry_is_error() {
+        let result = FerryFilter::parse_specs(&["X=X".to_string()]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("to itself"));
+    }
+
+    #[test]
+    fn parse_specs_duplicate_destination_is_error() {
+        let result = FerryFilter::parse_specs(&["X=Z".to_string(), "Y=Z".to_string()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_specs_arrow_syntax() {
+        let result = FerryFilter::parse_specs(&["X => Z".to_string()]);
+        assert!(result.is_ok());
+        let dims = result.unwrap();
+        assert_eq!(dims, vec![("X".to_string(), "Z".to_string())]);
+    }
+
+    #[test]
+    fn parse_specs_valid() {
+        let result = FerryFilter::parse_specs(&["X=Z".to_string(), "Y=Intensity".to_string()]);
+        assert!(result.is_ok());
+        let dims = result.unwrap();
+        assert_eq!(dims.len(), 2);
+        assert_eq!(dims[0], ("X".to_string(), "Z".to_string()));
+        assert_eq!(dims[1], ("Y".to_string(), "Intensity".to_string()));
+    }
+}

@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, PointId, PointView};
+use pdal_core::point::{DimId, DimType, PointId, PointLayout, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 #[derive(Clone, Copy, Default)]
@@ -182,4 +182,70 @@ impl Streamable for ChipperFilter {
     }
 
     fn reset(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::DimType;
+    use std::rc::Rc;
+
+    fn make_xy_view(points: &[(f64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        let layout = Rc::new(layout);
+        let mut view = PointView::new(layout);
+        for &(x, y) in points {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, x);
+            view.set_f64(idx, &DimId::Y, y);
+        }
+        view
+    }
+
+    #[test]
+    fn chipper_empty_input_returns_empty() {
+        let layout = Rc::new(PointLayout::new());
+        let view = PointView::new(layout);
+        let mut filter = ChipperFilter::new(100);
+        let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+        assert!(outputs.is_empty());
+    }
+
+    #[test]
+    fn chipper_small_input_returns_one_chip() {
+        let view = make_xy_view(&[(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)]);
+        let mut filter = ChipperFilter::new(5);
+        let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].len(), 3);
+    }
+
+    #[test]
+    fn chipper_threshold_partitions_points() {
+        let view = make_xy_view(&[
+            (0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0),
+            (5.0, 5.0), (6.0, 6.0), (7.0, 7.0), (8.0, 8.0), (9.0, 9.0),
+        ]);
+        let mut filter = ChipperFilter::new(3);
+        let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
+        assert!(outputs.len() >= 3);
+        let total: u64 = outputs.iter().map(|v| v.len()).sum();
+        assert_eq!(total, 10);
+    }
+
+    #[test]
+    fn chipper_names() {
+        let filter = ChipperFilter::new(100);
+        assert_eq!(filter.name(), "filters.chipper");
+        assert!(filter.as_any().downcast_ref::<ChipperFilter>().is_some());
+    }
+
+    #[test]
+    fn chipper_process_one_returns_false() {
+        let mut filter = ChipperFilter::new(100);
+        let mut scratch = PointView::new(Rc::new(PointLayout::new()));
+        assert!(!filter.process_one(&mut scratch, 0));
+    }
 }

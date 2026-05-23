@@ -108,3 +108,73 @@ fn skip_polar_data<R: Read + Seek>(reader: &mut R) -> Result<(), StageError> {
         .map_err(io_error)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn skip_ulem_data_no_magic_does_nothing() {
+        let mut buf = Cursor::new(vec![0u8; 8]);
+        let pos_before = buf.position();
+        skip_ulem_data(&mut buf).unwrap();
+        assert_eq!(buf.position(), pos_before);
+    }
+
+    #[test]
+    fn skip_ulem_data_with_magic() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"ULEM");
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 frames
+        buf.resize(64, 0u8);
+        let mut cursor = Cursor::new(buf);
+        skip_ulem_data(&mut cursor).unwrap();
+    }
+
+    #[test]
+    fn skip_polar_data_no_magic_does_nothing() {
+        let mut buf = Cursor::new(vec![0u8; 8]);
+        let pos_before = buf.position();
+        skip_polar_data(&mut buf).unwrap();
+        assert_eq!(buf.position(), pos_before);
+    }
+
+    #[test]
+    fn skip_polar_data_with_magic() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"POL$");
+        buf.extend_from_slice(&0i16.to_le_bytes()); // record size
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 frames
+        buf.extend_from_slice(&[0u8; 2]);  // padding
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 xmit
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 rcv
+        buf.resize(64, 0u8);
+        let mut cursor = Cursor::new(buf);
+        skip_polar_data(&mut cursor).unwrap();
+    }
+
+    #[test]
+    fn read_bundled_file_metadata_no_magic_stops() {
+        let mut buf = Cursor::new(vec![0u8; 8]);
+        let mut meta = MetadataNode::new("root");
+        read_bundled_file_metadata(&mut buf, &mut meta).unwrap();
+        assert!(meta.children().is_empty());
+    }
+
+    #[test]
+    fn read_bundled_file_metadata_with_file() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"FILE");
+        buf.extend_from_slice(&4u32.to_le_bytes()); // len = 4
+        let mut name = [0u8; 32];
+        name[..3].copy_from_slice(b"abc");
+        buf.extend_from_slice(&name);
+        buf.extend_from_slice(b"data");
+        buf.extend_from_slice(b"XXXX"); // non-FILE -> stop
+        let mut cursor = Cursor::new(buf);
+        let mut meta = MetadataNode::new("root");
+        read_bundled_file_metadata(&mut cursor, &mut meta).unwrap();
+        assert!(!meta.children().is_empty());
+    }
+}

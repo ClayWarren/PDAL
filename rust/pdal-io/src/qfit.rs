@@ -165,3 +165,73 @@ fn read_i32<R: Read>(reader: &mut R, endian: QfitEndian) -> Result<i32, std::io:
         QfitEndian::Little => reader.read_i32::<LittleEndian>(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_i32_little_endian() {
+        let buf = [0x78, 0x56, 0x34, 0x12];
+        let val = read_i32(&mut &buf[..], QfitEndian::Little).unwrap();
+        assert_eq!(val, 0x12345678);
+    }
+
+    #[test]
+    fn read_i32_big_endian() {
+        let buf = [0x12, 0x34, 0x56, 0x78];
+        let val = read_i32(&mut &buf[..], QfitEndian::Big).unwrap();
+        assert_eq!(val, 0x12345678);
+    }
+
+    #[test]
+    fn empty_filename_is_error() {
+        let mut r = QfitReader {
+            filename: String::new(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        match r.read().err() {
+            Some(e) => assert!(e.0.contains("requires a filename")),
+            None => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn nonexistent_file_is_error() {
+        let mut r = QfitReader {
+            filename: "/nonexistent/qfit-file.qi".to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        match r.read().err() {
+            Some(e) => assert!(e.0.contains("Couldn't open")),
+            None => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn flip_coordinates_reads_file() {
+        // Use the existing 10-word fixture to test the reader
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/qfit/10-word.qi");
+        let mut r = QfitReader {
+            filename: input.display().to_string(),
+            flip_coordinates: true,
+            scale_z: 0.001,
+        };
+        let views = r.read().unwrap();
+        assert!(!views.is_empty());
+        assert!(views[0].len() > 0);
+    }
+
+    #[test]
+    fn name_returns_readers_qfit() {
+        let r = QfitReader {
+            filename: "dummy".to_string(),
+            flip_coordinates: false,
+            scale_z: 0.001,
+        };
+        assert_eq!(r.name(), "readers.qfit");
+    }
+}

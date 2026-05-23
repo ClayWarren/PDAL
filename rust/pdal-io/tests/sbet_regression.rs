@@ -1,5 +1,6 @@
 use pdal_core::options::Options;
-use pdal_core::pipeline::Pipeline;
+use pdal_core::pipeline::{Pipeline, Writer};
+use pdal_core::point::{PointLayout, PointView};
 use pdal_io::sbet::SbetReader;
 use pdal_io::sbet_writer::SbetWriter;
 use std::fs;
@@ -83,6 +84,21 @@ fn test_rust_sbet_pipeline_standalone() {
     assert!(rust_output.exists());
     let content = fs::read(&rust_output).unwrap();
     assert!(!content.is_empty());
+}
+
+#[test]
+fn test_sbet_writer_rejects_empty_filename() {
+    let mut options = Options::new();
+    options.add("filename", "");
+    let mut writer = SbetWriter::new(&options);
+    let layout = std::rc::Rc::new(PointLayout::new());
+    let view = PointView::new(layout);
+    let result = writer.write(&[view]);
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().0.contains("filename"),
+        "error should mention missing filename"
+    );
 }
 
 fn make_temp_dir(name: &str) -> PathBuf {

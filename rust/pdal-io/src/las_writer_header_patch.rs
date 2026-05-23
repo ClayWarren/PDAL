@@ -86,3 +86,77 @@ fn patch_pdal_header_bounds(
     Ok(())
 }
 
+#[cfg(test)]
+mod header_patch_tests {
+    use super::*;
+
+    fn single_point_view(x: f64, y: f64, z: f64) -> PointView {
+        let mut layout = pdal_core::point::PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let layout = std::rc::Rc::new(layout);
+        let mut view = PointView::new(layout);
+        let id = view.add_point();
+        view.set_f64(id, &DimId::X, x);
+        view.set_f64(id, &DimId::Y, y);
+        view.set_f64(id, &DimId::Z, z);
+        view
+    }
+
+    #[test]
+    fn pdal_header_bounds_single_point() {
+        let views = vec![single_point_view(1.0, 2.0, 3.0)];
+        let xform = las::Transform {
+            scale: 0.01,
+            offset: 0.0,
+        };
+        let bounds = pdal_header_bounds(&views, &las::Vector {
+            x: xform,
+            y: xform,
+            z: xform,
+        });
+        assert!((bounds.min.x - 1.0).abs() < 0.01);
+        assert!((bounds.max.x - 1.0).abs() < 0.01);
+        assert!((bounds.min.y - 2.0).abs() < 0.01);
+        assert!((bounds.max.y - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn pdal_header_bounds_multiple_points() {
+        let views = vec![
+            single_point_view(1.0, 10.0, 100.0),
+            single_point_view(5.0, 20.0, 50.0),
+        ];
+        let xform = las::Transform {
+            scale: 0.01,
+            offset: 0.0,
+        };
+        let bounds = pdal_header_bounds(&views, &las::Vector {
+            x: xform,
+            y: xform,
+            z: xform,
+        });
+        assert!((bounds.min.x - 1.0).abs() < 0.01);
+        assert!((bounds.max.x - 5.0).abs() < 0.01);
+        assert!((bounds.min.y - 10.0).abs() < 0.01);
+        assert!((bounds.max.y - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn pdal_header_bounds_with_offset() {
+        let views = vec![single_point_view(100.0, 200.0, 300.0)];
+        let xform = las::Transform {
+            scale: 0.001,
+            offset: 50.0,
+        };
+        let bounds = pdal_header_bounds(&views, &las::Vector {
+            x: xform,
+            y: xform,
+            z: xform,
+        });
+        let expected = 100.0;
+        assert!((bounds.min.x - expected).abs() < 0.001);
+    }
+}
+

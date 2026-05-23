@@ -1,4 +1,4 @@
-use pdal_core::point::{DimId, DimType, PointView};
+use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::spatial::SpatialIndex3d;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -177,6 +177,22 @@ mod tests {
             assert_eq!(out.get_f64(idx, &DimId::Classification), 0.0);
         }
         assert_eq!(out.get_f64(25, &DimId::Classification), 18.0);
+    }
+
+    #[test]
+    fn statistical_mode_labels_outlier_with_few_points() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Classification, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, 0.0);
+        view.set_f64(idx, &DimId::Z, 0.0);
+        // Single point: distances.len() < 2 -> all inliers
+        let mut filter = OutlierFilter::new("statistical".to_string(), 2, 1.0, 8, 2.0, 18);
+        let out = filter.run(std::slice::from_ref(&view)).unwrap().remove(0);
+        assert_eq!(out.get_f64(0, &DimId::Classification), 0.0);
     }
 
     #[test]
