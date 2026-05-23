@@ -89,6 +89,18 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
 }
 
+#[test]
+fn test_rust_pts_pipeline_standalone() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/pts/site_56_8.pts");
+    let temp = make_temp_dir("pts-standalone");
+    let rust_output = temp.join("rust.pcd");
+    run_rust_pipeline(&input, &rust_output);
+    assert!(rust_output.exists());
+    let view = read_pcd(&rust_output);
+    assert_eq!(view.len(), 4);
+}
+
 fn read_pcd(path: &Path) -> pdal_core::point::PointView {
     let mut options = Options::new();
     options.add("filename", path.display());

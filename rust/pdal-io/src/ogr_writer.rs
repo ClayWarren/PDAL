@@ -75,10 +75,7 @@ impl Writer for OgrWriter {
 /// Validate the multicount/attr_dims combination used by the C++ OGR writer
 /// wrapper. The returned message is unprefixed so the caller can route it
 /// through `Stage::throwError`, which adds the `writers.ogr: ` prefix.
-pub fn validate_multicount_and_attrs(
-    multicount: u64,
-    attr_dim_count: u64,
-) -> Result<(), String> {
+pub fn validate_multicount_and_attrs(multicount: u64, attr_dim_count: u64) -> Result<(), String> {
     if multicount < 1 {
         return Err("multicount must be greater than 0.".to_string());
     }

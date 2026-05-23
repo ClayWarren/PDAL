@@ -73,6 +73,18 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
 }
 
+#[test]
+fn test_rust_sbet_pipeline_standalone() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/sbet/2-points.sbet");
+    let temp = make_temp_dir("sbet-standalone");
+    let rust_output = temp.join("rust.sbet");
+    run_rust_pipeline(&input, &rust_output);
+    assert!(rust_output.exists());
+    let content = fs::read(&rust_output).unwrap();
+    assert!(!content.is_empty());
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

@@ -398,3 +398,78 @@ fn spatial_reference_exports_metadata() {
         pdal_spatial_reference_destroy(srs);
     }
 }
+
+#[test]
+fn test_metadata_abi_nulls_and_errors() {
+    unsafe {
+        // 1. Check null handling on metadata functions
+        assert_eq!(take_string(pdal_metadata_node_name(std::ptr::null())), "");
+        assert_eq!(take_string(pdal_metadata_node_type(std::ptr::null())), "");
+        assert_eq!(take_string(pdal_metadata_node_description(std::ptr::null())), "");
+        
+        pdal_metadata_node_set_string(std::ptr::null_mut(), std::ptr::null());
+        pdal_metadata_node_set_type(std::ptr::null_mut(), std::ptr::null());
+        pdal_metadata_node_set_description(std::ptr::null_mut(), std::ptr::null());
+        pdal_metadata_node_set_i64(std::ptr::null_mut(), 0);
+        pdal_metadata_node_set_u64(std::ptr::null_mut(), 0);
+        pdal_metadata_node_set_f64(std::ptr::null_mut(), 0.0);
+        pdal_metadata_node_set_bool(std::ptr::null_mut(), false);
+
+        assert_eq!(pdal_metadata_node_value_kind(std::ptr::null()), 255);
+        assert_eq!(take_string(pdal_metadata_node_value(std::ptr::null())), "");
+        assert_eq!(pdal_metadata_node_value_i64(std::ptr::null()), 0);
+        assert_eq!(pdal_metadata_node_value_u64(std::ptr::null()), 0);
+        assert_eq!(pdal_metadata_node_value_f64(std::ptr::null()), 0.0);
+        assert!(!pdal_metadata_node_value_bool(std::ptr::null()));
+
+        assert!(pdal_metadata_node_child(std::ptr::null(), 0).is_null());
+        assert_eq!(pdal_metadata_node_child_named_count(std::ptr::null(), std::ptr::null()), 0);
+        assert!(pdal_metadata_node_child_named(std::ptr::null(), std::ptr::null(), 0).is_null());
+
+        pdal_metadata_node_add_child(std::ptr::null_mut(), std::ptr::null_mut());
+        pdal_metadata_node_add_or_update_child(std::ptr::null_mut(), std::ptr::null_mut());
+
+        // 2. Test valid value but null out_value pointer for converters
+        let int_type = CString::new("integer").unwrap();
+        let int_val = CString::new("123").unwrap();
+        assert!(pdal_metadata_value_as_i64(int_type.as_ptr(), int_val.as_ptr(), std::ptr::null_mut()));
+
+        let uint_type = CString::new("unsigned").unwrap();
+        let uint_val = CString::new("123").unwrap();
+        assert!(pdal_metadata_value_as_u64(uint_type.as_ptr(), uint_val.as_ptr(), std::ptr::null_mut()));
+
+        let double_type = CString::new("double").unwrap();
+        let double_val = CString::new("1.23").unwrap();
+        assert!(pdal_metadata_value_as_f64(double_type.as_ptr(), double_val.as_ptr(), std::ptr::null_mut()));
+
+        let bool_type = CString::new("boolean").unwrap();
+        let bool_val = CString::new("true").unwrap();
+        assert!(pdal_metadata_value_as_bool(bool_type.as_ptr(), bool_val.as_ptr(), std::ptr::null_mut()));
+
+        // 3. Test non-cloned child adding and non-cloned updating
+        let root = pdal_metadata_node_create(CString::new("root").unwrap().as_ptr());
+        let child1 = pdal_metadata_node_create(CString::new("child").unwrap().as_ptr());
+        pdal_metadata_node_set_string(child1, CString::new("one").unwrap().as_ptr());
+
+        // Test non-cloned add_child (takes ownership)
+        pdal_metadata_node_add_child(root, child1);
+        assert_eq!(pdal_metadata_node_child_count(root), 1);
+        assert_eq!(pdal_metadata_node_child_named_count(root, CString::new("child").unwrap().as_ptr()), 1);
+
+        // Test non-cloned add_or_update_child (takes ownership and replaces)
+        let child2 = pdal_metadata_node_create(CString::new("child").unwrap().as_ptr());
+        pdal_metadata_node_set_string(child2, CString::new("two").unwrap().as_ptr());
+        pdal_metadata_node_add_or_update_child(root, child2);
+
+        assert_eq!(pdal_metadata_node_child_count(root), 1);
+        let replaced_child = pdal_metadata_node_child(root, 0);
+        assert_eq!(take_string(pdal_metadata_node_value(replaced_child)), "two");
+        pdal_metadata_node_destroy(replaced_child);
+
+        // Test add_child / add_or_update_child with null child but valid parent (should do nothing and not crash)
+        pdal_metadata_node_add_child(root, std::ptr::null_mut());
+        pdal_metadata_node_add_or_update_child(root, std::ptr::null_mut());
+
+        pdal_metadata_node_destroy(root);
+    }
+}

@@ -1,5 +1,4 @@
 use super::super::*;
-use std::os::raw::c_char;
 
 fn cstring(value: &str) -> CString {
     CString::new(value).unwrap()

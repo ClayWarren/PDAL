@@ -77,10 +77,7 @@ fn utils_numeric_casts_round_trip_and_reject_null_out() {
         let mut out_f32: f32 = 0.0;
         assert!(pdal_utils_numeric_cast_f64_to_f32(2.5_f64, &mut out_f32));
         assert_eq!(out_f32, 2.5_f32);
-        assert!(!pdal_utils_numeric_cast_f64_to_f32(
-            1e40_f64,
-            &mut out_f32
-        ));
+        assert!(!pdal_utils_numeric_cast_f64_to_f32(1e40_f64, &mut out_f32));
         assert!(!pdal_utils_numeric_cast_f64_to_f32(
             2.5_f64,
             std::ptr::null_mut()
@@ -226,7 +223,10 @@ fn support_diff_helpers_match_byte_and_line_counts() {
             ),
             0
         );
-        assert_eq!(pdal_support_diff_text_files(a_c.as_ptr(), b_c.as_ptr(), -1), 0);
+        assert_eq!(
+            pdal_support_diff_text_files(a_c.as_ptr(), b_c.as_ptr(), -1),
+            0
+        );
 
         std::fs::write(&b, "world").unwrap();
         assert!(
@@ -252,5 +252,40 @@ fn support_diff_helpers_match_byte_and_line_counts() {
             ),
             0
         );
+    }
+}
+
+#[test]
+fn test_utils_abi_nulls_and_errors() {
+    unsafe {
+        // --- 1. File utils nulls ---
+        assert_eq!(pdal_file_utils_file_size(std::ptr::null()), 0);
+        assert!(!pdal_file_utils_file_exists(std::ptr::null()));
+        assert!(!pdal_file_utils_directory_exists(std::ptr::null()));
+        assert_eq!(pdal_file_utils_create_directory(std::ptr::null()), -1);
+        assert_eq!(pdal_file_utils_create_directories(std::ptr::null()), 1);
+        assert!(!pdal_file_utils_delete_file(std::ptr::null()));
+        pdal_file_utils_delete_directory(std::ptr::null());
+        pdal_file_utils_rename_file(std::ptr::null(), std::ptr::null());
+        assert!(pdal_file_utils_read_file_into_string(std::ptr::null()).is_null());
+        assert!(pdal_file_utils_directory_list(std::ptr::null()).is_null());
+        let glob_err = pdal_file_utils_glob(std::ptr::null());
+        assert!(!glob_err.is_null());
+        assert!(take_string(glob_err).is_empty());
+
+        // --- 2. Support diff nulls ---
+        assert_eq!(pdal_support_diff_files(std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+        let path = cstring("dummy");
+        assert_eq!(pdal_support_diff_files(path.as_ptr(), std::ptr::null(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+        assert_eq!(pdal_support_diff_files(std::ptr::null(), path.as_ptr(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+
+        assert_eq!(pdal_support_diff_text_files(std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+        assert_eq!(pdal_support_diff_text_files(path.as_ptr(), std::ptr::null(), 0), u32::MAX);
+        assert_eq!(pdal_support_diff_text_files(std::ptr::null(), path.as_ptr(), 0), u32::MAX);
+
+        // --- 3. Shell run command nulls ---
+        let mut output: *mut c_char = std::ptr::null_mut();
+        assert_eq!(pdal_utils_run_shell_command(std::ptr::null(), &mut output), -1);
+        assert_eq!(pdal_utils_run_shell_command(cstring("ls").as_ptr(), std::ptr::null_mut()), -1);
     }
 }

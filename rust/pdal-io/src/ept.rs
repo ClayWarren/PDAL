@@ -197,12 +197,9 @@ pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
     let info = read_json(path)?;
 
     let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
-    let point_count = info["points"].as_u64().ok_or_else(|| {
-        StageError(format!(
-            "EPT file '{}' is missing points.",
-            path.display()
-        ))
-    })?;
+    let point_count = info["points"]
+        .as_u64()
+        .ok_or_else(|| StageError(format!("EPT file '{}' is missing points.", path.display())))?;
     let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
 
     let data_type = info["dataType"].as_str().ok_or_else(|| {
@@ -212,12 +209,9 @@ pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
         ))
     })?;
 
-    let schema = info["schema"].as_array().ok_or_else(|| {
-        StageError(format!(
-            "EPT file '{}' is missing schema.",
-            path.display()
-        ))
-    })?;
+    let schema = info["schema"]
+        .as_array()
+        .ok_or_else(|| StageError(format!("EPT file '{}' is missing schema.", path.display())))?;
 
     let mut dim_names: Vec<String> = Vec::new();
     let mut saw_class_flags = false;
@@ -251,9 +245,9 @@ pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
 }
 
 fn ept_bounds_field(info: &Value, field: &str) -> Result<Bounds3D, StageError> {
-    let bounds = info[field].as_array().ok_or_else(|| {
-        StageError(format!("EPT file is missing {field}."))
-    })?;
+    let bounds = info[field]
+        .as_array()
+        .ok_or_else(|| StageError(format!("EPT file is missing {field}.")))?;
     if bounds.len() < 6 {
         return Err(StageError(format!(
             "EPT {field} must contain six coordinates."

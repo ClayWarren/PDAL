@@ -71,6 +71,18 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
 }
 
+#[test]
+fn test_rust_terrasolid_pipeline_standalone() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/terrasolid/20020715-time-color.bin");
+    let temp = make_temp_dir("terrasolid-standalone");
+    let rust_output = temp.join("rust.pcd");
+    run_rust_pipeline(&input, &rust_output);
+    assert!(rust_output.exists());
+    let content = fs::read_to_string(&rust_output).unwrap();
+    assert!(!content.is_empty());
+}
+
 fn make_temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("pdal-rust-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

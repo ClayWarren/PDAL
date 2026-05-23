@@ -1,6 +1,6 @@
 //! Geometry support via GEOS.
 
-use geos::{Geom, Geometry as GeosGeometry, CoordSeq};
+use geos::{CoordSeq, Geom, Geometry as GeosGeometry};
 
 /// A geometry (PDAL's `Geometry`).
 pub struct Geometry {
@@ -52,7 +52,8 @@ impl Geometry {
             self.geos_geom.topology_preserve_simplify(tolerance)
         } else {
             self.geos_geom.simplify(tolerance)
-        }.map_err(|e| e.to_string())?;
+        }
+        .map_err(|e| e.to_string())?;
         Ok(Self { geos_geom })
     }
 
@@ -61,13 +62,14 @@ impl Geometry {
     }
 
     pub fn bounds(&self) -> Result<(f64, f64, f64, f64, f64, f64), String> {
-        fn get_coords(geom: &impl geos::Geom, coords: &mut Vec<(f64, f64, f64)>) -> Result<(), String> {
+        fn get_coords(
+            geom: &impl geos::Geom,
+            coords: &mut Vec<(f64, f64, f64)>,
+        ) -> Result<(), String> {
             use geos::GeometryTypes;
             let g_type = geom.geometry_type().map_err(|e| e.to_string())?;
             match g_type {
-                GeometryTypes::Point |
-                GeometryTypes::LineString |
-                GeometryTypes::LinearRing => {
+                GeometryTypes::Point | GeometryTypes::LineString | GeometryTypes::LinearRing => {
                     if let Ok(coord_seq) = geom.get_coord_seq() {
                         if let Ok(size) = coord_seq.size() {
                             let has_z = if let Ok(dims) = coord_seq.dimensions() {
@@ -130,17 +132,33 @@ impl Geometry {
             let cx = coord.0;
             let cy = coord.1;
             let cz = coord.2;
-            if cx < minx { minx = cx; }
-            if cx > maxx { maxx = cx; }
-            if cy < miny { miny = cy; }
-            if cy > maxy { maxy = cy; }
+            if cx < minx {
+                minx = cx;
+            }
+            if cx > maxx {
+                maxx = cx;
+            }
+            if cy < miny {
+                miny = cy;
+            }
+            if cy > maxy {
+                maxy = cy;
+            }
             if !cz.is_nan() {
-                if cz < minz { minz = cz; }
-                if cz > maxz { maxz = cz; }
+                if cz < minz {
+                    minz = cz;
+                }
+                if cz > maxz {
+                    maxz = cz;
+                }
             }
         }
-        if minz.is_nan() || minz == f64::MAX { minz = 0.0; }
-        if maxz.is_nan() || maxz == f64::MIN { maxz = 0.0; }
+        if minz.is_nan() || minz == f64::MAX {
+            minz = 0.0;
+        }
+        if maxz.is_nan() || maxz == f64::MIN {
+            maxz = 0.0;
+        }
         Ok((minx, maxx, miny, maxy, minz, maxz))
     }
 
@@ -208,5 +226,109 @@ mod tests {
         assert_eq!(polygon.distance(5.0, 5.0, 0.0).unwrap(), 0.0);
         let ring = polygon.boundary().unwrap();
         assert_eq!(ring.distance(5.0, 5.0, 0.0).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn covers_reports_covers_and_boundaries() {
+        let geometry = Geometry::from_wkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+        // covers includes boundary
+        assert!(geometry.covers(5.0, 5.0));
+        assert!(geometry.covers(0.0, 0.0));
+        assert!(!geometry.covers(15.0, 5.0));
+    }
+
+    #[test]
+    fn area_computes_area() {
+        let geometry = Geometry::from_wkt("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+        assert_eq!(geometry.area().unwrap(), 100.0);
+        let point = Geometry::from_wkt("POINT(0 0)").unwrap();
+        assert_eq!(point.area().unwrap(), 0.0);
+    }
+
+    #[test]
+    fn simplify_reduces_coordinates() {
+        let geometry = Geometry::from_wkt("LINESTRING(0 0, 5 0.01, 10 0)").unwrap();
+        let simplified = geometry.simplify(0.1, true).unwrap();
+        let wkt = simplified.to_wkt().unwrap();
+        assert!(
+            wkt.contains("LINESTRING (0 0, 10 0)")
+                || wkt.contains("LINESTRING (0.0 0.0, 10.0 0.0)")
+        );
+
+        let simplified_no_top = geometry.simplify(0.1, false).unwrap();
+        assert!(!simplified_no_top.to_wkt().unwrap().is_empty());
+    }
+
+    #[test]
+    fn to_wkt_converts_back() {
+        let geometry = Geometry::from_wkt("POINT (1 2)").unwrap();
+        let wkt = geometry.to_wkt().unwrap();
+        assert!(wkt.contains("POINT (1") && wkt.contains("2)"));
+    }
+
+    #[test]
+    fn bounds_extracts_coordinates_3d() {
+        // Point 2D
+        let pt2d = Geometry::from_wkt("POINT(1 2)").unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = pt2d.bounds().unwrap();
+        assert_eq!(minx, 1.0);
+        assert_eq!(maxx, 1.0);
+        assert_eq!(miny, 2.0);
+        assert_eq!(maxy, 2.0);
+        assert_eq!(minz, 0.0);
+        assert_eq!(maxz, 0.0);
+
+        // Point 3D
+        let pt3d = Geometry::from_wkt("POINT(1 2 3)").unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = pt3d.bounds().unwrap();
+        assert_eq!(minx, 1.0);
+        assert_eq!(maxx, 1.0);
+        assert_eq!(miny, 2.0);
+        assert_eq!(maxy, 2.0);
+        assert_eq!(minz, 3.0);
+        assert_eq!(maxz, 3.0);
+
+        // LineString 3D
+        let line = Geometry::from_wkt("LINESTRING(0 0 1, 10 20 30)").unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = line.bounds().unwrap();
+        assert_eq!(minx, 0.0);
+        assert_eq!(maxx, 10.0);
+        assert_eq!(miny, 0.0);
+        assert_eq!(maxy, 20.0);
+        assert_eq!(minz, 1.0);
+        assert_eq!(maxz, 30.0);
+
+        // Polygon with interior rings
+        let poly = Geometry::from_wkt(
+            "POLYGON((0 0 0, 10 0 0, 10 10 0, 0 10 0, 0 0 0), (2 2 1, 8 2 1, 8 8 1, 2 8 1, 2 2 1))",
+        )
+        .unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = poly.bounds().unwrap();
+        assert_eq!(minx, 0.0);
+        assert_eq!(maxx, 10.0);
+        assert_eq!(miny, 0.0);
+        assert_eq!(maxy, 10.0);
+        assert_eq!(minz, 0.0);
+        assert_eq!(maxz, 1.0);
+
+        // MultiPoint 3D
+        let multipoint = Geometry::from_wkt("MULTIPOINT(0 0 5, 10 20 30)").unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = multipoint.bounds().unwrap();
+        assert_eq!(minx, 0.0);
+        assert_eq!(maxx, 10.0);
+        assert_eq!(miny, 0.0);
+        assert_eq!(maxy, 20.0);
+        assert_eq!(minz, 5.0);
+        assert_eq!(maxz, 30.0);
+
+        // Empty geometry
+        let empty = Geometry::from_wkt("GEOMETRYCOLLECTION EMPTY").unwrap();
+        let (minx, maxx, miny, maxy, minz, maxz) = empty.bounds().unwrap();
+        assert_eq!(minx, 0.0);
+        assert_eq!(maxx, 0.0);
+        assert_eq!(miny, 0.0);
+        assert_eq!(maxy, 0.0);
+        assert_eq!(minz, 0.0);
+        assert_eq!(maxz, 0.0);
     }
 }

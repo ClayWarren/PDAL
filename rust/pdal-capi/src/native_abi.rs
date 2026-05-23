@@ -119,10 +119,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_contains_point(
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
 #[no_mangle]
-pub unsafe extern "C" fn pdal_geometry_wkt_area(
-    wkt: *const c_char,
-    out_value: *mut f64,
-) -> bool {
+pub unsafe extern "C" fn pdal_geometry_wkt_area(wkt: *const c_char, out_value: *mut f64) -> bool {
     ffi_catch(false, || {
         let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
             set_last_error("Failed to parse WKT geometry");
@@ -164,20 +161,18 @@ pub unsafe extern "C" fn pdal_geometry_wkt_simplify(
             return false;
         };
         match geometry.simplify(tolerance, preserve_topology) {
-            Ok(simplified) => {
-                match simplified.to_wkt() {
-                    Ok(wkt_str) => {
-                        if let Some(out_wkt) = out_wkt.as_mut() {
-                            *out_wkt = string_to_c_ptr(wkt_str);
-                        }
-                        true
+            Ok(simplified) => match simplified.to_wkt() {
+                Ok(wkt_str) => {
+                    if let Some(out_wkt) = out_wkt.as_mut() {
+                        *out_wkt = string_to_c_ptr(wkt_str);
                     }
-                    Err(err) => {
-                        set_last_error(err);
-                        false
-                    }
+                    true
                 }
-            }
+                Err(err) => {
+                    set_last_error(err);
+                    false
+                }
+            },
             Err(err) => {
                 set_last_error(err);
                 false

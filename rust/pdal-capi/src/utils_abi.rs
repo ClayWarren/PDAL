@@ -81,6 +81,9 @@ pub unsafe extern "C" fn pdal_utils_run_shell_command(
     command: *const c_char,
     out_output: *mut *mut c_char,
 ) -> i32 {
+    if command.is_null() || out_output.is_null() {
+        return -1;
+    }
     let (status, output) = run_shell_command(&c_string(command));
     if !out_output.is_null() {
         *out_output = string_to_c(output);
@@ -524,7 +527,9 @@ pub unsafe extern "C" fn pdal_file_utils_file_size(filename: *const c_char) -> u
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(filename: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(
+    filename: *const c_char,
+) -> *mut c_char {
     let path_str = c_string(filename);
     match std::fs::read_to_string(Path::new(&path_str)) {
         Ok(content) => string_to_c(content),
@@ -537,10 +542,8 @@ pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) 
     let path_str = c_string(dirname);
     if let Ok(entries) = std::fs::read_dir(Path::new(&path_str)) {
         let mut paths = Vec::new();
-        for entry in entries {
-            if let Ok(entry) = entry {
-                paths.push(entry.path().to_string_lossy().into_owned());
-            }
+        for entry in entries.flatten() {
+            paths.push(entry.path().to_string_lossy().into_owned());
         }
         string_to_c(paths.join("\n"))
     } else {
@@ -554,10 +557,8 @@ pub unsafe extern "C" fn pdal_file_utils_glob(pattern: *const c_char) -> *mut c_
     match glob::glob(&pat) {
         Ok(entries) => {
             let mut paths = Vec::new();
-            for entry in entries {
-                if let Ok(path) = entry {
-                    paths.push(path.to_string_lossy().into_owned());
-                }
+            for path in entries.flatten() {
+                paths.push(path.to_string_lossy().into_owned());
             }
             string_to_c(paths.join("\n"))
         }

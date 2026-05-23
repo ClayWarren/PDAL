@@ -581,7 +581,7 @@ pub fn diff_files(
     ignorable_lengths: &[u32],
 ) -> u32 {
     use std::fs::File;
-    use std::io::Read;
+    use std::io::{BufReader, Read};
     use std::path::Path;
 
     let path1 = Path::new(file1);
@@ -591,11 +591,11 @@ pub fn diff_files(
     }
 
     let f1 = match File::open(path1) {
-        Ok(f) => f,
+        Ok(f) => BufReader::new(f),
         Err(_) => return u32::MAX,
     };
     let f2 = match File::open(path2) {
-        Ok(f) => f,
+        Ok(f) => BufReader::new(f),
         Err(_) => return u32::MAX,
     };
 
@@ -705,8 +705,8 @@ pub fn diff_text_files(file1: &str, file2: &str, ignore_line: i32) -> u32 {
             break;
         }
 
-        let clean1 = line1.replace('\r', "").replace('\n', "");
-        let clean2 = line2.replace('\r', "").replace('\n', "");
+        let clean1 = line1.replace(['\r', '\n'], "");
+        let clean2 = line2.replace(['\r', '\n'], "");
 
         if clean1 != clean2 {
             num_diffs += 1;
@@ -958,4 +958,3 @@ mod tests {
         let _ = std::fs::remove_file(&file2_path);
     }
 }
-

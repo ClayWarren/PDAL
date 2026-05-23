@@ -961,10 +961,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_destroy(handle: *mut EptReaderP
 /// C++ wrapper. Returns null on success, otherwise an owned C string carrying
 /// the unprefixed error message. Caller frees with `pdal_string_free`.
 #[no_mangle]
-pub extern "C" fn pdal_ogr_writer_validate(
-    multicount: u64,
-    attr_dim_count: u64,
-) -> *mut c_char {
+pub extern "C" fn pdal_ogr_writer_validate(multicount: u64, attr_dim_count: u64) -> *mut c_char {
     match pdal_io::ogr_writer::validate_multicount_and_attrs(multicount, attr_dim_count) {
         Ok(()) => std::ptr::null_mut(),
         Err(message) => string_to_c_ptr(message),

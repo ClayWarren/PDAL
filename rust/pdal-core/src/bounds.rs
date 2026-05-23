@@ -216,8 +216,8 @@ pub fn bounds3d_equal(a: &Bounds3D, b: &Bounds3D) -> bool {
 
 pub fn default_bounds2d() -> Bounds2D {
     Bounds2D {
-        minx: f64::MIN,
-        miny: f64::MIN,
+        minx: -f64::MAX,
+        miny: -f64::MAX,
         maxx: f64::MAX,
         maxy: f64::MAX,
     }
@@ -225,9 +225,9 @@ pub fn default_bounds2d() -> Bounds2D {
 
 pub fn default_bounds3d() -> Bounds3D {
     Bounds3D {
-        minx: f64::MIN,
-        miny: f64::MIN,
-        minz: f64::MIN,
+        minx: -f64::MAX,
+        miny: -f64::MAX,
+        minz: -f64::MAX,
         maxx: f64::MAX,
         maxy: f64::MAX,
         maxz: f64::MAX,
@@ -876,8 +876,7 @@ mod tests {
         assert!(err.contains("GeoJSON array must be 6"));
 
         // JSON object missing required field.
-        let err =
-            parse_bounds2d(r#"{"minx":1,"miny":2,"maxx":3}"#, 0).unwrap_err();
+        let err = parse_bounds2d(r#"{"minx":1,"miny":2,"maxx":3}"#, 0).unwrap_err();
         assert!(err.contains("must contain 'maxy'"));
     }
 
@@ -901,11 +900,7 @@ mod tests {
         assert_eq!(parsed.wkt, "EPSG:4326");
 
         // 3D object form omitting minz/maxz defaults to Bounds3D::empty's values.
-        let parsed = parse_bounds3d(
-            r#"{"minx":0,"miny":0,"maxx":1,"maxy":1}"#,
-            0,
-        )
-        .unwrap();
+        let parsed = parse_bounds3d(r#"{"minx":0,"miny":0,"maxx":1,"maxy":1}"#, 0).unwrap();
         assert_eq!(parsed.bounds.minz, f64::MAX);
         assert_eq!(parsed.bounds.maxz, f64::MIN);
     }
