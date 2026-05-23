@@ -34,11 +34,9 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <nlohmann/json.hpp>
+#include <string>
 
-#include <pdal/DimUtil.hpp>
-
-#include "Support.hpp"
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -46,16 +44,30 @@ namespace pdal
 TEST(DimensionTest, test_sanitization)
 {
     std::string with_space("Pulse width");
-    EXPECT_EQ(Dimension::fixName(with_space), with_space);
+    char* with_space_fixed = pdal_dimension_fix_name(with_space.c_str());
+    ASSERT_NE(with_space_fixed, nullptr);
+    EXPECT_EQ(std::string(with_space_fixed), with_space);
+    pdal_string_free(with_space_fixed);
 
     std::string with_a_number("DimensionName42");
-    EXPECT_EQ(Dimension::fixName(with_a_number), with_a_number);
+    char* with_a_number_fixed = pdal_dimension_fix_name(with_a_number.c_str());
+    ASSERT_NE(with_a_number_fixed, nullptr);
+    EXPECT_EQ(std::string(with_a_number_fixed), with_a_number);
+    pdal_string_free(with_a_number_fixed);
 
     std::string with_punctuation("with#punctuation.");
-    EXPECT_EQ(Dimension::fixName(with_punctuation), "with_punctuation_");
+    char* with_punctuation_fixed =
+        pdal_dimension_fix_name(with_punctuation.c_str());
+    ASSERT_NE(with_punctuation_fixed, nullptr);
+    EXPECT_EQ(std::string(with_punctuation_fixed), "with_punctuation_");
+    pdal_string_free(with_punctuation_fixed);
 
     std::string begin_with_a_number("42DimensionName42");
-    EXPECT_EQ(Dimension::fixName(begin_with_a_number), "_2DimensionName42");
+    char* begin_with_a_number_fixed =
+        pdal_dimension_fix_name(begin_with_a_number.c_str());
+    ASSERT_NE(begin_with_a_number_fixed, nullptr);
+    EXPECT_EQ(std::string(begin_with_a_number_fixed), "_2DimensionName42");
+    pdal_string_free(begin_with_a_number_fixed);
 }
 
 } // namespace pdal
