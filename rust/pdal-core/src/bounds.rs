@@ -743,4 +743,227 @@ mod tests {
         .unwrap();
         assert_eq!(parsed.wkt, "EPSG:2596");
     }
+
+    #[test]
+    fn equal_and_default_helpers_match_definitions() {
+        let a = Bounds2D {
+            minx: 0.0,
+            maxx: 1.0,
+            miny: 0.0,
+            maxy: 1.0,
+        };
+        let b = a;
+        assert!(bounds2d_equal(&a, &b));
+        let mut c = a;
+        c.maxx = 2.0;
+        assert!(!bounds2d_equal(&a, &c));
+
+        let a3 = Bounds3D {
+            minx: 0.0,
+            maxx: 1.0,
+            miny: 0.0,
+            maxy: 1.0,
+            minz: 0.0,
+            maxz: 1.0,
+        };
+        let b3 = a3;
+        assert!(bounds3d_equal(&a3, &b3));
+        let mut c3 = a3;
+        c3.maxz = 2.0;
+        assert!(!bounds3d_equal(&a3, &c3));
+
+        let d2 = default_bounds2d();
+        assert_eq!(d2.minx, f64::MIN);
+        assert_eq!(d2.maxx, f64::MAX);
+        let d3 = default_bounds3d();
+        assert_eq!(d3.minz, f64::MIN);
+        assert_eq!(d3.maxz, f64::MAX);
+    }
+
+    #[test]
+    fn format_helpers_render_empty_and_populated_bounds() {
+        assert_eq!(format_bounds2d(&Bounds2D::empty(), 2), "()");
+        assert_eq!(format_bounds3d(&Bounds3D::empty(), 2), "()");
+
+        let b2 = Bounds2D {
+            minx: 1.0,
+            maxx: 3.0,
+            miny: 2.0,
+            maxy: 4.0,
+        };
+        assert_eq!(format_bounds2d(&b2, 0), "([1, 3], [2, 4])");
+
+        let b3 = Bounds3D {
+            minx: 1.0,
+            maxx: 3.0,
+            miny: 2.0,
+            maxy: 4.0,
+            minz: 5.0,
+            maxz: 6.0,
+        };
+        assert_eq!(format_bounds3d(&b3, 0), "([1, 3], [2, 4], [5, 6])");
+    }
+
+    #[test]
+    fn wkt_and_geojson_renderers_handle_empty_and_populated_bounds() {
+        assert_eq!(bounds2d_to_wkt(&Bounds2D::empty(), 0), "");
+        assert_eq!(bounds3d_to_wkt(&Bounds3D::empty(), 0), "");
+        assert_eq!(bounds2d_to_geojson(&Bounds2D::empty(), 0), "");
+
+        let b2 = Bounds2D {
+            minx: 0.0,
+            maxx: 10.0,
+            miny: 0.0,
+            maxy: 5.0,
+        };
+        let wkt2 = bounds2d_to_wkt(&b2, 2);
+        assert!(wkt2.starts_with("POLYGON (("));
+        assert!(wkt2.contains("0.00 0.00"));
+        assert!(wkt2.contains("10.00 5.00"));
+
+        let geo = bounds2d_to_geojson(&b2, 1);
+        assert_eq!(geo, "{\"bbox\":[0.0, 0.0, 10.0,5.0]}");
+
+        let b3 = Bounds3D {
+            minx: 0.0,
+            maxx: 1.0,
+            miny: 0.0,
+            maxy: 1.0,
+            minz: 0.0,
+            maxz: 1.0,
+        };
+        let wkt3 = bounds3d_to_wkt(&b3, 0);
+        assert!(wkt3.starts_with("POLYHEDRON Z ("));
+        // Each of the six faces should appear.
+        assert_eq!(wkt3.matches("((").count(), 6);
+    }
+
+    #[test]
+    fn parser_reports_each_distinct_syntax_error() {
+        // Missing opening parenthesis around the dim list.
+        let err = parse_bounds2d("[1,2],[3,4])", 0).unwrap_err();
+        assert!(err.contains("opening"));
+
+        // Range without opening bracket.
+        let err = parse_bounds2d("(1,2],[3,4])", 0).unwrap_err();
+        assert!(err.contains("opening '['"));
+
+        // Range with no minimum number.
+        let err = parse_bounds2d("([,2],[3,4])", 0).unwrap_err();
+        assert!(err.contains("minimum"));
+
+        // Range with no comma between min/max.
+        let err = parse_bounds2d("([1 2],[3,4])", 0).unwrap_err();
+        assert!(err.contains("separator") || err.contains(","));
+
+        // Range with no maximum.
+        let err = parse_bounds2d("([1,],[3,4])", 0).unwrap_err();
+        assert!(err.contains("maximum"));
+
+        // Range with no closing bracket.
+        let err = parse_bounds2d("([1,2,[3,4])", 0).unwrap_err();
+        assert!(err.contains("closing"));
+
+        // Bounds with no closing paren.
+        let err = parse_bounds2d("([1,2],[3,4]", 0).unwrap_err();
+        assert!(err.contains("closing"));
+
+        // JSON arrays of wrong length report explicit error.
+        let err = parse_bounds2d("[1,2,3]", 0).unwrap_err();
+        assert!(err.contains("array size must be 4"));
+
+        let err = parse_bounds3d("[1,2,3]", 0).unwrap_err();
+        assert!(err.contains("GeoJSON array must be 6"));
+
+        // JSON object missing required field.
+        let err =
+            parse_bounds2d(r#"{"minx":1,"miny":2,"maxx":3}"#, 0).unwrap_err();
+        assert!(err.contains("must contain 'maxy'"));
+    }
+
+    #[test]
+    fn parser_handles_position_offsets_and_3d_json_object() {
+        // Resume parsing partway through a longer string.
+        let prefix = "garbage";
+        let composite = format!("{prefix}([1,2],[3,4])");
+        let parsed = parse_bounds2d(&composite, prefix.len()).unwrap();
+        assert_eq!(parsed.bounds.minx, 1.0);
+        assert_eq!(parsed.pos, composite.len());
+
+        // 3D object form with srs key (falls back to "srs" when "crs" missing).
+        let parsed = parse_bounds3d(
+            r#"{"minx":0,"miny":0,"maxx":1,"maxy":1,"minz":-1,"maxz":1,"srs":"EPSG:4326"}"#,
+            0,
+        )
+        .unwrap();
+        assert_eq!(parsed.bounds.minz, -1.0);
+        assert_eq!(parsed.bounds.maxz, 1.0);
+        assert_eq!(parsed.wkt, "EPSG:4326");
+
+        // 3D object form omitting minz/maxz defaults to Bounds3D::empty's values.
+        let parsed = parse_bounds3d(
+            r#"{"minx":0,"miny":0,"maxx":1,"maxy":1}"#,
+            0,
+        )
+        .unwrap();
+        assert_eq!(parsed.bounds.minz, f64::MAX);
+        assert_eq!(parsed.bounds.maxz, f64::MIN);
+    }
+
+    #[test]
+    fn bounds3d_clip_preserves_z_when_neighbour_window_does_not_intersect() {
+        let mut bounds = Bounds3D {
+            minx: 0.0,
+            maxx: 10.0,
+            miny: 0.0,
+            maxy: 10.0,
+            minz: 0.0,
+            maxz: 10.0,
+        };
+        let other = Bounds3D {
+            minx: 2.0,
+            maxx: 8.0,
+            miny: 2.0,
+            maxy: 8.0,
+            minz: 100.0,
+            maxz: 200.0,
+        };
+        bounds.clip(&other);
+        // 2D extents clipped to the other.
+        assert_eq!(bounds.minx, 2.0);
+        assert_eq!(bounds.maxx, 8.0);
+        // z extent untouched because other z is entirely outside.
+        assert_eq!(bounds.minz, 0.0);
+        assert_eq!(bounds.maxz, 10.0);
+    }
+
+    #[test]
+    fn bounds2d_contains_and_overlap_edge_cases() {
+        let bounds = Bounds2D {
+            minx: 0.0,
+            maxx: 10.0,
+            miny: 0.0,
+            maxy: 10.0,
+        };
+        assert!(bounds.contains_point(0.0, 0.0));
+        assert!(bounds.contains_point(10.0, 10.0));
+        assert!(!bounds.contains_point(10.0001, 5.0));
+        assert!(!bounds.contains_point(-0.0001, 5.0));
+
+        // Touching at an edge counts as overlap.
+        let touching = Bounds2D {
+            minx: 10.0,
+            maxx: 20.0,
+            miny: 0.0,
+            maxy: 10.0,
+        };
+        assert!(bounds.overlaps(&touching));
+        let disjoint = Bounds2D {
+            minx: 11.0,
+            maxx: 12.0,
+            miny: 0.0,
+            maxy: 10.0,
+        };
+        assert!(!bounds.overlaps(&disjoint));
+    }
 }
