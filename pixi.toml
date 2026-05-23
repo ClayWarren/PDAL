@@ -25,6 +25,8 @@ libarrow = "*"
 libparquet = "*"
 rust = "*"
 cargo-llvm-cov = "*"
+clang-tools = ">=19.1.7,<23"
+geotiff = ">=1.7.4,<2"
 
 [feature.doc.dependencies]
 jupyter-book = ">=1.0.3,<2"
