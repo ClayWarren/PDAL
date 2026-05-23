@@ -146,7 +146,7 @@ mod tests {
         buf.extend_from_slice(b"POL$");
         buf.extend_from_slice(&0i16.to_le_bytes()); // record size
         buf.extend_from_slice(&0u32.to_le_bytes()); // 0 frames
-        buf.extend_from_slice(&[0u8; 2]);  // padding
+        buf.extend_from_slice(&[0u8; 2]); // padding
         buf.extend_from_slice(&0u32.to_le_bytes()); // 0 xmit
         buf.extend_from_slice(&0u32.to_le_bytes()); // 0 rcv
         buf.resize(64, 0u8);

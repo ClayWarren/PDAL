@@ -274,18 +274,60 @@ fn test_utils_abi_nulls_and_errors() {
         assert!(take_string(glob_err).is_empty());
 
         // --- 2. Support diff nulls ---
-        assert_eq!(pdal_support_diff_files(std::ptr::null(), std::ptr::null(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+        assert_eq!(
+            pdal_support_diff_files(
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                0
+            ),
+            u32::MAX
+        );
         let path = cstring("dummy");
-        assert_eq!(pdal_support_diff_files(path.as_ptr(), std::ptr::null(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
-        assert_eq!(pdal_support_diff_files(std::ptr::null(), path.as_ptr(), std::ptr::null(), std::ptr::null(), 0), u32::MAX);
+        assert_eq!(
+            pdal_support_diff_files(
+                path.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                0
+            ),
+            u32::MAX
+        );
+        assert_eq!(
+            pdal_support_diff_files(
+                std::ptr::null(),
+                path.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                0
+            ),
+            u32::MAX
+        );
 
-        assert_eq!(pdal_support_diff_text_files(std::ptr::null(), std::ptr::null(), 0), u32::MAX);
-        assert_eq!(pdal_support_diff_text_files(path.as_ptr(), std::ptr::null(), 0), u32::MAX);
-        assert_eq!(pdal_support_diff_text_files(std::ptr::null(), path.as_ptr(), 0), u32::MAX);
+        assert_eq!(
+            pdal_support_diff_text_files(std::ptr::null(), std::ptr::null(), 0),
+            u32::MAX
+        );
+        assert_eq!(
+            pdal_support_diff_text_files(path.as_ptr(), std::ptr::null(), 0),
+            u32::MAX
+        );
+        assert_eq!(
+            pdal_support_diff_text_files(std::ptr::null(), path.as_ptr(), 0),
+            u32::MAX
+        );
 
         // --- 3. Shell run command nulls ---
         let mut output: *mut c_char = std::ptr::null_mut();
-        assert_eq!(pdal_utils_run_shell_command(std::ptr::null(), &mut output), -1);
-        assert_eq!(pdal_utils_run_shell_command(cstring("ls").as_ptr(), std::ptr::null_mut()), -1);
+        assert_eq!(
+            pdal_utils_run_shell_command(std::ptr::null(), &mut output),
+            -1
+        );
+        assert_eq!(
+            pdal_utils_run_shell_command(cstring("ls").as_ptr(), std::ptr::null_mut()),
+            -1
+        );
     }
 }

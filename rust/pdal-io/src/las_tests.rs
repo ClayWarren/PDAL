@@ -160,6 +160,14 @@ mod tests {
         assert_eq!(las_to_pdal_type(0), (None, 1));
         assert_eq!(las_to_pdal_type(1), (Some(DimType::U8), 1));
         assert_eq!(las_to_pdal_type(2), (Some(DimType::I8), 1));
+        assert_eq!(las_to_pdal_type(3), (Some(DimType::U16), 1));
+        assert_eq!(las_to_pdal_type(4), (Some(DimType::I16), 1));
+        assert_eq!(las_to_pdal_type(5), (Some(DimType::U32), 1));
+        assert_eq!(las_to_pdal_type(6), (Some(DimType::I32), 1));
+        assert_eq!(las_to_pdal_type(7), (Some(DimType::U64), 1));
+        assert_eq!(las_to_pdal_type(8), (Some(DimType::I64), 1));
+        assert_eq!(las_to_pdal_type(9), (Some(DimType::F32), 1));
+        assert_eq!(las_to_pdal_type(10), (Some(DimType::F64), 1));
         assert_eq!(las_to_pdal_type(11), (Some(DimType::U8), 2));
     }
 
@@ -271,5 +279,200 @@ mod tests {
         let mut reader = LasReader::new(&options);
         let views = reader.read().expect("streaming subset");
         assert_eq!(views[0].len(), 5);
+    }
+
+    #[test]
+    fn reader_srs_fallback() {
+        let mut options = Options::new();
+        options.add("filename", las_path("epsg_4326.las"));
+        options.add("srs_vlr_order", "geotiff");
+        let mut reader = LasReader::new(&options);
+        let views = reader.read().expect("read epsg_4326.las with geotiff order");
+        assert!(!views[0].spatial_reference().wkt().is_empty());
+    }
+
+    #[test]
+    fn detect_copc_error_paths() {
+        use std::path::Path;
+        assert!(!detect_copc(Path::new("nonexistent_file_xyz.las")));
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(b"short").unwrap();
+        assert!(!detect_copc(file.path()));
+    }
+
+    #[test]
+    fn reader_errors_when_start_exceeds_point_count_streaming() {
+        let mut options = Options::new();
+        options.add("filename", las_path("100-points.las"));
+        options.add("ignore_missing_vlrs", true);
+        options.add("start", 9999u64);
+        let mut reader = LasReader::new(&options);
+        let err = match reader.read() {
+            Ok(_) => panic!("start past end should error"),
+            Err(e) => e,
+        };
+        assert!(err.0.contains("outside"));
+    }
+
+    #[test]
+    fn test_read_vlr_lenient_various_cases() {
+        use std::io::Cursor;
+        
+        let mut empty_cursor = Cursor::new(vec![]);
+        match read_vlr_lenient(&mut empty_cursor, 100) {
+            VlrReadResult::Stop => {}
+            VlrReadResult::Ok(_) => panic!("expected Stop"),
+        }
+        
+        let mut header_buf = vec![0u8; VLR_HEADER_SIZE as usize];
+        header_buf[20] = 100;
+        header_buf[21] = 0;
+        let mut cursor2 = Cursor::new(header_buf);
+        match read_vlr_lenient(&mut cursor2, 50) {
+            VlrReadResult::Stop => {}
+            _ => panic!("expected Stop"),
+        }
+        
+        let mut header_buf3 = vec![0u8; VLR_HEADER_SIZE as usize];
+        header_buf3[20] = 50;
+        header_buf3[21] = 0;
+        let mut cursor3 = Cursor::new([header_buf3, vec![0u8; 10]].concat());
+        match read_vlr_lenient(&mut cursor3, 200) {
+            VlrReadResult::Stop => {}
+            _ => panic!("expected Stop"),
+        }
+        
+        let mut header_buf4 = vec![0u8; VLR_HEADER_SIZE as usize];
+        header_buf4[20] = 5;
+        header_buf4[21] = 0;
+        header_buf4[18] = 42;
+        header_buf4[19] = 0;
+        let data = b"hello".to_vec();
+        let mut cursor4 = Cursor::new([header_buf4, data].concat());
+        match read_vlr_lenient(&mut cursor4, 200) {
+            VlrReadResult::Ok(vlr) => {
+                assert_eq!(vlr.record_id, 42);
+                assert_eq!(vlr.data, b"hello");
+            }
+            _ => panic!("expected Ok"),
+        }
+    }
+
+    #[test]
+    fn test_read_header_lenient_compressed_error() {
+        let mut raw_header = las::raw::Header::default();
+        raw_header.point_data_record_format = 128 + 3;
+        let mut cursor = std::io::Cursor::new(vec![]);
+        let res = read_header_lenient(&mut cursor, raw_header);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.contains("LAZ"));
+    }
+
+    #[test]
+    fn test_read_header_lenient_ordering_and_evlr() {
+        use std::io::Cursor;
+        
+        let mut raw_header = las::raw::Header::default();
+        raw_header.point_data_record_format = 0;
+        raw_header.number_of_variable_length_records = 0;
+        raw_header.offset_to_point_data = 300;
+        
+        let mut cursor = Cursor::new(vec![0u8; 1000]);
+        let res = read_header_lenient(&mut cursor, raw_header.clone());
+        assert!(res.is_ok());
+        
+        let mut raw_header_greater = raw_header.clone();
+        raw_header_greater.offset_to_point_data = 200;
+        let mut cursor_greater = Cursor::new(vec![0u8; 1000]);
+        let res_greater = read_header_lenient(&mut cursor_greater, raw_header_greater);
+        assert!(res_greater.is_err());
+        assert!(res_greater.unwrap_err().0.contains("too small"));
+        
+        let mut raw_header_evlr = raw_header.clone();
+        raw_header_evlr.version = las::Version::new(1, 4);
+        let evlr_info = las::raw::header::Evlr {
+            start_of_first_evlr: 200,
+            number_of_evlrs: 1,
+        };
+        raw_header_evlr.evlr = Some(evlr_info);
+        
+        let mut buffer = vec![0u8; 1000];
+        buffer[200 + 20..200 + 28].copy_from_slice(&10u64.to_le_bytes());
+        
+        let mut cursor_evlr = Cursor::new(buffer);
+        let _ = read_header_lenient(&mut cursor_evlr, raw_header_evlr);
+    }
+
+    #[test]
+    fn test_set_extra_dims_error_propagation() {
+        use std::rc::Rc;
+        let mut layout = PointLayout::new();
+        layout.register(DimId::from_name("test_dim"), DimType::U16);
+        let mut view = PointView::new(Rc::new(layout));
+        let id = view.add_point();
+        
+        let ed = ExtraDim {
+            name: "test_dim".to_string(),
+            ty: DimType::U16,
+            size: 2,
+            offset: 0,
+            scale: 1.0,
+            value_offset: 0.0,
+        };
+        
+        let mut point = las::Point::default();
+        point.extra_bytes = vec![1u8];
+        let res = set_extra_dims(&mut view, id, &point, &[ed]);
+        assert!(res.is_ok());
+        
+        let malformed_ed = ExtraDim {
+            name: "test_dim".to_string(),
+            ty: DimType::U16,
+            size: 1,
+            offset: 0,
+            scale: 1.0,
+            value_offset: 0.0,
+        };
+        let mut point2 = las::Point::default();
+        point2.extra_bytes = vec![1u8];
+        let res2 = set_extra_dims(&mut view, id, &point2, &[malformed_ed]);
+        assert!(res2.is_err());
+    }
+
+    #[test]
+    fn test_read_pdal_val_all_types() {
+        use std::io::Cursor;
+        
+        let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8];
+        
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::U8).unwrap(), 1.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::I8).unwrap(), 1.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::U16).unwrap(), 513.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::I16).unwrap(), 513.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::U32).unwrap(), 67305985.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::I32).unwrap(), 67305985.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::U64).unwrap(), 578437695752307201.0);
+        assert_eq!(read_pdal_val(&mut Cursor::new(&data), DimType::I64).unwrap(), 578437695752307201.0);
+        
+        let f32_bytes = 1.23f32.to_le_bytes();
+        assert!((read_pdal_val(&mut Cursor::new(&f32_bytes), DimType::F32).unwrap() - 1.23).abs() < 1e-5);
+        
+        let f64_bytes = 4.56f64.to_le_bytes();
+        assert!((read_pdal_val(&mut Cursor::new(&f64_bytes), DimType::F64).unwrap() - 4.56).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_set_standard_dims_edge_of_flight_line() {
+        use std::rc::Rc;
+        let mut layout = PointLayout::new();
+        register_standard_dims(&mut layout, &las::Header::default());
+        let mut view = PointView::new(Rc::new(layout));
+        let id = view.add_point();
+        
+        let mut point = las::Point::default();
+        point.is_edge_of_flight_line = true;
+        
+        set_standard_dims(&mut view, id, &point, 3);
+        assert_eq!(view.get_f64(id, &DimId::EdgeOfFlightLine), 1.0);
     }
 }

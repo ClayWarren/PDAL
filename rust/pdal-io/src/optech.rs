@@ -278,10 +278,7 @@ mod tests {
 
     #[test]
     fn reader_name_returns_expected() {
-        assert_eq!(
-            OptechReader::new(&Options::new()).name(),
-            "readers.optech"
-        );
+        assert_eq!(OptechReader::new(&Options::new()).name(), "readers.optech");
     }
 
     #[test]

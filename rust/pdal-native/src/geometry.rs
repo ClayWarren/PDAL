@@ -267,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn bounds_extracts_coordinates_3d() {
         // Point 2D
         let pt2d = Geometry::from_wkt("POINT(1 2)").unwrap();

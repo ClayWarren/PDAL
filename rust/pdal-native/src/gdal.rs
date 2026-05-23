@@ -701,7 +701,10 @@ mod tests {
         let mut buf = vec![0.0f64; 3];
         let res = raster.read_band(1, 2, 2, &mut buf);
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err(), "GDAL band buffer size does not match raster dimensions.");
+        assert_eq!(
+            res.unwrap_err(),
+            "GDAL band buffer size does not match raster dimensions."
+        );
 
         // 2. Invalid band index
         let mut buf2 = vec![0.0f64; 4];
@@ -760,7 +763,9 @@ mod tests {
 
         // Test write_band_i32
         let data = [1, 2, 3, 4, 5, 6];
-        raster.write_band_i32(1, 2, 3, &data, -99, "Int32Band").unwrap();
+        raster
+            .write_band_i32(1, 2, 3, &data, -99, "Int32Band")
+            .unwrap();
 
         // Test write_band_i32 error (buffer mismatch)
         assert!(raster.write_band_i32(1, 2, 3, &[1, 2], -99, "").is_err());
@@ -808,16 +813,23 @@ mod tests {
 
         // 3. Vector create success
         let vector = Vector::create(path.to_str().unwrap(), "ESRI Shapefile").unwrap();
-        let layer = vector.open_or_create_layer("test_layer", "EPSG:4326").unwrap();
+        let layer = vector
+            .open_or_create_layer("test_layer", "EPSG:4326")
+            .unwrap();
         assert!(!layer.is_null());
 
         // 4. Create fields (unsafe)
         unsafe {
             Vector::create_string_field(layer, "name").unwrap();
             Vector::create_datetime_field(layer, "timestamp").unwrap();
-            
+
             // Add feature
-            Vector::add_feature(layer, "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))", &[("name", "test_geom")]).unwrap();
+            Vector::add_feature(
+                layer,
+                "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
+                &[("name", "test_geom")],
+            )
+            .unwrap();
         }
 
         drop(vector);

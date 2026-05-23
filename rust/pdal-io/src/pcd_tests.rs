@@ -640,4 +640,231 @@ mod tests {
         let _ = writer.write(&[view]);
         let _ = std::fs::remove_file(temp);
     }
+
+    #[test]
+    fn test_names_and_metadata() {
+        let reader = PcdReader::new(&Options::new());
+        assert_eq!(reader.name(), "readers.pcd");
+        
+        let mut writer_opts = Options::new();
+        writer_opts.add("filename", "dummy.pcd");
+        let writer = PcdWriter::new(&writer_opts);
+        assert_eq!(writer.name(), "writers.pcd");
+        
+        let metadata = writer.metadata();
+        assert_eq!(metadata.name(), "writers.pcd");
+    }
+
+    #[test]
+    fn test_writer_empty_views() {
+        let output = temp_path("empty-views.pcd");
+        let mut writer_opts = Options::new();
+        writer_opts.add("filename", &output);
+        let mut writer = PcdWriter::new(&writer_opts);
+        writer.write(&[]).unwrap();
+        let content = fs::read_to_string(&output).unwrap();
+        assert!(content.is_empty());
+    }
+
+    #[test]
+    fn test_extract_dim_errors() {
+        let mut writer_opts = Options::new();
+        let temp = temp_path("extract-dim-errors");
+        writer_opts.add("filename", temp.clone());
+        
+        // 1. Dimension not found
+        writer_opts.add("order", "NonexistentDim");
+        let mut writer = PcdWriter::new(&writer_opts);
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        assert!(writer.write(&[view.clone()]).is_err());
+        
+        // 2. Can't convert precision
+        let mut writer_opts2 = Options::new();
+        writer_opts2.add("filename", temp.clone());
+        writer_opts2.add("order", "X=Float:abc");
+        let mut writer2 = PcdWriter::new(&writer_opts2);
+        assert!(writer2.write(&[view.clone()]).is_err());
+        
+        // 3. Extra colon parts
+        let mut writer_opts3 = Options::new();
+        writer_opts3.add("filename", temp.clone());
+        writer_opts3.add("order", "X=Float:2:extra");
+        let mut writer3 = PcdWriter::new(&writer_opts3);
+        assert!(writer3.write(&[view.clone()]).is_err());
+        
+        // 4. Extra equals parts
+        let mut writer_opts4 = Options::new();
+        writer_opts4.add("filename", temp.clone());
+        writer_opts4.add("order", "X=Float=Extra");
+        let mut writer4 = PcdWriter::new(&writer_opts4);
+        assert!(writer4.write(&[view.clone()]).is_err());
+    }
+
+    #[test]
+    fn test_read_binary_value_all_types() {
+        let bytes = vec![
+            1u8,
+            2, 0,
+            3, 0, 0, 0,
+            4, 0, 0, 0, 0, 0, 0, 0,
+            5,
+            6, 0,
+            7, 0, 0, 0,
+            8, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        
+        let mut offset = 0;
+        
+        let f_s1 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Signed, count: 1, size: 1, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_s1).unwrap(), 1.0);
+        
+        let f_s2 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Signed, count: 1, size: 2, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_s2).unwrap(), 2.0);
+        
+        let f_s4 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Signed, count: 1, size: 4, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_s4).unwrap(), 3.0);
+        
+        let f_s8 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Signed, count: 1, size: 8, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_s8).unwrap(), 4.0);
+        
+        let f_u1 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Unsigned, count: 1, size: 1, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_u1).unwrap(), 5.0);
+        
+        let f_u2 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Unsigned, count: 1, size: 2, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_u2).unwrap(), 6.0);
+        
+        let f_u4 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Unsigned, count: 1, size: 4, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_u4).unwrap(), 7.0);
+        
+        let f_u8 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Unsigned, count: 1, size: 8, precision: 2 };
+        assert_eq!(read_binary_value(&bytes, &mut offset, &f_u8).unwrap(), 8.0);
+        
+        let mut f32_offset = 0;
+        let f32_bytes = 1.23f32.to_le_bytes().to_vec();
+        let f_f4 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Float, count: 1, size: 4, precision: 2 };
+        assert!((read_binary_value(&f32_bytes, &mut f32_offset, &f_f4).unwrap() - 1.23).abs() < 1e-5);
+        
+        let mut f64_offset = 0;
+        let f64_bytes = 4.56f64.to_le_bytes().to_vec();
+        let f_f8 = Field { id: DimId::X, label: "X".into(), ty: FieldType::Float, count: 1, size: 8, precision: 2 };
+        assert!((read_binary_value(&f64_bytes, &mut f64_offset, &f_f8).unwrap() - 4.56).abs() < 1e-9);
+        
+        let mut short_offset = 0;
+        assert!(read_binary_value(&[0u8], &mut short_offset, &f_s2).is_err());
+    }
+
+    #[test]
+    fn test_write_binary_value_all_types() {
+        let mut out = Vec::new();
+        write_binary_value(&mut out, 1.0, FieldType::Signed, 1).unwrap();
+        write_binary_value(&mut out, 2.0, FieldType::Signed, 2).unwrap();
+        write_binary_value(&mut out, 3.0, FieldType::Signed, 4).unwrap();
+        write_binary_value(&mut out, 4.0, FieldType::Signed, 8).unwrap();
+        write_binary_value(&mut out, 5.0, FieldType::Unsigned, 1).unwrap();
+        write_binary_value(&mut out, 6.0, FieldType::Unsigned, 2).unwrap();
+        write_binary_value(&mut out, 7.0, FieldType::Unsigned, 4).unwrap();
+        write_binary_value(&mut out, 8.0, FieldType::Unsigned, 8).unwrap();
+        write_binary_value(&mut out, 1.23, FieldType::Float, 4).unwrap();
+        write_binary_value(&mut out, 4.56, FieldType::Float, 8).unwrap();
+        
+        assert_eq!(out.len(), 1 + 2 + 4 + 8 + 1 + 2 + 4 + 8 + 4 + 8);
+        assert!(write_binary_value(&mut out, 1.0, FieldType::Signed, 3).is_err());
+    }
+
+    #[test]
+    fn test_apply_writer_type_all_types() {
+        let mut field = default_field(DimId::Intensity, 6);
+        
+        apply_writer_type(&mut field, "Unsigned8").unwrap();
+        assert_eq!(field.ty, FieldType::Unsigned);
+        assert_eq!(field.size, 1);
+        
+        apply_writer_type(&mut field, "Unsigned16").unwrap();
+        assert_eq!(field.size, 2);
+        
+        apply_writer_type(&mut field, "Unsigned32").unwrap();
+        assert_eq!(field.size, 4);
+        
+        apply_writer_type(&mut field, "Unsigned64").unwrap();
+        assert_eq!(field.size, 8);
+        
+        apply_writer_type(&mut field, "Signed8").unwrap();
+        assert_eq!(field.ty, FieldType::Signed);
+        assert_eq!(field.size, 1);
+        
+        apply_writer_type(&mut field, "Signed16").unwrap();
+        assert_eq!(field.size, 2);
+        
+        apply_writer_type(&mut field, "Signed32").unwrap();
+        assert_eq!(field.size, 4);
+        
+        apply_writer_type(&mut field, "Signed64").unwrap();
+        assert_eq!(field.size, 8);
+        
+        apply_writer_type(&mut field, "Float").unwrap();
+        assert_eq!(field.ty, FieldType::Float);
+        assert_eq!(field.size, 4);
+        
+        apply_writer_type(&mut field, "Double").unwrap();
+        assert_eq!(field.size, 8);
+    }
+
+    #[test]
+    fn test_dim_type_all_variants() {
+        let f_s1 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Signed, count: 1, size: 1, precision: 2 };
+        assert_eq!(dim_type(&f_s1), DimType::I8);
+        
+        let f_s2 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Signed, count: 1, size: 2, precision: 2 };
+        assert_eq!(dim_type(&f_s2), DimType::I16);
+        
+        let f_s4 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Signed, count: 1, size: 4, precision: 2 };
+        assert_eq!(dim_type(&f_s4), DimType::I32);
+        
+        let f_s8 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Signed, count: 1, size: 8, precision: 2 };
+        assert_eq!(dim_type(&f_s8), DimType::I64);
+        
+        let f_u1 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Unsigned, count: 1, size: 1, precision: 2 };
+        assert_eq!(dim_type(&f_u1), DimType::U8);
+        
+        let f_u2 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Unsigned, count: 1, size: 2, precision: 2 };
+        assert_eq!(dim_type(&f_u2), DimType::U16);
+        
+        let f_u4 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Unsigned, count: 1, size: 4, precision: 2 };
+        assert_eq!(dim_type(&f_u4), DimType::U32);
+        
+        let f_u8 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Unsigned, count: 1, size: 8, precision: 2 };
+        assert_eq!(dim_type(&f_u8), DimType::U64);
+        
+        let f_f4 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Float, count: 1, size: 4, precision: 2 };
+        assert_eq!(dim_type(&f_f4), DimType::F32);
+        
+        let f_f8 = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Float, count: 1, size: 8, precision: 2 };
+        assert_eq!(dim_type(&f_f8), DimType::F64);
+        
+        let f_invalid = Field { id: DimId::Intensity, label: "Intensity".into(), ty: FieldType::Signed, count: 1, size: 3, precision: 2 };
+        assert_eq!(dim_type(&f_invalid), DimType::F64);
+    }
+
+    #[test]
+    fn test_compressed_payload_errors() {
+        let header = Header {
+            fields: vec![Field { id: DimId::X, label: "X".into(), ty: FieldType::Float, count: 1, size: 4, precision: 2 }],
+            points: 10,
+            data_start: 0,
+            storage: "binary_compressed".to_string(),
+        };
+        
+        assert!(read_compressed_payload(&header, &[0u8; 4]).is_err());
+        
+        let mut size_mismatch_bytes = vec![0u8; 8];
+        size_mismatch_bytes[4..8].copy_from_slice(&5u32.to_le_bytes());
+        assert!(read_compressed_payload(&header, &size_mismatch_bytes).is_err());
+        
+        let mut too_large_bytes = vec![0u8; 8];
+        too_large_bytes[0..4].copy_from_slice(&100u32.to_le_bytes());
+        too_large_bytes[4..8].copy_from_slice(&40u32.to_le_bytes());
+        assert!(read_compressed_payload(&header, &too_large_bytes).is_err());
+    }
 }

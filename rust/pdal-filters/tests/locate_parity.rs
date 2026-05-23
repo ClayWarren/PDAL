@@ -118,7 +118,10 @@ fn test_locate_custom_dim() {
     }
     let mut filter = LocateFilter::new("MyDim".to_string(), "max".to_string());
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
-    assert_eq!(outputs[0].get_f64(0, &DimId::Other("MyDim".to_string())), 9.9);
+    assert_eq!(
+        outputs[0].get_f64(0, &DimId::Other("MyDim".to_string())),
+        9.9
+    );
 }
 
 #[test]

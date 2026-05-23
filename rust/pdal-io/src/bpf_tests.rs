@@ -298,6 +298,8 @@ fn read_autzen_dd_bpf() {
 
 #[test]
 fn reader_handles_v3_segregated_deflate() {
-    let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3-deflate-segregated.bpf"));
+    let view = read_bpf(&data_path(
+        "bpf/autzen-utm-chipped-25-v3-deflate-segregated.bpf",
+    ));
     assert_eq!(view.len(), 1065);
 }

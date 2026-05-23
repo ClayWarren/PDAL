@@ -1153,4 +1153,340 @@ mod tests {
             let _ = read_ept_preview(&path);
         }
     }
+
+    #[test]
+    fn test_ept_reader_name_direct() {
+        let options = Options::new();
+        let reader = EptReader::new(&options);
+        assert_eq!(reader.name(), "readers.ept");
+    }
+
+    #[test]
+    fn test_numeric_conversion_and_truncation() {
+        assert_eq!(read_binary_value(&[42], DimType::U8), 42.0);
+        assert_eq!(read_binary_value(&[254], DimType::I8), -2.0);
+        assert_eq!(read_binary_value(&[42, 0], DimType::U16), 42.0);
+        assert_eq!(read_binary_value(&[254, 255], DimType::I16), -2.0);
+        assert_eq!(read_binary_value(&[42, 0, 0, 0], DimType::U32), 42.0);
+        assert_eq!(read_binary_value(&[254, 255, 255, 255], DimType::I32), -2.0);
+        assert_eq!(
+            read_binary_value(&[42, 0, 0, 0, 0, 0, 0, 0], DimType::U64),
+            42.0
+        );
+        assert_eq!(
+            read_binary_value(&[254, 255, 255, 255, 255, 255, 255, 255], DimType::I64),
+            -2.0
+        );
+        assert_eq!(read_binary_value(&[0, 0, 40, 66], DimType::F32), 42.0);
+        assert_eq!(
+            read_binary_value(&[0, 0, 0, 0, 0, 0, 69, 64], DimType::F64),
+            42.0
+        );
+
+        assert_eq!(truncate_storage(42.3, DimType::U8), 42.0);
+        assert_eq!(truncate_storage(-2.3, DimType::I8), -2.0);
+        assert_eq!(truncate_storage(42.3, DimType::U16), 42.0);
+        assert_eq!(truncate_storage(-2.3, DimType::I16), -2.0);
+        assert_eq!(truncate_storage(42.3, DimType::U32), 42.0);
+        assert_eq!(truncate_storage(-2.3, DimType::I32), -2.0);
+        assert_eq!(truncate_storage(42.3, DimType::U64), 42.0);
+        assert_eq!(truncate_storage(-2.3, DimType::I64), -2.0);
+        assert_eq!(truncate_storage(42.3, DimType::F32), 42.29999923706055);
+        assert_eq!(truncate_storage(42.3, DimType::F64), 42.3);
+    }
+
+    #[test]
+    fn test_read_ept_preview_errors_more() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+
+        // Missing points
+        std::fs::write(&ept, r#"{"boundsConforming":[0,0,0,1,1,1]}"#).unwrap();
+        assert!(read_ept_preview(&ept.to_string_lossy()).is_err());
+
+        // Missing dataType
+        std::fs::write(&ept, r#"{"boundsConforming":[0,0,0,1,1,1],"points":10}"#).unwrap();
+        assert!(read_ept_preview(&ept.to_string_lossy()).is_err());
+
+        // Missing schema
+        std::fs::write(
+            &ept,
+            r#"{"boundsConforming":[0,0,0,1,1,1],"points":10,"dataType":"binary"}"#,
+        )
+        .unwrap();
+        assert!(read_ept_preview(&ept.to_string_lossy()).is_err());
+
+        // Schema entry missing name
+        std::fs::write(
+            &ept,
+            r#"{"boundsConforming":[0,0,0,1,1,1],"points":10,"dataType":"binary","schema":[{}]}"#,
+        )
+        .unwrap();
+        assert!(read_ept_preview(&ept.to_string_lossy()).is_err());
+
+        // boundsConforming missing coords (less than 6)
+        std::fs::write(
+            &ept,
+            r#"{"boundsConforming":[0,0,0],"points":10,"dataType":"binary","schema":[]}"#,
+        )
+        .unwrap();
+        assert!(read_ept_preview(&ept.to_string_lossy()).is_err());
+    }
+
+    #[test]
+    fn test_bounds_filter_errors() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-binary/ept.json").display(),
+        );
+        options.add("bounds", "([0,1],[0,1],[0,invalid])");
+        let mut reader = EptReader::new(&options);
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn test_source_origins_non_array() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        std::fs::write(
+            &ept,
+            r#"{
+  "dataType": "binary",
+  "hierarchyType": "json",
+  "span": 128,
+  "bounds": [0, 0, 0, 8, 8, 8],
+  "schema": []
+}"#,
+        )
+        .unwrap();
+
+        let hierarchy_dir = temp.path().join("ept-hierarchy");
+        std::fs::create_dir_all(&hierarchy_dir).unwrap();
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{}"#).unwrap();
+
+        let sources_dir = temp.path().join("ept-sources");
+        std::fs::create_dir(&sources_dir).unwrap();
+        std::fs::write(
+            sources_dir.join("manifest.json"),
+            r#"{"not_an_array": true}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        options.add("origin", "some-origin");
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("EPT source list must be a JSON array"));
+    }
+
+    #[test]
+    fn test_resolution_filter_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+
+        // Missing span
+        std::fs::write(
+            &ept,
+            r#"{"dataType":"binary","hierarchyType":"json","schema":[]}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        options.add("resolution", "1.0");
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("EPT file is missing span"));
+
+        // Non-positive span
+        std::fs::write(
+            &ept,
+            r#"{"dataType":"binary","hierarchyType":"json","schema":[],"span":0}"#,
+        )
+        .unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("EPT span must be positive"));
+
+        // Invalid bounds cube width
+        std::fs::write(&ept, r#"{"dataType":"binary","hierarchyType":"json","schema":[],"span":1,"bounds":[0,0,0,0,0,0]}"#).unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("EPT bounds cube width is invalid"));
+    }
+
+    #[test]
+    fn test_hierarchy_and_key_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        let hierarchy_dir = temp.path().join("ept-hierarchy");
+        std::fs::create_dir_all(&hierarchy_dir).unwrap();
+
+        // EPT hierarchy must be a JSON object
+        std::fs::write(
+            &ept,
+            r#"{
+  "dataType": "binary",
+  "hierarchyType": "json",
+  "span": 128,
+  "bounds": [0, 0, 0, 8, 8, 8],
+  "schema": []
+}"#,
+        )
+        .unwrap();
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"[1, 2, 3]"#).unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("must be a JSON object"));
+
+        // EptKey::parse errors - parts.next().is_some() (too many parts)
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{"0-0-0-0-0":1}"#).unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("Invalid EPT hierarchy key '0-0-0-0-0'"));
+
+        // EptKey::parse errors - shift/depth too large
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{"65-0-0-0":1}"#).unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("depth is too large"));
+
+        // EptKey::parse errors - missing part
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{"0-0-0":1}"#).unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("Invalid EPT hierarchy key '0-0-0'"));
+
+        // EptKey::parse errors - non-numeric part
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{"0-0-0-abc":1}"#).unwrap();
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("Invalid EPT hierarchy key '0-0-0-abc'"));
+    }
+
+    #[test]
+    fn test_source_origins_from_list_json() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        std::fs::write(
+            &ept,
+            r#"{
+  "dataType": "binary",
+  "hierarchyType": "json",
+  "span": 128,
+  "bounds": [0, 0, 0, 8, 8, 8],
+  "schema": []
+}"#,
+        )
+        .unwrap();
+
+        let hierarchy_dir = temp.path().join("ept-hierarchy");
+        std::fs::create_dir_all(&hierarchy_dir).unwrap();
+        std::fs::write(hierarchy_dir.join("0-0-0-0.json"), r#"{}"#).unwrap();
+
+        let sources_dir = temp.path().join("ept-sources");
+        std::fs::create_dir(&sources_dir).unwrap();
+        std::fs::write(sources_dir.join("list.json"), r#"[{"origin": 42}]"#).unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        options.add("origin", "42");
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+    }
+
+    #[test]
+    fn test_applies_2d_bounds_filter() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("ept/ellipsoid-binary/ept.json").display(),
+        );
+        options.add("bounds", "([-8242746,-8242600],[4966506,4966706])");
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert!(!views[0].is_empty());
+        assert!(views[0].len() < 100000);
+        for idx in 0..views[0].len() {
+            let x = views[0].get_f64(idx, &DimId::X);
+            let y = views[0].get_f64(idx, &DimId::Y);
+            assert!((-8242746.0..=-8242600.0).contains(&x));
+            assert!((4966506.0..=4966706.0).contains(&y));
+        }
+    }
+
+    #[test]
+    fn test_parse_type_all_cases() {
+        assert_eq!(dim_type("unsigned", 1).unwrap(), DimType::U8);
+        assert_eq!(dim_type("unsigned", 2).unwrap(), DimType::U16);
+        assert_eq!(dim_type("unsigned", 4).unwrap(), DimType::U32);
+        assert_eq!(dim_type("unsigned", 8).unwrap(), DimType::U64);
+        assert_eq!(dim_type("signed", 1).unwrap(), DimType::I8);
+        assert_eq!(dim_type("signed", 2).unwrap(), DimType::I16);
+        assert_eq!(dim_type("signed", 4).unwrap(), DimType::I32);
+        assert_eq!(dim_type("signed", 8).unwrap(), DimType::I64);
+        assert_eq!(dim_type("float", 4).unwrap(), DimType::F32);
+        assert_eq!(dim_type("float", 8).unwrap(), DimType::F64);
+        assert!(dim_type("unsigned", 3).is_err());
+        assert!(dim_type("invalid_kind", 4).is_err());
+    }
+
+    #[test]
+    fn test_view_from_binary_tile_size_mismatch() {
+        let schema = EptSchema {
+            point_size: 4,
+            entries: Vec::new(),
+            layout: std::rc::Rc::new(PointLayout::new()),
+        };
+        let path = Path::new("dummy.bin");
+        let result = view_from_binary_tile(path, vec![1, 2, 3], &schema, "");
+        assert!(result
+            .err()
+            .unwrap()
+            .0
+            .contains("size does not match schema"));
+    }
+
+    #[test]
+    fn reader_errors_on_missing_datatype() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        std::fs::write(&ept, r#"{"bounds":[0,0,0,1,1,1]}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("missing dataType"));
+    }
+
+    #[test]
+    fn reader_errors_on_invalid_json() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        std::fs::write(&ept, r#"{"invalid_json": "#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("not valid JSON"));
+    }
+
+    #[test]
+    fn reader_errors_on_bounds_too_short() {
+        let temp = tempfile::tempdir().unwrap();
+        let ept = temp.path().join("ept.json");
+        std::fs::write(&ept, r#"{"dataType":"binary","bounds":[0,0,0]}"#).unwrap();
+        let mut options = Options::new();
+        options.add("filename", ept.display());
+        let mut reader = EptReader::new(&options);
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("bounds must contain six coordinates"));
+    }
 }

@@ -665,4 +665,115 @@ mod tests {
         let result = PlyWriter::new(&options);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_names_and_metadata() {
+        let reader = PlyReader::new(&Options::new());
+        assert_eq!(reader.name(), "readers.ply");
+        assert_eq!(reader.metadata().name(), "readers.ply");
+        
+        let mut writer_opts = Options::new();
+        writer_opts.add("filename", "dummy.ply");
+        let writer = PlyWriter::new(&writer_opts).unwrap();
+        assert_eq!(writer.name(), "writers.ply");
+        assert_eq!(writer.metadata().name(), "writers.ply");
+    }
+
+    #[test]
+    fn test_read_binary_value_all_types() {
+        use std::io::Cursor;
+        
+        // Little Endian
+        assert_eq!(read_binary_value(&mut Cursor::new(&[1u8]), PlyFormat::BinaryLittleEndian, DimType::I8).unwrap(), 1.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[2u8]), PlyFormat::BinaryLittleEndian, DimType::U8).unwrap(), 2.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[3u8, 0]), PlyFormat::BinaryLittleEndian, DimType::I16).unwrap(), 3.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[4u8, 0]), PlyFormat::BinaryLittleEndian, DimType::U16).unwrap(), 4.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[5u8, 0, 0, 0]), PlyFormat::BinaryLittleEndian, DimType::I32).unwrap(), 5.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[6u8, 0, 0, 0]), PlyFormat::BinaryLittleEndian, DimType::U32).unwrap(), 6.0);
+        
+        // Big Endian
+        assert_eq!(read_binary_value(&mut Cursor::new(&[1u8]), PlyFormat::BinaryBigEndian, DimType::I8).unwrap(), 1.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[2u8]), PlyFormat::BinaryBigEndian, DimType::U8).unwrap(), 2.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[0, 3u8]), PlyFormat::BinaryBigEndian, DimType::I16).unwrap(), 3.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[0, 4u8]), PlyFormat::BinaryBigEndian, DimType::U16).unwrap(), 4.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[0, 0, 0, 5u8]), PlyFormat::BinaryBigEndian, DimType::I32).unwrap(), 5.0);
+        assert_eq!(read_binary_value(&mut Cursor::new(&[0, 0, 0, 6u8]), PlyFormat::BinaryBigEndian, DimType::U32).unwrap(), 6.0);
+        
+        assert!(read_binary_value(&mut Cursor::new(&[0u8; 8]), PlyFormat::BinaryLittleEndian, DimType::I64).is_err());
+    }
+
+    #[test]
+    fn test_parse_header_errors() {
+        assert!(parse_header("notply\n").is_err());
+        assert!(parse_header("ply\nnotformat\n").is_err());
+        assert!(parse_header("ply\nformat mysterious 1.0\n").is_err());
+        assert!(parse_header("ply\nformat ascii 2.0\n").is_err());
+        assert!(parse_header("ply\nformat ascii 1.0\nproperty float x\n").is_err());
+        assert!(parse_header("ply\nformat ascii 1.0\nelement vertex 10\nproperty float x\n").is_err());
+        assert!(parse_header("ply\nformat ascii 1.0\ninvalid_keyword\n").is_err());
+        assert!(parse_header("ply\nformat ascii 1.0\nelement vertex 10\nproperty list uchar int vertex_indices\n").is_err());
+    }
+
+    #[test]
+    fn test_write_ply_value_all_types() {
+        let mut out = Vec::new();
+        
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 1.0, DimType::I8, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 2.0, DimType::U8, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 3.0, DimType::I16, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 4.0, DimType::U16, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 5.0, DimType::I32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 6.0, DimType::U32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 1.23, DimType::F32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 4.56, DimType::F64, None).unwrap();
+        
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 1.0, DimType::I8, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 2.0, DimType::U8, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 3.0, DimType::I16, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 4.0, DimType::U16, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 5.0, DimType::I32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 6.0, DimType::U32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 1.23, DimType::F32, None).unwrap();
+        write_ply_value(&mut out, PlyFormat::BinaryBigEndian, 4.56, DimType::F64, None).unwrap();
+        
+        assert_eq!(out.len(), (1+1+2+2+4+4+4+8) * 2);
+        assert!(write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, 1.0, DimType::I64, None).is_err());
+    }
+
+    #[test]
+    fn test_ply_type_string_and_errors() {
+        assert_eq!(ply_type_string(DimType::I8, true), Some("int8"));
+        assert_eq!(ply_type_string(DimType::I8, false), Some("char"));
+        assert_eq!(ply_type_string(DimType::U8, true), Some("uint8"));
+        assert_eq!(ply_type_string(DimType::U8, false), Some("uchar"));
+        assert_eq!(ply_type_string(DimType::I16, true), Some("int16"));
+        assert_eq!(ply_type_string(DimType::I16, false), Some("short"));
+        assert_eq!(ply_type_string(DimType::U16, true), Some("uint16"));
+        assert_eq!(ply_type_string(DimType::U16, false), Some("ushort"));
+        assert_eq!(ply_type_string(DimType::I32, true), Some("int32"));
+        assert_eq!(ply_type_string(DimType::I32, false), Some("int"));
+        assert_eq!(ply_type_string(DimType::U32, true), Some("uint32"));
+        assert_eq!(ply_type_string(DimType::U32, false), Some("uint"));
+        assert_eq!(ply_type_string(DimType::F32, true), Some("float32"));
+        assert_eq!(ply_type_string(DimType::F32, false), Some("float"));
+        assert_eq!(ply_type_string(DimType::F64, true), Some("float64"));
+        assert_eq!(ply_type_string(DimType::F64, false), Some("double"));
+        assert_eq!(ply_type_string(DimType::I64, true), None);
+    }
+
+    #[test]
+    fn test_read_simple_non_simple_error() {
+        let prop = PlyProp::List { name: "test".into(), count_ty: DimType::U8, list_ty: DimType::I32 };
+        let mut data = PlyData::Ascii("".split_whitespace());
+        assert!(data.read_simple(&prop, "test_element").is_err());
+    }
+
+    #[test]
+    fn test_read_value_missing_token_error() {
+        let mut data = PlyData::Ascii("".split_whitespace());
+        assert!(data.read_value(DimType::F64, "vertex").is_err());
+        
+        let mut data_invalid = PlyData::Ascii("abc".split_whitespace());
+        assert!(data_invalid.read_value(DimType::F64, "vertex").is_err());
+    }
 }

@@ -284,7 +284,12 @@ mod tests {
         layout.register(DimId::Z, DimType::F64);
         layout.register(DimId::Classification, DimType::U8);
         let mut view = PointView::new(Rc::new(layout));
-        for (x, y, z) in &[(0.5, 0.5, 10.0), (0.5, 1.5, 12.0), (1.5, 0.5, 8.0), (1.5, 1.5, 11.0)] {
+        for (x, y, z) in &[
+            (0.5, 0.5, 10.0),
+            (0.5, 1.5, 12.0),
+            (1.5, 0.5, 8.0),
+            (1.5, 1.5, 11.0),
+        ] {
             let id = view.add_point();
             view.set_f64(id, &DimId::X, *x);
             view.set_f64(id, &DimId::Y, *y);
@@ -301,7 +306,11 @@ mod tests {
         layout.register(DimId::ReturnNumber, DimType::U8);
         layout.register(DimId::NumberOfReturns, DimType::U8);
         let mut view = PointView::new(Rc::new(layout));
-        for (x, y, z, rn, nr) in &[(0.5, 0.5, 10.0, 1, 1), (0.5, 1.5, 12.0, 1, 2), (1.5, 0.5, 8.0, 2, 2)] {
+        for (x, y, z, rn, nr) in &[
+            (0.5, 0.5, 10.0, 1, 1),
+            (0.5, 1.5, 12.0, 1, 2),
+            (1.5, 0.5, 8.0, 2, 2),
+        ] {
             let id = view.add_point();
             view.set_f64(id, &DimId::X, *x);
             view.set_f64(id, &DimId::Y, *y);
@@ -415,7 +424,14 @@ mod tests {
     #[test]
     fn smrf_returns_filter_first_only() {
         let mut filter = SmrfFilter::new(
-            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            1.0,
+            0.15,
+            None,
+            0.5,
+            0.5,
+            2,
+            1,
+            true,
             vec!["first".to_string()],
         );
         let result = filter.run_one(&grid_view_with_returns()).unwrap();
@@ -426,7 +442,14 @@ mod tests {
     #[test]
     fn smrf_returns_filter_last_only() {
         let mut filter = SmrfFilter::new(
-            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            1.0,
+            0.15,
+            None,
+            0.5,
+            0.5,
+            2,
+            1,
+            true,
             vec!["last".to_string()],
         );
         let result = filter.run_one(&grid_view_with_returns()).unwrap();
@@ -436,7 +459,14 @@ mod tests {
     #[test]
     fn smrf_returns_filter_only() {
         let mut filter = SmrfFilter::new(
-            1.0, 0.15, None, 0.5, 0.5, 2, 1, true,
+            1.0,
+            0.15,
+            None,
+            0.5,
+            0.5,
+            2,
+            1,
+            true,
             vec!["only".to_string()],
         );
         let result = filter.run_one(&grid_view_with_returns()).unwrap();
@@ -450,7 +480,11 @@ mod tests {
         let result = filter.run_one(&flat_3x3_view()).unwrap();
         // All 9 points at z=10 should be within threshold from a flat surface
         for i in 0..result[0].len() {
-            assert_eq!(result[0].get_f64(i, &DimId::Classification), 2.0, "point {i} should be ground");
+            assert_eq!(
+                result[0].get_f64(i, &DimId::Classification),
+                2.0,
+                "point {i} should be ground"
+            );
         }
     }
 

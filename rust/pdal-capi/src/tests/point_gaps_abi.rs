@@ -8,7 +8,9 @@ fn cstring(value: &str) -> CString {
 
 unsafe fn layout_with_all_dim_types() -> *mut pdal_core::point::PointLayout {
     let layout = pdal_point_layout_create();
-    let names = ["U8d", "U16d", "U32d", "U64d", "I8d", "I16d", "I32d", "I64d", "F32d", "F64d"];
+    let names = [
+        "U8d", "U16d", "U32d", "U64d", "I8d", "I16d", "I32d", "I64d", "F32d", "F64d",
+    ];
     for (i, name) in names.iter().enumerate() {
         let n = cstring(name);
         pdal_point_layout_register_dim(layout, n.as_ptr(), i as i32);
@@ -45,7 +47,10 @@ fn dim_type_from_name_and_base_size_handle_inputs() {
         let valid = cstring("float");
         assert!(pdal_dimension_type_from_name(valid.as_ptr()) >= 0);
 
-        assert_eq!(pdal_dimension_type_from_base_and_size(std::ptr::null(), 8), 0);
+        assert_eq!(
+            pdal_dimension_type_from_base_and_size(std::ptr::null(), 8),
+            0
+        );
         let base = cstring("signed");
         assert!(pdal_dimension_type_from_base_and_size(base.as_ptr(), 4) >= 0);
         assert!(pdal_dimension_type_from_base_and_size(base.as_ptr(), 1) >= 0);
@@ -139,8 +144,14 @@ fn calculate_bounds_2d_3d_handle_empty_and_no_dims() {
         let p = pdal_point_view_add_point(view);
         assert_eq!(p, 0);
 
-        assert!(!pdal_point_view_calculate_bounds_2d(view, std::ptr::null_mut()));
-        assert!(!pdal_point_view_calculate_bounds_3d(view, std::ptr::null_mut()));
+        assert!(!pdal_point_view_calculate_bounds_2d(
+            view,
+            std::ptr::null_mut()
+        ));
+        assert!(!pdal_point_view_calculate_bounds_3d(
+            view,
+            std::ptr::null_mut()
+        ));
         pdal_point_view_destroy(view);
 
         assert!(!pdal_point_view_calculate_bounds_2d(
@@ -217,7 +228,10 @@ fn point_view_add_named_mesh_triangle_round_trips() {
             1,
             2,
         ));
-        assert_eq!(pdal_point_view_named_mesh_triangle_count(view, mesh.as_ptr()), 1);
+        assert_eq!(
+            pdal_point_view_named_mesh_triangle_count(view, mesh.as_ptr()),
+            1
+        );
 
         let mut a = 0u64;
         let mut b = 0u64;

@@ -211,7 +211,9 @@ fn memoryview_read_covers_each_dim_type_variant() {
             std::mem::offset_of!(Row, f32v),
             std::mem::offset_of!(Row, f64v),
         ];
-        let type_ids = [0x201u32, 0x202, 0x204, 0x208, 0x101, 0x102, 0x104, 0x108, 0x404, 0x408];
+        let type_ids = [
+            0x201u32, 0x202, 0x204, 0x208, 0x101, 0x102, 0x104, 0x108, 0x404, 0x408,
+        ];
         let fields: Vec<pdal_memoryview_field_t> = (0..names.len())
             .map(|i| pdal_memoryview_field_t {
                 name: names[i].as_ptr(),
@@ -231,7 +233,10 @@ fn memoryview_read_covers_each_dim_type_variant() {
         );
         assert!(!view.is_null());
         assert_eq!(pdal_point_view_length(view), 1);
-        for (name, expected) in names.iter().zip([1.0, 2.0, 3.0, 4.0, -1.0, -2.0, -3.0, -4.0, 5.5, 6.5]) {
+        for (name, expected) in names
+            .iter()
+            .zip([1.0, 2.0, 3.0, 4.0, -1.0, -2.0, -3.0, -4.0, 5.5, 6.5])
+        {
             assert!((pdal_point_view_get_f64(view, 0, name.as_ptr()) - expected).abs() < 1e-6);
         }
         pdal_point_view_destroy(view);

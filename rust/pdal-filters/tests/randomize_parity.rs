@@ -109,8 +109,7 @@ fn test_randomize_single_element() {
 #[test]
 fn test_randomize_process_one_returns_false() {
     let mut filter = RandomizeFilter::new(Some(42));
-    let mut scratch =
-        PointView::new(Rc::new(PointLayout::new()));
+    let mut scratch = PointView::new(Rc::new(PointLayout::new()));
     assert!(!filter.process_one(&mut scratch, 0));
 }
 

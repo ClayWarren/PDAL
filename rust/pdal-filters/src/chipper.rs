@@ -225,8 +225,16 @@ mod tests {
     #[test]
     fn chipper_threshold_partitions_points() {
         let view = make_xy_view(&[
-            (0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0),
-            (5.0, 5.0), (6.0, 6.0), (7.0, 7.0), (8.0, 8.0), (9.0, 9.0),
+            (0.0, 0.0),
+            (1.0, 1.0),
+            (2.0, 2.0),
+            (3.0, 3.0),
+            (4.0, 4.0),
+            (5.0, 5.0),
+            (6.0, 6.0),
+            (7.0, 7.0),
+            (8.0, 8.0),
+            (9.0, 9.0),
         ]);
         let mut filter = ChipperFilter::new(3);
         let outputs = filter.run(std::slice::from_ref(&view)).unwrap();

@@ -216,7 +216,9 @@ fn config_clear_error_clears_last_error() {
         // Non-null error after inference
         pdal_clear_error();
         // After clear, the last error should be an empty string
-        let last = CStr::from_ptr(pdal_last_error()).to_string_lossy().to_string();
+        let last = CStr::from_ptr(pdal_last_error())
+            .to_string_lossy()
+            .to_string();
         assert_eq!(last, "");
     }
 }
@@ -299,14 +301,8 @@ fn pipeline_stage_tag_generation_roundtrips_through_c_abi() {
 #[test]
 fn driver_inference_handles_null_filename() {
     unsafe {
-        assert_eq!(
-            take_string(pdal_infer_reader_driver(std::ptr::null())),
-            ""
-        );
-        assert_eq!(
-            take_string(pdal_infer_writer_driver(std::ptr::null())),
-            ""
-        );
+        assert_eq!(take_string(pdal_infer_reader_driver(std::ptr::null())), "");
+        assert_eq!(take_string(pdal_infer_writer_driver(std::ptr::null())), "");
     }
 }
 

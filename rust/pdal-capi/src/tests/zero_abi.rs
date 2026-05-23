@@ -50,7 +50,9 @@ fn delaunay_triangulate_happy_and_null_paths() {
 #[test]
 fn ogr_spec_parse_handles_valid_invalid_and_null() {
     unsafe {
-        let input = cstring(r#"{"type": "ogr", "datasource": "places.shp", "drivers": ["ESRI Shapefile"], "layer": "places"}"#);
+        let input = cstring(
+            r#"{"type": "ogr", "datasource": "places.shp", "drivers": ["ESRI Shapefile"], "layer": "places"}"#,
+        );
         let raw = pdal_ogr_spec_parse_json(input.as_ptr());
         let parsed: serde_json::Value = serde_json::from_str(&take_string(raw)).unwrap();
         assert_eq!(parsed["ok"], serde_json::json!(true));
@@ -58,14 +60,12 @@ fn ogr_spec_parse_handles_valid_invalid_and_null() {
         assert_eq!(parsed["drivers"], serde_json::json!(["ESRI Shapefile"]));
 
         let null_raw = pdal_ogr_spec_parse_json(std::ptr::null());
-        let null_parsed: serde_json::Value =
-            serde_json::from_str(&take_string(null_raw)).unwrap();
+        let null_parsed: serde_json::Value = serde_json::from_str(&take_string(null_raw)).unwrap();
         assert_eq!(null_parsed["ok"], serde_json::json!(false));
 
         let bad = cstring("{ not json");
         let bad_raw = pdal_ogr_spec_parse_json(bad.as_ptr());
-        let bad_parsed: serde_json::Value =
-            serde_json::from_str(&take_string(bad_raw)).unwrap();
+        let bad_parsed: serde_json::Value = serde_json::from_str(&take_string(bad_raw)).unwrap();
         assert_eq!(bad_parsed["ok"], serde_json::json!(false));
         assert!(bad_parsed["error"].is_string());
     }
@@ -79,8 +79,13 @@ fn kernel_parse_stage_option_covers_ok_invalid_unknown_and_null() {
         let mut value: *mut c_char = std::ptr::null_mut();
 
         let input = cstring("--filters.range.limits=Z[0:10]");
-        let rc =
-            pdal_kernel_parse_stage_option(input.as_ptr(), true, &mut stage, &mut option, &mut value);
+        let rc = pdal_kernel_parse_stage_option(
+            input.as_ptr(),
+            true,
+            &mut stage,
+            &mut option,
+            &mut value,
+        );
         assert_eq!(rc, 0);
         assert_eq!(take_string(stage), "filters.range");
         assert_eq!(take_string(option), "limits");
@@ -126,12 +131,8 @@ fn plugin_valid_name_round_trips() {
         let value = take_string(raw);
         assert!(value.contains("foo"));
 
-        let raw_null = pdal_plugin_valid_name(
-            std::ptr::null(),
-            std::ptr::null(),
-            0,
-            std::ptr::null(),
-        );
+        let raw_null =
+            pdal_plugin_valid_name(std::ptr::null(), std::ptr::null(), 0, std::ptr::null());
         let _ = take_string(raw_null);
 
         let nul_in_list: [*const c_char; 1] = [std::ptr::null()];
@@ -180,13 +181,10 @@ fn grid_decimation_validate_and_kept_indices() {
             &mut len2,
         )
         .is_null());
-        assert!(pdal_grid_decimation_get_kept_indices(
-            view,
-            1.0,
-            std::ptr::null(),
-            &mut len2,
-        )
-        .is_null());
+        assert!(
+            pdal_grid_decimation_get_kept_indices(view, 1.0, std::ptr::null(), &mut len2,)
+                .is_null()
+        );
         assert!(pdal_grid_decimation_get_kept_indices(
             view,
             1.0,
@@ -223,10 +221,7 @@ fn icp_register_handles_happy_path_and_null_inputs() {
         let mut converged = false;
         let mut mse = 0.0f64;
         let identity: [f64; 16] = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
 
         let result = pdal_icp_register(
@@ -273,19 +268,37 @@ fn icp_register_handles_happy_path_and_null_inputs() {
         assert!(pdal_icp_register(
             std::ptr::null(),
             moving,
-            5, 2, 1e-7, 1e-7, 1e-12,
-            false, 0.0, false, std::ptr::null(),
-            std::ptr::null_mut(), std::ptr::null_mut(),
-            std::ptr::null_mut(), std::ptr::null_mut(),
+            5,
+            2,
+            1e-7,
+            1e-7,
+            1e-12,
+            false,
+            0.0,
+            false,
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
         )
         .is_null());
         assert!(pdal_icp_register(
             fixed,
             std::ptr::null(),
-            5, 2, 1e-7, 1e-7, 1e-12,
-            false, 0.0, false, std::ptr::null(),
-            std::ptr::null_mut(), std::ptr::null_mut(),
-            std::ptr::null_mut(), std::ptr::null_mut(),
+            5,
+            2,
+            1e-7,
+            1e-7,
+            1e-12,
+            false,
+            0.0,
+            false,
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
         )
         .is_null());
 

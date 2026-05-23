@@ -437,10 +437,14 @@ fn more_spatial_stats_filters_constructors_through_c_abi() {
 fn test_filters_abi_error_and_invalid_paths() {
     unsafe {
         // 1. pdal_stage_create_geomdistance nulls
-        assert!(pdal_stage_create_geomdistance(std::ptr::null(), std::ptr::null(), false).is_null());
+        assert!(
+            pdal_stage_create_geomdistance(std::ptr::null(), std::ptr::null(), false).is_null()
+        );
 
         // 2. pdal_stage_create_projpipeline nulls
-        assert!(pdal_stage_create_projpipeline(std::ptr::null(), std::ptr::null(), false).is_null());
+        assert!(
+            pdal_stage_create_projpipeline(std::ptr::null(), std::ptr::null(), false).is_null()
+        );
 
         // 3. pdal_stage_create_groupby null
         assert!(pdal_stage_create_groupby(std::ptr::null()).is_null());
@@ -460,7 +464,9 @@ fn test_filters_abi_error_and_invalid_paths() {
         pdal_stage_transformation_point(std::ptr::null_mut(), std::ptr::null_mut(), 0);
 
         // 8. pdal_transformation_matrix_parse null and bad
-        assert!(!pdal_transformation_matrix_parse(std::ptr::null(), std::ptr::null_mut()).is_null());
+        assert!(
+            !pdal_transformation_matrix_parse(std::ptr::null(), std::ptr::null_mut()).is_null()
+        );
         let mut mat = [0.0f64; 16];
         let err = take_string(pdal_transformation_matrix_parse(
             cstring("1 2 3").as_ptr(),
@@ -520,8 +526,9 @@ fn test_filters_abi_error_and_invalid_paths() {
         )
         .is_null());
 
+        let x_str = cstring("X");
         let valid_limit = pdal_range_limit_t {
-            dim_name: cstring("X").as_ptr(),
+            dim_name: x_str.as_ptr(),
             lower_bound: 0.0,
             upper_bound: 1.0,
             inclusive_lower: true,
@@ -602,7 +609,8 @@ fn test_filters_abi_error_and_invalid_paths() {
 
         // 16. pdal_stage_create_neighborclassifier errors
         assert!(
-            pdal_stage_create_neighborclassifier(std::ptr::null(), 1, 2, std::ptr::null()).is_null()
+            pdal_stage_create_neighborclassifier(std::ptr::null(), 1, 2, std::ptr::null())
+                .is_null()
         );
         assert!(pdal_stage_create_neighborclassifier(&bad_limit, 1, 2, std::ptr::null()).is_null());
         let nc = pdal_stage_create_neighborclassifier(std::ptr::null(), 0, 2, std::ptr::null());
@@ -615,55 +623,91 @@ fn test_filters_abi_error_and_invalid_paths() {
 fn test_filter_abi_nulls_and_errors() {
     unsafe {
         // --- filter_abi.rs ---
-        assert!(pdal_stage_create_geomdistance(std::ptr::null(), std::ptr::null(), false).is_null());
-        assert!(pdal_stage_create_geomdistance(CString::new("POINT(0 0)").unwrap().as_ptr(), std::ptr::null(), false).is_null());
-        assert!(pdal_stage_create_geomdistance(std::ptr::null(), CString::new("X").unwrap().as_ptr(), false).is_null());
-        
-        assert!(pdal_stage_create_projpipeline(std::ptr::null(), std::ptr::null(), false).is_null());
-        assert!(pdal_stage_create_projpipeline(CString::new("EPSG:4326").unwrap().as_ptr(), std::ptr::null(), false).is_null());
-        assert!(pdal_stage_create_projpipeline(std::ptr::null(), CString::new("+proj=utm").unwrap().as_ptr(), false).is_null());
-        
+        assert!(
+            pdal_stage_create_geomdistance(std::ptr::null(), std::ptr::null(), false).is_null()
+        );
+        assert!(pdal_stage_create_geomdistance(
+            CString::new("POINT(0 0)").unwrap().as_ptr(),
+            std::ptr::null(),
+            false
+        )
+        .is_null());
+        assert!(pdal_stage_create_geomdistance(
+            std::ptr::null(),
+            CString::new("X").unwrap().as_ptr(),
+            false
+        )
+        .is_null());
+
+        assert!(
+            pdal_stage_create_projpipeline(std::ptr::null(), std::ptr::null(), false).is_null()
+        );
+        assert!(pdal_stage_create_projpipeline(
+            CString::new("EPSG:4326").unwrap().as_ptr(),
+            std::ptr::null(),
+            false
+        )
+        .is_null());
+        assert!(pdal_stage_create_projpipeline(
+            std::ptr::null(),
+            CString::new("+proj=utm").unwrap().as_ptr(),
+            false
+        )
+        .is_null());
+
         assert!(pdal_stage_create_groupby(std::ptr::null()).is_null());
-        
+
         assert!(pdal_stage_create_labelduplicates(std::ptr::null(), 0).is_null());
         let bad_dims = [std::ptr::null()];
         assert!(pdal_stage_create_labelduplicates(bad_dims.as_ptr(), 1).is_null());
-        
+
         pdal_stage_merge_append(std::ptr::null_mut(), std::ptr::null_mut());
-        
+
         assert!(pdal_stage_create_transformation(std::ptr::null()).is_null());
         pdal_stage_transformation_point(std::ptr::null_mut(), std::ptr::null_mut(), 0);
-        
+
         let mut matrix_out = [0.0; 16];
         let parse_err = pdal_transformation_matrix_parse(std::ptr::null(), matrix_out.as_mut_ptr());
         assert!(!parse_err.is_null());
         pdal_string_free(parse_err);
-        
+
         let format_err = pdal_transformation_matrix_format(std::ptr::null());
         assert!(!format_err.is_null());
         assert_eq!(take_string(format_err), "");
-        
+
         let geo_err = pdal_georeference_validate_coordinate_system(std::ptr::null());
         assert!(!geo_err.is_null());
         assert_eq!(take_string(geo_err), "Missing coordinate system.");
         let beam_err = pdal_georeference_validate_transform_beam(std::ptr::null(), false);
         assert!(!beam_err.is_null());
         assert_eq!(take_string(beam_err), "Missing point layout.");
-        
+
         let div = pdal_stage_create_divider(0, 0, 0, std::ptr::null(), 0);
         assert!(!div.is_null());
         pdal_stage_destroy(div);
-        
+
         let bad_evals = [0u8];
         let div2 = pdal_stage_create_divider(0, 0, 0, bad_evals.as_ptr(), 1);
         assert!(!div2.is_null());
         pdal_stage_destroy(div2);
 
         assert!(pdal_stage_create_divider(0, 1, 0, std::ptr::null(), 0).is_null());
-        
+
         assert!(pdal_stage_create_gpstimeconvert(std::ptr::null()).is_null());
-        
-        assert!(pdal_stage_create_radiusassign(std::ptr::null(), 1, std::ptr::null(), 1, std::ptr::null(), 1, 1.0, false, 0.0, 0.0).is_null());
+
+        assert!(pdal_stage_create_radiusassign(
+            std::ptr::null(),
+            1,
+            std::ptr::null(),
+            1,
+            std::ptr::null(),
+            1,
+            1.0,
+            false,
+            0.0,
+            0.0
+        )
+        .is_null());
 
         // --- filter_abi_basic.rs ---
         assert!(pdal_stage_create_head(std::ptr::null()).is_null());
@@ -674,7 +718,7 @@ fn test_filter_abi_nulls_and_errors() {
         assert!(!pdal_stage_validate_assign_statement(std::ptr::null()));
         pdal_stage_ferry_point(std::ptr::null_mut(), std::ptr::null_mut(), 0);
         assert!(pdal_stage_create_randomize(std::ptr::null()).is_null());
-        
+
         let limit_err = pdal_range_limit_parse(
             std::ptr::null(),
             std::ptr::null_mut(),
@@ -687,18 +731,34 @@ fn test_filter_abi_nulls_and_errors() {
         );
         assert!(!limit_err.is_null());
         pdal_string_free(limit_err);
-        
+
         assert!(pdal_stage_create_range(std::ptr::null(), 0).is_null());
-        assert!(!pdal_stage_range_point_passes(std::ptr::null_mut(), std::ptr::null_mut(), 0));
-        assert!(pdal_stage_create_sort(std::ptr::null(), 0, std::ptr::null(), std::ptr::null()).is_null());
+        assert!(!pdal_stage_range_point_passes(
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0
+        ));
+        assert!(
+            pdal_stage_create_sort(std::ptr::null(), 0, std::ptr::null(), std::ptr::null())
+                .is_null()
+        );
         assert!(pdal_stage_create_returns(std::ptr::null(), 0).is_null());
-        
+
         // --- filter_abi_geo.rs ---
         assert!(pdal_stage_create_decimation(std::ptr::null()).is_null());
-        let crop = pdal_stage_create_crop(false, std::ptr::null(), 0, std::ptr::null(), 0, std::ptr::null(), 0, 0.0);
+        let crop = pdal_stage_create_crop(
+            false,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0,
+            0.0,
+        );
         assert!(!crop.is_null());
         pdal_stage_destroy(crop);
-        
+
         let invalid_wkt = CString::new("INVALID WKT").unwrap();
         let bad_poly = [invalid_wkt.as_ptr()];
         assert!(pdal_stage_create_crop(
@@ -710,17 +770,34 @@ fn test_filter_abi_nulls_and_errors() {
             std::ptr::null(),
             0,
             0.0
-        ).is_null());
-        assert!(pdal_stage_create_overlay(std::ptr::null(), std::ptr::null(), std::ptr::null()).is_null());
-        assert!(pdal_stage_create_colorinterp(std::ptr::null(), std::ptr::null(), 0.0, 0.0, false, false).is_null());
+        )
+        .is_null());
+        assert!(
+            pdal_stage_create_overlay(std::ptr::null(), std::ptr::null(), std::ptr::null())
+                .is_null()
+        );
+        assert!(pdal_stage_create_colorinterp(
+            std::ptr::null(),
+            std::ptr::null(),
+            0.0,
+            0.0,
+            false,
+            false
+        )
+        .is_null());
         assert_eq!(
-            take_string(pdal_colorinterp_validate_prepared(std::ptr::null(), std::ptr::null(), 0.0, 0.0)),
+            take_string(pdal_colorinterp_validate_prepared(
+                std::ptr::null(),
+                std::ptr::null(),
+                0.0,
+                0.0
+            )),
             "Missing colorinterp layout."
         );
         assert!(pdal_colorinterp_pipeline_streamable(0.0, 0.0));
         assert!(pdal_stage_create_colorization(std::ptr::null(), std::ptr::null(), 0).is_null());
         assert!(pdal_stage_create_hag_dem(std::ptr::null(), 0, false, 0.0, 0.0, 0.0, 0).is_null());
-        
+
         // --- filter_abi_spatial_stats.rs ---
         assert!(pdal_stage_create_voxeldownsize(std::ptr::null()).is_null());
         assert!(pdal_stage_create_sample(std::ptr::null()).is_null());
@@ -729,28 +806,50 @@ fn test_filter_abi_nulls_and_errors() {
         let rd = pdal_stage_create_radialdensity(0.0);
         assert!(!rd.is_null());
         pdal_stage_destroy(rd);
-        
+
         let nnd = pdal_stage_create_nndistance(0, std::ptr::null());
         assert!(!nnd.is_null());
         pdal_stage_destroy(nnd);
-        
+
         assert!(pdal_stage_create_zsmooth(0.0, 0.0, std::ptr::null()).is_null());
         assert!(pdal_stage_create_outlier(std::ptr::null(), 0, 0.0, 0, 0.0, 0).is_null());
         assert!(pdal_stage_create_dbscan(0, 0.0, std::ptr::null(), 0).is_null());
-        
-        let smrf = pdal_stage_create_smrf(0.0, 0.0, false, 0.0, 0.0, 0.0, 0, 0, false, std::ptr::null(), 0);
+
+        let smrf = pdal_stage_create_smrf(
+            0.0,
+            0.0,
+            false,
+            0.0,
+            0.0,
+            0.0,
+            0,
+            0,
+            false,
+            std::ptr::null(),
+            0,
+        );
         assert!(!smrf.is_null());
         pdal_stage_destroy(smrf);
-        
+
         assert!(pdal_stage_create_iqr(0.0, std::ptr::null()).is_null());
         assert!(pdal_stage_create_mad(0.0, std::ptr::null(), 0.0).is_null());
-        
-        let cov = pdal_stage_create_covariancefeatures(0, false, 0.0, 0, 0, 0, false, std::ptr::null(), 0);
+
+        let cov = pdal_stage_create_covariancefeatures(
+            0,
+            false,
+            0.0,
+            0,
+            0,
+            0,
+            false,
+            std::ptr::null(),
+            0,
+        );
         assert!(!cov.is_null());
         pdal_stage_destroy(cov);
-        
+
         assert!(pdal_stage_create_straighten(std::ptr::null(), false, 0.0).is_null());
-        
+
         let lk = pdal_stage_create_lloydkmeans(0, 0, std::ptr::null(), 0);
         assert!(!lk.is_null());
         pdal_stage_destroy(lk);
@@ -827,7 +926,12 @@ fn test_filter_abi_execution_coverage() {
         let sort_dims = [sort_dim_str.as_ptr()];
         let sort_order = cstring("desc");
         let sort_alg = cstring("");
-        let sort = pdal_stage_create_sort(sort_dims.as_ptr(), 1, sort_order.as_ptr(), sort_alg.as_ptr());
+        let sort = pdal_stage_create_sort(
+            sort_dims.as_ptr(),
+            1,
+            sort_order.as_ptr(),
+            sort_alg.as_ptr(),
+        );
         let out_sort = pdal_stage_run(sort, view);
         assert_eq!(pdal_point_view_length(out_sort), 3);
         assert_eq!(get(out_sort, 0, "X"), 2.0);
@@ -900,10 +1004,7 @@ fn test_filter_abi_execution_coverage() {
 
         // 16. TransformationFilter
         let matrix = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            1.0, 2.0, 3.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 2.0, 3.0, 1.0,
         ];
         let xform = pdal_stage_create_transformation(matrix.as_ptr());
         pdal_stage_transformation_point(xform, view, 1);
@@ -913,10 +1014,7 @@ fn test_filter_abi_execution_coverage() {
         pdal_stage_destroy(xform);
 
         // 17. GpsTimeConvert
-        let gps_ops = options(&[
-            ("conversion", "gws2gt"),
-            ("start_date", "2020-01-08"),
-        ]);
+        let gps_ops = options(&[("conversion", "gws2gt"), ("start_date", "2020-01-08")]);
         let gps = pdal_stage_create_gpstimeconvert(gps_ops);
         let out_gps = pdal_stage_run(gps, view);
         assert!(!out_gps.is_null());
@@ -945,3 +1043,153 @@ fn test_filter_abi_execution_coverage() {
     }
 }
 
+#[test]
+fn test_geo_filters_execution() {
+    unsafe {
+        pdal_core::gdal::register_drivers();
+
+        // --- 1. ColorizationFilter ---
+        // Setup point layout registering X, Y, Z, Red
+        let layout1 = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "Red"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout1, name.as_ptr(), 9);
+        }
+        let view1 = pdal_point_view_create(layout1);
+        let idx1 = pdal_point_view_add_point(view1);
+        pdal_point_view_set_f64(view1, idx1, cstring("X").as_ptr(), 440750.0);
+        pdal_point_view_set_f64(view1, idx1, cstring("Y").as_ptr(), 3751290.0);
+        pdal_point_view_set_f64(view1, idx1, cstring("Z").as_ptr(), 200.0);
+        pdal_point_view_set_f64(view1, idx1, cstring("Red").as_ptr(), 0.0);
+
+        let raster_path = cstring(&data_path("gdal/int32.tif"));
+        let red_dim = cstring("Red");
+        let bands = [pdal_band_info_t {
+            name: red_dim.as_ptr(),
+            band: 1,
+            scale: 1.0,
+        }];
+        let colorization = pdal_stage_create_colorization(raster_path.as_ptr(), bands.as_ptr(), 1);
+        assert!(!colorization.is_null());
+
+        let out_colorization = pdal_stage_run(colorization, view1);
+        assert!(!out_colorization.is_null());
+        assert_eq!(pdal_point_view_length(out_colorization), 1);
+        let red_val = get(out_colorization, 0, "Red");
+        assert_eq!(red_val, 107.0);
+
+        pdal_point_view_destroy(out_colorization);
+        pdal_stage_destroy(colorization);
+        pdal_point_view_destroy(view1);
+
+        // --- 2. OverlayFilter ---
+        // Setup point layout registering X, Y, Z, Classification
+        let layout2 = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "Classification"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout2, name.as_ptr(), 9);
+        }
+        let view2 = pdal_point_view_create(layout2);
+        let idx2 = pdal_point_view_add_point(view2);
+        // A point inside the first polygon feature of attributes.json:
+        // X = -123.065, Y = 44.058, Z = 0.0
+        pdal_point_view_set_f64(view2, idx2, cstring("X").as_ptr(), -123.065);
+        pdal_point_view_set_f64(view2, idx2, cstring("Y").as_ptr(), 44.058);
+        pdal_point_view_set_f64(view2, idx2, cstring("Z").as_ptr(), 0.0);
+        pdal_point_view_set_f64(view2, idx2, cstring("Classification").as_ptr(), 0.0);
+
+        let overlay_ds = cstring(&data_path("autzen/attributes.json"));
+        let class_dim = cstring("Classification");
+        let cls_col = cstring("cls");
+        let overlay =
+            pdal_stage_create_overlay(class_dim.as_ptr(), overlay_ds.as_ptr(), cls_col.as_ptr());
+        assert!(!overlay.is_null());
+
+        let out_overlay = pdal_stage_run(overlay, view2);
+        assert!(!out_overlay.is_null());
+        assert_eq!(pdal_point_view_length(out_overlay), 1);
+        let class_val = get(out_overlay, 0, "Classification");
+        assert_eq!(class_val, 2.0);
+
+        pdal_point_view_destroy(out_overlay);
+        pdal_stage_destroy(overlay);
+        pdal_point_view_destroy(view2);
+
+        // --- 3. HagDemFilter ---
+        // Setup point layout registering X, Y, Z, HeightAboveGround
+        let layout3 = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "HeightAboveGround"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout3, name.as_ptr(), 9);
+        }
+        let view3 = pdal_point_view_create(layout3);
+        let idx3 = pdal_point_view_add_point(view3);
+        pdal_point_view_set_f64(view3, idx3, cstring("X").as_ptr(), 440750.0);
+        pdal_point_view_set_f64(view3, idx3, cstring("Y").as_ptr(), 3751290.0);
+        pdal_point_view_set_f64(view3, idx3, cstring("Z").as_ptr(), 200.0);
+        pdal_point_view_set_f64(view3, idx3, cstring("HeightAboveGround").as_ptr(), 0.0);
+
+        let hag_dem =
+            pdal_stage_create_hag_dem(raster_path.as_ptr(), 1, false, 0.0, 1000.0, -9999.0, 2);
+        assert!(!hag_dem.is_null());
+
+        let out_hag = pdal_stage_run(hag_dem, view3);
+        assert!(!out_hag.is_null());
+        assert_eq!(pdal_point_view_length(out_hag), 1);
+        let hag_val = get(out_hag, 0, "HeightAboveGround");
+        assert_eq!(hag_val, 93.0); // 200.0 - 107.0 = 93.0
+
+        pdal_point_view_destroy(out_hag);
+        pdal_stage_destroy(hag_dem);
+        pdal_point_view_destroy(view3);
+
+        // HagDemFilter zero_ground path:
+        let layout4 = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "Classification", "HeightAboveGround"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout4, name.as_ptr(), 9);
+        }
+        let view4 = pdal_point_view_create(layout4);
+        let idx4 = pdal_point_view_add_point(view4);
+        pdal_point_view_set_f64(view4, idx4, cstring("X").as_ptr(), 440750.0);
+        pdal_point_view_set_f64(view4, idx4, cstring("Y").as_ptr(), 3751290.0);
+        pdal_point_view_set_f64(view4, idx4, cstring("Z").as_ptr(), 200.0);
+        pdal_point_view_set_f64(view4, idx4, cstring("Classification").as_ptr(), 2.0);
+        pdal_point_view_set_f64(view4, idx4, cstring("HeightAboveGround").as_ptr(), -1.0);
+
+        let hag_dem_zero =
+            pdal_stage_create_hag_dem(raster_path.as_ptr(), 1, true, 0.0, 1000.0, -9999.0, 2);
+        assert!(!hag_dem_zero.is_null());
+
+        let out_hag_zero = pdal_stage_run(hag_dem_zero, view4);
+        assert!(!out_hag_zero.is_null());
+        assert_eq!(pdal_point_view_length(out_hag_zero), 1);
+        let hag_val_zero = get(out_hag_zero, 0, "HeightAboveGround");
+        assert_eq!(hag_val_zero, 0.0);
+
+        pdal_point_view_destroy(out_hag_zero);
+        pdal_stage_destroy(hag_dem_zero);
+        pdal_point_view_destroy(view4);
+
+        // HagDemFilter failed raster load path:
+        let layout5 = pdal_point_layout_create();
+        for dim in ["X", "Y", "Z", "HeightAboveGround"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout5, name.as_ptr(), 9);
+        }
+        let view5 = pdal_point_view_create(layout5);
+        let idx5 = pdal_point_view_add_point(view5);
+        pdal_point_view_set_f64(view5, idx5, cstring("HeightAboveGround").as_ptr(), -42.0);
+
+        let bad_raster = cstring("nonexistent.tif");
+        let hag_dem_bad =
+            pdal_stage_create_hag_dem(bad_raster.as_ptr(), 1, false, 0.0, 1000.0, -9999.0, 2);
+        assert!(!hag_dem_bad.is_null());
+        let out_hag_bad = pdal_stage_run(hag_dem_bad, view5);
+        // nonexistent.tif load failure will result in pipeline execution error and returns null
+        assert!(out_hag_bad.is_null());
+
+        pdal_point_view_destroy(view5);
+        pdal_stage_destroy(hag_dem_bad);
+    }
+}

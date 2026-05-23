@@ -132,7 +132,10 @@ mod tests {
     fn label_duplicates_names() {
         let filter = LabelDuplicatesFilter::new(vec!["X".to_string()]);
         assert_eq!(filter.name(), "filters.label_duplicates");
-        assert!(filter.as_any().downcast_ref::<LabelDuplicatesFilter>().is_some());
+        assert!(filter
+            .as_any()
+            .downcast_ref::<LabelDuplicatesFilter>()
+            .is_some());
     }
 
     #[test]

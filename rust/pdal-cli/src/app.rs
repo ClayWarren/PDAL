@@ -1233,7 +1233,8 @@ mod tests {
 
     #[test]
     fn info_command_errors_on_filename_with_nul_byte() {
-        let nul_path = String::from_utf8(vec![b'/', b't', b'm', b'p', 0, b'.', b'l', b'a', b's']).unwrap_or_default();
+        let nul_path = String::from_utf8(vec![b'/', b't', b'm', b'p', 0, b'.', b'l', b'a', b's'])
+            .unwrap_or_default();
         if !nul_path.is_empty() {
             let app = app_with_command("info", &[&nul_path]);
             let _ = app.run_info();

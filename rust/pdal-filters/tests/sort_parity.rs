@@ -23,17 +23,15 @@ fn make_xyz_view(points: &[(f64, f64, f64)]) -> PointView {
 }
 
 fn extract_xs(view: &PointView) -> Vec<f64> {
-    (0..view.len()).map(|i| view.get_f64(i, &DimId::X)).collect()
+    (0..view.len())
+        .map(|i| view.get_f64(i, &DimId::X))
+        .collect()
 }
 
 #[test]
 fn test_sort_ascending() {
     let view = make_xyz_view(&[(3.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]);
-    let mut filter = SortFilter::new(
-        vec!["X".to_string()],
-        SortOrder::Asc,
-        SortAlgorithm::Normal,
-    );
+    let mut filter = SortFilter::new(vec!["X".to_string()], SortOrder::Asc, SortAlgorithm::Normal);
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(extract_xs(&outputs[0]), vec![1.0, 2.0, 3.0]);
 }
@@ -64,11 +62,7 @@ fn test_sort_stable_preserves_order_for_equal_values() {
         view.set_f64(idx, &DimId::Classification, cls);
     }
 
-    let mut filter = SortFilter::new(
-        vec!["X".to_string()],
-        SortOrder::Asc,
-        SortAlgorithm::Stable,
-    );
+    let mut filter = SortFilter::new(vec!["X".to_string()], SortOrder::Asc, SortAlgorithm::Stable);
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     let out = &outputs[0];
     assert_eq!(out.get_f64(0, &DimId::Classification), 2.0);
@@ -108,22 +102,14 @@ fn test_sort_multi_dimension() {
 fn test_sort_empty_input() {
     let layout = Rc::new(PointLayout::new());
     let view = PointView::new(layout);
-    let mut filter = SortFilter::new(
-        vec!["X".to_string()],
-        SortOrder::Asc,
-        SortAlgorithm::Normal,
-    );
+    let mut filter = SortFilter::new(vec!["X".to_string()], SortOrder::Asc, SortAlgorithm::Normal);
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(outputs[0].len(), 0);
 }
 
 #[test]
 fn test_sort_process_one_returns_false() {
-    let mut filter = SortFilter::new(
-        vec!["X".to_string()],
-        SortOrder::Asc,
-        SortAlgorithm::Normal,
-    );
+    let mut filter = SortFilter::new(vec!["X".to_string()], SortOrder::Asc, SortAlgorithm::Normal);
     let mut scratch = PointView::new(Rc::new(PointLayout::new()));
     assert!(!filter.process_one(&mut scratch, 0));
 }
@@ -131,11 +117,7 @@ fn test_sort_process_one_returns_false() {
 #[test]
 fn test_sort_reset() {
     let view = make_xyz_view(&[(3.0, 0.0, 0.0), (1.0, 0.0, 0.0)]);
-    let mut filter = SortFilter::new(
-        vec!["X".to_string()],
-        SortOrder::Asc,
-        SortAlgorithm::Normal,
-    );
+    let mut filter = SortFilter::new(vec!["X".to_string()], SortOrder::Asc, SortAlgorithm::Normal);
     filter.reset();
     let outputs = filter.run(std::slice::from_ref(&view)).unwrap();
     assert_eq!(extract_xs(&outputs[0]), vec![1.0, 3.0]);

@@ -463,7 +463,7 @@ mod tests {
         assert_eq!(MetadataValue::F64(1.5).as_f64(), 1.5);
         assert_eq!(MetadataValue::Bool(true).as_f64(), 1.0);
         assert_eq!(MetadataValue::Bool(false).as_f64(), 0.0);
-        assert_eq!(MetadataValue::String("3.14".into()).as_f64(), 3.14);
+        assert_eq!(MetadataValue::String("3.15".into()).as_f64(), 3.15);
     }
 
     #[test]

@@ -72,7 +72,10 @@ fn test_geom_distance_empty_input() {
 fn test_geom_distance_names() {
     let filter = GeomDistanceFilter::new("POINT(0 0 0)", "D", false).unwrap();
     assert_eq!(filter.name(), "filters.geomdistance");
-    assert!(filter.as_any().downcast_ref::<GeomDistanceFilter>().is_some());
+    assert!(filter
+        .as_any()
+        .downcast_ref::<GeomDistanceFilter>()
+        .is_some());
 }
 
 #[test]
