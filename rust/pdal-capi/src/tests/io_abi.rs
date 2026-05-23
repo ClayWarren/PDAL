@@ -721,4 +721,5 @@ fn stac_reader_returns_local_asset_through_c_abi() {
     }
 }
 
+mod ept_preview;
 mod writers;

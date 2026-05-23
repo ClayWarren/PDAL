@@ -1,0 +1,133 @@
+use super::super::*;
+use std::os::raw::c_char;
+
+fn cstring(value: &str) -> CString {
+    CString::new(value).unwrap()
+}
+
+fn data_path(path: &str) -> String {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data")
+        .join(path)
+        .display()
+        .to_string()
+}
+
+#[test]
+fn ept_preview_returns_bounds_count_srs_and_dim_names() {
+    unsafe {
+        let path = data_path("ept/lone-star-laszip/ept.json");
+        let path_c = cstring(&path);
+        let handle = pdal_ept_reader_preview_create(path_c.as_ptr());
+        assert!(!handle.is_null());
+
+        assert_eq!(pdal_ept_reader_preview_point_count(handle), 518862);
+
+        let mut minx = 0.0;
+        let mut miny = 0.0;
+        let mut minz = 0.0;
+        let mut maxx = 0.0;
+        let mut maxy = 0.0;
+        let mut maxz = 0.0;
+        assert!(pdal_ept_reader_preview_bounds(
+            handle, &mut minx, &mut miny, &mut minz, &mut maxx, &mut maxy, &mut maxz,
+        ));
+        assert_eq!(minx, 515368.0);
+        assert_eq!(maxz, 2339.0);
+
+        let srs = take_string(pdal_ept_reader_preview_srs_wkt(handle));
+        assert!(srs.contains("NAD83 / UTM zone 12N"));
+
+        let count = pdal_ept_reader_preview_dim_count(handle);
+        // 14 schema dims + 4 laszip class flags.
+        assert_eq!(count, 18);
+
+        let mut names: Vec<String> = (0..count)
+            .map(|i| take_string(pdal_ept_reader_preview_dim_name(handle, i)))
+            .collect();
+        names.sort();
+        assert!(names.contains(&"X".to_string()));
+        assert!(names.contains(&"Withheld".to_string()));
+        assert!(names.contains(&"OriginId".to_string()));
+
+        // Out-of-range dim index returns null.
+        assert!(pdal_ept_reader_preview_dim_name(handle, count).is_null());
+
+        pdal_ept_reader_preview_destroy(handle);
+    }
+}
+
+#[test]
+fn ept_preview_rejects_null_and_missing_files() {
+    unsafe {
+        assert!(pdal_ept_reader_preview_create(std::ptr::null()).is_null());
+
+        // Missing file -> null + last error set.
+        let bad = cstring("/this/path/definitely/does/not/exist/ept.json");
+        let handle = pdal_ept_reader_preview_create(bad.as_ptr());
+        assert!(handle.is_null());
+        let last = pdal_last_error();
+        assert!(!last.is_null());
+        let msg = std::ffi::CStr::from_ptr(last).to_string_lossy();
+        assert!(msg.contains("Can't open"));
+    }
+}
+
+#[test]
+fn ept_preview_accessors_handle_null_handle() {
+    unsafe {
+        // Each accessor should tolerate a null handle.
+        assert_eq!(pdal_ept_reader_preview_point_count(std::ptr::null()), 0);
+        assert_eq!(pdal_ept_reader_preview_dim_count(std::ptr::null()), 0);
+        assert!(pdal_ept_reader_preview_srs_wkt(std::ptr::null()).is_null());
+        assert!(pdal_ept_reader_preview_dim_name(std::ptr::null(), 0).is_null());
+
+        // bounds returns false for null handle (and shouldn't crash).
+        let mut a = 0.0;
+        let mut b = 0.0;
+        let mut c = 0.0;
+        let mut d = 0.0;
+        let mut e = 0.0;
+        let mut f = 0.0;
+        assert!(!pdal_ept_reader_preview_bounds(
+            std::ptr::null(),
+            &mut a,
+            &mut b,
+            &mut c,
+            &mut d,
+            &mut e,
+            &mut f
+        ));
+
+        // Destroy null is a no-op.
+        pdal_ept_reader_preview_destroy(std::ptr::null_mut());
+    }
+}
+
+#[test]
+fn ogr_writer_validate_reports_unprefixed_messages() {
+    unsafe {
+        // Happy path returns null (no error).
+        assert!(pdal_ogr_writer_validate(1, 0).is_null());
+        assert!(pdal_ogr_writer_validate(3, 0).is_null());
+
+        // multicount = 0 -> error.
+        let err = take_string(pdal_ogr_writer_validate(0, 0));
+        assert!(err.contains("multicount must be greater than 0"));
+
+        // multicount > 1 with attr_dims -> error.
+        let err = take_string(pdal_ogr_writer_validate(3, 2));
+        assert!(err.contains("multicount > 1 incompatible with attr_dims"));
+    }
+}
+
+#[test]
+fn ogr_writer_dim_not_found_formats_message_or_returns_null_for_null_input() {
+    unsafe {
+        let err = take_string(pdal_ogr_writer_dim_not_found(cstring("Bananas").as_ptr()));
+        assert_eq!(err, "Dimension 'Bananas' (attr_dims) not found.");
+
+        assert!(pdal_ogr_writer_dim_not_found(std::ptr::null()).is_null());
+    }
+}
