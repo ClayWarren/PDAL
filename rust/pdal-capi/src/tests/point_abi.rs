@@ -109,6 +109,56 @@ fn point_view_typed_getters_match_pdal_cast_contract() {
 }
 
 #[test]
+fn point_view_checked_setter_matches_pdal_range_contract() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let foo = CString::new("foo").unwrap();
+        let bar = CString::new("bar").unwrap();
+        pdal_point_layout_register_dim(layout, foo.as_ptr(), 0);
+        pdal_point_layout_register_dim(layout, bar.as_ptr(), 4);
+        let view = pdal_point_view_create(layout);
+        let point = pdal_point_view_add_point(view);
+
+        assert!(pdal_point_view_try_set_f64(
+            view,
+            point,
+            foo.as_ptr(),
+            250.0
+        ));
+        assert_eq!(pdal_point_view_get_f64(view, point, foo.as_ptr()), 250.0);
+        assert!(pdal_point_view_try_set_f64(
+            view,
+            point,
+            bar.as_ptr(),
+            -120.23456
+        ));
+        assert_eq!(pdal_point_view_get_f64(view, point, bar.as_ptr()), -120.0);
+
+        assert!(!pdal_point_view_try_set_f64(
+            view,
+            point,
+            foo.as_ptr(),
+            260.0
+        ));
+        assert_eq!(pdal_point_view_get_f64(view, point, foo.as_ptr()), 250.0);
+        assert!(!pdal_point_view_try_set_f64(
+            view,
+            point + 1,
+            foo.as_ptr(),
+            1.0
+        ));
+        assert!(!pdal_point_view_try_set_f64(
+            view,
+            point,
+            std::ptr::null(),
+            1.0
+        ));
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
 fn point_view_bounds_roundtrip_through_c_abi() {
     unsafe {
         let layout = pdal_point_layout_create();

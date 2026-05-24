@@ -88,6 +88,7 @@ void verifyTestView(const PointView& view, point_count_t cnt = 17)
 }
 
 constexpr int RustU8 = 0;
+constexpr int RustI8 = 4;
 constexpr int RustF32 = 8;
 constexpr int RustF64 = 9;
 
@@ -293,37 +294,36 @@ TEST(PointViewTest, pointRef)
 
 TEST(PointViewTest, bigfile)
 {
-    PointTable table;
+    constexpr point_count_t NUM_PTS = 1000000;
 
-    point_count_t NUM_PTS = 1000000;
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", RustF64);
+    pdal_point_layout_register_dim(layout, "Y", RustF64);
+    pdal_point_layout_register_dim(layout, "Z", RustF64);
 
-    PointLayoutPtr layout(table.layout());
-
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
-
-    PointView view(table);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    ASSERT_NE(view, nullptr);
 
     for (PointId id = 0; id < NUM_PTS; ++id)
     {
-        view.setField(Dimension::Id::X, id, id);
-        view.setField(Dimension::Id::Y, id, 2 * id);
-        view.setField(Dimension::Id::Z, id, -(int)id);
+        ASSERT_EQ(pdal_point_view_add_point(view), id);
+        pdal_point_view_set_f64(view, id, "X", id);
+        pdal_point_view_set_f64(view, id, "Y", 2 * id);
+        pdal_point_view_set_f64(view, id, "Z", -static_cast<double>(id));
     }
 
     for (PointId id = 0; id < NUM_PTS; ++id)
     {
-        EXPECT_EQ(view.getFieldAs<PointId>(Dimension::Id::X, id), id);
-        EXPECT_EQ(view.getFieldAs<PointId>(Dimension::Id::Y, id), id * 2);
-        EXPECT_EQ(view.getFieldAs<int>(Dimension::Id::Z, id), -(int)id);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "X"), id);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "Y"), id * 2);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "Z"),
+                         -static_cast<double>(id));
     }
 
-    // Test some random access.
     std::unique_ptr<PointId[]> ids(new PointId[NUM_PTS]);
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
         ids[idx] = idx;
-    // Do a bunch of random swaps.
+
     std::default_random_engine generator;
     std::uniform_int_distribution<PointId> distribution(0, NUM_PTS - 1);
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
@@ -337,18 +337,21 @@ TEST(PointViewTest, bigfile)
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
     {
         PointId id = ids[idx];
-        view.setField(Dimension::Id::X, id, idx);
-        view.setField(Dimension::Id::Y, id, 2 * idx);
-        view.setField(Dimension::Id::Z, id, -(int)idx);
+        pdal_point_view_set_f64(view, id, "X", idx);
+        pdal_point_view_set_f64(view, id, "Y", 2 * idx);
+        pdal_point_view_set_f64(view, id, "Z", -static_cast<double>(idx));
     }
 
     for (PointId idx = 0; idx < NUM_PTS; ++idx)
     {
         PointId id = ids[idx];
-        EXPECT_EQ(view.getFieldAs<PointId>(Dimension::Id::X, id), idx);
-        EXPECT_EQ(view.getFieldAs<PointId>(Dimension::Id::Y, id), idx * 2);
-        EXPECT_EQ(view.getFieldAs<int>(Dimension::Id::Z, id), -(int)idx);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "X"), idx);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "Y"), idx * 2);
+        EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, id, "Z"),
+                         -static_cast<double>(idx));
     }
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, order)
@@ -380,27 +383,23 @@ TEST(PointViewTest, order)
 
 TEST(PointViewTest, issue1264)
 {
-    PointTable t;
-    PointLayoutPtr layout(t.layout());
-    Dimension::Id foo = layout->assignDim("foo", Dimension::Type::Unsigned8);
-    Dimension::Id bar = layout->assignDim("bar", Dimension::Type::Signed8);
-    layout->finalize();
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "foo", RustU8);
+    pdal_point_layout_register_dim(layout, "bar", RustI8);
 
-    PointView v(t);
-    double d(250.0);
-    v.setField(foo, 0, d);
-    d = v.getFieldAs<double>(foo, 0);
-    EXPECT_DOUBLE_EQ(d, 250.0);
-    d = 123.0;
-    v.setField(bar, 0, d);
-    d = v.getFieldAs<double>(bar, 0);
-    EXPECT_DOUBLE_EQ(d, 123.0);
-    d = -120.23456;
-    v.setField(bar, 0, d);
-    d = v.getFieldAs<double>(bar, 0);
-    EXPECT_DOUBLE_EQ(d, -120.0);
-    d = 260.0;
-    EXPECT_THROW(v.setField(foo, 0, d), pdal_error);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    ASSERT_NE(view, nullptr);
+    ASSERT_EQ(pdal_point_view_add_point(view), 0u);
+
+    EXPECT_TRUE(pdal_point_view_try_set_f64(view, 0, "foo", 250.0));
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "foo"), 250.0);
+    EXPECT_TRUE(pdal_point_view_try_set_f64(view, 0, "bar", 123.0));
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "bar"), 123.0);
+    EXPECT_TRUE(pdal_point_view_try_set_f64(view, 0, "bar", -120.23456));
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "bar"), -120.0);
+    EXPECT_FALSE(pdal_point_view_try_set_f64(view, 0, "foo", 260.0));
+
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, getFloatNan)

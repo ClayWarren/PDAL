@@ -18,6 +18,63 @@ fn layout_offsets_and_field_roundtrip() {
 }
 
 #[test]
+fn checked_field_set_rejects_values_outside_storage_type() {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::Other("foo".into()), DimType::U8);
+    layout.register(DimId::Other("bar".into()), DimType::I8);
+    let mut view = PointView::new(Rc::new(layout));
+    let point = view.add_point();
+
+    assert!(view.try_set_f64(point, &DimId::Other("foo".into()), 250.0));
+    assert_eq!(view.get_f64(point, &DimId::Other("foo".into())), 250.0);
+    assert!(view.try_set_f64(point, &DimId::Other("bar".into()), -120.23456));
+    assert_eq!(view.get_f64(point, &DimId::Other("bar".into())), -120.0);
+
+    assert!(!view.try_set_f64(point, &DimId::Other("foo".into()), 260.0));
+    assert_eq!(view.get_f64(point, &DimId::Other("foo".into())), 250.0);
+    assert!(!view.try_set_f64(point + 1, &DimId::Other("foo".into()), 1.0));
+    assert!(!view.try_set_f64(point, &DimId::Other("missing".into()), 1.0));
+}
+
+#[test]
+fn checked_field_set_covers_numeric_type_ranges() {
+    let dims = [
+        ("u16", DimType::U16, u16::MAX as f64, -1.0),
+        ("u32", DimType::U32, u32::MAX as f64, -1.0),
+        ("u64", DimType::U64, u64::MAX as f64, -1.0),
+        ("i16", DimType::I16, i16::MIN as f64, i16::MIN as f64 - 1.0),
+        ("i32", DimType::I32, i32::MAX as f64, i32::MAX as f64 + 1.0),
+        ("i64", DimType::I64, i64::MIN as f64, f64::NEG_INFINITY),
+        ("f32", DimType::F32, f32::MAX as f64, f32::MAX as f64 * 2.0),
+        ("f64", DimType::F64, f64::INFINITY, f64::NAN),
+    ];
+
+    let mut layout = PointLayout::new();
+    for (name, ty, _, _) in dims {
+        layout.register(DimId::Other(name.into()), ty);
+    }
+    let mut view = PointView::new(Rc::new(layout));
+    let point = view.add_point();
+
+    for (name, _, accepted, rejected) in dims {
+        let dim = DimId::Other(name.into());
+        assert!(view.try_set_f64(point, &dim, accepted), "{name}");
+        let before = view.get_f64(point, &dim);
+        let rejected_ok = name == "f64" && rejected.is_nan();
+        assert_eq!(
+            view.try_set_f64(point, &dim, rejected),
+            rejected_ok,
+            "{name}"
+        );
+        if rejected_ok {
+            assert!(view.get_f64(point, &dim).is_nan());
+        } else {
+            assert_eq!(view.get_f64(point, &dim), before);
+        }
+    }
+}
+
+#[test]
 fn append_point_copies_record() {
     let mut layout = PointLayout::new();
     layout.register(DimId::OffsetTime, DimType::F64);

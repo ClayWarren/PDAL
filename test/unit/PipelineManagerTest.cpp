@@ -164,30 +164,20 @@ TEST(PipelineManagerTest, objects)
 
 TEST(PipelineManagerTest, arrayPipeline)
 {
-    std::string cmd = Support::binpath(Support::exename("pdal") + " pipeline");
-
     std::string file(Support::configuredpath("pipeline/array-pipeline.json"));
+    std::string outfile(Support::temppath("array-pipeline.las"));
+    FileUtils::deleteFile(outfile);
 
-    std::string output;
-    int stat = Utils::run_shell_command(cmd + " " + file, output);
-    EXPECT_EQ(stat, 0);
+    std::string json = FileUtils::readFileIntoString(file);
+    pdal_pipeline_t* pipeline = pdal_pipeline_create_json(json.c_str());
+    ASSERT_NE(pipeline, nullptr);
 
-    StageFactory f;
-    Stage* r = f.createStage("readers.las");
+    int64_t np = pdal_pipeline_execute_count(pipeline, nullptr);
+    EXPECT_EQ(np, 10653);
+    pdal_pipeline_destroy(pipeline);
 
-    Options o;
-    o.add("filename", Support::temppath("array-pipeline.las"));
-    r->setOptions(o);
-
-    PointTable t;
-    r->prepare(t);
-    PointViewSet s = r->execute(t);
-    EXPECT_EQ(s.size(), 1U);
-    PointViewPtr v = *(s.begin());
-
-    EXPECT_EQ(v->size(), 10653U);
-
-    FileUtils::deleteFile(Support::temppath("array-pipeline.las"));
+    EXPECT_TRUE(!std::ifstream(outfile).fail());
+    FileUtils::deleteFile(outfile);
 }
 
 TEST(PipelineManagerTest, replace)

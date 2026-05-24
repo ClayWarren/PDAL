@@ -19,6 +19,8 @@ COVERED: dict[str, object] = {
         "getAsInt32",
         "getFloat",
         "calculateBounds",
+        "issue1264",
+        "bigfile",
         "getFloatNan",
     },
     "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological", "computeCentroid", "demeanTest"},
@@ -638,7 +640,7 @@ COVERED: dict[str, object] = {
         "filenameTemplate",
     },
     "pdal_pipeline_writer_test": {"issue_2458", "serialize"},
-    "pdal_pipeline_manager_test": {"basic"},
+    "pdal_pipeline_manager_test": {"basic", "arrayPipeline"},
     "pdal_streaming_test": ALL,
 }
 

@@ -335,6 +335,8 @@ extern "C"
     uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
     void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx,
                                  const char* dim_name, double val);
+    bool pdal_point_view_try_set_f64(pdal_point_view_t* view, uint64_t idx,
+                                     const char* dim_name, double val);
     double pdal_point_view_get_f64(pdal_point_view_t* view, uint64_t idx,
                                    const char* dim_name);
     bool pdal_point_view_get_u8(pdal_point_view_t* view, uint64_t idx,

@@ -901,6 +901,43 @@ impl PointView {
             write_value(&mut self.data[base..base + ty.size()], ty, value);
         }
     }
+
+    /// Checked variant of [`PointView::set_f64`]. Returns `false` if the point,
+    /// dimension, or target type cannot accept the value.
+    pub fn try_set_f64(&mut self, idx: PointId, dim: &DimId, value: f64) -> bool {
+        let Some((off, ty)) = self.layout.dim(dim) else {
+            return false;
+        };
+        if idx >= self.len() || !value_fits_type(value, ty) {
+            return false;
+        }
+
+        let base = (idx as usize) * self.layout.point_size() + off;
+        write_value(&mut self.data[base..base + ty.size()], ty, value);
+        true
+    }
+}
+
+fn value_fits_type(value: f64, ty: DimType) -> bool {
+    if value.is_nan() {
+        return matches!(ty, DimType::F32 | DimType::F64);
+    }
+    if !value.is_finite() {
+        return matches!(ty, DimType::F32 | DimType::F64);
+    }
+
+    match ty {
+        DimType::U8 => (u8::MIN as f64..=u8::MAX as f64).contains(&value),
+        DimType::U16 => (u16::MIN as f64..=u16::MAX as f64).contains(&value),
+        DimType::U32 => (u32::MIN as f64..=u32::MAX as f64).contains(&value),
+        DimType::U64 => (u64::MIN as f64..=u64::MAX as f64).contains(&value),
+        DimType::I8 => (i8::MIN as f64..=i8::MAX as f64).contains(&value),
+        DimType::I16 => (i16::MIN as f64..=i16::MAX as f64).contains(&value),
+        DimType::I32 => (i32::MIN as f64..=i32::MAX as f64).contains(&value),
+        DimType::I64 => (i64::MIN as f64..=i64::MAX as f64).contains(&value),
+        DimType::F32 => value.abs() <= f32::MAX as f64,
+        DimType::F64 => true,
+    }
 }
 
 /// Decode a little-endian dimension value to `f64`.

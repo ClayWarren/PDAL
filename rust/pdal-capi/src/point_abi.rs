@@ -247,6 +247,21 @@ pub unsafe extern "C" fn pdal_point_view_set_f64(
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_try_set_f64(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    val: f64,
+) -> bool {
+    if let (Some(view), false) = (view.as_mut(), dim_name.is_null()) {
+        let n = CStr::from_ptr(dim_name).to_string_lossy();
+        view.try_set_f64(idx, &dim_id_from_name(&n), val)
+    } else {
+        false
+    }
+}
+
 /// Get a dimension value from a point, as `f64`.
 ///
 /// # Safety
