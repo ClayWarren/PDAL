@@ -40,6 +40,7 @@ use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
+use pdal_filters::pmf::PmfFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::reciprocity::ReciprocityFilter;
@@ -122,6 +123,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.optimalneighborhood",
     "filters.outlier",
     "filters.planefit",
+    "filters.pmf",
     "filters.radialdensity",
     "filters.randomize",
     "filters.reciprocity",
@@ -370,6 +372,18 @@ pub fn create_filter(
             options, "knn", 8,
         )?
             as usize)))),
+        "filters.pmf" => Ok(Box::new(FilterWrapper::new(PmfFilter::new(
+            get_f64(options, "cell_size", 1.0)?,
+            get_bool(options, "exponential", true)?,
+            get_f64(options, "initial_distance", 0.15)?,
+            comma_list(&options.get_str("returns", "last,only")),
+            get_f64(options, "max_distance", 2.5)?,
+            get_f64(options, "max_window_size", 33.0)?,
+            get_f64(options, "slope", 1.0)?,
+            get_u64(options, "ground_class", 2)? as u8,
+            get_u64(options, "other_class", 1)? as u8,
+            get_bool(options, "only_ground", false)?,
+        )?))),
         "filters.radialdensity" => Ok(Box::new(FilterWrapper::new(RadialDensityFilter::new(
             get_f64(options, "radius", 1.0)?,
         )))),

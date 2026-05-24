@@ -258,6 +258,60 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a PMF stage.
+///
+/// # Safety
+///
+/// `returns` must either be null with a zero count or point to `count`
+/// NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_pmf(
+    cell_size: f64,
+    exponential: bool,
+    initial_distance: f64,
+    max_distance: f64,
+    max_window_size: f64,
+    slope: f64,
+    ground_class: u8,
+    other_class: u8,
+    only_ground: bool,
+    returns: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    let mut rust_returns = Vec::new();
+    if !returns.is_null() {
+        for i in 0..count {
+            let ptr = *returns.offset(i as isize);
+            if ptr.is_null() {
+                set_last_error("Null return name in PMF options.");
+                return std::ptr::null_mut();
+            }
+            rust_returns.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+        }
+    }
+
+    match PmfFilter::new(
+        cell_size,
+        exponential,
+        initial_distance,
+        rust_returns,
+        max_distance,
+        max_window_size,
+        slope,
+        ground_class,
+        other_class,
+        only_ground,
+    ) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(&err.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Create a skewness balancing filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_skewnessbalancing(

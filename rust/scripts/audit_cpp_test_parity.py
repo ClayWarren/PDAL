@@ -340,6 +340,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_nndistance_test": ALL,
     "pdal_filters_outlier_test": ALL,
     "pdal_filters_planefit_test": ALL,
+    "pdal_filters_pmf_test": ALL,
     "pdal_filters_radius_assign_test": {
         "basic_usage",
         "with_z_limit",

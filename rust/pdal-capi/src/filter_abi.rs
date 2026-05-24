@@ -47,6 +47,7 @@ use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::overlay::OverlayFilter;
 use pdal_filters::planefit::PlaneFitFilter;
+use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::radiusassign::{RadiusAssignFilter, RadiusAssignment};

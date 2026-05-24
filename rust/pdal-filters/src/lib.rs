@@ -48,6 +48,7 @@ pub mod optimal_neighborhood;
 pub mod outlier;
 pub mod overlay;
 pub mod planefit;
+pub mod pmf;
 pub mod proj_pipeline;
 pub mod radialdensity;
 pub mod radiusassign;

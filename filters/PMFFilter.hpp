@@ -62,8 +62,6 @@ private:
     void prepared(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
 
-    void processGround(PointViewPtr view);
-
     PMFFilter& operator=(const PMFFilter&); // not implemented
     PMFFilter(const PMFFilter&);            // not implemented
 };

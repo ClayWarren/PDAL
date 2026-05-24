@@ -39,12 +39,11 @@
 
 #include "PMFFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
-#include "private/Segmentation.hpp"
 
 namespace pdal
 {
@@ -129,17 +128,24 @@ void PMFFilter::prepared(PointTableRef table)
                        r.m_name + "'.");
     }
 
+    std::vector<const char*> returns;
+    returns.reserve(m_args->m_returns.size());
+    for (const std::string& r : m_args->m_returns)
+        returns.push_back(r.c_str());
+
+    pdal_stage_t* stage = pdal_stage_create_pmf(
+        m_args->m_cellSize, m_args->m_exponential, m_args->m_initialDistance,
+        m_args->m_maxDistance, m_args->m_maxWindowSize, m_args->m_slope,
+        m_groundClass, m_otherClass, m_onlyGround, returns.data(),
+        returns.size());
+    if (!stage)
+        rust_view_converter::throwLastError("Failed to create Rust PMF stage.");
+    pdal_stage_destroy(stage);
+
     if (m_args->m_returns.size())
     {
         for (auto& r : m_args->m_returns)
-        {
             Utils::trim(r);
-            if ((r != "first") && (r != "intermediate") && (r != "last") &&
-                (r != "only"))
-            {
-                throwError("Unrecognized 'returns' value: '" + r + "'.");
-            }
-        }
 
         if (!layout->hasDim(Id::ReturnNumber) ||
             !layout->hasDim(Id::NumberOfReturns))
@@ -156,218 +162,26 @@ void PMFFilter::prepared(PointTableRef table)
 PointViewSet PMFFilter::run(PointViewPtr input)
 {
     PointViewSet viewSet{input};
-    // Segment input view into ignored/kept views.
-    PointViewPtr ignoredView = input->makeNew();
-    PointViewPtr keptView = input->makeNew();
 
-    if (m_args->m_ignored.empty())
-        keptView->append(*input);
-    else
-        Segmentation::ignoreDimRanges(m_args->m_ignored, input, keptView,
-                                      ignoredView);
+    if (!m_args->m_ignored.empty())
+        throwError("Rust PMF path does not yet support the 'ignore' option.");
 
-    // Check for 0's in ReturnNumber and NumberOfReturns
-    bool nrOneZero(false);
-    bool rnOneZero(false);
-    bool nrAllZero(true);
-    bool rnAllZero(true);
-    for (const PointRef& p : *keptView)
-    {
-        uint8_t nr = p.getFieldAs<uint8_t>(Id::NumberOfReturns);
-        uint8_t rn = p.getFieldAs<uint8_t>(Id::ReturnNumber);
-        if ((nr == 0) && !nrOneZero)
-            nrOneZero = true;
-        if ((rn == 0) && !rnOneZero)
-            rnOneZero = true;
-        if (nr != 0)
-            nrAllZero = false;
-        if (rn != 0)
-            rnAllZero = false;
-    }
+    std::vector<const char*> returns;
+    returns.reserve(m_args->m_returns.size());
+    for (const std::string& r : m_args->m_returns)
+        returns.push_back(r.c_str());
 
-    if ((nrOneZero || rnOneZero) && !(nrAllZero && rnAllZero))
-        throwError("Some NumberOfReturns or ReturnNumber values were 0, but "
-                   "not all. Check that all values in the input file are >= "
-                   "1.");
+    pdal_stage_t* stage = pdal_stage_create_pmf(
+        m_args->m_cellSize, m_args->m_exponential, m_args->m_initialDistance,
+        m_args->m_maxDistance, m_args->m_maxWindowSize, m_args->m_slope,
+        m_groundClass, m_otherClass, m_onlyGround, returns.data(),
+        returns.size());
+    if (!stage)
+        rust_view_converter::throwLastError("Failed to create Rust PMF stage.");
 
-    // Segment kept view into two views
-    PointViewPtr inlierView = keptView->makeNew();
-    PointViewPtr outlierView = keptView->makeNew();
-    if (nrAllZero && rnAllZero)
-    {
-        log()->get(LogLevel::Warning)
-            << "Both NumberOfReturns and ReturnNumber are filled with 0's. "
-               "Proceeding without any further return filtering.\n";
-        inlierView->append(*keptView);
-    }
-    else
-    {
-        Segmentation::segmentReturns(keptView, inlierView, outlierView,
-                                     m_args->m_returns);
-    }
-
-    if (!inlierView->size())
-        throwError("No returns to process.");
-
-    if (!m_onlyGround)
-    {
-        for (PointRef p : *inlierView)
-            p.setField(Id::Classification, m_otherClass);
-    }
-
-    // Run the actual PMF algorithm.
-    processGround(inlierView);
-
+    rust_view_converter::runInPlace(stage, *input);
+    pdal_stage_destroy(stage);
     return viewSet;
-}
-
-void PMFFilter::processGround(PointViewPtr view)
-{
-    // initialize bounds, rows, columns, and surface
-    BOX2D bounds;
-    view->calculateBounds(bounds);
-    size_t cols = static_cast<size_t>(
-        ((bounds.maxx - bounds.minx) / m_args->m_cellSize) + 1);
-    size_t rows = static_cast<size_t>(
-        ((bounds.maxy - bounds.miny) / m_args->m_cellSize) + 1);
-
-    // initialize surface to NaN
-    std::vector<double> ZImin(rows * cols,
-                              std::numeric_limits<double>::quiet_NaN());
-
-    // loop through all points, identifying minimum Z value for each populated
-    // cell
-    for (const PointRef& p : *view)
-    {
-        double x = p.getFieldAs<double>(Id::X);
-        double y = p.getFieldAs<double>(Id::Y);
-        double z = p.getFieldAs<double>(Id::Z);
-        int c = static_cast<int>(floor(x - bounds.minx) / m_args->m_cellSize);
-        int r = static_cast<int>(floor(y - bounds.miny) / m_args->m_cellSize);
-        size_t idx = c * rows + r;
-        if (z < ZImin[idx] || std::isnan(ZImin[idx]))
-            ZImin[idx] = z;
-    }
-
-    // convert vector to PointView for indexing
-    PointViewPtr temp = view->makeNew();
-    PointId i(0);
-    for (size_t c = 0; c < cols; ++c)
-    {
-        for (size_t r = 0; r < rows; ++r)
-        {
-            size_t cell = c * rows + r;
-            double val = ZImin[cell];
-            if (std::isnan(val))
-                continue;
-            PointRef p = temp->point(i++);
-            p.setField(Id::X, bounds.minx + (c + 0.5) * m_args->m_cellSize);
-            p.setField(Id::Y, bounds.miny + (r + 0.5) * m_args->m_cellSize);
-            p.setField(Id::Z, val);
-        }
-    }
-
-    // build the 2D KD-tree
-    KD2Index& kdi = temp->build2dIndex();
-
-    // loop through all cells, and for each NaN, replace with elevation of
-    // nearest neighbor
-    std::vector<double> out = ZImin;
-    for (size_t c = 0; c < cols; ++c)
-    {
-        for (size_t r = 0; r < rows; ++r)
-        {
-            size_t idx = c * rows + r;
-            if (!std::isnan(out[idx]))
-                continue;
-            double x = bounds.minx + (c + 0.5) * m_args->m_cellSize;
-            double y = bounds.miny + (r + 0.5) * m_args->m_cellSize;
-            int k = 1;
-            PointIdList neighbors(k);
-            std::vector<double> sqr_dists(k);
-            kdi.knnSearch(x, y, k, &neighbors, &sqr_dists);
-            out[idx] = temp->getFieldAs<double>(Id::Z, neighbors[0]);
-        }
-    }
-
-    ZImin.swap(out);
-
-    // initialize ground indices
-    PointIdList groundIdx;
-    for (PointId i = 0; i < view->size(); ++i)
-        groundIdx.push_back(i);
-
-    // Compute the series of window sizes and height thresholds
-    std::vector<double> htvec;
-    std::vector<double> wsvec;
-    int iter(0);
-    double ws(0);
-    double ht(0);
-
-    // pre-compute window sizes and height thresholds
-    while (ws < m_args->m_maxWindowSize)
-    {
-        // Determine the initial window size.
-        if (m_args->m_exponential)
-            ws = m_args->m_cellSize * (2.0 * std::pow(2, iter) + 1.0);
-        else
-            ws = m_args->m_cellSize * (2.0 * (iter + 1) * 2 + 1.0);
-
-        // Calculate the height threshold to be used in the next iteration.
-        if (iter == 0)
-            ht = m_args->m_initialDistance;
-        else
-            ht = m_args->m_slope * (ws - wsvec[iter - 1]) * m_args->m_cellSize +
-                 m_args->m_initialDistance;
-
-        // Enforce max distance on height threshold
-        if (ht > m_args->m_maxDistance)
-            ht = m_args->m_maxDistance;
-
-        wsvec.push_back(ws);
-        htvec.push_back(ht);
-
-        iter++;
-    }
-
-    // Progressively filter ground returns using morphological open
-    for (size_t j = 0; j < wsvec.size(); ++j)
-    {
-        log()->get(LogLevel::Debug)
-            << "Iteration " << j << " (height threshold = " << htvec[j]
-            << ", window size = " << wsvec[j] << ")...\n";
-
-        int iters = static_cast<int>(0.5 * (wsvec[j] - 1));
-        math::erodeDiamond(ZImin, rows, cols, iters);
-        math::dilateDiamond(ZImin, rows, cols, iters);
-
-        PointIdList groundNewIdx;
-        for (PointId const& p_idx : groundIdx)
-        {
-            PointRef p = view->point(p_idx);
-            double x = p.getFieldAs<double>(Id::X);
-            double y = p.getFieldAs<double>(Id::Y);
-            double z = p.getFieldAs<double>(Id::Z);
-
-            int c =
-                static_cast<int>(floor((x - bounds.minx) / m_args->m_cellSize));
-            int r =
-                static_cast<int>(floor((y - bounds.miny) / m_args->m_cellSize));
-
-            if ((z - ZImin[c * rows + r]) < htvec[j])
-                groundNewIdx.push_back(p_idx);
-        }
-        groundIdx.swap(groundNewIdx);
-
-        log()->get(LogLevel::Debug)
-            << "Ground now has " << groundIdx.size() << " points.\n";
-    }
-
-    log()->get(LogLevel::Debug2)
-        << "Labeled " << groundIdx.size() << " ground returns!\n";
-
-    for (PointId const& i : groundIdx)
-        view->setField(Id::Classification, i, m_groundClass);
 }
 
 } // namespace pdal
