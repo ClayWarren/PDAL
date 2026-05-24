@@ -63,6 +63,7 @@ use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::straighten::StraightenFilter;
+use pdal_filters::supervoxel::SupervoxelFilter;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::transformation::{
     format_transformation_matrix, parse_transformation_matrix, TransformationFilter,

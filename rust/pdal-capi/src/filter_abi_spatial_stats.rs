@@ -344,6 +344,13 @@ pub extern "C" fn pdal_stage_create_cluster(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a supervoxel filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_supervoxel(knn: u64, resolution: f64) -> *mut StageWrapper {
+    let filter = Box::new(SupervoxelFilter::new(knn as usize, resolution));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
 /// Create a sparse surface filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_sparsesurface(

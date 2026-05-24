@@ -746,6 +746,7 @@ extern "C"
     pdal_stage_t* pdal_stage_create_cluster(uint64_t min_points,
                                             uint64_t max_points,
                                             double tolerance, bool is_3d);
+    pdal_stage_t* pdal_stage_create_supervoxel(uint64_t knn, double resolution);
     pdal_stage_t* pdal_stage_create_sparsesurface(double radius,
                                                   uint8_t ground_class,
                                                   uint8_t low_point_class);

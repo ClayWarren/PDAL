@@ -53,6 +53,7 @@ use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats::StatsFilter;
 use pdal_filters::straighten::StraightenFilter;
+use pdal_filters::supervoxel::SupervoxelFilter;
 use pdal_filters::tail::TailFilter;
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
 use pdal_filters::voxel_centroid_nearest_neighbor::VoxelCentroidNearestNeighborFilter;
@@ -134,6 +135,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.sort",
     "filters.stats",
     "filters.straighten",
+    "filters.supervoxel",
     "filters.tail",
     "filters.voxelcenternearestneighbor",
     "filters.voxelcentroidnearestneighbor",
@@ -454,6 +456,10 @@ pub fn create_filter(
         ))),
         "filters.stats" => Ok(Box::new(FilterWrapper::new(StatsFilter::from_options(
             options,
+        )))),
+        "filters.supervoxel" => Ok(Box::new(FilterWrapper::new(SupervoxelFilter::new(
+            get_u64(options, "knn", 32)? as usize,
+            get_f64(options, "resolution", 1.0)?,
         )))),
         "filters.tail" => Ok(Box::new(FilterWrapper::new(TailFilter::new(
             get_u64(options, "count", 10)?,
