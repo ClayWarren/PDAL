@@ -3,10 +3,42 @@ use crate::registry::pipeline_from_json;
 use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::gdal::{LayerHandle, Vector};
+use pdal_core::point::DimId;
+use pdal_filters::hexer::{HexGrid, SQRT_3};
+use pdal_native::geometry::Geometry;
 use std::ffi::CStr;
 use std::io::Read;
 use std::os::raw::c_char;
 use std::path::Path;
+
+/// Defaults match the C++ TIndexKernel option defaults; `fast_boundary`
+/// short-circuits to bbox output, and `boundary_expr` is rejected because
+/// we don't have point-level expression filtering wired up here yet.
+struct BoundaryOptions {
+    density: i32,
+    edge_length: f64,
+    sample_size: u32,
+    smooth: bool,
+    fast_boundary: bool,
+}
+
+impl Default for BoundaryOptions {
+    fn default() -> Self {
+        Self {
+            density: 15,
+            edge_length: 0.0,
+            sample_size: 5000,
+            smooth: true,
+            fast_boundary: false,
+        }
+    }
+}
+
+impl BoundaryOptions {
+    fn exact(&self) -> bool {
+        !self.fast_boundary
+    }
+}
 
 struct CreateArgs {
     tindex_file: String,
@@ -18,6 +50,7 @@ struct CreateArgs {
     location_field: String,
     lco_description: Option<String>,
     rich_boundary_options: bool,
+    boundary: BoundaryOptions,
     stdin_requested: bool,
     input_methods: u8,
     unsupported_input: bool,
@@ -30,6 +63,9 @@ struct Entry {
     miny: f64,
     maxx: f64,
     maxy: f64,
+    /// Exact boundary WKT (MULTIPOLYGON) when rich-boundary is requested;
+    /// `None` falls back to the axis-aligned bbox polygon.
+    boundary_wkt: Option<String>,
 }
 
 pub(super) unsafe fn run_tindex_kernel(argc: i32, argv: *const *const c_char) -> i32 {
@@ -128,6 +164,7 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
         location_field: "location".to_string(),
         lco_description: None,
         rich_boundary_options: false,
+        boundary: BoundaryOptions::default(),
         stdin_requested: false,
         input_methods: 0,
         unsupported_input: false,
@@ -160,9 +197,36 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                 parsed.input_methods += 1;
                 parsed.stdin_requested = true;
             }
-            "--threshold" | "--resolution" | "--simplify" | "--where" | "--fast_boundary" => {
+            "--threshold" => {
                 parsed.rich_boundary_options = true;
+                let value = next_value(&mut iter, arg)?;
+                parsed.boundary.density = parse_int(value, arg)?;
+            }
+            "--resolution" | "--edge_length" => {
+                parsed.rich_boundary_options = true;
+                let value = next_value(&mut iter, arg)?;
+                parsed.boundary.edge_length = parse_float(value, arg)?;
+            }
+            "--sample_size" => {
+                parsed.rich_boundary_options = true;
+                let value = next_value(&mut iter, arg)?;
+                parsed.boundary.sample_size = parse_uint(value, arg)?;
+            }
+            "--simplify" => {
+                parsed.rich_boundary_options = true;
+                let value = next_value(&mut iter, arg)?;
+                parsed.boundary.smooth = parse_bool(value, arg)?;
+            }
+            "--fast_boundary" => {
+                parsed.rich_boundary_options = true;
+                let value = next_value(&mut iter, arg)?;
+                parsed.boundary.fast_boundary = parse_bool(value, arg)?;
+            }
+            "--where" => {
+                // Point-level expression filtering for hexer is not yet
+                // wired; fall back to C++ for that case.
                 let _ = next_value(&mut iter, arg)?;
+                return Err(ParseResult::Unsupported);
             }
             _ if let Some(value) = arg.strip_prefix("--filespec=") => {
                 parsed.input_methods += 1;
@@ -193,12 +257,31 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if let Some(value) = arg.strip_prefix("--lco=") => {
                 apply_layer_creation_option(&mut parsed, value)?;
             }
-            _ if arg.starts_with("--threshold=")
-                || arg.starts_with("--resolution=")
-                || arg.starts_with("--simplify=")
-                || arg.starts_with("--where=") =>
+            _ if let Some(value) = arg.strip_prefix("--threshold=") => {
+                parsed.rich_boundary_options = true;
+                parsed.boundary.density = parse_int(value, "--threshold")?;
+            }
+            _ if let Some(value) = arg
+                .strip_prefix("--resolution=")
+                .or_else(|| arg.strip_prefix("--edge_length=")) =>
             {
                 parsed.rich_boundary_options = true;
+                parsed.boundary.edge_length = parse_float(value, "--resolution")?;
+            }
+            _ if let Some(value) = arg.strip_prefix("--sample_size=") => {
+                parsed.rich_boundary_options = true;
+                parsed.boundary.sample_size = parse_uint(value, "--sample_size")?;
+            }
+            _ if let Some(value) = arg.strip_prefix("--simplify=") => {
+                parsed.rich_boundary_options = true;
+                parsed.boundary.smooth = parse_bool(value, "--simplify")?;
+            }
+            _ if let Some(value) = arg.strip_prefix("--fast_boundary=") => {
+                parsed.rich_boundary_options = true;
+                parsed.boundary.fast_boundary = parse_bool(value, "--fast_boundary")?;
+            }
+            _ if arg.starts_with("--where=") => {
+                return Err(ParseResult::Unsupported);
             }
             _ if arg.starts_with("--filters.hexbin.smooth") => {
                 return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
@@ -231,9 +314,6 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
     }
     if parsed.stdin_requested {
         parsed.files.extend(read_stdin_files()?);
-    }
-    if parsed.rich_boundary_options && parsed.lco_description.is_none() {
-        return Err(ParseResult::Unsupported);
     }
     if parsed.tindex_file.is_empty() {
         return Err(ParseResult::Error(
@@ -268,6 +348,36 @@ where
 {
     iter.next()
         .ok_or_else(|| ParseResult::Error(format!("{arg} requires a value")))
+}
+
+fn parse_int(value: &str, arg: &str) -> Result<i32, ParseResult> {
+    value
+        .parse::<i32>()
+        .map_err(|_| ParseResult::Error(format!("{arg} requires an integer value, got '{value}'")))
+}
+
+fn parse_uint(value: &str, arg: &str) -> Result<u32, ParseResult> {
+    value.parse::<u32>().map_err(|_| {
+        ParseResult::Error(format!(
+            "{arg} requires a non-negative integer value, got '{value}'"
+        ))
+    })
+}
+
+fn parse_float(value: &str, arg: &str) -> Result<f64, ParseResult> {
+    value
+        .parse::<f64>()
+        .map_err(|_| ParseResult::Error(format!("{arg} requires a numeric value, got '{value}'")))
+}
+
+fn parse_bool(value: &str, arg: &str) -> Result<bool, ParseResult> {
+    match value.to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        _ => Err(ParseResult::Error(format!(
+            "{arg} requires a boolean value, got '{value}'"
+        ))),
+    }
 }
 
 fn read_glob(pattern: &str) -> Result<Vec<String>, ParseResult> {
@@ -334,6 +444,13 @@ fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
         .unwrap_or("")
         .to_string();
     let location = tindex_location(file, args.write_absolute_path)?;
+
+    let boundary_wkt = if args.rich_boundary_options && args.boundary.exact() {
+        compute_exact_boundary(file, &args.boundary)?
+    } else {
+        None
+    };
+
     Ok(Entry {
         location,
         wkt,
@@ -341,7 +458,117 @@ fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
         miny,
         maxx,
         maxy,
+        boundary_wkt,
     })
+}
+
+/// Build an exact MULTIPOLYGON boundary for `file` using the Rust hexer port,
+/// then run it through GEOS topology-preserving simplification when smoothing
+/// is enabled (matching `pdal::Polygon::simplify`). Returns `Ok(None)` if the
+/// file has too few points to populate at least one dense hex cell.
+fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<String>, ()> {
+    let Some(driver) = infer_reader_driver(file) else {
+        eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{file}'.");
+        return Err(());
+    };
+    let mut pipeline = match pipeline_from_json(
+        &serde_json::json!([{ "type": driver, "filename": file }]).to_string(),
+    ) {
+        Ok(p) => p,
+        Err(err) => {
+            eprintln!("PDAL: kernels.tindex: {err}");
+            return Err(());
+        }
+    };
+    let views = match pipeline.execute(Vec::new()) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("PDAL: kernels.tindex: {err}");
+            return Err(());
+        }
+    };
+
+    let mut grid = if opts.edge_length > 0.0 {
+        HexGrid::with_height(opts.edge_length * SQRT_3, opts.density)
+    } else {
+        // Auto-edge-length sampling isn't ported yet; fall back to a small
+        // edge derived from the leading-point spacing so we still produce a
+        // boundary instead of throwing. The result will differ from
+        // installed PDAL when edge_length is left unset.
+        match estimate_edge_length(&views, opts.sample_size, opts.density) {
+            Some(h) => HexGrid::with_height(h, opts.density),
+            None => return Ok(None),
+        }
+    };
+    for view in &views {
+        for idx in 0..view.len() {
+            let x = view.get_f64(idx, &DimId::X);
+            let y = view.get_f64(idx, &DimId::Y);
+            grid.add_xy(x, y);
+        }
+    }
+    if grid.find_shapes().is_err() {
+        return Ok(None);
+    }
+    grid.find_parent_paths();
+    let wkt = grid.to_wkt(8);
+    if !opts.smooth {
+        return Ok(Some(wkt));
+    }
+    let tolerance = 1.1 * grid.height() / 2.0;
+    match Geometry::from_wkt(&wkt).and_then(|g| g.simplify(tolerance, true)).and_then(|g| g.to_wkt()) {
+        Ok(simplified) => Ok(Some(ensure_multipolygon(&simplified))),
+        Err(err) => {
+            eprintln!("PDAL: kernels.tindex: GEOS simplify failed for '{file}': {err}");
+            Ok(Some(wkt))
+        }
+    }
+}
+
+fn estimate_edge_length(
+    views: &[pdal_core::point::PointView],
+    sample_size: u32,
+    density: i32,
+) -> Option<f64> {
+    let mut last: Option<(f64, f64)> = None;
+    let mut total = 0.0_f64;
+    let mut count = 0u64;
+    let limit = sample_size.max(1) as u64;
+    'outer: for view in views {
+        for idx in 0..view.len() {
+            let x = view.get_f64(idx, &DimId::X);
+            let y = view.get_f64(idx, &DimId::Y);
+            if let Some((px, py)) = last {
+                let dx = x - px;
+                let dy = y - py;
+                total += (dx * dx + dy * dy).sqrt();
+                count += 1;
+                if count >= limit {
+                    break 'outer;
+                }
+            }
+            last = Some((x, y));
+        }
+    }
+    if count == 0 {
+        return None;
+    }
+    Some((density as f64 * total) / (count + 1) as f64)
+}
+
+fn ensure_multipolygon(wkt: &str) -> String {
+    let trimmed = wkt.trim_start();
+    if trimmed.starts_with('P') || trimmed.starts_with('p') {
+        // Wrap a single POLYGON in a MULTIPOLYGON so output shape stays
+        // consistent across smoothing branches.
+        let after_keyword = trimmed
+            .strip_prefix("POLYGON ")
+            .or_else(|| trimmed.strip_prefix("POLYGON"))
+            .unwrap_or(trimmed);
+        format!("MULTIPOLYGON ({})", after_keyword.trim_start())
+    } else {
+        wkt.to_string()
+    }
 }
 
 fn summary_for_file(file: &str) -> Result<serde_json::Value, ()> {
@@ -430,19 +657,21 @@ fn create_fields(layer: LayerHandle, location_field: &str) -> Result<(), ()> {
 
 fn add_features(layer: LayerHandle, location_field: &str, entries: Vec<Entry>) -> i32 {
     for entry in entries {
-        let poly_wkt = format!(
-            "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
-            entry.minx,
-            entry.miny,
-            entry.maxx,
-            entry.miny,
-            entry.maxx,
-            entry.maxy,
-            entry.minx,
-            entry.maxy,
-            entry.minx,
-            entry.miny
-        );
+        let poly_wkt = entry.boundary_wkt.clone().unwrap_or_else(|| {
+            format!(
+                "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
+                entry.minx,
+                entry.miny,
+                entry.maxx,
+                entry.miny,
+                entry.maxx,
+                entry.maxy,
+                entry.minx,
+                entry.maxy,
+                entry.minx,
+                entry.miny
+            )
+        });
         let fields = vec![
             (location_field, entry.location.as_str()),
             ("srs", entry.wkt.as_str()),

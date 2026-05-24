@@ -61,6 +61,52 @@ fn make_temp_dir(name: &str) -> PathBuf {
 }
 
 #[test]
+#[ignore = "requires PDAL_BIN env var pointing at a locally-built pdal binary"]
+fn locally_built_pdal_tindex_rich_boundary_produces_multipolygon() {
+    // The rich-boundary path lives in the C ABI kernel_abi/tindex.rs and is
+    // exercised through the C++ `pdal` binary. PDAL_BIN should point at a
+    // binary built with this Rust port (the brew/installed pdal does NOT
+    // share our Rust code).
+    let Ok(pdal_bin) = std::env::var("PDAL_BIN") else {
+        eprintln!("set PDAL_BIN to a locally-built pdal binary");
+        return;
+    };
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("tindex_rich_boundary");
+    let output = temp.join("rich.geojson");
+
+    let result = Command::new(&pdal_bin)
+        .args([
+            "tindex",
+            "create",
+            "--tindex",
+            output.to_str().unwrap(),
+            input.to_str().unwrap(),
+            "--ogrdriver",
+            "GeoJSON",
+            "--threshold=1",
+            "--resolution=10",
+        ])
+        .output()
+        .expect("failed to execute pdal");
+    assert!(
+        result.status.success(),
+        "pdal tindex rich boundary failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson = std::fs::read_to_string(&output).unwrap();
+    // The bbox path emits a 5-vertex Polygon ring; the exact boundary
+    // produced by hexer should have many more vertices.
+    let coord_pairs = geojson.matches('[').count();
+    assert!(
+        coord_pairs > 10,
+        "expected a rich boundary with many vertices, got {coord_pairs} '[' tokens in {geojson}"
+    );
+}
+
+#[test]
 fn tindex_creates_geojson_index() {
     let input1 = data_path("test/data/las/interesting.las");
     let input2 = data_path("test/data/las/1.2-with-color.las");
