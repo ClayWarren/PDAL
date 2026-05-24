@@ -370,6 +370,8 @@ extern "C"
     uint64_t pdal_point_view_length(pdal_point_view_t* view);
     uint64_t pdal_point_view_source_index(pdal_point_view_t* view,
                                           uint64_t idx);
+    bool pdal_point_view_swap_points(pdal_point_view_t* view, uint64_t a,
+                                     uint64_t b);
     bool pdal_point_view_calculate_bounds_2d(const pdal_point_view_t* view,
                                              pdal_bounds2d_t* out_bounds);
     bool pdal_point_view_calculate_bounds_3d(const pdal_point_view_t* view,

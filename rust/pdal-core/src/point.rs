@@ -871,6 +871,25 @@ impl PointView {
         self.source_indices.push(src.source_index(src_idx));
     }
 
+    /// Swap the stored data and source indices for two point rows.
+    pub fn swap_points(&mut self, a: PointId, b: PointId) -> bool {
+        if a >= self.len() || b >= self.len() {
+            return false;
+        }
+        if a == b {
+            return true;
+        }
+
+        let ps = self.layout.point_size();
+        let a_start = (a as usize) * ps;
+        let b_start = (b as usize) * ps;
+        for offset in 0..ps {
+            self.data.swap(a_start + offset, b_start + offset);
+        }
+        self.source_indices.swap(a as usize, b as usize);
+        true
+    }
+
     /// Original source row copied into this point. Used by the C++ bridge to
     /// preserve PDAL PointView table IDs when filters return subsets.
     pub fn source_index(&self, idx: PointId) -> PointId {

@@ -115,6 +115,31 @@ fn append_point_preserves_source_index() {
 }
 
 #[test]
+fn swap_points_exchanges_data_and_source_indices() {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    let layout = Rc::new(layout);
+
+    let mut src = PointView::new(Rc::clone(&layout));
+    for i in 0..3 {
+        let point = src.add_point();
+        src.set_f64(point, &DimId::X, i as f64);
+    }
+
+    let mut view = src.make_new();
+    view.append_point(&src, 2);
+    view.append_point(&src, 0);
+    assert!(view.swap_points(0, 1));
+
+    assert_eq!(view.get_f64(0, &DimId::X), 0.0);
+    assert_eq!(view.get_f64(1, &DimId::X), 2.0);
+    assert_eq!(view.source_index(0), 0);
+    assert_eq!(view.source_index(1), 2);
+    assert!(view.swap_points(0, 0));
+    assert!(!view.swap_points(0, 2));
+}
+
+#[test]
 fn calculate_bounds_matches_point_view_contract() {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);

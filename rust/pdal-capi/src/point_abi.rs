@@ -454,6 +454,21 @@ pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx:
     }
 }
 
+/// Swap two point rows in a view.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_swap_points(view: *mut PointView, a: u64, b: u64) -> bool {
+    if let Some(view) = view.as_mut() {
+        view.swap_points(a, b)
+    } else {
+        false
+    }
+}
+
 /// Calculate 2D bounds for X/Y dimensions.
 ///
 /// Returns false when `view` or `out_bounds` is null, the view is empty, or X/Y

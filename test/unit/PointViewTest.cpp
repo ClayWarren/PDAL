@@ -244,52 +244,42 @@ TEST(PointViewTest, calculateBounds)
 
 TEST(PointViewTest, pointRef)
 {
-    PointTable table;
-    PointLayoutPtr layout(table.layout());
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", RustF64);
+    pdal_point_layout_register_dim(layout, "Y", RustF64);
 
-    PointView view(table);
-    view.setField(Dimension::Id::X, 0, 10.0);
-    view.setField(Dimension::Id::Y, 0, 20.0);
-    view.setField(Dimension::Id::X, 1, 30.0);
-    view.setField(Dimension::Id::Y, 1, 40.0);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    ASSERT_NE(view, nullptr);
+    ASSERT_EQ(pdal_point_view_add_point(view), 0u);
+    ASSERT_EQ(pdal_point_view_add_point(view), 1u);
 
-    PointRef point(view, 0);
-    EXPECT_DOUBLE_EQ(point.getFieldAs<double>(Dimension::Id::X), 10.0);
-    point.setField(Dimension::Id::X, 15.0);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 15.0);
+    pdal_point_view_set_f64(view, 0, "X", 10.0);
+    pdal_point_view_set_f64(view, 0, "Y", 20.0);
+    pdal_point_view_set_f64(view, 1, "X", 30.0);
+    pdal_point_view_set_f64(view, 1, "Y", 40.0);
 
-    point.setPointId(1);
-    EXPECT_EQ(point.pointId(), 1u);
-    EXPECT_DOUBLE_EQ(point.getFieldAs<double>(Dimension::Id::Y), 40.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "X"), 10.0);
+    pdal_point_view_set_f64(view, 0, "X", 15.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "X"), 15.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 1, "Y"), 40.0);
 
-    PointRef added(view, view.size());
-    added.setField(Dimension::Id::X, 50.0);
-    added.setField(Dimension::Id::Y, 60.0);
-    EXPECT_EQ(view.size(), 3u);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 2), 50.0);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::Y, 2), 60.0);
+    ASSERT_EQ(pdal_point_view_add_point(view), 2u);
+    pdal_point_view_set_f64(view, 2, "X", 50.0);
+    pdal_point_view_set_f64(view, 2, "Y", 60.0);
+    EXPECT_EQ(pdal_point_view_length(view), 3u);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 2, "X"), 50.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 2, "Y"), 60.0);
 
-    PointRef first(view, 0);
-    PointRef second(view, 1);
-    PointRef::swap(first, second);
-    EXPECT_EQ(first.pointId(), 1u);
-    EXPECT_EQ(second.pointId(), 0u);
-    EXPECT_DOUBLE_EQ(first.getFieldAs<double>(Dimension::Id::X), 30.0);
-    EXPECT_DOUBLE_EQ(second.getFieldAs<double>(Dimension::Id::X), 15.0);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 30.0);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 1), 15.0);
+    EXPECT_TRUE(pdal_point_view_swap_points(view, 0, 1));
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "X"), 30.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 1, "X"), 15.0);
 
-    const PointRef constFirst(view, 0);
-    const PointRef constAdded(view, 2);
-    PointRef::swap(constFirst, constAdded);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 0), 50.0);
-    EXPECT_DOUBLE_EQ(view.getFieldAs<double>(Dimension::Id::X, 2), 30.0);
+    EXPECT_TRUE(pdal_point_view_swap_points(view, 0, 2));
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 0, "X"), 50.0);
+    EXPECT_DOUBLE_EQ(pdal_point_view_get_f64(view, 2, "X"), 30.0);
+    EXPECT_FALSE(pdal_point_view_swap_points(view, 0, 7));
 
-    PointRef tablePoint(table);
-    tablePoint.setPointId(7);
-    EXPECT_EQ(tablePoint.pointId(), 7u);
+    pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, bigfile)

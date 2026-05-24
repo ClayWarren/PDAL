@@ -61,7 +61,7 @@ Status definitions:
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
-| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 245 `unsafe { ... }` blocks, 405 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
+| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 245 `unsafe { ... }` blocks, 406 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
@@ -140,7 +140,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `764 / 1039` built C++ GoogleTest cases, or `73.53%`, are
+Current checkpoint: `765 / 1039` built C++ GoogleTest cases, or `73.63%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains route `SpatialReference` user-input normalization, PROJ4 export,
 semantic `IsSame` equality, and `identifyHorizontalEPSG` through a Rust GDAL
@@ -253,8 +253,9 @@ Known mixed binaries:
   Rust C ABI. PROJJSON export, axis ordering, GeoTIFF VLR encoding, and
   `SrsTransform` reprojection remain C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
-  `calculateBounds`, `issue1264`, `bigfile`, and `getFloatNan` count. PointRef
-  swapping, view ordering, and C++ debug death-test behavior remain C++.
+  `calculateBounds`, `pointRef`, `issue1264`, `bigfile`, and `getFloatNan`
+  count. Point row add/mutate/swap behavior routes through the Rust C ABI.
+  View ordering and C++ debug death-test behavior remain C++.
 - `pdal_eigen_test`: `calcBounds`, `ComputeValues`, `Morphological`,
   `computeCentroid`, and `demeanTest` count. The remaining Eigen fixture cases
   still exercise C++ matrix behavior.

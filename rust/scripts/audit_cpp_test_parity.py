@@ -31,6 +31,7 @@ COVERED: dict[str, object] = {
         "getAsInt32",
         "getFloat",
         "calculateBounds",
+        "pointRef",
         "issue1264",
         "bigfile",
         "getFloatNan",
