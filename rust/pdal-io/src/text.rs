@@ -2,6 +2,7 @@ use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
 use std::fs;
 use std::path::Path;
@@ -13,6 +14,7 @@ pub struct TextReader {
     separator: Option<char>,
     header: Option<String>,
     skip: usize,
+    override_srs: String,
 }
 
 impl TextReader {
@@ -25,6 +27,7 @@ impl TextReader {
             separator: separator.chars().next(),
             header: (!header.is_empty()).then_some(header),
             skip: options.get_u64("skip", 0) as usize,
+            override_srs: options.get_str("override_srs", ""),
         }
     }
 
@@ -186,6 +189,9 @@ impl Reader for TextReader {
         }
         let layout = Rc::new(layout);
         let mut view = PointView::new(layout);
+        if !self.override_srs.is_empty() {
+            view.set_spatial_reference(SpatialReference::new(&self.override_srs));
+        }
         let separator = self.separator.unwrap_or(' ');
 
         for line in lines.iter().skip(self.data_start()) {
@@ -326,6 +332,15 @@ mod tests {
         assert_eq!(view.len(), 10);
         assert_eq!(view.get_f64(0, &DimId::Other("A".to_string())), 289814.15);
         assert_eq!(view.get_f64(9, &DimId::Other("G".to_string())), 9.0);
+    }
+
+    #[test]
+    fn override_srs_sets_view_spatial_reference() {
+        let view = read_text("text/utm17_1.txt", |options| {
+            options.add("override_srs", "EPSG:2029");
+        });
+
+        assert_eq!(view.spatial_reference().wkt(), "EPSG:2029");
     }
 
     #[test]

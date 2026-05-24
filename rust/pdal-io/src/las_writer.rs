@@ -51,6 +51,7 @@ pub struct LasWriter {
     creation_year: Option<i32>,
     project_id: Option<uuid::Uuid>,
     global_encoding: Option<u16>,
+    forward: String,
     a_srs: Option<String>,
     pdal_metadata_json: Option<String>,
     pdal_pipeline_json: Option<String>,
@@ -128,6 +129,7 @@ impl LasWriter {
                 .value("project_id")
                 .and_then(|value| uuid::Uuid::parse_str(value.trim()).ok()),
             global_encoding: numeric_option_u16(options, "global_encoding"),
+            forward: options.get_str("forward", ""),
             a_srs: string_option(options, "a_srs"),
             pdal_metadata_json: string_option(options, "pdal_metadata_json"),
             pdal_pipeline_json: string_option(options, "pdal_pipeline_json"),
@@ -168,6 +170,12 @@ impl LasWriter {
             builder.gps_time_type = GpsTimeType::from(global_encoding & 1);
             builder.has_synthetic_return_numbers = global_encoding & 8 != 0;
             builder.has_wkt_crs = global_encoding & 16 != 0;
+        } else if self.forward.split(',').any(|part| part.trim() == "all")
+            && views
+                .first()
+                .is_some_and(|view| view.layout().dim(&DimId::GpsTime).is_some())
+        {
+            builder.gps_time_type = GpsTimeType::Standard;
         }
         let bounds = min_xyz(views);
         if self.scale_x.is_some()
@@ -254,15 +262,14 @@ impl Writer for LasWriter {
                 self.srs_projjson_vlr.as_deref(),
                 self.srs_wkt1_vlr.as_deref(),
             );
+        } else {
+            add_srs_vlr(&mut builder, views, self.a_srs.as_deref());
         }
         builder.point_format.is_compressed = should_compress;
 
-        let mut header = builder
+        let header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
-        if !self.enhanced_srs_vlrs {
-            set_header_srs(&mut header, views, self.a_srs.as_deref());
-        }
 
         let file = File::create(path)
             .map(BufWriter::new)
@@ -625,7 +632,7 @@ fn write_extra_dim_vlr_record(output: &mut Vec<u8>, ed: &ExtraDim) -> Result<(),
     Ok(())
 }
 
-fn set_header_srs(header: &mut Header, views: &[PointView], a_srs: Option<&str>) {
+fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Option<&str>) {
     let srs_text = a_srs
         .filter(|srs| !srs.is_empty())
         .map(str::to_string)
@@ -640,10 +647,21 @@ fn set_header_srs(header: &mut Header, views: &[PointView], a_srs: Option<&str>)
         return;
     };
 
-    if header.version() < las::Version::new(1, 4) {
+    if builder.version < las::Version::new(1, 4) {
         return;
     }
-    header.set_wkt_crs(wkt.into_bytes()).unwrap_or(());
+    let wkt = pdal_native::srs::user_input_to_wkt(&wkt)
+        .map(|srs| srs.wkt)
+        .unwrap_or(wkt);
+    builder.vlrs.retain(|vlr| !vlr.is_crs());
+    builder.evlrs.retain(|vlr| !vlr.is_crs());
+    builder.vlrs.push(Vlr {
+        user_id: TRANSFORM_USER_ID.to_string(),
+        record_id: WKT_RECORD_ID,
+        description: String::new(),
+        data: wkt.into_bytes(),
+    });
+    builder.has_wkt_crs = true;
 }
 
 fn quantize_coord(value: f64, transform: &Transform) -> f64 {

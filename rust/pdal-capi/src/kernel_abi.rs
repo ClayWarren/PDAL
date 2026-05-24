@@ -1,8 +1,9 @@
 use crate::error::string_to_c_ptr;
 use crate::registry::pipeline_from_json;
-use crate::tile_abi::pdal_tile;
+use crate::tile_abi::{tile_file, TileRequest};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::kernel::{parse_stage_option, ParseStageResult};
+use pdal_core::options::Options;
 use pdal_kernels::{FauxPluginKernel, Kernel, KernelArgs};
 use std::ffi::{CStr, CString};
 use std::fs;
@@ -827,6 +828,8 @@ unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let mut origin_x = f64::NAN;
     let mut origin_y = f64::NAN;
     let mut buffer = 0.0;
+    let mut out_srs = None;
+    let mut writer_options = Options::new();
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -858,7 +861,19 @@ unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
                 "origin_x" => &mut origin_x,
                 "origin_y" => &mut origin_y,
                 "buffer" => &mut buffer,
-                _ => return -1,
+                "out_srs" => {
+                    out_srs = Some(value.to_string());
+                    continue;
+                }
+                _ => {
+                    let option_text = format!("--{key}={value}");
+                    let parsed = parse_stage_option(&option_text, true);
+                    if parsed.result == ParseStageResult::Ok && parsed.stage == "writers.text" {
+                        writer_options.add(&parsed.option, parsed.value);
+                        continue;
+                    }
+                    return -1;
+                }
             };
             match value.parse::<f64>() {
                 Ok(parsed) => *target = parsed,
@@ -885,28 +900,28 @@ unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         eprintln!("PDAL: kernels.tile: Missing value for positional argument 'output'.");
         return 1;
     };
-    let (Ok(c_input), Ok(c_output)) = (CString::new(input), CString::new(output)) else {
+    if CString::new(input.as_str()).is_err() || CString::new(output.as_str()).is_err() {
         eprintln!("PDAL: kernels.tile: Path contains an interior NUL byte.");
         return 1;
-    };
+    }
 
-    let count = pdal_tile(
-        c_input.as_ptr(),
-        c_output.as_ptr(),
+    let request = TileRequest {
+        input_path: &input,
+        output_template: &output,
         length,
         origin_x,
         origin_y,
         buffer,
-    );
-    if count < 0 {
-        let message = CStr::from_ptr(crate::error::pdal_last_error())
-            .to_string_lossy()
-            .into_owned();
-        if !message.is_empty() {
-            eprintln!("{message}");
+        out_srs: out_srs.as_deref(),
+        writer_options: &writer_options,
+    };
+    let count = match tile_file(request) {
+        Ok(count) => count,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
         }
-        return 1;
-    }
+    };
     println!("Wrote {count} tile(s).");
     0
 }
