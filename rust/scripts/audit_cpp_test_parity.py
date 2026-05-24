@@ -21,6 +21,7 @@ COVERED: dict[str, object] = {
         "wgs84FromZone",
         "test_proj4_roundtrip",
         "test_userstring_roundtrip",
+        "test_get_utmzone",
         "test_read_srs",
         "test_io",
         "test_vertical_and_horizontal",
