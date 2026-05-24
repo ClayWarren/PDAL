@@ -680,6 +680,41 @@ mod tests {
     }
 
     #[test]
+    fn raster_paths_and_names_reject_nul_bytes() {
+        assert!(Raster::open("bad\0path").is_err());
+        assert!(Raster::create_float64(
+            "bad\0path",
+            "GTiff",
+            1,
+            1,
+            1,
+            [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+            "",
+        )
+        .is_err());
+        assert!(Raster::create_float64(
+            temp_tif("nul-driver").to_str().unwrap(),
+            "bad\0driver",
+            1,
+            1,
+            1,
+            [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+            "",
+        )
+        .is_err());
+        assert!(Raster::create_float64(
+            temp_tif("nul-srs").to_str().unwrap(),
+            "GTiff",
+            1,
+            1,
+            1,
+            [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+            "bad\0srs",
+        )
+        .is_err());
+    }
+
+    #[test]
     fn test_raster_read_band_errors() {
         register_drivers();
         let path = temp_tif("read-band-errors");
@@ -769,9 +804,25 @@ mod tests {
 
         // Test write_band_i32 error (buffer mismatch)
         assert!(raster.write_band_i32(1, 2, 3, &[1, 2], -99, "").is_err());
+        assert!(raster
+            .write_band_i32(2, 2, 3, &data, -99, "InvalidBand")
+            .is_err());
+        assert!(raster
+            .write_band_i32(1, 2, 3, &data, -99, "bad\0description")
+            .is_err());
 
         // Test write_band_f64 error (buffer mismatch)
         assert!(raster.write_band_f64(1, 2, 3, &[1.0], -99.0, "").is_err());
+        let float_data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        assert!(raster
+            .write_band_f64(2, 2, 3, &float_data, -99.0, "InvalidBand")
+            .is_err());
+        assert!(raster
+            .write_band_f64(1, 2, 3, &float_data, -99.0, "bad\0description")
+            .is_err());
+        assert!(raster.set_metadata_item("bad\0key", "value").is_err());
+        assert!(raster.set_metadata_item("key", "bad\0value").is_err());
+        assert!(raster.metadata_item("bad\0key").is_none());
 
         drop(raster);
 
@@ -791,6 +842,28 @@ mod tests {
         assert_eq!(pixel_buf[0], 2.0);
     }
 
+    #[test]
+    fn raster_read_at_rejects_noninvertible_geotransform() {
+        register_drivers();
+        let path = temp_tif("read-at-noninvertible");
+        let raster = Raster::create_float64(
+            path.to_str().unwrap(),
+            "GTiff",
+            1,
+            1,
+            1,
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "",
+        )
+        .unwrap();
+
+        let mut buf = [0.0];
+        assert_eq!(
+            raster.read_at(0.0, 0.0, &mut buf).unwrap_err(),
+            "Failed to get geo transform"
+        );
+    }
+
     fn temp_shp(name: &str) -> PathBuf {
         let path =
             std::env::temp_dir().join(format!("pdal-native-{name}-{}.shp", std::process::id()));
@@ -807,9 +880,12 @@ mod tests {
 
         // 1. Vector open failure
         assert!(Vector::open(path.to_str().unwrap()).is_err());
+        assert!(Vector::open("bad\0path").is_err());
 
         // 2. Vector create invalid driver failure
         assert!(Vector::create(path.to_str().unwrap(), "NonExistentVectorDriver").is_err());
+        assert!(Vector::create("bad\0path", "ESRI Shapefile").is_err());
+        assert!(Vector::create(path.to_str().unwrap(), "bad\0driver").is_err());
 
         // 3. Vector create success
         let vector = Vector::create(path.to_str().unwrap(), "ESRI Shapefile").unwrap();
@@ -820,10 +896,18 @@ mod tests {
 
         // 4. Create fields (unsafe)
         unsafe {
+            assert!(Vector::create_string_field(layer, "bad\0name").is_err());
+            assert!(Vector::create_datetime_field(layer, "bad\0timestamp").is_err());
             Vector::create_string_field(layer, "name").unwrap();
             Vector::create_datetime_field(layer, "timestamp").unwrap();
 
             // Add feature
+            assert!(
+                Vector::add_feature(layer, "POLYGON EMPTY", &[("bad\0field", "value")]).is_err()
+            );
+            assert!(
+                Vector::add_feature(layer, "POLYGON EMPTY", &[("name", "bad\0value")]).is_err()
+            );
             Vector::add_feature(
                 layer,
                 "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))",
@@ -843,5 +927,11 @@ mod tests {
 
         // Feature column not found
         assert!(vector.get_features(0, "nonexistent").is_err());
+        assert!(vector.get_features(99, "name").is_err());
+    }
+
+    #[test]
+    fn version_info_rejects_nul_key() {
+        assert_eq!(version_info("bad\0key"), "");
     }
 }

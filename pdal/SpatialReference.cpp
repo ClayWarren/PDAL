@@ -116,31 +116,37 @@ bool SpatialReference::empty() const
 
 bool SpatialReference::valid() const
 {
-    OGRSpatialReference current(m_wkt.data());
-
-    return current.Validate() == OGRERR_NONE;
+    bool v = false;
+    if (pdal_srs_valid(m_wkt.c_str(), &v))
+        return v;
+    return false;
 }
 
 std::string SpatialReference::identifyHorizontalEPSG() const
 {
-    OGRScopedSpatialReference srs(ogrCreateSrs(getHorizontal(), m_epoch));
-
-    if (!srs || srs->AutoIdentifyEPSG() != OGRERR_NONE)
-        return "";
-
-    if (const char* c = srs->GetAuthorityCode(nullptr))
-        return std::string(c);
-
+    char* rust_code = nullptr;
+    if (pdal_srs_identify_horizontal_epsg(m_wkt.c_str(), m_epoch, &rust_code))
+    {
+        std::string code(rust_code ? rust_code : "");
+        pdal_string_free(rust_code);
+        return code;
+    }
+    if (rust_code)
+        pdal_string_free(rust_code);
     return "";
 }
 
 std::string SpatialReference::identifyVerticalEPSG() const
 {
-    OGRScopedSpatialReference srs(ogrCreateSrs(getVertical(), m_epoch));
-
-    if (const char* c = srs->GetAuthorityCode(nullptr))
-        return std::string(c);
-
+    char* rust_code = nullptr;
+    if (pdal_srs_identify_vertical_epsg(m_wkt.c_str(), m_epoch, &rust_code))
+    {
+        std::string code(rust_code ? rust_code : "");
+        pdal_string_free(rust_code);
+        return code;
+    }
+    if (rust_code)
+        pdal_string_free(rust_code);
     return "";
 }
 
@@ -210,105 +216,87 @@ void SpatialReference::set(std::string v)
         return;
     }
 
-    OGRSpatialReference srs(nullptr);
-
-    CPLErrorReset();
-    const char* input = v.c_str();
-    OGRErr err = srs.SetFromUserInput(const_cast<char*>(input));
-    if (err != OGRERR_NONE)
+    char* rust_wkt = nullptr;
+    char* rust_wkt2 = nullptr;
+    double rust_epoch = 0.0;
+    if (pdal_srs_user_input_to_wkt(v.c_str(), &rust_wkt, &rust_wkt2,
+                                   &rust_epoch))
     {
-        std::ostringstream oss;
-        std::string msg = CPLGetLastErrorMsg();
-        if (msg.empty())
-            msg = "(unknown reason)";
-        oss << "Could not import coordinate system '" << input << "': " << msg
-            << ".";
-        throw pdal_error(oss.str());
+        m_wkt = rust_wkt ? std::string(rust_wkt) : std::string();
+        m_wkt2 = rust_wkt2 ? std::string(rust_wkt2) : std::string();
+        m_epoch = rust_epoch;
+        pdal_string_free(rust_wkt);
+        pdal_string_free(rust_wkt2);
+        return;
     }
 
-    m_epoch = srs.GetCoordinateEpoch();
+    if (rust_wkt)
+        pdal_string_free(rust_wkt);
+    if (rust_wkt2)
+        pdal_string_free(rust_wkt2);
 
-    m_wkt = exportToWkt(&srs);
-
-    m_wkt2 = exportToWkt(&srs, {"FORMAT=WKT2_2018"});
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error("Could not import coordinate system '" + v + "'.");
 }
 
 std::string SpatialReference::getProj4() const
 {
-    std::string tmp;
-
-    const char* poWKT = m_wkt.c_str();
-
-    OGRSpatialReference srs(nullptr);
-    if (OGRERR_NONE == srs.importFromWkt(const_cast<char**>(&poWKT)))
+    char* rust_proj4 = nullptr;
+    if (pdal_srs_wkt_to_proj4(m_wkt.c_str(), &rust_proj4))
     {
-        char* proj4 = nullptr;
-        srs.exportToProj4(&proj4);
-        tmp = proj4;
-        CPLFree(proj4);
-        Utils::trim(tmp);
+        std::string tmp(rust_proj4 ? rust_proj4 : "");
+        pdal_string_free(rust_proj4);
+        return tmp;
     }
-
-    return tmp;
+    if (rust_proj4)
+        pdal_string_free(rust_proj4);
+    return std::string();
 }
 
 std::string SpatialReference::getVertical() const
 {
-    std::string tmp;
-
-    OGRScopedSpatialReference poSRS = ogrCreateSrs(m_wkt, m_epoch);
-
-    // Above can fail if m_wkt is bad.
-    if (!poSRS)
-        return tmp;
-
-    char* pszWKT = nullptr;
-
-    OGR_SRSNode* node = poSRS->GetAttrNode("VERT_CS");
-    if (node && poSRS)
+    char* rust_wkt = nullptr;
+    if (pdal_srs_get_vertical_wkt(m_wkt.c_str(), &rust_wkt))
     {
-        node->exportToWkt(&pszWKT);
-        tmp = pszWKT;
-        CPLFree(pszWKT);
+        std::string out(rust_wkt ? rust_wkt : "");
+        pdal_string_free(rust_wkt);
+        return out;
     }
-
-    return tmp;
+    if (rust_wkt)
+        pdal_string_free(rust_wkt);
+    return std::string();
 }
 
 std::string SpatialReference::getVerticalUnits() const
 {
-    std::string tmp;
-
-    OGRScopedSpatialReference poSRS = ogrCreateSrs(m_wkt, m_epoch);
-    if (poSRS)
+    char* rust_units = nullptr;
+    if (pdal_srs_get_vertical_units(m_wkt.c_str(), &rust_units))
     {
-        OGR_SRSNode* node = poSRS->GetAttrNode("VERT_CS");
-        if (node)
-        {
-            char* units(nullptr);
-
-            // 'units' remains internal to the OGRSpatialReference
-            // and should not be freed, or modified. It may be invalidated
-            // on the next OGRSpatialReference call.
-            (void)poSRS->GetLinearUnits(&units);
-            tmp = units;
-            Utils::trim(tmp);
-        }
+        std::string out(rust_units ? rust_units : "");
+        pdal_string_free(rust_units);
+        return out;
     }
-
-    return tmp;
+    if (rust_units)
+        pdal_string_free(rust_units);
+    return std::string();
 }
 
 std::string SpatialReference::getHorizontal() const
 {
     if (m_horizontalWkt.empty())
     {
-        OGRScopedSpatialReference poSRS = ogrCreateSrs(m_wkt, m_epoch);
-
-        if (poSRS)
+        char* rust_wkt = nullptr;
+        if (pdal_srs_get_horizontal_wkt(m_wkt.c_str(), &rust_wkt))
         {
-            poSRS->StripVertical();
-            m_horizontalWkt = exportToWkt(poSRS.get());
+            if (rust_wkt)
+                m_horizontalWkt = rust_wkt;
+            pdal_string_free(rust_wkt);
+        }
+        else if (rust_wkt)
+        {
+            pdal_string_free(rust_wkt);
         }
     }
     return m_horizontalWkt;
@@ -316,20 +304,16 @@ std::string SpatialReference::getHorizontal() const
 
 std::string SpatialReference::getHorizontalUnits() const
 {
-    OGRScopedSpatialReference poSRS = ogrCreateSrs(m_wkt, m_epoch);
-
-    if (!poSRS)
-        return std::string();
-
-    char* units(nullptr);
-
-    // The returned value remains internal to the OGRSpatialReference
-    // and should not be freed, or modified. It may be invalidated on
-    // the next OGRSpatialReference call.
-    poSRS->GetLinearUnits(&units);
-    std::string tmp(units);
-    Utils::trim(tmp);
-    return tmp;
+    char* rust_units = nullptr;
+    if (pdal_srs_get_horizontal_units(m_wkt.c_str(), &rust_units))
+    {
+        std::string out(rust_units ? rust_units : "");
+        pdal_string_free(rust_units);
+        return out;
+    }
+    if (rust_units)
+        pdal_string_free(rust_units);
+    return std::string();
 }
 
 bool SpatialReference::equals(const SpatialReference& input) const
@@ -337,15 +321,11 @@ bool SpatialReference::equals(const SpatialReference& input) const
     if (getWKT() == input.getWKT())
         return true;
 
-    OGRScopedSpatialReference current = ogrCreateSrs(getWKT(), m_epoch);
-    OGRScopedSpatialReference other = ogrCreateSrs(input.getWKT(), m_epoch);
-
-    if (!current || !other)
-        return false;
-
-    int output = current->IsSame(other.get());
-
-    return (output == 1);
+    bool same = false;
+    if (pdal_srs_is_same(getWKT().c_str(), input.getWKT().c_str(), m_epoch,
+                         &same))
+        return same;
+    return false;
 }
 
 bool SpatialReference::operator==(const SpatialReference& input) const
@@ -493,13 +473,10 @@ std::string SpatialReference::getWKT2() const
 
 int SpatialReference::getUTMZone() const
 {
-    OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
-    if (!current)
-        throw pdal_error("Could not fetch current SRS");
-
-    int north(0);
-    int zone = current->GetUTMZone(&north);
-    return (north ? 1 : -1) * zone;
+    int32_t zone = 0;
+    if (pdal_srs_get_utm_zone(m_wkt.c_str(), &zone))
+        return zone;
+    throw pdal_error("Could not fetch current SRS");
 }
 
 int SpatialReference::computeUTMZone(const BOX3D& cbox) const

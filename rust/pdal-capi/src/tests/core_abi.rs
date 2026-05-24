@@ -380,6 +380,52 @@ fn geometry_wkt_output_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn geometry_json_is_valid_through_c_abi() {
+    unsafe {
+        let good = CString::new(
+            r#"{ "srs": "EPSG:2991", "type": "Polygon", "coordinates": [ [ [0,0], [1,0], [1,1], [0,1], [0,0] ] ] }"#,
+        )
+        .unwrap();
+        let mut valid = false;
+        assert!(pdal_geometry_json_is_valid(good.as_ptr(), &mut valid));
+        assert!(valid);
+
+        let bad = CString::new("not json").unwrap();
+        assert!(!pdal_geometry_json_is_valid(bad.as_ptr(), &mut valid));
+    }
+}
+
+#[test]
+fn geometry_wkt_to_json_matches_gdal_format() {
+    unsafe {
+        let polygon = CString::new(
+            "POLYGON ((636889.412951239268295 851528.512293258565478 422.7001953125,\
+             636899.14233423944097 851475.000686757150106 422.4697265625,\
+             636928.33048324030824 851494.459452757611871 422.5400390625,\
+             636889.412951239268295 851528.512293258565478 422.7001953125))",
+        )
+        .unwrap();
+        let mut out_json = std::ptr::null_mut();
+        assert!(pdal_geometry_wkt_to_json(
+            polygon.as_ptr(),
+            5,
+            &mut out_json
+        ));
+        let json = take_string(out_json);
+        assert!(json.starts_with(
+            "{ \"type\": \"Polygon\", \"coordinates\": [ [ [ 636889.41295, 851528.51229, 422.7002 ]"
+        ));
+        assert!(json.ends_with("[ 636889.41295, 851528.51229, 422.7002 ] ] ] }"));
+
+        assert!(!pdal_geometry_wkt_to_json(
+            std::ptr::null(),
+            5,
+            &mut out_json
+        ));
+    }
+}
+
+#[test]
 fn geometry_distance_roundtrips_through_c_abi() {
     unsafe {
         let point = CString::new("POINT(0 0 0)").unwrap();
@@ -393,6 +439,140 @@ fn geometry_distance_roundtrips_through_c_abi() {
             &mut distance
         ));
         assert_eq!(distance, 5.0);
+    }
+}
+
+#[test]
+fn srs_user_input_to_wkt_returns_canonical_wkt_and_wkt2() {
+    unsafe {
+        let input = CString::new("EPSG:4326").unwrap();
+        let mut wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            input.as_ptr(),
+            &mut wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let wkt = take_string(wkt);
+        let wkt2 = take_string(wkt2);
+        assert!(wkt.contains("WGS 84"));
+        assert!(wkt.contains("GEOGCS["));
+        assert!(wkt2.contains("WGS 84"));
+        assert_eq!(epoch, 0.0);
+
+        let bad = CString::new("not a srs").unwrap();
+        let mut wkt_bad = std::ptr::null_mut();
+        let mut wkt2_bad = std::ptr::null_mut();
+        assert!(!pdal_srs_user_input_to_wkt(
+            bad.as_ptr(),
+            &mut wkt_bad,
+            &mut wkt2_bad,
+            &mut epoch
+        ));
+    }
+}
+
+#[test]
+fn srs_wkt_to_proj4_returns_trimmed_string() {
+    unsafe {
+        let input = CString::new("EPSG:4326").unwrap();
+        let mut wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            input.as_ptr(),
+            &mut wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let wkt_str = take_string(wkt);
+        let _ = take_string(wkt2);
+        let wkt_c = CString::new(wkt_str).unwrap();
+        let mut proj4 = std::ptr::null_mut();
+        assert!(pdal_srs_wkt_to_proj4(wkt_c.as_ptr(), &mut proj4));
+        assert_eq!(take_string(proj4), "+proj=longlat +datum=WGS84 +no_defs");
+
+        // Empty WKT yields empty PROJ4 without erroring.
+        let empty = CString::new("").unwrap();
+        let mut proj4 = std::ptr::null_mut();
+        assert!(pdal_srs_wkt_to_proj4(empty.as_ptr(), &mut proj4));
+        assert_eq!(take_string(proj4), "");
+    }
+}
+
+#[test]
+fn srs_is_same_matches_equivalent_srs_through_c_abi() {
+    unsafe {
+        let a = CString::new("EPSG:4326").unwrap();
+        let b = CString::new("+proj=longlat +datum=WGS84 +no_defs").unwrap();
+        let mut wkt_a = std::ptr::null_mut();
+        let mut wkt2_a = std::ptr::null_mut();
+        let mut wkt_b = std::ptr::null_mut();
+        let mut wkt2_b = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            a.as_ptr(),
+            &mut wkt_a,
+            &mut wkt2_a,
+            &mut epoch
+        ));
+        assert!(pdal_srs_user_input_to_wkt(
+            b.as_ptr(),
+            &mut wkt_b,
+            &mut wkt2_b,
+            &mut epoch
+        ));
+        let wkt_a = CString::new(take_string(wkt_a)).unwrap();
+        let wkt_b = CString::new(take_string(wkt_b)).unwrap();
+        let _ = take_string(wkt2_a);
+        let _ = take_string(wkt2_b);
+
+        let mut same = false;
+        assert!(pdal_srs_is_same(
+            wkt_a.as_ptr(),
+            wkt_b.as_ptr(),
+            0.0,
+            &mut same
+        ));
+        assert!(same);
+
+        // Empty inputs report not-same without error.
+        let empty = CString::new("").unwrap();
+        let mut same = true;
+        assert!(pdal_srs_is_same(
+            empty.as_ptr(),
+            wkt_b.as_ptr(),
+            0.0,
+            &mut same
+        ));
+        assert!(!same);
+    }
+}
+
+#[test]
+fn srs_identify_horizontal_epsg_returns_code() {
+    unsafe {
+        let input = CString::new("EPSG:32617").unwrap();
+        let mut wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            input.as_ptr(),
+            &mut wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let wkt_c = CString::new(take_string(wkt)).unwrap();
+        let _ = take_string(wkt2);
+        let mut code = std::ptr::null_mut();
+        assert!(pdal_srs_identify_horizontal_epsg(
+            wkt_c.as_ptr(),
+            0.0,
+            &mut code
+        ));
+        assert_eq!(take_string(code), "32617");
     }
 }
 

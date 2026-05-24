@@ -24,7 +24,7 @@ Status definitions:
 | Rust pipeline graph | in progress | Reader/filter/writer DAG execution, tags, dependencies, `where`/`where_merge` splitting, metadata aggregation, summaries, and error propagation exist. Not a full C++ `PipelineManager` replacement. |
 | Options | in progress | String-keyed typed getters match the current Rust option flow. Full C++ `Options` parity is not claimed. |
 | Metadata | in progress | Typed scalar metadata trees and JSON serialization exist. C++ descriptions, arrays/list kind preservation, JSON/base64 typed nodes, and full pipeline serialization remain incomplete. |
-| Spatial reference | prototype | Text plus coordinate epoch are stored and exported. No full GDAL/PROJ-backed normalization, reprojection, authority lookup, WKT conversion, axis ordering, or unit handling yet. |
+| Spatial reference | in progress | `SpatialReference::set` (non-WKT user input), `getProj4`, `equals` (semantic IsSame fallback), `identifyHorizontalEPSG`, `identifyVerticalEPSG`, `getUTMZone`, `getHorizontal`, `getVertical`, `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through a Rust GDAL/OSR adapter (`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`, `pdal_srs_identify_horizontal_epsg`, `pdal_srs_identify_vertical_epsg`, `pdal_srs_get_utm_zone`, `pdal_srs_get_horizontal_wkt`, `pdal_srs_get_vertical_wkt`, `pdal_srs_get_horizontal_units`, `pdal_srs_get_vertical_units`, `pdal_srs_valid`). Vertical extraction uses a Rust WKT bracket-matching parser because GDAL's C API has no `OGR_SRSNode` equivalent. PROJJSON export, axis-mapping config, GeoTIFF VLR encoding, and reprojection (`SrsTransform` remains C++) are still C++ GDAL/OGR-backed. |
 | Spatial index | in progress | Exact brute-force neighbor queries sit behind a replaceable API. Do not bake one-off neighbor searches into new filters. |
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
@@ -139,9 +139,20 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `747 / 926` built C++ GoogleTest cases, or `80.67%`, are
+Current checkpoint: `757 / 926` built C++ GoogleTest cases, or `81.75%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route Polygon WKT parsing/output, root-array pipeline execution, large point-view random-access
+gains route `SpatialReference` user-input normalization, PROJ4 export,
+semantic `IsSame` equality, and `identifyHorizontalEPSG` through a Rust GDAL
+OSR adapter (the C++ `SpatialReference::set` user-input branch, `getProj4`,
+`equals`, and `identifyHorizontalEPSG` now delegate to
+`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`,
+and `pdal_srs_identify_horizontal_epsg`), promote
+`test_proj4_roundtrip`, `test_userstring_roundtrip`, `test_read_srs`,
+`test_io`, `readerOptions`, and `identifyEPSG` as Rust-backed in
+`pdal_spatial_reference_test`, route Polygon GeoJSON parsing/output (GDAL
+`OGR_G_ExportToJsonEx(COORDINATE_PRECISION)` shape via a Rust
+WKT-to-GeoJSON formatter, with PDAL's optional `srs` top-level key
+stripped before GEOS parsing), Polygon WKT parsing/output, root-array pipeline execution, large point-view random-access
 storage, point-view checked typed writes, the basic pipeline manager execute
 path, typed point-view reads, the default spatial-reference contract, basic
 point storage, and option JSON canonicalization through the Rust C ABI, route
@@ -217,9 +228,17 @@ Known mixed binaries:
 
 - `pdal_kdindex_test`: all 5 tests currently count; KNN/radius queries route
   through Rust spatial query ABI.
-- `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, and
-  `wgs84FromZone` count. Most SRS normalization, authority lookup,
-  WKT/PROJJSON, and LAS SRS behavior remains C++ GDAL/OGR-backed.
+- `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, `wgs84FromZone`,
+  `test_proj4_roundtrip`, `test_userstring_roundtrip`, `test_read_srs`,
+  `test_io`, `test_vertical_and_horizontal`, `readerOptions`, `identifyEPSG`,
+  and `issue_1989` count. User-input normalization (`OSRSetFromUserInput`
+  + WKT1 and WKT2_2018 export), `getProj4`, semantic equality (`OSRIsSame`
+  fallback), horizontal-EPSG identification, vertical-EPSG identification,
+  `getUTMZone`, `getHorizontal`, `getVertical` (WKT bracket-matching subtree
+  extraction because GDAL's C API has no `OGR_SRSNode` equivalent),
+  `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through the
+  Rust C ABI. PROJJSON export, axis ordering, GeoTIFF VLR encoding, and
+  `SrsTransform` reprojection remain C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
   `calculateBounds`, `issue1264`, `bigfile`, and `getFloatNan` count. PointRef
   swapping, view ordering, and C++ debug death-test behavior remain C++.
@@ -275,11 +294,13 @@ Known mixed binaries:
   `issue_4751`, `conditional`, and `test_option_writing` count. Option-name
   validation, command-line formatting, JSON scalar formatting, and conditional
   option serialization route through Rust helpers. Option storage remains C++.
-- `pdal_polygon_test`: `test_wkt_in`, `test_wkt_out`, `simplify`, `smooth`,
-  `covers`, `valid`, `bounds`, `bounds2d`, and `bounds3d` count. Native
-  geometry validity, WKT output, area, simplification, point coverage, and
-  bounds route through the Rust C ABI. GeoJSON serialization, stream operators,
-  and polygon relational operators remain C++/GDAL.
+- `pdal_polygon_test`: `test_wkt_in`, `test_wkt_out`, `test_json_in`,
+  `test_json_out`, `simplify`, `smooth`, `covers`, `valid`, `bounds`,
+  `bounds2d`, and `bounds3d` count. Native geometry validity, WKT output,
+  GeoJSON parse validity, WKT-to-GeoJSON serialization in GDAL's
+  `OGR_G_ExportToJsonEx(COORDINATE_PRECISION)` byte-for-byte shape,
+  area, simplification, point coverage, and bounds route through the Rust C
+  ABI. Stream operators and polygon relational operators remain C++/GDAL.
 - `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
   fills, depth, and region queries route through the Rust C ABI.
 - `pdal_xml_schema_test`: `legacyNames` and `roundTrip` count; legacy

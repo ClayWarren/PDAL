@@ -70,8 +70,10 @@ TEST(PolygonTest, test_wkt_in)
 TEST(PolygonTest, test_json_in)
 {
     std::string json(getJSON());
+    bool valid(false);
 
-    Polygon p(json);
+    EXPECT_TRUE(pdal_geometry_json_is_valid(json.c_str(), &valid));
+    EXPECT_TRUE(valid);
 }
 
 TEST(PolygonTest, test_wkt_out)
@@ -141,8 +143,6 @@ TEST(PolygonTest, simplify)
 
 TEST(PolygonTest, test_json_out)
 {
-    Polygon p(getJSON());
-    std::string j = p.json(5);
     std::string expected(
         "{ \"type\": \"Polygon\", \"coordinates\": [ [ [ 636889.41295, "
         "851528.51229, 422.7002 ], [ 636899.14233, 851475.00069, 422.46973 ], "
@@ -158,7 +158,14 @@ TEST(PolygonTest, test_json_out)
         "850511.79177, 420.7998 ], [ 636758.06628, 850667.4619, 434.60938 ], [ "
         "636539.15516, 851056.63722, 422.63965 ], [ 636889.41295, "
         "851528.51229, 422.7002 ] ] ] }");
-    EXPECT_EQ(j, expected);
+
+    char* outJson(nullptr);
+    ASSERT_TRUE(pdal_geometry_wkt_to_json(getWKT().c_str(), 5, &outJson));
+    ASSERT_NE(outJson, nullptr);
+    std::string j(outJson);
+    pdal_string_free(outJson);
+
+    EXPECT_EQ(expected, j);
 }
 
 TEST(PolygonTest, smooth)

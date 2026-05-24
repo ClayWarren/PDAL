@@ -7,6 +7,7 @@ description = "Native library adapters for the PDAL Rust port."
 
 [dependencies]
 gdal-sys = { version = "0.12", features = ["bindgen"] }
-geos = "11.1"
+geos = { version = "11.1", features = ["v3_10_0", "json"] }
 proj = "0.31"
 proj-sys = "0.27"
+serde_json = "1"

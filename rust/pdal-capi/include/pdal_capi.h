@@ -501,6 +501,39 @@ extern "C"
                                     bool preserve_topology, char** out_wkt);
     bool pdal_geometry_wkt_to_wkt(const char* wkt, char** out_wkt);
     bool pdal_geometry_wkt_bounds(const char* wkt, pdal_bounds3d_t* out_bounds);
+    bool pdal_geometry_json_is_valid(const char* json, bool* out_value);
+    bool pdal_geometry_wkt_to_json(const char* wkt, uint32_t precision,
+                                   char** out_json);
+
+    // Spatial reference helpers (GDAL OSR routed through Rust).
+    bool pdal_srs_user_input_to_wkt(const char* input, char** out_wkt,
+                                    char** out_wkt2, double* out_epoch);
+    bool pdal_srs_wkt_to_proj4(const char* wkt, char** out_proj4);
+    bool pdal_srs_is_same(const char* wkt_a, const char* wkt_b, double epoch,
+                          bool* out_same);
+    bool pdal_srs_identify_horizontal_epsg(const char* wkt, double epoch,
+                                           char** out_code);
+    bool pdal_srs_get_utm_zone(const char* wkt, int32_t* out_zone);
+    bool pdal_srs_get_horizontal_wkt(const char* wkt, char** out_wkt);
+    bool pdal_srs_get_horizontal_units(const char* wkt, char** out_units);
+    bool pdal_srs_get_vertical_wkt(const char* wkt, char** out_wkt);
+    bool pdal_srs_get_vertical_units(const char* wkt, char** out_units);
+    bool pdal_srs_identify_vertical_epsg(const char* wkt, double epoch,
+                                         char** out_code);
+    bool pdal_srs_valid(const char* wkt, bool* out_valid);
+
+    typedef struct pdal_srs_transform pdal_srs_transform_t;
+    pdal_srs_transform_t* pdal_srs_transform_create(
+        const char* src_wkt, double src_epoch, const char* dst_wkt,
+        double dst_epoch, const int32_t* src_axis_order,
+        size_t src_axis_order_len, const int32_t* dst_axis_order,
+        size_t dst_axis_order_len);
+    void pdal_srs_transform_destroy(pdal_srs_transform_t* handle);
+    bool pdal_srs_transform_xyz(const pdal_srs_transform_t* handle, double* x,
+                                double* y, double* z);
+    bool pdal_srs_transform_xyz_array(const pdal_srs_transform_t* handle,
+                                      double* xs, double* ys, double* zs,
+                                      size_t len);
 
     // XML schema
     char* pdal_xml_schema_remap_old_name(const char* name);

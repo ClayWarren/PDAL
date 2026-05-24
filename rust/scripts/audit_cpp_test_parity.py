@@ -12,7 +12,19 @@ ALL = object()
 
 COVERED: dict[str, object] = {
     "pdal_kdindex_test": ALL,
-    "pdal_spatial_reference_test": {"test_ctor", "calcZone", "wgs84FromZone"},
+    "pdal_spatial_reference_test": {
+        "test_ctor",
+        "calcZone",
+        "wgs84FromZone",
+        "test_proj4_roundtrip",
+        "test_userstring_roundtrip",
+        "test_read_srs",
+        "test_io",
+        "test_vertical_and_horizontal",
+        "readerOptions",
+        "identifyEPSG",
+        "issue_1989",
+    },
     "pdal_point_view_test": {
         "getSet",
         "getAsUint8",
@@ -103,6 +115,8 @@ COVERED: dict[str, object] = {
     "pdal_polygon_test": {
         "test_wkt_in",
         "test_wkt_out",
+        "test_json_in",
+        "test_json_out",
         "simplify",
         "smooth",
         "covers",

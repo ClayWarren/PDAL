@@ -1,6 +1,7 @@
 //! Geometry support via GEOS.
 
 use geos::{CoordSeq, Geom, Geometry as GeosGeometry};
+use serde_json::Value;
 
 /// A geometry (PDAL's `Geometry`).
 pub struct Geometry {
@@ -12,6 +13,28 @@ impl Geometry {
         let geos_geom =
             GeosGeometry::new_from_wkt(wkt).map_err(|e| format!("Failed to parse WKT: {}", e))?;
         Ok(Self { geos_geom })
+    }
+
+    /// Parse a GeoJSON geometry. Accepts PDAL's optional top-level `srs` key by
+    /// stripping it before handing the JSON to GEOS, which is strict about
+    /// GeoJSON shape.
+    pub fn from_geojson(json: &str) -> Result<Self, String> {
+        let cleaned = strip_non_geojson_keys(json);
+        let geos_geom = GeosGeometry::new_from_geojson(&cleaned)
+            .map_err(|e| format!("Failed to parse GeoJSON: {}", e))?;
+        Ok(Self { geos_geom })
+    }
+
+    /// Render this geometry as GeoJSON using GDAL's
+    /// `OGR_G_ExportToJsonEx(COORDINATE_PRECISION=precision)` formatting:
+    /// single line, spaces around `{`/`}`/`[`/`]`, `", "` separators, and
+    /// coordinate values formatted with `precision` decimals after trimming
+    /// trailing zeros. Only supports the geometry types currently used by
+    /// `pdal::Polygon`.
+    pub fn to_gdal_geojson(&self, precision: u32) -> Result<String, String> {
+        let geojson = self.geos_geom.to_geojson().map_err(|e| e.to_string())?;
+        let value: Value = serde_json::from_str(&geojson).map_err(|e| e.to_string())?;
+        format_gdal_geojson_value(&value, precision)
     }
 
     pub fn is_valid(&self) -> Result<bool, String> {
@@ -65,62 +88,10 @@ impl Geometry {
     }
 
     pub fn bounds(&self) -> Result<(f64, f64, f64, f64, f64, f64), String> {
-        fn get_coords(
-            geom: &impl geos::Geom,
-            coords: &mut Vec<(f64, f64, f64)>,
-        ) -> Result<(), String> {
-            use geos::GeometryTypes;
-            let g_type = geom.geometry_type().map_err(|e| e.to_string())?;
-            match g_type {
-                GeometryTypes::Point | GeometryTypes::LineString | GeometryTypes::LinearRing => {
-                    if let Ok(coord_seq) = geom.get_coord_seq() {
-                        if let Ok(size) = coord_seq.size() {
-                            let has_z = if let Ok(dims) = coord_seq.dimensions() {
-                                let d: std::os::raw::c_int = dims.into();
-                                d >= 3
-                            } else {
-                                false
-                            };
-                            for i in 0..size {
-                                let x = coord_seq.get_x(i).unwrap_or(0.0);
-                                let y = coord_seq.get_y(i).unwrap_or(0.0);
-                                let cz = if has_z {
-                                    coord_seq.get_z(i).unwrap_or(f64::NAN)
-                                } else {
-                                    f64::NAN
-                                };
-                                coords.push((x, y, cz));
-                            }
-                        }
-                    }
-                }
-                GeometryTypes::Polygon => {
-                    if let Ok(ext) = geom.get_exterior_ring() {
-                        get_coords(&ext, coords)?;
-                    }
-                    if let Ok(num_int) = geom.get_num_interior_rings() {
-                        for i in 0..num_int {
-                            if let Ok(interior) = geom.get_interior_ring_n(i) {
-                                get_coords(&interior, coords)?;
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    if let Ok(num_geoms) = geom.get_num_geometries() {
-                        for i in 0..num_geoms {
-                            if let Ok(sub_geom) = geom.get_geometry_n(i) {
-                                get_coords(&sub_geom, coords)?;
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-
+        let geojson = self.geos_geom.to_geojson().map_err(|e| e.to_string())?;
+        let value: Value = serde_json::from_str(&geojson).map_err(|e| e.to_string())?;
         let mut coords = Vec::new();
-        get_coords(&self.geos_geom, &mut coords)?;
+        collect_geojson_coords(&value, &mut coords);
 
         if coords.is_empty() {
             return Ok((0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
@@ -239,6 +210,115 @@ pub fn version() -> String {
     geos::version().unwrap_or_default()
 }
 
+/// Strip any non-RFC-7946 top-level keys from a GeoJSON object (currently
+/// PDAL's `srs` extension) so the result can be handed to GEOS's strict
+/// reader. Returns the input unchanged if it doesn't parse as a JSON object.
+fn strip_non_geojson_keys(json: &str) -> String {
+    let mut value: serde_json::Value = match serde_json::from_str(json) {
+        Ok(v) => v,
+        Err(_) => return json.to_string(),
+    };
+    if let Some(obj) = value.as_object_mut() {
+        obj.remove("srs");
+    }
+    serde_json::to_string(&value).unwrap_or_else(|_| json.to_string())
+}
+
+fn format_gdal_geojson_value(value: &Value, precision: u32) -> Result<String, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "to_gdal_geojson: expected GeoJSON object".to_string())?;
+    let g_type = obj
+        .get("type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "to_gdal_geojson: missing geometry type".to_string())?;
+    if !matches!(g_type, "Point" | "LineString" | "Polygon" | "MultiPolygon") {
+        return Err(format!(
+            "to_gdal_geojson: unsupported geometry type {g_type}"
+        ));
+    }
+    let coords = obj
+        .get("coordinates")
+        .ok_or_else(|| "to_gdal_geojson: missing coordinates".to_string())?;
+
+    let mut out = String::new();
+    out.push_str("{ \"type\": \"");
+    out.push_str(g_type);
+    out.push_str("\", \"coordinates\": ");
+    format_gdal_coords(coords, precision, &mut out)?;
+    out.push_str(" }");
+    Ok(out)
+}
+
+fn format_gdal_coords(value: &Value, precision: u32, out: &mut String) -> Result<(), String> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| "to_gdal_geojson: coordinates must be arrays".to_string())?;
+    out.push_str("[ ");
+    for (idx, item) in values.iter().enumerate() {
+        if idx > 0 {
+            out.push_str(", ");
+        }
+        if let Some(n) = item.as_f64() {
+            out.push_str(&format_coord_num(n, precision));
+        } else {
+            format_gdal_coords(item, precision, out)?;
+        }
+    }
+    out.push_str(" ]");
+    Ok(())
+}
+
+fn collect_geojson_coords(value: &Value, coords: &mut Vec<(f64, f64, f64)>) {
+    if let Some(obj) = value.as_object() {
+        if let Some(geometries) = obj.get("geometries") {
+            collect_geojson_coords(geometries, coords);
+        }
+        if let Some(coordinates) = obj.get("coordinates") {
+            collect_geojson_coords(coordinates, coords);
+        }
+        return;
+    }
+
+    let Some(values) = value.as_array() else {
+        return;
+    };
+    if values.len() >= 2 && values.iter().all(Value::is_number) {
+        let x = values.first().and_then(Value::as_f64).unwrap_or(0.0);
+        let y = values.get(1).and_then(Value::as_f64).unwrap_or(0.0);
+        let z = values.get(2).and_then(Value::as_f64).unwrap_or(f64::NAN);
+        coords.push((x, y, z));
+    } else {
+        for item in values {
+            collect_geojson_coords(item, coords);
+        }
+    }
+}
+
+/// Format a coordinate value the way GDAL's
+/// `OGR_G_ExportToJsonEx(COORDINATE_PRECISION=precision)` does: fixed-point
+/// with `precision` decimals, then trim trailing zeros and a trailing `.`.
+fn format_coord_num(value: f64, precision: u32) -> String {
+    if !value.is_finite() {
+        return value.to_string();
+    }
+    let p = precision as usize;
+    let mut s = format!("{value:.p$}");
+    if s.contains('.') {
+        while s.ends_with('0') {
+            s.pop();
+        }
+        if s.ends_with('.') {
+            s.pop();
+        }
+    }
+    if s == "-0" || s.is_empty() {
+        "0".to_string()
+    } else {
+        s
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,6 +365,108 @@ mod tests {
         assert_eq!(polygon.distance(5.0, 5.0, 0.0).unwrap(), 0.0);
         let ring = polygon.boundary().unwrap();
         assert_eq!(ring.distance(5.0, 5.0, 0.0).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn from_geojson_accepts_pdal_srs_extension() {
+        let json = r#"{ "srs": "EPSG:2991", "type": "Point", "coordinates": [1, 2] }"#;
+        let geom = Geometry::from_geojson(json).unwrap();
+        assert!(geom.is_valid().unwrap());
+    }
+
+    #[test]
+    fn from_geojson_rejects_garbage() {
+        assert!(Geometry::from_geojson("not json").is_err());
+        assert!(Geometry::from_geojson(r#"{ "type": "Bogus" }"#).is_err());
+    }
+
+    #[test]
+    fn strip_non_geojson_keys_only_removes_srs_from_objects() {
+        assert_eq!(
+            strip_non_geojson_keys(
+                r#"{ "srs": "EPSG:2991", "type": "Point", "coordinates": [1, 2] }"#
+            ),
+            r#"{"coordinates":[1,2],"type":"Point"}"#
+        );
+        assert_eq!(strip_non_geojson_keys("[1, 2]"), "[1,2]");
+        assert_eq!(strip_non_geojson_keys("not json"), "not json");
+    }
+
+    #[test]
+    fn to_gdal_geojson_writes_core_geometry_shapes() {
+        let point = Geometry::from_wkt("POINT Z (1.25 2.5 3.75)").unwrap();
+        assert_eq!(
+            point.to_gdal_geojson(2).unwrap(),
+            r#"{ "type": "Point", "coordinates": [ 1.25, 2.5, 3.75 ] }"#
+        );
+
+        let line = Geometry::from_wkt("LINESTRING (0 0, 1.25 2.5)").unwrap();
+        assert_eq!(
+            line.to_gdal_geojson(1).unwrap(),
+            r#"{ "type": "LineString", "coordinates": [ [ 0, 0 ], [ 1.2, 2.5 ] ] }"#
+        );
+
+        let polygon =
+            Geometry::from_wkt("POLYGON ((0 0, 4 0, 4 4, 0 0), (1 1, 2 1, 1 2, 1 1))").unwrap();
+        assert_eq!(
+            polygon.to_gdal_geojson(0).unwrap(),
+            r#"{ "type": "Polygon", "coordinates": [ [ [ 0, 0 ], [ 4, 0 ], [ 4, 4 ], [ 0, 0 ] ], [ [ 1, 1 ], [ 2, 1 ], [ 1, 2 ], [ 1, 1 ] ] ] }"#
+        );
+
+        let multipolygon =
+            Geometry::from_wkt("MULTIPOLYGON (((0 0, 1 0, 0 1, 0 0)), ((2 2, 3 2, 2 3, 2 2)))")
+                .unwrap();
+        assert_eq!(
+            multipolygon.to_gdal_geojson(0).unwrap(),
+            r#"{ "type": "MultiPolygon", "coordinates": [ [ [ [ 0, 0 ], [ 1, 0 ], [ 0, 1 ], [ 0, 0 ] ] ], [ [ [ 2, 2 ], [ 3, 2 ], [ 2, 3 ], [ 2, 2 ] ] ] ] }"#
+        );
+    }
+
+    #[test]
+    fn to_gdal_geojson_rejects_unsupported_geometry_collections() {
+        let collection = Geometry::from_wkt("GEOMETRYCOLLECTION (POINT (0 0))").unwrap();
+        assert!(collection
+            .to_gdal_geojson(3)
+            .unwrap_err()
+            .contains("unsupported geometry type"));
+    }
+
+    #[test]
+    fn to_gdal_geojson_polygon_matches_gdal_format() {
+        let wkt = "POLYGON ((636889.412951239268295 851528.512293258565478 422.7001953125,\
+                   636899.14233423944097 851475.000686757150106 422.4697265625,\
+                   636928.33048324030824 851494.459452757611871 422.5400390625,\
+                   636976.977398241520859 851513.918218758190051 424.150390625,\
+                   637069.406536744092591 851475.000686757150106 438.7099609375,\
+                   637132.647526245797053 851445.812537756282836 425.9501953125,\
+                   637336.964569251285866 851411.759697255445644 425.8203125,\
+                   637473.175931254867464 851158.795739248627797 435.6298828125,\
+                   637589.928527257987298 850711.244121236610226 420.509765625,\
+                   637244.535430748714134 850511.791769731207751 420.7998046875,\
+                   636758.066280735656619 850667.461897735483944 434.609375,\
+                   636539.155163229792379 851056.63721774588339 422.6396484375,\
+                   636889.412951239268295 851528.512293258565478 422.7001953125))";
+        let geom = Geometry::from_wkt(wkt).unwrap();
+        let out = geom.to_gdal_geojson(5).unwrap();
+        // First and last vertex from the expected GDAL output, plus structural shape.
+        assert!(out.starts_with("{ \"type\": \"Polygon\", \"coordinates\": [ [ [ 636889.41295, 851528.51229, 422.7002 ]"));
+        assert!(out.ends_with("[ 636889.41295, 851528.51229, 422.7002 ] ] ] }"));
+        // 425.9502 (trailing 0 trimmed) and 425.82031 should both appear.
+        assert!(out.contains("425.9502"));
+        assert!(out.contains("425.82031"));
+    }
+
+    #[test]
+    fn format_coord_num_strips_trailing_zeros_and_dot() {
+        assert_eq!(format_coord_num(422.7001953125, 5), "422.7002");
+        assert_eq!(format_coord_num(425.9501953125, 5), "425.9502");
+        assert_eq!(format_coord_num(425.8203125, 5), "425.82031");
+        assert_eq!(format_coord_num(5.0, 5), "5");
+        assert_eq!(format_coord_num(5.5, 0), "6");
+        assert_eq!(format_coord_num(0.0, 5), "0");
+        assert_eq!(format_coord_num(-0.000001, 5), "0");
+        assert_eq!(format_coord_num(f64::NAN, 5), "NaN");
+        assert_eq!(format_coord_num(f64::INFINITY, 5), "inf");
     }
 
     #[test]
@@ -387,5 +569,17 @@ mod tests {
         assert_eq!(maxy, 0.0);
         assert_eq!(minz, 0.0);
         assert_eq!(maxz, 0.0);
+
+        let collection =
+            Geometry::from_wkt("GEOMETRYCOLLECTION (POINT (5 6), LINESTRING (1 2, 3 4))").unwrap();
+        assert_eq!(collection.bounds().unwrap(), (1.0, 5.0, 2.0, 6.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn significant_decimal_formatter_covers_special_values() {
+        assert_eq!(format_significant_decimal(0.0, 15), "0");
+        assert_eq!(format_significant_decimal(f64::NAN, 15), "NaN");
+        assert_eq!(format_significant_decimal(f64::INFINITY, 15), "inf");
+        assert_eq!(format_significant_decimal(-0.00000001, 2), "0");
     }
 }
