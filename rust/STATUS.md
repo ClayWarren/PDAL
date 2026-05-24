@@ -480,6 +480,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `approximatecoplanar`
 - `chipper`
 - `cluster`
+- `covariancefeatures`
 - `dbscan`
 - `decimation`
 - `divider`
@@ -496,6 +497,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `iqr`
 - `label_duplicates`
 - `litree`
+- `lloydkmeans`
 - `locate`
 - `lof`
 - `m3c2`
@@ -512,6 +514,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `radialdensity`
 - `randomize`
 - `reciprocity`
+- `relaxationdartthrowing`
 - `reprojection`
 - `returns`
 - `sample`
@@ -539,14 +542,17 @@ algorithm decision.
 
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
-- Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
-  `LloydKMeans`, `Poisson`,
-  `Straighten`, `GreedyProjection`,
-  `IterativeClosestPoint`, `RelaxationDartThrowing`.
+- Private or specialized algorithms: `CS`, `Georeference`, `Poisson`,
+  `GreedyProjection`.
+- Now Rust C ABI-backed: `Delaunay`.
 - Now Rust C ABI-backed: `HagDelaunay`.
+- Now Rust C ABI-backed: `IterativeClosestPoint`.
 - Now Rust C ABI-backed: `M3C2`.
 - Now Rust C ABI-backed: `LiTree`.
+- Now Rust C ABI-backed: `LloydKMeans`.
 - Now Rust C ABI-backed: `PMF`.
+- Now Rust C ABI-backed: `RelaxationDartThrowing`.
+- Now Rust C ABI-backed: `Straighten`.
 - Now Rust C ABI-backed: `Supervoxel`.
 - Now Rust C ABI-backed: `Normal` (compute path only; MST refinement remains C++).
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
