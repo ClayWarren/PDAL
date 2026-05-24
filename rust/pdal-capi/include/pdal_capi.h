@@ -1115,6 +1115,41 @@ extern "C"
                         const char* const* argv);
     void pdal_capi_free(void* ptr);
 
+    // NITF native bridge (used by readers.nitf / writers.nitf).
+    typedef int (*pdal_nitf_metadata_cb)(const char* key, const char* value,
+                                         void* userdata);
+
+    typedef struct pdal_nitf_write_options_t
+    {
+        const char* file_title;
+        const char* complexity_level;
+        const char* system_type;
+        const char* origin_station_id;
+        const char* file_class;
+        const char* origin_name;
+        const char* origin_phone;
+        const char* fsclsy;
+        const char* fsctlh;
+        const char* fscltx;
+        const char* image_security_class;
+        const char* image_date_time;
+        const char* image_id2;
+        const char* const* aimidb; // null-terminated, may be null
+        const char* const* acftb;  // null-terminated, may be null
+        double minx;
+        double miny;
+        double maxx;
+        double maxy;
+    } pdal_nitf_write_options_t;
+
+    bool pdal_nitf_lidar_segment(const char* path, uint64_t* out_offset,
+                                 uint64_t* out_length);
+    bool pdal_nitf_read_metadata(const char* path,
+                                 pdal_nitf_metadata_cb cb,
+                                 void* userdata);
+    bool pdal_nitf_write(const char* input_path, const char* output_path,
+                         const pdal_nitf_write_options_t* opts);
+
 #ifdef __cplusplus
 }
 #endif

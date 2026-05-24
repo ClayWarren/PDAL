@@ -1077,6 +1077,7 @@ dependencies = [
  "proj",
  "proj-sys",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

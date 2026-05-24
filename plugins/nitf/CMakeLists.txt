@@ -30,11 +30,12 @@ PDAL_ADD_PLUGIN(reader_libname reader nitf
     INCLUDES
         ${PDAL_VENDOR_DIR}
         ${NLOHMANN_INCLUDE_DIR}
+        ${RUST_CAPI_HEADER_DIR}
     LINK_WITH
-        ${NITRO_LIBRARIES}
         GDAL::GDAL
         ${PDAL_ARBITER_LIB_NAME}
         ${PDAL_LIBRARIES}
+        ${NITRO_LIBRARIES}
 )
 if (WIN32)
     target_compile_definitions(${reader_libname}
@@ -50,11 +51,13 @@ PDAL_ADD_PLUGIN(writer_libname writer nitf
         io/NitfWriter.cpp
         io/MetadataReader.cpp
         io/tre_plugins.cpp
+    INCLUDES
+        ${RUST_CAPI_HEADER_DIR}
     LINK_WITH
-        ${NITRO_LIBRARIES}
         GDAL::GDAL
         ${PDAL_LIBRARIES}
         ${PDAL_ARBITER_LIB_NAME}
+        ${NITRO_LIBRARIES}
 )
 if (WIN32)
     target_compile_definitions(${writer_libname}

@@ -172,6 +172,11 @@ if (WITH_TESTS)
     enable_testing()
 endif()
 
+# Expose the Rust C ABI include directory and library path to plugins before
+# they are processed. The rest of rust.cmake (which has compile-time side
+# effects we don't want at this point) runs later.
+set(RUST_CAPI_HEADER_DIR "${ROOT_DIR}/rust/pdal-capi/include")
+
 add_subdirectory(plugins)
 
 if (BUILD_DOCS)
@@ -318,6 +323,17 @@ target_link_libraries(${PDAL_LIB_NAME}
     PRIVATE
         ${RUST_CAPI_LIB}
 )
+
+# The Rust C ABI archive embeds the Nitro NITF bridge (nitf_bridge.o) which
+# references symbols from nitf-c and nitf-cpp. Link those native libraries
+# into pdalcpp so the static archive's references resolve regardless of
+# whether the NITF plugin itself is built.
+if (NITRO_FOUND AND NITRO_LIBRARIES)
+    target_link_libraries(${PDAL_LIB_NAME}
+        PRIVATE
+            ${NITRO_LIBRARIES}
+    )
+endif()
 
 if (ZSTD_FOUND)
     target_link_libraries(${PDAL_LIB_NAME}

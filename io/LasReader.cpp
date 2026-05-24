@@ -515,6 +515,8 @@ void LasReader::ready(PointTableRef table)
     pdal_options_add_str(options, "nosrs", d->opts.nosrs ? "true" : "false");
     pdal_options_add_str(options, "ignore_missing_vlrs",
                          d->opts.ignoreMissingVLRs ? "true" : "false");
+    if (m_startOffset > 0)
+        pdal_options_add_u64(options, "start_offset", m_startOffset);
     if (!d->opts.extraDimSpec.empty())
         addExtraDimsToOptions(options, d->extraDims);
     if (!d->opts.srsVlrOrder.types.empty())

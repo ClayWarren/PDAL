@@ -471,6 +471,8 @@ COVERED: dict[str, object] = {
         "LargeFile",
     },
     "pdal_io_gltf_writer_test": ALL,
+    "pdal_io_nitf_reader_test": ALL,
+    "pdal_io_nitf_writer_test": ALL,
     "pdal_io_memoryview_reader_test": {
         "readsFieldsFromMemory",
         "rejectsMalformedShape",

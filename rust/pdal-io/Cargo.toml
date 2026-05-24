@@ -17,9 +17,9 @@ pdal-native = { path = "../pdal-native" }
 roxmltree = "0.21.1"
 serde_json = "1.0"
 spz-crate = { package = "spz", version = "0.0.6" }
+tempfile = "3.27.0"
 uuid = "1.23.1"
 zstd = "0.13"
 
 [dev-dependencies]
 pdal-filters = { path = "../pdal-filters" }
-tempfile = "3.27.0"

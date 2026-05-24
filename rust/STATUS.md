@@ -104,7 +104,7 @@ ABI pattern without forcing a plugin SDK decision.
 | `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
 | `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
 | `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
-| `plugins/nitf` | prototype | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. Full `readers.nitf`/`writers.nitf` stage parity remains deferred. |
+| `plugins/nitf` | in progress | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are now thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. The legacy in-tree `NitfFileReader`/`NitfFileWriter` C++ classes still exist as compile-time peers for option storage (`m_nitf.m_fileTitle`, etc.) but no longer do the wrap/unwrap themselves. |
 | `plugins/openscenegraph` | deferred | OSG reader/writer waits on 3D scene dependency and mesh I/O strategy. |
 | `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
 | `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
@@ -154,6 +154,13 @@ pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
 added during the port, is `766 / 1039` currently built C++ GoogleTest cases, or
 `73.72%`; compute that with `--include-added-tests`.
+
+When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
+and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
+via `pdal_nitf_lidar_segment`, `pdal_nitf_read_metadata`, and `pdal_nitf_write`.
+The pre-port baseline above does not include them because the baseline build
+did not enable the NITF plugin; rerun the audit with `BUILD_PLUGIN_NITF=ON`
+and `--include-added-tests` to see them counted.
 
 Recent gains route `SpatialReference` user-input normalization, PROJ4 export,
 semantic `IsSame` equality, horizontal/vertical EPSG helpers, Polygon

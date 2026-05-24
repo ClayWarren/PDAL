@@ -169,6 +169,15 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!(false)),
             ),
         ],
+        "readers.nitf" => vec![
+            filename(),
+            option("count", "Maximum number of points to read.", None),
+            option(
+                "spatialreference",
+                "Override the inferred spatial reference.",
+                None,
+            ),
+        ],
         "readers.text" => vec![
             filename(),
             option(
@@ -782,6 +791,32 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             option("creation_doy", "LAS creation day of year.", None),
             option("creation_year", "LAS creation year.", None),
             option("project_id", "LAS project GUID.", None),
+        ],
+        "writers.nitf" => vec![
+            filename(),
+            option("clevel", "NITF complexity level.", Some(json!("03"))),
+            option("stype", "NITF system type.", Some(json!("BF01"))),
+            option("ostaid", "Originating station ID.", Some(json!("PDAL"))),
+            option("ftitle", "File title (defaults to filename).", None),
+            option("fsclas", "File classification.", Some(json!("U"))),
+            option("oname", "Originator name.", None),
+            option("ophone", "Originator phone.", None),
+            option("fsctlh", "File control/handling.", None),
+            option("fsclsy", "File classification system.", None),
+            option("fscltx", "File classification text.", None),
+            option("isclas", "Image classification.", Some(json!("U"))),
+            option("idatim", "Image date/time (YYYYMMDDHHMMSS).", None),
+            option("iid2", "Image identifier 2.", None),
+            option(
+                "aimidb",
+                "AIMIDB field overrides (repeatable, name:value).",
+                None,
+            ),
+            option(
+                "acftb",
+                "ACFTB field overrides (repeatable, name:value).",
+                None,
+            ),
         ],
         "writers.text" => vec![
             filename(),

@@ -32,6 +32,9 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
+#include <atomic>
+#include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -40,18 +43,9 @@
 #include <io/private/las/Header.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/FileUtils.hpp>
 
-#ifndef IMPORT_NITRO_API
-#define IMPORT_NITRO_API
-#endif
-#include "tre_plugins.hpp"
-#include <nitro/c++/import/nitf.hpp>
-
-// NOTES
-//
-// is it legal to write a LAZ file?
-// syntactically, how do we name all the LAS writer options that we will
-// pass to the las writer?
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -102,37 +96,99 @@ void NitfWriter::writeView(const PointViewPtr view)
     LasWriter::writeView(view);
 }
 
+namespace
+{
+
+std::string make_temp_las_path(const std::string& hint)
+{
+    auto dir = std::filesystem::temp_directory_path();
+    static std::atomic<uint64_t> counter{0};
+    uint64_t id = counter.fetch_add(1) ^
+                  static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&counter));
+    std::string base = "pdal_nitf_payload_" + std::to_string(id) + "_" + hint
+                       + ".las";
+    return (dir / base).string();
+}
+
+} // namespace
+
 void NitfWriter::readyFile(const std::string& filename,
                            const SpatialReference& srs)
 {
+    // Final NITF output filename comes from `filename`. The embedded LAS
+    // payload is staged in a temp file that LasWriter writes through its
+    // standard (now Rust-backed) flow.
     m_nitf.setFilename(filename);
-
-    Utils::writeProgress(m_progressFd, "READYFILE", filename);
-    prepOutput(&m_oss, srs);
+    m_payloadPath = make_temp_las_path(
+        std::filesystem::path(filename).stem().string());
+    LasWriter::readyFile(m_payloadPath, srs);
 }
 
 void NitfWriter::doneFile()
 {
-    finishOutput();
+    // Have LasWriter finalize the LAS payload to the temp path.
+    LasWriter::doneFile();
 
-    std::streambuf* buf = m_oss.rdbuf();
-    std::streamoff size = buf->pubseekoff(0, m_oss.end);
-    buf->pubseekoff(0, m_oss.beg);
+    BOX3D bounds = reprojectBoxToDD(m_srs, header().bounds);
 
-    std::vector<char> bytes(size);
-    buf->sgetn(bytes.data(), size);
-    m_oss.clear();
-    m_nitf.wrapData(bytes.data(), size);
-    m_nitf.setBounds(reprojectBoxToDD(m_srs, header().bounds));
+    pdal_nitf_write_options_t opts{};
+    std::string title =
+        m_nitf.m_fileTitle.empty() ? FileUtils::getFilename(m_nitf.m_filename)
+                                   : m_nitf.m_fileTitle;
+    opts.file_title = title.c_str();
+    opts.complexity_level =
+        m_nitf.m_cLevel.empty() ? nullptr : m_nitf.m_cLevel.c_str();
+    opts.system_type =
+        m_nitf.m_sType.empty() ? nullptr : m_nitf.m_sType.c_str();
+    opts.origin_station_id =
+        m_nitf.m_oStationId.empty() ? nullptr : m_nitf.m_oStationId.c_str();
+    opts.file_class =
+        m_nitf.m_fileClass.empty() ? nullptr : m_nitf.m_fileClass.c_str();
+    opts.origin_name =
+        m_nitf.m_origName.empty() ? nullptr : m_nitf.m_origName.c_str();
+    opts.origin_phone =
+        m_nitf.m_origPhone.empty() ? nullptr : m_nitf.m_origPhone.c_str();
+    opts.fsclsy = m_nitf.m_securityClassificationSystem.empty()
+                      ? nullptr
+                      : m_nitf.m_securityClassificationSystem.c_str();
+    opts.fsctlh = m_nitf.m_securityControlAndHandling.empty()
+                      ? nullptr
+                      : m_nitf.m_securityControlAndHandling.c_str();
+    opts.fscltx = m_nitf.m_sic.empty() ? nullptr : m_nitf.m_sic.c_str();
+    opts.image_security_class =
+        m_nitf.m_imgSecurityClass.empty() ? nullptr
+                                          : m_nitf.m_imgSecurityClass.c_str();
+    opts.image_date_time =
+        m_nitf.m_imgDate.empty() ? nullptr : m_nitf.m_imgDate.c_str();
+    opts.image_id2 = m_nitf.m_imgIdentifier2.empty()
+                         ? nullptr
+                         : m_nitf.m_imgIdentifier2.c_str();
 
-    try
-    {
-        m_nitf.write();
-    }
-    catch (const NitfFileWriter::error& err)
-    {
-        throwError(err.what());
-    }
+    std::vector<const char*> aimidb_ptrs;
+    aimidb_ptrs.reserve(m_nitf.m_aimidb.size() + 1);
+    for (const auto& s : m_nitf.m_aimidb)
+        aimidb_ptrs.push_back(s.c_str());
+    aimidb_ptrs.push_back(nullptr);
+
+    std::vector<const char*> acftb_ptrs;
+    acftb_ptrs.reserve(m_nitf.m_acftb.size() + 1);
+    for (const auto& s : m_nitf.m_acftb)
+        acftb_ptrs.push_back(s.c_str());
+    acftb_ptrs.push_back(nullptr);
+
+    opts.aimidb = m_nitf.m_aimidb.empty() ? nullptr : aimidb_ptrs.data();
+    opts.acftb = m_nitf.m_acftb.empty() ? nullptr : acftb_ptrs.data();
+    opts.minx = bounds.minx;
+    opts.miny = bounds.miny;
+    opts.maxx = bounds.maxx;
+    opts.maxy = bounds.maxy;
+
+    bool ok = pdal_nitf_write(m_payloadPath.c_str(), m_nitf.m_filename.c_str(),
+                              &opts);
+    std::remove(m_payloadPath.c_str());
+    m_payloadPath.clear();
+    if (!ok)
+        throwError(pdal_last_error());
 }
 
 } // namespace pdal

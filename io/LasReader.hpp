@@ -113,6 +113,16 @@ public:
 protected:
     virtual LasStreamPtr createStream();
 
+    /// Set a byte offset that the Rust-backed LAS reader will seek to before
+    /// parsing the LAS header. Used by `NitfReader` to skip the NITF wrapper
+    /// bytes and reach the embedded LAS payload.
+    void setStartOffset(uint64_t offset)
+    {
+        m_startOffset = offset;
+    }
+
+    uint64_t m_startOffset = 0;
+
 private:
     void addArgs(ProgramArgs& args) override;
     void initialize(PointTableRef table) override;

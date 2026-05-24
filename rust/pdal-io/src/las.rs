@@ -46,6 +46,7 @@ pub struct LasReader {
     count: Option<u64>,
     nosrs: bool,
     ignore_missing_vlrs: bool,
+    start_offset: u64,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     srs_vlr_order: Vec<SrsVlrKind>,
     metadata: MetadataNode,
@@ -68,6 +69,9 @@ impl LasReader {
             count: options.has("count").then(|| options.get_u64("count", 0)),
             nosrs: options.get_bool("nosrs", false),
             ignore_missing_vlrs: options.get_bool("ignore_missing_vlrs", false),
+            // Non-zero: skip this many bytes before the LAS header. Used by
+            // `readers.nitf` to expose the embedded LAS payload.
+            start_offset: options.get_u64("start_offset", 0),
             configured_extra_dims: configured_extra_dims_from_options(options),
             srs_vlr_order: srs_vlr_order_from_options(options),
             metadata: MetadataNode::new("readers.las"),
@@ -214,7 +218,38 @@ impl Reader for LasReader {
         }
 
         let path = Path::new(&self.filename);
-        let view = if self.ignore_missing_vlrs {
+        let view = if self.start_offset > 0 {
+            // NITF-embedded LAS: open the file, shift past the wrapper bytes,
+            // and let the standard `las` reader walk the embedded payload.
+            let file = File::open(path)
+                .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
+            let shifted = crate::shift_reader::ShiftReader::new(file, self.start_offset)
+                .map_err(|e| StageError(format!("Failed to seek LAS start offset: {}", e)))?;
+            let buffered = BufReader::new(shifted);
+            let mut reader = las::Reader::new(buffered)
+                .map_err(|e| StageError(format!("Failed to open embedded LAS: {}", e)))?;
+            let header = reader.header();
+            let point_count = header.number_of_points();
+            let point_format = header.point_format().to_u8().unwrap_or(3);
+            if self.start >= point_count && point_count > 0 {
+                return Err(StageError(format!(
+                    "LAS start point {} is outside the file's {} points.",
+                    self.start, point_count
+                )));
+            }
+            self.add_metadata(header);
+            let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
+            let mut view = PointView::new(Rc::new(layout));
+            self.set_spatial_reference(&mut view, header);
+            self.read_points(
+                &mut reader,
+                point_count,
+                point_format,
+                &mut view,
+                &extra_dims,
+            )?;
+            view
+        } else if self.ignore_missing_vlrs {
             let file = File::open(path)
                 .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
             let mut read = BufReader::new(file);

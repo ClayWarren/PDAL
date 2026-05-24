@@ -33,7 +33,8 @@
  ****************************************************************************/
 
 #include "NitfReader.hpp"
-#include "NitfFileReader.hpp"
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -57,59 +58,42 @@ std::string NitfReader::getName() const
 //   - have at least one Image segment ("IM")
 //   - have at least one DES segment ("DE") named LIDARA
 //
-// You could have multiple image segments and LIDARA segments, but the
-// standard doesn't seem to say anything about how you associate which
-// image segment(s) with which LIDARA segment(s). We will assume only
-// one image segment and only one LIDARA segment.
-//
-// We don't support LIDARA segments that are split into multiple DES
-// segments via the DES INDEX mechanism. We also don't support wierd
-// things that Nitro doesn't support: NITF 1.0, streaming segments,
-// and so on.
-//
-// For the metadata, we store:
-//    - the file header fields    --> FH.field_name
-//    - the file header TREs      --> FH.TRE.tre_name
-//    - the IM segment fields     --> IM:0.field_name
-//    - the IM segment TREs       --> IM:0.tre_name.field_name
-//    - the DES fields            --> DE:0.field_name
-//    - the DES TREs              --> DE:0.field_name
-//
-// Note we use a ":N" syntax to indicate which segment is being used,
-// so there is no ambiuity with multisegment NITFs
-//
-// We parse out the TRE fields for those TREs that Nitro recognizes
-// (see tre_plugins.cpp).
-//
-// The dimensions we write out are (precisely) the LAS dimensions; we
-// use the same names, so as not to require upstream stgaes to
-// understand both LAS dimension names and NITF dimension names.
-//
 
-//
-// BUG: we should provide an option to set the SRS of the Stage using
-// the IGEOLO field.
-//
-// BUG: need to implement addDefaultDimensions() so it does what LAS
-// does.
-//
-// BUG: findIMSegment() allows "None" as an image type (for now, just
-// to support the autzen test input)
-//
+namespace
+{
+
+// Each call carries a `MetadataNode*` so we can route the Rust callback
+// into PDAL's metadata tree.
+extern "C" int append_nitf_metadata(const char* key, const char* value,
+                                    void* userdata)
+{
+    auto* node = static_cast<MetadataNode*>(userdata);
+    if (!node || !key || !value)
+        return 0;
+    node->add<std::string>(key, value);
+    return 0;
+}
+
+} // namespace
 
 void NitfReader::initialize(PointTableRef table)
 {
     tryLoadRemote();
-    try
+
+    uint64_t offset = 0;
+    uint64_t length = 0;
+    if (!pdal_nitf_lidar_segment(m_filename.c_str(), &offset, &length))
     {
-        NitfFileReader nitf(m_filename);
-        nitf.open();
-        nitf.getLasOffset(m_offset, m_length);
-        nitf.extractMetadata(m_metadata);
+        throwError(pdal_last_error());
     }
-    catch (const NitfFileReader::error& err)
+    m_offset = offset;
+    m_length = length;
+    setStartOffset(m_offset);
+
+    if (!pdal_nitf_read_metadata(m_filename.c_str(), &append_nitf_metadata,
+                                 &m_metadata))
     {
-        throwError(err.what());
+        throwError(pdal_last_error());
     }
     m_metadata.add("DESDATA_OFFSET", m_offset);
     m_metadata.add("DESDATA_LENGTH", m_length);

@@ -55,6 +55,7 @@ private:
     NitfFileWriter m_nitf;
     std::stringstream m_oss;
     BOX3D m_bounds;
+    std::string m_payloadPath;
 
     virtual void addArgs(ProgramArgs& args);
     virtual void readyFile(const std::string& filename,
