@@ -1,9 +1,10 @@
 use crate::error::string_to_c_ptr;
 use crate::registry::pipeline_from_json;
+use crate::tile_abi::pdal_tile;
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::kernel::{parse_stage_option, ParseStageResult};
 use pdal_kernels::{FauxPluginKernel, Kernel, KernelArgs};
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 #[no_mangle]
@@ -54,6 +55,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "merge" => run_merge_kernel(argc, argv),
         "sort" => run_sort_kernel(argc, argv),
+        "tile" => run_tile_kernel(argc, argv),
         _ => -1,
     }
 }
@@ -347,6 +349,112 @@ fn execute_kernel_pipeline(name: &str, value: serde_json::Value) -> i32 {
     }
 }
 
+unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.tile: Missing value for positional argument 'input'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!("  pdal tile <input> <output-template> [--length=N] [--origin_x=X] [--origin_y=Y] [--buffer=N]");
+        return 0;
+    }
+
+    let mut input = None;
+    let mut output = None;
+    let mut length = 1000.0;
+    let mut origin_x = f64::NAN;
+    let mut origin_y = f64::NAN;
+    let mut buffer = 0.0;
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--input" || arg == "-i" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
+                return 1;
+            };
+            input = Some(value.clone());
+        } else if arg == "--output" || arg == "-o" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
+                return 1;
+            };
+            output = Some(value.clone());
+        } else if let Some(rest) = arg.strip_prefix("--") {
+            let (key, value) = match rest.split_once('=') {
+                Some(pair) => pair,
+                None => {
+                    let Some(value) = iter.next() else {
+                        eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
+                        return 1;
+                    };
+                    (rest, value.as_str())
+                }
+            };
+            let target = match key {
+                "length" => &mut length,
+                "origin_x" => &mut origin_x,
+                "origin_y" => &mut origin_y,
+                "buffer" => &mut buffer,
+                _ => return -1,
+            };
+            match value.parse::<f64>() {
+                Ok(parsed) => *target = parsed,
+                Err(_) => {
+                    eprintln!("PDAL: kernels.tile: Option '--{key}' expects a number.");
+                    return 1;
+                }
+            }
+        } else if input.is_none() {
+            input = Some(arg.clone());
+        } else if output.is_none() {
+            output = Some(arg.clone());
+        } else {
+            eprintln!("PDAL: kernels.tile: Unexpected argument '{arg}'.");
+            return 1;
+        }
+    }
+
+    let Some(input) = input else {
+        eprintln!("PDAL: kernels.tile: Missing value for positional argument 'input'.");
+        return 1;
+    };
+    let Some(output) = output else {
+        eprintln!("PDAL: kernels.tile: Missing value for positional argument 'output'.");
+        return 1;
+    };
+    let (Ok(c_input), Ok(c_output)) = (CString::new(input), CString::new(output)) else {
+        eprintln!("PDAL: kernels.tile: Path contains an interior NUL byte.");
+        return 1;
+    };
+
+    let count = pdal_tile(
+        c_input.as_ptr(),
+        c_output.as_ptr(),
+        length,
+        origin_x,
+        origin_y,
+        buffer,
+    );
+    if count < 0 {
+        let message = CStr::from_ptr(crate::error::pdal_last_error())
+            .to_string_lossy()
+            .into_owned();
+        if !message.is_empty() {
+            eprintln!("{message}");
+        }
+        return 1;
+    }
+    println!("Wrote {count} tile(s).");
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,6 +501,15 @@ mod tests {
     #[test]
     fn rust_kernel_run_reports_merge_missing_files() {
         let name = CString::new("merge").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn rust_kernel_run_reports_tile_missing_input() {
+        let name = CString::new("tile").unwrap();
 
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 

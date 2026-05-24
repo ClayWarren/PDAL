@@ -105,6 +105,7 @@ COVERED: dict[str, object] = {
     "pdal_kernel_test": ALL,
     "pdal_app_plugin_test": ALL,
     "pdal_merge_test": ALL,
+    "pdal_tile_test": {"test1", "test3"},
     "pdal_config_test": ALL,
     "pdal_log_test": {"t1"},
     "pdal_stage_factory_test": {"extensionTest", "stageExtensionsLoadPerInstance"},
