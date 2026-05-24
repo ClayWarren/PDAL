@@ -31,6 +31,8 @@
 #include "SrsTransform.hpp"
 #include <pdal/SpatialReference.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 #include <ogr_spatialref.h>
 
 namespace pdal
@@ -41,40 +43,58 @@ SrsTransform::SrsTransform() {}
 SrsTransform::SrsTransform(const SrsTransform& src)
 {
     if (src.valid())
-        set(*(src.m_transform->GetSourceCS()),
-            *(src.m_transform->GetTargetCS()));
+        setFromWkt(src.m_srcWkt, src.m_srcEpoch, src.m_dstWkt, src.m_dstEpoch,
+                   src.m_srcOrder, src.m_dstOrder);
 }
 
 SrsTransform::SrsTransform(SrsTransform&& src)
-    : m_transform(std::move(src.m_transform))
+    : m_rustTransform(src.m_rustTransform),
+      m_transform(std::move(src.m_transform)),
+      m_srcWkt(std::move(src.m_srcWkt)), m_dstWkt(std::move(src.m_dstWkt)),
+      m_srcEpoch(src.m_srcEpoch), m_dstEpoch(src.m_dstEpoch),
+      m_srcOrder(std::move(src.m_srcOrder)),
+      m_dstOrder(std::move(src.m_dstOrder))
 {
+    src.m_rustTransform = nullptr;
 }
 
-SrsTransform::~SrsTransform() {}
+SrsTransform::~SrsTransform()
+{
+    reset();
+}
 
 void SrsTransform::setSrcEpoch(double epoch)
 {
 #if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
-    OGRSpatialReference target(*m_transform->GetTargetCS());
-    OGRSpatialReference source(*m_transform->GetSourceCS());
-    source.SetCoordinateEpoch(epoch);
-    set(target, source);
+    if (m_srcWkt.empty() || m_dstWkt.empty())
+        return;
+    setFromWkt(m_srcWkt, epoch, m_dstWkt, m_dstEpoch, m_srcOrder, m_dstOrder);
 #endif
 }
 
 void SrsTransform::setDstEpoch(double epoch)
 {
 #if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
-    OGRSpatialReference target(*m_transform->GetTargetCS());
-    OGRSpatialReference source(*m_transform->GetSourceCS());
-    target.SetCoordinateEpoch(epoch);
-    set(target, source);
+    if (m_srcWkt.empty() || m_dstWkt.empty())
+        return;
+    setFromWkt(m_srcWkt, m_srcEpoch, m_dstWkt, epoch, m_srcOrder, m_dstOrder);
 #endif
 }
 
 SrsTransform& SrsTransform::operator=(SrsTransform&& src)
 {
+    if (this == &src)
+        return *this;
+    reset();
+    m_rustTransform = src.m_rustTransform;
+    src.m_rustTransform = nullptr;
     m_transform = std::move(src.m_transform);
+    m_srcWkt = std::move(src.m_srcWkt);
+    m_dstWkt = std::move(src.m_dstWkt);
+    m_srcEpoch = src.m_srcEpoch;
+    m_dstEpoch = src.m_dstEpoch;
+    m_srcOrder = std::move(src.m_srcOrder);
+    m_dstOrder = std::move(src.m_dstOrder);
     return *this;
 }
 
@@ -112,6 +132,10 @@ SrsTransform::SrsTransform(const SpatialReference& src,
         srcRef.SetDataAxisToSRSAxisMapping(srcOrder);
     if (dstOrder.size())
         dstRef.SetDataAxisToSRSAxisMapping(dstOrder);
+
+    setFromWkt(src.getWKT2(), src.getEpoch(), dst.getWKT2(), dst.getEpoch(),
+               srcOrder, dstOrder);
+
     m_transform.reset(OGRCreateCoordinateTransformation(&srcRef, &dstRef));
 }
 
@@ -136,6 +160,16 @@ void SrsTransform::set(OGRSpatialReference src, OGRSpatialReference dst)
     //
     src.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     dst.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+
+    char* srcWkt = nullptr;
+    char* dstWkt = nullptr;
+    src.exportToWkt(&srcWkt);
+    dst.exportToWkt(&dstWkt);
+    setFromWkt(srcWkt ? srcWkt : "", src.GetCoordinateEpoch(),
+               dstWkt ? dstWkt : "", dst.GetCoordinateEpoch());
+    CPLFree(srcWkt);
+    CPLFree(dstWkt);
+
     m_transform.reset(OGRCreateCoordinateTransformation(&src, &dst));
 }
 
@@ -146,17 +180,49 @@ OGRCoordinateTransformation* SrsTransform::get() const
 
 bool SrsTransform::transform(double& x, double& y, double& z) const
 {
-    return m_transform && m_transform->Transform(1, &x, &y, &z);
+    if (!m_srcOrder.empty() || !m_dstOrder.empty())
+        return m_transform && m_transform->Transform(1, &x, &y, &z);
+    return pdal_srs_transform_xyz(m_rustTransform, &x, &y, &z);
 }
 
 bool SrsTransform::transform(std::vector<double>& x, std::vector<double>& y,
                              std::vector<double>& z) const
 {
-    if (x.size() != y.size() && y.size() != z.size())
+    if (x.size() != y.size() || y.size() != z.size())
         throw pdal_error("SrsTransform::called with vectors of different "
                          "sizes.");
-    int err = m_transform->Transform(x.size(), x.data(), y.data(), z.data());
-    return (err == OGRERR_NONE);
+    if (!m_srcOrder.empty() || !m_dstOrder.empty())
+        return m_transform &&
+               m_transform->Transform(x.size(), x.data(), y.data(), z.data());
+    return pdal_srs_transform_xyz_array(m_rustTransform, x.data(), y.data(),
+                                        z.data(), x.size());
+}
+
+void SrsTransform::reset()
+{
+    if (m_rustTransform)
+        pdal_srs_transform_destroy(m_rustTransform);
+    m_rustTransform = nullptr;
+    m_transform.reset();
+}
+
+void SrsTransform::setFromWkt(const std::string& srcWkt, double srcEpoch,
+                              const std::string& dstWkt, double dstEpoch,
+                              const std::vector<int>& srcOrder,
+                              const std::vector<int>& dstOrder)
+{
+    if (m_rustTransform)
+        pdal_srs_transform_destroy(m_rustTransform);
+    m_rustTransform = pdal_srs_transform_create(
+        srcWkt.c_str(), srcEpoch, dstWkt.c_str(), dstEpoch,
+        srcOrder.empty() ? nullptr : srcOrder.data(), srcOrder.size(),
+        dstOrder.empty() ? nullptr : dstOrder.data(), dstOrder.size());
+    m_srcWkt = srcWkt;
+    m_dstWkt = dstWkt;
+    m_srcEpoch = srcEpoch;
+    m_dstEpoch = dstEpoch;
+    m_srcOrder = srcOrder;
+    m_dstOrder = dstOrder;
 }
 
 } // namespace pdal

@@ -33,6 +33,7 @@
 
 class OGRCoordinateTransformation;
 class OGRSpatialReference;
+typedef struct pdal_srs_transform pdal_srs_transform_t;
 
 namespace pdal
 {
@@ -84,11 +85,24 @@ public:
     /// \return  Whether the transform is valid or not.
     bool valid() const
     {
-        return (bool)m_transform.get();
+        return m_rustTransform != nullptr;
     }
 
 private:
+    void reset();
+    void setFromWkt(const std::string& srcWkt, double srcEpoch,
+                    const std::string& dstWkt, double dstEpoch,
+                    const std::vector<int>& srcOrder = {},
+                    const std::vector<int>& dstOrder = {});
+
+    pdal_srs_transform_t* m_rustTransform = nullptr;
     std::unique_ptr<OGRCoordinateTransformation> m_transform;
+    std::string m_srcWkt;
+    std::string m_dstWkt;
+    double m_srcEpoch = 0;
+    double m_dstEpoch = 0;
+    std::vector<int> m_srcOrder;
+    std::vector<int> m_dstOrder;
 };
 
 } // namespace pdal
