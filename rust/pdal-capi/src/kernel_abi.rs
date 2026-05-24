@@ -52,6 +52,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
     let name = CStr::from_ptr(kernel_name).to_string_lossy().to_lowercase();
     let name = name.strip_prefix("kernels.").unwrap_or(&name);
     match name {
+        "density" => run_density_kernel(argc, argv),
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "merge" => run_merge_kernel(argc, argv),
         "random" => run_random_kernel(argc, argv),
@@ -60,6 +61,108 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "translate" => run_translate_kernel(argc, argv),
         _ => -1,
     }
+}
+
+unsafe fn run_density_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.density: Missing value for positional argument 'input'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!("  pdal density <input> <output.geojson> [--<stage>.<key>=<value> ...]");
+        return 0;
+    }
+
+    let mut input = None;
+    let mut output = None;
+    let mut reader_override = None;
+    let mut hexbin_stage = serde_json::json!({
+        "type": "filters.hexbin",
+    });
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--input" || arg == "-i" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
+                return 1;
+            };
+            input = Some(value.clone());
+        } else if arg == "--output" || arg == "-o" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
+                return 1;
+            };
+            output = Some(value.clone());
+        } else if arg == "--driver" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.density: Missing value for option '--driver'.");
+                return 1;
+            };
+            reader_override = Some(value.clone());
+        } else if let Some(value) = arg.strip_prefix("--driver=") {
+            reader_override = Some(value.to_string());
+        } else if arg == "--ogrdriver" || arg == "-f" {
+            if iter.next().is_none() {
+                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
+                return 1;
+            }
+        } else if arg == "--edge_length" || arg == "--threshold" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
+                return 1;
+            };
+            hexbin_stage[arg.trim_start_matches("--")] = parse_option_value(value);
+        } else if let Some(value) = arg.strip_prefix("--edge_length=") {
+            hexbin_stage["edge_length"] = parse_option_value(value);
+        } else if let Some(value) = arg.strip_prefix("--threshold=") {
+            hexbin_stage["threshold"] = parse_option_value(value);
+        } else if arg.starts_with("--") {
+            let Some(option) = parse_cli_stage_option(arg) else {
+                return -1;
+            };
+            if option.stage != "filters.hexbin" && option.stage != "hexbin" {
+                return -1;
+            }
+            hexbin_stage[option.key.as_str()] = parse_option_value(&option.value);
+        } else if input.is_none() {
+            input = Some(arg.clone());
+        } else if output.is_none() {
+            output = Some(arg.clone());
+        } else {
+            eprintln!("PDAL: kernels.density: Unexpected argument '{arg}'.");
+            return 1;
+        }
+    }
+
+    let Some(input) = input else {
+        eprintln!("PDAL: kernels.density: Missing value for positional argument 'input'.");
+        return 1;
+    };
+    let Some(output) = output else {
+        eprintln!("PDAL: kernels.density: Missing value for positional argument 'output'.");
+        return 1;
+    };
+    let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
+    else {
+        eprintln!("PDAL: kernels.density: Unable to infer reader driver for '{input}'.");
+        return 1;
+    };
+
+    hexbin_stage["density"] = serde_json::json!(output);
+    execute_kernel_pipeline(
+        "density",
+        serde_json::json!([
+            { "type": reader, "filename": input },
+            hexbin_stage,
+        ]),
+    )
 }
 
 unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<String>, i32> {
@@ -402,7 +505,10 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         return 0;
     }
 
-    if args.iter().any(|arg| arg.contains("option_file")) {
+    if args
+        .iter()
+        .any(|arg| arg.contains("option_file") || arg == "range" || arg == "filters.range")
+    {
         return -1;
     }
 
@@ -730,6 +836,15 @@ mod tests {
     }
 
     #[test]
+    fn rust_kernel_run_reports_density_missing_input() {
+        let name = CString::new("density").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
     fn rust_kernel_run_reports_sort_missing_input() {
         let name = CString::new("sort").unwrap();
 
@@ -769,6 +884,17 @@ mod tests {
     fn rust_kernel_run_declines_translate_option_file() {
         let name = CString::new("translate").unwrap();
         let arg = CString::new("--filters.range.option_file=opts.json").unwrap();
+        let argv = [arg.as_ptr()];
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+        assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn rust_kernel_run_declines_translate_range_filter() {
+        let name = CString::new("translate").unwrap();
+        let arg = CString::new("filters.range").unwrap();
         let argv = [arg.as_ptr()];
 
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
