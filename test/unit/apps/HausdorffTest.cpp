@@ -34,64 +34,77 @@
 
 #include <string>
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/PointView.hpp>
 #include <pdal/pdal_test_main.hpp>
+#include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <array>
+#include <cmath>
+#include <fstream>
+#include <vector>
 
 #include "Support.hpp"
 
 using namespace pdal;
 
+namespace
+{
+
+void writeCloud(const std::string& filename,
+                const std::vector<std::array<double, 3>>& points)
+{
+    std::ofstream out(filename);
+    out << "X,Y,Z\n";
+    for (const auto& point : points)
+        out << point[0] << "," << point[1] << "," << point[2] << "\n";
+}
+
+} // namespace
+
 TEST(Hausdorff, kernel)
 {
-    std::string A = Support::datapath("autzen/autzen-thin.las");
-    std::string B = Support::datapath("las/autzen_trim.las");
-    std::string output;
+    std::string a = Support::datapath("autzen/autzen-thin.las");
+    std::string b = Support::datapath("las/autzen_trim.las");
 
-    const std::string cmd = Support::binpath(Support::exename("pdal")) +
-                            " hausdorff " + A + " " + B;
-
-    EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
-    EXPECT_TRUE(output.find("\"hausdorff\": 4416.968175") != std::string::npos);
+    double hausdorff = 0.0;
+    double modified = 0.0;
+    ASSERT_EQ(pdal_hausdorff(a.c_str(), b.c_str(), &hausdorff, &modified), 0)
+        << pdal_last_error();
+    EXPECT_NEAR(hausdorff, 4416.968175, 1.0e-6);
 }
 
 TEST(Hausdorff, distance)
 {
-    PointTable table;
-    PointLayoutPtr layout(table.layout());
+    std::string source = Support::temppath("hausdorff-source.txt");
+    std::string candidate = Support::temppath("hausdorff-candidate.txt");
+    FileUtils::deleteFile(source);
+    FileUtils::deleteFile(candidate);
 
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
+    writeCloud(source, {{{0.0, 0.0, 0.0}}});
+    writeCloud(candidate, {{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}}});
 
-    PointViewPtr src(new PointView(table));
-    src->setField(Dimension::Id::X, 0, 0.0);
-    src->setField(Dimension::Id::Y, 0, 0.0);
-    src->setField(Dimension::Id::Z, 0, 0.0);
+    double hausdorff = 0.0;
+    double modified = 0.0;
+    ASSERT_EQ(pdal_hausdorff(source.c_str(), candidate.c_str(), &hausdorff,
+                             &modified),
+              0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(hausdorff, 2.0);
 
-    PointViewPtr cand(new PointView(table));
-    cand->setField(Dimension::Id::X, 0, 1.0);
-    cand->setField(Dimension::Id::Y, 0, 0.0);
-    cand->setField(Dimension::Id::Z, 0, 0.0);
+    writeCloud(candidate, {{{1.0, 0.0, 0.0}, {0.0, 0.0, 3.0}}});
+    ASSERT_EQ(pdal_hausdorff(source.c_str(), candidate.c_str(), &hausdorff,
+                             &modified),
+              0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(hausdorff, 3.0);
 
-    cand->setField(Dimension::Id::X, 1, 0.0);
-    cand->setField(Dimension::Id::Y, 1, 2.0);
-    cand->setField(Dimension::Id::Z, 1, 0.0);
+    writeCloud(source, {{{1.0, 1.0, 1.0}}});
+    ASSERT_EQ(pdal_hausdorff(source.c_str(), candidate.c_str(), &hausdorff,
+                             &modified),
+              0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(hausdorff, std::sqrt(6.0));
 
-    std::pair<double, double> result = Utils::computeHausdorffPair(src, cand);
-    EXPECT_EQ(2.0, result.first);
-
-    cand->setField(Dimension::Id::X, 1, 0.0);
-    cand->setField(Dimension::Id::Y, 1, 0.0);
-    cand->setField(Dimension::Id::Z, 1, 3.0);
-
-    result = Utils::computeHausdorffPair(src, cand);
-    EXPECT_EQ(3.0, result.first);
-
-    src->setField(Dimension::Id::X, 0, 1.0);
-    src->setField(Dimension::Id::Y, 0, 1.0);
-    src->setField(Dimension::Id::Z, 0, 1.0);
-
-    result = Utils::computeHausdorffPair(src, cand);
-    EXPECT_EQ(std::sqrt(6.0), result.first);
+    FileUtils::deleteFile(source);
+    FileUtils::deleteFile(candidate);
 }

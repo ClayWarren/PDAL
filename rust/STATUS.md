@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `765 / 903` baseline C++ GoogleTest cases, or
-`84.72%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `769 / 903` baseline C++ GoogleTest cases, or
+`85.16%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `804 / 953` currently built C++ GoogleTest cases, or
-`84.37%`; compute that with `--include-added-tests`.
+added during the port, is `808 / 953` currently built C++ GoogleTest cases, or
+`84.78%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -168,6 +168,7 @@ semantic `IsSame` equality, horizontal/vertical EPSG helpers, Polygon
 WKT/GeoJSON parsing/output, root-array pipeline execution, large point-view
 storage, point row add/mutate/swap behavior, checked typed writes, typed
 point-view reads, default spatial-reference behavior, basic point storage,
+Chamfer/Hausdorff app metric tests,
 option JSON canonicalization, EPT preview and selected non-streaming EPT paths,
 OGR writer option validation, file utilities, Support diff helpers, PointTable
 layout limits, LAS userView reads, metadata construction/update, buffer stats

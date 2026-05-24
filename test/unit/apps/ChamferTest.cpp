@@ -34,62 +34,68 @@
 
 #include <string>
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/PointView.hpp>
 #include <pdal/pdal_test_main.hpp>
+#include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <array>
+#include <fstream>
+#include <vector>
 
 #include "Support.hpp"
 
 using namespace pdal;
 
+namespace
+{
+
+void writeCloud(const std::string& filename,
+                const std::vector<std::array<double, 3>>& points)
+{
+    std::ofstream out(filename);
+    out << "X,Y,Z\n";
+    for (const auto& point : points)
+        out << point[0] << "," << point[1] << "," << point[2] << "\n";
+}
+
+} // namespace
+
 TEST(Chamfer, kernel)
 {
-    std::string A = Support::datapath("autzen/autzen-thin.las");
-    std::string B = Support::datapath("las/autzen_trim.las");
-    std::string output;
+    std::string a = Support::datapath("autzen/autzen-thin.las");
+    std::string b = Support::datapath("las/autzen_trim.las");
 
-    const std::string cmd =
-        Support::binpath(Support::exename("pdal")) + " chamfer " + A + " " + B;
-
-    EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
-    EXPECT_TRUE(output.find("\"chamfer\": 5.907628766e+10") !=
-                std::string::npos);
+    double chamfer = 0.0;
+    ASSERT_EQ(pdal_chamfer(a.c_str(), b.c_str(), &chamfer), 0)
+        << pdal_last_error();
+    EXPECT_NEAR(chamfer, 5.907628766e+10, 1.0e+2);
 }
 
 TEST(Chamfer, distance)
 {
-    PointTable table;
-    PointLayoutPtr layout(table.layout());
+    std::string source = Support::temppath("chamfer-source.txt");
+    std::string candidate = Support::temppath("chamfer-candidate.txt");
+    FileUtils::deleteFile(source);
+    FileUtils::deleteFile(candidate);
 
-    layout->registerDim(Dimension::Id::X);
-    layout->registerDim(Dimension::Id::Y);
-    layout->registerDim(Dimension::Id::Z);
+    writeCloud(source, {{{0.0, 0.0, 0.0}}});
+    writeCloud(candidate, {{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}}});
 
-    PointViewPtr src(new PointView(table));
-    src->setField(Dimension::Id::X, 0, 0.0);
-    src->setField(Dimension::Id::Y, 0, 0.0);
-    src->setField(Dimension::Id::Z, 0, 0.0);
+    double chamfer = 0.0;
+    ASSERT_EQ(pdal_chamfer(source.c_str(), candidate.c_str(), &chamfer), 0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(chamfer, 6.0);
 
-    PointViewPtr cand(new PointView(table));
-    cand->setField(Dimension::Id::X, 0, 1.0);
-    cand->setField(Dimension::Id::Y, 0, 0.0);
-    cand->setField(Dimension::Id::Z, 0, 0.0);
+    writeCloud(candidate, {{{1.0, 0.0, 0.0}, {0.0, 0.0, 3.0}}});
+    ASSERT_EQ(pdal_chamfer(source.c_str(), candidate.c_str(), &chamfer), 0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(chamfer, 11.0);
 
-    cand->setField(Dimension::Id::X, 1, 0.0);
-    cand->setField(Dimension::Id::Y, 1, 2.0);
-    cand->setField(Dimension::Id::Z, 1, 0.0);
+    writeCloud(source, {{{1.0, 1.0, 1.0}}});
+    ASSERT_EQ(pdal_chamfer(source.c_str(), candidate.c_str(), &chamfer), 0)
+        << pdal_last_error();
+    EXPECT_DOUBLE_EQ(chamfer, 10.0);
 
-    EXPECT_EQ(6.0, Utils::computeChamfer(src, cand));
-
-    cand->setField(Dimension::Id::X, 1, 0.0);
-    cand->setField(Dimension::Id::Y, 1, 0.0);
-    cand->setField(Dimension::Id::Z, 1, 3.0);
-
-    EXPECT_EQ(11.0, Utils::computeChamfer(src, cand));
-
-    src->setField(Dimension::Id::X, 0, 1.0);
-    src->setField(Dimension::Id::Y, 0, 1.0);
-    src->setField(Dimension::Id::Z, 0, 1.0);
-
-    EXPECT_EQ(10.0, Utils::computeChamfer(src, cand));
+    FileUtils::deleteFile(source);
+    FileUtils::deleteFile(candidate);
 }

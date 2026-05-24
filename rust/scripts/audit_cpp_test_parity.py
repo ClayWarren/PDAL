@@ -104,6 +104,8 @@ COVERED: dict[str, object] = {
     "pdal_point_table_test": {"resolveType", "layoutLimit", "userView", "srs", "simple"},
     "pdal_kernel_test": ALL,
     "pdal_app_plugin_test": ALL,
+    "chamfer_test": ALL,
+    "hausdorff_test": ALL,
     "pdal_eval_test": ALL,
     "pdal_merge_test": ALL,
     "pdal_tile_test": {"test1", "test3"},
