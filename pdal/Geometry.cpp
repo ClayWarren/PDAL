@@ -253,7 +253,8 @@ double Geometry::distance(double x, double y, double z) const
         throw pdal_error("Cannot compare distance of null geometry!");
 
     double distance(0.0);
-    if (pdal_geometry_wkt_distance_to_point(wkt(20).c_str(), x, y, z, &distance))
+    if (pdal_geometry_wkt_distance_to_point(wkt(20).c_str(), x, y, z,
+                                            &distance))
         return distance;
 
     const char* message = pdal_last_error();
@@ -351,7 +352,15 @@ void Geometry::clear()
 
 std::ostream& operator<<(std::ostream& ostr, const Geometry& p)
 {
-    ostr << p.wkt();
+    std::string wkt = p.wkt();
+    char* out_wkt = nullptr;
+    if (pdal_geometry_wkt_to_wkt_precision(wkt.c_str(), 16, &out_wkt) &&
+        out_wkt)
+    {
+        wkt = out_wkt;
+        pdal_string_free(out_wkt);
+    }
+    ostr << wkt;
     return ostr;
 }
 

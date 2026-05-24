@@ -418,6 +418,13 @@ fn geometry_wkt_output_roundtrips_through_c_abi() {
 
         assert!(pdal_geometry_wkt_to_wkt(polygon.as_ptr(), &mut out_wkt));
         assert_eq!(take_string(out_wkt), "POLYGON ((0 0,10 0,10 10,0 10,0 0))");
+        let point = CString::new("POINT (1.23456 2.34567)").unwrap();
+        assert!(pdal_geometry_wkt_to_wkt_precision(
+            point.as_ptr(),
+            2,
+            &mut out_wkt
+        ));
+        assert_eq!(take_string(out_wkt), "POINT (1.23 2.35)");
         assert!(!pdal_geometry_wkt_to_wkt(std::ptr::null(), &mut out_wkt));
     }
 }

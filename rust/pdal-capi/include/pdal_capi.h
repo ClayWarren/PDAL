@@ -529,6 +529,8 @@ extern "C"
     bool pdal_geometry_wkt_simplify(const char* wkt, double tolerance,
                                     bool preserve_topology, char** out_wkt);
     bool pdal_geometry_wkt_to_wkt(const char* wkt, char** out_wkt);
+    bool pdal_geometry_wkt_to_wkt_precision(const char* wkt, uint32_t precision,
+                                            char** out_wkt);
     bool pdal_geometry_wkt_bounds(const char* wkt, pdal_bounds3d_t* out_bounds);
     bool pdal_geometry_json_is_valid(const char* json, bool* out_value);
     bool pdal_geometry_wkt_to_json(const char* wkt, uint32_t precision,
@@ -1150,8 +1152,7 @@ extern "C"
 
     bool pdal_nitf_lidar_segment(const char* path, uint64_t* out_offset,
                                  uint64_t* out_length);
-    bool pdal_nitf_read_metadata(const char* path,
-                                 pdal_nitf_metadata_cb cb,
+    bool pdal_nitf_read_metadata(const char* path, pdal_nitf_metadata_cb cb,
                                  void* userdata);
     bool pdal_nitf_write(const char* input_path, const char* output_path,
                          const pdal_nitf_write_options_t* opts);

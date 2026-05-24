@@ -220,12 +220,30 @@ pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt(
     wkt: *const c_char,
     out_wkt: *mut *mut c_char,
 ) -> bool {
+    pdal_geometry_wkt_to_wkt_precision(wkt, 16, out_wkt)
+}
+
+/// Convert WKT geometry to canonical WKT using the native GEOS adapter and an
+/// explicit rounding precision.
+///
+/// Caller owns the returned WKT string and must free it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt_precision(
+    wkt: *const c_char,
+    precision: u32,
+    out_wkt: *mut *mut c_char,
+) -> bool {
     ffi_catch(false, || {
         let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
             set_last_error("Failed to parse WKT geometry");
             return false;
         };
-        match geometry.to_wkt() {
+        match geometry.to_wkt_precision(precision) {
             Ok(wkt_str) => {
                 if let Some(out_wkt) = out_wkt.as_mut() {
                     *out_wkt = string_to_c_ptr(wkt_str);

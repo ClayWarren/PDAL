@@ -128,6 +128,7 @@ COVERED: dict[str, object] = {
         "bounds",
         "bounds2d",
         "bounds3d",
+        "streams",
     },
     "pdal_quad_index_test": ALL,
     "pdal_xml_schema_test": {"legacyNames", "roundTrip"},

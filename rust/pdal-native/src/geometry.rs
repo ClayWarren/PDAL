@@ -1,6 +1,6 @@
 //! Geometry support via GEOS.
 
-use geos::{CoordSeq, Geom, Geometry as GeosGeometry};
+use geos::{CoordDimensions, CoordSeq, Geom, Geometry as GeosGeometry, WKTWriter};
 use serde_json::Value;
 
 /// A geometry (PDAL's `Geometry`).
@@ -81,8 +81,17 @@ impl Geometry {
     }
 
     pub fn to_wkt(&self) -> Result<String, String> {
-        self.geos_geom
-            .to_wkt()
+        self.to_wkt_precision(16)
+    }
+
+    pub fn to_wkt_precision(&self, precision: u32) -> Result<String, String> {
+        let mut writer = WKTWriter::new().map_err(|e| e.to_string())?;
+        writer.set_rounding_precision(precision);
+        writer.set_trim(true);
+        writer.set_output_dimension(CoordDimensions::ThreeD);
+
+        writer
+            .write(&self.geos_geom)
             .map(|wkt| normalize_wkt(&wkt))
             .map_err(|e| e.to_string())
     }
@@ -502,6 +511,12 @@ mod tests {
         let geometry = Geometry::from_wkt("POINT (1 2)").unwrap();
         let wkt = geometry.to_wkt().unwrap();
         assert!(wkt.contains("POINT (1") && wkt.contains("2)"));
+    }
+
+    #[test]
+    fn to_wkt_precision_rounds_coordinates() {
+        let geometry = Geometry::from_wkt("POINT (1.23456 2.34567)").unwrap();
+        assert_eq!(geometry.to_wkt_precision(2).unwrap(), "POINT (1.23 2.35)");
     }
 
     #[test]
