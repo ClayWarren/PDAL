@@ -556,8 +556,11 @@ pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(
 #[no_mangle]
 pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) -> *mut c_char {
     let path_str = c_string(dirname);
-    if let Ok(entries) = std::fs::read_dir(Path::new(&path_str)) {
+    let path = Path::new(&path_str);
+    if let Ok(entries) = std::fs::read_dir(path) {
         let mut paths = Vec::new();
+        paths.push(path.join(".").to_string_lossy().into_owned());
+        paths.push(path.join("..").to_string_lossy().into_owned());
         for entry in entries.flatten() {
             paths.push(entry.path().to_string_lossy().into_owned());
         }

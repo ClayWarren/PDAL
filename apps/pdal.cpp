@@ -372,8 +372,13 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         for (auto const& arg : cmdArgs)
             argv.push_back(arg.c_str());
 
+        LogLevel kernelLogLevel =
+            m_logLevel != LogLevel::None ? m_logLevel : log->getLevel();
         int ret = pdal_kernel_run(m_command.c_str(),
-                                  static_cast<int>(argv.size()), argv.data());
+                                  static_cast<int>(argv.size()), argv.data(),
+                                  m_log.c_str(),
+                                  static_cast<int>(kernelLogLevel),
+                                  m_logtiming);
         if (ret != 0)
         {
             NL::json kernels = parseCapiJson(pdal_kernel_list_json());

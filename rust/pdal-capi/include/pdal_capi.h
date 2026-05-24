@@ -1113,7 +1113,8 @@ extern "C"
     char* pdal_stage_options_json(const char* stage_name);
     char* pdal_stage_options_text(const char* stage_name);
     int pdal_kernel_run(const char* kernel_name, int argc,
-                        const char* const* argv);
+                        const char* const* argv, const char* log_name,
+                        int log_level, bool log_timing);
     void pdal_capi_free(void* ptr);
 
     // Standalone tools

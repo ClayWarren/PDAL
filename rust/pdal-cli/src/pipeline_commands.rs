@@ -785,6 +785,7 @@ impl App {
 
         let mut output: Option<&str> = None;
         let mut count: u64 = 1000;
+        let mut stage_options: Vec<StageOption> = Vec::new();
         let mut args = self.command_args.iter();
         while let Some(arg) = args.next() {
             if let Some(value) = arg.strip_prefix("--count=") {
@@ -817,8 +818,13 @@ impl App {
                     return 1;
                 }
             } else if arg.starts_with("--") {
-                eprintln!("Error: unknown option '{arg}' for random");
-                return 1;
+                match parse_stage_option_arg(arg) {
+                    Ok(option) => stage_options.push(option),
+                    Err(message) => {
+                        eprintln!("Error: {message}");
+                        return 1;
+                    }
+                }
             } else if output.is_none() {
                 output = Some(arg.as_str());
             } else {
@@ -840,7 +846,7 @@ impl App {
         };
 
         // Uniformly random points in the unit cube, via the faux reader.
-        let stages: Vec<serde_json::Value> = vec![
+        let mut stages: Vec<serde_json::Value> = vec![
             serde_json::json!({
                 "type": "readers.faux",
                 "count": count,
@@ -854,6 +860,10 @@ impl App {
             }),
             serde_json::json!({ "type": writer, "filename": output }),
         ];
+        if let Err(message) = apply_stage_options(&mut stages, &stage_options) {
+            eprintln!("Error: {message}");
+            return 1;
+        }
         self.execute_stage_pipeline(stages)
     }
 

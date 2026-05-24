@@ -197,7 +197,8 @@ extern "C"
     }
 
     int pdal_kernel_run(const char* kernel_name, int argc,
-                        const char* const* argv)
+                        const char* const* argv, const char* log_name,
+                        int log_level, bool log_timing)
     {
         if (!kernel_name || (argc > 0 && !argv))
             return 1;
@@ -219,7 +220,9 @@ extern "C"
             for (int i = 0; i < argc; ++i)
                 cmdArgs.push_back(argv[i]);
 
-            LogPtr log = Log::makeLog("pdal", "stderr");
+            LogPtr log = Log::makeLog("pdal", log_name ? log_name : "stderr",
+                                      log_timing);
+            log->setLevel(static_cast<LogLevel>(log_level));
             int ret = kernel->run(cmdArgs, log);
             kernel.reset();
             gdal::unregisterDrivers();
