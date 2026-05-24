@@ -8,6 +8,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 mod ground;
+mod split;
 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_kernel_parse_stage_option(
@@ -60,6 +61,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "merge" => run_merge_kernel(argc, argv),
         "random" => run_random_kernel(argc, argv),
         "sort" => run_sort_kernel(argc, argv),
+        "split" => split::run_split_kernel(argc, argv),
         "tile" => run_tile_kernel(argc, argv),
         "translate" => run_translate_kernel(argc, argv),
         _ => -1,
@@ -859,6 +861,15 @@ mod tests {
     #[test]
     fn rust_kernel_run_reports_sort_missing_input() {
         let name = CString::new("sort").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn rust_kernel_run_reports_split_missing_input() {
+        let name = CString::new("split").unwrap();
 
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 
