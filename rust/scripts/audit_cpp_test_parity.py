@@ -109,7 +109,7 @@ COVERED: dict[str, object] = {
     "chamfer_test": ALL,
     "hausdorff_test": ALL,
     "pdal_eval_test": ALL,
-    "pdal_info_test": {"stats", "schema", "all"},
+    "pdal_info_test": {"point", "query", "stats", "schema", "all"},
     "pdal_merge_test": ALL,
     "pdal_tile_test": {"test1", "test3"},
     "pdal_tindex_test": {"test1", "test2", "test3", "test6"},

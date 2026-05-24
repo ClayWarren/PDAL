@@ -4,7 +4,7 @@ use crate::pipeline_abi::{
 };
 use crate::registry::pipeline_from_json;
 use pdal_core::driver::infer_reader_driver;
-use pdal_core::point::{DimType, PointView};
+use pdal_core::point::{DimId, DimType, PointId, PointView};
 use std::ffi::CStr;
 use std::io::Read;
 use std::os::raw::c_char;
@@ -231,6 +231,39 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             mode = InfoMode::Schema;
         } else if arg == "--all" {
             mode = InfoMode::All;
+        } else if arg == "-p" || arg == "--point" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
+                return 1;
+            };
+            let Some(point_id) = parse_point_id(value) else {
+                return -1;
+            };
+            mode = InfoMode::Point(point_id);
+        } else if let Some(value) = arg.strip_prefix("-p=") {
+            let Some(point_id) = parse_point_id(value) else {
+                return -1;
+            };
+            mode = InfoMode::Point(point_id);
+        } else if let Some(value) = arg.strip_prefix("--point=") {
+            let Some(point_id) = parse_point_id(value) else {
+                return -1;
+            };
+            mode = InfoMode::Point(point_id);
+        } else if arg == "--query" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--query'.");
+                return 1;
+            };
+            let Some(query) = parse_query(value) else {
+                return -1;
+            };
+            mode = InfoMode::Query(query);
+        } else if let Some(value) = arg.strip_prefix("--query=") {
+            let Some(query) = parse_query(value) else {
+                return -1;
+            };
+            mode = InfoMode::Query(query);
         } else if arg == "--driver" {
             let Some(driver) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '--driver'.");
@@ -248,7 +281,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 eprintln!("PDAL: kernels.info: Expected exactly one input file.");
                 return 1;
             }
-        } else if arg.starts_with("--") || arg.starts_with("-p") || arg == "-p" {
+        } else if arg.starts_with("--") {
             return -1;
         } else if filename.replace(arg.clone()).is_some() {
             eprintln!("PDAL: kernels.info: Expected exactly one input file.");
@@ -287,7 +320,11 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 1
             }
         },
-        InfoMode::Stats | InfoMode::Schema | InfoMode::All => match pipeline.execute(Vec::new()) {
+        InfoMode::Stats
+        | InfoMode::Schema
+        | InfoMode::All
+        | InfoMode::Point(_)
+        | InfoMode::Query(_) => match pipeline.execute(Vec::new()) {
             Ok(views) => {
                 println!("{}", info_report(mode, &views));
                 0
@@ -306,6 +343,15 @@ enum InfoMode {
     Stats,
     Schema,
     All,
+    Point(PointId),
+    Query(QueryRequest),
+}
+
+#[derive(Clone, Copy)]
+struct QueryRequest {
+    x: f64,
+    y: f64,
+    count: usize,
 }
 
 fn info_pipeline(driver: &str, filename: &str) -> Result<pdal_core::pipeline::Pipeline, String> {
@@ -327,8 +373,123 @@ fn info_report(mode: InfoMode, views: &[PointView]) -> String {
             output.push_str("\n}\n");
             output
         }
+        InfoMode::Point(point_id) => point_report(views, point_id),
+        InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
     }
+}
+
+fn point_report(views: &[PointView], point_id: PointId) -> String {
+    let mut output = String::from("{\n  \"points\":\n  {\n");
+    if let Some((view, local_id)) = locate_point(views, point_id) {
+        output.push_str("    \"point\":\n");
+        output.push_str(&point_json(view, local_id, 4));
+        output.push('\n');
+    } else {
+        output.push_str("    \"point\": null\n");
+    }
+    output.push_str("  },\n  \"reader\": \"readers.las\"\n}\n");
+    output
+}
+
+fn query_report(views: &[PointView], query: QueryRequest) -> String {
+    let mut points = Vec::new();
+    for view in views {
+        if view.layout().dim(&DimId::X).is_none() || view.layout().dim(&DimId::Y).is_none() {
+            continue;
+        }
+        for local_id in 0..view.len() {
+            let dx = view.get_f64(local_id, &DimId::X) - query.x;
+            let dy = view.get_f64(local_id, &DimId::Y) - query.y;
+            points.push((
+                dx.mul_add(dx, dy * dy),
+                view.source_index(local_id),
+                view,
+                local_id,
+            ));
+        }
+    }
+    points.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.1.cmp(&b.1))
+    });
+
+    let mut output = String::from("{\n  \"points\":\n  {\n    \"point\":\n    [\n");
+    for (idx, (_, _, view, local_id)) in points.iter().take(query.count).enumerate() {
+        if idx > 0 {
+            output.push_str(",\n");
+        }
+        output.push_str(&point_json(view, *local_id, 6));
+    }
+    output.push_str("\n    ]\n  },\n  \"reader\": \"readers.las\"\n}\n");
+    output
+}
+
+fn locate_point(views: &[PointView], point_id: PointId) -> Option<(&PointView, PointId)> {
+    for view in views {
+        for local_id in 0..view.len() {
+            if view.source_index(local_id) == point_id {
+                return Some((view, local_id));
+            }
+        }
+    }
+    None
+}
+
+fn point_json(view: &PointView, local_id: PointId, indent: usize) -> String {
+    let pad = " ".repeat(indent);
+    let value_pad = " ".repeat(indent + 2);
+    let mut fields = point_field_names(view);
+    let point_id_pos = fields
+        .iter()
+        .position(|name| name.as_str() > "PointId")
+        .unwrap_or(fields.len());
+    fields.insert(point_id_pos, "PointId".to_string());
+
+    let mut output = format!("{pad}{{\n");
+    for (idx, name) in fields.iter().enumerate() {
+        if idx > 0 {
+            output.push_str(",\n");
+        }
+        let value = if name == "PointId" {
+            view.source_index(local_id) as f64
+        } else {
+            view.get_f64(local_id, &DimId::from_name(name))
+        };
+        output.push_str(&format!(
+            "{value_pad}\"{name}\": {}",
+            format_point_value(value)
+        ));
+    }
+    output.push_str(&format!("\n{pad}}}"));
+    output
+}
+
+fn point_field_names(view: &PointView) -> Vec<String> {
+    let layout = view.layout();
+    let mut names = Vec::new();
+    for idx in 0..layout.dim_count() {
+        if let Some((dim, _)) = layout.dim_at(idx) {
+            names.push(dim.name().to_string());
+        }
+    }
+    names.sort();
+    names
+}
+
+fn parse_point_id(value: &str) -> Option<PointId> {
+    value.parse::<PointId>().ok()
+}
+
+fn parse_query(value: &str) -> Option<QueryRequest> {
+    let (coords, count) = value.split_once('/')?;
+    let (x, y) = coords.split_once(',')?;
+    Some(QueryRequest {
+        x: x.parse().ok()?,
+        y: y.parse().ok()?,
+        count: count.parse().ok()?,
+    })
 }
 
 fn schema_report(views: &[PointView]) -> String {
@@ -476,6 +637,10 @@ fn format_number(value: f64) -> String {
         text.pop();
     }
     text
+}
+
+fn format_point_value(value: f64) -> String {
+    format_number(value)
 }
 
 unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<String>, i32> {
