@@ -1,5 +1,5 @@
 use crate::error::pdal_string_free;
-use crate::metrics_abi::{pdal_chamfer, pdal_delta, pdal_hausdorff};
+use crate::metrics_abi::{pdal_chamfer, pdal_delta, pdal_eval, pdal_hausdorff};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -104,6 +104,120 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
     println!("{}", CStr::from_ptr(json).to_string_lossy());
     pdal_string_free(json);
     0
+}
+
+pub(super) unsafe fn run_eval_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.eval: Missing value for positional argument 'predicted'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!(
+            "  pdal eval <predicted> <truth> --labels=<l1,l2,...> \
+             [--prediction_dim=Classification] [--truth_dim=Classification]"
+        );
+        return 0;
+    }
+
+    let eval = match parse_eval_args(&args) {
+        Ok(eval) => eval,
+        Err(message) => {
+            eprintln!("Error: {message}");
+            return 1;
+        }
+    };
+    let (c_predicted, c_truth, c_labels, c_prediction_dim, c_truth_dim) = match (
+        CString::new(eval.predicted.as_str()),
+        CString::new(eval.truth.as_str()),
+        CString::new(eval.labels.as_str()),
+        CString::new(eval.prediction_dim.as_str()),
+        CString::new(eval.truth_dim.as_str()),
+    ) {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e)) => (a, b, c, d, e),
+        _ => {
+            eprintln!("Error: an argument contains an interior NUL byte");
+            return 1;
+        }
+    };
+
+    let json = pdal_eval(
+        c_predicted.as_ptr(),
+        c_truth.as_ptr(),
+        c_labels.as_ptr(),
+        c_prediction_dim.as_ptr(),
+        c_truth_dim.as_ptr(),
+    );
+    if json.is_null() {
+        print_last_error();
+        return 1;
+    }
+    println!("{}", CStr::from_ptr(json).to_string_lossy());
+    pdal_string_free(json);
+    0
+}
+
+struct EvalArgs {
+    predicted: String,
+    truth: String,
+    labels: String,
+    prediction_dim: String,
+    truth_dim: String,
+}
+
+fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
+    let mut predicted = None;
+    let mut truth = None;
+    let mut labels = String::new();
+    let mut prediction_dim = String::from("Classification");
+    let mut truth_dim = String::from("Classification");
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(rest) = arg.strip_prefix("--") {
+            let (key, value) = match rest.split_once('=') {
+                Some(pair) => pair,
+                None => {
+                    let Some(value) = iter.next() else {
+                        return Err(format!("option '{arg}' requires a value"));
+                    };
+                    (rest, value.as_str())
+                }
+            };
+            match key {
+                "predicted" => predicted = Some(value.to_string()),
+                "truth" => truth = Some(value.to_string()),
+                "labels" => labels = value.to_string(),
+                "prediction_dim" => prediction_dim = value.to_string(),
+                "truth_dim" => truth_dim = value.to_string(),
+                _ => return Err(format!("unknown eval option '--{key}'")),
+            }
+        } else if predicted.is_none() {
+            predicted = Some(arg.clone());
+        } else if truth.is_none() {
+            truth = Some(arg.clone());
+        } else {
+            return Err("eval expects a predicted path and a truth path".to_string());
+        }
+    }
+
+    let (Some(predicted), Some(truth)) = (predicted, truth) else {
+        return Err("eval expects a predicted path and a truth path".to_string());
+    };
+    if labels.is_empty() {
+        return Err("eval requires --labels=<comma-separated classification labels>".to_string());
+    }
+
+    Ok(EvalArgs {
+        predicted,
+        truth,
+        labels,
+        prediction_dim,
+        truth_dim,
+    })
 }
 
 fn parse_source_candidate_args(command: &str, args: &[String]) -> Result<(String, String), String> {

@@ -61,7 +61,7 @@ fn rust_kernel_run_reports_density_missing_input() {
 
 #[test]
 fn rust_kernel_run_reports_metric_missing_inputs() {
-    for command in ["hausdorff", "chamfer", "delta"] {
+    for command in ["hausdorff", "chamfer", "delta", "eval"] {
         let name = CString::new(command).unwrap();
 
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
@@ -72,7 +72,7 @@ fn rust_kernel_run_reports_metric_missing_inputs() {
 
 #[test]
 fn rust_kernel_run_accepts_metric_help() {
-    for command in ["hausdorff", "chamfer", "delta"] {
+    for command in ["hausdorff", "chamfer", "delta", "eval"] {
         let name = CString::new(command).unwrap();
         let arg = CString::new("--help").unwrap();
         let argv = [arg.as_ptr()];
@@ -90,6 +90,18 @@ fn rust_kernel_run_rejects_metric_unknown_option() {
     let argv = [arg.as_ptr()];
 
     let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
+fn rust_kernel_run_rejects_eval_without_labels() {
+    let name = CString::new("eval").unwrap();
+    let predicted = CString::new("predicted.las").unwrap();
+    let truth = CString::new("truth.las").unwrap();
+    let argv = [predicted.as_ptr(), truth.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 2, argv.as_ptr()) };
 
     assert_eq!(result, 1);
 }

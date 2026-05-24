@@ -60,6 +60,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "chamfer" => metrics::run_chamfer_kernel(argc, argv),
         "delta" => metrics::run_delta_kernel(argc, argv),
         "density" => run_density_kernel(argc, argv),
+        "eval" => metrics::run_eval_kernel(argc, argv),
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "ground" => ground::run_ground_kernel(argc, argv),
         "hausdorff" => metrics::run_hausdorff_kernel(argc, argv),
