@@ -13,6 +13,7 @@ extern "C"
     typedef struct pdal_point_layout pdal_point_layout_t;
     typedef struct pdal_point_view pdal_point_view_t;
     typedef struct pdal_spatial_reference pdal_spatial_reference_t;
+    typedef struct pdal_spatial_reference_list pdal_spatial_reference_list_t;
     typedef struct pdal_metadata_node pdal_metadata_node_t;
     typedef struct pdal_stage pdal_stage_t;
     typedef struct pdal_pipeline pdal_pipeline_t;
@@ -475,6 +476,18 @@ extern "C"
                                           double epoch);
     pdal_metadata_node_t*
     pdal_spatial_reference_to_metadata(const pdal_spatial_reference_t* srs);
+    pdal_spatial_reference_list_t* pdal_spatial_reference_list_create();
+    void pdal_spatial_reference_list_clear(pdal_spatial_reference_list_t* list);
+    void pdal_spatial_reference_list_add(pdal_spatial_reference_list_t* list,
+                                         const pdal_spatial_reference_t* srs);
+    bool pdal_spatial_reference_list_unique(
+        const pdal_spatial_reference_list_t* list);
+    uint64_t
+    pdal_spatial_reference_list_size(const pdal_spatial_reference_list_t* list);
+    pdal_spatial_reference_t*
+    pdal_spatial_reference_list_any(const pdal_spatial_reference_list_t* list);
+    void
+    pdal_spatial_reference_list_destroy(pdal_spatial_reference_list_t* list);
     int32_t pdal_spatial_reference_calculate_zone(double lon, double lat);
     char* pdal_spatial_reference_wgs84_code_from_zone(int32_t zone);
     void pdal_spatial_reference_destroy(pdal_spatial_reference_t* srs);

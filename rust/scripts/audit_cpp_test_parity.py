@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 from pathlib import Path
 
 
 ALL = object()
+DEFAULT_BASELINE_REF = "d540428c9^"
+TEST_RE = re.compile(r"\bTEST(?:_F|_P)?\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([A-Za-z_][A-Za-z0-9_]*)")
 
 COVERED: dict[str, object] = {
     "pdal_kdindex_test": ALL,
@@ -97,7 +100,7 @@ COVERED: dict[str, object] = {
     "pdal_segmentation_test": ALL,
     "pdal_filespec_test": ALL,
     "pdal_dimension_test": ALL,
-    "pdal_point_table_test": {"resolveType", "layoutLimit", "userView", "simple"},
+    "pdal_point_table_test": {"resolveType", "layoutLimit", "userView", "srs", "simple"},
     "pdal_kernel_test": ALL,
     "pdal_config_test": ALL,
     "pdal_log_test": {"t1"},
@@ -679,9 +682,46 @@ def list_tests(binary: Path) -> list[str]:
     return tests
 
 
+def git(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        check=check,
+        capture_output=True,
+        text=True,
+    )
+
+
+def baseline_tests(ref: str) -> set[str]:
+    exists = git(["rev-parse", "--verify", "--quiet", ref], check=False)
+    if exists.returncode != 0:
+        raise SystemExit(f"baseline ref not found: {ref}")
+
+    listed = git(["ls-tree", "-r", "--name-only", ref, "test"]).stdout
+    tests: set[str] = set()
+    for path in listed.splitlines():
+        if not path.endswith((".cpp", ".hpp")):
+            continue
+        blob = git(["show", f"{ref}:{path}"], check=False)
+        if blob.returncode != 0:
+            continue
+        for suite, name in TEST_RE.findall(blob.stdout):
+            tests.add(f"{suite}.{name}")
+    return tests
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-dir", default="build")
+    parser.add_argument(
+        "--baseline-ref",
+        default=DEFAULT_BASELINE_REF,
+        help="Git ref used for the pre-port C++ test baseline",
+    )
+    parser.add_argument(
+        "--include-added-tests",
+        action="store_true",
+        help="Use every currently built C++ GoogleTest case as the denominator",
+    )
     args = parser.parse_args()
 
     bin_dir = Path(args.build_dir) / "bin"
@@ -689,6 +729,7 @@ def main() -> int:
     if not binaries:
         raise SystemExit(f"no built test binaries found under {bin_dir}")
 
+    baseline = None if args.include_added_tests else baseline_tests(args.baseline_ref)
     total = 0
     covered = 0
     missing_binaries = []
@@ -696,7 +737,12 @@ def main() -> int:
     rows: list[tuple[str, int, int]] = []
 
     for binary in binaries:
-        tests = list_tests(binary)
+        all_tests = list_tests(binary)
+        tests = all_tests
+        if baseline is not None:
+            tests = [test for test in all_tests if test in baseline]
+            if not tests:
+                continue
         total += len(tests)
         rule = COVERED.get(binary.name)
         if rule is ALL:
@@ -716,6 +762,8 @@ def main() -> int:
             rows.append((binary.name, count, len(tests)))
 
     percent = covered / total * 100 if total else 0.0
+    scope = "all currently built tests" if args.include_added_tests else f"pre-port baseline ({args.baseline_ref})"
+    print(f"Scope: {scope}")
     print(f"Built C++ GoogleTest binaries: {len(binaries)}")
     print(f"Built C++ GoogleTest cases: {total}")
     print(f"Rust C ABI-backed cases: {covered}")

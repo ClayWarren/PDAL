@@ -16,6 +16,49 @@ fn spatial_reference_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn spatial_reference_list_matches_point_table_ordering_contract() {
+    unsafe {
+        let srs1_text = CString::new("EPSG:4326").unwrap();
+        let srs2_text = CString::new("EPSG:32617").unwrap();
+        let srs1 = pdal_spatial_reference_create(srs1_text.as_ptr());
+        let srs2 = pdal_spatial_reference_create(srs2_text.as_ptr());
+        let list = pdal_spatial_reference_list_create();
+
+        assert!(pdal_spatial_reference_list_unique(list));
+        assert_eq!(pdal_spatial_reference_list_size(list), 0);
+
+        pdal_spatial_reference_list_add(list, srs1);
+        pdal_spatial_reference_list_add(list, srs1);
+        assert!(pdal_spatial_reference_list_unique(list));
+        assert_eq!(pdal_spatial_reference_list_size(list), 1);
+        let any = pdal_spatial_reference_list_any(list);
+        assert_eq!(take_string(pdal_spatial_reference_text(any)), "EPSG:4326");
+        pdal_spatial_reference_destroy(any);
+
+        pdal_spatial_reference_list_add(list, srs2);
+        assert!(!pdal_spatial_reference_list_unique(list));
+        assert_eq!(pdal_spatial_reference_list_size(list), 2);
+        let any = pdal_spatial_reference_list_any(list);
+        assert_eq!(take_string(pdal_spatial_reference_text(any)), "EPSG:32617");
+        pdal_spatial_reference_destroy(any);
+
+        pdal_spatial_reference_list_add(list, srs1);
+        let any = pdal_spatial_reference_list_any(list);
+        assert_eq!(take_string(pdal_spatial_reference_text(any)), "EPSG:4326");
+        pdal_spatial_reference_destroy(any);
+        assert_eq!(pdal_spatial_reference_list_size(list), 2);
+
+        pdal_spatial_reference_list_clear(list);
+        assert!(pdal_spatial_reference_list_unique(list));
+        assert_eq!(pdal_spatial_reference_list_size(list), 0);
+
+        pdal_spatial_reference_list_destroy(list);
+        pdal_spatial_reference_destroy(srs2);
+        pdal_spatial_reference_destroy(srs1);
+    }
+}
+
+#[test]
 fn spatial_reference_wgs84_zone_code_roundtrips_through_c_abi() {
     unsafe {
         assert_eq!(

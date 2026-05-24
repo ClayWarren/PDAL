@@ -51,6 +51,49 @@ impl SpatialReference {
     }
 }
 
+/// Ordered set of spatial references tracked by a point table.
+#[derive(Clone, Debug, Default)]
+pub struct SpatialReferenceList {
+    refs: Vec<SpatialReference>,
+}
+
+impl SpatialReferenceList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn clear(&mut self) {
+        self.refs.clear();
+    }
+
+    pub fn add(&mut self, srs: SpatialReference) {
+        if let Some(pos) = self.refs.iter().position(|existing| existing == &srs) {
+            if pos != 0 {
+                let srs = self.refs.remove(pos);
+                self.refs.insert(0, srs);
+            }
+        } else {
+            self.refs.insert(0, srs);
+        }
+    }
+
+    pub fn is_unique(&self) -> bool {
+        self.refs.len() <= 1
+    }
+
+    pub fn any(&self) -> SpatialReference {
+        self.refs.first().cloned().unwrap_or_default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.refs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.refs.is_empty()
+    }
+}
+
 pub fn calculate_zone(lon: f64, lat: f64) -> i32 {
     let lon = normalize_longitude(lon);
 
@@ -154,6 +197,36 @@ mod tests {
             metadata.find_child("epoch").and_then(|node| node.value()),
             Some(&MetadataValue::F64(2020.5))
         );
+    }
+
+    #[test]
+    fn spatial_reference_list_tracks_unique_refs_and_moves_recent_to_front() {
+        let srs1 = SpatialReference::new("EPSG:4326");
+        let srs2 = SpatialReference::new("EPSG:32617");
+        let mut list = SpatialReferenceList::new();
+
+        assert!(list.is_empty());
+        assert!(list.is_unique());
+        assert!(list.any().is_empty());
+
+        list.add(srs1.clone());
+        list.add(srs1.clone());
+        assert!(list.is_unique());
+        assert_eq!(list.any(), srs1);
+        assert_eq!(list.len(), 1);
+
+        list.add(srs2.clone());
+        assert!(!list.is_unique());
+        assert_eq!(list.any(), srs2);
+        assert_eq!(list.len(), 2);
+
+        list.add(srs1.clone());
+        assert!(!list.is_unique());
+        assert_eq!(list.any(), srs1);
+        assert_eq!(list.len(), 2);
+
+        list.clear();
+        assert!(list.is_empty());
     }
 
     #[test]

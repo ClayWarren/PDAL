@@ -186,14 +186,14 @@ TEST(PointTable, userView)
 
 TEST(PointTable, srs)
 {
-    SpatialReference srs1(
+    const char* srsText1 =
         "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
         "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
         "\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\","
         "\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\","
-        "\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]");
+        "\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]";
 
-    SpatialReference srs2(
+    const char* srsText2 =
         "PROJCS[\"WGS 84 / UTM zone 17N\",GEOGCS[\"WGS "
         "84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
         "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
@@ -203,24 +203,46 @@ TEST(PointTable, srs)
         "PARAMETER[\"central_meridian\",-81],PARAMETER[\"scale_factor\",0.9996]"
         ",PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],"
         "UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AUTHORITY[\"EPSG\","
-        "\"32617\"]]");
+        "\"32617\"]]";
 
-    PointTable table;
+    pdal_spatial_reference_t* srs1 = pdal_spatial_reference_create(srsText1);
+    pdal_spatial_reference_t* srs2 = pdal_spatial_reference_create(srsText2);
+    pdal_spatial_reference_list_t* list = pdal_spatial_reference_list_create();
+    ASSERT_NE(srs1, nullptr);
+    ASSERT_NE(srs2, nullptr);
+    ASSERT_NE(list, nullptr);
 
-    table.addSpatialReference(srs1);
-    table.addSpatialReference(srs1);
-    EXPECT_TRUE(table.spatialReferenceUnique());
-    EXPECT_EQ(table.anySpatialReference(), srs1);
+    pdal_spatial_reference_list_add(list, srs1);
+    pdal_spatial_reference_list_add(list, srs1);
+    EXPECT_TRUE(pdal_spatial_reference_list_unique(list));
+    EXPECT_EQ(pdal_spatial_reference_list_size(list), 1u);
+    pdal_spatial_reference_t* any = pdal_spatial_reference_list_any(list);
+    char* text = pdal_spatial_reference_text(any);
+    EXPECT_STREQ(text, srsText1);
+    pdal_string_free(text);
+    pdal_spatial_reference_destroy(any);
 
-    table.addSpatialReference(srs2);
-    EXPECT_FALSE(table.spatialReferenceUnique());
-    EXPECT_EQ(table.anySpatialReference(), srs2);
-    EXPECT_EQ(table.m_spatialRefs.size(), 2u);
+    pdal_spatial_reference_list_add(list, srs2);
+    EXPECT_FALSE(pdal_spatial_reference_list_unique(list));
+    EXPECT_EQ(pdal_spatial_reference_list_size(list), 2u);
+    any = pdal_spatial_reference_list_any(list);
+    text = pdal_spatial_reference_text(any);
+    EXPECT_STREQ(text, srsText2);
+    pdal_string_free(text);
+    pdal_spatial_reference_destroy(any);
 
-    table.addSpatialReference(srs1);
-    EXPECT_FALSE(table.spatialReferenceUnique());
-    EXPECT_EQ(table.anySpatialReference(), srs1);
-    EXPECT_EQ(table.m_spatialRefs.size(), 2u);
+    pdal_spatial_reference_list_add(list, srs1);
+    EXPECT_FALSE(pdal_spatial_reference_list_unique(list));
+    EXPECT_EQ(pdal_spatial_reference_list_size(list), 2u);
+    any = pdal_spatial_reference_list_any(list);
+    text = pdal_spatial_reference_text(any);
+    EXPECT_STREQ(text, srsText1);
+    pdal_string_free(text);
+    pdal_spatial_reference_destroy(any);
+
+    pdal_spatial_reference_list_destroy(list);
+    pdal_spatial_reference_destroy(srs2);
+    pdal_spatial_reference_destroy(srs1);
 }
 
 void simpleTest()

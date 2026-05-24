@@ -61,7 +61,7 @@ Status definitions:
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
-| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 245 `unsafe { ... }` blocks, 406 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
+| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 246 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
@@ -140,49 +140,27 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `765 / 1039` built C++ GoogleTest cases, or `73.63%`, are
-confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route `SpatialReference` user-input normalization, PROJ4 export,
-semantic `IsSame` equality, and `identifyHorizontalEPSG` through a Rust GDAL
-OSR adapter (the C++ `SpatialReference::set` user-input branch, `getProj4`,
-`equals`, and `identifyHorizontalEPSG` now delegate to
-`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`,
-and `pdal_srs_identify_horizontal_epsg`), promote
-`test_proj4_roundtrip`, `test_userstring_roundtrip`, `test_read_srs`,
-`test_io`, `readerOptions`, and `identifyEPSG` as Rust-backed in
-`pdal_spatial_reference_test`, route Polygon GeoJSON parsing/output (GDAL
-`OGR_G_ExportToJsonEx(COORDINATE_PRECISION)` shape via a Rust
-WKT-to-GeoJSON formatter, with PDAL's optional `srs` top-level key
-stripped before GEOS parsing), Polygon WKT parsing/output, root-array pipeline execution, large point-view random-access
-storage, point-view checked typed writes, the basic pipeline manager execute
-path, typed point-view reads, the default spatial-reference contract, basic
-point storage, and option JSON canonicalization through the Rust C ABI, route
-EPT reader `inspect`
-(no-spatial-filter preview) through a new Rust C ABI that reads `ept.json` and
-expands LASzip class-flag dims to match `EptInfo`, audit the EPT reader's
-`resolutionLimit` and corrupted-tile and
-bad-tile-point-count failure paths (`unreadableTileFailure`,
-`badTilePointCountLaszip`, `badTilePointCountBinary`) as Rust-backed since
-the wrapper now routes the non-streaming non-special-options path through
-Rust (the `resolution` option already flows through to the Rust EPT
-reader), route the EPT reader's `ignore_unreadable` non-streaming path
-through Rust (returning a single empty view when every tile is skipped),
-route OGR writer option validation (multicount/attr_dims combination and
-missing-`attr_dims` dimension messages) through the Rust C ABI, promote
-newly Rust-backed `pdal_polygon_test` geometry operation cases, alongside file utility operations (directory exists/list/create, file exists/size/delete, rename, read into string, glob),
-path-based Support::diff_files and Support::diff_text_files routing,
-PointTable layout limits, LAS userView reads, metadata
-construction/update, buffer stats execution, XMLSchema round-trip parsing,
-hexbin filter execution cases, COPC reader multi-input handling, EPT reader
-audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
-confirmed; badOriginQuery corrected), OGR writer GeoJSON output, streaming
-execution, private filter ports for Delaunay, ICP, Lloyd K-means, relaxation
-dart throwing, Straighten, four legacy OldPCLBlock outlier/range pipeline
-cases, `pdal::ThreadPool` scheduling/stop/restart behavior, and ShellFilter
-command execution through Rust.
-`Utils::toString(double)` and `Utils::run_shell_command()` now route through
-the Rust C ABI. This remains a conservative lower bound, not a final
-port-completion percentage:
+Current pre-port checkpoint: `738 / 891` baseline C++ GoogleTest cases, or
+`82.83%`, are confirmed Rust C ABI-backed by
+`rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
+pre-port test set from `d540428c9^`, so newly added guard tests do not move the
+headline denominator. The branch-wide health metric, including guard tests
+added during the port, is `766 / 1039` currently built C++ GoogleTest cases, or
+`73.72%`; compute that with `--include-added-tests`.
+
+Recent gains route `SpatialReference` user-input normalization, PROJ4 export,
+semantic `IsSame` equality, horizontal/vertical EPSG helpers, Polygon
+WKT/GeoJSON parsing/output, root-array pipeline execution, large point-view
+storage, point row add/mutate/swap behavior, checked typed writes, typed
+point-view reads, default spatial-reference behavior, basic point storage,
+option JSON canonicalization, EPT preview and selected non-streaming EPT paths,
+OGR writer option validation, file utilities, Support diff helpers, PointTable
+layout limits, LAS userView reads, metadata construction/update, buffer stats
+execution, XMLSchema round-trip parsing, selected COPC/EPT/OGR/streaming
+execution paths, private filter ports, `pdal::ThreadPool` behavior,
+ShellFilter command execution, `Utils::toString(double)`, and
+`Utils::run_shell_command()` through the Rust C ABI. This remains a
+conservative lower bound, not a final port-completion percentage:
 40 built test binaries remain unclassified by the audit script in the current
 optional-plugin-enabled build. Of these:
    - 6 are private/specialized C++ algorithms with no Rust-backed count yet
@@ -235,6 +213,7 @@ Recompute the current built-suite parity checkpoint with:
 
 ```sh
 python3 rust/scripts/audit_cpp_test_parity.py --build-dir build
+python3 rust/scripts/audit_cpp_test_parity.py --build-dir build --include-added-tests
 ```
 
 Known mixed binaries:
@@ -284,12 +263,12 @@ Known mixed binaries:
   validation route through the Rust C ABI.
 - `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
   through the Rust C ABI.
-- `pdal_point_table_test`: `resolveType`, `layoutLimit`, `userView`, and
+- `pdal_point_table_test`: `resolveType`, `layoutLimit`, `userView`, `srs`, and
   `simple` count; dimension type resolution routes through the Rust C ABI,
   layout-limited dimension registration uses Rust-backed type resolution, LAS
-  user-view reads route through the Rust LAS reader, and basic point storage
-  uses Rust `PointView` storage through the C ABI. SRS list management and
-  `ColumnPointTable` typed storage remain C++.
+  user-view reads route through the Rust LAS reader, SRS list management routes
+  through Rust, and basic point storage uses Rust `PointView` storage through
+  the C ABI. `ColumnPointTable` typed storage remains C++.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
 - `pdal_config_test`: all 1 test counts; version integer and full-version
