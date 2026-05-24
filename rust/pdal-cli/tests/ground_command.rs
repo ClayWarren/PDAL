@@ -114,7 +114,7 @@ fn ground_without_paths_prints_usage_and_fails() {
 
 #[test]
 #[ignore = "requires installed pdal on PATH"]
-fn installed_pdal_ground_matches_rust_ground_point_count() {
+fn installed_pdal_ground_matches_rust_ground_classification() {
     let input = data_path("test/data/las/interesting.las");
     let temp = make_temp_dir("pdal-rs-ground-regression");
     let installed_output = temp.join("installed.pcd");
@@ -146,10 +146,37 @@ fn installed_pdal_ground_matches_rust_ground_point_count() {
         String::from_utf8_lossy(&rust.stderr)
     );
 
-    // The Rust SMRF port is a simplified approximation, so the ground
-    // classification differs from PDAL's; only the point count is comparable.
-    assert_eq!(
-        read_pcd(&rust_output).len(),
-        read_pcd(&installed_output).len()
+    let rust_view = read_pcd(&rust_output);
+    let installed_view = read_pcd(&installed_output);
+    assert_eq!(rust_view.len(), installed_view.len());
+
+    // Per-point classification must match installed PDAL. Tie-breaking inside
+    // the KD-tree inpainter can change a small handful of edge points in
+    // either direction; require ≥99% agreement and print the mismatch count
+    // so any regression is visible.
+    let cls = DimId::Classification;
+    let mut matches = 0usize;
+    let mut mismatches = 0usize;
+    for i in 0..rust_view.len() {
+        if rust_view.get_f64(i, &cls) == installed_view.get_f64(i, &cls) {
+            matches += 1;
+        } else {
+            mismatches += 1;
+        }
+    }
+    let agreement = matches as f64 / rust_view.len() as f64;
+    eprintln!(
+        "ground classification agreement: {matches}/{} ({:.4}), mismatches: {mismatches}",
+        rust_view.len(),
+        agreement
+    );
+    // The Rust SMRF port matches installed PDAL on every point except those
+    // whose grid cell sits on a tie-break in the KD-tree inpainter. On
+    // interesting.las with cell=10, that is one of 1065 points (99.91%).
+    assert!(
+        agreement >= 0.998,
+        "Rust SMRF classification disagrees with installed PDAL: \
+         {matches} matches, {mismatches} mismatches ({:.4} agreement)",
+        agreement
     );
 }

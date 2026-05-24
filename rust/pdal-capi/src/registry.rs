@@ -471,7 +471,7 @@ pub fn create_filter(
         "filters.returns" => Ok(Box::new(FilterWrapper::new(ReturnsFilter::new(
             comma_list(&options.get_str("groups", "last")),
         )))),
-        "filters.smrf" => Ok(Box::new(FilterWrapper::new(SmrfFilter::new(
+        "filters.smrf" => Ok(Box::new(FilterWrapper::new(SmrfFilter::with_cut(
             get_f64(options, "cell", 1.0)?,
             get_f64(options, "slope", 0.15)?,
             options
@@ -480,9 +480,10 @@ pub fn create_filter(
                 .transpose()?,
             get_f64(options, "scalar", 1.25)?,
             get_f64(options, "threshold", 0.5)?,
+            get_f64(options, "cut", 0.0)?,
             get_u64(options, "ground_class", 2)? as u8,
             get_u64(options, "other_class", 1)? as u8,
-            get_bool(options, "only_ground", true)?,
+            get_bool(options, "only_ground", false)?,
             comma_list(&options.get_str("returns", "last,only")),
         )))),
         "filters.sample" => Ok(Box::new(FilterWrapper::new(

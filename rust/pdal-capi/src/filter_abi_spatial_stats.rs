@@ -227,6 +227,7 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
     window: f64,
     scalar: f64,
     threshold: f64,
+    cut: f64,
     ground_class: u8,
     other_class: u8,
     only_ground: bool,
@@ -244,12 +245,13 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
         }
     }
 
-    let filter = Box::new(SmrfFilter::new(
+    let filter = Box::new(SmrfFilter::with_cut(
         cell,
         slope,
         if has_window { Some(window) } else { None },
         scalar,
         threshold,
+        cut,
         ground_class,
         other_class,
         only_ground,

@@ -214,8 +214,8 @@ PointViewSet SMRFilter::run(PointViewPtr view)
         pdal_stage_t* stage = pdal_stage_create_smrf(
             m_args->m_cell, m_args->m_slope, m_args->m_windowArg->set(),
             m_args->m_window, m_args->m_scalar, m_args->m_threshold,
-            m_groundClass, m_otherClass, m_onlyGround, returns.data(),
-            returns.size());
+            m_args->m_cut, m_groundClass, m_otherClass, m_onlyGround,
+            returns.data(), returns.size());
         if (!stage)
             throwError("Failed to create Rust SMRF stage.");
 

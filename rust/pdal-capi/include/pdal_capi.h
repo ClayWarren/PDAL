@@ -732,7 +732,7 @@ extern "C"
     pdal_stage_t* pdal_stage_create_smrf(double cell, double slope,
                                          bool has_window, double window,
                                          double scalar, double threshold,
-                                         uint8_t ground_class,
+                                         double cut, uint8_t ground_class,
                                          uint8_t other_class, bool only_ground,
                                          const char* const* returns,
                                          uint64_t count);
