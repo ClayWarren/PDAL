@@ -2,6 +2,7 @@ use crate::pipeline_abi::{
     pdal_pipeline_result_t, pipeline_result_to_json_for_kernel, PipelineHandle,
 };
 use crate::registry::pipeline_from_json;
+use pdal_core::driver::infer_reader_driver;
 use std::ffi::CStr;
 use std::io::Read;
 use std::os::raw::c_char;
@@ -127,6 +128,92 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
         }
         Err(err) => {
             eprintln!("PDAL: kernels.pipeline: {err}");
+            1
+        }
+    }
+}
+
+pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.info: Missing value for positional argument 'input'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!("  pdal info --summary <file>");
+        return 0;
+    }
+
+    let mut filename = None;
+    let mut driver_override = None;
+    let mut summary = false;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--summary" {
+            summary = true;
+        } else if arg == "--driver" {
+            let Some(driver) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--driver'.");
+                return 1;
+            };
+            driver_override = Some(driver.clone());
+        } else if let Some(driver) = arg.strip_prefix("--driver=") {
+            driver_override = Some(driver.to_string());
+        } else if arg == "--input" || arg == "-i" {
+            let Some(input) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
+                return 1;
+            };
+            if filename.replace(input.clone()).is_some() {
+                eprintln!("PDAL: kernels.info: Expected exactly one input file.");
+                return 1;
+            }
+        } else if arg.starts_with("--") || arg.starts_with("-p") {
+            return -1;
+        } else if filename.replace(arg.clone()).is_some() {
+            eprintln!("PDAL: kernels.info: Expected exactly one input file.");
+            return 1;
+        }
+    }
+
+    if !summary {
+        return -1;
+    }
+
+    let Some(filename) = filename else {
+        eprintln!("PDAL: kernels.info: Missing value for positional argument 'input'.");
+        return 1;
+    };
+    let Some(driver) =
+        driver_override.or_else(|| infer_reader_driver(&filename).map(str::to_string))
+    else {
+        eprintln!("PDAL: kernels.info: Unable to infer reader driver for '{filename}'.");
+        return 1;
+    };
+
+    let mut pipeline = match pipeline_from_json(
+        &serde_json::json!([{ "type": driver, "filename": filename }]).to_string(),
+    ) {
+        Ok(pipeline) => pipeline,
+        Err(err) => {
+            eprintln!("PDAL: kernels.info: {err}");
+            return 1;
+        }
+    };
+
+    match pipeline.execute_with_result(Vec::new()) {
+        Ok(result) => {
+            let handle = PipelineHandle { pipeline };
+            println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
+            0
+        }
+        Err(err) => {
+            eprintln!("PDAL: kernels.info: {err}");
             1
         }
     }

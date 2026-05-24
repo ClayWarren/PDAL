@@ -64,6 +64,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "ground" => ground::run_ground_kernel(argc, argv),
         "hausdorff" => metrics::run_hausdorff_kernel(argc, argv),
+        "info" => pipeline::run_info_kernel(argc, argv),
         "merge" => run_merge_kernel(argc, argv),
         "pipeline" => pipeline::run_pipeline_kernel(argc, argv),
         "random" => run_random_kernel(argc, argv),

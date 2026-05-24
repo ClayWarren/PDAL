@@ -199,3 +199,36 @@ fn rust_kernel_run_reports_pipeline_missing_input() {
 
     assert_eq!(result, 1);
 }
+
+#[test]
+fn rust_kernel_run_accepts_info_help() {
+    let name = CString::new("info").unwrap();
+    let arg = CString::new("--help").unwrap();
+    let argv = [arg.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+    assert_eq!(result, 0);
+}
+
+#[test]
+fn rust_kernel_run_declines_default_info_mode() {
+    let name = CString::new("info").unwrap();
+    let arg = CString::new("input.las").unwrap();
+    let argv = [arg.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+    assert_eq!(result, -1);
+}
+
+#[test]
+fn rust_kernel_run_declines_rich_info_options() {
+    let name = CString::new("info").unwrap();
+    let arg = CString::new("--schema").unwrap();
+    let argv = [arg.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+    assert_eq!(result, -1);
+}
