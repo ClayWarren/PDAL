@@ -11,6 +11,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::PointView;
 use pdal_core::stage::StageError;
+use regex::Regex;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 pub struct StacReader {
     filename: String,
     asset_names: Vec<String>,
+    collections: Vec<String>,
 }
 
 impl StacReader {
@@ -25,6 +27,7 @@ impl StacReader {
         Self {
             filename: options.get_str("filename", ""),
             asset_names: asset_names(options),
+            collections: comma_values(options, "collections"),
         }
     }
 }
@@ -43,12 +46,20 @@ impl Reader for StacReader {
 
         let mut visited = BTreeSet::new();
         let mut assets = Vec::new();
+        let collections = compile_regexes(&self.collections, "collections")?;
         collect_assets(
             Path::new(&self.filename),
             &self.asset_names,
+            &collections,
             &mut visited,
             &mut assets,
         )?;
+
+        if assets.is_empty() && !self.collections.is_empty() {
+            return Err(StageError(
+                "Reader list is empty after filtering.".to_string(),
+            ));
+        }
 
         let mut merged: Option<PointView> = None;
         for asset in assets {
@@ -67,11 +78,16 @@ impl Reader for StacReader {
 }
 
 fn asset_names(options: &Options) -> Vec<String> {
-    let values = options.values("asset_names");
-    if values.is_empty() {
+    let names = comma_values(options, "asset_names");
+    if names.is_empty() {
         return vec!["data".to_string()];
     }
-    values
+    names
+}
+
+fn comma_values(options: &Options, key: &str) -> Vec<String> {
+    options
+        .values(key)
         .iter()
         .flat_map(|value| value.split(','))
         .map(str::trim)
@@ -83,6 +99,7 @@ fn asset_names(options: &Options) -> Vec<String> {
 fn collect_assets(
     path: &Path,
     asset_names: &[String],
+    collections: &[Regex],
     visited: &mut BTreeSet<PathBuf>,
     assets: &mut Vec<PathBuf>,
 ) -> Result<(), StageError> {
@@ -101,9 +118,9 @@ fn collect_assets(
     })?;
     let base = path.parent().unwrap_or(Path::new(""));
     match json["type"].as_str() {
-        Some("Feature") => collect_item_assets(&json, base, asset_names, assets),
+        Some("Feature") => collect_item_assets(&json, base, asset_names, collections, assets),
         Some("Catalog") | Some("Collection") => {
-            collect_linked_items(&json, base, asset_names, visited, assets)
+            collect_linked_items(&json, base, asset_names, collections, visited, assets)
         }
         Some("FeatureCollection") => {
             let features = json["features"].as_array().ok_or_else(|| {
@@ -113,9 +130,9 @@ fn collect_assets(
                 ))
             })?;
             for feature in features {
-                collect_item_assets(feature, base, asset_names, assets)?;
+                collect_item_assets(feature, base, asset_names, collections, assets)?;
             }
-            collect_linked_items(&json, base, asset_names, visited, assets)
+            collect_linked_items(&json, base, asset_names, collections, visited, assets)
         }
         Some(other) => Err(StageError(format!(
             "Unsupported STAC object type '{other}' in '{}'.",
@@ -132,8 +149,13 @@ fn collect_item_assets(
     item: &Value,
     base: &Path,
     asset_names: &[String],
+    collections: &[Regex],
     assets: &mut Vec<PathBuf>,
 ) -> Result<(), StageError> {
+    if !collection_matches(item, collections) {
+        return Ok(());
+    }
+
     let map = item["assets"]
         .as_object()
         .ok_or_else(|| StageError("STAC Item is missing assets.".to_string()))?;
@@ -158,6 +180,7 @@ fn collect_linked_items(
     json: &Value,
     base: &Path,
     asset_names: &[String],
+    collections: &[Regex],
     visited: &mut BTreeSet<PathBuf>,
     assets: &mut Vec<PathBuf>,
 ) -> Result<(), StageError> {
@@ -175,9 +198,38 @@ fn collect_linked_items(
         if is_remote(href) {
             continue;
         }
-        collect_assets(&resolve_location(base, href), asset_names, visited, assets)?;
+        collect_assets(
+            &resolve_location(base, href),
+            asset_names,
+            collections,
+            visited,
+            assets,
+        )?;
     }
     Ok(())
+}
+
+fn collection_matches(item: &Value, collections: &[Regex]) -> bool {
+    if collections.is_empty() {
+        return true;
+    }
+    let Some(collection) = item["collection"].as_str() else {
+        return false;
+    };
+    collections.iter().any(|regex| regex.is_match(collection))
+}
+
+fn compile_regexes(values: &[String], label: &str) -> Result<Vec<Regex>, StageError> {
+    values
+        .iter()
+        .map(|value| {
+            Regex::new(value).map_err(|err| {
+                StageError(format!(
+                    "Invalid {label} regular expression '{value}': {err}"
+                ))
+            })
+        })
+        .collect()
 }
 
 fn canonical_or_original(path: &Path) -> PathBuf {
@@ -277,6 +329,75 @@ mod tests {
         let mut reader = StacReader::new(&options);
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
+    }
+
+    #[test]
+    fn collection_filter_accepts_matching_item() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        std::fs::copy(&source, temp.path().join("simple_text.ply")).unwrap();
+        let item = temp.path().join("item.json");
+        std::fs::write(
+            &item,
+            r#"{
+  "type": "Feature",
+  "collection": "usgs-test",
+  "assets": {"data": {"href": "simple_text.ply"}}
+}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", item.display());
+        options.add("collections", "usgs-.*");
+        let mut reader = StacReader::new(&options);
+
+        assert_eq!(reader.read().unwrap()[0].len(), 3);
+    }
+
+    #[test]
+    fn collection_filter_rejects_nonmatching_item() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        std::fs::copy(&source, temp.path().join("simple_text.ply")).unwrap();
+        let item = temp.path().join("item.json");
+        std::fs::write(
+            &item,
+            r#"{
+  "type": "Feature",
+  "collection": "usgs-test",
+  "assets": {"data": {"href": "simple_text.ply"}}
+}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", item.display());
+        options.add("collections", "no-match");
+        let mut reader = StacReader::new(&options);
+
+        assert!(reader.read().is_err());
+    }
+
+    #[test]
+    fn collection_filter_rejects_invalid_regex() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{"type":"Feature","collection":"x","assets":{"data":{"href":"x.las"}}}"#,
+        )
+        .unwrap();
+        let mut options = Options::new();
+        options.add("filename", temp.path().to_string_lossy().into_owned());
+        options.add("collections", "[");
+        let mut reader = StacReader::new(&options);
+
+        let err = reader.read().err().unwrap();
+        assert!(err.0.contains("Invalid collections regular expression"));
     }
 
     #[test]

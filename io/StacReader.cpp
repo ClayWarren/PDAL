@@ -415,10 +415,10 @@ bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
     Args& args = *m_args;
     return !Utils::isRemote(filename) && args.items.empty() &&
-           args.catalogs.empty() && args.collections.empty() &&
-           args.properties.empty() && args.rawReaderArgs.empty() &&
-           args.dates.empty() && args.bounds.empty() && !args.ogr.size() &&
-           !args.validateSchema && rustStacTypeSupported(filename);
+           args.catalogs.empty() && args.properties.empty() &&
+           args.rawReaderArgs.empty() && args.dates.empty() &&
+           args.bounds.empty() && !args.ogr.size() && !args.validateSchema &&
+           rustStacTypeSupported(filename);
 }
 
 std::string listStr(std::string key, std::vector<RegEx> ids)
@@ -593,6 +593,8 @@ void StacReader::initialize()
         addOption(options, "filename", m_filename);
         for (const std::string& assetName : m_p->m_args->assetNames)
             addOption(options, "asset_names", assetName);
+        for (const RegEx& collection : m_p->m_args->collections)
+            addOption(options, "collections", collection.m_str);
 
         pdal_reader_t* reader = pdal_reader_create_stac(options);
         if (!reader)

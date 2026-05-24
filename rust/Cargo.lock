@@ -1054,6 +1054,7 @@ dependencies = [
  "pdal-core",
  "pdal-filters",
  "pdal-native",
+ "regex",
  "roxmltree",
  "serde_json",
  "spz",

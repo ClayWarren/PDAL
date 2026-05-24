@@ -656,6 +656,7 @@ COVERED: dict[str, object] = {
     "pdal_io_smrmsg_reader_test": ALL,
     "pdal_io_stac_reader_test": {
         "local_data_test",
+        "collection_filter_test",
         "collection_test",
     },
     "pdal_io_terrasolid_test": {

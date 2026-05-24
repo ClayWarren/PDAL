@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `769 / 903` baseline C++ GoogleTest cases, or
-`85.16%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `770 / 903` baseline C++ GoogleTest cases, or
+`85.27%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `808 / 953` currently built C++ GoogleTest cases, or
-`84.78%`; compute that with `--include-added-tests`.
+added during the port, is `809 / 953` currently built C++ GoogleTest cases, or
+`84.89%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -448,10 +448,12 @@ Known mixed binaries:
   diamond pipelines route through the Rust C ABI. Streaming, SRS-bound
   reprojection, polygon/OGR crops, addons, spatial-filter preview, and
   prepare-time bad-origin validation remain C++.
-- `pdal_io_stac_reader_test`: `local_data_test` and `collection_test` count.
-  Local STAC Feature/Collection traversal with direct asset reads routes through
-  the Rust C ABI. Catalog/FeatureCollection preview metadata, filters, schema
-  validation, remote assets, and mixed-reader option behavior remain C++.
+- `pdal_io_stac_reader_test`: `local_data_test`, `collection_filter_test`, and
+  `collection_test` count. Local STAC Feature/Collection traversal, direct
+  asset reads, and collection-id filtering route through the Rust C ABI.
+  Catalog/FeatureCollection preview metadata, item/catalog/property/date/bounds
+  filters, schema validation, remote assets, and mixed-reader option behavior
+  remain C++.
 - `pdal_io_ogr_writer_test`: `json`, `error_multicount_attrs`, and
   `error_unknown_attr` count. GeoJSON point and MultiPoint output routes
   through the Rust C ABI when the driver is GeoJSON without `ogr_options` or
