@@ -153,8 +153,8 @@ Current pre-port checkpoint: `756 / 891` baseline C++ GoogleTest cases, or
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `790 / 934` currently built C++ GoogleTest cases, or
-`84.58%`; compute that with `--include-added-tests`.
+added during the port, is `790 / 936` currently built C++ GoogleTest cases, or
+`84.40%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
