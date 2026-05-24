@@ -4,6 +4,7 @@ use crate::pipeline_abi::{
 };
 use crate::registry::pipeline_from_json;
 use pdal_core::driver::infer_reader_driver;
+use pdal_core::point::{DimType, PointView};
 use std::ffi::CStr;
 use std::io::Read;
 use std::os::raw::c_char;
@@ -221,11 +222,15 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
 
     let mut filename = None;
     let mut driver_override = None;
-    let mut summary = false;
+    let mut mode = InfoMode::Stats;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         if arg == "--summary" {
-            summary = true;
+            mode = InfoMode::Summary;
+        } else if arg == "--schema" {
+            mode = InfoMode::Schema;
+        } else if arg == "--all" {
+            mode = InfoMode::All;
         } else if arg == "--driver" {
             let Some(driver) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '--driver'.");
@@ -243,16 +248,12 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 eprintln!("PDAL: kernels.info: Expected exactly one input file.");
                 return 1;
             }
-        } else if arg.starts_with("--") || arg.starts_with("-p") {
+        } else if arg.starts_with("--") || arg.starts_with("-p") || arg == "-p" {
             return -1;
         } else if filename.replace(arg.clone()).is_some() {
             eprintln!("PDAL: kernels.info: Expected exactly one input file.");
             return 1;
         }
-    }
-
-    if !summary {
-        return -1;
     }
 
     let Some(filename) = filename else {
@@ -266,9 +267,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         return 1;
     };
 
-    let mut pipeline = match pipeline_from_json(
-        &serde_json::json!([{ "type": driver, "filename": filename }]).to_string(),
-    ) {
+    let mut pipeline = match info_pipeline(&driver, &filename) {
         Ok(pipeline) => pipeline,
         Err(err) => {
             eprintln!("PDAL: kernels.info: {err}");
@@ -276,17 +275,207 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         }
     };
 
-    match pipeline.execute_with_result(Vec::new()) {
-        Ok(result) => {
-            let handle = PipelineHandle { pipeline };
-            println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
-            0
+    match mode {
+        InfoMode::Summary => match pipeline.execute_with_result(Vec::new()) {
+            Ok(result) => {
+                let handle = PipelineHandle { pipeline };
+                println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
+                0
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                1
+            }
+        },
+        InfoMode::Stats | InfoMode::Schema | InfoMode::All => match pipeline.execute(Vec::new()) {
+            Ok(views) => {
+                println!("{}", info_report(mode, &views));
+                0
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                1
+            }
+        },
+    }
+}
+
+#[derive(Clone, Copy)]
+enum InfoMode {
+    Summary,
+    Stats,
+    Schema,
+    All,
+}
+
+fn info_pipeline(driver: &str, filename: &str) -> Result<pdal_core::pipeline::Pipeline, String> {
+    pipeline_from_json(&serde_json::json!([{ "type": driver, "filename": filename }]).to_string())
+        .map_err(|err| err.to_string())
+}
+
+fn info_report(mode: InfoMode, views: &[PointView]) -> String {
+    match mode {
+        InfoMode::Stats => stats_report(views),
+        InfoMode::Schema => schema_report(views),
+        InfoMode::All => {
+            let mut output = String::from("{\n");
+            output.push_str("  \"schema\":\n");
+            output.push_str(&schema_body(views, 2));
+            output.push_str(",\n");
+            output.push_str("  \"stats\":\n");
+            output.push_str(&stats_body(views, 2));
+            output.push_str("\n}\n");
+            output
         }
-        Err(err) => {
-            eprintln!("PDAL: kernels.info: {err}");
-            1
+        InfoMode::Summary => String::new(),
+    }
+}
+
+fn schema_report(views: &[PointView]) -> String {
+    format!("{{\n  \"schema\":\n{}\n}}\n", schema_body(views, 2))
+}
+
+fn schema_body(views: &[PointView], indent: usize) -> String {
+    let pad = " ".repeat(indent);
+    let list_pad = " ".repeat(indent + 2);
+    let item_pad = " ".repeat(indent + 4);
+    let value_pad = " ".repeat(indent + 6);
+    let mut output = format!("{pad}{{\n{list_pad}\"dimensions\":\n{list_pad}[\n");
+    if let Some(view) = views.first() {
+        let layout = view.layout();
+        for idx in 0..layout.dim_count() {
+            if let Some((dim, ty)) = layout.dim_at(idx) {
+                if idx > 0 {
+                    output.push_str(",\n");
+                }
+                output.push_str(&format!(
+                    "{item_pad}{{\n{value_pad}\"name\": \"{}\",\n{value_pad}\"size\": {},\n{value_pad}\"type\": \"{}\"\n{item_pad}}}",
+                    dim.name(),
+                    ty.size(),
+                    dim_type_name(ty)
+                ));
+            }
         }
     }
+    output.push_str(&format!("\n{list_pad}]\n{pad}}}"));
+    output
+}
+
+fn stats_report(views: &[PointView]) -> String {
+    format!("{{\n  \"stats\":\n{}\n}}\n", stats_body(views, 2))
+}
+
+fn stats_body(views: &[PointView], indent: usize) -> String {
+    let pad = " ".repeat(indent);
+    let list_pad = " ".repeat(indent + 2);
+    let item_pad = " ".repeat(indent + 4);
+    let value_pad = " ".repeat(indent + 6);
+    let stats = dimension_stats(views);
+    let mut output = format!("{pad}{{\n{list_pad}\"statistic\":\n{list_pad}[\n");
+    for (idx, stat) in stats.iter().enumerate() {
+        if idx > 0 {
+            output.push_str(",\n");
+        }
+        output.push_str(&format!(
+            "{item_pad}{{\n{value_pad}\"average\": {},\n{value_pad}\"count\": {},\n{value_pad}\"maximum\": {},\n{value_pad}\"minimum\": {},\n{value_pad}\"name\": \"{}\",\n{value_pad}\"position\": {},\n{value_pad}\"stddev\": {},\n{value_pad}\"variance\": {}\n{item_pad}}}",
+            format_number(stat.average),
+            stat.count,
+            format_number(stat.maximum),
+            format_number(stat.minimum),
+            stat.name,
+            idx,
+            format_number(stat.stddev),
+            format_number(stat.variance)
+        ));
+    }
+    output.push_str(&format!("\n{list_pad}]\n{pad}}}"));
+    output
+}
+
+struct InfoDimensionStats {
+    name: String,
+    count: u64,
+    minimum: f64,
+    maximum: f64,
+    average: f64,
+    variance: f64,
+    stddev: f64,
+}
+
+fn dimension_stats(views: &[PointView]) -> Vec<InfoDimensionStats> {
+    let Some(first) = views.first() else {
+        return Vec::new();
+    };
+    let layout = first.layout();
+    let mut output = Vec::new();
+    for idx in 0..layout.dim_count() {
+        let Some((dim, _)) = layout.dim_at(idx) else {
+            continue;
+        };
+        let mut values = Vec::new();
+        for view in views {
+            if view.layout().dim(dim).is_none() {
+                continue;
+            }
+            for point_idx in 0..view.len() {
+                values.push(view.get_f64(point_idx, dim));
+            }
+        }
+        if values.is_empty() {
+            continue;
+        }
+        let count = values.len() as u64;
+        let sum = values.iter().sum::<f64>();
+        let average = sum / count as f64;
+        let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
+        let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let variance = if count > 1 {
+            values
+                .iter()
+                .map(|value| {
+                    let diff = value - average;
+                    diff * diff
+                })
+                .sum::<f64>()
+                / (count - 1) as f64
+        } else {
+            0.0
+        };
+        output.push(InfoDimensionStats {
+            name: dim.name().to_string(),
+            count,
+            minimum,
+            maximum,
+            average,
+            variance,
+            stddev: variance.sqrt(),
+        });
+    }
+    output
+}
+
+fn dim_type_name(ty: DimType) -> &'static str {
+    match ty {
+        DimType::U8 | DimType::U16 | DimType::U32 | DimType::U64 => "unsigned",
+        DimType::I8 | DimType::I16 | DimType::I32 | DimType::I64 => "signed",
+        DimType::F32 | DimType::F64 => "floating",
+    }
+}
+
+fn format_number(value: f64) -> String {
+    if value == 0.0 {
+        return "0".to_string();
+    }
+    let digits_before_decimal = value.abs().log10().floor().max(0.0) as i32 + 1;
+    let decimals = (10 - digits_before_decimal).max(0) as usize;
+    let mut text = format!("{value:.decimals$}");
+    while text.contains('.') && text.ends_with('0') {
+        text.pop();
+    }
+    if text.ends_with('.') {
+        text.pop();
+    }
+    text
 }
 
 unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<String>, i32> {
