@@ -1,5 +1,6 @@
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
+use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::gdal::{LayerHandle, Vector};
 use std::ffi::CStr;
@@ -383,7 +384,7 @@ fn add_features(layer: LayerHandle, location_field: &str, entries: Vec<Entry>) -
 }
 
 fn run_merge(args: &[String]) -> i32 {
-    let (index_file, output_file, location_field) = match parse_merge_args(args) {
+    let (index_file, output_file, location_field, bounds) = match parse_merge_args(args) {
         Ok(parsed) => parsed,
         Err(ParseResult::Error(message)) => {
             eprintln!("PDAL: kernels.tindex: {message}");
@@ -417,7 +418,17 @@ fn run_merge(args: &[String]) -> i32 {
 
     let mut stages = Vec::new();
     let mut tags = Vec::new();
+    let mut file_count = 0;
     for (index, feature) in features.iter().enumerate() {
+        if let Some(bounds) = &bounds {
+            let Some(feature_bounds) = feature_bounds_2d(feature) else {
+                eprintln!("PDAL: kernels.tindex: Feature has invalid geometry.");
+                return 1;
+            };
+            if !feature_bounds.overlaps(bounds) {
+                continue;
+            }
+        }
         let Some(location) = feature["properties"][&location_field].as_str() else {
             eprintln!("PDAL: kernels.tindex: Feature is missing '{location_field}'.");
             return 1;
@@ -433,6 +444,12 @@ fn run_merge(args: &[String]) -> i32 {
             "tag": tag,
         }));
         tags.push(tag);
+        file_count += 1;
+    }
+    println!("Merge filecount: {file_count}");
+    if stages.is_empty() {
+        eprintln!("PDAL: kernels.tindex: No indexed files matched merge criteria.");
+        return 1;
     }
     if stages.len() > 1 {
         stages.push(serde_json::json!({
@@ -448,10 +465,13 @@ fn run_merge(args: &[String]) -> i32 {
     execute_pipeline(serde_json::Value::Array(stages))
 }
 
-fn parse_merge_args(args: &[String]) -> Result<(String, String, String), ParseResult> {
+fn parse_merge_args(
+    args: &[String],
+) -> Result<(String, String, String, Option<Bounds2D>), ParseResult> {
     let mut tindex_file = None;
     let mut output_file = None;
     let mut location_field = "location".to_string();
+    let mut bounds = None;
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -459,10 +479,21 @@ fn parse_merge_args(args: &[String]) -> Result<(String, String, String), ParseRe
             "--tindex" => tindex_file = Some(next_value(&mut iter, "--tindex")?.clone()),
             "--filespec" => output_file = Some(next_value(&mut iter, "--filespec")?.clone()),
             "--tindex_name" => location_field = next_value(&mut iter, "--tindex_name")?.clone(),
+            "--bounds" => {
+                let value = next_value(&mut iter, "--bounds")?;
+                bounds = Some(parse_merge_bounds(value)?);
+            }
+            "--log" => {
+                let _ = next_value(&mut iter, "--log")?;
+            }
             "--lyr_name" | "--ogrdriver" | "-f" => {
                 let _ = next_value(&mut iter, arg)?;
             }
-            _ if arg.starts_with("--bounds") || arg.starts_with("--") => {
+            _ if let Some(value) = arg.strip_prefix("--bounds=") => {
+                bounds = Some(parse_merge_bounds(value)?);
+            }
+            _ if arg.starts_with("--log=") => {}
+            _ if arg.starts_with("--") => {
                 return Err(ParseResult::Unsupported);
             }
             _ if tindex_file.is_none() => tindex_file = Some(arg.clone()),
@@ -481,7 +512,47 @@ fn parse_merge_args(args: &[String]) -> Result<(String, String, String), ParseRe
             "merge requires --filespec <output>".to_string(),
         ));
     };
-    Ok((tindex_file, output_file, location_field))
+    Ok((tindex_file, output_file, location_field, bounds))
+}
+
+fn parse_merge_bounds(value: &str) -> Result<Bounds2D, ParseResult> {
+    parse_bounds2d(value, 0)
+        .map(|parsed| parsed.bounds)
+        .map_err(|err| ParseResult::Error(format!("Invalid bounds: {err}")))
+}
+
+fn feature_bounds_2d(feature: &serde_json::Value) -> Option<Bounds2D> {
+    let geometry = feature.get("geometry")?;
+    match geometry.get("type")?.as_str()? {
+        "Polygon" => bounds_from_positions(geometry.get("coordinates")?.get(0)?.as_array()?),
+        "MultiPolygon" => {
+            let polygons = geometry.get("coordinates")?.as_array()?;
+            let mut output: Option<Bounds2D> = None;
+            for polygon in polygons {
+                let ring = polygon.get(0)?.as_array()?;
+                let bounds = bounds_from_positions(ring)?;
+                if let Some(out) = output.as_mut() {
+                    out.grow_bounds(&bounds);
+                } else {
+                    output = Some(bounds);
+                }
+            }
+            output
+        }
+        _ => None,
+    }
+}
+
+fn bounds_from_positions(positions: &[serde_json::Value]) -> Option<Bounds2D> {
+    let mut iter = positions.iter();
+    let first = iter.next()?.as_array()?;
+    let mut bounds = Bounds2D::empty();
+    bounds.grow_point(first.first()?.as_f64()?, first.get(1)?.as_f64()?);
+    for position in iter {
+        let coords = position.as_array()?;
+        bounds.grow_point(coords.first()?.as_f64()?, coords.get(1)?.as_f64()?);
+    }
+    Some(bounds)
 }
 
 fn execute_pipeline(pipeline_json: serde_json::Value) -> i32 {
