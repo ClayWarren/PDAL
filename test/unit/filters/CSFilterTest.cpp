@@ -64,3 +64,57 @@ TEST(CSFilterTest, emptyView)
     PointViewSet s = filter->execute(table);
     EXPECT_EQ(s.size(), 0u);
 }
+
+TEST(CSFilterTest, equalClassesThrowWhenOnlyGroundIsFalse)
+{
+    PointTable table;
+    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
+                                  Dimension::Id::Z,
+                                  Dimension::Id::Classification});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 0.0);
+    view->setField(Dimension::Id::Y, 0, 0.0);
+    view->setField(Dimension::Id::Z, 0, 0.0);
+    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
+
+    BufferReader reader;
+    reader.addView(view);
+
+    StageFactory factory;
+    Stage* filter(factory.createStage("filters.csf"));
+    Options options;
+    options.add("ground_class", 2);
+    options.add("other_class", 2);
+    options.add("only_ground", false);
+    filter->setOptions(options);
+    filter->setInput(reader);
+
+    EXPECT_THROW(filter->prepare(table), pdal_error);
+}
+
+TEST(CSFilterTest, invalidIgnoredDimensionThrows)
+{
+    PointTable table;
+    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
+                                  Dimension::Id::Z,
+                                  Dimension::Id::Classification});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 0.0);
+    view->setField(Dimension::Id::Y, 0, 0.0);
+    view->setField(Dimension::Id::Z, 0, 0.0);
+    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
+
+    BufferReader reader;
+    reader.addView(view);
+
+    StageFactory factory;
+    Stage* filter(factory.createStage("filters.csf"));
+    Options options;
+    options.add("ignore", "NoSuchDim[1:2]");
+    filter->setOptions(options);
+    filter->setInput(reader);
+
+    EXPECT_THROW(filter->prepare(table), pdal_error);
+}
