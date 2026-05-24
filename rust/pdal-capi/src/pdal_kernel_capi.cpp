@@ -205,6 +205,10 @@ extern "C"
 
         try
         {
+            int rustRet = pdal_rust_kernel_run(kernel_name, argc, argv);
+            if (rustRet != -1)
+                return rustRet;
+
             ensurePluginsLoaded();
 
             std::string fullName = kernel_name;

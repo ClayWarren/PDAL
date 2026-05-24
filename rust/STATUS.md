@@ -57,7 +57,7 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch, but that bridge is still implemented in C++ over `PluginManager`/`Kernel`. Do not count `pdal_app_test` as Rust-backed until this dispatch crosses into Rust-owned command code or the installed `pdal` binary becomes the Rust CLI. |
+| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. `kernels.fauxplugin` now dispatches through Rust-owned kernel code via that bridge; most app metadata and unsupported kernels still fall back to C++ `PluginManager`/`Kernel`. Do not count `pdal_app_test` as Rust-backed until this dispatch broadly crosses into Rust-owned command code or the installed `pdal` binary becomes the Rust CLI. |
 | Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `741 / 891` baseline C++ GoogleTest cases, or
-`83.16%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `742 / 891` baseline C++ GoogleTest cases, or
+`83.28%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `775 / 932` currently built C++ GoogleTest cases, or
-`83.15%`; compute that with `--include-added-tests`.
+added during the port, is `776 / 932` currently built C++ GoogleTest cases, or
+`83.26%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -173,16 +173,15 @@ OGR writer option validation, file utilities, Support diff helpers, PointTable
 layout limits, LAS userView reads, metadata construction/update, buffer stats
 execution, XMLSchema round-trip parsing, selected COPC/EPT/OGR/streaming
 execution paths, private filter ports, `pdal::ThreadPool` behavior,
-ShellFilter command execution, `Utils::toString(double)`, and
-`Utils::run_shell_command()` through the Rust C ABI. This remains a
+ShellFilter command execution, `Utils::toString(double)`, `kernels.fauxplugin`,
+and `Utils::run_shell_command()` through the Rust C ABI. This remains a
 conservative lower bound, not a final port-completion percentage:
-20 pre-port built test binaries remain unclassified by the audit script in the
+19 pre-port built test binaries remain unclassified by the audit script in the
 current build. Of these:
    - 6 are private/specialized C++ algorithms with no Rust-backed count yet
      (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
-   - 8 are command/infrastructure/utility/tooling tests, not pipeline stages
-     (app_plugin, app, artifact, info cmd, merge cmd, program_arg, tile cmd,
-     tindex cmd)
+   - 7 are command/infrastructure/utility/tooling tests, not pipeline stages
+     (app, artifact, info cmd, merge cmd, program_arg, tile cmd, tindex cmd)
    - 2 are pipeline/framework behavior tests that dynamically dispatch to C++
      stages (info filter, where). `pdal_where_test` now exercises
      Rust-backed `where` splitting for non-streaming Stage execution, but the

@@ -237,6 +237,8 @@ extern "C"
     int pdal_kernel_parse_stage_option(const char* input,
                                        bool allow_stage_prefix, char** stage,
                                        char** option, char** value);
+    int pdal_rust_kernel_run(const char* kernel_name, int argc,
+                             const char* const* argv);
 
     // Pipeline
     char* pdal_pipeline_generate_stage_tag(const char* stage_name,

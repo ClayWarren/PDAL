@@ -32,22 +32,24 @@ impl NitfWriter {
             handle_filename_template(&filename).map_err(StageError)?
         };
 
-        let mut nitf_opts = pdal_native::nitf::NitfWriteOptions::default();
-        nitf_opts.file_title = optional(options, "ftitle");
-        nitf_opts.complexity_level = optional(options, "clevel");
-        nitf_opts.system_type = optional(options, "stype");
-        nitf_opts.origin_station_id = optional(options, "ostaid");
-        nitf_opts.file_class = optional(options, "fsclas");
-        nitf_opts.origin_name = optional(options, "oname");
-        nitf_opts.origin_phone = optional(options, "ophone");
-        nitf_opts.fsclsy = optional(options, "fsclsy");
-        nitf_opts.fsctlh = optional(options, "fsctlh");
-        nitf_opts.fscltx = optional(options, "fscltx");
-        nitf_opts.image_security_class = optional(options, "isclas");
-        nitf_opts.image_date_time = optional(options, "idatim");
-        nitf_opts.image_id2 = optional(options, "iid2");
-        nitf_opts.aimidb = collect_list(options, "aimidb");
-        nitf_opts.acftb = collect_list(options, "acftb");
+        let nitf_opts = pdal_native::nitf::NitfWriteOptions {
+            file_title: optional(options, "ftitle"),
+            complexity_level: optional(options, "clevel"),
+            system_type: optional(options, "stype"),
+            origin_station_id: optional(options, "ostaid"),
+            file_class: optional(options, "fsclas"),
+            origin_name: optional(options, "oname"),
+            origin_phone: optional(options, "ophone"),
+            fsclsy: optional(options, "fsclsy"),
+            fsctlh: optional(options, "fsctlh"),
+            fscltx: optional(options, "fscltx"),
+            image_security_class: optional(options, "isclas"),
+            image_date_time: optional(options, "idatim"),
+            image_id2: optional(options, "iid2"),
+            aimidb: collect_list(options, "aimidb"),
+            acftb: collect_list(options, "acftb"),
+            ..Default::default()
+        };
 
         // LAS writer options are everything except the NITF-only options.
         // Pass them through as-is; LasWriter will pick what it understands.
