@@ -738,6 +738,8 @@ extern "C"
         double max_distance, double max_window_size, double slope,
         uint8_t ground_class, uint8_t other_class, bool only_ground,
         const char* const* returns, uint64_t count);
+    pdal_stage_t* pdal_stage_create_litree(uint64_t min_points,
+                                           double min_height, double radius);
     pdal_stage_t* pdal_stage_create_skewnessbalancing(uint8_t ground_class,
                                                       uint8_t other_class,
                                                       bool only_ground);

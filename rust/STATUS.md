@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `751 / 891` baseline C++ GoogleTest cases, or
-`84.29%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `754 / 891` baseline C++ GoogleTest cases, or
+`84.62%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `785 / 932` currently built C++ GoogleTest cases, or
-`84.23%`; compute that with `--include-added-tests`.
+added during the port, is `788 / 932` currently built C++ GoogleTest cases, or
+`84.55%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -175,12 +175,12 @@ execution, XMLSchema round-trip parsing, selected COPC/EPT/OGR/streaming
 execution paths, private filter ports, `pdal::ThreadPool` behavior,
 ShellFilter command execution, `Utils::toString(double)`, `kernels.fauxplugin`,
 installed-app `sort`/`merge`/simple `tile`, `Utils::run_shell_command()`, and
-`filters.pmf` through the Rust C ABI. This remains a conservative lower bound,
-not a final port-completion percentage:
-15 pre-port built test binaries remain unclassified by the audit script in the
+`filters.pmf`, and `filters.litree` through the Rust C ABI. This remains a
+conservative lower bound, not a final port-completion percentage:
+14 pre-port built test binaries remain unclassified by the audit script in the
 current build. Of these:
-   - 4 are private/specialized C++ algorithms with no Rust-backed count yet
-     (csf, litree, m3c2, slpk_reader)
+   - 3 are private/specialized C++ algorithms with no Rust-backed count yet
+     (csf, m3c2, slpk_reader)
    - 5 are command/infrastructure/utility/tooling tests, not pipeline stages
      (app, artifact, info cmd, program_arg, tindex cmd)
    - 2 are pipeline/framework behavior tests that dynamically dispatch to C++
@@ -493,6 +493,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `hexbin`
 - `iqr`
 - `label_duplicates`
+- `litree`
 - `locate`
 - `lof`
 - `mad`
@@ -536,9 +537,10 @@ algorithm decision.
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
 - Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
-  `HagDelaunay`, `LiTree`, `LloydKMeans`, `M3C2`, `Poisson`,
+  `HagDelaunay`, `LloydKMeans`, `M3C2`, `Poisson`,
   `Straighten`, `GreedyProjection`,
   `IterativeClosestPoint`, `RelaxationDartThrowing`.
+- Now Rust C ABI-backed: `LiTree`.
 - Now Rust C ABI-backed: `PMF`.
 - Now Rust C ABI-backed: `Supervoxel`.
 - Now Rust C ABI-backed: `Normal` (compute path only; MST refinement remains C++).

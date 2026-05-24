@@ -312,6 +312,17 @@ pub unsafe extern "C" fn pdal_stage_create_pmf(
     }
 }
 
+/// Create a Li tree filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_litree(
+    min_points: u64,
+    min_height: f64,
+    radius: f64,
+) -> *mut StageWrapper {
+    let filter = Box::new(LiTreeFilter::new(min_points as usize, min_height, radius));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
 /// Create a skewness balancing filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_skewnessbalancing(

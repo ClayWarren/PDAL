@@ -28,6 +28,7 @@ use pdal_filters::head::HeadFilter;
 use pdal_filters::hexbin::HexBinFilter;
 use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
+use pdal_filters::litree::LiTreeFilter;
 use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
@@ -111,6 +112,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.hexbin",
     "filters.iqr",
     "filters.label_duplicates",
+    "filters.litree",
     "filters.lloydkmeans",
     "filters.locate",
     "filters.lof",
@@ -317,6 +319,11 @@ pub fn create_filter(
         )))),
         "filters.label_duplicates" => Ok(Box::new(FilterWrapper::new(LabelDuplicatesFilter::new(
             comma_list(&options.get_str("dimensions", "X,Y,Z")),
+        )))),
+        "filters.litree" => Ok(Box::new(FilterWrapper::new(LiTreeFilter::new(
+            get_u64(options, "min_points", 10)? as usize,
+            get_f64(options, "min_height", 3.0)?,
+            get_f64(options, "radius", 100.0)?,
         )))),
         "filters.lof" => Ok(Box::new(FilterWrapper::new(LofFilter::new(get_u64(
             options, "minpts", 10,

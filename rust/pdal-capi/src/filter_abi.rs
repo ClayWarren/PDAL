@@ -33,6 +33,7 @@ use pdal_filters::head::HeadFilter;
 use pdal_filters::hexbin::HexBinFilter;
 use pdal_filters::iqr::IqrFilter;
 use pdal_filters::labelduplicates::LabelDuplicatesFilter;
+use pdal_filters::litree::LiTreeFilter;
 use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
