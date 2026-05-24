@@ -103,6 +103,14 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
         Err(()) => return -1,
     };
 
+    if validate_only {
+        if let Err(err) = validate_pipeline_json_shape(&json) {
+            eprintln!("PDAL: kernels.pipeline: {err}");
+            return 1;
+        }
+        return 0;
+    }
+
     if let Some(path) = serialization_file {
         if let Err(err) = std::fs::write(&path, &json) {
             eprintln!(
@@ -119,10 +127,6 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             return 1;
         }
     };
-    if validate_only {
-        return 0;
-    }
-
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
             if let Some(path) = metadata_file {
@@ -140,6 +144,37 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             1
         }
     }
+}
+
+fn validate_pipeline_json_shape(json: &str) -> Result<(), String> {
+    let value: serde_json::Value =
+        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+    let stages = if let Some(stages) = value.as_array() {
+        stages
+    } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
+        stages
+    } else {
+        return Err("Pipeline JSON must be an array or an object with a 'pipeline' array.".into());
+    };
+
+    for (position, stage) in stages.iter().enumerate() {
+        if stage.is_string() {
+            continue;
+        }
+        let Some(object) = stage.as_object() else {
+            return Err(format!(
+                "Pipeline stage {position} must be a JSON object or filename string."
+            ));
+        };
+        if let Some(stage_type) = object.get("type") {
+            if !stage_type.is_string() {
+                return Err(format!(
+                    "Pipeline stage {position} has a non-string 'type'."
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn apply_stage_options_to_pipeline_json(
@@ -304,5 +339,19 @@ mod tests {
 
         assert_eq!(parsed[1]["dimension"][0], "X");
         assert_eq!(parsed[1]["dimension"][1], "Y");
+    }
+
+    #[test]
+    fn validate_shape_accepts_object_valued_options() {
+        let json = r#"[{"type":"readers.ept","filename":"ept.json"},{"type":"writers.ept_addon","addons":{"Z":"Z"}}]"#;
+
+        assert!(validate_pipeline_json_shape(json).is_ok());
+    }
+
+    #[test]
+    fn validate_shape_rejects_non_stage_entries() {
+        let json = r#"[{"type":"readers.faux"}, 7]"#;
+
+        assert!(validate_pipeline_json_shape(json).is_err());
     }
 }

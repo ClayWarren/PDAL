@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `772 / 903` baseline C++ GoogleTest cases, or
-`85.49%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `773 / 903` baseline C++ GoogleTest cases, or
+`85.60%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `811 / 953` currently built C++ GoogleTest cases, or
-`85.10%`; compute that with `--include-added-tests`.
+added during the port, is `812 / 953` currently built C++ GoogleTest cases, or
+`85.20%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -389,11 +389,11 @@ Known mixed binaries:
   scalar conversion, JSON scalar formatting, child updates, and colon-path child
   lookup route through the Rust C ABI. Pointer round-tripping is represented as
   an opaque Rust metadata scalar exposed by the C ABI.
-- `pdal_pipeline_manager_test`: `basic`, `OptionOrder`, `InputGlobbing`, and
-  `arrayPipeline` count. They execute reader-to-writer pipelines through the
-  Rust C ABI, including root-array JSON, command-line stage-option overrides,
-  and LAS input globbing. Object validation and C++ stage replacement behavior
-  remain C++.
+- `pdal_pipeline_manager_test`: `basic`, `OptionOrder`, `InputGlobbing`,
+  `objects`, and `arrayPipeline` count. They execute reader-to-writer pipelines
+  through the Rust C ABI, including root-array JSON, command-line stage-option
+  overrides, LAS input globbing, and validate-only object-valued options. C++
+  stage replacement behavior remains C++.
 - `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
 - `pdal_io_las_reader_test`: all currently built cases count by explicit audit
   list. Point materialization, callbacks, lazperf stream decoding, VLR/SRS

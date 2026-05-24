@@ -676,6 +676,7 @@ COVERED: dict[str, object] = {
         "basic",
         "OptionOrder",
         "InputGlobbing",
+        "objects",
         "arrayPipeline",
     },
     "pdal_streaming_test": ALL,
