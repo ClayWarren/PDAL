@@ -34,48 +34,93 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <kernels/EvalKernel.hpp>
+#include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <fstream>
+#include <string>
+#include <vector>
+
+#include "Support.hpp"
 
 namespace pdal
 {
 
+namespace
+{
+
+void writeCloud(const std::string& filename,
+                const std::vector<int>& classifications)
+{
+    std::ofstream out(filename);
+    out << "X,Y,Z,Classification\n";
+    for (size_t i = 0; i < classifications.size(); ++i)
+        out << i << ",0,0," << classifications[i] << "\n";
+}
+
+void expectContains(const std::string& text, const std::string& needle)
+{
+    EXPECT_NE(text.find(needle), std::string::npos) << text;
+}
+
+} // namespace
+
 TEST(EvalTest, labelStatsReportsConfusionMetrics)
 {
-    LabelStats stats(2);
+    std::string predicted = Support::temppath("eval-predicted.txt");
+    std::string truth = Support::temppath("eval-truth.txt");
+    FileUtils::deleteFile(predicted);
+    FileUtils::deleteFile(truth);
 
-    stats.insert(0, 0);
-    stats.insert(0, 1);
-    stats.insert(1, 0);
-    stats.insert(1, 1);
+    writeCloud(predicted, {0, 1, 0, 1});
+    writeCloud(truth, {0, 0, 1, 1});
 
-    EXPECT_EQ(stats.getSupport(0), 2u);
-    EXPECT_EQ(stats.getSupport(1), 2u);
-    EXPECT_EQ(stats.getTruePositives(0), 1u);
-    EXPECT_EQ(stats.getFalsePositives(0), 1u);
-    EXPECT_EQ(stats.getFalseNegatives(0), 1u);
-    EXPECT_EQ(stats.getTrueNegatives(0), 1u);
-    EXPECT_DOUBLE_EQ(stats.getIntersectionOverUnion(0), 1.0 / 3.0);
-    EXPECT_DOUBLE_EQ(stats.getF1Score(0), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getSensitivity(0), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getSpecificity(0), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getPrecision(0), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getAccuracy(0), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getMeanIntersectionOverUnion(), 1.0 / 3.0);
-    EXPECT_DOUBLE_EQ(stats.getOverallAccuracy(), 0.5);
-    EXPECT_DOUBLE_EQ(stats.getF1Score(), 0.5);
-    EXPECT_EQ(stats.prettyPrintConfusionMatrix(), "[[1,1,0],[1,1,0],[0,0,0]]");
+    char* raw = pdal_eval(predicted.c_str(), truth.c_str(), "0,1",
+                          "Classification", "Classification");
+    ASSERT_NE(raw, nullptr) << pdal_last_error();
+    std::string report(raw);
+    pdal_string_free(raw);
+
+    expectContains(report, "\"support\":2");
+    expectContains(report, "\"intersection_over_union\":0.3333333333333333");
+    expectContains(report, "\"f1_score\":0.5");
+    expectContains(report, "\"sensitivity\":0.5");
+    expectContains(report, "\"specificity\":0.5");
+    expectContains(report, "\"precision\":0.5");
+    expectContains(report, "\"accuracy\":0.5");
+    expectContains(report,
+                   "\"mean_intersection_over_union\":0.3333333333333333");
+    expectContains(report, "\"overall_accuracy\":0.5");
+    expectContains(report, "\"confusion_matrix\":[[1,1,0],[1,1,0],[0,0,0]]");
+
+    FileUtils::deleteFile(predicted);
+    FileUtils::deleteFile(truth);
 }
 
 TEST(EvalTest, labelStatsHandlesLabelsWithoutSupport)
 {
-    LabelStats stats(2);
+    std::string predicted = Support::temppath("eval-predicted-empty-label.txt");
+    std::string truth = Support::temppath("eval-truth-empty-label.txt");
+    FileUtils::deleteFile(predicted);
+    FileUtils::deleteFile(truth);
 
-    stats.insert(0, 0);
+    writeCloud(predicted, {0});
+    writeCloud(truth, {0});
 
-    EXPECT_EQ(stats.getSupport(1), 0u);
-    EXPECT_DOUBLE_EQ(stats.getIntersectionOverUnion(1), 0.0);
-    EXPECT_DOUBLE_EQ(stats.getSensitivity(1), 0.0);
-    EXPECT_DOUBLE_EQ(stats.getPrecision(1), 0.0);
+    char* raw = pdal_eval(predicted.c_str(), truth.c_str(), "0,1",
+                          "Classification", "Classification");
+    ASSERT_NE(raw, nullptr) << pdal_last_error();
+    std::string report(raw);
+    pdal_string_free(raw);
+
+    expectContains(report, "\"label\":1");
+    expectContains(report, "\"support\":0");
+    expectContains(report, "\"intersection_over_union\":0.0");
+    expectContains(report, "\"sensitivity\":0.0");
+    expectContains(report, "\"precision\":0.0");
+
+    FileUtils::deleteFile(predicted);
+    FileUtils::deleteFile(truth);
 }
 
 } // namespace pdal
