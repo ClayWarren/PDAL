@@ -51,6 +51,18 @@ mod tests {
     }
 
     #[test]
+    fn reader_expands_filename_globs() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test/data/autzen/thin*.las");
+        let mut options = Options::new();
+        options.add("filename", path);
+        let mut reader = LasReader::new(&options);
+        let views = reader.read().expect("read autzen glob");
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 10653);
+    }
+
+    #[test]
     fn detect_copc_matches_signature_at_offset_377() {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         let mut data = vec![0u8; 381];

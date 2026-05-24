@@ -35,11 +35,13 @@ enum SrsVlrKind {
     Wkt2,
 }
 
+#[derive(Clone)]
 struct ConfiguredExtraDim {
     name: String,
     type_name: String,
 }
 
+#[derive(Clone)]
 pub struct LasReader {
     filename: String,
     start: u64,
@@ -218,6 +220,9 @@ impl Reader for LasReader {
                 "LasReader requires a filename option.".to_string(),
             ));
         }
+        if filename_has_glob(&self.filename) {
+            return self.read_glob();
+        }
 
         let path = Path::new(&self.filename);
         let view = if self.start_offset > 0 {
@@ -317,6 +322,85 @@ impl Reader for LasReader {
     fn metadata(&self) -> MetadataNode {
         self.metadata.clone()
     }
+}
+
+impl LasReader {
+    fn read_glob(&mut self) -> Result<Vec<PointView>, StageError> {
+        if self.start_offset > 0 || self.start_length > 0 {
+            return Err(StageError(
+                "LAS filename globbing is not supported with start offsets.".to_string(),
+            ));
+        }
+
+        let mut paths = glob::glob(&self.filename)
+            .map_err(|err| StageError(format!("Invalid LAS filename glob: {err}")))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| StageError(format!("Failed to expand LAS filename glob: {err}")))?;
+        paths.sort();
+        if paths.is_empty() {
+            return Err(StageError(format!(
+                "LAS filename glob '{}' matched no files.",
+                self.filename
+            )));
+        }
+
+        let mut merged: Option<PointView> = None;
+        for path in paths {
+            let mut reader = self.clone();
+            reader.filename = path.display().to_string();
+            let mut views = reader.read()?;
+            let view = views
+                .drain(..)
+                .next()
+                .ok_or_else(|| StageError(format!("'{}' produced no points.", path.display())))?;
+            append_glob_view(&mut merged, &view, &path.display().to_string())?;
+            self.metadata = reader.metadata;
+        }
+
+        Ok(merged.into_iter().collect())
+    }
+}
+
+fn filename_has_glob(filename: &str) -> bool {
+    filename.contains('*') || filename.contains('?') || filename.contains('[')
+}
+
+fn append_glob_view(
+    output: &mut Option<PointView>,
+    view: &PointView,
+    path: &str,
+) -> Result<(), StageError> {
+    let Some(output) = output else {
+        *output = Some(view.clone());
+        return Ok(());
+    };
+    ensure_same_layout(output, view, path)?;
+    for idx in 0..view.len() {
+        output.append_point(view, idx);
+    }
+    Ok(())
+}
+
+fn ensure_same_layout(
+    reference: &PointView,
+    view: &PointView,
+    path: &str,
+) -> Result<(), StageError> {
+    if reference.layout().dim_count() != view.layout().dim_count()
+        || reference.layout().point_size() != view.layout().point_size()
+    {
+        return Err(StageError(format!(
+            "'{path}' produced point views with incompatible layouts"
+        )));
+    }
+    for idx in 0..reference.layout().dim_count() {
+        if reference.layout().dim_at(idx) != view.layout().dim_at(idx) {
+            return Err(StageError(format!(
+                "'{path}' produced point views with incompatible layouts"
+            )));
+        }
+    }
+    Ok(())
 }
 
 enum VlrReadResult {

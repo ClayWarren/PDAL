@@ -1048,6 +1048,7 @@ dependencies = [
  "byteorder",
  "chrono",
  "flate2",
+ "glob",
  "las",
  "las-crs",
  "lzf-rust",

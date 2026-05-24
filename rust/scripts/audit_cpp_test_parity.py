@@ -672,7 +672,12 @@ COVERED: dict[str, object] = {
         "filenameTemplate",
     },
     "pdal_pipeline_writer_test": {"issue_2458", "serialize"},
-    "pdal_pipeline_manager_test": {"basic", "OptionOrder", "arrayPipeline"},
+    "pdal_pipeline_manager_test": {
+        "basic",
+        "OptionOrder",
+        "InputGlobbing",
+        "arrayPipeline",
+    },
     "pdal_streaming_test": ALL,
     "nitfwrap_test": ALL,
     "pc2pc_test": ALL,
