@@ -201,6 +201,47 @@ fn rust_kernel_run_reports_pipeline_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_accepts_tindex_help() {
+    let name = CString::new("tindex").unwrap();
+    let arg = CString::new("--help").unwrap();
+    let argv = [arg.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+    assert_eq!(result, 0);
+}
+
+#[test]
+fn rust_kernel_run_reports_tindex_missing_subcommand() {
+    let name = CString::new("tindex").unwrap();
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
+fn rust_kernel_run_declines_tindex_rich_boundary_options() {
+    let name = CString::new("tindex").unwrap();
+    let create = CString::new("create").unwrap();
+    let tindex = CString::new("--tindex").unwrap();
+    let output = CString::new("out.geojson").unwrap();
+    let threshold = CString::new("--threshold=1").unwrap();
+    let file = CString::new("input.las").unwrap();
+    let argv = [
+        create.as_ptr(),
+        tindex.as_ptr(),
+        output.as_ptr(),
+        threshold.as_ptr(),
+        file.as_ptr(),
+    ];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, -1);
+}
+
+#[test]
 fn rust_kernel_run_accepts_info_help() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("--help").unwrap();

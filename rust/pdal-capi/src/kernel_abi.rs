@@ -11,6 +11,7 @@ mod ground;
 mod metrics;
 mod pipeline;
 mod split;
+mod tindex;
 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_kernel_parse_stage_option(
@@ -71,6 +72,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "sort" => run_sort_kernel(argc, argv),
         "split" => split::run_split_kernel(argc, argv),
         "tile" => run_tile_kernel(argc, argv),
+        "tindex" => tindex::run_tindex_kernel(argc, argv),
         "translate" => run_translate_kernel(argc, argv),
         _ => -1,
     }
