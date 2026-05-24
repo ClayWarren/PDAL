@@ -148,20 +148,20 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `738 / 891` baseline C++ GoogleTest cases, or
-`82.83%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `741 / 891` baseline C++ GoogleTest cases, or
+`83.16%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `766 / 1039` currently built C++ GoogleTest cases, or
-`73.72%`; compute that with `--include-added-tests`.
+added during the port, is `775 / 932` currently built C++ GoogleTest cases, or
+`83.15%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
 via `pdal_nitf_lidar_segment`, `pdal_nitf_read_metadata`, and `pdal_nitf_write`.
 The pre-port baseline above does not include them because the baseline build
 did not enable the NITF plugin; rerun the audit with `BUILD_PLUGIN_NITF=ON`
-and `--include-added-tests` to see them counted.
+and `--include-added-tests` to see them counted when that plugin is present.
 
 Recent gains route `SpatialReference` user-input normalization, PROJ4 export,
 semantic `IsSame` equality, horizontal/vertical EPSG helpers, Polygon
@@ -176,22 +176,21 @@ execution paths, private filter ports, `pdal::ThreadPool` behavior,
 ShellFilter command execution, `Utils::toString(double)`, and
 `Utils::run_shell_command()` through the Rust C ABI. This remains a
 conservative lower bound, not a final port-completion percentage:
-40 built test binaries remain unclassified by the audit script in the current
-optional-plugin-enabled build. Of these:
+20 pre-port built test binaries remain unclassified by the audit script in the
+current build. Of these:
    - 6 are private/specialized C++ algorithms with no Rust-backed count yet
      (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
-   - 14 are command/infrastructure/utility/tooling tests, not pipeline stages
-     (chamfer, hausdorff, pc2pc, app_plugin, app, artifact, eval, info cmd,
-     merge cmd, program_arg, tile cmd, tindex cmd, random, translate)
-   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++
-     stages (groundfilter, info filter, where). `pdal_where_test` now exercises
+   - 8 are command/infrastructure/utility/tooling tests, not pipeline stages
+     (app_plugin, app, artifact, info cmd, merge cmd, program_arg, tile cmd,
+     tindex cmd)
+   - 2 are pipeline/framework behavior tests that dynamically dispatch to C++
+     stages (info filter, where). `pdal_where_test` now exercises
      Rust-backed `where` splitting for non-streaming Stage execution, but the
      binary remains uncounted because it still bundles C++ dynamic test stages
      and streaming writer paths.
-   - 17 are explicitly deferred, optional-plugin, or baseline/toolchain-sensitive
-     I/O tests (Arrow, COPC remote/writer, Draco, EPT addon, HDF, Icebridge,
-     NITF, SLPK, TileDB, and VSI)
-  No easy audit wins remain among the 40 uncounted binaries — all require
+   - 4 are explicitly deferred or baseline/toolchain-sensitive I/O tests
+     (COPC remote/writer, EPT addon, and VSI)
+  No easy audit wins remain among the uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.

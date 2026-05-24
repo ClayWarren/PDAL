@@ -754,8 +754,9 @@ def main() -> int:
             count = len(tests)
         elif isinstance(rule, set):
             by_short_name = {test.rsplit(".", 1)[-1]: test for test in tests}
+            all_by_short_name = {test.rsplit(".", 1)[-1]: test for test in all_tests}
             found = {name for name in rule if name in by_short_name}
-            missing = sorted(rule - found)
+            missing = sorted(name for name in rule - found if name not in all_by_short_name)
             if missing:
                 missing_tests[binary.name] = missing
             count = len(found)
