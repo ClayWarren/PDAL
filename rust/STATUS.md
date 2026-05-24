@@ -139,7 +139,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `757 / 926` built C++ GoogleTest cases, or `81.75%`, are
+Current checkpoint: `761 / 926` built C++ GoogleTest cases, or `82.18%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains route `SpatialReference` user-input normalization, PROJ4 export,
 semantic `IsSame` equality, and `identifyHorizontalEPSG` through a Rust GDAL
@@ -176,16 +176,26 @@ hexbin filter execution cases, COPC reader multi-input handling, EPT reader
 audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
 confirmed; badOriginQuery corrected), OGR writer GeoJSON output, streaming
 execution, private filter ports for Delaunay, ICP, Lloyd K-means, relaxation
-dart throwing, and Straighten, and ShellFilter command execution through Rust.
+dart throwing, Straighten, four legacy OldPCLBlock outlier/range pipeline
+cases, and ShellFilter command execution through Rust.
 `Utils::toString(double)` and `Utils::run_shell_command()` now route through
 the Rust C ABI. This remains a conservative lower bound, not a final
 port-completion percentage:
-25 built test binaries remain unclassified by the audit script. Of these:
-   - 6 are private/specialized C++ algorithms with no Rust-backed count yet (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
-   - 13 are infrastructure/utility/tooling tests, not pipeline stages (app_plugin, app, artifact, eval, info cmd, merge cmd, oldpclblock, pipeline_manager, program_arg, thread_pool, tile cmd, tindex cmd, vsi)
-   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++ stages (groundfilter, info filter, where). `pdal_where_test` now exercises Rust-backed `where` splitting for non-streaming Stage execution, but the binary remains uncounted because it still bundles C++ dynamic test stages and streaming writer paths.
-   - 3 are explicitly deferred (copc_remote_reader, copc_writer, ept_addon_writer)
-  No easy audit wins remain among the 25 uncounted binaries — all require
+28 built test binaries remain unclassified by the audit script. Of these:
+   - 6 are private/specialized C++ algorithms with no Rust-backed count yet
+     (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
+   - 15 are command/infrastructure/utility/tooling tests, not pipeline stages
+     (chamfer, hausdorff, pc2pc, app_plugin, app, artifact, eval, info cmd,
+     merge cmd, program_arg, thread_pool, tile cmd, tindex cmd, random,
+     translate)
+   - 3 are pipeline/framework behavior tests that dynamically dispatch to C++
+     stages (groundfilter, info filter, where). `pdal_where_test` now exercises
+     Rust-backed `where` splitting for non-streaming Stage execution, but the
+     binary remains uncounted because it still bundles C++ dynamic test stages
+     and streaming writer paths.
+   - 4 are explicitly deferred or baseline/toolchain-sensitive I/O tests
+     (copc_remote_reader, copc_writer, ept_addon_writer, vsi)
+  No easy audit wins remain among the 28 uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.

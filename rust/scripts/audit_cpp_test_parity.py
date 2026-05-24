@@ -129,6 +129,12 @@ COVERED: dict[str, object] = {
     "pdal_xml_schema_test": {"legacyNames", "roundTrip"},
     "pdal_uuid_test": ALL,
     "pdal_ogr_arg_test": {"parseErrors", "createFromFile"},
+    "pdal_oldpclblock_test": {
+        "StatisticalOutliers1",
+        "StatisticalOutliers2",
+        "RadiusOutliers1",
+        "RadiusOutliers2",
+    },
     "pdal_filters_crop_test": {
         "create",
         "test_crop",
