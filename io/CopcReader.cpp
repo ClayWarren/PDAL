@@ -622,6 +622,58 @@ QuickInfo CopcReader::inspect()
 
     initialize(t);
 
+    if (!Utils::isRemote(m_filename) && m_args->resolution == 0 &&
+        m_args->polys.empty() && m_args->ogr.empty() && m_args->clip.empty() &&
+        !m_args->nosrs)
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        pdal_reader_t* reader = pdal_reader_create_copc(options);
+        if (!reader)
+        {
+            pdal_options_destroy(options);
+            rust_view_converter::throwLastError(
+                "Failed to create Rust COPC reader.");
+        }
+
+        pdal_point_view_t* view = pdal_reader_read_first(reader);
+        pdal_reader_destroy(reader);
+        pdal_options_destroy(options);
+        if (!view)
+            rust_view_converter::throwLastError("Rust COPC reader failed.");
+
+        pdal_bounds3d_t bounds;
+        if (pdal_point_view_calculate_bounds_3d(view, &bounds))
+        {
+            qi.m_bounds.minx = bounds.minx;
+            qi.m_bounds.maxx = bounds.maxx;
+            qi.m_bounds.miny = bounds.miny;
+            qi.m_bounds.maxy = bounds.maxy;
+            qi.m_bounds.minz = bounds.minz;
+            qi.m_bounds.maxz = bounds.maxz;
+        }
+        qi.m_pointCount = pdal_point_view_length(view);
+        pdal_spatial_reference_t* srs = pdal_point_view_spatial_reference(view);
+        if (srs)
+        {
+            char* text = pdal_spatial_reference_text(srs);
+            qi.m_srs.set(text ? text : "");
+            pdal_string_free(text);
+            pdal_spatial_reference_destroy(srs);
+        }
+        uint64_t dimCount = pdal_point_view_dim_count(view);
+        for (uint64_t idx = 0; idx < dimCount; ++idx)
+        {
+            std::string name = rust_view_converter::takeString(
+                pdal_point_view_dim_name(view, idx));
+            if (!name.empty())
+                qi.m_dimNames.push_back(name);
+        }
+        qi.m_valid = true;
+        pdal_point_view_destroy(view);
+        return qi;
+    }
+
     const las::Header& h = m_p->header;
     qi.m_bounds = h.bounds;
     qi.m_srs = getSpatialReference();

@@ -534,6 +534,7 @@ COVERED: dict[str, object] = {
         "btint",
     },
     "pdal_io_copc_reader_test": {
+        "inspect",
         "fullRead",
         "boundedRead2d",
         "boundedRead3d",
