@@ -4,6 +4,9 @@
 //! `delta`, and `eval` kernels.
 
 use crate::point::{DimId, PointId, PointView};
+use rstar::{primitives::GeomWithData, PointDistance, RTree};
+
+type IndexedPoint = GeomWithData<[f64; 3], PointId>;
 
 /// Read a point's `(X, Y, Z)` coordinates.
 fn xyz(view: &PointView, idx: PointId) -> (f64, f64, f64) {
@@ -14,24 +17,36 @@ fn xyz(view: &PointView, idx: PointId) -> (f64, f64, f64) {
     )
 }
 
+fn xyz_array(view: &PointView, idx: PointId) -> [f64; 3] {
+    let (x, y, z) = xyz(view, idx);
+    [x, y, z]
+}
+
+fn index_points(view: &PointView) -> RTree<IndexedPoint> {
+    RTree::bulk_load(
+        (0..view.len())
+            .map(|idx| IndexedPoint::new(xyz_array(view, idx), idx))
+            .collect(),
+    )
+}
+
 /// For each point of `from`, the `(index, squared distance)` of its nearest
-/// neighbor in `to`, in point order. Neighbor search is brute force; a future
-/// spatial-index acceleration would replace the inner loop only. `to` must be
-/// non-empty.
+/// neighbor in `to`, in point order. `to` must be non-empty.
 fn nearest_neighbors(from: &PointView, to: &PointView) -> Vec<(PointId, f64)> {
+    let index = index_points(to);
+    nearest_neighbors_with_index(from, &index)
+}
+
+fn nearest_neighbors_with_index(
+    from: &PointView,
+    index: &RTree<IndexedPoint>,
+) -> Vec<(PointId, f64)> {
     let mut neighbors = Vec::with_capacity(from.len() as usize);
     for i in 0..from.len() {
-        let (fx, fy, fz) = xyz(from, i);
-        let mut best = 0;
-        let mut best_sq = f64::MAX;
-        for j in 0..to.len() {
-            let (tx, ty, tz) = xyz(to, j);
-            let dsq = (fx - tx).powi(2) + (fy - ty).powi(2) + (fz - tz).powi(2);
-            if dsq < best_sq {
-                best_sq = dsq;
-                best = j;
-            }
-        }
+        let query = xyz_array(from, i);
+        let nearest = index.nearest_neighbor(&query).expect("non-empty index");
+        let best = nearest.data;
+        let best_sq = nearest.distance_2(&query);
         neighbors.push((best, best_sq));
     }
     neighbors
@@ -39,10 +54,10 @@ fn nearest_neighbors(from: &PointView, to: &PointView) -> Vec<(PointId, f64)> {
 
 /// `(max, mean)` of the nearest-neighbor distance from each point of `from`
 /// to the points of `to`.
-fn directed(from: &PointView, to: &PointView) -> (f64, f64) {
+fn directed_with_index(from: &PointView, index: &RTree<IndexedPoint>) -> (f64, f64) {
     let mut max_distance = f64::MIN;
     let mut mean = 0.0f64;
-    for (i, &(_, nearest_sq)) in nearest_neighbors(from, to).iter().enumerate() {
+    for (i, &(_, nearest_sq)) in nearest_neighbors_with_index(from, index).iter().enumerate() {
         if nearest_sq > max_distance {
             max_distance = nearest_sq;
         }
@@ -61,21 +76,25 @@ fn directed(from: &PointView, to: &PointView) -> (f64, f64) {
 /// two directed mean-nearest-neighbor distances. Both input views must be
 /// non-empty.
 pub fn hausdorff_pair(a: &PointView, b: &PointView) -> (f64, f64) {
-    let a2b = directed(a, b);
-    let b2a = directed(b, a);
+    let a_index = index_points(a);
+    let b_index = index_points(b);
+    let a2b = directed_with_index(a, &b_index);
+    let b2a = directed_with_index(b, &a_index);
     (a2b.0.max(b2a.0), a2b.1.max(b2a.1))
 }
 
 /// The Chamfer distance between two point sets (PDAL's `computeChamfer`):
 /// the sum of squared nearest-neighbor distances taken in both directions.
 pub fn chamfer_distance(a: &PointView, b: &PointView) -> f64 {
-    let sum_sq = |from: &PointView, to: &PointView| -> f64 {
-        nearest_neighbors(from, to)
+    let a_index = index_points(a);
+    let b_index = index_points(b);
+    let sum_sq = |from: &PointView, index: &RTree<IndexedPoint>| -> f64 {
+        nearest_neighbors_with_index(from, index)
             .iter()
             .map(|&(_, dsq)| dsq)
             .sum()
     };
-    sum_sq(a, b) + sum_sq(b, a)
+    sum_sq(a, &b_index) + sum_sq(b, &a_index)
 }
 
 /// Min/mean/max of the signed delta of one dimension.
