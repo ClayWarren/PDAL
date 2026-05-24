@@ -56,6 +56,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "merge" => run_merge_kernel(argc, argv),
         "sort" => run_sort_kernel(argc, argv),
         "tile" => run_tile_kernel(argc, argv),
+        "translate" => run_translate_kernel(argc, argv),
         _ => -1,
     }
 }
@@ -331,6 +332,41 @@ fn parse_option_value(value: &str) -> serde_json::Value {
     }
 }
 
+struct CliStageOption {
+    stage: String,
+    key: String,
+    value: String,
+}
+
+fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
+    let spec = arg.strip_prefix("--")?;
+    let (lhs, value) = spec.split_once('=')?;
+    let (stage, key) = lhs.rsplit_once('.')?;
+    Some(CliStageOption {
+        stage: stage.to_string(),
+        key: key.to_string(),
+        value: value.to_string(),
+    })
+}
+
+fn apply_cli_stage_options(stages: &mut [serde_json::Value], options: &[CliStageOption]) -> bool {
+    for option in options {
+        let qualified = format!("filters.{}", option.stage);
+        let mut applied = false;
+        for entry in stages.iter_mut() {
+            let entry_type = entry["type"].as_str();
+            if entry_type == Some(option.stage.as_str()) || entry_type == Some(qualified.as_str()) {
+                entry[option.key.as_str()] = parse_option_value(&option.value);
+                applied = true;
+            }
+        }
+        if !applied {
+            return false;
+        }
+    }
+    true
+}
+
 fn execute_kernel_pipeline(name: &str, value: serde_json::Value) -> i32 {
     let mut pipeline = match pipeline_from_json(&value.to_string()) {
         Ok(pipeline) => pipeline,
@@ -347,6 +383,116 @@ fn execute_kernel_pipeline(name: &str, value: serde_json::Value) -> i32 {
             1
         }
     }
+}
+
+unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.translate: Missing value for positional argument 'input'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!("  pdal translate <input> <output> [filter ...] [--<stage>.<key>=<value> ...]");
+        return 0;
+    }
+
+    if args.iter().any(|arg| arg.contains("option_file")) {
+        return -1;
+    }
+
+    let mut input = None;
+    let mut output = None;
+    let mut reader_override = None;
+    let mut writer_override = None;
+    let mut filters = Vec::new();
+    let mut stage_options = Vec::new();
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--input" || arg == "-i" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            input = Some(value.clone());
+        } else if arg == "--output" || arg == "-o" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            output = Some(value.clone());
+        } else if arg == "--reader" || arg == "-r" || arg == "--driver" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            reader_override = Some(value.clone());
+        } else if arg == "--writer" || arg == "-w" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            writer_override = Some(value.clone());
+        } else if arg == "--filter" || arg == "-f" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            filters.push(value.clone());
+        } else if arg.starts_with("--") {
+            match parse_cli_stage_option(arg) {
+                Some(option) => stage_options.push(option),
+                None => return -1,
+            }
+        } else if input.is_none() {
+            input = Some(arg.clone());
+        } else if output.is_none() {
+            output = Some(arg.clone());
+        } else {
+            filters.push(arg.clone());
+        }
+    }
+
+    let Some(input) = input else {
+        eprintln!("PDAL: kernels.translate: Missing value for positional argument 'input'.");
+        return 1;
+    };
+    let Some(output) = output else {
+        eprintln!("PDAL: kernels.translate: Missing value for positional argument 'output'.");
+        return 1;
+    };
+    let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
+    else {
+        eprintln!("PDAL: kernels.translate: Unable to infer reader driver for '{input}'.");
+        return 1;
+    };
+    let Some(writer) = writer_override.or_else(|| infer_writer_driver(&output).map(str::to_string))
+    else {
+        eprintln!("PDAL: kernels.translate: Unable to infer writer driver for '{output}'.");
+        return 1;
+    };
+
+    let mut stages = Vec::new();
+    stages.push(serde_json::json!({ "type": reader, "filename": input }));
+    for filter in filters {
+        let stage_type = if filter.contains('.') {
+            filter
+        } else {
+            format!("filters.{filter}")
+        };
+        stages.push(serde_json::json!({ "type": stage_type }));
+    }
+    stages.push(serde_json::json!({ "type": writer, "filename": output }));
+
+    if !apply_cli_stage_options(&mut stages, &stage_options) {
+        return -1;
+    }
+    execute_kernel_pipeline("translate", serde_json::Value::Array(stages))
 }
 
 unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
@@ -514,5 +660,25 @@ mod tests {
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 
         assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn rust_kernel_run_reports_translate_missing_input() {
+        let name = CString::new("translate").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn rust_kernel_run_declines_translate_option_file() {
+        let name = CString::new("translate").unwrap();
+        let arg = CString::new("--filters.range.option_file=opts.json").unwrap();
+        let argv = [arg.as_ptr()];
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+
+        assert_eq!(result, -1);
     }
 }
