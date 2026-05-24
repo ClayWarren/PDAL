@@ -5,6 +5,7 @@ use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::kernel::{parse_stage_option, ParseStageResult};
 use pdal_kernels::{FauxPluginKernel, Kernel, KernelArgs};
 use std::ffi::{CStr, CString};
+use std::fs;
 use std::os::raw::c_char;
 
 mod ground;
@@ -451,6 +452,7 @@ fn parse_option_value(value: &str) -> serde_json::Value {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct CliStageOption {
     pub(super) stage: String,
     pub(super) key: String,
@@ -532,13 +534,6 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         println!("Usage:");
         println!("  pdal translate <input> <output> [filter ...] [--<stage>.<key>=<value> ...]");
         return 0;
-    }
-
-    if args
-        .iter()
-        .any(|arg| arg.contains("option_file") || arg == "range" || arg == "filters.range")
-    {
-        return -1;
     }
 
     let mut input = None;
@@ -625,10 +620,96 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     }
     stages.push(serde_json::json!({ "type": writer, "filename": output }));
 
+    let stage_options = match expand_translate_option_files(stage_options) {
+        Ok(options) => options,
+        Err(code) => return code,
+    };
     if !apply_cli_stage_options(&mut stages, &stage_options) {
         return -1;
     }
     execute_kernel_pipeline("translate", serde_json::Value::Array(stages))
+}
+
+fn expand_translate_option_files(options: Vec<CliStageOption>) -> Result<Vec<CliStageOption>, i32> {
+    let mut expanded = Vec::new();
+    for option in options {
+        if option.key != "option_file" {
+            expanded.push(option);
+            continue;
+        }
+        let text = match fs::read_to_string(&option.value) {
+            Ok(text) => text,
+            Err(_) => {
+                eprintln!("Can't read {}", option.value);
+                return Err(1);
+            }
+        };
+        let loaded = match parse_option_file(&option.stage, &text) {
+            Ok(loaded) => loaded,
+            Err(message) => {
+                eprintln!("{message}");
+                return Err(1);
+            }
+        };
+        expanded.extend(loaded);
+    }
+    Ok(expanded)
+}
+
+fn parse_option_file(stage: &str, text: &str) -> Result<Vec<CliStageOption>, String> {
+    let trimmed = text.trim();
+    if trimmed.starts_with('{') {
+        let value: serde_json::Value =
+            serde_json::from_str(trimmed).map_err(|_| "Unexpected argument".to_string())?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| "Unexpected argument".to_string())?;
+        return object
+            .iter()
+            .map(|(key, value)| {
+                validate_translate_option_file_key(stage, key)?;
+                Ok(CliStageOption {
+                    stage: stage.to_string(),
+                    key: key.clone(),
+                    value: option_file_value_to_string(value)?,
+                })
+            })
+            .collect();
+    }
+
+    trimmed
+        .split_whitespace()
+        .map(|arg| {
+            let Some(spec) = arg.strip_prefix("--") else {
+                return Err("Unexpected argument".to_string());
+            };
+            let Some((key, value)) = spec.split_once('=') else {
+                return Err("Unexpected argument".to_string());
+            };
+            validate_translate_option_file_key(stage, key)?;
+            Ok(CliStageOption {
+                stage: stage.to_string(),
+                key: key.to_string(),
+                value: value.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn validate_translate_option_file_key(stage: &str, key: &str) -> Result<(), String> {
+    if stage == "filters.range" && key == "limits" {
+        return Ok(());
+    }
+    Err("Unexpected argument".to_string())
+}
+
+fn option_file_value_to_string(value: &serde_json::Value) -> Result<String, String> {
+    match value {
+        serde_json::Value::String(value) => Ok(value.clone()),
+        serde_json::Value::Bool(value) => Ok(value.to_string()),
+        serde_json::Value::Number(value) => Ok(value.to_string()),
+        _ => Err("Unexpected argument".to_string()),
+    }
 }
 
 unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {

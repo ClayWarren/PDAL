@@ -46,6 +46,7 @@ use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
+use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::relaxation_dart_throwing::RelaxationDartThrowingFilter;
 use pdal_filters::reprojection::ReprojectionFilter;
@@ -132,6 +133,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.pmf",
     "filters.radialdensity",
     "filters.randomize",
+    "filters.range",
     "filters.reciprocity",
     "filters.relaxationdartthrowing",
     "filters.reprojection",
@@ -417,6 +419,32 @@ pub fn create_filter(
                 .then(|| get_u64(options, "seed", 0).map(|seed| seed as u32))
                 .transpose()?;
             Ok(Box::new(FilterWrapper::new(RandomizeFilter::new(seed))))
+        }
+        "filters.range" => {
+            let limits = options
+                .values("limits")
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    parse_range_limit(value).map(|limit| RangeLimit {
+                        dim_name: limit.dim_name,
+                        lower_bound: limit.lower_bound,
+                        upper_bound: limit.upper_bound,
+                        inclusive_lower: limit.inclusive_lower,
+                        inclusive_upper: limit.inclusive_upper,
+                        negate: limit.negate,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(StageError)?;
+            if limits.is_empty() {
+                return Err(StageError(
+                    "Missing value for positional argument 'limits'.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(RangeFilter::new(limits))))
         }
         "filters.reciprocity" => Ok(Box::new(FilterWrapper::new(ReciprocityFilter::new(
             get_u64(options, "knn", 8)? as usize,

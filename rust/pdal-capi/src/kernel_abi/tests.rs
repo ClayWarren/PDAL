@@ -161,25 +161,42 @@ fn rust_kernel_run_reports_translate_missing_input() {
 }
 
 #[test]
-fn rust_kernel_run_declines_translate_option_file() {
-    let name = CString::new("translate").unwrap();
-    let arg = CString::new("--filters.range.option_file=opts.json").unwrap();
-    let argv = [arg.as_ptr()];
+fn translate_option_file_expands_command_options() {
+    let options = vec![CliStageOption {
+        stage: "filters.range".to_string(),
+        key: "option_file".to_string(),
+        value: "../../test/data/apps/good_cmd_opt".to_string(),
+    }];
 
-    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+    let expanded = expand_translate_option_files(options).unwrap();
 
-    assert_eq!(result, -1);
+    assert_eq!(expanded.len(), 1);
+    assert_eq!(expanded[0].stage, "filters.range");
+    assert_eq!(expanded[0].key, "limits");
+    assert_eq!(expanded[0].value, "Classification[0:3]");
 }
 
 #[test]
-fn rust_kernel_run_declines_translate_range_filter() {
-    let name = CString::new("translate").unwrap();
-    let arg = CString::new("filters.range").unwrap();
-    let argv = [arg.as_ptr()];
+fn translate_option_file_expands_json_options() {
+    let options = vec![CliStageOption {
+        stage: "filters.range".to_string(),
+        key: "option_file".to_string(),
+        value: "../../test/data/apps/good_json_opt".to_string(),
+    }];
 
-    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
+    let expanded = expand_translate_option_files(options).unwrap();
 
-    assert_eq!(result, -1);
+    assert_eq!(expanded.len(), 1);
+    assert_eq!(expanded[0].stage, "filters.range");
+    assert_eq!(expanded[0].key, "limits");
+    assert_eq!(expanded[0].value, "Classification[0:3]");
+}
+
+#[test]
+fn translate_option_file_rejects_unknown_option() {
+    let err = parse_option_file("filters.range", "--foobar=Classification[0:3]").unwrap_err();
+
+    assert_eq!(err, "Unexpected argument");
 }
 
 #[test]
