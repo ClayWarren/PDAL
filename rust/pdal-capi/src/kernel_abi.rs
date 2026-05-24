@@ -54,6 +54,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
     match name {
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "merge" => run_merge_kernel(argc, argv),
+        "random" => run_random_kernel(argc, argv),
         "sort" => run_sort_kernel(argc, argv),
         "tile" => run_tile_kernel(argc, argv),
         "translate" => run_translate_kernel(argc, argv),
@@ -495,6 +496,99 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     execute_kernel_pipeline("translate", serde_json::Value::Array(stages))
 }
 
+unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
+    let args = match argv_to_vec(argc, argv) {
+        Ok(args) => args,
+        Err(code) => return code,
+    };
+
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.random: Missing value for positional argument 'output'.");
+            return 1;
+        }
+        println!("Usage:");
+        println!("  pdal random <output> [--count=N]");
+        return 0;
+    }
+
+    let mut output = None;
+    let mut count = 1000_u64;
+    let mut writer_options = serde_json::Map::new();
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix("--count=") {
+            match value.parse::<u64>() {
+                Ok(parsed) => count = parsed,
+                Err(_) => {
+                    eprintln!("PDAL: kernels.random: --count must be a non-negative integer.");
+                    return 1;
+                }
+            }
+        } else if arg == "--count" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.random: Missing value for option '--count'.");
+                return 1;
+            };
+            match value.parse::<u64>() {
+                Ok(parsed) => count = parsed,
+                Err(_) => {
+                    eprintln!("PDAL: kernels.random: --count must be a non-negative integer.");
+                    return 1;
+                }
+            }
+        } else if arg == "--output" || arg == "-o" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.random: Missing value for option '{arg}'.");
+                return 1;
+            };
+            output = Some(value.clone());
+        } else if arg.starts_with("--") {
+            if !apply_writer_stage_option(arg, &mut writer_options) {
+                return -1;
+            }
+        } else if output.is_none() {
+            output = Some(arg.clone());
+        } else {
+            eprintln!("PDAL: kernels.random: Unexpected argument '{arg}'.");
+            return 1;
+        }
+    }
+
+    let Some(output) = output else {
+        eprintln!("PDAL: kernels.random: Missing value for positional argument 'output'.");
+        return 1;
+    };
+    let Some(writer) = infer_writer_driver(&output).map(str::to_string) else {
+        eprintln!("PDAL: kernels.random: Unable to infer writer driver for '{output}'.");
+        return 1;
+    };
+
+    let mut writer_stage = serde_json::Map::new();
+    writer_stage.insert("type".to_string(), serde_json::json!(writer));
+    writer_stage.insert("filename".to_string(), serde_json::json!(output));
+    writer_stage.extend(writer_options);
+
+    execute_kernel_pipeline(
+        "random",
+        serde_json::json!([
+            {
+                "type": "readers.faux",
+                "count": count,
+                "mode": "uniform",
+                "minx": 0.0,
+                "maxx": 1.0,
+                "miny": 0.0,
+                "maxy": 1.0,
+                "minz": 0.0,
+                "maxz": 1.0,
+            },
+            serde_json::Value::Object(writer_stage),
+        ]),
+    )
+}
+
 unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
@@ -680,5 +774,14 @@ mod tests {
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
 
         assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn rust_kernel_run_reports_random_missing_output() {
+        let name = CString::new("random").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
     }
 }
