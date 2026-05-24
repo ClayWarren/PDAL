@@ -58,7 +58,10 @@ impl Geometry {
     }
 
     pub fn to_wkt(&self) -> Result<String, String> {
-        self.geos_geom.to_wkt().map_err(|e| e.to_string())
+        self.geos_geom
+            .to_wkt()
+            .map(|wkt| normalize_wkt(&wkt))
+            .map_err(|e| e.to_string())
     }
 
     pub fn bounds(&self) -> Result<(f64, f64, f64, f64, f64, f64), String> {
@@ -176,6 +179,62 @@ impl Geometry {
     }
 }
 
+fn normalize_wkt(wkt: &str) -> String {
+    let wkt = wkt.replace(" Z ", " ");
+    let mut output = String::with_capacity(wkt.len());
+    let mut token = String::new();
+
+    for ch in wkt.chars() {
+        if ch.is_ascii_digit() || matches!(ch, '-' | '+' | '.' | 'e' | 'E') {
+            token.push(ch);
+        } else {
+            push_normalized_wkt_token(&mut output, &mut token);
+            if ch == ',' {
+                output.push(',');
+            } else {
+                output.push(ch);
+            }
+        }
+    }
+    push_normalized_wkt_token(&mut output, &mut token);
+    output.replace(", ", ",")
+}
+
+fn push_normalized_wkt_token(output: &mut String, token: &mut String) {
+    if token.is_empty() {
+        return;
+    }
+    if let Ok(value) = token.parse::<f64>() {
+        output.push_str(&format_significant_decimal(value, 15));
+    } else {
+        output.push_str(token);
+    }
+    token.clear();
+}
+
+fn format_significant_decimal(value: f64, significant_digits: usize) -> String {
+    if !value.is_finite() || value == 0.0 {
+        return value.to_string();
+    }
+
+    let integer_digits = value.abs().log10().floor().max(0.0) as usize + 1;
+    let fractional_digits = significant_digits.saturating_sub(integer_digits);
+    let mut formatted = format!("{value:.fractional_digits$}");
+    if formatted.contains('.') {
+        while formatted.ends_with('0') {
+            formatted.pop();
+        }
+        if formatted.ends_with('.') {
+            formatted.pop();
+        }
+    }
+    if formatted == "-0" {
+        "0".to_string()
+    } else {
+        formatted
+    }
+}
+
 pub fn version() -> String {
     geos::version().unwrap_or_default()
 }
@@ -250,10 +309,7 @@ mod tests {
         let geometry = Geometry::from_wkt("LINESTRING(0 0, 5 0.01, 10 0)").unwrap();
         let simplified = geometry.simplify(0.1, true).unwrap();
         let wkt = simplified.to_wkt().unwrap();
-        assert!(
-            wkt.contains("LINESTRING (0 0, 10 0)")
-                || wkt.contains("LINESTRING (0.0 0.0, 10.0 0.0)")
-        );
+        assert!(wkt.contains("LINESTRING (0 0,10 0)"));
 
         let simplified_no_top = geometry.simplify(0.1, false).unwrap();
         assert!(!simplified_no_top.to_wkt().unwrap().is_empty());

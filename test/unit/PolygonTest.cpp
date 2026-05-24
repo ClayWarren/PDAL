@@ -39,6 +39,7 @@
 #include <pdal/Polygon.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -60,8 +61,10 @@ std::string getJSON()
 TEST(PolygonTest, test_wkt_in)
 {
     std::string wkt(getWKT());
+    bool valid(false);
 
-    Polygon p(wkt);
+    EXPECT_TRUE(pdal_geometry_wkt_is_valid(wkt.c_str(), &valid));
+    EXPECT_TRUE(valid);
 }
 
 TEST(PolygonTest, test_json_in)
@@ -74,7 +77,6 @@ TEST(PolygonTest, test_json_in)
 TEST(PolygonTest, test_wkt_out)
 {
 
-    Polygon p(getWKT());
     std::string expected(
         "POLYGON ((636889.412951239 851528.512293259 "
         "422.7001953125,636899.142334239 851475.000686757 "
@@ -96,7 +98,12 @@ TEST(PolygonTest, test_wkt_out)
         "434.609375,636539.15516323 851056.637217746 "
         "422.6396484375,636889.412951239 851528.512293259 422.7001953125))");
 
-    std::string w = p.wkt();
+    char* outWkt(nullptr);
+    ASSERT_TRUE(pdal_geometry_wkt_to_wkt(getWKT().c_str(), &outWkt));
+    ASSERT_NE(outWkt, nullptr);
+    std::string w(outWkt);
+    pdal_string_free(outWkt);
+
     EXPECT_EQ(expected, w);
 }
 

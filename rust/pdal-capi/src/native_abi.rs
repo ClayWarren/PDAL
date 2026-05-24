@@ -206,6 +206,39 @@ pub unsafe extern "C" fn pdal_geometry_wkt_simplify(
     })
 }
 
+/// Convert WKT geometry to canonical WKT using the native GEOS adapter.
+///
+/// Caller owns the returned WKT string and must free it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt(
+    wkt: *const c_char,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || {
+        let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
+            set_last_error("Failed to parse WKT geometry");
+            return false;
+        };
+        match geometry.to_wkt() {
+            Ok(wkt_str) => {
+                if let Some(out_wkt) = out_wkt.as_mut() {
+                    *out_wkt = string_to_c_ptr(wkt_str);
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
 /// Compute the 3D bounding box bounds of WKT geometry using the native GEOS adapter.
 ///
 /// # Safety

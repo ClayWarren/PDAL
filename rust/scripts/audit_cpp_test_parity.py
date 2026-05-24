@@ -101,6 +101,8 @@ COVERED: dict[str, object] = {
         "json",
     },
     "pdal_polygon_test": {
+        "test_wkt_in",
+        "test_wkt_out",
         "simplify",
         "smooth",
         "covers",

@@ -368,6 +368,18 @@ fn geometry_predicates_roundtrip_through_c_abi() {
 }
 
 #[test]
+fn geometry_wkt_output_roundtrips_through_c_abi() {
+    unsafe {
+        let polygon = CString::new("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))").unwrap();
+        let mut out_wkt = std::ptr::null_mut();
+
+        assert!(pdal_geometry_wkt_to_wkt(polygon.as_ptr(), &mut out_wkt));
+        assert_eq!(take_string(out_wkt), "POLYGON ((0 0,10 0,10 10,0 10,0 0))");
+        assert!(!pdal_geometry_wkt_to_wkt(std::ptr::null(), &mut out_wkt));
+    }
+}
+
+#[test]
 fn geometry_distance_roundtrips_through_c_abi() {
     unsafe {
         let point = CString::new("POINT(0 0 0)").unwrap();

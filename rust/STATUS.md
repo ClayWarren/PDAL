@@ -139,9 +139,9 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `745 / 926` built C++ GoogleTest cases, or `80.45%`, are
+Current checkpoint: `747 / 926` built C++ GoogleTest cases, or `80.67%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
-gains route root-array pipeline execution, large point-view random-access
+gains route Polygon WKT parsing/output, root-array pipeline execution, large point-view random-access
 storage, point-view checked typed writes, the basic pipeline manager execute
 path, typed point-view reads, the default spatial-reference contract, basic
 point storage, and option JSON canonicalization through the Rust C ABI, route
@@ -275,11 +275,11 @@ Known mixed binaries:
   `issue_4751`, `conditional`, and `test_option_writing` count. Option-name
   validation, command-line formatting, JSON scalar formatting, and conditional
   option serialization route through Rust helpers. Option storage remains C++.
-- `pdal_polygon_test`: `simplify`, `smooth`, `covers`, `valid`, `bounds`,
-  `bounds2d`, and `bounds3d` count. Native geometry validity, area,
-  simplification, point coverage, and bounds route through the Rust C ABI.
-  Polygon construction, WKT/JSON serialization, stream operators, and polygon
-  relational operators remain C++/GDAL.
+- `pdal_polygon_test`: `test_wkt_in`, `test_wkt_out`, `simplify`, `smooth`,
+  `covers`, `valid`, `bounds`, `bounds2d`, and `bounds3d` count. Native
+  geometry validity, WKT output, area, simplification, point coverage, and
+  bounds route through the Rust C ABI. GeoJSON serialization, stream operators,
+  and polygon relational operators remain C++/GDAL.
 - `pdal_quad_index_test`: all 1 test counts; QuadIndex construction, bounds,
   fills, depth, and region queries route through the Rust C ABI.
 - `pdal_xml_schema_test`: `legacyNames` and `roundTrip` count; legacy
