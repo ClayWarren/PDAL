@@ -569,12 +569,15 @@ extern "C"
     void pdal_metadata_node_set_u64(pdal_metadata_node_t* node, uint64_t value);
     void pdal_metadata_node_set_f64(pdal_metadata_node_t* node, double value);
     void pdal_metadata_node_set_bool(pdal_metadata_node_t* node, bool value);
+    void pdal_metadata_node_set_pointer(pdal_metadata_node_t* node,
+                                        void* value);
     uint8_t pdal_metadata_node_value_kind(const pdal_metadata_node_t* node);
     char* pdal_metadata_node_value(const pdal_metadata_node_t* node);
     int64_t pdal_metadata_node_value_i64(const pdal_metadata_node_t* node);
     uint64_t pdal_metadata_node_value_u64(const pdal_metadata_node_t* node);
     double pdal_metadata_node_value_f64(const pdal_metadata_node_t* node);
     bool pdal_metadata_node_value_bool(const pdal_metadata_node_t* node);
+    void* pdal_metadata_node_value_pointer(const pdal_metadata_node_t* node);
     char* pdal_metadata_json_value(const char* type_name, const char* value);
     bool pdal_metadata_value_as_i64(const char* type_name, const char* value,
                                     int64_t* out_value);

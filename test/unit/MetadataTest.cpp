@@ -335,12 +335,11 @@ TEST(MetadataTest, pointer)
 
     foo f;
 
-    MetadataNode n("top");
-    MetadataNode n2 = n.add("test", &f);
-
-    std::istringstream iss;
-    foo* f2 = n2.value<foo*>();
+    pdal_metadata_node_t* n = pdal_metadata_node_create("test");
+    pdal_metadata_node_set_pointer(n, &f);
+    foo* f2 = static_cast<foo*>(pdal_metadata_node_value_pointer(n));
     EXPECT_EQ(f2, &f);
+    pdal_metadata_node_destroy(n);
 }
 
 // Test the output of infinity/nan

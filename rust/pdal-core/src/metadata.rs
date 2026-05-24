@@ -12,6 +12,7 @@ pub enum MetadataValue {
     U64(u64),
     F64(f64),
     Bool(bool),
+    Pointer(usize),
 }
 
 impl MetadataValue {
@@ -22,6 +23,7 @@ impl MetadataValue {
             MetadataValue::U64(_) => 2,
             MetadataValue::F64(_) => 3,
             MetadataValue::Bool(_) => 4,
+            MetadataValue::Pointer(_) => 5,
         }
     }
 
@@ -32,6 +34,7 @@ impl MetadataValue {
             MetadataValue::U64(value) => value.to_string(),
             MetadataValue::F64(value) => value.to_string(),
             MetadataValue::Bool(value) => value.to_string(),
+            MetadataValue::Pointer(value) => value.to_string(),
         }
     }
 
@@ -41,6 +44,7 @@ impl MetadataValue {
             MetadataValue::U64(value) => *value as i64,
             MetadataValue::F64(value) => *value as i64,
             MetadataValue::Bool(value) => i64::from(*value),
+            MetadataValue::Pointer(value) => *value as i64,
             MetadataValue::String(value) => value.parse().unwrap_or_default(),
         }
     }
@@ -51,6 +55,7 @@ impl MetadataValue {
             MetadataValue::U64(value) => *value,
             MetadataValue::F64(value) => *value as u64,
             MetadataValue::Bool(value) => u64::from(*value),
+            MetadataValue::Pointer(value) => *value as u64,
             MetadataValue::String(value) => value.parse().unwrap_or_default(),
         }
     }
@@ -67,6 +72,7 @@ impl MetadataValue {
                     0.0
                 }
             }
+            MetadataValue::Pointer(value) => *value as f64,
             MetadataValue::String(value) => value.parse().unwrap_or_default(),
         }
     }
@@ -77,7 +83,15 @@ impl MetadataValue {
             MetadataValue::U64(value) => *value != 0,
             MetadataValue::F64(value) => *value != 0.0,
             MetadataValue::Bool(value) => *value,
+            MetadataValue::Pointer(value) => *value != 0,
             MetadataValue::String(value) => matches!(value.as_str(), "true" | "1"),
+        }
+    }
+
+    pub fn as_pointer(&self) -> usize {
+        match self {
+            MetadataValue::Pointer(value) => *value,
+            _ => 0,
         }
     }
 }
@@ -425,6 +439,7 @@ mod tests {
         assert_eq!(MetadataValue::U64(1).kind_id(), 2);
         assert_eq!(MetadataValue::F64(1.0).kind_id(), 3);
         assert_eq!(MetadataValue::Bool(true).kind_id(), 4);
+        assert_eq!(MetadataValue::Pointer(1).kind_id(), 5);
     }
 
     #[test]
@@ -434,6 +449,7 @@ mod tests {
         assert_eq!(MetadataValue::U64(42).as_string(), "42");
         assert_eq!(MetadataValue::F64(1.5).as_string(), "1.5");
         assert_eq!(MetadataValue::Bool(true).as_string(), "true");
+        assert_eq!(MetadataValue::Pointer(42).as_string(), "42");
     }
 
     #[test]
@@ -443,6 +459,7 @@ mod tests {
         assert_eq!(MetadataValue::F64(3.7).as_i64(), 3);
         assert_eq!(MetadataValue::Bool(true).as_i64(), 1);
         assert_eq!(MetadataValue::Bool(false).as_i64(), 0);
+        assert_eq!(MetadataValue::Pointer(42).as_i64(), 42);
         assert_eq!(MetadataValue::String("42".into()).as_i64(), 42);
         assert_eq!(MetadataValue::String("nope".into()).as_i64(), 0);
     }
@@ -453,6 +470,7 @@ mod tests {
         assert_eq!(MetadataValue::U64(7).as_u64(), 7);
         assert_eq!(MetadataValue::F64(3.7).as_u64(), 3);
         assert_eq!(MetadataValue::Bool(true).as_u64(), 1);
+        assert_eq!(MetadataValue::Pointer(42).as_u64(), 42);
         assert_eq!(MetadataValue::String("42".into()).as_u64(), 42);
     }
 
@@ -463,6 +481,7 @@ mod tests {
         assert_eq!(MetadataValue::F64(1.5).as_f64(), 1.5);
         assert_eq!(MetadataValue::Bool(true).as_f64(), 1.0);
         assert_eq!(MetadataValue::Bool(false).as_f64(), 0.0);
+        assert_eq!(MetadataValue::Pointer(42).as_f64(), 42.0);
         assert_eq!(MetadataValue::String("3.15".into()).as_f64(), 3.15);
     }
 
@@ -475,9 +494,17 @@ mod tests {
         assert!(MetadataValue::F64(0.1).as_bool());
         assert!(!MetadataValue::F64(0.0).as_bool());
         assert!(MetadataValue::Bool(true).as_bool());
+        assert!(MetadataValue::Pointer(42).as_bool());
+        assert!(!MetadataValue::Pointer(0).as_bool());
         assert!(MetadataValue::String("true".into()).as_bool());
         assert!(MetadataValue::String("1".into()).as_bool());
         assert!(!MetadataValue::String("nope".into()).as_bool());
+    }
+
+    #[test]
+    fn metadata_value_pointer_round_trips_raw_address() {
+        assert_eq!(MetadataValue::Pointer(0x1234).as_pointer(), 0x1234);
+        assert_eq!(MetadataValue::String("0x1234".into()).as_pointer(), 0);
     }
 
     #[test]

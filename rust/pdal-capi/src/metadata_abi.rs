@@ -4,6 +4,7 @@ use pdal_core::metadata::{
     MetadataValue,
 };
 use serde_json::json;
+use std::ffi::c_void;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
@@ -189,6 +190,22 @@ pub unsafe extern "C" fn pdal_metadata_node_set_bool(node: *mut MetadataNode, va
     }
 }
 
+/// Set a metadata node's opaque pointer value.
+///
+/// # Safety
+///
+/// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
+/// The pointed-to object remains owned by the caller.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_set_pointer(
+    node: *mut MetadataNode,
+    value: *mut c_void,
+) {
+    if let Some(node) = node.as_mut() {
+        node.set_value(MetadataValue::Pointer(value as usize));
+    }
+}
+
 /// Return the metadata scalar value kind: 0 string, 1 i64, 2 u64, 3 f64,
 /// 4 bool, 255 no value.
 ///
@@ -275,6 +292,22 @@ pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode
         .and_then(MetadataNode::value)
         .map(MetadataValue::as_bool)
         .unwrap_or_default()
+}
+
+/// Return a node's scalar value as an opaque pointer.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_value_pointer(
+    node: *const MetadataNode,
+) -> *mut c_void {
+    node.as_ref()
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_pointer)
+        .unwrap_or_default() as *mut c_void
 }
 
 /// Format a PDAL metadata scalar value as JSON text. Caller must free with
@@ -621,6 +654,7 @@ fn metadata_value_to_json(value: &MetadataValue) -> serde_json::Value {
         MetadataValue::U64(value) => json!(value),
         MetadataValue::F64(value) => json!(value),
         MetadataValue::Bool(value) => json!(value),
+        MetadataValue::Pointer(value) => json!(value),
     }
 }
 
@@ -631,6 +665,7 @@ fn metadata_value_type(value: &MetadataValue) -> &'static str {
         MetadataValue::U64(_) => "u64",
         MetadataValue::F64(_) => "f64",
         MetadataValue::Bool(_) => "bool",
+        MetadataValue::Pointer(_) => "pointer",
     }
 }
 
