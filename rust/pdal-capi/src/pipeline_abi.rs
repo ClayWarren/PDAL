@@ -486,6 +486,13 @@ fn pipeline_result_to_json(
     })
 }
 
+pub(crate) fn pipeline_result_to_json_for_kernel(
+    result: pdal_core::pipeline::ExecResult,
+    pipeline: &PipelineHandle,
+) -> String {
+    pipeline_result_to_json(result, Some(pipeline.pipeline.metadata())).to_string()
+}
+
 fn dimension_summary_json(summary: &DimensionSummary) -> serde_json::Value {
     json!({
         "name": summary.name,

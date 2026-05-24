@@ -8,6 +8,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 mod ground;
+mod pipeline;
 mod split;
 
 #[no_mangle]
@@ -59,6 +60,7 @@ pub unsafe extern "C" fn pdal_rust_kernel_run(
         "fauxplugin" => run_fauxplugin_kernel(argc, argv),
         "ground" => ground::run_ground_kernel(argc, argv),
         "merge" => run_merge_kernel(argc, argv),
+        "pipeline" => pipeline::run_pipeline_kernel(argc, argv),
         "random" => run_random_kernel(argc, argv),
         "sort" => run_sort_kernel(argc, argv),
         "split" => split::run_split_kernel(argc, argv),
@@ -928,6 +930,15 @@ mod tests {
     #[test]
     fn rust_kernel_run_reports_random_missing_output() {
         let name = CString::new("random").unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn rust_kernel_run_reports_pipeline_missing_input() {
+        let name = CString::new("pipeline").unwrap();
 
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 
