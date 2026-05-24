@@ -282,7 +282,14 @@ fn ground_with_real_files_runs() {
     let dir = tmp_dir("ground-real");
     let out = dir.join("out.las");
     let las = repo_path("test/data/las/100-points.las");
-    let app = app_with_command("ground", &[las.to_str().unwrap(), out.to_str().unwrap()]);
+    let app = app_with_command(
+        "ground",
+        &[
+            las.to_str().unwrap(),
+            out.to_str().unwrap(),
+            "--filters.smrf.cell=10",
+        ],
+    );
     let _ = app.run_ground();
     let _ = std::fs::remove_dir_all(&dir);
 }
