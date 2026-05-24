@@ -14,6 +14,8 @@ struct CreateArgs {
     write_absolute_path: bool,
     layer_name: String,
     location_field: String,
+    input_methods: u8,
+    unsupported_input: bool,
 }
 
 struct Entry {
@@ -107,14 +109,21 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
         write_absolute_path: false,
         layer_name: "pdal".to_string(),
         location_field: "location".to_string(),
+        input_methods: 0,
+        unsupported_input: false,
     };
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--tindex" => parsed.tindex_file = next_value(&mut iter, "--tindex")?.clone(),
-            "--filelist" => return Err(ParseResult::Unsupported),
+            "--filelist" => {
+                parsed.input_methods += 1;
+                let _ = next_value(&mut iter, "--filelist")?;
+                parsed.unsupported_input = true;
+            }
             "--glob" => {
+                parsed.input_methods += 1;
                 let pattern = next_value(&mut iter, "--glob")?;
                 parsed.files.extend(read_glob(pattern)?);
             }
@@ -123,8 +132,34 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
             "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
             "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
-            "--stdin" | "-s" | "--threshold" | "--resolution" | "--simplify" | "--where"
-            | "--fast_boundary" => return Err(ParseResult::Unsupported),
+            "--stdin" | "-s" => {
+                parsed.input_methods += 1;
+                parsed.unsupported_input = true;
+            }
+            "--threshold" | "--resolution" | "--simplify" | "--where" | "--fast_boundary" => {
+                return Err(ParseResult::Unsupported);
+            }
+            _ if let Some(value) = arg.strip_prefix("--filespec=") => {
+                parsed.input_methods += 1;
+                parsed.files.push(value.to_string());
+            }
+            _ if let Some(pattern) = arg.strip_prefix("--glob=") => {
+                parsed.input_methods += 1;
+                parsed.files.extend(read_glob(pattern)?);
+            }
+            _ if arg.starts_with("--filelist=") => {
+                parsed.input_methods += 1;
+                parsed.unsupported_input = true;
+            }
+            _ if let Some(value) = arg.strip_prefix("--write_absolute_path=") => {
+                parsed.write_absolute_path = matches!(
+                    value.to_ascii_lowercase().as_str(),
+                    "true" | "1" | "yes" | "on"
+                );
+            }
+            _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
+                parsed.path_prefix = Some(value.to_string());
+            }
             _ if arg.starts_with("--threshold=")
                 || arg.starts_with("--resolution=")
                 || arg.starts_with("--simplify=")
@@ -136,10 +171,27 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if arg.starts_with('-') => return Err(ParseResult::Unsupported),
             _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
             _ if arg.contains('*') || arg.contains('?') || arg.contains('[') => {
-                return Err(ParseResult::Unsupported);
+                parsed.input_methods += 1;
+                parsed.files.extend(read_glob(arg)?);
             }
-            _ => parsed.files.push(arg.clone()),
+            _ => {
+                parsed.input_methods += 1;
+                parsed.files.push(arg.clone());
+            }
         }
+    }
+    if parsed.input_methods > 1 {
+        return Err(ParseResult::Error(
+            "Can't specify more than one source of tindex input files.".to_string(),
+        ));
+    }
+    if parsed.path_prefix.is_some() && parsed.write_absolute_path {
+        return Err(ParseResult::Error(
+            "Can't specify both path_prefix and write_absolute_path.".to_string(),
+        ));
+    }
+    if parsed.unsupported_input {
+        return Err(ParseResult::Unsupported);
     }
     if parsed.tindex_file.is_empty() {
         return Err(ParseResult::Error(
