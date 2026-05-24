@@ -56,6 +56,9 @@ extern "C"
 
     // Log
     const char* pdal_log_level_string(int32_t level);
+    char* pdal_log_format_prefix(const char* leader, int32_t level,
+                                 bool timing, double elapsed_seconds);
+    char* pdal_app_unknown_command_message(const char* command);
 
     // FileSpec
     char* pdal_file_spec_parse_json(const char* input);

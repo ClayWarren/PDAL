@@ -389,9 +389,13 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
                     found = found || stageField(kernel, "name") == m_command;
             }
             if (!found)
-                log->get(LogLevel::Error)
-                    << "Command '" << m_command << "' not recognized" << '\n'
-                    << '\n';
+            {
+                char* raw =
+                    pdal_app_unknown_command_message(m_command.c_str());
+                std::string msg = raw ? raw : "";
+                pdal_string_free(raw);
+                log->get(LogLevel::Error) << msg << '\n' << '\n';
+            }
         }
         return ret;
     }

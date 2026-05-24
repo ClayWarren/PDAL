@@ -111,21 +111,20 @@ std::ostream& Log::get(LogLevel level)
 {
     const auto incoming(Utils::toNative(level));
     const auto stored(Utils::toNative(m_level));
-    const auto nativeDebug(Utils::toNative(LogLevel::Debug));
     if (incoming <= stored)
     {
         const std::string l = leader();
-
-        *m_log << "(" << l;
-        if (l.size())
-            *m_log << " ";
-        *m_log << getLevelString(level);
-        if (m_timing)
-            *m_log << " " << now();
-        *m_log << ") "
-               << std::string(incoming < nativeDebug ? 0
-                                                     : incoming - nativeDebug,
-                              '\t');
+        const double elapsed =
+            m_timing
+                ? std::chrono::duration<double>(m_clock.now() - m_start).count()
+                : 0.0;
+        char* raw = pdal_log_format_prefix(l.c_str(), incoming, m_timing,
+                                           elapsed);
+        if (raw)
+        {
+            *m_log << raw;
+            pdal_string_free(raw);
+        }
         return *m_log;
     }
     return m_nullStream;

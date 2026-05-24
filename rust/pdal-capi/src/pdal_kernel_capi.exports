@@ -4,4 +4,6 @@ _pdal_stage_list_json
 _pdal_stage_options_json
 _pdal_kernel_run
 _pdal_rust_kernel_run
+_pdal_log_format_prefix
+_pdal_app_unknown_command_message
 _pdal_capi_free
