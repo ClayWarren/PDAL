@@ -44,6 +44,7 @@ COVERED: dict[str, object] = {
     "pdal_bounds_test": {
         "test_ctor",
         "test_equals",
+        "test_accessor",
         "test_clip",
         "test_intersect",
         "test_grow",

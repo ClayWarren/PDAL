@@ -37,6 +37,7 @@
 #include <pdal/pdal_test_main.hpp>
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 using namespace pdal;
 
@@ -85,13 +86,13 @@ TEST(BoundsTest, test_copy)
 
 TEST(BoundsTest, test_accessor)
 {
-    BOX2D b1(1, 2, 3, 4);
+    pdal_bounds2d_t b1{1, 3, 2, 4};
     EXPECT_DOUBLE_EQ(b1.minx, 1.0);
     EXPECT_DOUBLE_EQ(b1.miny, 2.0);
     EXPECT_DOUBLE_EQ(b1.maxx, 3.0);
     EXPECT_DOUBLE_EQ(b1.maxy, 4.0);
 
-    BOX3D b2(1, 2, 3, 4, 5, 6);
+    pdal_bounds3d_t b2{1, 4, 2, 5, 3, 6};
     EXPECT_DOUBLE_EQ(b2.minx, 1.0);
     EXPECT_DOUBLE_EQ(b2.miny, 2.0);
     EXPECT_DOUBLE_EQ(b2.minz, 3.0);
