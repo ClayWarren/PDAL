@@ -135,6 +135,7 @@ COVERED: dict[str, object] = {
         "RadiusOutliers1",
         "RadiusOutliers2",
     },
+    "pdal_thread_pool_test": ALL,
     "pdal_filters_crop_test": {
         "create",
         "test_crop",

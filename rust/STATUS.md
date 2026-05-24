@@ -26,6 +26,7 @@ Status definitions:
 | Metadata | in progress | Typed scalar metadata trees and JSON serialization exist. C++ descriptions, arrays/list kind preservation, JSON/base64 typed nodes, and full pipeline serialization remain incomplete. |
 | Spatial reference | in progress | `SpatialReference::set` (non-WKT user input), `getProj4`, `equals` (semantic IsSame fallback), `identifyHorizontalEPSG`, `identifyVerticalEPSG`, `getUTMZone`, `getHorizontal`, `getVertical`, `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through a Rust GDAL/OSR adapter (`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`, `pdal_srs_identify_horizontal_epsg`, `pdal_srs_identify_vertical_epsg`, `pdal_srs_get_utm_zone`, `pdal_srs_get_horizontal_wkt`, `pdal_srs_get_vertical_wkt`, `pdal_srs_get_horizontal_units`, `pdal_srs_get_vertical_units`, `pdal_srs_valid`). `SrsTransform` default-axis point and array transforms now call the Rust C ABI transform handle. Vertical extraction uses a Rust WKT bracket-matching parser because GDAL's C API has no `OGR_SRSNode` equivalent. PROJJSON export, explicit custom axis-mapping transforms, `SrsTransform::get()` consumers, and GeoTIFF VLR encoding are still C++ GDAL/OGR-backed. |
 | Spatial index | in progress | Exact brute-force neighbor queries sit behind a replaceable API. Do not bake one-off neighbor searches into new filters. |
+| Thread pool | in progress | `pdal::ThreadPool` now delegates scheduling, stop/restart, await, queue clearing, and resize behavior through the Rust C ABI while keeping the existing C++ facade. |
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
@@ -60,7 +61,7 @@ Status definitions:
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
-| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 217 `unsafe { ... }` blocks, 366 `unsafe extern "C" fn` exports, 32 non-extern `unsafe fn` helpers, one unsafe extern callback type alias, and zero `unsafe impl`s. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
+| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 245 `unsafe { ... }` blocks, 403 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
@@ -139,7 +140,7 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current checkpoint: `761 / 926` built C++ GoogleTest cases, or `82.18%`, are
+Current checkpoint: `763 / 1039` built C++ GoogleTest cases, or `73.44%`, are
 confirmed Rust C ABI-backed by `rust/scripts/audit_cpp_test_parity.py`. Recent
 gains route `SpatialReference` user-input normalization, PROJ4 export,
 semantic `IsSame` equality, and `identifyHorizontalEPSG` through a Rust GDAL
@@ -177,25 +178,27 @@ audit corrections (fullReadZstandard, unreadableDataFailure, duplicateInputs
 confirmed; badOriginQuery corrected), OGR writer GeoJSON output, streaming
 execution, private filter ports for Delaunay, ICP, Lloyd K-means, relaxation
 dart throwing, Straighten, four legacy OldPCLBlock outlier/range pipeline
-cases, and ShellFilter command execution through Rust.
+cases, `pdal::ThreadPool` scheduling/stop/restart behavior, and ShellFilter
+command execution through Rust.
 `Utils::toString(double)` and `Utils::run_shell_command()` now route through
 the Rust C ABI. This remains a conservative lower bound, not a final
 port-completion percentage:
-28 built test binaries remain unclassified by the audit script. Of these:
+40 built test binaries remain unclassified by the audit script in the current
+optional-plugin-enabled build. Of these:
    - 6 are private/specialized C++ algorithms with no Rust-backed count yet
      (csf, litree, m3c2, pmf, supervoxel, slpk_reader)
-   - 15 are command/infrastructure/utility/tooling tests, not pipeline stages
+   - 14 are command/infrastructure/utility/tooling tests, not pipeline stages
      (chamfer, hausdorff, pc2pc, app_plugin, app, artifact, eval, info cmd,
-     merge cmd, program_arg, thread_pool, tile cmd, tindex cmd, random,
-     translate)
+     merge cmd, program_arg, tile cmd, tindex cmd, random, translate)
    - 3 are pipeline/framework behavior tests that dynamically dispatch to C++
      stages (groundfilter, info filter, where). `pdal_where_test` now exercises
      Rust-backed `where` splitting for non-streaming Stage execution, but the
      binary remains uncounted because it still bundles C++ dynamic test stages
      and streaming writer paths.
-   - 4 are explicitly deferred or baseline/toolchain-sensitive I/O tests
-     (copc_remote_reader, copc_writer, ept_addon_writer, vsi)
-  No easy audit wins remain among the 28 uncounted binaries — all require
+   - 17 are explicitly deferred, optional-plugin, or baseline/toolchain-sensitive
+     I/O tests (Arrow, COPC remote/writer, Draco, EPT addon, HDF, Icebridge,
+     NITF, SLPK, TileDB, and VSI)
+  No easy audit wins remain among the 40 uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.

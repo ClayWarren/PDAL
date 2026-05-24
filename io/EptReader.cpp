@@ -37,6 +37,7 @@
 #include <atomic>
 #include <limits>
 #include <sstream>
+#include <thread>
 
 #include <nlohmann/json.hpp>
 
@@ -514,8 +515,8 @@ QuickInfo EptReader::inspect()
         if (preview)
         {
             double minx, miny, minz, maxx, maxy, maxz;
-            pdal_ept_reader_preview_bounds(preview, &minx, &miny, &minz,
-                                           &maxx, &maxy, &maxz);
+            pdal_ept_reader_preview_bounds(preview, &minx, &miny, &minz, &maxx,
+                                           &maxy, &maxz);
             qi.m_bounds = BOX3D(minx, miny, minz, maxx, maxy, maxz);
             qi.m_pointCount = pdal_ept_reader_preview_point_count(preview);
             char* srsWkt = pdal_ept_reader_preview_srs_wkt(preview);

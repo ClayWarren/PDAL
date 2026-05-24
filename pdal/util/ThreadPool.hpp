@@ -34,13 +34,12 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cassert>
-#include <condition_variable>
 #include <functional>
-#include <queue>
-#include <thread>
 
 #include <pdal/pdal_types.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -54,16 +53,15 @@ public:
     // queue.
     PDAL_EXPORT ThreadPool(std::size_t numThreads, int64_t queueSize = -1,
                            bool verbose = true)
-        : m_queueSize(queueSize),
-          m_numThreads(std::max<std::size_t>(numThreads, 1))
     {
-        assert(m_queueSize != 0);
-        go();
+        assert(queueSize != 0);
+        m_pool = pdal_thread_pool_create(std::max<std::size_t>(numThreads, 1),
+                                         queueSize);
     }
 
     PDAL_EXPORT ~ThreadPool()
     {
-        join();
+        pdal_thread_pool_destroy(m_pool);
     }
 
     ThreadPool(const ThreadPool& other) = delete;
@@ -76,41 +74,26 @@ public:
     // tasks to complete.
     PDAL_EXPORT void join()
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        if (!m_running)
-            return;
-        m_running = false;
-        lock.unlock();
-
-        m_consumeCv.notify_all();
-        for (auto& t : m_threads)
-            t.join();
-        m_threads.clear();
+        pdal_thread_pool_join(m_pool);
     }
 
     // join() and empty the queue of tasks that may have been waiting to run.
     PDAL_EXPORT void stop()
     {
-        join();
-        clearTasks();
+        pdal_thread_pool_stop(m_pool);
     }
 
     // Empty the queue of tasks that may have been waiting to run.
     PDAL_EXPORT void clearTasks()
     {
-        // Effectively clear the queue.
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::queue<std::function<void()>> q;
-        m_tasks.swap(q);
+        pdal_thread_pool_clear_tasks(m_pool);
     }
 
     // Wait for all current tasks to complete.  As opposed to join, tasks may
     // continue to be added while a thread is await()-ing the queue to empty.
     PDAL_EXPORT void await()
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        m_produceCv.wait(lock, [this]()
-                         { return !m_outstanding && m_tasks.empty(); });
+        pdal_thread_pool_await(m_pool);
     }
 
     // Join and restart.
@@ -123,60 +106,45 @@ public:
     // Change the number of threads.  Current threads will be joined.
     PDAL_EXPORT void resize(const std::size_t numThreads)
     {
-        join();
-        m_numThreads = numThreads;
-        go();
+        pdal_thread_pool_resize(m_pool, numThreads);
     }
 
     // Add a threaded task, blocking until a thread is available.  If join() is
     // called, add() may not be called again until go() is called and completes.
     PDAL_EXPORT void add(std::function<void()> task)
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        if (!m_running)
+        auto* heapTask = new std::function<void()>(std::move(task));
+        if (!pdal_thread_pool_add(m_pool, heapTask, runTask, dropTask))
         {
+            delete heapTask;
             throw pdal_error("Attempted to add a task to a stopped ThreadPool");
         }
-
-        m_produceCv.wait(lock,
-                         [this]()
-                         {
-                             return m_queueSize < 0 ||
-                                    m_tasks.size() < (size_t)m_queueSize;
-                         });
-
-        m_tasks.emplace(task);
-
-        // Notify worker that a task is available.
-        lock.unlock();
-        m_consumeCv.notify_all();
     }
 
     PDAL_EXPORT std::size_t size() const
     {
-        return m_numThreads;
+        return numThreads();
     }
 
     PDAL_EXPORT std::size_t numThreads() const
     {
-        return m_numThreads;
+        return pdal_thread_pool_num_threads(m_pool);
     }
 
 private:
-    // Worker thread function.  Wait for a task and run it.
-    void work();
+    static void runTask(void* data)
+    {
+        auto* task = static_cast<std::function<void()>*>(data);
+        (*task)();
+        delete task;
+    }
 
-    int64_t m_queueSize;
-    std::size_t m_numThreads;
-    std::vector<std::thread> m_threads;
-    std::queue<std::function<void()>> m_tasks;
+    static void dropTask(void* data)
+    {
+        delete static_cast<std::function<void()>*>(data);
+    }
 
-    std::size_t m_outstanding = 0;
-    bool m_running = false;
-
-    mutable std::mutex m_mutex;
-    std::condition_variable m_produceCv;
-    std::condition_variable m_consumeCv;
+    pdal_thread_pool_t* m_pool = nullptr;
 };
 
 } // namespace pdal

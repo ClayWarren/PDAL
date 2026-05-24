@@ -21,6 +21,7 @@ extern "C"
     typedef struct pdal_quad_index pdal_quad_index_t;
     typedef struct pdal_deflate_compressor pdal_deflate_compressor_t;
     typedef struct pdal_deflate_decompressor pdal_deflate_decompressor_t;
+    typedef struct pdal_thread_pool pdal_thread_pool_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -91,6 +92,19 @@ extern "C"
                                  bool for_output);
     int64_t pdal_charbuf_seekoff(int64_t off, uint8_t dir, int64_t offset,
                                  int64_t len, int64_t current);
+    pdal_thread_pool_t* pdal_thread_pool_create(size_t num_threads,
+                                                int64_t queue_size);
+    void pdal_thread_pool_destroy(pdal_thread_pool_t* handle);
+    void pdal_thread_pool_go(pdal_thread_pool_t* handle);
+    void pdal_thread_pool_join(pdal_thread_pool_t* handle);
+    void pdal_thread_pool_stop(pdal_thread_pool_t* handle);
+    void pdal_thread_pool_clear_tasks(pdal_thread_pool_t* handle);
+    void pdal_thread_pool_await(const pdal_thread_pool_t* handle);
+    void pdal_thread_pool_resize(pdal_thread_pool_t* handle,
+                                 size_t num_threads);
+    size_t pdal_thread_pool_num_threads(const pdal_thread_pool_t* handle);
+    bool pdal_thread_pool_add(pdal_thread_pool_t* handle, void* data,
+                              void (*run)(void*), void (*drop)(void*));
     char* pdal_file_utils_getcwd();
     char* pdal_file_utils_to_absolute_path(const char* filename);
     char* pdal_file_utils_to_absolute_path_with_base(const char* filename,

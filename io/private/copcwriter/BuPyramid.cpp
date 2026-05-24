@@ -35,6 +35,7 @@
 #include <iomanip>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <pdal/util/FileUtils.hpp>
