@@ -58,7 +58,7 @@ Status definitions:
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. `kernels.fauxplugin`, `pipeline`, `translate`, `random`, `density`, `ground`, `split`, `hausdorff`, `chamfer`, `delta`, `eval`, scoped `info --summary`/point/query/stats/schema/all, scoped `tindex create/merge`, and the installed-app `sort`/`merge` commands now dispatch through Rust-owned kernel code via that bridge; simple `tile` workflows dispatch through Rust and unsupported tile/tindex options fall back to C++. `pdal_app_test.option_file` now counts because the installed `pdal translate` option-file path is Rust-backed. `pdal_app_test.load` and `pdal_app_test.log` remain top-level C++ app/logging behavior and do not count yet. |
-| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `info` owns summary, point lookup, nearest query, stats, schema, and all-mode schema/stat output; STAC output remains C++ fallback. `tindex` now owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, input-source conflict guard, and invalid forwarded-filter diagnostic, but richer boundary generation remains C++ fallback. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
+| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `info` owns summary, point lookup, nearest query, stats, schema, and all-mode schema/stat output; STAC output remains C++ fallback. `tindex` now owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, and GeoJSON stdout layer-description option, but richer boundary generation remains C++ fallback. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `784 / 903` baseline C++ GoogleTest cases, or
-`86.82%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `785 / 903` baseline C++ GoogleTest cases, or
+`86.93%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 pre-port test set from `d540428c9^`, so newly added guard tests do not move the
 headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `823 / 953` currently built C++ GoogleTest cases, or
-`86.36%`; compute that with `--include-added-tests`.
+added during the port, is `824 / 953` currently built C++ GoogleTest cases, or
+`86.46%`; compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI

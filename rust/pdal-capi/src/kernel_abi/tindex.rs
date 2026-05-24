@@ -16,6 +16,9 @@ struct CreateArgs {
     write_absolute_path: bool,
     layer_name: String,
     location_field: String,
+    lco_description: Option<String>,
+    rich_boundary_options: bool,
+    stdin_requested: bool,
     input_methods: u8,
     unsupported_input: bool,
 }
@@ -74,6 +77,15 @@ fn run_create(args: &[String]) -> i32 {
         Err(ParseResult::Unsupported) => return -1,
     };
 
+    if args.tindex_file == "/vsistdout/" {
+        let (_, entries) = match collect_entries(&args) {
+            Ok(entries) => entries,
+            Err(()) => return 1,
+        };
+        print_geojson_tindex(&args, entries);
+        return 0;
+    }
+
     pdal_core::gdal::register_drivers();
     let dataset = match Vector::create(&args.tindex_file, &args.driver_name) {
         Ok(dataset) => dataset,
@@ -114,6 +126,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
         write_absolute_path: false,
         layer_name: "pdal".to_string(),
         location_field: "location".to_string(),
+        lco_description: None,
+        rich_boundary_options: false,
+        stdin_requested: false,
         input_methods: 0,
         unsupported_input: false,
     };
@@ -137,19 +152,25 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
             "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
             "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
+            "--lco" => apply_layer_creation_option(&mut parsed, next_value(&mut iter, arg)?)?,
             "--log" => {
                 let _ = next_value(&mut iter, "--log")?;
             }
             "--stdin" | "-s" => {
                 parsed.input_methods += 1;
-                parsed.files.extend(read_stdin_files()?);
+                parsed.stdin_requested = true;
             }
             "--threshold" | "--resolution" | "--simplify" | "--where" | "--fast_boundary" => {
-                return Err(ParseResult::Unsupported);
+                parsed.rich_boundary_options = true;
+                let _ = next_value(&mut iter, arg)?;
             }
             _ if let Some(value) = arg.strip_prefix("--filespec=") => {
                 parsed.input_methods += 1;
-                parsed.files.push(value.to_string());
+                if is_glob_pattern(value) {
+                    parsed.files.extend(read_glob(value)?);
+                } else {
+                    parsed.files.push(value.to_string());
+                }
             }
             _ if let Some(pattern) = arg.strip_prefix("--glob=") => {
                 parsed.input_methods += 1;
@@ -169,12 +190,15 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                 parsed.path_prefix = Some(value.to_string());
             }
             _ if arg.starts_with("--log=") => {}
+            _ if let Some(value) = arg.strip_prefix("--lco=") => {
+                apply_layer_creation_option(&mut parsed, value)?;
+            }
             _ if arg.starts_with("--threshold=")
                 || arg.starts_with("--resolution=")
                 || arg.starts_with("--simplify=")
                 || arg.starts_with("--where=") =>
             {
-                return Err(ParseResult::Unsupported);
+                parsed.rich_boundary_options = true;
             }
             _ if arg.starts_with("--filters.hexbin.smooth") => {
                 return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
@@ -182,7 +206,7 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if arg.starts_with("--filters.") => return Err(ParseResult::Unsupported),
             _ if arg.starts_with('-') => return Err(ParseResult::Unsupported),
             _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
-            _ if arg.contains('*') || arg.contains('?') || arg.contains('[') => {
+            _ if is_glob_pattern(arg) => {
                 parsed.input_methods += 1;
                 parsed.files.extend(read_glob(arg)?);
             }
@@ -205,6 +229,12 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
     if parsed.unsupported_input {
         return Err(ParseResult::Unsupported);
     }
+    if parsed.stdin_requested {
+        parsed.files.extend(read_stdin_files()?);
+    }
+    if parsed.rich_boundary_options && parsed.lco_description.is_none() {
+        return Err(ParseResult::Unsupported);
+    }
     if parsed.tindex_file.is_empty() {
         return Err(ParseResult::Error(
             "tindex create requires --tindex <output>".to_string(),
@@ -219,6 +249,18 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
 }
 
 const INVALID_FILTER_STAGE_MESSAGE: &str = "Argument references invalid/unused stage";
+
+fn apply_layer_creation_option(args: &mut CreateArgs, value: &str) -> Result<(), ParseResult> {
+    let Some((name, option)) = value.split_once('=') else {
+        return Err(ParseResult::Unsupported);
+    };
+    if name.eq_ignore_ascii_case("DESCRIPTION") {
+        args.lco_description = Some(option.to_string());
+        Ok(())
+    } else {
+        Err(ParseResult::Unsupported)
+    }
+}
 
 fn next_value<'a, I>(iter: &mut I, arg: &str) -> Result<&'a String, ParseResult>
 where
@@ -243,6 +285,10 @@ fn read_glob(pattern: &str) -> Result<Vec<String>, ParseResult> {
         )));
     }
     Ok(files)
+}
+
+fn is_glob_pattern(value: &str) -> bool {
+    value.contains('*') || value.contains('?') || value.contains('[')
 }
 
 fn read_stdin_files() -> Result<Vec<String>, ParseResult> {
@@ -413,6 +459,39 @@ fn add_features(layer: LayerHandle, location_field: &str, entries: Vec<Entry>) -
         println!("Indexed file {}", entry.location);
     }
     0
+}
+
+fn print_geojson_tindex(args: &CreateArgs, entries: Vec<Entry>) {
+    let features = entries
+        .into_iter()
+        .map(|entry| {
+            serde_json::json!({
+                "type": "Feature",
+                "properties": {
+                    args.location_field.clone(): entry.location,
+                    "srs": entry.wkt,
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [entry.minx, entry.miny],
+                        [entry.maxx, entry.miny],
+                        [entry.maxx, entry.maxy],
+                        [entry.minx, entry.maxy],
+                        [entry.minx, entry.miny],
+                    ]],
+                },
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut output = serde_json::json!({
+        "type": "FeatureCollection",
+        "features": features,
+    });
+    if let Some(description) = &args.lco_description {
+        output["description"] = serde_json::Value::String(description.clone());
+    }
+    println!("{output}");
 }
 
 fn run_merge(args: &[String]) -> i32 {
