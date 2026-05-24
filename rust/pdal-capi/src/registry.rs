@@ -23,6 +23,7 @@ use pdal_filters::estimate_rank::EstimateRankFilter;
 use pdal_filters::faceraster::FaceRasterFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
+use pdal_filters::hag_delaunay::HagDelaunayFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::hexbin::HexBinFilter;
@@ -108,6 +109,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.faceraster",
     "filters.gpstimeconvert",
     "filters.groupby",
+    "filters.hag_delaunay",
     "filters.hag_nn",
     "filters.head",
     "filters.hexbin",
@@ -276,6 +278,11 @@ pub fn create_filter(
         )?))),
         "filters.groupby" => Ok(Box::new(FilterWrapper::new(GroupByFilter::new(
             options.get_str("dimension", ""),
+        )))),
+        "filters.hag_delaunay" => Ok(Box::new(FilterWrapper::new(HagDelaunayFilter::new(
+            get_u64(options, "count", 10)? as usize,
+            get_bool(options, "allow_extrapolation", true)?,
+            get_u64(options, "class", 2)? as u8,
         )))),
         "filters.hag_nn" => Ok(Box::new(FilterWrapper::new(HagNnFilter::new(
             get_u64(options, "count", 1)? as usize,

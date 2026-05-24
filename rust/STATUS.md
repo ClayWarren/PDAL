@@ -336,10 +336,10 @@ Known mixed binaries:
 - `pdal_filters_colorization_test`: `test1`, `test2`, `test3`, and `test5`
   count. Color sampling and point updates route through the Rust C ABI. Invalid
   dimension-name validation remains C++ layout behavior.
-- `pdal_filters_hag_test`: `dem` and `dem_clamps` count for `filters.hag_dem`;
-  `neighbors` and `closest` count for `filters.hag_nn`. DEM sampling and
-  nearest-neighbor HAG assignment route through the Rust C ABI. Delaunay and
-  other hag variants remain C++.
+- `pdal_filters_hag_test`: `delaunay` counts for `filters.hag_delaunay`, `dem`
+  and `dem_clamps` count for `filters.hag_dem`, and `neighbors` and `closest`
+  count for `filters.hag_nn`. DEM sampling, Delaunay interpolation, and
+  nearest-neighbor HAG assignment route through the Rust C ABI.
 - `pdal_filters_chipper_test`: `issue_2479`, `empty_buffer`, and
   `test_construction` count. View partitioning routes through the Rust C ABI.
   Factory smoke coverage remains C++ wrapper behavior.
@@ -489,6 +489,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `faceraster`
 - `gpstimeconvert`
 - `groupby`
+- `hag_delaunay`
 - `hag_nn`
 - `head`
 - `hexbin`
@@ -539,9 +540,10 @@ algorithm decision.
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
 - Private or specialized algorithms: `CS`, `Delaunay`, `Georeference`,
-  `HagDelaunay`, `LloydKMeans`, `Poisson`,
+  `LloydKMeans`, `Poisson`,
   `Straighten`, `GreedyProjection`,
   `IterativeClosestPoint`, `RelaxationDartThrowing`.
+- Now Rust C ABI-backed: `HagDelaunay`.
 - Now Rust C ABI-backed: `M3C2`.
 - Now Rust C ABI-backed: `LiTree`.
 - Now Rust C ABI-backed: `PMF`.

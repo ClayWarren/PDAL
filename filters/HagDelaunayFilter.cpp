@@ -31,73 +31,14 @@
 
 #include "HagDelaunayFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/private/MathUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 
-#include "private/delaunator.hpp"
+#include <pdal_capi.h>
 
-#include <cmath>
 #include <string>
-#include <vector>
 
 namespace pdal
 {
-
-namespace
-{
-
-// The non-ground point (x0, y0) is in exactly 0 or 1 of the triangles of
-// the ground triangulation, so when we find a triangle containing the point,
-// return the interpolated z.
-// (I suppose the point could be on a edge of two triangles, but the
-//  result is the same, so this is still good.)
-double delaunay_interp_ground(double x0, double y0, PointViewPtr gView,
-                              const PointIdList& ids)
-{
-    using namespace pdal::Dimension;
-
-    // Delaunay-based interpolation
-    std::vector<double> neighbors;
-
-    for (size_t j = 0; j < ids.size(); ++j)
-    {
-        neighbors.push_back(gView->getFieldAs<double>(Id::X, ids[j]));
-        neighbors.push_back(gView->getFieldAs<double>(Id::Y, ids[j]));
-    }
-
-    delaunator::Delaunator triangulation(neighbors);
-    const std::vector<size_t>& triangles(triangulation.triangles);
-
-    for (size_t j = 0; j < triangles.size(); j += 3)
-    {
-        auto ai = triangles[j + 0];
-        auto bi = triangles[j + 1];
-        auto ci = triangles[j + 2];
-        double ax = gView->getFieldAs<double>(Id::X, ids[ai]);
-        double ay = gView->getFieldAs<double>(Id::Y, ids[ai]);
-        double az = gView->getFieldAs<double>(Id::Z, ids[ai]);
-
-        double bx = gView->getFieldAs<double>(Id::X, ids[bi]);
-        double by = gView->getFieldAs<double>(Id::Y, ids[bi]);
-        double bz = gView->getFieldAs<double>(Id::Z, ids[bi]);
-
-        double cx = gView->getFieldAs<double>(Id::X, ids[ci]);
-        double cy = gView->getFieldAs<double>(Id::Y, ids[ci]);
-        double cz = gView->getFieldAs<double>(Id::Z, ids[ci]);
-
-        // Returns infinity unless the point x0/y0 is in the triangle.
-        double z1 = math::barycentricInterpolation(ax, ay, az, bx, by, bz, cx,
-                                                   cy, cz, x0, y0);
-        if (z1 != std::numeric_limits<double>::infinity())
-            return z1;
-    }
-    // If the non ground point was outside the triangulation of ground
-    // points, just use the Z coordinate of the closest
-    // ground point.
-    return gView->getFieldAs<double>(Id::Z, ids[0]);
-}
-
-} // unnamed namespace
 
 static StaticPluginInfo const s_info{
     "filters.hag_delaunay",
@@ -145,85 +86,13 @@ void HagDelaunayFilter::prepared(PointTableRef table)
 
 void HagDelaunayFilter::filter(PointView& view)
 {
-    using namespace pdal::Dimension;
+    pdal_stage_t* stage =
+        pdal_stage_create_hag_delaunay(m_count, m_allowExtrapolation, m_class);
+    if (!stage)
+        throwError("Failed to create Rust hag_delaunay stage.");
 
-    PointViewPtr gView = view.makeNew();
-    PointViewPtr ngView = view.makeNew();
-
-    // Separate into ground and non-ground views.
-    for (PointId i = 0; i < view.size(); ++i)
-    {
-        if (view.getFieldAs<uint8_t>(Id::Classification, i) == m_class)
-        {
-            view.setField(Id::HeightAboveGround, i, 0);
-            gView->appendPoint(view, i);
-        }
-        else
-            ngView->appendPoint(view, i);
-    }
-    BOX2D gBounds;
-    gView->calculateBounds(gBounds);
-
-    // Bail if there weren't any points classified as ground.
-    if (gView->size() == 0)
-        log()->get(LogLevel::Error) << "Input PointView does not have any "
-                                       "points classified as ground.\n";
-
-    // Build the 2D KD-tree.
-    const KD2Index& kdi = gView->build2dIndex();
-
-    // Find Z difference between non-ground points and the nearest
-    // neighbor (2D) in the ground view or between non-ground points and the
-    // locally-computed surface (Delaunay triangultion of the neighborhood).
-    for (PointId i = 0; i < ngView->size(); ++i)
-    {
-        PointRef point = ngView->point(i);
-
-        // Non-ground view point for which we're trying to calc HAG
-        double x0 = point.getFieldAs<double>(Id::X);
-        double y0 = point.getFieldAs<double>(Id::Y);
-        double z0 = point.getFieldAs<double>(Id::Z);
-
-        PointIdList ids(m_count);
-        std::vector<double> sqr_dists(m_count);
-        kdi.knnSearch(x0, y0, m_count, &ids, &sqr_dists);
-
-        // Closest ground point.
-        double x = gView->getFieldAs<double>(Id::X, ids[0]);
-        double y = gView->getFieldAs<double>(Id::Y, ids[0]);
-        double z = gView->getFieldAs<double>(Id::Z, ids[0]);
-
-        double z1;
-        // If the close ground point is at the same X/Y as the non-ground
-        // point, we're done.  Also, if there's only one ground point, we
-        // just use that.
-        if ((x0 == x && y0 == y) || ids.size() == 1)
-        {
-            z1 = z;
-        }
-        // If the non-ground point is outside the bounds of all the
-        // ground points and we're not doing extrapolation, just return
-        // its current Z, which will give a HAG of 0.
-        else if (!gBounds.contains(x0, y0) && !m_allowExtrapolation)
-        {
-            z1 = z0;
-        }
-        else
-        {
-            try
-            {
-                z1 = delaunay_interp_ground(x0, y0, gView, ids);
-            }
-            // In degenerate cases (ids are collinear or duplicates), the above
-            // will throw, so treat x0/y0 as outside and assign the current
-            // value.
-            catch (...)
-            {
-                z1 = z0;
-            }
-        }
-        ngView->setField(Dimension::Id::HeightAboveGround, i, z0 - z1);
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal

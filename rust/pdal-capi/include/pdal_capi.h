@@ -757,6 +757,9 @@ extern "C"
     pdal_stage_t* pdal_stage_create_hagnn(uint64_t count, double max_distance,
                                           bool allow_extrapolation,
                                           uint8_t class_label);
+    pdal_stage_t* pdal_stage_create_hag_delaunay(uint64_t count,
+                                                 bool allow_extrapolation,
+                                                 uint8_t class_label);
     pdal_stage_t* pdal_stage_create_cluster(uint64_t min_points,
                                             uint64_t max_points,
                                             double tolerance, bool is_3d);

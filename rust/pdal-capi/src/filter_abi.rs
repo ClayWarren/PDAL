@@ -27,6 +27,7 @@ use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::h3::H3Filter;
+use pdal_filters::hag_delaunay::HagDelaunayFilter;
 use pdal_filters::hag_dem::HagDemFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;

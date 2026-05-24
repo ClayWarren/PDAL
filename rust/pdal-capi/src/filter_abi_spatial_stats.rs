@@ -445,6 +445,21 @@ pub extern "C" fn pdal_stage_create_hagnn(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Create a HAG Delaunay filter stage.
+#[no_mangle]
+pub extern "C" fn pdal_stage_create_hag_delaunay(
+    count: u64,
+    allow_extrapolation: bool,
+    class_label: u8,
+) -> *mut StageWrapper {
+    let filter = Box::new(HagDelaunayFilter::new(
+        count as usize,
+        allow_extrapolation,
+        class_label,
+    ));
+    Box::into_raw(Box::new(StageWrapper { filter }))
+}
+
 /// Create a cluster filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_cluster(

@@ -25,6 +25,7 @@ pub mod gpstimeconvert;
 pub mod griddecimation;
 pub mod groupby;
 pub mod h3;
+pub mod hag_delaunay;
 pub mod hag_dem;
 pub mod hagnn;
 pub mod head;
