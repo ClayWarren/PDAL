@@ -399,4 +399,64 @@ mod tests {
         assert_eq!(report.confusion_matrix[1][0], 1);
         assert_eq!(report.overall_accuracy, 0.5);
     }
+
+    #[test]
+    fn evaluate_sorts_deduplicates_labels_and_tracks_unknown_classes() {
+        let truth = labeled_cloud(&[
+            (0.0, 0.0, 0.0, 1.0),
+            (10.0, 0.0, 0.0, 2.0),
+            (20.0, 0.0, 0.0, 9.0),
+        ]);
+        let predicted = labeled_cloud(&[
+            (0.0, 0.0, 0.0, 2.0),
+            (10.0, 0.0, 0.0, 2.0),
+            (20.0, 0.0, 0.0, 7.0),
+        ]);
+
+        let report = evaluate(
+            &predicted,
+            &truth,
+            &DimId::Classification,
+            &DimId::Classification,
+            &[2, 1, 2],
+        );
+
+        assert_eq!(
+            report.labels.iter().map(|m| m.label).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(
+            report.confusion_matrix,
+            vec![vec![0, 1, 0], vec![0, 1, 0], vec![0, 0, 1]]
+        );
+        assert_eq!(report.overall_accuracy, 0.5);
+        assert_eq!(report.labels[0].support, 1);
+        assert_eq!(report.labels[0].precision, 0.0);
+        assert_eq!(report.labels[0].sensitivity, 0.0);
+        assert_eq!(report.labels[0].specificity, 1.0);
+        assert_eq!(report.labels[1].support, 1);
+        assert_eq!(report.labels[1].precision, 0.5);
+        assert_eq!(report.labels[1].sensitivity, 1.0);
+        assert_eq!(report.labels[1].specificity, 0.0);
+    }
+
+    #[test]
+    fn evaluate_with_no_requested_labels_reports_empty_metrics() {
+        let truth = labeled_cloud(&[(0.0, 0.0, 0.0, 1.0)]);
+        let predicted = labeled_cloud(&[(0.0, 0.0, 0.0, 1.0)]);
+
+        let report = evaluate(
+            &predicted,
+            &truth,
+            &DimId::Classification,
+            &DimId::Classification,
+            &[],
+        );
+
+        assert!(report.labels.is_empty());
+        assert_eq!(report.mean_intersection_over_union, 0.0);
+        assert_eq!(report.overall_accuracy, 0.0);
+        assert_eq!(report.f1_score, 0.0);
+        assert_eq!(report.confusion_matrix, vec![vec![1]]);
+    }
 }
