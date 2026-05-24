@@ -323,6 +323,59 @@ pub extern "C" fn pdal_stage_create_litree(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// Compute M3C2 output for two source clouds and a core-point view.
+///
+/// # Safety
+///
+/// `view1`, `view2`, and `cores` must be valid point-view pointers returned by
+/// the Rust C ABI.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_m3c2_compute(
+    view1: *const PointView,
+    view2: *const PointView,
+    cores: *const PointView,
+    normal_radius: f64,
+    cyl_radius: f64,
+    cyl_half_len: f64,
+    reg_error: f64,
+    orientation: u8,
+    min_points: u64,
+) -> *mut PointView {
+    let Some(view1) = view1.as_ref() else {
+        set_last_error("M3C2 missing first view.");
+        return std::ptr::null_mut();
+    };
+    let Some(view2) = view2.as_ref() else {
+        set_last_error("M3C2 missing second view.");
+        return std::ptr::null_mut();
+    };
+    let Some(cores) = cores.as_ref() else {
+        set_last_error("M3C2 missing core points.");
+        return std::ptr::null_mut();
+    };
+
+    let orientation = match orientation {
+        1 => M3C2NormalOrientation::Down,
+        2 => M3C2NormalOrientation::None,
+        _ => M3C2NormalOrientation::Up,
+    };
+    let filter = M3C2Filter::new(
+        normal_radius,
+        cyl_radius,
+        cyl_half_len,
+        reg_error,
+        orientation,
+        min_points as usize,
+    );
+    match filter.compute(view1, view2, cores) {
+        Ok(out) => Box::into_raw(Box::new(out)),
+        Err(err) => {
+            set_last_error(&err.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Create a skewness balancing filter stage.
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_skewnessbalancing(

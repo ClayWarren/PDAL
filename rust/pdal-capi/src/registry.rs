@@ -32,6 +32,7 @@ use pdal_filters::litree::LiTreeFilter;
 use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
+use pdal_filters::m3c2::{M3C2Filter, NormalOrientation as M3C2NormalOrientation};
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::miniball::MiniballFilter;
@@ -114,6 +115,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.label_duplicates",
     "filters.litree",
     "filters.lloydkmeans",
+    "filters.m3c2",
     "filters.locate",
     "filters.lof",
     "filters.mad",
@@ -312,6 +314,14 @@ pub fn create_filter(
                 .iter()
                 .map(|s| DimId::from_name(s))
                 .collect(),
+        )))),
+        "filters.m3c2" => Ok(Box::new(FilterWrapper::new(M3C2Filter::new(
+            get_f64(options, "normal_radius", 2.0)?,
+            get_f64(options, "cyl_radius", 2.0)?,
+            get_f64(options, "cyl_halflen", 5.0)?,
+            get_f64(options, "reg_error", 0.0)?,
+            m3c2_orientation(&options.get_str("orientation", "up"))?,
+            get_u64(options, "min_points", 1)? as usize,
         )))),
         "filters.locate" => Ok(Box::new(FilterWrapper::new(LocateFilter::new(
             options.get_str("dimension", ""),
@@ -604,6 +614,17 @@ fn nn_distance_mode(value: &str) -> Result<NNDistanceMode, StageError> {
         "avg" | "average" => Ok(NNDistanceMode::Average),
         _ => Err(StageError(format!(
             "filters.nndistance mode must be 'kth' or 'avg', got '{value}'."
+        ))),
+    }
+}
+
+fn m3c2_orientation(value: &str) -> Result<M3C2NormalOrientation, StageError> {
+    match value.to_ascii_lowercase().as_str() {
+        "up" => Ok(M3C2NormalOrientation::Up),
+        "down" => Ok(M3C2NormalOrientation::Down),
+        "none" => Ok(M3C2NormalOrientation::None),
+        _ => Err(StageError(format!(
+            "filters.m3c2 orientation must be 'up', 'down', or 'none', got '{value}'."
         ))),
     }
 }

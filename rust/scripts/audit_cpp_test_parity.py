@@ -436,6 +436,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_smrf_test": ALL,
     "pdal_filters_labelduplicates_test": ALL,
     "pdal_filters_litree_test": ALL,
+    "pdal_filters_m3c2_test": ALL,
     "pdal_filters_neighborclassifier_test": ALL,
     "pdal_filters_separatescanline_test": ALL,
     "pdal_filters_supervoxel_test": ALL,

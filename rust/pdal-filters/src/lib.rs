@@ -36,6 +36,7 @@ pub mod litree;
 pub mod lloydkmeans;
 pub mod locate;
 pub mod lof;
+pub mod m3c2;
 pub mod mad;
 pub mod math;
 pub mod merge;

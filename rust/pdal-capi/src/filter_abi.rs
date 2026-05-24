@@ -37,6 +37,7 @@ use pdal_filters::litree::LiTreeFilter;
 use pdal_filters::lloydkmeans::LloydKMeansFilter;
 use pdal_filters::locate::LocateFilter;
 use pdal_filters::lof::LofFilter;
+use pdal_filters::m3c2::{M3C2Filter, NormalOrientation as M3C2NormalOrientation};
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::miniball::MiniballFilter;

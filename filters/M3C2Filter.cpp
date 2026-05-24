@@ -34,12 +34,8 @@
 
 #include "M3C2Filter.hpp"
 
-#include <Eigen/Geometry>
-#include <algorithm>
-#include <numeric>
-
-#include "private/Comparison.hpp"
-#include <pdal/private/MathUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -59,8 +55,6 @@ struct M3C2Filter::Private
     PointViewPtr v1;
     PointViewPtr v2;
     PointViewPtr cores;
-    double cylRadius2;
-    double cylBallRadius;
     Dimension::Id distanceDim;
     Dimension::Id uncertaintyDim;
     Dimension::Id significantDim;
@@ -166,15 +160,6 @@ void M3C2Filter::addDimensions(PointLayoutPtr layout)
     m_p->n2Dim = layout->assignDim("m3c2_count2", Dimension::Type::Unsigned16);
 }
 
-void M3C2Filter::initialize()
-{
-    m_p->cylRadius2 = std::pow(m_args->cylRadius, 2.0);
-
-    // Compute the radius of a ball that fits around the cylinder.
-    m_p->cylBallRadius =
-        std::sqrt(m_p->cylRadius2 + m_args->cylHalfLen * m_args->cylHalfLen);
-}
-
 PointViewSet M3C2Filter::run(PointViewPtr view)
 {
     if (!m_p->v1)
@@ -199,179 +184,28 @@ void M3C2Filter::done(PointTableRef _)
     if (!m_p->cores)
         throwError("Missing core points.");
 
-    BOX3D v1Bounds;
-    m_p->v1->calculateBounds(v1Bounds);
+    uint8_t orientation = 0;
+    if (m_args->orientation == NormalOrientation::Down)
+        orientation = 1;
+    else if (m_args->orientation == NormalOrientation::None)
+        orientation = 2;
 
-    PointView& v1 = *m_p->v1;
-    PointGrid g1(v1Bounds.to2d(), v1);
-    for (PointId id = 0; id < v1.size(); ++id)
-        g1.add(v1.getFieldAs<double>(Dimension::Id::X, id),
-               v1.getFieldAs<double>(Dimension::Id::Y, id), id);
+    pdal_point_view_t* rustView1 = rust_view_converter::toRust(m_p->v1);
+    pdal_point_view_t* rustView2 = rust_view_converter::toRust(m_p->v2);
+    pdal_point_view_t* rustCores = rust_view_converter::toRust(m_p->cores);
+    pdal_point_view_t* rustOut =
+        pdal_m3c2_compute(rustView1, rustView2, rustCores, m_args->normalRadius,
+                          m_args->cylRadius, m_args->cylHalfLen,
+                          m_args->regError, orientation, m_args->minPoints);
+    pdal_point_view_destroy(rustView1);
+    pdal_point_view_destroy(rustView2);
+    pdal_point_view_destroy(rustCores);
 
-    BOX3D v2Bounds;
-    m_p->v2->calculateBounds(v2Bounds);
+    if (!rustOut)
+        rust_view_converter::throwLastError("Rust M3C2 stage failed.");
 
-    PointView& v2 = *m_p->v2;
-    PointGrid g2(v2Bounds.to2d(), v2);
-    for (PointId id = 0; id < v2.size(); ++id)
-        g2.add(v2.getFieldAs<double>(Dimension::Id::X, id),
-               v2.getFieldAs<double>(Dimension::Id::Y, id), id);
-
-    for (PointRef ref : *m_p->cores)
-    {
-        PointIdList pts1;
-        PointIdList pts2;
-
-        Eigen::Vector3d core(ref.getFieldAs<double>(Dimension::Id::X),
-                             ref.getFieldAs<double>(Dimension::Id::Y),
-                             ref.getFieldAs<double>(Dimension::Id::Z));
-
-        Eigen::Vector3d normal = findNormal(core, g1);
-        if (m_args->orientation == NormalOrientation::Up)
-            normal = math::orientUp(normal);
-        else if (m_args->orientation == NormalOrientation::Down)
-            if (normal(2) > 0)
-                normal = -normal;
-
-        Eigen::Vector3d radius(m_args->cylRadius, m_args->cylRadius,
-                               m_args->cylRadius);
-        Eigen::Vector3d end1 = core + (normal * m_args->cylHalfLen);
-        Eigen::Vector3d end2 = core - (normal * m_args->cylHalfLen);
-        Eigen::Vector3d c1 = end1 + radius;
-        Eigen::Vector3d c2 = end1 - radius;
-        Eigen::Vector3d c3 = end2 + radius;
-        Eigen::Vector3d c4 = end2 - radius;
-        BOX2D box;
-        box.grow(c1(0), c1(1));
-        box.grow(c2(0), c2(1));
-        box.grow(c3(0), c3(1));
-        box.grow(c4(0), c4(1));
-
-        PointIdList pts = g1.findNeighbors(box);
-        std::vector<double> dists1 = filterPoints(core, normal, g1.view(), pts);
-
-        pts = g2.findNeighbors(box);
-        std::vector<double> dists2 = filterPoints(core, normal, g2.view(), pts);
-
-        Stats stats;
-        if (calcStats(dists1, dists2, stats))
-        {
-            ref.setField(m_p->distanceDim, stats.distance);
-            ref.setField(m_p->uncertaintyDim, stats.uncertainty);
-            ref.setField(m_p->significantDim, stats.significant);
-            ref.setField(m_p->stdDev1Dim, stats.stdDev1);
-            ref.setField(m_p->stdDev2Dim, stats.stdDev2);
-            ref.setField(m_p->n1Dim, stats.n1);
-            ref.setField(m_p->n2Dim, stats.n2);
-        }
-    }
-}
-
-Eigen::Vector3d M3C2Filter::findNormal(Eigen::Vector3d pos,
-                                       const PointGrid& grid)
-{
-    PointIdList neighbors = grid.findNeighbors3d(pos, m_args->normalRadius);
-    math::NormalResult res = math::findNormal(grid.view(), neighbors);
-    return res.normal;
-}
-
-bool M3C2Filter::calcStats(const std::vector<double>& pts1,
-                           const std::vector<double>& pts2, Stats& stats)
-{
-    if ((int)pts1.size() < m_args->minPoints ||
-        (int)pts2.size() < m_args->minPoints)
-        return false;
-
-    // Set square distances to distances
-    double sum = 0;
-    double sum2 = 0;
-    for (double val : pts1)
-    {
-        sum += val;
-        sum2 += val * val;
-    }
-    double mean1 = sum / pts1.size();
-    // This is a bad variance calcuation from a computational standpoint.
-    double var1 = sum2 / pts1.size() - mean1 * mean1;
-
-    sum = 0;
-    sum2 = 0;
-    for (double val : pts2)
-    {
-        sum += val;
-        sum2 += val * val;
-    }
-    double mean2 = sum / pts2.size();
-    double var2 = sum2 / pts2.size() - mean2 * mean2;
-
-    double lodVar = var1 / pts1.size() + var2 / pts2.size();
-    double lod = 1.96 * (std::sqrt(lodVar) + m_args->regError);
-
-    stats.distance = mean2 - mean1;
-    stats.uncertainty = lod;
-    stats.significant = std::abs(stats.distance) > lod;
-    stats.stdDev1 = std::sqrt(var1);
-    stats.stdDev2 = std::sqrt(var2);
-    stats.n1 = pts1.size();
-    stats.n2 = pts2.size();
-
-    return true;
-}
-
-std::vector<double> M3C2Filter::filterPoints(Eigen::Vector3d cylCenter,
-                                             Eigen::Vector3d cylNormal,
-                                             const PointView& view,
-                                             const PointIdList& neighbors)
-{
-    std::vector<double> dists;
-
-    if (!neighbors.size())
-        return dists;
-    dists.reserve(neighbors.size());
-
-    Eigen::Vector3d point(view.getFieldAs<double>(Dimension::Id::X, 0),
-                          view.getFieldAs<double>(Dimension::Id::Y, 0),
-                          view.getFieldAs<double>(Dimension::Id::Z, 0));
-
-    size_t start = 0;
-    // If the first point is the test point, ignore it.
-    if (Comparison::closeEnough(cylCenter(0), point(0)) &&
-        Comparison::closeEnough(cylCenter(1), point(1)) &&
-        Comparison::closeEnough(cylCenter(2), point(2)))
-        start++;
-
-    for (size_t i = start; i < neighbors.size(); i++)
-    {
-        PointId id = neighbors[i];
-        Eigen::Vector3d point(view.getFieldAs<double>(Dimension::Id::X, id),
-                              view.getFieldAs<double>(Dimension::Id::Y, id),
-                              view.getFieldAs<double>(Dimension::Id::Z, id));
-
-        double dist = pointPasses(point, cylCenter, cylNormal);
-        if (!std::isnan(dist))
-            dists.push_back(dist);
-    }
-    return dists;
-}
-
-double M3C2Filter::pointPasses(Eigen::Vector3d point, Eigen::Vector3d cylCenter,
-                               Eigen::Vector3d cylNormal)
-{
-    // Calculate the distance from the point to the line that goes through the
-    // cylinder normal vector. Make sure it's less than the cylinder radius.
-    Eigen::ParametrizedLine<double, 3> line(cylCenter, cylNormal);
-    if (line.squaredDistance(point) > m_p->cylRadius2)
-        return std::numeric_limits<double>::quiet_NaN();
-
-    // Calculate the distance from the point to the plane that's parallel to the
-    // cylinder's end and goes through the cylinder "center" (our core point).
-    // Make sure that's less than the half length of the cylinder.
-    Eigen::Hyperplane<double, 3> plane(cylNormal, cylCenter);
-    double dist = plane.signedDistance(point);
-    if (std::abs(dist) > m_args->cylHalfLen)
-        return std::numeric_limits<double>::quiet_NaN();
-
-    return dist;
+    rust_view_converter::fromRust(rustOut, *m_p->cores);
+    pdal_point_view_destroy(rustOut);
 }
 
 } // namespace pdal

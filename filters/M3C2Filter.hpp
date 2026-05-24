@@ -34,10 +34,7 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-
 #include <pdal/Filter.hpp>
-#include <pdal/private/PointGrid.hpp>
 
 namespace pdal
 {
@@ -46,17 +43,6 @@ class PointView;
 
 class PDAL_EXPORT M3C2Filter : public Filter
 {
-    struct Stats
-    {
-        double distance;
-        double uncertainty;
-        double significant;
-        double stdDev1;
-        double stdDev2;
-        int n1;
-        int n2;
-    };
-
     enum class NormalOrientation
     {
         Up,
@@ -83,20 +69,8 @@ public:
 private:
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
-    void initialize() override;
     PointViewSet run(PointViewPtr view) override;
     void done(PointTableRef table) override;
-
-    Eigen::Vector3d findNormal(Eigen::Vector3d pos, const PointGrid& grid);
-
-    bool calcStats(const std::vector<double>& dists1,
-                   const std::vector<double>& dists2, Stats& stats);
-    std::vector<double> filterPoints(Eigen::Vector3d cylCenter,
-                                     Eigen::Vector3d cylNormal,
-                                     const PointView& ids,
-                                     const PointIdList& neighbors);
-    double pointPasses(Eigen::Vector3d point, Eigen::Vector3d cylCenter,
-                       Eigen::Vector3d cylNormal);
 
     std::unique_ptr<M3C2Filter::Args> m_args;
 

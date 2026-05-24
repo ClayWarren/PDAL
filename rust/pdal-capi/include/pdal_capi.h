@@ -740,6 +740,13 @@ extern "C"
         const char* const* returns, uint64_t count);
     pdal_stage_t* pdal_stage_create_litree(uint64_t min_points,
                                            double min_height, double radius);
+    pdal_point_view_t* pdal_m3c2_compute(const pdal_point_view_t* view1,
+                                         const pdal_point_view_t* view2,
+                                         const pdal_point_view_t* cores,
+                                         double normal_radius,
+                                         double cyl_radius, double cyl_half_len,
+                                         double reg_error, uint8_t orientation,
+                                         uint64_t min_points);
     pdal_stage_t* pdal_stage_create_skewnessbalancing(uint8_t ground_class,
                                                       uint8_t other_class,
                                                       bool only_ground);
