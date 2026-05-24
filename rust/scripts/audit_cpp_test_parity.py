@@ -671,6 +671,10 @@ COVERED: dict[str, object] = {
     "pdal_pipeline_writer_test": {"issue_2458", "serialize"},
     "pdal_pipeline_manager_test": {"basic", "arrayPipeline"},
     "pdal_streaming_test": ALL,
+    "nitfwrap_test": ALL,
+    "pc2pc_test": ALL,
+    "random_test": ALL,
+    "translate_test": ALL,
 }
 
 
@@ -739,7 +743,7 @@ def main() -> int:
     args = parser.parse_args()
 
     bin_dir = Path(args.build_dir) / "bin"
-    binaries = sorted(bin_dir.glob("pdal*_test"))
+    binaries = sorted(bin_dir.glob("*_test"))
     if not binaries:
         raise SystemExit(f"no built test binaries found under {bin_dir}")
 

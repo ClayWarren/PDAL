@@ -135,6 +135,26 @@ fn parse_stage_option_arg_rejects_no_dot() {
 }
 
 #[test]
+fn apply_stage_options_preserves_repeated_values() {
+    let mut stages = vec![serde_json::json!({ "type": "filters.returns" })];
+    let options = vec![
+        StageOption {
+            stage: "filters.returns".to_string(),
+            key: "groups".to_string(),
+            value: "last".to_string(),
+        },
+        StageOption {
+            stage: "filters.returns".to_string(),
+            key: "groups".to_string(),
+            value: "first".to_string(),
+        },
+    ];
+
+    apply_stage_options(&mut stages, &options).unwrap();
+    assert_eq!(stages[0]["groups"], serde_json::json!(["last", "first"]));
+}
+
+#[test]
 fn run_entry_point_parse_error_returns_1() {
     // Pass an unexpected root argument to trigger parse_args error in run.
     assert_eq!(

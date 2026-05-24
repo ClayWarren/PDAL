@@ -32,6 +32,7 @@ const PROJJSON_RECORD_ID: u16 = 4225;
 const LEGACY_MAX_RETURN_COUNT: u8 = 5;
 const LAS14_MAX_RETURN_COUNT: u8 = 15;
 
+#[derive(Clone)]
 pub struct LasWriter {
     filename: String,
     compression: bool,
@@ -63,11 +64,13 @@ pub struct LasWriter {
     forward_vlrs: Vec<ForwardedVlr>,
 }
 
+#[derive(Clone)]
 struct ConfiguredExtraDim {
     name: String,
     type_name: String,
 }
 
+#[derive(Clone)]
 struct UserVlr {
     user_id: String,
     record_id: u16,
@@ -76,6 +79,7 @@ struct UserVlr {
     write_as_evlr: bool,
 }
 
+#[derive(Clone)]
 struct ForwardedVlr {
     user_id: String,
     record_id: u16,
@@ -222,6 +226,14 @@ impl Writer for LasWriter {
                 "LasWriter requires a filename option.".to_string(),
             ));
         }
+        if self.filename.contains('#') {
+            for (idx, view) in views.iter().enumerate() {
+                let mut writer = self.clone();
+                writer.filename = numbered_filename(&self.filename, idx + 1);
+                writer.write(std::slice::from_ref(view))?;
+            }
+            return Ok(());
+        }
 
         let path = Path::new(&self.filename);
         let should_compress = self.should_compress(path);
@@ -313,6 +325,10 @@ fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraD
             type_name: types[idx].clone(),
         })
         .collect()
+}
+
+fn numbered_filename(template: &str, number: usize) -> String {
+    template.replacen('#', &number.to_string(), 1)
 }
 
 fn resolve_extra_dims(

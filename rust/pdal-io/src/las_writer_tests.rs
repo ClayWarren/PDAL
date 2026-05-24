@@ -1096,6 +1096,32 @@ mod tests {
     }
 
     #[test]
+    fn writer_expands_filename_template_for_multiple_views() {
+        let template = std::env::temp_dir().join(format!(
+            "pdal-las-template-{}-#.las",
+            std::process::id()
+        ));
+        let first = std::path::PathBuf::from(numbered_filename(template.to_str().unwrap(), 1));
+        let second = std::path::PathBuf::from(numbered_filename(template.to_str().unwrap(), 2));
+        let _ = std::fs::remove_file(&first);
+        let _ = std::fs::remove_file(&second);
+        let _ = std::fs::remove_file(&template);
+
+        let mut options = Options::new();
+        options.add("filename", template.display().to_string());
+        let mut writer = LasWriter::new(&options);
+        writer
+            .write(&[synthetic_point_view(), synthetic_point_view()])
+            .unwrap();
+
+        assert!(first.exists());
+        assert!(second.exists());
+        assert!(!template.exists());
+        let _ = std::fs::remove_file(first);
+        let _ = std::fs::remove_file(second);
+    }
+
+    #[test]
     fn dim_type_from_interpretation_signed_and_float_branches() {
         assert_eq!(dim_type_from_interpretation("int8"), Some(DimType::I8));
         assert_eq!(dim_type_from_interpretation("int16"), Some(DimType::I16));

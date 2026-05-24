@@ -687,7 +687,17 @@ fn apply_stage_options(
         for entry in stages.iter_mut() {
             let entry_type = entry["type"].as_str();
             if entry_type == Some(stage.as_str()) || entry_type == Some(qualified.as_str()) {
-                entry[key.as_str()] = serde_json::json!(value);
+                match entry.get_mut(key.as_str()) {
+                    Some(existing) => {
+                        if let Some(values) = existing.as_array_mut() {
+                            values.push(serde_json::json!(value));
+                        } else {
+                            let first = std::mem::take(existing);
+                            *existing = serde_json::json!([first, value]);
+                        }
+                    }
+                    None => entry[key.as_str()] = serde_json::json!(value),
+                }
                 applied = true;
             }
         }

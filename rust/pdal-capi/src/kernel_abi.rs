@@ -467,7 +467,18 @@ fn apply_cli_stage_options(stages: &mut [serde_json::Value], options: &[CliStage
         for entry in stages.iter_mut() {
             let entry_type = entry["type"].as_str();
             if entry_type == Some(option.stage.as_str()) || entry_type == Some(qualified.as_str()) {
-                entry[option.key.as_str()] = parse_option_value(&option.value);
+                let value = parse_option_value(&option.value);
+                match entry.get_mut(option.key.as_str()) {
+                    Some(existing) => {
+                        if let Some(values) = existing.as_array_mut() {
+                            values.push(value);
+                        } else {
+                            let first = std::mem::take(existing);
+                            *existing = serde_json::json!([first, value]);
+                        }
+                    }
+                    None => entry[option.key.as_str()] = value,
+                }
                 applied = true;
             }
         }
@@ -820,6 +831,26 @@ mod tests {
         let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 
         assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn cli_stage_options_preserve_repeated_values() {
+        let mut stages = vec![serde_json::json!({ "type": "filters.returns" })];
+        let options = vec![
+            CliStageOption {
+                stage: "filters.returns".to_string(),
+                key: "groups".to_string(),
+                value: "last".to_string(),
+            },
+            CliStageOption {
+                stage: "filters.returns".to_string(),
+                key: "groups".to_string(),
+                value: "first".to_string(),
+            },
+        ];
+
+        assert!(apply_cli_stage_options(&mut stages, &options));
+        assert_eq!(stages[0]["groups"], serde_json::json!(["last", "first"]));
     }
 
     #[test]
