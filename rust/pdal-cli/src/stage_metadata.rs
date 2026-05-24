@@ -54,6 +54,11 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
             description: "dump LAS header, VLR, and point checksum information",
         },
         KernelInfo {
+            name: "nitfwrap",
+            full_name: "tools.nitfwrap",
+            description: "wrap LAS/LAZ/BPF data in a NITF file or unwrap it",
+        },
+        KernelInfo {
             name: "merge",
             full_name: "kernels.merge",
             description: "merge several point cloud files into one output",

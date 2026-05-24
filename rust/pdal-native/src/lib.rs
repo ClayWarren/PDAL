@@ -6,12 +6,14 @@
 
 pub mod gdal;
 pub mod geometry;
+pub mod nitf;
 pub mod srs;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeCapability {
     Gdal,
     Geos,
+    Nitro,
     Proj,
 }
 
@@ -26,6 +28,7 @@ pub fn built_capabilities() -> &'static [NativeCapability] {
     &[
         NativeCapability::Gdal,
         NativeCapability::Geos,
+        NativeCapability::Nitro,
         NativeCapability::Proj,
     ]
 }
@@ -41,6 +44,11 @@ pub fn built_dependencies() -> Vec<NativeDependency> {
             capability: NativeCapability::Geos,
             name: "GEOS",
             version: geometry::version(),
+        },
+        NativeDependency {
+            capability: NativeCapability::Nitro,
+            name: "NITRO",
+            version: "linked".to_string(),
         },
         NativeDependency {
             capability: NativeCapability::Proj,

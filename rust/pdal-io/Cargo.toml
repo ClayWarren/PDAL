@@ -13,6 +13,7 @@ las = { version = "0.9.11", features = ["laz"] }
 las-crs = "1.0.0"
 lzf-rust = "0.1.0"
 pdal-core = { path = "../pdal-core" }
+pdal-native = { path = "../pdal-native" }
 roxmltree = "0.21.1"
 serde_json = "1.0"
 spz-crate = { package = "spz", version = "0.0.6" }

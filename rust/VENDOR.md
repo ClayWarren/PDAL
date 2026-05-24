@@ -85,6 +85,7 @@ GDAL/OGR path unless a future milestone proves a safe boundary.
 - GEOS geometry operations: `geos` through `pdal-native`
 - PROJ transformations: `proj` through `pdal-native`
 - GDAL raster/vector access: `gdal-sys` through `pdal-native`
+- NITF wrap/unwrap support: Nitro through `pdal-native`
 - JSON parsing: `serde_json`
 
 These are choices made for the current spike, not a permanent promise. If a

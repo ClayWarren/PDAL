@@ -82,8 +82,9 @@ roadmap as permission to sweep a directory.
    `pdal-rs` can keep proving command parity, but the top-layer C++ app/tool
    migration closes only after the lower library surface is stable. `lasdump`
    may advance in narrow LAS-backed steps; LAZ checksum parity waits on the
-   compression strategy. `nitfwrap` waits on NITF/plugin strategy; broad kernels
-   stay late.
+   compression strategy. `nitfwrap` may use a Nitro adapter because NITF writing
+   is a vendor-format boundary; full `readers.nitf`/`writers.nitf` parity remains
+   an I/O/plugin milestone. Broad kernels stay late.
 7. Define plugin compatibility after the first-party surface.
    Keep broad optional plugins in C++ until the first-party library, command
    surface, C ABI versioning, ownership/lifetime rules, dynamic loading, and
@@ -255,7 +256,9 @@ Apps/tools work is allowed when it directly supports a command-readiness gate:
 - `tools/lasdump` can progress for uncompressed LAS once LAS header/VLR/point
   checksum behavior is parity-tested; LAZ checksum parity waits for the
   compression strategy.
-- `tools/nitfwrap` waits for the NITF/plugin or specialized I/O strategy.
+- `tools/nitfwrap` can progress through a Nitro-backed adapter for the narrow
+  wrap/unwrap tool workflow. Do not treat that as full `readers.nitf` or
+  `writers.nitf` parity.
 
 Do not mark apps/tools complete because the LOC is small. They close only when
 their underlying command or format strategy has parity coverage.
@@ -453,8 +456,9 @@ Required shape:
   not as an independent early port.
 - `tools/lasdump` should stay narrow until LAS/LAZ behavior is explicit:
   uncompressed LAS dumping can move ahead, while LAZ checksum parity waits on
-  compression. `tools/nitfwrap` remains deferred until its NITF lower-layer
-  strategy is explicit.
+  compression. `tools/nitfwrap` may move ahead through the Nitro adapter for
+  byte-preserving LAS/BPF wrap and unwrap workflows, but that does not imply
+  full `readers.nitf` or `writers.nitf` parity.
 - New concrete command work does not start until the command readiness gates in
   `Migration Order` are satisfied for that command.
 - `pdal pipeline` proved the library surface directly. `pdal info` and simple

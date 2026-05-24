@@ -470,6 +470,11 @@ fn options_for_unknown_stage_does_not_panic() {
 }
 
 #[test]
+fn output_last_error_falls_back_without_message() {
+    App::new().output_last_error();
+}
+
+#[test]
 fn run_with_no_command_outputs_help() {
     let app = App::new();
     assert_eq!(app.run(), 0);
@@ -482,4 +487,16 @@ fn fauxplugin_dispatch_via_run() {
     app.command = "fauxplugin".to_string();
     // Not asserting return code; just exercising the branch.
     let _ = app.run();
+}
+
+#[test]
+fn lasdump_reports_option_and_positional_errors() {
+    let app = app_with_command("lasdump", &["-o"]);
+    assert_eq!(app.run_lasdump(), 1);
+
+    let app = app_with_command("lasdump", &["a.las", "b.las"]);
+    assert_eq!(app.run_lasdump(), 1);
+
+    let app = app_with_command("lasdump", &["--bogus"]);
+    assert_eq!(app.run_lasdump(), 1);
 }

@@ -301,6 +301,9 @@ impl App {
             if command == "lasdump" {
                 return self.run_lasdump();
             }
+            if command == "nitfwrap" {
+                return self.run_nitfwrap();
+            }
             if command == "translate" {
                 return self.run_translate();
             }
@@ -431,6 +434,76 @@ impl App {
             print!("{text}");
         }
         0
+    }
+}
+
+struct NitfwrapArgs<'a> {
+    input: &'a str,
+    output: Option<&'a str>,
+    unwrap: bool,
+}
+
+impl<'a> NitfwrapArgs<'a> {
+    fn parse(args: &'a [String]) -> Result<Self, String> {
+        let mut input = None;
+        let mut output = None;
+        let mut unwrap = false;
+        let mut iter = args.iter();
+        while let Some(arg) = iter.next() {
+            match arg.as_str() {
+                "-u" | "--unwrap" => unwrap = true,
+                "-o" | "--output" => {
+                    let Some(value) = iter.next() else {
+                        return Err("output option requires a filename".to_string());
+                    };
+                    output = Some(value.as_str());
+                }
+                _ if arg.starts_with("--output=") => {
+                    output = arg.strip_prefix("--output=");
+                }
+                _ if arg.starts_with('-') => return Err(format!("Unexpected argument '{arg}'")),
+                _ if input.is_none() => input = Some(arg.as_str()),
+                _ if output.is_none() => output = Some(arg.as_str()),
+                _ => return Err(format!("Unexpected argument '{arg}'")),
+            }
+        }
+        let Some(input) = input else {
+            return Err(String::new());
+        };
+        Ok(Self {
+            input,
+            output,
+            unwrap,
+        })
+    }
+}
+
+impl App {
+    pub(super) fn run_nitfwrap(&self) -> i32 {
+        let args = match NitfwrapArgs::parse(&self.command_args) {
+            Ok(args) => args,
+            Err(message) => {
+                if !message.is_empty() {
+                    eprintln!("nitfwrap: {message}");
+                }
+                eprintln!("usage: nitfwrap [options] <input> [output]");
+                return 1;
+            }
+        };
+        let input = Path::new(args.input);
+        let output = args.output.map(Path::new);
+        let result = if args.unwrap {
+            pdal_io::nitfwrap::unwrap(input, output)
+        } else {
+            pdal_io::nitfwrap::wrap(input, output)
+        };
+        match result {
+            Ok(_) => 0,
+            Err(err) => {
+                eprintln!("nitfwrap: {err}");
+                1
+            }
+        }
     }
 }
 

@@ -1,0 +1,42 @@
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn main() {
+    let prefix = env::var("CONDA_PREFIX")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("../../.pixi/envs/dev"));
+    let include = prefix.join("include");
+    let lib = prefix.join("lib");
+    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
+
+    cc::Build::new()
+        .cpp(true)
+        .std("c++17")
+        .define("_REENTRANT", None)
+        .define("__POSIX", None)
+        .include(include.join("nitro/c++"))
+        .include(include.join("nitro/c"))
+        .file("src/nitf_bridge.cpp")
+        .compile("pdal_native_nitf_bridge");
+
+    println!("cargo:rustc-link-search=native={}", lib.display());
+    println!("cargo:rustc-link-lib=nitf-cpp");
+    println!("cargo:rustc-link-lib=nitf-c");
+    copy_runtime_library(&lib, &out_dir, "libnitf-cpp.dylib");
+    copy_runtime_library(&lib, &out_dir, "libnitf-c.dylib");
+    copy_runtime_library(&lib, &out_dir, "libnitf-cpp.so");
+    copy_runtime_library(&lib, &out_dir, "libnitf-c.so");
+    if cfg!(any(target_os = "macos", target_os = "linux")) {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib.display());
+    }
+    println!("cargo:rerun-if-env-changed=CONDA_PREFIX");
+    println!("cargo:rerun-if-changed=src/nitf_bridge.cpp");
+}
+
+fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
+    let src = lib.join(name);
+    if src.exists() {
+        let _ = fs::copy(src, out_dir.join(name));
+    }
+}

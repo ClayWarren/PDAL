@@ -1013,6 +1013,7 @@ dependencies = [
  "pdal-kernels",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1050,6 +1051,7 @@ dependencies = [
  "lzf-rust",
  "pdal-core",
  "pdal-filters",
+ "pdal-native",
  "roxmltree",
  "serde_json",
  "spz",
@@ -1069,6 +1071,7 @@ dependencies = [
 name = "pdal-native"
 version = "0.0.0"
 dependencies = [
+ "cc",
  "gdal-sys",
  "geos",
  "proj",

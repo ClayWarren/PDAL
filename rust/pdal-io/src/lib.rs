@@ -17,6 +17,7 @@ pub mod ilvis2_metadata;
 pub mod las;
 pub mod las_writer;
 pub mod lasdump;
+pub mod nitfwrap;
 pub mod nullwriter;
 pub mod obj;
 pub mod ogr_writer;

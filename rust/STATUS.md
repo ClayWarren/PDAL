@@ -57,15 +57,15 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists only Rust-backed stages/commands and no longer links the C++ helper dispatch shim. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. |
+| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `ground` currently compares point-count preservation only because the Rust SMRF implementation is still a simplified approximation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
-| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 246 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
-| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
+| Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 248 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, no unsafe extern blocks, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
+| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
-| Broad kernels/apps/tools migration | deferred | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels, `apps/pdal.cpp`, and `nitfwrap` wait on lower-layer parity. `pdal-rs lasdump` has an initial Rust path for uncompressed LAS header, VLR, and point checksum output; LAZ checksum parity remains deferred. |
+| Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. Broad kernels and `apps/pdal.cpp` wait on lower-layer parity. `pdal-rs lasdump` has an initial Rust path for uncompressed LAS header, VLR, and point checksum output; LAZ checksum parity remains deferred. `pdal-rs nitfwrap` uses a Nitro native adapter for LIDARA DES wrap/unwrap and has LAS/BPF fixture parity for byte-preserving round trips. |
 
 ## Root-Level Migration Status
 
@@ -104,7 +104,7 @@ ABI pattern without forcing a plugin SDK decision.
 | `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
 | `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
 | `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
-| `plugins/nitf` | deferred | NITF tooling and reader behavior wait on plugin I/O and tool migration decisions. |
+| `plugins/nitf` | prototype | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. Full `readers.nitf`/`writers.nitf` stage parity remains deferred. |
 | `plugins/openscenegraph` | deferred | OSG reader/writer waits on 3D scene dependency and mesh I/O strategy. |
 | `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
 | `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
@@ -133,6 +133,13 @@ place only when a ported stage needs it.
 | `vendor/nlohmann` | No Rust role | C++ JSON dependency; Rust uses `serde_json`. |
 | `vendor/schema-validator` | Deferred | Defer until schema validation parity needs it. |
 | `vendor/utfcpp` | Deferred | C++ Unicode helper dependency; use Rust string/UTF-8 APIs unless a concrete parity gap appears. |
+
+## Tools Status
+
+| Tool | Status | Notes |
+|---|---|---|
+| `tools/lasdump` | in progress | Rust command path covers uncompressed LAS header, VLR, and point checksum output against fixture parity. LAZ checksum parity remains deferred. |
+| `tools/nitfwrap` | prototype | Rust command path wraps and unwraps LAS/BPF through Nitro, preserving embedded bytes and unwrapping the existing NITF fixture. Full NITF reader/writer stage parity is tracked under `plugins/nitf` and I/O. |
 
 ## C++ Test Parity Accounting
 

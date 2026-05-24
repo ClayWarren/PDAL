@@ -10,6 +10,37 @@ use pdal_io::pcd::PcdReader;
 use pdal_io::ply::PlyReader;
 
 #[test]
+fn root_argument_errors_and_driver_table_run() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--bogus-root-option")
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("Unexpected argument"));
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--drivers")
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    assert!(String::from_utf8_lossy(&result.stdout).contains("readers.las"));
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("--label")
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("--label requires"));
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .args(["--options", "all"])
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    assert!(String::from_utf8_lossy(&result.stdout).contains("readers.las"));
+}
+
+#[test]
 fn pipeline_command_runs_text_pipeline() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");
@@ -563,7 +594,7 @@ fn list_commands_reports_rust_commands() {
     assert!(result.status.success());
     assert_eq!(
         String::from_utf8_lossy(&result.stdout),
-        "chamfer\ndelta\ndensity\neval\nfauxplugin\nground\nhausdorff\ninfo\nlasdump\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
+        "chamfer\ndelta\ndensity\neval\nfauxplugin\nground\nhausdorff\ninfo\nlasdump\nnitfwrap\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
     );
 }
 
