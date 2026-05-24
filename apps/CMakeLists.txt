@@ -116,7 +116,7 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/pdal-config.in"
                NEWLINE_STYLE UNIX)
 install(PROGRAMS "${PDAL_OUTPUT_BIN_DIR}/pdal-config"
     DESTINATION
-        "${CMAKE_INSTALL_PREFIX}/bin"
+        "${CMAKE_INSTALL_BINDIR}"
     PERMISSIONS
         OWNER_READ OWNER_WRITE OWNER_EXECUTE
         GROUP_READ GROUP_EXECUTE
@@ -129,7 +129,7 @@ if(WIN32)
                    NEWLINE_STYLE CRLF)
     install(PROGRAMS "${PDAL_OUTPUT_BIN_DIR}/pdal-config.bat"
         DESTINATION
-            "${CMAKE_INSTALL_PREFIX}/bin"
+            "${CMAKE_INSTALL_BINDIR}"
         PERMISSIONS
             OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
             WORLD_READ WORLD_EXECUTE)
