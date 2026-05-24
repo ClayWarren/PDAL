@@ -42,9 +42,10 @@ impl NitfReader {
         }
     }
 
-    fn build_inner_reader(&self, start_offset: u64) -> LasReader {
+    fn build_inner_reader(&self, start_offset: u64, start_length: u64) -> LasReader {
         let mut opts = self.inner_options.clone();
         opts.add("start_offset", start_offset);
+        opts.add("start_length", start_length);
         LasReader::new(&opts)
     }
 
@@ -72,12 +73,12 @@ impl Reader for NitfReader {
             ));
         }
 
-        let (offset, _length) = pdal_native::nitf::lidar_segment(&self.filename)
+        let (offset, length) = pdal_native::nitf::lidar_segment(&self.filename)
             .map_err(|e| StageError(format!("readers.nitf: {}", e)))?;
 
         self.populate_nitf_metadata()?;
 
-        let mut inner = self.build_inner_reader(offset);
+        let mut inner = self.build_inner_reader(offset, length);
         let mut views = inner.read()?;
 
         if let Some(srs) = &self.spatial_reference_override {

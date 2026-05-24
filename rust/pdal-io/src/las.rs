@@ -47,6 +47,7 @@ pub struct LasReader {
     nosrs: bool,
     ignore_missing_vlrs: bool,
     start_offset: u64,
+    start_length: u64,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     srs_vlr_order: Vec<SrsVlrKind>,
     metadata: MetadataNode,
@@ -72,6 +73,7 @@ impl LasReader {
             // Non-zero: skip this many bytes before the LAS header. Used by
             // `readers.nitf` to expose the embedded LAS payload.
             start_offset: options.get_u64("start_offset", 0),
+            start_length: options.get_u64("start_length", 0),
             configured_extra_dims: configured_extra_dims_from_options(options),
             srs_vlr_order: srs_vlr_order_from_options(options),
             metadata: MetadataNode::new("readers.las"),
@@ -223,8 +225,16 @@ impl Reader for LasReader {
             // and let the standard `las` reader walk the embedded payload.
             let file = File::open(path)
                 .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
-            let shifted = crate::shift_reader::ShiftReader::new(file, self.start_offset)
-                .map_err(|e| StageError(format!("Failed to seek LAS start offset: {}", e)))?;
+            let shifted = if self.start_length > 0 {
+                crate::shift_reader::ShiftReader::with_length(
+                    file,
+                    self.start_offset,
+                    self.start_length,
+                )
+            } else {
+                crate::shift_reader::ShiftReader::new(file, self.start_offset)
+            }
+            .map_err(|e| StageError(format!("Failed to seek LAS start offset: {}", e)))?;
             let buffered = BufReader::new(shifted);
             let mut reader = las::Reader::new(buffered)
                 .map_err(|e| StageError(format!("Failed to open embedded LAS: {}", e)))?;

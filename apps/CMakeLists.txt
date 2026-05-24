@@ -11,6 +11,23 @@ cmake_minimum_required(VERSION 3.13)
 
 set(PDAL_APP pdal)
 
+# Kernel C ABI bridge: thin extern "C" surface over PluginManager / Kernel
+# used both by the C++ pdal binary and the Rust pdal-rs binary.
+add_library(pdal_kernel_capi STATIC
+    "${RUST_CAPI_DIR}/pdal-capi/src/pdal_kernel_capi.cpp"
+)
+pdal_target_compile_settings(pdal_kernel_capi)
+target_include_directories(pdal_kernel_capi PRIVATE
+    ${RUST_CAPI_HEADER_DIR}
+    ${PDAL_INCLUDE_DIR}
+    ${PROJECT_BINARY_DIR}/include
+    ${NLOHMANN_INCLUDE_DIR}
+)
+target_link_libraries(pdal_kernel_capi PRIVATE ${PDAL_LIB_NAME})
+set_target_properties(pdal_kernel_capi PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+)
+
 if (APPLE AND PDAL_BUNDLE)
     add_executable(${PDAL_APP} MACOSX_BUNDLE pdal.cpp)
 else (APPLE AND PDAL_BUNDLE)
@@ -19,6 +36,7 @@ endif(APPLE AND PDAL_BUNDLE)
 pdal_target_compile_settings(${PDAL_APP})
 target_link_libraries(${PDAL_APP}
     PRIVATE
+        pdal_kernel_capi
         ${PDAL_LIB_NAME}
         GDAL::GDAL
         ${WINSOCK_LIBRARY}
@@ -26,7 +44,8 @@ target_link_libraries(${PDAL_APP}
 target_include_directories(${PDAL_APP} PRIVATE
     ${NLOHMANN_INCLUDE_DIR}
     ${PDAL_INCLUDE_DIR}
-    ${PROJECT_BINARY_DIR}/include)
+    ${PROJECT_BINARY_DIR}/include
+    ${RUST_CAPI_HEADER_DIR})
 
 IF(MSVC)
     target_link_options(${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
@@ -38,21 +57,6 @@ if (BUILD_RUST_CLI)
     #
     set(PDAL_RS_APP pdal-rs)
     set(PDAL_RS_BIN "${RUST_CAPI_DIR}/target/release/pdal-rs")
-
-    # Build kernel C ABI wrapper as a static library for the Rust binary.
-    add_library(pdal_kernel_capi STATIC
-        "${RUST_CAPI_DIR}/pdal-capi/src/pdal_kernel_capi.cpp"
-    )
-    target_include_directories(pdal_kernel_capi PRIVATE
-        ${RUST_CAPI_HEADER_DIR}
-        ${PDAL_INCLUDE_DIR}
-        ${PROJECT_BINARY_DIR}/include
-        ${NLOHMANN_INCLUDE_DIR}
-    )
-    target_link_libraries(pdal_kernel_capi PRIVATE ${PDAL_LIB_NAME})
-    set_target_properties(pdal_kernel_capi PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
-    )
 
     add_custom_command(
         OUTPUT ${PDAL_RS_BIN}

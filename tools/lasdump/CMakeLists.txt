@@ -6,38 +6,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(lasdump
     Dumper.cpp
-    Header.cpp
-    ${PDAL_UTIL_DIR}/VSIIO.cpp
-    ${PDAL_UTIL_DIR}/Bounds.cpp
-    ${PDAL_UTIL_DIR}/FileUtils.cpp
-    ${PDAL_UTIL_DIR}/Utils.cpp
+    ${ROOT_DIR}/plugins/nitf/io/tre_plugins.cpp
 )
 
 target_link_libraries(lasdump PRIVATE
-    ${PDAL_LAZPERF_LIB_NAME}
+    ${RUST_CAPI_LIB}
+    ${PDAL_LIB_NAME}
     GDAL::GDAL
     PROJ::proj
     ${GEOS_C_LIBRARY}
+    ${NITRO_LIBRARIES}
     ${COREFOUNDATION_FRAMEWORK}
-    "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
-    "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++>"
-    ${RUST_CAPI_LIB}
 )
 
 target_include_directories(lasdump PRIVATE
-    ${PDAL_VENDOR_DIR}
-    ${PDAL_INCLUDE_DIR}
-    ${NLOHMANN_INCLUDE_DIR}
-    ${UTFCPP_INCLUDE_DIR}
     ${RUST_CAPI_HEADER_DIR}
+    ${PROJECT_BINARY_DIR}/include
+    ${ROOT_DIR}
+    ${NITRO_INCLUDE_DIR}
+    ${NITRO_INCLUDE_DIR}/nitro/c++
+    ${NITRO_INCLUDE_DIR}/nitro/c
 )
 
-#
-# For byte-ordering functions
-#
-if (WIN32)
-    target_link_libraries(lasdump PRIVATE wsock32 ws2_32)
-endif()
-
 PDAL_TARGET_COMPILE_SETTINGS(lasdump)
-

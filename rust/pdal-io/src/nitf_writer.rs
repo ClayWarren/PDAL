@@ -154,17 +154,11 @@ fn reproject_bounds_to_dd(view: &PointView, bounds: &Bounds3D) -> (f64, f64, f64
     if target_wkt.is_empty() {
         return (bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
     }
-    let transform = match pdal_native::srs::GdalSrsTransform::new(
-        wkt,
-        0.0,
-        &target_wkt,
-        0.0,
-        &[],
-        &[],
-    ) {
-        Ok(t) => t,
-        Err(_) => return (bounds.minx, bounds.miny, bounds.maxx, bounds.maxy),
-    };
+    let transform =
+        match pdal_native::srs::GdalSrsTransform::new(wkt, 0.0, &target_wkt, 0.0, &[], &[]) {
+            Ok(t) => t,
+            Err(_) => return (bounds.minx, bounds.miny, bounds.maxx, bounds.maxy),
+        };
     let mut minx = bounds.minx;
     let mut miny = bounds.miny;
     let mut maxx = bounds.maxx;
@@ -241,15 +235,15 @@ impl Writer for NitfWriter {
                         maxz: 0.0,
                     });
                     let mut nitf_opts = self.nitf_opts.clone();
-                    let (minx, miny, maxx, maxy) =
-                        reproject_bounds_to_dd(&views[0], &bounds);
+                    let (minx, miny, maxx, maxy) = reproject_bounds_to_dd(&views[0], &bounds);
                     nitf_opts.minx = minx;
                     nitf_opts.miny = miny;
                     nitf_opts.maxx = maxx;
                     nitf_opts.maxy = maxy;
                     if nitf_opts.file_title.as_deref().unwrap_or("").is_empty() {
-                        if let Some(name) =
-                            Path::new(&self.filename).file_name().and_then(|n| n.to_str())
+                        if let Some(name) = Path::new(&self.filename)
+                            .file_name()
+                            .and_then(|n| n.to_str())
                         {
                             nitf_opts.file_title = Some(name.to_string());
                         }

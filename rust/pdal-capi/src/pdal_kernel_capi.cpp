@@ -36,11 +36,15 @@
 #include <pdal/PluginManager.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/pdal_config.hpp>
+#include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
 
-#include <nlohmann/json.hpp>
 #include <cstring>
+#include <exception>
+#include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 using namespace pdal;
@@ -49,9 +53,20 @@ static std::once_flag s_pluginsLoaded;
 
 static void ensurePluginsLoaded()
 {
-    std::call_once(s_pluginsLoaded, []()
-                   { PluginManager<Kernel>::loadAll();
-                   PluginManager<Stage>::loadAll(); });
+    std::call_once(s_pluginsLoaded,
+                   []()
+                   {
+                       PluginManager<Kernel>::loadAll();
+                       PluginManager<Stage>::loadAll();
+                   });
+}
+
+static char* copyString(const std::string& value)
+{
+    char* buf = static_cast<char*>(malloc(value.size() + 1));
+    if (buf)
+        std::memcpy(buf, value.c_str(), value.size() + 1);
+    return buf;
 }
 
 extern "C"
@@ -65,45 +80,61 @@ extern "C"
 
     char* pdal_kernel_list_json()
     {
-        ensurePluginsLoaded();
-
-        NL::json arr = NL::json::array();
-        std::string kernelbase("kernels.");
-        for (const auto& name : PluginManager<Kernel>::names())
+        try
         {
-            std::string shortName = name;
-            if (Utils::startsWith(name, kernelbase))
-                shortName = name.substr(kernelbase.size());
+            ensurePluginsLoaded();
 
-            arr.push_back({{"name", shortName},
-                           {"full_name", name},
-                           {"description", PluginManager<Kernel>::description(name)}});
+            NL::json arr = NL::json::array();
+            std::string kernelbase("kernels.");
+            for (const auto& name : PluginManager<Kernel>::names())
+            {
+                std::string shortName = name;
+                if (Utils::startsWith(name, kernelbase))
+                    shortName = name.substr(kernelbase.size());
+
+                arr.push_back({{"name", shortName},
+                               {"full_name", name},
+                               {"description",
+                                PluginManager<Kernel>::description(name)}});
+            }
+
+            return copyString(arr.dump());
         }
-
-        std::string result = arr.dump();
-        char* buf = static_cast<char*>(malloc(result.size() + 1));
-        if (buf)
-            std::memcpy(buf, result.c_str(), result.size() + 1);
-        return buf;
+        catch (...)
+        {
+            return nullptr;
+        }
     }
 
     char* pdal_stage_list_json()
     {
-        ensurePluginsLoaded();
-
-        NL::json arr = NL::json::array();
-        for (const auto& name : PluginManager<Stage>::names())
+        try
         {
-            arr.push_back({{"name", name},
-                           {"description", PluginManager<Stage>::description(name)},
-                           {"link", PluginManager<Stage>::link(name)}});
-        }
+            ensurePluginsLoaded();
 
-        std::string result = arr.dump();
-        char* buf = static_cast<char*>(malloc(result.size() + 1));
-        if (buf)
-            std::memcpy(buf, result.c_str(), result.size() + 1);
-        return buf;
+            StageFactory factory(false);
+            StageExtensions& extensions = PluginManager<Stage>::extensions();
+
+            NL::json arr = NL::json::array();
+            for (const auto& name : PluginManager<Stage>::names())
+            {
+                Stage* stage = factory.createStage(name);
+                bool streamable = stage && stage->pipelineStreamable();
+
+                arr.push_back(
+                    {{"name", name},
+                     {"description", PluginManager<Stage>::description(name)},
+                     {"link", PluginManager<Stage>::link(name)},
+                     {"extensions", extensions.extensions(name)},
+                     {"streamable", streamable}});
+            }
+
+            return copyString(arr.dump());
+        }
+        catch (...)
+        {
+            return nullptr;
+        }
     }
 
     char* pdal_stage_options_json(const char* stage_name)
@@ -111,50 +142,93 @@ extern "C"
         if (!stage_name)
             return nullptr;
 
-        ensurePluginsLoaded();
+        try
+        {
+            ensurePluginsLoaded();
 
-        StageFactory factory(false);
-        Stage* stage = factory.createStage(stage_name);
-        if (!stage)
+            StageFactory factory(false);
+            Stage* stage = factory.createStage(stage_name);
+            if (!stage)
+                return nullptr;
+
+            ProgramArgs args;
+            stage->addAllArgs(args);
+
+            std::ostringstream ostr;
+            args.dump3(ostr);
+            return copyString(ostr.str());
+        }
+        catch (...)
+        {
             return nullptr;
-
-        ProgramArgs args;
-        stage->addAllArgs(args);
-
-        std::ostringstream ostr;
-        args.dump3(ostr);
-
-        std::string result = ostr.str();
-        char* buf = static_cast<char*>(malloc(result.size() + 1));
-        if (buf)
-            std::memcpy(buf, result.c_str(), result.size() + 1);
-        return buf;
+        }
     }
 
-    int pdal_kernel_run(const char* kernel_name, int argc, const char* const* argv)
+    char* pdal_stage_options_text(const char* stage_name)
     {
-        if (!kernel_name || !argv)
+        if (!stage_name)
+            return nullptr;
+
+        try
+        {
+            ensurePluginsLoaded();
+
+            StageFactory factory(false);
+            Stage* stage = factory.createStage(stage_name);
+            if (!stage)
+                return nullptr;
+
+            ProgramArgs args;
+            stage->addAllArgs(args);
+
+            std::string headline(Utils::screenWidth(), '-');
+            std::ostringstream ostr;
+            ostr << stage_name << " -- "
+                 << PluginManager<Stage>::link(stage_name) << '\n';
+            ostr << headline << '\n';
+            args.dump2(ostr, 2, 6, headline.size());
+
+            return copyString(ostr.str());
+        }
+        catch (...)
+        {
+            return nullptr;
+        }
+    }
+
+    int pdal_kernel_run(const char* kernel_name, int argc,
+                        const char* const* argv)
+    {
+        if (!kernel_name || (argc > 0 && !argv))
             return 1;
 
-        ensurePluginsLoaded();
+        try
+        {
+            ensurePluginsLoaded();
 
-        std::string fullName = kernel_name;
-        if (!Utils::startsWith(fullName, "kernels."))
-            fullName = "kernels." + fullName;
+            std::string fullName = kernel_name;
+            if (!Utils::startsWith(fullName, "kernels."))
+                fullName = "kernels." + fullName;
 
-        Kernel* kernel = PluginManager<Kernel>::createObject(fullName);
-        if (!kernel)
+            std::unique_ptr<Kernel> kernel(
+                PluginManager<Kernel>::createObject(fullName));
+            if (!kernel)
+                return 1;
+
+            StringList cmdArgs;
+            for (int i = 0; i < argc; ++i)
+                cmdArgs.push_back(argv[i]);
+
+            LogPtr log = Log::makeLog("pdal", "stderr");
+            int ret = kernel->run(cmdArgs, log);
+            kernel.reset();
+            gdal::unregisterDrivers();
+            return ret;
+        }
+        catch (...)
+        {
             return 1;
-
-        StringList cmdArgs;
-        for (int i = 0; i < argc; ++i)
-            cmdArgs.push_back(argv[i]);
-
-        LogPtr log = Log::makeLog("pdal", "stderr");
-        int ret = kernel->run(cmdArgs, log);
-
-        delete kernel;
-        return ret;
+        }
     }
 
     void pdal_capi_free(void* ptr)

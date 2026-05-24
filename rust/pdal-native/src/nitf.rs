@@ -292,7 +292,10 @@ mod tests {
     fn reads_metadata_from_autzen_fixture() {
         let path = repo().join("test/data/nitf/autzen-utm10.ntf");
         let meta = read_metadata(path.to_str().unwrap()).unwrap();
-        assert_eq!(meta.get("FH.FDT").map(String::as_str), Some("20120323002946"));
+        assert_eq!(
+            meta.get("FH.FDT").map(String::as_str),
+            Some("20120323002946")
+        );
         assert_eq!(
             meta.get("IM:0.IGEOLO").map(String::as_str),
             Some("440344N1230429W440344N1230346W440300N1230346W440300N1230429W")
@@ -317,10 +320,22 @@ mod tests {
         write(input.to_str().unwrap(), output.to_str().unwrap(), &opts).unwrap();
 
         let meta = read_metadata(output.to_str().unwrap()).unwrap();
-        assert_eq!(meta.get("FH.FTITLE").map(String::as_str), Some("LiDAR from somewhere"));
-        assert_eq!(meta.get("FH.ONAME").map(String::as_str), Some("Howard Butler"));
-        assert_eq!(meta.get("FH.OPHONE").map(String::as_str), Some("5155554628"));
-        assert_eq!(meta.get("IM:0.IDATIM").map(String::as_str), Some("20110516183337"));
+        assert_eq!(
+            meta.get("FH.FTITLE").map(String::as_str),
+            Some("LiDAR from somewhere")
+        );
+        assert_eq!(
+            meta.get("FH.ONAME").map(String::as_str),
+            Some("Howard Butler")
+        );
+        assert_eq!(
+            meta.get("FH.OPHONE").map(String::as_str),
+            Some("5155554628")
+        );
+        assert_eq!(
+            meta.get("IM:0.IDATIM").map(String::as_str),
+            Some("20110516183337")
+        );
     }
 
     #[test]

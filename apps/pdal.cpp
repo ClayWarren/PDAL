@@ -33,13 +33,14 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <pdal/Kernel.hpp>
-#include <pdal/PluginManager.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/pdal_config.hpp>
-#include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/Log.hpp>
+#include <pdal/PDALUtils.hpp>
 #include <pdal/util/Backtrace.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <pdal/util/ProgramArgs.hpp>
+#include <pdal/util/Utils.hpp>
+
+#include <pdal_capi.h>
 
 #include <iomanip>
 #include <iostream>
@@ -59,6 +60,41 @@ using namespace pdal;
 
 std::string headline(Utils::screenWidth(), '-');
 
+namespace
+{
+std::string takeCapiString(char* ptr)
+{
+    if (!ptr)
+        return "";
+    std::string value(ptr);
+    pdal_capi_free(ptr);
+    return value;
+}
+
+NL::json parseCapiJson(char* ptr)
+{
+    std::string text = takeCapiString(ptr);
+    if (text.empty())
+        return NL::json();
+
+    try
+    {
+        return NL::json::parse(text);
+    }
+    catch (NL::json::parse_error&)
+    {
+        return NL::json();
+    }
+}
+
+std::string stageField(const NL::json& stage, const std::string& key)
+{
+    if (stage.contains(key) && stage[key].is_string())
+        return stage[key].get<std::string>();
+    return "";
+}
+} // namespace
+
 class App
 {
 public:
@@ -66,7 +102,8 @@ public:
         : m_out(std::cout), m_debug(false), m_logLevel(LogLevel::Error),
           m_showDrivers(false), m_help(false), m_showCommands(false),
           m_showVersion(false), m_showJSON(false), m_logtiming(false)
-    {}
+    {
+    }
 
     int execute(StringList& cmdArgs, LogPtr& log);
 
@@ -97,7 +134,7 @@ private:
 void App::outputVersion()
 {
     m_out << headline << '\n';
-    m_out << "pdal " << Config::fullVersionString() << '\n';
+    m_out << "pdal " << pdal_version_string() << '\n';
     m_out << headline << '\n';
     m_out << '\n';
 }
@@ -113,9 +150,6 @@ void App::outputHelp(const ProgramArgs& args)
 
     m_out << "The following commands are available:" << '\n';
 
-    // Load all kernels so that we can report the names.
-    StageFactory f;
-    PluginManager<Kernel>::loadAll();
     outputCommands("  - ");
     m_out << '\n';
     m_out << "See https://pdal.org/apps/ for more detail" << '\n';
@@ -123,10 +157,9 @@ void App::outputHelp(const ProgramArgs& args)
 
 void App::outputDrivers()
 {
-    // Force plugin loading.
-    StageFactory f;
-    PluginManager<Stage>::loadAll();
-    StringList stages = PluginManager<Stage>::names();
+    NL::json stages = parseCapiJson(pdal_stage_list_json());
+    if (!stages.is_array())
+        stages = NL::json::array();
 
     if (!m_showJSON)
     {
@@ -144,9 +177,10 @@ void App::outputDrivers()
 
         m_out << std::left;
 
-        for (auto name : stages)
+        for (auto const& stage : stages)
         {
-            std::string descrip = PluginManager<Stage>::description(name);
+            std::string name = stageField(stage, "name");
+            std::string descrip = stageField(stage, "description");
             StringList lines = Utils::wordWrap(descrip, descripColLen - 1);
             for (size_t i = 0; i < lines.size(); ++i)
             {
@@ -160,90 +194,68 @@ void App::outputDrivers()
     }
     else
     {
-        NL::json j;
-        StageExtensions& extensions = PluginManager<Stage>::extensions();
-        for (auto name : stages)
-        {
-            Stage* s = f.createStage(name);
-            std::string description = PluginManager<Stage>::description(name);
-            std::string link = PluginManager<Stage>::link(name);
-            j.push_back({{"name", name},
-                         {"description", description},
-                         {"link", link},
-                         {"extensions", extensions.extensions(name)},
-                         {"streamable", s->pipelineStreamable()}});
-        }
-        m_out << std::setw(4) << j;
+        m_out << std::setw(4) << stages;
     }
 }
 
 void App::outputCommands(const std::string& leader)
 {
-    StageFactory f;
-    PluginManager<Kernel>::loadAll();
-    std::string kernelbase("kernels.");
-    for (auto name : PluginManager<Kernel>::names())
+    NL::json kernels = parseCapiJson(pdal_kernel_list_json());
+    if (!kernels.is_array())
+        return;
+
+    for (auto const& kernel : kernels)
     {
-        if (Utils::startsWith(name, kernelbase))
-            name = name.substr(kernelbase.size());
+        std::string name = stageField(kernel, "name");
         m_out << leader << name << '\n';
     }
 }
 
 void App::outputOptions(std::string const& stageName, std::ostream& strm)
 {
-    // Force plugin loading.
-    StageFactory f(false);
+    if (!m_showJSON)
+    {
+        std::string text =
+            takeCapiString(pdal_stage_options_text(stageName.c_str()));
+        if (text.empty())
+            std::cerr << "Unable to create stage " << stageName << "\n";
+        else
+            strm << text;
+        return;
+    }
 
-    Stage* s = f.createStage(stageName);
-    if (!s)
+    std::string text =
+        takeCapiString(pdal_stage_options_json(stageName.c_str()));
+    if (text.empty())
     {
         std::cerr << "Unable to create stage " << stageName << "\n";
         return;
     }
 
-    ProgramArgs args;
-    s->addAllArgs(args);
-
-    if (!m_showJSON)
+    NL::json array;
+    try
     {
-        strm << stageName << " -- " << PluginManager<Stage>::link(stageName)
-             << '\n';
-        strm << headline << '\n';
-
-        args.dump2(strm, 2, 6, headline.size());
+        array = NL::json::parse(text);
     }
-    else
+    catch (NL::json::parse_error&)
     {
-        std::ostringstream ostr;
-        args.dump3(ostr);
-
-        NL::json array;
-        try
-        {
-            array = NL::json::parse(ostr.str());
-        }
-        catch (NL::json::parse_error&)
-        {
-        }
-
-        NL::json object = {stageName, array};
-        strm << object;
     }
+
+    NL::json object = {stageName, array};
+    strm << object;
 }
 
 void App::outputOptions()
 {
-    // Force plugin loading.
-    StageFactory f(false);
-
-    StringList nv = PluginManager<Stage>::names();
+    NL::json stages = parseCapiJson(pdal_stage_list_json());
+    if (!stages.is_array())
+        stages = NL::json::array();
 
     if (!m_showJSON)
     {
-        for (auto const& n : nv)
+        for (auto const& stage : stages)
         {
-            outputOptions(n, m_out);
+            outputOptions(stageField(stage, "name"), m_out);
             m_out << '\n';
         }
     }
@@ -251,9 +263,9 @@ void App::outputOptions()
     {
         std::stringstream strm;
         NL::json options;
-        for (auto const& n : nv)
+        for (auto const& stage : stages)
         {
-            outputOptions(n, strm);
+            outputOptions(stageField(stage, "name"), strm);
             NL::json j;
             try
             {
@@ -332,8 +344,6 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
     else if (m_debug)
         log->setLevel(LogLevel::Debug);
     log->get(LogLevel::Debug) << "Debugging..." << '\n';
-    PluginManager<Stage>::setLog(log);
-    PluginManager<Kernel>::setLog(log);
 #ifndef _WIN32
     if (m_debug)
     {
@@ -354,30 +364,29 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
     m_command = Utils::tolower(m_command);
     if (!m_command.empty())
     {
-        int ret = 0;
-        std::string name("kernels." + m_command);
+        if (m_help)
+            cmdArgs.push_back("--help");
 
-        Kernel* kernel = PluginManager<Kernel>::createObject(name);
-        if (kernel)
+        std::vector<const char*> argv;
+        argv.reserve(cmdArgs.size());
+        for (auto const& arg : cmdArgs)
+            argv.push_back(arg.c_str());
+
+        int ret = pdal_kernel_run(m_command.c_str(),
+                                  static_cast<int>(argv.size()), argv.data());
+        if (ret != 0)
         {
-            if (m_help)
-                cmdArgs.push_back("--help");
-            // This shouldn't throw.  If it does, it's something awful, so
-            // not cleaning up seems inconsequential.
-            log->setLeader("pdal " + m_command);
-            ret = kernel->run(cmdArgs, log);
-            delete kernel;
-            // IMPORTANT - The kernel must be destroyed before GDAL
-            //  drivers are unregistered or GDAL will attempt to destroy
-            //  resources more than once, resulting in a crash.
-            gdal::unregisterDrivers();
-        }
-        else
-        {
-            log->get(LogLevel::Error)
-                << "Command '" << m_command << "' not recognized" << '\n'
-                << '\n';
-            ret = 1;
+            NL::json kernels = parseCapiJson(pdal_kernel_list_json());
+            bool found = false;
+            if (kernels.is_array())
+            {
+                for (auto const& kernel : kernels)
+                    found = found || stageField(kernel, "name") == m_command;
+            }
+            if (!found)
+                log->get(LogLevel::Error)
+                    << "Command '" << m_command << "' not recognized" << '\n'
+                    << '\n';
         }
         return ret;
     }

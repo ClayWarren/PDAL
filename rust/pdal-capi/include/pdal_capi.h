@@ -1111,9 +1111,14 @@ extern "C"
     char* pdal_kernel_list_json(void);
     char* pdal_stage_list_json(void);
     char* pdal_stage_options_json(const char* stage_name);
+    char* pdal_stage_options_text(const char* stage_name);
     int pdal_kernel_run(const char* kernel_name, int argc,
                         const char* const* argv);
     void pdal_capi_free(void* ptr);
+
+    // Standalone tools
+    int pdal_tool_lasdump_run(int argc, const char* const* argv);
+    int pdal_tool_nitfwrap_run(int argc, const char* const* argv);
 
     // NITF native bridge (used by readers.nitf / writers.nitf).
     typedef int (*pdal_nitf_metadata_cb)(const char* key, const char* value,

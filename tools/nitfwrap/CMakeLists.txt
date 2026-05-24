@@ -1,26 +1,27 @@
 include(${ROOT_DIR}/cmake/common.cmake NO_POLICY_SCOPE)
-include(${PDAL_CMAKE_DIR}/nitro.cmake)
-
-set(PDAL_NITF_DIR ${ROOT_DIR}/plugins/nitf/io)
 
 add_executable(nitfwrap
     NitfWrap.cpp
-    ${PDAL_NITF_DIR}/MetadataReader.cpp
-    ${PDAL_NITF_DIR}/NitfFileReader.cpp
-    ${PDAL_NITF_DIR}/NitfFileWriter.cpp
-    ${PDAL_NITF_DIR}/tre_plugins.cpp
+    ${ROOT_DIR}/plugins/nitf/io/tre_plugins.cpp
 )
 pdal_target_compile_settings(nitfwrap)
-add_dependencies(nitfwrap generate_dimension_hpp)
 target_link_libraries(nitfwrap PRIVATE
-    ${PDAL_BASE_LIB_NAME}
+    ${RUST_CAPI_LIB}
+    ${PDAL_LIB_NAME}
+    GDAL::GDAL
+    PROJ::proj
+    ${GEOS_C_LIBRARY}
     ${NITRO_LIBRARIES}
+    ${COREFOUNDATION_FRAMEWORK}
 )
 
 target_include_directories(nitfwrap PRIVATE
+    ${RUST_CAPI_HEADER_DIR}
     ${PROJECT_BINARY_DIR}/include
-    ${PDAL_INCLUDE_DIR}
     ${ROOT_DIR}
+    ${NITRO_INCLUDE_DIR}
+    ${NITRO_INCLUDE_DIR}/nitro/c++
+    ${NITRO_INCLUDE_DIR}/nitro/c
 )
 
 if (WITH_TESTS)
@@ -28,4 +29,3 @@ if (WITH_TESTS)
         FILES NitfWrapTest.cpp
     )
 endif()
-

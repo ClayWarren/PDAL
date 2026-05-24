@@ -1,6 +1,7 @@
 //! Raw LAS dumper used by the `lasdump` tool.
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use las::point::Format;
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -67,9 +68,10 @@ pub fn dump_las(path: &Path) -> Result<String, String> {
     }
 
     if header.compressed {
-        return Err("Compressed LAZ point checksums are not supported yet.".to_string());
+        write_compressed_point_checksums(&mut output, path, &header)?;
+    } else {
+        write_point_checksums(&mut output, &mut file, &header)?;
     }
-    write_point_checksums(&mut output, &mut file, &header)?;
 
     if header.version_minor >= 4 && header.evlr_count > 0 {
         file.seek(SeekFrom::Start(header.evlr_offset))
@@ -284,6 +286,40 @@ fn write_point_checksums<R: Read + Seek>(
     Ok(())
 }
 
+fn write_compressed_point_checksums(
+    output: &mut String,
+    path: &Path,
+    header: &Header,
+) -> Result<(), String> {
+    let mut reader =
+        las::Reader::from_path(path).map_err(|e| format!("Failed to open LAZ points: {e}"))?;
+    let mut format =
+        Format::new(header.point_format).map_err(|e| format!("Invalid point format: {e}"))?;
+    let base_len = format.len();
+    if header.point_len < base_len {
+        return Err(format!(
+            "Point record length {} is smaller than base format length {}.",
+            header.point_len, base_len
+        ));
+    }
+    format.extra_bytes = header.point_len - base_len;
+
+    for i in 0..header.point_count {
+        let point = reader
+            .read_point()
+            .map_err(|e| format!("Failed to read LAZ point: {e}"))?
+            .ok_or_else(|| format!("Expected point {i}, but LAZ stream ended."))?;
+        let raw = point
+            .into_raw(reader.header().transforms())
+            .map_err(|e| format!("Failed to encode LAZ point: {e}"))?;
+        let mut buf = Vec::with_capacity(header.point_len as usize);
+        raw.write_to(&mut buf, &format)
+            .map_err(|e| format!("Failed to encode LAZ point: {e}"))?;
+        writeln!(output, "{i} {}", checksum(&buf)).unwrap();
+    }
+    Ok(())
+}
+
 fn read_uuid<R: Read>(reader: &mut R) -> Result<Uuid, String> {
     let data1 = reader.read_u32::<LittleEndian>().map_err(read_err)?;
     let data2 = reader.read_u16::<LittleEndian>().map_err(read_err)?;
@@ -425,10 +461,8 @@ mod tests {
         let invalid = dump_las(Path::new("../../test/data/las/mvk-thin.las.wkt")).unwrap_err();
         assert_eq!(invalid, "Not a LAS/LAZ file.  Invalid file signature.");
 
-        let compressed = dump_las(Path::new("../../test/data/laz/simple.laz")).unwrap_err();
-        assert_eq!(
-            compressed,
-            "Compressed LAZ point checksums are not supported yet."
-        );
+        let compressed = dump_las(Path::new("../../test/data/laz/simple.laz")).unwrap();
+        assert!(compressed.contains("Compressed: true\n"));
+        assert!(compressed.contains("0 "));
     }
 }
