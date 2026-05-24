@@ -3,6 +3,7 @@
 //! Port of `io/LasReader.cpp` using the `las` Rust crate.
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use chrono::Datelike;
 use las::point::ScanDirection;
 use las::Header;
 use las_crs::{get_epsg_from_geotiff_crs, ParseEpsgCRS};
@@ -100,6 +101,12 @@ impl LasReader {
             "filesource_id",
             MetadataValue::U64(header.file_source_id() as u64),
         );
+        if let Some(date) = header.date() {
+            self.metadata
+                .add_value("creation_year", MetadataValue::U64(date.year() as u64));
+            self.metadata
+                .add_value("creation_doy", MetadataValue::U64(date.ordinal() as u64));
+        }
         self.metadata.add_value(
             "system_id",
             MetadataValue::String(header.system_identifier().to_string()),

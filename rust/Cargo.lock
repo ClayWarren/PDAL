@@ -993,6 +993,7 @@ dependencies = [
 name = "pdal-capi"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "glob",
  "pdal-core",
  "pdal-filters",

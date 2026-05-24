@@ -11,6 +11,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 
 [dependencies]
+chrono = "0.4.44"
 pdal-core = { path = "../pdal-core" }
 pdal-filters = { path = "../pdal-filters" }
 pdal-io = { path = "../pdal-io" }

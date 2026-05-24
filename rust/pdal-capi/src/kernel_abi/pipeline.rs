@@ -3,11 +3,14 @@ use crate::pipeline_abi::{
     pdal_pipeline_result_t, pipeline_result_to_json_for_kernel, PipelineHandle,
 };
 use crate::registry::pipeline_from_json;
+use chrono::NaiveDate;
 use pdal_core::driver::infer_reader_driver;
+use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::point::{DimId, DimType, PointId, PointView};
 use std::ffi::CStr;
 use std::io::Read;
 use std::os::raw::c_char;
+use std::path::Path;
 
 pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
@@ -231,6 +234,8 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             mode = InfoMode::Schema;
         } else if arg == "--all" {
             mode = InfoMode::All;
+        } else if arg == "--stac" {
+            mode = InfoMode::Stac;
         } else if arg == "-p" || arg == "--point" {
             let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
@@ -323,10 +328,12 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         InfoMode::Stats
         | InfoMode::Schema
         | InfoMode::All
+        | InfoMode::Stac
         | InfoMode::Point(_)
         | InfoMode::Query(_) => match pipeline.execute(Vec::new()) {
             Ok(views) => {
-                println!("{}", info_report(mode, &views));
+                let metadata = pipeline.metadata();
+                println!("{}", info_report(mode, &views, &metadata, &filename));
                 0
             }
             Err(err) => {
@@ -343,6 +350,7 @@ enum InfoMode {
     Stats,
     Schema,
     All,
+    Stac,
     Point(PointId),
     Query(QueryRequest),
 }
@@ -359,7 +367,12 @@ fn info_pipeline(driver: &str, filename: &str) -> Result<pdal_core::pipeline::Pi
         .map_err(|err| err.to_string())
 }
 
-fn info_report(mode: InfoMode, views: &[PointView]) -> String {
+fn info_report(
+    mode: InfoMode,
+    views: &[PointView],
+    metadata: &MetadataNode,
+    filename: &str,
+) -> String {
     match mode {
         InfoMode::Stats => stats_report(views),
         InfoMode::Schema => schema_report(views),
@@ -373,10 +386,55 @@ fn info_report(mode: InfoMode, views: &[PointView]) -> String {
             output.push_str("\n}\n");
             output
         }
+        InfoMode::Stac => stac_report(views, metadata, filename),
         InfoMode::Point(point_id) => point_report(views, point_id),
         InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
     }
+}
+
+fn stac_report(views: &[PointView], metadata: &MetadataNode, filename: &str) -> String {
+    if views
+        .first()
+        .is_none_or(|view| view.spatial_reference().is_empty())
+    {
+        return "{\n  \"stac\":\n  {\n    \"message\": \"Failed to create STAC Feature with missing key. 'EPSG:4326'\",\n    \"status\": \"error\"\n  }\n}\n".to_string();
+    }
+
+    format!(
+        "{{\n  \"stac\":\n  {{\n    \"properties\":\n    {{\n      \"datetime\": \"{}\",\n      \"pc:count\": {},\n      \"pc:encoding\": \"{}\",\n      \"pc:type\": \"lidar\"\n    }}\n  }}\n}}\n",
+        stac_datetime(metadata),
+        views.iter().map(PointView::len).sum::<u64>(),
+        stac_encoding(filename)
+    )
+}
+
+fn stac_datetime(metadata: &MetadataNode) -> String {
+    let year = metadata_value_u64(metadata, "creation_year");
+    let doy = metadata_value_u64(metadata, "creation_doy");
+    if let (Some(year), Some(doy)) = (year, doy) {
+        if let Some(date) = NaiveDate::from_yo_opt(year as i32, doy as u32) {
+            return date.format("%Y-%m-%dT00:00:00Z").to_string();
+        }
+    }
+    "1970-01-01T00:00:00Z".to_string()
+}
+
+fn metadata_value_u64(node: &MetadataNode, name: &str) -> Option<u64> {
+    if node.name() == name {
+        return node.value().map(MetadataValue::as_u64);
+    }
+    node.children()
+        .iter()
+        .find_map(|child| metadata_value_u64(child, name))
+}
+
+fn stac_encoding(filename: &str) -> String {
+    Path::new(filename)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| format!(".{}", extension.to_ascii_lowercase()))
+        .unwrap_or_else(|| "?".to_string())
 }
 
 fn point_report(views: &[PointView], point_id: PointId) -> String {
