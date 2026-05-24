@@ -4,6 +4,7 @@ use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::gdal::{LayerHandle, Vector};
 use std::ffi::CStr;
+use std::io::Read;
 use std::os::raw::c_char;
 use std::path::Path;
 
@@ -64,6 +65,9 @@ fn run_create(args: &[String]) -> i32 {
     let args = match parse_create_args(args) {
         Ok(args) => args,
         Err(ParseResult::Error(message)) => {
+            if message == INVALID_FILTER_STAGE_MESSAGE {
+                println!("PDAL: kernels.tindex: {message}");
+            }
             eprintln!("PDAL: kernels.tindex: {message}");
             return 1;
         }
@@ -133,9 +137,12 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
             "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
             "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
+            "--log" => {
+                let _ = next_value(&mut iter, "--log")?;
+            }
             "--stdin" | "-s" => {
                 parsed.input_methods += 1;
-                parsed.unsupported_input = true;
+                parsed.files.extend(read_stdin_files()?);
             }
             "--threshold" | "--resolution" | "--simplify" | "--where" | "--fast_boundary" => {
                 return Err(ParseResult::Unsupported);
@@ -161,14 +168,18 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
                 parsed.path_prefix = Some(value.to_string());
             }
+            _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--threshold=")
                 || arg.starts_with("--resolution=")
                 || arg.starts_with("--simplify=")
-                || arg.starts_with("--where=")
-                || arg.starts_with("--filters.") =>
+                || arg.starts_with("--where=") =>
             {
                 return Err(ParseResult::Unsupported);
             }
+            _ if arg.starts_with("--filters.hexbin.smooth") => {
+                return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
+            }
+            _ if arg.starts_with("--filters.") => return Err(ParseResult::Unsupported),
             _ if arg.starts_with('-') => return Err(ParseResult::Unsupported),
             _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
             _ if arg.contains('*') || arg.contains('?') || arg.contains('[') => {
@@ -207,6 +218,8 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
     Ok(parsed)
 }
 
+const INVALID_FILTER_STAGE_MESSAGE: &str = "Argument references invalid/unused stage";
+
 fn next_value<'a, I>(iter: &mut I, arg: &str) -> Result<&'a String, ParseResult>
 where
     I: Iterator<Item = &'a String>,
@@ -228,6 +241,25 @@ fn read_glob(pattern: &str) -> Result<Vec<String>, ParseResult> {
         return Err(ParseResult::Error(format!(
             "glob pattern '{pattern}' did not match any files"
         )));
+    }
+    Ok(files)
+}
+
+fn read_stdin_files() -> Result<Vec<String>, ParseResult> {
+    let mut input = String::new();
+    std::io::stdin()
+        .read_to_string(&mut input)
+        .map_err(|err| ParseResult::Error(format!("unable to read stdin file list: {err}")))?;
+    let files = input
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if files.is_empty() {
+        return Err(ParseResult::Error(
+            "stdin contained no tindex input files".to_string(),
+        ));
     }
     Ok(files)
 }
