@@ -1,3 +1,4 @@
+use super::{apply_cli_stage_options, parse_cli_stage_option, CliStageOption};
 use crate::pipeline_abi::{
     pdal_pipeline_result_t, pipeline_result_to_json_for_kernel, PipelineHandle,
 };
@@ -30,6 +31,7 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
     let mut validate_only = false;
     let mut metadata_file = None;
     let mut serialization_file = None;
+    let mut stage_options: Vec<CliStageOption> = Vec::new();
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -57,6 +59,8 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
                 return 1;
             };
             serialization_file = Some(value.clone());
+        } else if let Some(stage_option) = parse_cli_stage_option(arg) {
+            stage_options.push(stage_option);
         } else if arg.starts_with("--") || arg.starts_with("-v") {
             return -1;
         } else if input.replace(arg.clone()).is_some() {
@@ -92,6 +96,11 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
                 return 1;
             }
         }
+    };
+
+    let json = match apply_stage_options_to_pipeline_json(&json, &stage_options) {
+        Ok(json) => json,
+        Err(()) => return -1,
     };
 
     if let Some(path) = serialization_file {
@@ -131,6 +140,32 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             1
         }
     }
+}
+
+fn apply_stage_options_to_pipeline_json(
+    json: &str,
+    stage_options: &[CliStageOption],
+) -> Result<String, ()> {
+    if stage_options.is_empty() {
+        return Ok(json.to_string());
+    }
+
+    let mut value: serde_json::Value = serde_json::from_str(json).map_err(|_| ())?;
+    let stages = if let Some(stages) = value.as_array_mut() {
+        stages
+    } else if let Some(stages) = value
+        .get_mut("pipeline")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        stages
+    } else {
+        return Err(());
+    };
+
+    if !apply_cli_stage_options(stages, stage_options) {
+        return Err(());
+    }
+    serde_json::to_string(&value).map_err(|_| ())
 }
 
 pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i32 {
@@ -233,3 +268,41 @@ unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<Strin
 
 #[allow(dead_code)]
 fn _assert_result_abi_shape(_: pdal_pipeline_result_t) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn applies_cli_stage_options_to_object_pipeline() {
+        let json = r#"{"pipeline":[{"type":"readers.faux"},{"type":"filters.sort","dimension":"X"},{"type":"writers.las"}]}"#;
+        let options = vec![CliStageOption {
+            stage: "filters.sort".to_string(),
+            key: "dimension".to_string(),
+            value: "Y".to_string(),
+        }];
+
+        let updated = apply_stage_options_to_pipeline_json(json, &options).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&updated).unwrap();
+
+        assert_eq!(parsed["pipeline"][1]["dimension"][0], "X");
+        assert_eq!(parsed["pipeline"][1]["dimension"][1], "Y");
+    }
+
+    #[test]
+    fn applies_cli_stage_options_to_array_pipeline() {
+        let json =
+            r#"[{"type":"readers.faux"},{"type":"sort","dimension":"X"},{"type":"writers.las"}]"#;
+        let options = vec![CliStageOption {
+            stage: "sort".to_string(),
+            key: "dimension".to_string(),
+            value: "Y".to_string(),
+        }];
+
+        let updated = apply_stage_options_to_pipeline_json(json, &options).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&updated).unwrap();
+
+        assert_eq!(parsed[1]["dimension"][0], "X");
+        assert_eq!(parsed[1]["dimension"][1], "Y");
+    }
+}

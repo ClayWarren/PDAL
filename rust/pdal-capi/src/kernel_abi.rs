@@ -451,13 +451,13 @@ fn parse_option_value(value: &str) -> serde_json::Value {
     }
 }
 
-struct CliStageOption {
-    stage: String,
-    key: String,
-    value: String,
+pub(super) struct CliStageOption {
+    pub(super) stage: String,
+    pub(super) key: String,
+    pub(super) value: String,
 }
 
-fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
+pub(super) fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
     let spec = arg.strip_prefix("--")?;
     let (lhs, value) = spec.split_once('=')?;
     let (stage, key) = lhs.rsplit_once('.')?;
@@ -468,7 +468,10 @@ fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
     })
 }
 
-fn apply_cli_stage_options(stages: &mut [serde_json::Value], options: &[CliStageOption]) -> bool {
+pub(super) fn apply_cli_stage_options(
+    stages: &mut [serde_json::Value],
+    options: &[CliStageOption],
+) -> bool {
     for option in options {
         let qualified = format!("filters.{}", option.stage);
         let mut applied = false;
