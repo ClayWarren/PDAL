@@ -355,7 +355,7 @@ mod tests {
 
         let mut opts = Options::default();
         opts.add("filename", nitf_out.to_str().unwrap());
-        let long_title: String = std::iter::repeat('a').take(120).collect();
+        let long_title = "a".repeat(120);
         opts.add("ftitle", long_title);
         let mut writer = NitfWriter::new(&opts).unwrap();
         let err = writer.write(std::slice::from_ref(&source)).unwrap_err();
