@@ -563,7 +563,7 @@ fn list_commands_reports_rust_commands() {
     assert!(result.status.success());
     assert_eq!(
         String::from_utf8_lossy(&result.stdout),
-        "chamfer\ndelta\ndensity\neval\nfauxplugin\nground\nhausdorff\ninfo\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
+        "chamfer\ndelta\ndensity\neval\nfauxplugin\nground\nhausdorff\ninfo\nlasdump\nmerge\npipeline\nrandom\nsort\nsplit\ntile\ntindex\ntranslate\n"
     );
 }
 

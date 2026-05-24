@@ -81,8 +81,9 @@ roadmap as permission to sweep a directory.
 6. Close apps/tools and broad kernels.
    `pdal-rs` can keep proving command parity, but the top-layer C++ app/tool
    migration closes only after the lower library surface is stable. `lasdump`
-   waits on LAS/LAZ strategy; `nitfwrap` waits on NITF/plugin strategy; broad
-   kernels stay late.
+   may advance in narrow LAS-backed steps; LAZ checksum parity waits on the
+   compression strategy. `nitfwrap` waits on NITF/plugin strategy; broad kernels
+   stay late.
 7. Define plugin compatibility after the first-party surface.
    Keep broad optional plugins in C++ until the first-party library, command
    surface, C ABI versioning, ownership/lifetime rules, dynamic loading, and
@@ -214,7 +215,8 @@ foundations are not permission to skip ahead to broad top-layer ports.
    pipelines through the C ABI. This is small by LOC but high in dependency
    density: `apps/pdal.cpp` owns CLI dispatch and driver/option introspection,
    while `tools/lasdump` and `tools/nitfwrap` are tied to LAS/LAZ and NITF
-   strategy decisions.
+   strategy decisions. The Rust `lasdump` path can cover uncompressed LAS
+   behavior before the broader LAZ compression strategy is complete.
 5. `kernels/` last. The first simple command surface lives in `pdal-cli`
    because the pipeline/reader/filter/writer loop can exercise it. Do not use
    that as permission to sweep kernels broadly; only add commands whose lower
@@ -250,7 +252,9 @@ Apps/tools work is allowed when it directly supports a command-readiness gate:
 - `apps/pdal.cpp` can be touched when Rust has enough pipeline JSON, stage
   registry, driver listing, option introspection, logging/error, and output
   behavior to compare a `pdal` command against the installed C++ binary.
-- `tools/lasdump` waits for the LAS/LAZ reader/writer and compression strategy.
+- `tools/lasdump` can progress for uncompressed LAS once LAS header/VLR/point
+  checksum behavior is parity-tested; LAZ checksum parity waits for the
+  compression strategy.
 - `tools/nitfwrap` waits for the NITF/plugin or specialized I/O strategy.
 
 Do not mark apps/tools complete because the LOC is small. They close only when
@@ -447,8 +451,10 @@ Required shape:
   wrappers over Rust-backed pipeline/I/O/filter behavior.
 - `apps/pdal.cpp` is treated as the CLI dispatch surface for command parity,
   not as an independent early port.
-- `tools/lasdump` and `tools/nitfwrap` remain deferred until their LAS/LAZ and
-  NITF lower-layer strategies are explicit.
+- `tools/lasdump` should stay narrow until LAS/LAZ behavior is explicit:
+  uncompressed LAS dumping can move ahead, while LAZ checksum parity waits on
+  compression. `tools/nitfwrap` remains deferred until its NITF lower-layer
+  strategy is explicit.
 - New concrete command work does not start until the command readiness gates in
   `Migration Order` are satisfied for that command.
 - `pdal pipeline` proved the library surface directly. `pdal info` and simple

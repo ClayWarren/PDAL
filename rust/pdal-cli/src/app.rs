@@ -298,6 +298,9 @@ impl App {
             if command == "info" {
                 return self.run_info();
             }
+            if command == "lasdump" {
+                return self.run_lasdump();
+            }
             if command == "translate" {
                 return self.run_translate();
             }
@@ -363,6 +366,70 @@ impl App {
             self.output_help();
         }
 
+        0
+    }
+}
+
+struct LasdumpArgs<'a> {
+    input: &'a str,
+    output: Option<&'a str>,
+}
+
+impl<'a> LasdumpArgs<'a> {
+    fn parse(args: &'a [String]) -> Result<Self, String> {
+        let mut input = None;
+        let mut output = None;
+        let mut iter = args.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "-o" {
+                let Some(value) = iter.next() else {
+                    return Err("Couldn't open output file.".to_string());
+                };
+                output = Some(value.as_str());
+            } else if arg.starts_with('-') {
+                return Err(String::new());
+            } else if input.is_none() {
+                input = Some(arg.as_str());
+            } else {
+                return Err(String::new());
+            }
+        }
+        let Some(input) = input else {
+            return Err(String::new());
+        };
+        Ok(Self { input, output })
+    }
+}
+
+impl App {
+    pub(super) fn run_lasdump(&self) -> i32 {
+        let args = match LasdumpArgs::parse(&self.command_args) {
+            Ok(args) => args,
+            Err(message) => {
+                if !message.is_empty() {
+                    eprintln!("Error: {message}");
+                }
+                eprintln!("Usage: lasdump [-o <output filename>] <las/las file>");
+                return 1;
+            }
+        };
+
+        let text = match pdal_io::lasdump::dump_las(Path::new(args.input)) {
+            Ok(text) => text,
+            Err(message) => {
+                eprintln!("Error: {message}");
+                return 1;
+            }
+        };
+
+        if let Some(output) = args.output {
+            if let Err(_err) = std::fs::write(output, text) {
+                eprintln!("Error: Couldn't open output file.");
+                return 1;
+            }
+        } else {
+            print!("{text}");
+        }
         0
     }
 }

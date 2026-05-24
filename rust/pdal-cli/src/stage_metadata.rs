@@ -49,6 +49,11 @@ pub(crate) fn kernel_list() -> Vec<KernelInfo> {
                 "report metadata, bounds, and per-dimension summary for a point cloud file",
         },
         KernelInfo {
+            name: "lasdump",
+            full_name: "tools.lasdump",
+            description: "dump LAS header, VLR, and point checksum information",
+        },
+        KernelInfo {
             name: "merge",
             full_name: "kernels.merge",
             description: "merge several point cloud files into one output",
