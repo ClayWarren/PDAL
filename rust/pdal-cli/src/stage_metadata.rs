@@ -322,6 +322,63 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!("dimensionality")),
             ),
         ],
+        "filters.crop" => vec![
+            option("bounds", "Point box for cropped points.", None),
+            option(
+                "polygon",
+                "Bounding polygon(s) for cropped points (WKT or GeoJSON).",
+                None,
+            ),
+            option("point", "Center point for distance-based cropping.", None),
+            option(
+                "distance",
+                "Distance from 2D or 3D 'point' for cropping.",
+                None,
+            ),
+            option(
+                "outside",
+                "Invert cropping: keep points outside the region.",
+                Some(json!(false)),
+            ),
+            option("a_srs", "Spatial reference for bounding region.", None),
+            option("ogr", "OGR datasource for filter geometries.", None),
+        ],
+        "filters.csf" => vec![
+            option("smooth", "Apply slope postprocessing.", Some(json!(true))),
+            option("step", "Time step.", Some(json!(0.65))),
+            option("threshold", "Classification threshold.", Some(json!(0.5))),
+            option("hdiff", "Height difference threshold.", Some(json!(0.3))),
+            option("resolution", "Cloth resolution.", Some(json!(1.0))),
+            option("rigidness", "Rigidness.", Some(json!(3))),
+            option("iterations", "Max iterations.", Some(json!(500))),
+            option("ignore", "Ignore values.", None),
+            option(
+                "returns",
+                "Comma-separated return kinds to include.",
+                Some(json!("last,only")),
+            ),
+            option(
+                "debug",
+                "Enable debug output to the 'dir' directory.",
+                Some(json!(false)),
+            ),
+            option("dir", "Optional output directory for debugging.", None),
+            option(
+                "ground_class",
+                "Classification value for ground points.",
+                Some(json!(2)),
+            ),
+            option(
+                "other_class",
+                "Classification value for non-ground points.",
+                Some(json!(1)),
+            ),
+            option(
+                "only_ground",
+                "Only emit ground-classified points.",
+                Some(json!(false)),
+            ),
+        ],
         "filters.dbscan" => vec![
             option(
                 "min_points",
