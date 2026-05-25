@@ -645,6 +645,9 @@ COVERED: dict[str, object] = {
         "bcbfToLonLat",
         "bcbfToLonLat2dBoundsThrows",
         "duplicateInputs",
+        "binaryStream",
+        "laszipStream",
+        "zstandardStream",
     },
     "pdal_io_ept_addon_writer_test": {
         "fullLoop",

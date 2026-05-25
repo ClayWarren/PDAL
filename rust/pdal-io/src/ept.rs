@@ -102,7 +102,8 @@ impl Reader for EptReader {
         let hierarchy_bounds = bounds
             .as_ref()
             .and_then(|filter| filter.hierarchy_query_bounds());
-        let tiles = hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
+        let (tiles, hierarchy_step) =
+            hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
@@ -120,6 +121,10 @@ impl Reader for EptReader {
             layout.register(ept_point_id.clone(), DimType::U32);
         }
         let mut node_id: u32 = 1;
+        // (depth, x, y, z, count, node_id) tuples for every tile we
+        // materialized. Serialized into metadata so the C++ wrapper can rebuild
+        // an `ept::Artifact` for downstream stages like `writers.ept_addon`.
+        let mut artifact_tiles: Vec<(u32, u32, u32, u32, u64, u32)> = Vec::new();
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
         let origin = self.origin_filter(Path::new(&root))?;
         let tile_count = tiles.len();
@@ -176,7 +181,13 @@ impl Reader for EptReader {
             for view in views {
                 let mut view = view;
                 apply_addons(&mut view, &addons, &tile.key)?;
-                for idx in 0..view.len() {
+                // Assign full-tile EptNodeId/EptPointId values BEFORE filtering
+                // so surviving points retain their original tile-local indices.
+                // The addon writer's buffer is sized by the full tile count and
+                // indexed by EptPointId; filtered points' ids still fall inside
+                // [0, full_tile_count).
+                let full_tile_count: u64 = view.len();
+                for idx in 0..full_tile_count {
                     view.set_f64(idx, &ept_node_id, node_id as f64);
                     view.set_f64(idx, &ept_point_id, idx as f64);
                 }
@@ -184,7 +195,25 @@ impl Reader for EptReader {
                     apply_polygons(apply_bounds(view, bounds.as_ref()), &polygons),
                     origin,
                 );
-                point_count += view.len();
+                let tile_kept = view.len();
+                point_count += tile_kept;
+                // Record the FULL tile count (matches the C++ `Overlap.m_count`
+                // shape and what the addon writer's buffer needs).
+                let parts: Vec<u32> = tile
+                    .key
+                    .split('-')
+                    .filter_map(|p| p.parse::<u32>().ok())
+                    .collect();
+                if parts.len() == 4 {
+                    artifact_tiles.push((
+                        parts[0],
+                        parts[1],
+                        parts[2],
+                        parts[3],
+                        full_tile_count,
+                        node_id,
+                    ));
+                }
                 node_id += 1;
                 append_view(&mut merged, &view, Path::new(&path))?;
             }
@@ -193,6 +222,32 @@ impl Reader for EptReader {
             .add_value("count", MetadataValue::U64(point_count));
         self.metadata
             .add_value("tiles", MetadataValue::U64(tile_count as u64));
+        // Stash an `ept::Artifact`-equivalent for the C++ wrapper. Marked with
+        // a `__` prefix so downstream callers can identify and strip it.
+        let tiles_json: Vec<serde_json::Value> = artifact_tiles
+            .iter()
+            .map(|(d, x, y, z, c, n)| {
+                serde_json::json!({
+                    "d": d, "x": x, "y": y, "z": z, "count": c, "node_id": n,
+                })
+            })
+            .collect();
+        let artifact = serde_json::json!({
+            "hierarchy_step": hierarchy_step,
+            "root_bounds": {
+                "minx": root_bounds.minx,
+                "miny": root_bounds.miny,
+                "minz": root_bounds.minz,
+                "maxx": root_bounds.maxx,
+                "maxy": root_bounds.maxy,
+                "maxz": root_bounds.maxz,
+            },
+            "tiles": tiles_json,
+        });
+        self.metadata.add_value(
+            "__ept_artifact",
+            MetadataValue::String(artifact.to_string()),
+        );
 
         // Return at least one (possibly empty) view so wrappers don't
         // mis-treat a clean ignore_unreadable run as a reader failure.
@@ -572,15 +627,21 @@ fn is_remote_location(value: &str) -> bool {
     value.contains("://")
 }
 
+/// Walk the EPT hierarchy. Returns the leaf tiles to materialize **and** the
+/// detected `hierarchy_step` (depth at which subtree pointers first appear).
+/// The C++ `EptReader` exposes the same step value through `ept::Artifact`;
+/// the wrapper picks it up from metadata so downstream stages like
+/// `writers.ept_addon` can split hierarchy JSON correctly.
 fn hierarchy_tiles(
     root: &str,
     max_depth: Option<u64>,
     query: Option<&QueryBounds>,
     root_bounds: Bounds3D,
-) -> Result<Vec<EptTile>, StageError> {
+) -> Result<(Vec<EptTile>, u64), StageError> {
     let mut tiles = Vec::new();
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::from([String::from("0-0-0-0")]);
+    let mut hierarchy_step: u64 = 0;
     while let Some(key) = queue.pop_front() {
         if !seen.insert(key.clone()) {
             continue;
@@ -603,13 +664,16 @@ fn hierarchy_tiles(
                         expected_points: points as u64,
                     }),
                 Some(-1) if max_depth.is_none_or(|max| depth <= max) => {
+                    if hierarchy_step == 0 {
+                        hierarchy_step = depth;
+                    }
                     queue.push_back(node.clone())
                 }
                 _ => {}
             }
         }
     }
-    Ok(tiles)
+    Ok((tiles, hierarchy_step))
 }
 
 struct EptKey {

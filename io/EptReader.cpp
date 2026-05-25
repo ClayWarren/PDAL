@@ -68,6 +68,82 @@ const StaticPluginInfo s_info{"readers.ept",
                               "https://pdal.org/stages/reader.ept.html",
                               {"ept"}};
 
+/// Build an `ept::Artifact` from the JSON-encoded hierarchy that the Rust
+/// EPT reader stashes under `__ept_artifact` in its metadata. Publishes the
+/// artifact via the table's artifact manager so downstream stages
+/// (e.g. `writers.ept_addon`) work unchanged when the Rust read path runs.
+void publishRustEptArtifact(pdal_reader_t* reader, PointTableRef table,
+                            const std::string& eptFilename)
+{
+    pdal_metadata_node_t* metadata = pdal_reader_metadata(reader);
+    if (!metadata)
+        return;
+
+    std::string artifactJson;
+    uint64_t childCount = pdal_metadata_node_child_count(metadata);
+    for (uint64_t idx = 0; idx < childCount; ++idx)
+    {
+        pdal_metadata_node_t* child = pdal_metadata_node_child(metadata, idx);
+        if (!child)
+            continue;
+        char* nameBuf = pdal_metadata_node_name(child);
+        std::string name = nameBuf ? nameBuf : "";
+        if (nameBuf)
+            pdal_string_free(nameBuf);
+        if (name == "__ept_artifact")
+        {
+            char* valueBuf = pdal_metadata_node_value(child);
+            if (valueBuf)
+            {
+                artifactJson = valueBuf;
+                pdal_string_free(valueBuf);
+            }
+            pdal_metadata_node_destroy(child);
+            break;
+        }
+        pdal_metadata_node_destroy(child);
+    }
+    pdal_metadata_node_destroy(metadata);
+
+    if (artifactJson.empty())
+        return;
+
+    NL::json parsed;
+    try
+    {
+        parsed = NL::json::parse(artifactJson);
+    }
+    catch (NL::json::parse_error&)
+    {
+        return;
+    }
+
+    auto hierarchy = std::make_unique<ept::Hierarchy>();
+    if (parsed.contains("tiles") && parsed["tiles"].is_array())
+    {
+        for (const auto& t : parsed["tiles"])
+        {
+            ept::Key k;
+            k.d = t.value<uint32_t>("d", 0);
+            k.x = t.value<uint32_t>("x", 0);
+            k.y = t.value<uint32_t>("y", 0);
+            k.z = t.value<uint32_t>("z", 0);
+            point_count_t count = t.value<uint64_t>("count", 0);
+            uint64_t nodeId = t.value<uint64_t>("node_id", 0);
+            hierarchy->emplace(k, count, nodeId);
+        }
+    }
+    size_t hierarchyStep = parsed.value<size_t>("hierarchy_step", 0);
+
+    auto info = std::make_unique<ept::EptInfo>(eptFilename,
+                                               connector::Connector());
+    auto connector = std::make_unique<connector::Connector>();
+    auto artifact = std::make_shared<ept::Artifact>(
+        std::move(info), std::move(hierarchy), std::move(connector),
+        hierarchyStep);
+    table.artifactManager().replaceOrPut("ept", artifact);
+}
+
 void reprogrow(BOX3D& b, const SrsTransform& xform, double x, double y,
                double z)
 {
@@ -708,8 +784,7 @@ void EptReader::ready(PointTableRef table)
     bool rustBoundsSupported =
         m_args->m_bounds.spatialReference().empty() || !m_args->m_bounds.is2d();
 
-    if (!Utils::isRemote(m_filename) && rustBoundsSupported &&
-        m_nodeIdDim == Dimension::Id::Unknown)
+    if (!Utils::isRemote(m_filename) && rustBoundsSupported)
     {
         pdal_options_t* options = pdal_options_create();
         addOption(options, "filename", m_filename);
@@ -746,6 +821,13 @@ void EptReader::ready(PointTableRef table)
                 "Failed to create Rust EPT reader.");
         }
         m_p->rustView = pdal_reader_read_first(reader);
+        // Pull `__ept_artifact` from the Rust reader's metadata before
+        // releasing the handle so downstream stages like `writers.ept_addon`
+        // can consume an `ept::Artifact` that mirrors what the C++ path
+        // publishes. The Rust path otherwise wouldn't populate the
+        // artifactManager, and the addon writer (or anything else relying on
+        // upstream EPT hierarchy state) would fail in `ready()`.
+        publishRustEptArtifact(reader, table, m_filename);
         pdal_reader_destroy(reader);
         pdal_options_destroy(options);
         if (!m_p->rustView)

@@ -148,14 +148,19 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `815 / 819` baseline C++ GoogleTest cases, or
-`99.51%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `818 / 819` baseline C++ GoogleTest cases, or
+`99.88%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. The
 branch-wide health metric, including guard tests added before and during the
-port, is `947 / 953` currently built C++ GoogleTest cases, or `99.37%`;
+port, is `950 / 953` currently built C++ GoogleTest cases, or `99.69%`;
 compute that with `--include-added-tests`.
+
+The single remaining pre-port test (`pdal_plugin_manager_test.CreateObject`)
+is intentionally deferred to a later milestone; it exercises runtime plugin
+registration and C++ plugin-class object creation that depend on a Rust
+plugin loading SDK (milestone 7 per `rust/PORTING.md`).
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -493,8 +498,15 @@ Known mixed binaries:
   local streaming over Rust-materialized binary, LASzip, and zstandard views,
   same-SRS polygon cropping, EPSG:4326-to-source polygon reprojection,
   GeoJSON OGR polygon crops, reprojected 3D bounds filtering for BCBF data,
-  bad-origin validation, and multi-input diamond pipelines route through the
-  Rust C ABI. Spatial-filter preview remains C++.
+  bad-origin validation, multi-input diamond pipelines, and the three
+  `*Stream` cases (`binaryStream`, `laszipStream`, `zstandardStream`) route
+  through the Rust C ABI. Streaming works because the Rust reader stamps
+  `EptNodeId`/`EptPointId` on each tile's full point set before bounds and
+  polygon filters, then republishes an `ept::Artifact` (hierarchy step,
+  per-tile `Overlap` entries, root bounds) into the C++ table's
+  artifactManager so downstream stages — especially
+  `writers.ept_addon` — keep working with the Rust read path. Spatial-filter
+  preview remains C++.
 - `pdal_io_ept_addon_writer_test`: all 4 tests count
   (`fullLoop`, `boundedWrite`, `boundedRead`, `mustDescendFromEptReader`).
   Each addon dimension's per-tile binary chunk writes, hierarchy JSON
