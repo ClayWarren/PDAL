@@ -14,16 +14,24 @@ use crate::copc_hierarchy::{
 };
 use crate::las::LasReader;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
+use pdal_core::geometry::Geometry;
 use pdal_core::metadata::MetadataNode;
+use pdal_core::ogr_spec::parse_ogr_spec_json;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::StageError;
+use pdal_native::srs::{user_input_to_wkt, GdalSrsTransform};
+use serde_json::Value;
 
 pub struct CopcReader {
     inner: LasReader,
     filename: String,
     bounds: String,
+    polygons: Vec<String>,
+    polygon_srs: Vec<String>,
+    ogr: String,
+    source_srs: String,
     resolution: f64,
     metadata: MetadataNode,
 }
@@ -34,6 +42,10 @@ impl CopcReader {
             inner: LasReader::new(options),
             filename: options.get_str("filename", ""),
             bounds: options.get_str("bounds", ""),
+            polygons: option_values(options, "polygon"),
+            polygon_srs: option_values(options, "polygon_srs"),
+            ogr: options.get_str("ogr", ""),
+            source_srs: options.get_str("source_srs", ""),
             resolution: options.get_f64("resolution", 0.0),
             metadata: MetadataNode::new("readers.copc"),
         }
@@ -73,11 +85,13 @@ impl Reader for CopcReader {
 
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
         let bounds = self.bounds_filter()?;
+        let polygons = self.polygon_filters()?;
         let views = self
             .inner
             .read()?
             .into_iter()
             .map(|view| apply_bounds(view, bounds.as_ref()))
+            .map(|view| apply_polygons(view, &polygons))
             .filter(|view| !view.is_empty())
             .collect();
         self.metadata = self.inner.metadata();
@@ -101,6 +115,109 @@ impl CopcReader {
             .map(|parsed| Some(QueryBounds::Two(parsed.bounds)))
             .map_err(|err| StageError(format!("Invalid COPC bounds option: {err}")))
     }
+
+    fn polygon_filters(&self) -> Result<Vec<PolygonFilter>, StageError> {
+        let mut filters: Vec<PolygonFilter> = self
+            .polygons
+            .iter()
+            .enumerate()
+            .map(|(idx, wkt)| {
+                let geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
+                let polygon_srs = self.polygon_srs.get(idx).map_or("", String::as_str);
+                let transform = polygon_transform(&self.source_srs, polygon_srs)?;
+                Ok(PolygonFilter {
+                    geometry,
+                    transform,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        filters.extend(self.ogr_polygon_filters()?);
+        Ok(filters)
+    }
+
+    fn ogr_polygon_filters(&self) -> Result<Vec<PolygonFilter>, StageError> {
+        if self.ogr.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let spec = parse_ogr_spec_json(&self.ogr).map_err(StageError)?;
+        let text = std::fs::read_to_string(&spec.datasource).map_err(|err| {
+            StageError(format!(
+                "Can't open OGR datasource '{}': {err}",
+                spec.datasource
+            ))
+        })?;
+        let json: Value = serde_json::from_str(&text).map_err(|err| {
+            StageError(format!(
+                "OGR datasource '{}' is not valid GeoJSON: {err}",
+                spec.datasource
+            ))
+        })?;
+        let features = json["features"].as_array().ok_or_else(|| {
+            StageError(format!(
+                "OGR datasource '{}' is missing GeoJSON features.",
+                spec.datasource
+            ))
+        })?;
+        let mut filters = Vec::new();
+        for feature in features {
+            if feature["geometry"].is_null() {
+                continue;
+            }
+            let geometry =
+                Geometry::from_geojson(&feature["geometry"].to_string()).map_err(StageError)?;
+            filters.push(PolygonFilter {
+                geometry,
+                transform: polygon_transform(&self.source_srs, "EPSG:4326")?,
+            });
+        }
+        Ok(filters)
+    }
+}
+
+struct PolygonFilter {
+    geometry: Geometry,
+    transform: Option<GdalSrsTransform>,
+}
+
+impl PolygonFilter {
+    fn contains(&self, mut x: f64, mut y: f64, mut z: f64) -> bool {
+        if let Some(transform) = &self.transform {
+            if !transform.transform_xyz(&mut x, &mut y, &mut z) {
+                return false;
+            }
+        }
+        self.geometry.contains(x, y)
+    }
+}
+
+fn polygon_transform(
+    source_srs: &str,
+    polygon_srs: &str,
+) -> Result<Option<GdalSrsTransform>, StageError> {
+    if source_srs.trim().is_empty() || polygon_srs.trim().is_empty() {
+        return Ok(None);
+    }
+    if source_srs == polygon_srs {
+        return Ok(None);
+    }
+    let source_wkt = user_input_to_wkt(source_srs).map_err(StageError)?.wkt;
+    let polygon_wkt = user_input_to_wkt(polygon_srs).map_err(StageError)?.wkt;
+    if source_wkt == polygon_wkt {
+        return Ok(None);
+    }
+    GdalSrsTransform::new(&source_wkt, 0.0, &polygon_wkt, 0.0, &[], &[])
+        .map(Some)
+        .map_err(StageError)
+}
+
+fn option_values(options: &Options, key: &str) -> Vec<String> {
+    options
+        .values(key)
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 enum QueryBounds {
@@ -161,6 +278,22 @@ fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
     let mut output = view.make_new();
     for idx in 0..view.len() {
         if bounds.contains(&view, idx) {
+            output.append_point(&view, idx);
+        }
+    }
+    output
+}
+
+fn apply_polygons(view: PointView, polygons: &[PolygonFilter]) -> PointView {
+    if polygons.is_empty() {
+        return view;
+    }
+    let mut output = view.make_new();
+    for idx in 0..view.len() {
+        let x = view.get_f64(idx, &DimId::X);
+        let y = view.get_f64(idx, &DimId::Y);
+        let z = view.get_f64(idx, &DimId::Z);
+        if polygons.iter().any(|polygon| polygon.contains(x, y, z)) {
             output.append_point(&view, idx);
         }
     }
@@ -273,5 +406,24 @@ mod tests {
             assert!((4918350.0..=4918370.0).contains(&y));
             assert!((2320.0..=2325.0).contains(&z));
         }
+    }
+
+    #[test]
+    fn applies_reprojected_polygon_filter() {
+        let source_srs = std::fs::read_to_string(data_path("autzen/autzen-srs.wkt")).unwrap();
+        let polygon = std::fs::read_to_string(data_path("autzen/autzen-selection-dd.wkt")).unwrap();
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            data_path("copc/1.2-with-color.copc.laz").display(),
+        );
+        options.add("source_srs", source_srs);
+        options.add("polygon", polygon);
+        options.add("polygon_srs", "EPSG:4326");
+        let mut reader = CopcReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert!((40..=50).contains(&views[0].len()));
     }
 }

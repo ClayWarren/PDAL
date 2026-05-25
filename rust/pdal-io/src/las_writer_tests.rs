@@ -444,6 +444,27 @@ mod tests {
     }
 
     #[test]
+    fn configured_extra_dims_parses_pdal_extra_dims_option() {
+        let mut opts = Options::new();
+        opts.add("extra_dims", "Q=int32, S=double");
+        let dims = configured_extra_dims_from_options(&opts);
+        assert_eq!(dims.len(), 2);
+        assert_eq!(dims[0].name, "Q");
+        assert_eq!(dims[0].type_name, "int32");
+        assert_eq!(dims[1].name, "S");
+        assert_eq!(dims[1].type_name, "double");
+    }
+
+    #[test]
+    fn configured_extra_dims_preserves_all_marker() {
+        let mut opts = Options::new();
+        opts.add("extra_dims", "all");
+        let dims = configured_extra_dims_from_options(&opts);
+        assert_eq!(dims.len(), 1);
+        assert_eq!(dims[0].name, "all");
+    }
+
+    #[test]
     fn configured_extra_dims_uses_min_of_lengths() {
         let mut opts = Options::new();
         opts.add("extra_dim_name", "A");
@@ -1089,6 +1110,30 @@ mod tests {
         options.add("filename", path.display().to_string());
         options.add("extra_dim_name", "DefinitelyNotADim");
         options.add("extra_dim_type", "float");
+        let mut writer = LasWriter::new(&options);
+        let view = synthetic_point_view();
+        assert!(writer.write(&[view]).is_err());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn writer_with_extra_dims_option_rejects_standard_dim() {
+        let path = temp_las("extra-standard-dim.las");
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add("extra_dims", "X=int32");
+        let mut writer = LasWriter::new(&options);
+        let view = synthetic_point_view();
+        assert!(writer.write(&[view]).is_err());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn writer_with_extra_dims_option_rejects_missing_type() {
+        let path = temp_las("extra-missing-type.las");
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add("extra_dims", "MyDim");
         let mut writer = LasWriter::new(&options);
         let view = synthetic_point_view();
         assert!(writer.write(&[view]).is_err());

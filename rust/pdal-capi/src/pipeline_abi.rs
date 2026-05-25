@@ -166,6 +166,77 @@ pub unsafe extern "C" fn pdal_pipeline_add_dependency(
     }
 }
 
+/// Replace a stage while preserving the pipeline graph edges.
+///
+/// Returns 0 on success, -1 on error. The replacement stage is consumed.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+/// `stage` must be a valid pointer returned by a `pdal_stage_create_*` function.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_replace_stage(
+    pipeline: *mut PipelineHandle,
+    idx: u64,
+    stage: *mut StageWrapper,
+) -> i64 {
+    if pipeline.is_null() || stage.is_null() {
+        return -1;
+    }
+    let p = &mut (*pipeline).pipeline;
+    let stage_wrapper = Box::from_raw(stage);
+    let name = stage_wrapper.name().to_string();
+    match p.replace_stage(idx as usize, &name, stage_wrapper, Options::new()) {
+        Ok(()) => 0,
+        Err(e) => {
+            set_last_error(&e.0);
+            -1
+        }
+    }
+}
+
+/// Return the number of direct inputs to a stage, or -1 on error.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_input_count(
+    pipeline: *const PipelineHandle,
+    idx: u64,
+) -> i64 {
+    if pipeline.is_null() {
+        return -1;
+    }
+    match (*pipeline).pipeline.input_count(idx as usize) {
+        Ok(count) => count as i64,
+        Err(e) => {
+            set_last_error(&e.0);
+            -1
+        }
+    }
+}
+
+/// Return one direct input stage index, or -1 on error.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_input(
+    pipeline: *const PipelineHandle,
+    idx: u64,
+    input_idx: u64,
+) -> i64 {
+    if pipeline.is_null() {
+        return -1;
+    }
+    match (*pipeline).pipeline.input(idx as usize, input_idx as usize) {
+        Ok(input) => input as i64,
+        Err(e) => {
+            set_last_error(&e.0);
+            -1
+        }
+    }
+}
+
 /// Add a reader to the pipeline.
 ///
 /// Returns the stage index, or -1 on error. The reader is consumed by the

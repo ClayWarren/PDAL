@@ -2,6 +2,7 @@ use super::*;
 use crate::stage_abi::StageWrapper;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
+use std::os::raw::c_int;
 
 fn cstring(value: &str) -> CString {
     CString::new(value).unwrap()
@@ -58,6 +59,31 @@ unsafe fn get(view: *mut PointView, idx: u64, dim: &str) -> f64 {
 unsafe fn destroy_stage(stage: *mut StageWrapper) {
     assert!(!stage.is_null());
     pdal_stage_destroy(stage);
+}
+
+#[test]
+fn csf_classify_rejects_negative_rigidness() {
+    let xyz = [0.0, 0.0, 0.0];
+    let mut ground = [0_u8];
+
+    unsafe {
+        assert_eq!(
+            pdal_filter_csf_classify(
+                xyz.as_ptr(),
+                1,
+                true,
+                0.65,
+                0.5,
+                0.3,
+                1.0,
+                -1,
+                500,
+                ground.as_mut_ptr(),
+            ),
+            -1
+        );
+        assert_eq!(ground[0], 0);
+    }
 }
 
 #[test]
@@ -805,6 +831,18 @@ fn test_filter_abi_nulls_and_errors() {
         assert!(pdal_stage_create_voxeldownsize(std::ptr::null()).is_null());
         assert!(pdal_stage_create_sample(std::ptr::null()).is_null());
         assert!(pdal_stage_create_hexbin(std::ptr::null()).is_null());
+        let hexes: Vec<c_int> = [(0, 0), (1, 0), (0, 1)]
+            .into_iter()
+            .flat_map(|(i, j)| [i, j])
+            .collect();
+        let wkt = take_string(pdal_hexgrid_wkt(
+            1.0,
+            1,
+            hexes.as_ptr(),
+            (hexes.len() / 2) as u64,
+            6,
+        ));
+        assert!(wkt.starts_with("MULTIPOLYGON "));
         assert!(pdal_stage_create_faceraster(std::ptr::null()).is_null());
         let rd = pdal_stage_create_radialdensity(0.0);
         assert!(!rd.is_null());

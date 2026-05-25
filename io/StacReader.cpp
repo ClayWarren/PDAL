@@ -53,6 +53,8 @@
 #include <pdal/util/Utils.hpp>
 #include <pdal_capi.h>
 
+#include <sstream>
+
 #include "private/stac/Collection.hpp"
 #include "private/stac/ItemCollection.hpp"
 
@@ -414,10 +416,8 @@ void StacReader::Private::printErrors(Catalog& c)
 bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
     Args& args = *m_args;
-    return !Utils::isRemote(filename) && args.items.empty() &&
-           args.catalogs.empty() && args.properties.empty() &&
-           args.rawReaderArgs.empty() && args.dates.empty() &&
-           args.bounds.empty() && !args.ogr.size() && !args.validateSchema &&
+    return !Utils::isRemote(filename) && args.catalogs.empty() &&
+           args.dates.empty() && args.bounds.empty() && !args.ogr.size() &&
            rustStacTypeSupported(filename);
 }
 
@@ -593,8 +593,17 @@ void StacReader::initialize()
         addOption(options, "filename", m_filename);
         for (const std::string& assetName : m_p->m_args->assetNames)
             addOption(options, "asset_names", assetName);
+        for (const RegEx& item : m_p->m_args->items)
+            addOption(options, "items", item.m_str);
         for (const RegEx& collection : m_p->m_args->collections)
             addOption(options, "collections", collection.m_str);
+        if (!m_p->m_args->properties.empty())
+            addOption(options, "properties", m_p->m_args->properties.dump());
+        if (!m_p->m_args->rawReaderArgs.empty())
+            addOption(options, "reader_args",
+                      m_p->m_args->rawReaderArgs.dump());
+        if (m_p->m_args->validateSchema)
+            addOption(options, "validate_schema", std::string("true"));
 
         pdal_reader_t* reader = pdal_reader_create_stac(options);
         if (!reader)
@@ -646,6 +655,78 @@ void StacReader::initialize()
 QuickInfo StacReader::inspect()
 {
     QuickInfo qi;
+
+    std::string stacType;
+    try
+    {
+        NL::json stacJson =
+            NL::json::parse(FileUtils::readFileIntoString(m_filename));
+        stacType = Utils::jsonValue<std::string>(stacJson, "type");
+    }
+    catch (...)
+    {
+    }
+
+    const bool hasDataAsset =
+        std::find(m_p->m_args->assetNames.begin(),
+                  m_p->m_args->assetNames.end(),
+                  "data") != m_p->m_args->assetNames.end();
+    const bool rustCatalogPreview =
+        stacType == "Catalog" && m_p->m_args->items.empty() && hasDataAsset;
+    const bool rustFeatureCollectionPreview =
+        stacType == "FeatureCollection" && m_p->m_args->catalogs.empty();
+    const bool rustFeaturePreview = stacType == "Feature";
+    const bool rustRemotePreview = Utils::isRemote(m_filename);
+    if (m_p->m_args->collections.empty() && m_p->m_args->properties.empty() &&
+        m_p->m_args->rawReaderArgs.empty() &&
+        (rustCatalogPreview || rustFeatureCollectionPreview ||
+         rustFeaturePreview || rustRemotePreview))
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        for (const std::string& assetName : m_p->m_args->assetNames)
+            addOption(options, "asset_names", assetName);
+        for (const RegEx& item : m_p->m_args->items)
+            addOption(options, "items", item.m_str);
+        for (const NL::json& date : m_p->m_args->dates)
+            addOption(options, "date_ranges", date.dump());
+        if (!m_p->m_args->bounds.empty())
+        {
+            std::stringstream bounds;
+            bounds << m_p->m_args->bounds;
+            addOption(options, "bounds", bounds.str());
+        }
+        if (m_p->m_args->ogr.size())
+        {
+            std::stringstream ogr;
+            ogr << m_p->m_args->ogr;
+            addOption(options, "ogr", ogr.str());
+        }
+        if (m_p->m_args->validateSchema)
+            addOption(options, "validate_schema", std::string("true"));
+        char* raw = pdal_stac_preview_json(options);
+        pdal_options_destroy(options);
+        if (!raw)
+            rust_view_converter::throwLastError("Rust STAC preview failed.");
+        NL::json preview = NL::json::parse(raw);
+        pdal_string_free(raw);
+        qi.m_pointCount = preview.value("point_count", 0ULL);
+        for (const std::string& id :
+             preview.value("catalog_ids", std::vector<std::string>()))
+            m_metadata.addList("catalog_ids", id);
+        for (const std::string& id :
+             preview.value("collection_ids", std::vector<std::string>()))
+            m_metadata.addList("collection_ids", id);
+        for (const std::string& id :
+             preview.value("item_ids", std::vector<std::string>()))
+        {
+            m_metadata.addList("ids", id);
+            m_metadata.addList("item_ids", id);
+        }
+        qi.m_metadata = m_metadata;
+        qi.m_valid = true;
+        return qi;
+    }
 
     initialize();
 

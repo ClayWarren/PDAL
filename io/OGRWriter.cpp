@@ -37,6 +37,7 @@
 
 #include "OGRWriter.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <tuple>
 
@@ -69,6 +70,13 @@ void addOption(pdal_options_t* options, const std::string& key,
 void addOption(pdal_options_t* options, const std::string& key, size_t value)
 {
     pdal_options_add_u64(options, key.c_str(), value);
+}
+
+bool rustSupportedOgrOption(const std::string& value)
+{
+    return value == "WRITE_BBOX=YES" ||
+           value.rfind("COORDINATE_PRECISION=", 0) == 0 ||
+           value == "RFC7946=YES";
 }
 
 } // unnamed namespace
@@ -115,9 +123,9 @@ void OGRWriter::addArgs(ProgramArgs& args)
 void OGRWriter::initialize()
 {
     gdal::registerDrivers();
-    char* err = pdal_ogr_writer_validate(
-        static_cast<uint64_t>(m_multiCount),
-        static_cast<uint64_t>(m_attrDimNames.size()));
+    char* err =
+        pdal_ogr_writer_validate(static_cast<uint64_t>(m_multiCount),
+                                 static_cast<uint64_t>(m_attrDimNames.size()));
     if (err)
     {
         std::string message(err);
@@ -177,8 +185,9 @@ void OGRWriter::prepared(PointTableRef table)
             if (dim == Dimension::Id::Unknown)
             {
                 char* err = pdal_ogr_writer_dim_not_found(name.c_str());
-                std::string message = err ? std::string(err)
-                    : "Dimension '" + name + "' (attr_dims) not found.";
+                std::string message =
+                    err ? std::string(err)
+                        : "Dimension '" + name + "' (attr_dims) not found.";
                 pdal_string_free(err);
                 throwError(message);
             }
@@ -243,6 +252,7 @@ void OGRWriter::readyFile(const std::string& filename,
 {
     m_curCount = 0;
     m_outputFilename = filename;
+    m_outputSrsWkt = srs.getWKT();
 
     m_rustWriter = useRustWriter();
     clearRustViews();
@@ -423,8 +433,14 @@ void OGRWriter::doneFile()
 
 bool OGRWriter::useRustWriter() const
 {
-    return m_driverName == "GeoJSON" && m_ogrOptions.empty() &&
-        m_measureDimName.empty();
+    if (m_driverName == "GeoJSON")
+        return m_measureDimName.empty() &&
+               std::all_of(m_ogrOptions.begin(), m_ogrOptions.end(),
+                           rustSupportedOgrOption);
+
+    return (m_driverName == "ESRI Shapefile" && m_ogrOptions.empty()) ||
+           (m_driverName == "GPKG" && m_ogrOptions.empty() &&
+            m_multiCount == 1 && m_measureDimName.empty());
 }
 
 void OGRWriter::writeRustOutput()
@@ -437,6 +453,12 @@ void OGRWriter::writeRustOutput()
     addOption(options, "ogrdriver", m_driverName);
     if (m_multiCount > 1)
         addOption(options, "multicount", m_multiCount);
+    for (const auto& option : m_ogrOptions)
+        addOption(options, "ogr_options", option);
+    if (!m_outputSrsWkt.empty())
+        addOption(options, "input_srs", m_outputSrsWkt);
+    if (!m_measureDimName.empty())
+        addOption(options, "measure_dim", m_measureDimName);
     if (!m_attrDimNames.empty())
     {
         std::string joined;
@@ -458,7 +480,7 @@ void OGRWriter::writeRustOutput()
     }
 
     std::vector<const pdal_point_view_t*> rustViews(m_rustViews.begin(),
-                                                     m_rustViews.end());
+                                                    m_rustViews.end());
     bool ok =
         pdal_writer_write_views(writer, rustViews.data(), rustViews.size());
     pdal_writer_destroy(writer);

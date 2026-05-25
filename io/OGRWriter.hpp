@@ -76,6 +76,7 @@ private:
     OGRwkbGeometryType m_geomType;
     OGRMultiPoint m_multiPoint;
     std::string m_outputFilename;
+    std::string m_outputSrsWkt;
     std::string m_driverName;
     size_t m_multiCount;
     size_t m_curCount;

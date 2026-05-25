@@ -82,15 +82,24 @@ pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
 }
 
 pub(crate) fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError> {
-    let filename = path.to_string_lossy();
-    let driver = pdal_core::driver::infer_reader_driver(&filename).ok_or_else(|| {
-        StageError(format!(
-            "TindexReader cannot infer a reader driver for '{}'.",
-            path.display()
-        ))
-    })?;
-    let mut options = Options::new();
-    options.add("filename", filename.as_ref());
+    read_point_location(&path.to_string_lossy(), None, &Options::new())
+}
+
+pub(crate) fn read_point_location(
+    location: &str,
+    driver_hint: Option<&str>,
+    extra_options: &Options,
+) -> Result<Vec<PointView>, StageError> {
+    let driver = driver_hint
+        .or_else(|| pdal_core::driver::infer_reader_driver(location))
+        .ok_or_else(|| {
+            StageError(format!(
+                "TindexReader cannot infer a reader driver for '{}'.",
+                location
+            ))
+        })?;
+    let mut options = extra_options.clone();
+    options.add("filename", location);
     match driver {
         "readers.bpf" => crate::bpf::BpfReader::new(&options).read(),
         "readers.fbi" => crate::fbi::FbiReader::new(&options).read(),

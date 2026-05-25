@@ -182,42 +182,41 @@ TEST(PipelineManagerTest, arrayPipeline)
 
 TEST(PipelineManagerTest, replace)
 {
-    PipelineManager mgr;
+    pdal_pipeline_t* pipeline = pdal_pipeline_create();
+    ASSERT_NE(pipeline, nullptr);
 
-    Stage& r = mgr.makeReader("in.las", "readers.las");
-    Stage& f = mgr.makeFilter("filters.crop", r);
-    Stage& w = mgr.makeWriter("out.las", "writers.las", f);
+    int64_t r = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+    int64_t f = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+    int64_t w = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+    ASSERT_EQ(r, 0);
+    ASSERT_EQ(f, 1);
+    ASSERT_EQ(w, 2);
+    ASSERT_EQ(pdal_pipeline_add_dependency(pipeline, f, r), 0);
+    ASSERT_EQ(pdal_pipeline_add_dependency(pipeline, w, f), 0);
 
-    StageFactory factory;
-    Stage* r2 = factory.createStage("readers.bpf");
-    mgr.replace(&r, r2);
-    EXPECT_EQ(r2->getInputs().size(), 0U);
+    EXPECT_EQ(
+        pdal_pipeline_replace_stage(pipeline, r, pdal_stage_create_merge()), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, r), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, f), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, f, 0), r);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, w), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, w, 0), f);
 
-    EXPECT_EQ(f.getInputs().size(), 1U);
-    EXPECT_EQ(f.getInputs().front(), r2);
+    EXPECT_EQ(
+        pdal_pipeline_replace_stage(pipeline, f, pdal_stage_create_merge()), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, r), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, f), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, f, 0), r);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, w), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, w, 0), f);
 
-    EXPECT_EQ(w.getInputs().size(), 1U);
-    EXPECT_EQ(w.getInputs().front(), &f);
+    EXPECT_EQ(
+        pdal_pipeline_replace_stage(pipeline, w, pdal_stage_create_merge()), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, r), 0);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, f), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, f, 0), r);
+    EXPECT_EQ(pdal_pipeline_input_count(pipeline, w), 1);
+    EXPECT_EQ(pdal_pipeline_input(pipeline, w, 0), f);
 
-    Stage* f2 = factory.createStage("filters.range");
-
-    mgr.replace(&f, f2);
-    EXPECT_EQ(r2->getInputs().size(), 0U);
-
-    EXPECT_EQ(f2->getInputs().size(), 1U);
-    EXPECT_EQ(f2->getInputs().front(), r2);
-
-    EXPECT_EQ(w.getInputs().size(), 1U);
-    EXPECT_EQ(w.getInputs().front(), f2);
-
-    Stage* w2 = factory.createStage("writers.bpf");
-
-    mgr.replace(&w, w2);
-    EXPECT_EQ(r2->getInputs().size(), 0U);
-
-    EXPECT_EQ(f2->getInputs().size(), 1U);
-    EXPECT_EQ(f2->getInputs().front(), r2);
-
-    EXPECT_EQ(w2->getInputs().size(), 1U);
-    EXPECT_EQ(w2->getInputs().front(), f2);
+    pdal_pipeline_destroy(pipeline);
 }

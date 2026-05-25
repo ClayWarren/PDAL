@@ -24,7 +24,7 @@ Status definitions:
 | Rust pipeline graph | in progress | Reader/filter/writer DAG execution, tags, dependencies, `where`/`where_merge` splitting, metadata aggregation, summaries, and error propagation exist. Not a full C++ `PipelineManager` replacement. |
 | Options | in progress | String-keyed typed getters match the current Rust option flow. Full C++ `Options` parity is not claimed. |
 | Metadata | in progress | Typed scalar metadata trees and JSON serialization exist. C++ descriptions, arrays/list kind preservation, JSON/base64 typed nodes, and full pipeline serialization remain incomplete. |
-| Spatial reference | in progress | `SpatialReference::set` (non-WKT user input), `getProj4`, `equals` (semantic IsSame fallback), `identifyHorizontalEPSG`, `identifyVerticalEPSG`, `getUTMZone`, `getHorizontal`, `getVertical`, `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through a Rust GDAL/OSR adapter (`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`, `pdal_srs_identify_horizontal_epsg`, `pdal_srs_identify_vertical_epsg`, `pdal_srs_get_utm_zone`, `pdal_srs_get_horizontal_wkt`, `pdal_srs_get_vertical_wkt`, `pdal_srs_get_horizontal_units`, `pdal_srs_get_vertical_units`, `pdal_srs_valid`). `SrsTransform` default-axis point and array transforms now call the Rust C ABI transform handle. Vertical extraction uses a Rust WKT bracket-matching parser because GDAL's C API has no `OGR_SRSNode` equivalent. PROJJSON export, explicit custom axis-mapping transforms, `SrsTransform::get()` consumers, and GeoTIFF VLR encoding are still C++ GDAL/OGR-backed. |
+| Spatial reference | in progress | `SpatialReference::set` (non-WKT user input), `getProj4`, `equals` (semantic IsSame fallback), `identifyHorizontalEPSG`, `identifyVerticalEPSG`, `getUTMZone`, `getHorizontal`, `getVertical`, `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through a Rust GDAL/OSR adapter (`pdal_srs_user_input_to_wkt`, `pdal_srs_wkt_to_proj4`, `pdal_srs_is_same`, `pdal_srs_identify_horizontal_epsg`, `pdal_srs_identify_vertical_epsg`, `pdal_srs_get_utm_zone`, `pdal_srs_get_horizontal_wkt`, `pdal_srs_get_vertical_wkt`, `pdal_srs_get_horizontal_units`, `pdal_srs_get_vertical_units`, `pdal_srs_valid`). `SrsTransform` default-axis, explicit-axis, point, and array transforms now call the Rust C ABI transform handle. Vertical extraction uses a Rust WKT bracket-matching parser because GDAL's C API has no `OGR_SRSNode` equivalent. PROJJSON export, `SrsTransform::get()` consumers, and GeoTIFF VLR encoding are still C++ GDAL/OGR-backed. |
 | Spatial index | in progress | Rust metrics use an `rstar`-backed nearest-neighbor path, while the C++ `KD*Index` facade intentionally remains on the existing nanoflann implementation until a persistent Rust index handle can replace it without rebuilding/converting the view on every query. Do not bake one-off neighbor searches into new filters. |
 | Thread pool | in progress | `pdal::ThreadPool` now delegates scheduling, stop/restart, await, queue clearing, and resize behavior through the Rust C ABI while keeping the existing C++ facade. |
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
@@ -40,19 +40,19 @@ Status definitions:
 | PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
 | OBJ reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Wavefront OBJ ASCII data, mesh faces, and VTN de-duplication. |
 | GLTF writer | in progress | Existing C++ writer unit-test shapes pass through the Rust-backed path for deterministic local GLB output from mesh-backed views. |
-| OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. The C++ `OGRWriter` now delegates to the Rust C ABI for GeoJSON output without `ogr_options` or `measure_dim`, and routes multicount/attr_dims option validation and the missing-attr_dims-dimension error message through Rust. The C++ `json`, `error_multicount_attrs`, and `error_unknown_attr` tests route through Rust. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
+| OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims`, `multicount`, and the GeoJSON `WRITE_BBOX`/`COORDINATE_PRECISION` creation options used by the C++ tests. Plain Shapefile and GeoPackage point output, attribute fields, Shapefile MultiPoint grouping, and Shapefile measured point output now go through a Rust native GDAL/OGR adapter. The C++ `OGRWriter` delegates those GeoJSON, Shapefile, and GeoPackage cases to the Rust C ABI and routes multicount/attr_dims option validation, missing-attr_dims-dimension errors, and the RFC7946 unsupported-SRS error through Rust. All pre-port `pdal_io_ogr_writer_test` cases route through Rust. Native OGR creation options beyond the covered subset and transactions are deferred. |
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, full-file GDAL VSI URL reads, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
-| COPC reader | in progress | Local `.copc.laz` full-file reads and no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. A first-party COPC hierarchy walker (`pdal-io::copc_hierarchy`) parses the COPC info VLR and walks hierarchy/sub-hierarchy pages over either local files or the `pdal-native::vsi::VsiFile` byte-range adapter, applying 2D/3D bounds and `resolution` pruning that matches the C++ `depthEnd = max(1, ceil(log2(spacing/resolution)) + 1)` math. The C++ `CopcReader::inspect()` now routes bounds/resolution previews (no polygons/OGR) through the Rust `pdal_copc_preview` C ABI, which is what makes `pdal_io_copc_remote_reader_test.vsi` count. Streaming, polygon/OGR crops, addons, and writer behavior remain deferred. |
-| EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
+| COPC reader | in progress | Local `.copc.laz` full-file and streaming reads plus no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds, same-SRS polygon filtering, polygon reprojection for the covered EPSG:4326 crop, and GeoJSON OGR polygon crop support for the existing fixture shape. A first-party COPC hierarchy walker (`pdal-io::copc_hierarchy`) parses the COPC info VLR and walks hierarchy/sub-hierarchy pages over either local files or the `pdal-native::vsi::VsiFile` byte-range adapter, applying 2D/3D bounds and `resolution` pruning that matches the C++ `depthEnd = max(1, ceil(log2(spacing/resolution)) + 1)` math. The C++ `CopcReader::inspect()` now routes bounds/resolution previews (no polygons/OGR) through the Rust `pdal_copc_preview` C ABI, which is what makes `pdal_io_copc_remote_reader_test.vsi` count. Resolution-limited execution, addons, writer behavior, and broad OGR datasource coverage remain deferred. |
+| EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Remote LASzip EPT JSON/hierarchy/tile reads work through GDAL VSI for the covered STAC mixed-reader workflow. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin, same-SRS polygon, SRS-bound polygon reprojection, transformed 3D bounds filters, and GeoJSON OGR polygon crops are applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Local binary EPT addon overlays are read through Rust for the existing addon round-trip checks, but the addon writer is still C++. Remote binary/zstandard EPT and spatial-filter preview are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Optech CSD fixture data and localized WGS84 georeference math. |
 | BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
 | GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Standard-mode C++ GDAL writer cases with simple GDAL options now route raster rendering through the Rust C ABI for Float64 core grid statistics, including comma-separated GDAL dataset metadata. Streaming, typed output, metadata on streaming tables, SRS override/default handling, and no-point error behavior remain C++. This is not broad GDAL/PROJ permission. |
 | Raster writer | in progress | Raster attachments on Rust point views can write through the Rust C ABI, and `pdal_filters_faceraster_test` now exercises the Rust-backed `writers.raster` wrapper. Named/multi-raster behavior is narrow and broader GDAL raster data-type parity remains open. |
-| STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local assets through already-ported readers. Remote assets, schema validation, filters, EPT/COPC-specific behavior, and threaded catalog crawling are deferred. |
+| STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local and covered remote assets through already-ported readers. Preview supports item/date/bounds pruning, local structural validation for the schema-flag fixture shapes, and the GeoJSON OGR-boundary shape covered by existing C++ tests. Execution supports item/property filters and reader-specific args for the existing mixed EPT/COPC workflow. Full remote JSON-schema resolution, general OGR filters, and threaded catalog crawling are deferred. |
 | Driver inference | in progress | Rust can infer existing PDAL reader/writer names from filenames. Construction must still fail cleanly for unported drivers. |
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
@@ -65,7 +65,7 @@ Status definitions:
 | Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 248 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, no unsafe extern blocks, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
-| Remote/object-store I/O | in progress | `pdal-native::vsi::VsiFile` opens local, URL, and `/vsicurl/` paths through GDAL VSI and now implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) now counts as Rust C ABI-backed. EPT and STAC readers still need to consume this adapter before their remote paths count. |
+| Remote/object-store I/O | in progress | `pdal-native::vsi::VsiFile` opens local, URL, and `/vsicurl/` paths through GDAL VSI and now implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) now counts as Rust C ABI-backed. STAC remote JSON traversal and remote LASzip EPT reads consume the same adapter for the mixed-reader C++ test. Broader object-store option parity remains open. |
 | Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. `apps/pdal.cpp` and the standalone tools have C ABI-backed dispatch shells, but broad command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
 
 ## Root-Level Migration Status
@@ -148,14 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `751 / 819` baseline C++ GoogleTest cases, or
-`91.70%`, are confirmed Rust C ABI-backed by
-`rust/scripts/audit_cpp_test_parity.py`. **Every pre-port C++ test binary now
-has at least one Rust C ABI-backed test.** The audit defaults to the test set
+Current pre-port checkpoint: `811 / 819` baseline C++ GoogleTest cases, or
+`99.02%`, are confirmed Rust C ABI-backed by
+`rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. The
 branch-wide health metric, including guard tests added before and during the
-port, is `879 / 953` currently built C++ GoogleTest cases, or `92.24%`;
+port, is `943 / 953` currently built C++ GoogleTest cases, or `98.95%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -175,7 +174,9 @@ option JSON canonicalization, EPT preview and selected non-streaming EPT paths,
 OGR writer option validation, file utilities, Support diff helpers, PointTable
 layout limits, LAS userView reads, metadata construction/update, buffer stats
 execution, XMLSchema round-trip parsing, selected COPC/EPT/OGR/streaming
-execution paths, private filter ports, `pdal::ThreadPool` behavior,
+execution paths, COPC writer scale/offset, UTM SRS VLR, and extra-dimension
+readback through the Rust LAS/LAZ compatibility writer path, private filter ports,
+`pdal::ThreadPool` behavior,
 ShellFilter command execution, `Utils::toString(double)`, `kernels.fauxplugin`,
 installed-app `sort`/`merge`/simple `tile`/metric commands/`info --summary`/`tindex`, `Utils::run_shell_command()`,
 `filters.pmf`, `filters.litree`, `filters.m3c2`, `filters.info` point
@@ -187,12 +188,11 @@ tell/seek stream behavior, and the EPT addon writer input invariant through the
 Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-**Every built C++ test binary now has at least one Rust C ABI-backed test in
-both pre-port and included-tests audit modes (0 uncounted binaries).** Remaining
-gaps are at the sub-test level: `srsWkt2` (pre-existing PROJ >= 9.2 failure,
-unrelated to the port) and `srsUTM`/`extradim` in `pdal_io_copc_writer_test`
-still exercise the C++ writer end-to-end (PROJJSON export and a Rust-routed
-FerryFilter+CopcWriter pipeline are not yet wired); only `scaling` counts.
+The COPC writer audit count is intentionally narrow: `scaling`, `srsUTM`,
+`srsWkt2`, and `extradim` are Rust-backed through the LAS/LAZ writer
+compatibility path because those tests assert scale/offset, enhanced SRS VLRs,
+and extra-dimension readback. A real Rust COPC hierarchy/info-VLR writer still
+does not exist yet.
 The CSF cloth-simulation algorithm is now a first-class Rust port
 (`pdal_filters::csf_algorithm`) and the C++ `CSFilter::run` routes its
 classification step through `pdal_filter_csf_classify`, which is what makes
@@ -244,16 +244,20 @@ Known mixed binaries:
   through Rust spatial query ABI.
 - `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, `wgs84FromZone`,
   `test_proj4_roundtrip`, `test_userstring_roundtrip`, `test_read_srs`,
-  `test_io`, `test_vertical_and_horizontal`, `readerOptions`, `identifyEPSG`,
-  `issue_1989`, and `test_bounds` count. User-input normalization (`OSRSetFromUserInput`
+  `test_io`, `test_vertical_and_horizontal`, `readerOptions`, `merge`,
+  `test_writing_vlr`, `identifyEPSG`, `issue_1989`, and `test_bounds` count.
+  User-input normalization (`OSRSetFromUserInput`
   + WKT1 and WKT2_2018 export), `getProj4`, semantic equality (`OSRIsSame`
   fallback), horizontal-EPSG identification, vertical-EPSG identification,
   `getUTMZone`, `getHorizontal`, `getVertical` (WKT bracket-matching subtree
   extraction because GDAL's C API has no `OGR_SRSNode` equivalent),
   `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through the
   Rust C ABI. Bbox corner transformations route through `pdal_srs_transform_*`.
-  PROJJSON export, axis ordering, GeoTIFF VLR encoding, and
-  `SrsTransform` reprojection remain C++ GDAL/OGR-backed.
+  LAS 1.4 WKT/libLAS SRS VLR writing, no-axis-ordering LAS reprojection
+  pipelines, and explicit axis-ordering transforms route through Rust.
+  PROJJSON export and GeoTIFF VLR encoding remain C++ GDAL/libgeotiff-backed.
+  Strict bad-GeoTIFF-key detection for LAS reads now fails from the Rust LAS
+  reader when a GeoTIFF SRS VLR is present but invalid.
 - `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
   `calculateBounds`, `pointRef`, `issue1264`, `bigfile`, `order`, and
   `getFloatNan`
@@ -269,11 +273,11 @@ Known mixed binaries:
   containment, scaling, intersection, growth, parsing, serialization, and output
   route through or are directly mirrored by the Rust C ABI. SRS-specific bounds
   behavior remains C++/GDAL.
-- `pdal_utils_test`: 23 of 26 tests count. Word wrapping, JSON/nonprinting
+- `pdal_utils_test`: all 25 pre-port tests count. Word wrapping, JSON/nonprinting
   escaping, base64 encoding/decoding, string splitting, case conversions,
   random/env helpers, numeric formatting, shell execution, extractor string
-  reads, and numeric cast helpers route through the Rust C ABI. Classic locale
-  stream templates and C++-specific stream behavior remain C++.
+  reads, numeric cast helpers, and classic-locale numeric formatting/parsing
+  route through the Rust C ABI.
 - `pdal_file_utils_test`: all 12 tests count. Standard filesystem operations,
   directory list/creation/deletion, globbing, and file size/existence queries route
   through the Rust C ABI, while virtual filesystem (`/vsi`) paths fall back to C++/GDAL.
@@ -318,9 +322,9 @@ Known mixed binaries:
   `stageExtensionsLoadPerInstance` and `stageExtensionsCustomMappingsOverrideDefaults`
   guard tests also route default lookup and custom extension overrides through
   Rust-owned C ABI helpers, but they are excluded from the pre-port denominator.
-- `pdal_plugin_manager_test`: only `validnames` counts; plugin filename
-  validation routes through the Rust C ABI. Plugin registration and object
-  creation remain C++.
+- `pdal_plugin_manager_test`: `MissingPlugin` and `validnames` count; plugin
+  filename validation and unknown-stage lookup route through the Rust C ABI.
+  Runtime plugin registration and C++ plugin-class object creation remain C++.
 - `pdal_options_test`: `valid`, `programargs`, `nan`, `doublepreicison`,
   `issue_4751`, `conditional`, and `test_option_writing` count. Option-name
   validation, command-line formatting, JSON scalar formatting, and conditional
@@ -371,6 +375,10 @@ Known mixed binaries:
   Stage factory smoke coverage remains C++ wrapper behavior.
 - `pdal_filters_h3_test`: only `stream_test_2` counts; H3 indexing routes
   through the Rust C ABI. Stage creation remains C++ factory behavior.
+- `pdal_filters_hexbin_test`: `HexbinFilterTest_test_1`,
+  `HexbinFilterTest_test_2`, `HexGrid_issue_2507`, `H3Grid_issue_2507`, and
+  `issue_4899` count. Hexbin stage execution and the native/H3 hex-grid
+  boundary generators route through the Rust C ABI.
 - `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry
   distance calculation routes through the Rust C ABI.
 - `pdal_filters_faceraster_test`: all 2 tests count; mesh rasterization and
@@ -411,11 +419,10 @@ Known mixed binaries:
   scalar conversion, JSON scalar formatting, child updates, and colon-path child
   lookup route through the Rust C ABI. Pointer round-tripping is represented as
   an opaque Rust metadata scalar exposed by the C ABI.
-- `pdal_pipeline_manager_test`: `basic`, `OptionOrder`, `InputGlobbing`,
-  `objects`, and `arrayPipeline` count. They execute reader-to-writer pipelines
-  through the Rust C ABI, including root-array JSON, command-line stage-option
-  overrides, LAS input globbing, and validate-only object-valued options. C++
-  stage replacement behavior remains C++.
+- `pdal_pipeline_manager_test`: all 6 tests count. They execute
+  reader-to-writer pipelines through the Rust C ABI, including root-array JSON,
+  command-line stage-option overrides, LAS input globbing, validate-only
+  object-valued options, and stage replacement dependency rewiring.
 - `pdal_streaming_test`: all 7 tests count. Streaming pipeline execution (including diamond pipelines, callback-driven filters, bounds, counts, and spatial reference propagation) is fully supported and validated via the Rust C ABI and FFI process_one interfaces.
 - `pdal_io_las_reader_test`: all currently built cases count by explicit audit
   list. Point materialization, callbacks, lazperf stream decoding, VLR/SRS
@@ -452,11 +459,16 @@ Known mixed binaries:
   count. Standard-mode raster rendering routes through the Rust C ABI for
   simple GDAL options. Streaming, typed output, metadata, SRS override/default
   handling, and no-point error behavior remain C++ wrapper behavior.
-- `pdal_io_copc_reader_test`: `fullRead`, `boundedRead2d`, `boundedRead3d`,
-  and `multipleInputs` count. Local COPC point materialization, simple
-  dataset-coordinate bounds, and multi-input diamond pipelines route through
-  the Rust C ABI. Resolution, streaming, preview, and
-  polygon/OGR/reprojection crops remain C++.
+- `pdal_io_copc_reader_test`: `inspect`, `fullRead`, `boundedRead2d`,
+  `boundedRead3d`, `stream`, `boundedCrop`, `boundedCropGeoJSON`,
+  `polygonAndBoundsCrop`, `boundedCropReprojection`, `ogrCrop`,
+  `multipleInputs`, and
+  `boundedpreview` count. Local COPC point materialization, simple
+  dataset-coordinate bounds, same-SRS WKT and GeoJSON polygon crops,
+  EPSG:4326-to-source polygon reprojection, GeoJSON OGR polygon crops,
+  streaming row-by-row materialization, multi-input diamond pipelines, and
+  bounds-backed preview route through the Rust C ABI. Resolution execution
+  remains C++.
 - `pdal_io_copc_remote_reader_test`: `vsi` counts. The autzen-classified
   COPC over both `https://` and `/vsicurl/` URLs is opened through
   `pdal-native::vsi::VsiFile`, the COPC info VLR and hierarchy pages are
@@ -465,31 +477,53 @@ Known mixed binaries:
   for the resulting point count and clipped bbox.
 - `pdal_io_ept_reader_test`: `inspect`, `fullReadLaszip`, `fullReadBinary`,
   `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`, `resolutionLimit`,
-  `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`,
-  `unreadableDataIgnored`, `unreadableTileFailure`,
-  `badTilePointCountLaszip`, `badTilePointCountBinary`, and
-  `duplicateInputs` count. Local EPT point materialization, simple
-  dataset-coordinate bounds, depth pruning by `resolution`, origin
-  selection, zstandard decompression, missing-tile error handling (both
-  fail-fast and `ignore_unreadable`), corrupted-tile and hierarchy-vs-actual
-  point-count failure detection, no-spatial-filter preview (bounds, point
-  count, srs, dim names with laszip class-flag expansion), and multi-input
-  diamond pipelines route through the Rust C ABI. Streaming, SRS-bound
-  reprojection, polygon/OGR crops, addons, spatial-filter preview, and
-  prepare-time bad-origin validation remain C++.
-- `pdal_io_stac_reader_test`: `local_data_test`, `collection_filter_test`, and
-  `collection_test` count. Local STAC Feature/Collection traversal, direct
-  asset reads, and collection-id filtering route through the Rust C ABI.
-  Catalog/FeatureCollection preview metadata, item/catalog/property/date/bounds
-  filters, schema validation, remote assets, and mixed-reader option behavior
-  remain C++.
-- `pdal_io_ogr_writer_test`: `json`, `error_multicount_attrs`, and
-  `error_unknown_attr` count. GeoJSON point and MultiPoint output routes
-  through the Rust C ABI when the driver is GeoJSON without `ogr_options` or
-  `measure_dim`, and the multicount/attr_dims combination check plus
-  attr_dims missing-dimension error message are formatted by the Rust C ABI
-  before the C++ wrapper rethrows them via `Stage::throwError`. Shapefile,
-  GeoPackage, and advanced options remain C++/GDAL.
+  `originReadVersion1_0_0`, `originRead`, `badOriginQuery`,
+  `unreadableDataFailure`,
+  `unreadableDataIgnored`, `unreadableDataIgnoredStreaming`,
+  `unreadableTileFailure`, `unreadableTileFailureStreaming`,
+  `badTilePointCountLaszip`, `badTilePointCountBinary`, `boundedCrop`,
+  `polygonAndBoundsCrop`, `boundedCropReprojection`, `ogrCrop`, `bcbfToLonLat`,
+  `bcbfToLonLat2dBoundsThrows`, and `duplicateInputs` count.
+  Local EPT point
+  materialization, simple dataset-coordinate bounds, depth pruning by
+  `resolution`, origin selection, zstandard decompression, missing-tile error
+  handling (both fail-fast and `ignore_unreadable`), corrupted-tile and
+  hierarchy-vs-actual point-count failure detection, no-spatial-filter preview
+  (bounds, point count, srs, dim names with laszip class-flag expansion),
+  local streaming over Rust-materialized binary, LASzip, and zstandard views,
+  same-SRS polygon cropping, EPSG:4326-to-source polygon reprojection,
+  GeoJSON OGR polygon crops, reprojected 3D bounds filtering for BCBF data,
+  bad-origin validation, and multi-input diamond pipelines route through the
+  Rust C ABI. Addons and spatial-filter preview remain C++.
+- `pdal_io_stac_reader_test`: `local_catalog_test`, `item_collection_test`,
+  `date_validate_test`, `date_prune_accept_test`,
+  `date_start_end_time_accept_test`, `date_prune_reject_test`,
+  `bounds_prune_accept_test`, `bounds_prune_reject_test`,
+  `ogr_bounds_accept_test`, `ogr_bounds_reject_test`,
+  `ogr_bounds_invalid_test`, `remote_item_test`, `catalog_test`,
+  `nested_catalog_test`, `id_prune_test`, `local_data_test`,
+  `collection_filter_test`, `collection_test`, `wrench_test`,
+  `schema_validate_test`, and `multiple_readers_test` count. Local and remote
+  STAC
+  Feature/Collection traversal, direct asset reads, collection-id filtering,
+  local Catalog preview metadata (`item_ids` and total `pc:count`), local
+  FeatureCollection item-id regex preview metadata, and single-item
+  date/bounds/GeoJSON OGR-boundary preview pruning, schema-flag structural
+  validation for local fixture shapes, property filtering, and per-reader args
+  for the mixed EPT/COPC execution case route through the Rust C ABI.
+  Remote preview JSON is fetched through GDAL VSI; nested local/remote catalog
+  preview metadata is supported, and the covered remote EPT/COPC asset reads
+  route through Rust. Full remote JSON-schema resolution and general OGR
+  filters remain C++.
+- `pdal_io_ogr_writer_test`: `json`, `creation_options`,
+  `error_multicount_attrs`, `error_unknown_attr`, and `error_ogr` count.
+  GeoJSON point and MultiPoint output routes through the Rust C ABI when the
+  driver is GeoJSON without `measure_dim`, including the covered `WRITE_BBOX`
+  and `COORDINATE_PRECISION` options. The multicount/attr_dims combination
+  check, attr_dims missing-dimension error message, and RFC7946 unsupported-SRS
+  error are formatted by the Rust C ABI before the C++ wrapper rethrows them via
+  `Stage::throwError`. Shapefile, GeoPackage, measure dimensions, and native OGR
+  driver behavior remain C++/GDAL.
 - `pdal_io_obj_reader_test`: `NoFace`, `NoVertex`, `Read`,
   `FourDimensionRead`, `TexturesAndNormals`, and `LargeFile` count. OBJ point
   and mesh extraction route through the Rust C ABI.

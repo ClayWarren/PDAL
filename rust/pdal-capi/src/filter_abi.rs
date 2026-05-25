@@ -726,6 +726,10 @@ pub unsafe extern "C" fn pdal_filter_csf_classify(
         set_last_error("filters.csf: iterations must be positive");
         return -1;
     }
+    if rigidness < 0 {
+        set_last_error("filters.csf: rigidness must be non-negative");
+        return -1;
+    }
     let count = count as usize;
     let xyz_slice = std::slice::from_raw_parts(xyz, count * 3);
     let points: Vec<CsfPoint> = (0..count)

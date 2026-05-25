@@ -169,6 +169,7 @@ pub fn version() -> String {
 pub struct UserInput {
     pub wkt: String,
     pub wkt2: String,
+    pub projjson: String,
     pub epoch: f64,
 }
 
@@ -199,10 +200,16 @@ pub fn user_input_to_wkt(input: &str) -> Result<UserInput, String> {
         let epoch = gdal_sys::OSRGetCoordinateEpoch(srs);
         let wkt = export_to_wkt(srs, &[]);
         let wkt2 = export_to_wkt(srs, &[("FORMAT", "WKT2_2018")]);
+        let projjson = export_to_projjson(srs);
         gdal_sys::OSRDestroySpatialReference(srs);
-        match (wkt, wkt2) {
-            (Ok(wkt), Ok(wkt2)) => Ok(UserInput { wkt, wkt2, epoch }),
-            (Err(e), _) | (_, Err(e)) => Err(e),
+        match (wkt, wkt2, projjson) {
+            (Ok(wkt), Ok(wkt2), Ok(projjson)) => Ok(UserInput {
+                wkt,
+                wkt2,
+                projjson,
+                epoch,
+            }),
+            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
         }
     }
 }
@@ -566,6 +573,23 @@ unsafe fn export_to_wkt(
     Ok(out)
 }
 
+unsafe fn export_to_projjson(srs: gdal_sys::OGRSpatialReferenceH) -> Result<String, String> {
+    let mut json: *mut c_char = std::ptr::null_mut();
+    let indentation = CString::new("INDENTATION_WIDTH=2").map_err(|e| e.to_string())?;
+    let schema = CString::new("SCHEMA=").map_err(|e| e.to_string())?;
+    let options = [indentation.as_ptr(), schema.as_ptr(), std::ptr::null()];
+    let err = gdal_sys::OSRExportToPROJJSON(srs, &mut json, options.as_ptr());
+    if err != gdal_sys::OGRErr::OGRERR_NONE || json.is_null() {
+        if !json.is_null() {
+            gdal_sys::VSIFree(json as *mut c_void);
+        }
+        return Err(format!("OSRExportToPROJJSON failed: {err:?}"));
+    }
+    let out = CStr::from_ptr(json).to_string_lossy().into_owned();
+    gdal_sys::VSIFree(json as *mut c_void);
+    Ok(out)
+}
+
 unsafe fn last_cpl_error() -> String {
     let msg = gdal_sys::CPLGetLastErrorMsg();
     if msg.is_null() {
@@ -603,6 +627,9 @@ mod tests {
         assert!(result.wkt.contains("GEOGCS["));
         assert!(result.wkt.contains("WGS 84"));
         assert!(result.wkt2.contains("GEOGCRS[") || result.wkt2.contains("GEOGCS["));
+        assert!(result
+            .projjson
+            .starts_with("{\n  \"type\": \"GeographicCRS\","));
         assert_eq!(result.epoch, 0.0);
     }
 

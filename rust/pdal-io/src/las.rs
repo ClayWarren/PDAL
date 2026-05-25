@@ -131,14 +131,18 @@ impl LasReader {
             .add_value("count", MetadataValue::U64(header.number_of_points()));
     }
 
-    fn set_spatial_reference(&self, view: &mut PointView, header: &Header) {
+    fn set_spatial_reference(
+        &self,
+        view: &mut PointView,
+        header: &Header,
+    ) -> Result<(), StageError> {
         if self.nosrs {
-            return;
+            return Ok(());
         }
 
-        if let Some(srs) = resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order) {
+        if let Some(srs) = resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order)? {
             view.set_spatial_reference(srs);
-            return;
+            return Ok(());
         }
 
         if let Some(wkt_bytes) = header.get_wkt_crs_bytes() {
@@ -151,6 +155,7 @@ impl LasReader {
                 crs.get_horizontal()
             )));
         }
+        Ok(())
     }
 
     fn read_points(
@@ -189,7 +194,7 @@ impl LasReader {
         let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
 
         let mut view = PointView::new(Rc::new(layout));
-        self.set_spatial_reference(&mut view, header);
+        self.set_spatial_reference(&mut view, header)?;
         self.read_points(reader, point_count, point_format, &mut view, &extra_dims)?;
         Ok(view)
     }
@@ -309,7 +314,7 @@ impl Reader for LasReader {
             self.add_metadata(header);
             let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
             let mut view = PointView::new(Rc::new(layout));
-            self.set_spatial_reference(&mut view, header);
+            self.set_spatial_reference(&mut view, header)?;
             self.read_points(
                 &mut reader,
                 point_count,
@@ -338,7 +343,7 @@ impl Reader for LasReader {
             let (layout, extra_dims) = las_layout(&header, &self.configured_extra_dims)?;
 
             let mut view = PointView::new(Rc::new(layout));
-            self.set_spatial_reference(&mut view, &header);
+            self.set_spatial_reference(&mut view, &header)?;
             self.read_points_from_stream(&mut read, &header, point_format, &mut view, &extra_dims)?;
             view
         } else {
@@ -636,7 +641,7 @@ fn vlr_as_string(data: &[u8]) -> String {
 fn resolve_spatial_reference_from_vlrs(
     header: &Header,
     order: &[SrsVlrKind],
-) -> Option<pdal_core::srs::SpatialReference> {
+) -> Result<Option<pdal_core::srs::SpatialReference>, StageError> {
     let order = if order.is_empty() {
         default_srs_vlr_order(header)
     } else {
@@ -649,7 +654,7 @@ fn resolve_spatial_reference_from_vlrs(
                 if let Some(vlr) = find_vlr(header, TRANSFORM_USER_ID, WKT2_RECORD_ID) {
                     let wkt = vlr_as_string(&vlr.data);
                     if !wkt.is_empty() {
-                        return Some(pdal_core::srs::SpatialReference::new(&wkt));
+                        return Ok(Some(pdal_core::srs::SpatialReference::new(&wkt)));
                     }
                 }
             }
@@ -657,7 +662,7 @@ fn resolve_spatial_reference_from_vlrs(
                 if let Some(vlr) = find_vlr(header, PDAL_USER_ID, PROJJSON_RECORD_ID) {
                     let text = vlr_as_string(&vlr.data);
                     if !text.is_empty() {
-                        return Some(pdal_core::srs::SpatialReference::new(&text));
+                        return Ok(Some(pdal_core::srs::SpatialReference::new(&text)));
                     }
                 }
             }
@@ -667,32 +672,36 @@ fn resolve_spatial_reference_from_vlrs(
                 if let Some(vlr) = vlr {
                     let wkt = vlr_as_string(&vlr.data);
                     if !wkt.is_empty() {
-                        return Some(pdal_core::srs::SpatialReference::new(&wkt));
+                        return Ok(Some(pdal_core::srs::SpatialReference::new(&wkt)));
                     }
                 }
             }
             SrsVlrKind::Geotiff => {
                 if find_vlr(header, TRANSFORM_USER_ID, GEOTIFF_DIRECTORY_RECORD_ID).is_some() {
-                    if let Some(srs) = spatial_reference_from_geotiff_vlrs(header) {
-                        return Some(srs);
+                    if let Some(srs) = spatial_reference_from_geotiff_vlrs(header)? {
+                        return Ok(Some(srs));
                     }
                 }
             }
         }
     }
 
-    None
+    Ok(None)
 }
 
 fn spatial_reference_from_geotiff_vlrs(
     header: &Header,
-) -> Option<pdal_core::srs::SpatialReference> {
-    let geotiff = header.get_geotiff_crs().ok()??;
-    let crs = get_epsg_from_geotiff_crs(&geotiff).ok()?;
-    Some(pdal_core::srs::SpatialReference::new(&format!(
+) -> Result<Option<pdal_core::srs::SpatialReference>, StageError> {
+    let geotiff = header
+        .get_geotiff_crs()
+        .map_err(|err| StageError(format!("Could not create an SRS: {err}")))?
+        .ok_or_else(|| StageError("Could not create an SRS: missing GeoTIFF keys.".to_string()))?;
+    let crs = get_epsg_from_geotiff_crs(&geotiff)
+        .map_err(|err| StageError(format!("Could not create an SRS: {err}")))?;
+    Ok(Some(pdal_core::srs::SpatialReference::new(&format!(
         "EPSG:{}",
         crs.get_horizontal()
-    )))
+    ))))
 }
 
 fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {

@@ -36,14 +36,10 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/FerryFilter.hpp>
-#include <io/BufferReader.hpp>
 #include <io/CopcReader.hpp>
 #include <io/CopcWriter.hpp>
 #include <io/LasReader.hpp>
 #include <pdal/util/FileUtils.hpp>
-
-#include <pdal/PDALUtils.hpp>
 
 #include <rust/pdal-capi/include/pdal_capi.h>
 
@@ -108,33 +104,36 @@ TEST(CopcWriterTest, srsWkt2)
 #endif
     const auto filename = Support::temppath("srsWkt2.copc.las");
     {
-        Options readerOps;
-        readerOps.add("filename", Support::datapath("las/utm15.las"));
+        pdal_point_layout_t* layout = pdal_point_layout_create();
+        pdal_point_layout_register_dim(layout, "X", 9);
+        pdal_point_layout_register_dim(layout, "Y", 9);
+        pdal_point_layout_register_dim(layout, "Z", 9);
+        pdal_point_view_t* view = pdal_point_view_create(layout);
+        pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, 0, "X", 635619.85);
+        pdal_point_view_set_f64(view, 0, "Y", 850064.04);
+        pdal_point_view_set_f64(view, 0, "Z", 447.01);
 
-        LasReader reader;
-        reader.setOptions(readerOps);
-
-        Options writerOps;
-        writerOps.add("filename", filename);
-        writerOps.add("a_srs", wkt2DerivedProjected);
-        writerOps.add("enhanced_srs_vlrs", true);
-        CopcWriter writer;
-        writer.setInput(reader);
-        writer.setOptions(writerOps);
-
-        PointTable table;
-        writer.prepare(table);
-        writer.execute(table);
+        pdal_options_t* writeOpts = pdal_options_create();
+        pdal_options_add_str(writeOpts, "filename", filename.c_str());
+        pdal_options_add_str(writeOpts, "a_srs", wkt2DerivedProjected.c_str());
+        pdal_options_add_str(writeOpts, "enhanced_srs_vlrs", "true");
+        pdal_writer_t* writer = pdal_writer_create_copc(writeOpts);
+        EXPECT_NE(writer, nullptr) << pdal_last_error();
+        EXPECT_TRUE(pdal_writer_write_view(writer, view)) << pdal_last_error();
+        pdal_writer_destroy(writer);
+        pdal_options_destroy(writeOpts);
+        pdal_point_view_destroy(view);
     }
 
     {
         Options options;
         options.add("filename", filename);
 
-        CopcReader creader;
-        creader.setOptions(options);
+        LasReader reader;
+        reader.setOptions(options);
 
-        const QuickInfo qi(creader.preview());
+        const QuickInfo qi(reader.preview());
         std::string srs = qi.m_srs.getWKT();
 
         EXPECT_TRUE(Utils::startsWith(
@@ -146,10 +145,10 @@ TEST(CopcWriterTest, srsWkt2)
         options.add("filename", filename);
         options.add("srs_vlr_order", "projjson, wkt2");
 
-        CopcReader creader;
-        creader.setOptions(options);
+        LasReader reader;
+        reader.setOptions(options);
 
-        const QuickInfo qi(creader.preview());
+        const QuickInfo qi(reader.preview());
         std::string srs = qi.m_srs.getPROJJSON();
 
         EXPECT_TRUE(
@@ -161,22 +160,26 @@ TEST(CopcWriterTest, srsUTM)
 {
     const auto filename = Support::temppath("srs.copc.las");
     {
-        Options readerOps;
-        readerOps.add("filename", Support::datapath("las/utm15.las"));
+        pdal_point_layout_t* layout = pdal_point_layout_create();
+        pdal_point_layout_register_dim(layout, "X", 9);
+        pdal_point_layout_register_dim(layout, "Y", 9);
+        pdal_point_layout_register_dim(layout, "Z", 9);
+        pdal_point_view_t* view = pdal_point_view_create(layout);
+        pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, 0, "X", 635619.85);
+        pdal_point_view_set_f64(view, 0, "Y", 850064.04);
+        pdal_point_view_set_f64(view, 0, "Z", 447.01);
 
-        LasReader reader;
-        reader.setOptions(readerOps);
-
-        Options writerOps;
-        writerOps.add("filename", filename);
-        writerOps.add("enhanced_srs_vlrs", true);
-        CopcWriter writer;
-        writer.setInput(reader);
-        writer.setOptions(writerOps);
-
-        PointTable table;
-        writer.prepare(table);
-        writer.execute(table);
+        pdal_options_t* writeOpts = pdal_options_create();
+        pdal_options_add_str(writeOpts, "filename", filename.c_str());
+        pdal_options_add_str(writeOpts, "a_srs", "EPSG:26915");
+        pdal_options_add_str(writeOpts, "enhanced_srs_vlrs", "true");
+        pdal_writer_t* writer = pdal_writer_create_copc(writeOpts);
+        EXPECT_NE(writer, nullptr) << pdal_last_error();
+        EXPECT_TRUE(pdal_writer_write_view(writer, view)) << pdal_last_error();
+        pdal_writer_destroy(writer);
+        pdal_options_destroy(writeOpts);
+        pdal_point_view_destroy(view);
     }
 
     Options ops;
@@ -269,39 +272,46 @@ TEST(CopcWriterTest, scaling)
 
 TEST(CopcWriterTest, extradim)
 {
-    std::string filename(Support::datapath("las/1.2-with-color.las"));
     std::string outFilename(Support::temppath("copcdims.copc.laz"));
 
     FileUtils::deleteFile(outFilename);
 
     auto createFile = [&](const std::string& extraDims)
     {
-        LasReader r;
+        pdal_point_layout_t* layout = pdal_point_layout_create();
+        pdal_point_layout_register_dim(layout, "X", 9);
+        pdal_point_layout_register_dim(layout, "Y", 9);
+        pdal_point_layout_register_dim(layout, "Z", 9);
+        pdal_point_layout_register_dim(layout, "Q", 9);
+        pdal_point_layout_register_dim(layout, "R", 9);
+        pdal_point_layout_register_dim(layout, "S", 9);
+        pdal_point_view_t* view = pdal_point_view_create(layout);
+        pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, 0, "X", 1);
+        pdal_point_view_set_f64(view, 0, "Y", 2);
+        pdal_point_view_set_f64(view, 0, "Z", 3);
+        pdal_point_view_set_f64(view, 0, "Q", 4);
+        pdal_point_view_set_f64(view, 0, "R", 5);
+        pdal_point_view_set_f64(view, 0, "S", 6);
 
-        Options ro;
-        ro.add("filename", filename);
-
-        r.setOptions(ro);
-
-        // Make Q, R & S as extra dims.
-        FerryFilter f;
-        Options fo;
-        fo.add("dimensions", "X=>Q, Y=>R, Red=>S");
-
-        f.setOptions(fo);
-        f.setInput(r);
-
-        CopcWriter w;
-        Options wo;
-        wo.add("filename", outFilename);
-        wo.add("extra_dims", extraDims);
-
-        w.setOptions(wo);
-        w.setInput(f);
-
-        PointTable t;
-        w.prepare(t);
-        w.execute(t);
+        pdal_options_t* options = pdal_options_create();
+        pdal_options_add_str(options, "filename", outFilename.c_str());
+        pdal_options_add_str(options, "extra_dims", extraDims.c_str());
+        pdal_writer_t* writer = pdal_writer_create_copc(options);
+        if (!writer)
+        {
+            pdal_options_destroy(options);
+            pdal_point_view_destroy(view);
+            throw pdal_error(pdal_last_error() ? pdal_last_error()
+                                               : "Rust COPC writer failed");
+        }
+        bool ok = pdal_writer_write_view(writer, view);
+        pdal_writer_destroy(writer);
+        pdal_options_destroy(options);
+        pdal_point_view_destroy(view);
+        if (!ok)
+            throw pdal_error(pdal_last_error() ? pdal_last_error()
+                                               : "Rust COPC writer failed");
     };
 
     auto verifyFile = [&](bool q, bool r, bool s) -> bool

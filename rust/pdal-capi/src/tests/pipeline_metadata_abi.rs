@@ -204,6 +204,55 @@ fn pipeline_management_c_abi_covers_tags_and_empty_execution() {
 }
 
 #[test]
+fn pipeline_replace_stage_preserves_dependencies_through_c_abi() {
+    unsafe {
+        let pipeline = pdal_pipeline_create();
+        let first = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+        let second = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+        let third = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+
+        assert_eq!(first, 0);
+        assert_eq!(second, 1);
+        assert_eq!(third, 2);
+        assert_eq!(
+            pdal_pipeline_add_dependency(pipeline, second as u64, first as u64),
+            0
+        );
+        assert_eq!(
+            pdal_pipeline_add_dependency(pipeline, third as u64, second as u64),
+            0
+        );
+
+        assert_eq!(
+            pdal_pipeline_replace_stage(pipeline, first as u64, pdal_stage_create_merge()),
+            0
+        );
+        assert_eq!(pdal_pipeline_input_count(pipeline, first as u64), 0);
+        assert_eq!(pdal_pipeline_input_count(pipeline, second as u64), 1);
+        assert_eq!(pdal_pipeline_input(pipeline, second as u64, 0), first);
+        assert_eq!(pdal_pipeline_input(pipeline, third as u64, 0), second);
+
+        assert_eq!(
+            pdal_pipeline_replace_stage(pipeline, second as u64, pdal_stage_create_merge()),
+            0
+        );
+        assert_eq!(pdal_pipeline_input_count(pipeline, second as u64), 1);
+        assert_eq!(pdal_pipeline_input(pipeline, second as u64, 0), first);
+        assert_eq!(pdal_pipeline_input(pipeline, third as u64, 0), second);
+
+        assert_eq!(
+            pdal_pipeline_replace_stage(std::ptr::null_mut(), 0, std::ptr::null_mut()),
+            -1
+        );
+        assert_eq!(pdal_pipeline_input_count(std::ptr::null(), 0), -1);
+        assert_eq!(pdal_pipeline_input(std::ptr::null(), 0, 0), -1);
+        assert_eq!(pdal_pipeline_input(pipeline, first as u64, 0), -1);
+
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
 fn metadata_tree_roundtrips_through_c_abi() {
     unsafe {
         let root_name = CString::new("root").unwrap();

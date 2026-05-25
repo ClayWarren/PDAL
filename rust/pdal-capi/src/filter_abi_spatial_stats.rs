@@ -1,4 +1,6 @@
 use super::*;
+use pdal_filters::hexer::{H3Grid, HexGrid, HexId};
+use std::os::raw::{c_char, c_int};
 
 /// Create a voxeldownsize filter stage from options.
 ///
@@ -65,6 +67,98 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
         }))
     } else {
         std::ptr::null_mut()
+    }
+}
+
+/// Build a HexGrid WKT boundary from packed `(i, j)` hex coordinates.
+///
+/// # Safety
+///
+/// `hexes` must point to `pair_count * 2` valid `int32_t` values.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_hexgrid_wkt(
+    height: f64,
+    dense_limit: c_int,
+    hexes: *const c_int,
+    pair_count: u64,
+    precision: u64,
+) -> *mut c_char {
+    if hexes.is_null() && pair_count != 0 {
+        set_last_error("Missing hex coordinates.");
+        return std::ptr::null_mut();
+    }
+
+    let raw = std::slice::from_raw_parts(hexes, pair_count as usize * 2);
+    let ids: Vec<HexId> = raw
+        .chunks_exact(2)
+        .map(|pair| HexId::new(pair[0], pair[1]))
+        .collect();
+    let mut grid = HexGrid::with_height(height, dense_limit);
+    grid.set_hexes(&ids);
+    match grid.find_shapes() {
+        Ok(()) => {
+            grid.find_parent_paths();
+            grid.sort_paths();
+            string_to_c_ptr(grid.to_wkt(precision as usize))
+        }
+        Err(err) => {
+            set_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Build an H3Grid WKT boundary from packed `(i, j)` H3 local coordinates.
+///
+/// # Safety
+///
+/// `hexes` must point to `pair_count * 2` valid `int32_t` values.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_h3grid_wkt(
+    resolution: u8,
+    dense_limit: c_int,
+    origin_lat_degrees: f64,
+    origin_lng_degrees: f64,
+    hexes: *const c_int,
+    pair_count: u64,
+    precision: u64,
+) -> *mut c_char {
+    if hexes.is_null() && pair_count != 0 {
+        set_last_error("Missing H3 hex coordinates.");
+        return std::ptr::null_mut();
+    }
+
+    let raw = std::slice::from_raw_parts(hexes, pair_count as usize * 2);
+    let ids: Vec<HexId> = raw
+        .chunks_exact(2)
+        .map(|pair| HexId::new(pair[0], pair[1]))
+        .collect();
+    let origin =
+        match H3Grid::origin_from_degrees(origin_lat_degrees, origin_lng_degrees, resolution) {
+            Ok(origin) => origin,
+            Err(err) => {
+                set_last_error(err);
+                return std::ptr::null_mut();
+            }
+        };
+    let mut grid = match H3Grid::new(resolution, dense_limit, origin) {
+        Ok(grid) => grid,
+        Err(err) => {
+            set_last_error(err);
+            return std::ptr::null_mut();
+        }
+    };
+    grid.set_hexes(&ids);
+    match grid.find_shapes() {
+        Ok(()) => {
+            grid.find_parent_paths();
+            grid.sort_paths();
+            string_to_c_ptr(grid.to_wkt(precision as usize))
+        }
+        Err(err) => {
+            set_last_error(err);
+            std::ptr::null_mut()
+        }
     }
 }
 

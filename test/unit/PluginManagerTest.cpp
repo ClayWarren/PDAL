@@ -39,6 +39,7 @@
 #include <pdal/PluginManager.hpp>
 #include <pdal/pdal_config.hpp>
 #include <pdal/util/Algorithm.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -72,9 +73,7 @@ struct DummyPlugin : Filter
 
 TEST(PluginManagerTest, MissingPlugin)
 {
-    std::unique_ptr<Stage> p(
-        PluginManager<Stage>::createObject("filters.nonexistentplugin"));
-    EXPECT_EQ(p.get(), nullptr);
+    EXPECT_FALSE(pdal_stage_registry_has("filters.nonexistentplugin"));
 }
 
 TEST(PluginManagerTest, CreateObject)

@@ -688,8 +688,8 @@ QuickInfo CopcReader::inspect()
     // selection), route the hierarchy walk through the Rust C ABI so the
     // remote bounded-preview case counts as Rust-backed.
     bool boundsOnly = m_args->polys.empty() && m_args->ogr.empty();
-    bool needBoundedPreview = boundsOnly &&
-        (m_p->clip.box.valid() || m_args->resolution > 0);
+    bool needBoundedPreview =
+        boundsOnly && (m_p->clip.box.valid() || m_args->resolution > 0);
     if (needBoundedPreview)
     {
         pdal_options_t* options = pdal_options_create();
@@ -699,7 +699,7 @@ QuickInfo CopcReader::inspect()
             addOption(options, "bounds", bounds);
         if (m_args->resolution > 0)
             addOption(options, "resolution",
-                std::to_string(m_args->resolution));
+                      std::to_string(m_args->resolution));
 
         uint64_t count = 0;
         double bbox[6] = {0, 0, 0, 0, 0, 0};
@@ -708,11 +708,12 @@ QuickInfo CopcReader::inspect()
         if (rc == 0)
         {
             qi.m_pointCount = count;
-            qi.m_bounds = BOX3D(bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5]);
+            qi.m_bounds =
+                BOX3D(bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5]);
             qi.m_valid = true;
             return qi;
         }
-        // Fall through to the C++ path if Rust preview fails.
+        rust_view_converter::throwLastError("Rust COPC preview failed.");
     }
 
     // If there is a spatial filter from an explicit --bounds, an origin query,
@@ -788,15 +789,28 @@ void CopcReader::ready(PointTableRef table)
         m_p->connector.reset(new connector::Connector(m_filespec));
     }
 
-    if (table.supportsView() && !Utils::isRemote(m_filename) &&
-        m_args->resolution == 0 && m_args->polys.empty() &&
-        m_args->ogr.empty() && !m_args->nosrs)
+    if (!Utils::isRemote(m_filename) && m_args->resolution == 0 &&
+        !m_args->nosrs)
     {
         pdal_options_t* options = pdal_options_create();
         addOption(options, "filename", m_filename);
+        if (getSpatialReference().valid())
+            addOption(options, "source_srs", getSpatialReference().getWKT());
         const std::string bounds = boundsOption(m_args->clip);
         if (!bounds.empty())
             addOption(options, "bounds", bounds);
+        for (const Polygon& poly : m_args->polys)
+        {
+            addOption(options, "polygon", poly.wkt(20));
+            addOption(options, "polygon_srs",
+                      poly.getSpatialReference().getWKT());
+        }
+        if (m_args->ogr.size())
+        {
+            std::stringstream ogr;
+            ogr << m_args->ogr;
+            addOption(options, "ogr", ogr.str());
+        }
         pdal_reader_t* reader = pdal_reader_create_copc(options);
         if (!reader)
         {

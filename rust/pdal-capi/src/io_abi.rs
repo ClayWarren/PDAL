@@ -384,6 +384,87 @@ pub unsafe extern "C" fn pdal_reader_create_ept(ops: *const Options) -> *mut Rea
     }
 }
 
+/// Validate an EPT origin option through the Rust reader implementation.
+///
+/// # Safety
+/// `filename` and `origin` must be valid null-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_validate_origin(
+    filename: *const c_char,
+    origin: *const c_char,
+) -> bool {
+    if filename.is_null() || origin.is_null() {
+        set_last_error("Missing EPT origin validation input.");
+        return false;
+    }
+    let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
+    let origin = CStr::from_ptr(origin).to_string_lossy().into_owned();
+    let mut options = Options::new();
+    options.add("filename", filename);
+    options.add("origin", origin);
+    match pdal_io::ept::EptReader::new(&options).validate_origin() {
+        Ok(()) => true,
+        Err(err) => {
+            set_last_error(err.0);
+            false
+        }
+    }
+}
+
+/// Validate an EPT bounds option through the Rust reader implementation.
+///
+/// # Safety
+/// `filename` and `bounds` must be valid null-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_validate_bounds(
+    filename: *const c_char,
+    bounds: *const c_char,
+) -> bool {
+    if filename.is_null() || bounds.is_null() {
+        set_last_error("Missing EPT bounds validation input.");
+        return false;
+    }
+    let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
+    let bounds = CStr::from_ptr(bounds).to_string_lossy().into_owned();
+    let mut options = Options::new();
+    options.add("filename", filename);
+    options.add("bounds", bounds);
+    match pdal_io::ept::EptReader::new(&options).validate_bounds() {
+        Ok(()) => true,
+        Err(err) => {
+            set_last_error(err.0);
+            false
+        }
+    }
+}
+
+/// Return local STAC preview metadata as JSON.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stac_preview_json(ops: *const Options) -> *mut c_char {
+    let Some(options) = ops.as_ref() else {
+        set_last_error("Missing STAC preview options.");
+        return std::ptr::null_mut();
+    };
+    match pdal_io::stac::StacReader::new(options).preview() {
+        Ok(preview) => string_to_c_ptr(
+            serde_json::json!({
+                "point_count": preview.point_count,
+                "catalog_ids": preview.catalog_ids,
+                "collection_ids": preview.collection_ids,
+                "item_ids": preview.item_ids,
+            })
+            .to_string(),
+        ),
+        Err(err) => {
+            set_last_error(err.0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Read the first point view produced by a reader.
 ///
 /// # Safety

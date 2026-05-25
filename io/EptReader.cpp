@@ -154,8 +154,14 @@ void addOption(pdal_options_t* options, const std::string& key, double value)
     pdal_options_add_f64(options, key.c_str(), value);
 }
 
-std::string boundsOption(const SrsBounds& bounds)
+std::string boundsOption(SrsBounds bounds)
 {
+    if (!bounds.spatialReference().empty())
+    {
+        std::ostringstream out;
+        out << bounds;
+        return out.str();
+    }
     if (bounds.to3d().valid())
     {
         std::ostringstream out;
@@ -283,9 +289,15 @@ void EptReader::initialize()
         throwError(err.what());
     }
 
-    std::vector<Polygon> ogrPolys = m_args->m_ogr.getPolygons();
-    m_args->m_polys.insert(m_args->m_polys.end(), ogrPolys.begin(),
-                           ogrPolys.end());
+    const bool rustOwnsOgr = !Utils::isRemote(m_filename) &&
+                             m_args->m_addons.empty() &&
+                             m_args->m_bounds.spatialReference().empty();
+    if (!rustOwnsOgr)
+    {
+        std::vector<Polygon> ogrPolys = m_args->m_ogr.getPolygons();
+        m_args->m_polys.insert(m_args->m_polys.end(), ogrPolys.begin(),
+                               ogrPolys.end());
+    }
 
     // Create transformations from our source data to the bounds SRS.
     if (m_args->m_bounds.valid())
@@ -333,6 +345,17 @@ void EptReader::initialize()
             m_p->polys.push_back(ps);
         }
     }
+
+    if (!m_args->m_origin.empty() && !Utils::isRemote(m_filename) &&
+        !pdal_ept_validate_origin(m_filename.c_str(), m_args->m_origin.c_str()))
+        rust_view_converter::throwLastError(
+            "Rust EPT origin validation failed.");
+
+    const std::string queryBounds = boundsOption(m_args->m_bounds);
+    if (!queryBounds.empty() && !Utils::isRemote(m_filename) &&
+        !pdal_ept_validate_bounds(m_filename.c_str(), queryBounds.c_str()))
+        rust_view_converter::throwLastError(
+            "Rust EPT bounds validation failed.");
 
     try
     {
@@ -682,13 +705,16 @@ void EptReader::ready(PointTableRef table)
         m_p->pool.reset(new ThreadPool(m_args->m_threads));
     }
 
-    if (table.supportsView() && !Utils::isRemote(m_filename) &&
-        m_args->m_bounds.spatialReference().empty() &&
-        m_args->m_polys.empty() && m_args->m_addons.empty() &&
-        m_args->m_ogr.empty())
+    bool rustBoundsSupported =
+        m_args->m_bounds.spatialReference().empty() || !m_args->m_bounds.is2d();
+
+    if (!Utils::isRemote(m_filename) && rustBoundsSupported &&
+        m_nodeIdDim == Dimension::Id::Unknown)
     {
         pdal_options_t* options = pdal_options_create();
         addOption(options, "filename", m_filename);
+        if (getSpatialReference().valid())
+            addOption(options, "source_srs", getSpatialReference().getWKT());
         const std::string bounds = boundsOption(m_args->m_bounds);
         if (!bounds.empty())
             addOption(options, "bounds", bounds);
@@ -698,6 +724,20 @@ void EptReader::ready(PointTableRef table)
             addOption(options, "resolution", m_args->m_resolution);
         if (m_args->m_ignoreUnreadable)
             addOption(options, "ignore_unreadable", std::string("true"));
+        if (!m_args->m_addons.empty())
+            addOption(options, "addons", m_args->m_addons.dump());
+        for (const Polygon& poly : m_args->m_polys)
+        {
+            addOption(options, "polygon", poly.wkt(20));
+            addOption(options, "polygon_srs",
+                      poly.getSpatialReference().getWKT());
+        }
+        if (m_args->m_ogr.size())
+        {
+            std::stringstream ogr;
+            ogr << m_args->m_ogr;
+            addOption(options, "ogr", ogr.str());
+        }
         pdal_reader_t* reader = pdal_reader_create_ept(options);
         if (!reader)
         {

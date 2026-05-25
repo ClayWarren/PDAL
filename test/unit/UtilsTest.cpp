@@ -484,46 +484,28 @@ TEST(UtilsTest, toString)
 
 TEST(UtilsTest, StringStreamClassicLocale)
 {
-    Utils::StringStreamClassicLocale ss;
-    double d = 456.34;
-    ss << d;
-    EXPECT_EQ(ss.str(), "456.34");
+    EXPECT_EQ(takeRustString(pdal_utils_to_string_f64(456.34, 6)), "456.34");
 
-    ss.clear();
-    ss.str("");
-
-    ss << "123456789";
     int i = 0;
-    ss >> i;
+    EXPECT_EQ(pdal_utils_from_string_i32("123456789", &i), 0);
     EXPECT_EQ(i, 123456789);
 }
 
 TEST(UtilsTest, OStringStreamClassicLocale)
 {
-    Utils::OStringStreamClassicLocale ss;
-    double d = 456.34;
-    ss << d;
-    EXPECT_EQ(ss.str(), "456.34");
-
-    ss.clear();
-    ss.str("");
-
-    int i = 123456789;
-    ss << i;
-    EXPECT_EQ(ss.str(), "123456789");
+    EXPECT_EQ(takeRustString(pdal_utils_to_string_f64(456.34, 6)), "456.34");
+    EXPECT_EQ(takeRustString(pdal_utils_to_string_i32(123456789)), "123456789");
 }
 
 TEST(UtilsTest, IStringStreamClassicLocale)
 {
-    Utils::IStringStreamClassicLocale ss("123456789");
     int i = 0;
-    ss >> i;
+    EXPECT_EQ(pdal_utils_from_string_i32("123456789", &i), 0);
     EXPECT_EQ(i, 123456789);
 
-    ss.clear();
-    ss.str("80123.45 987654");
     double d = 0;
-    ss >> d >> i;
+    EXPECT_EQ(pdal_utils_from_string_f64("80123.45", &d), 0);
+    EXPECT_EQ(pdal_utils_from_string_i32("987654", &i), 0);
     EXPECT_EQ(d, 80123.45);
     EXPECT_EQ(i, 987654);
 }

@@ -256,11 +256,18 @@ impl Writer for LasWriter {
         add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
         if self.enhanced_srs_vlrs {
+            let generated_srs = generated_srs_vlrs(self, views);
             add_enhanced_srs_vlrs(
                 &mut builder,
-                self.srs_wkt2_vlr.as_deref(),
-                self.srs_projjson_vlr.as_deref(),
-                self.srs_wkt1_vlr.as_deref(),
+                self.srs_wkt2_vlr
+                    .as_deref()
+                    .or(generated_srs.as_ref().map(|srs| srs.wkt2.as_bytes())),
+                self.srs_projjson_vlr
+                    .as_deref()
+                    .or(generated_srs.as_ref().map(|srs| srs.projjson.as_bytes())),
+                self.srs_wkt1_vlr
+                    .as_deref()
+                    .or(generated_srs.as_ref().map(|srs| srs.wkt.as_bytes())),
             );
         } else {
             add_srs_vlr(&mut builder, views, self.a_srs.as_deref());
@@ -307,6 +314,24 @@ impl Writer for LasWriter {
     }
 }
 
+fn generated_srs_vlrs(
+    writer: &LasWriter,
+    views: &[PointView],
+) -> Option<pdal_native::srs::UserInput> {
+    let srs_text = writer
+        .a_srs
+        .as_deref()
+        .filter(|srs| !srs.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            views.first().and_then(|view| {
+                let srs = view.spatial_reference();
+                (!srs.is_empty()).then(|| srs.wkt().to_string())
+            })
+        })?;
+    pdal_native::srs::user_input_to_wkt(&srs_text).ok()
+}
+
 fn min_xyz(views: &[PointView]) -> Option<[f64; 3]> {
     let mut min = [f64::MAX; 3];
     let mut has_points = false;
@@ -322,15 +347,39 @@ fn min_xyz(views: &[PointView]) -> Option<[f64; 3]> {
 }
 
 fn configured_extra_dims_from_options(options: &Options) -> Vec<ConfiguredExtraDim> {
+    let extra_dims = options
+        .values("extra_dims")
+        .iter()
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            if value == "all" {
+                ConfiguredExtraDim {
+                    name: "all".to_string(),
+                    type_name: String::new(),
+                }
+            } else if let Some((name, type_name)) = value.split_once('=') {
+                ConfiguredExtraDim {
+                    name: name.trim().to_string(),
+                    type_name: type_name.trim().to_string(),
+                }
+            } else {
+                ConfiguredExtraDim {
+                    name: value.to_string(),
+                    type_name: String::new(),
+                }
+            }
+        });
     let names = options.values("extra_dim_name");
     let types = options.values("extra_dim_type");
     let count = names.len().min(types.len());
 
-    (0..count)
-        .map(|idx| ConfiguredExtraDim {
+    extra_dims
+        .chain((0..count).map(|idx| ConfiguredExtraDim {
             name: names[idx].clone(),
             type_name: types[idx].clone(),
-        })
+        }))
         .collect()
 }
 
@@ -351,10 +400,29 @@ fn resolve_extra_dims(
         StageError("LasWriter requires at least one point view for extra_dims.".to_string())
     })?;
 
+    if configured_extra_dims
+        .iter()
+        .any(|spec| spec.name.eq_ignore_ascii_case("all"))
+    {
+        return Ok(extra_dims_from_views(views, point_format));
+    }
+    let standard_dims = pdrf_dims(point_format);
     configured_extra_dims
         .iter()
         .map(|spec| {
+            if spec.type_name.is_empty() {
+                return Err(StageError(format!(
+                    "No type was specified for extra_dim '{}'.",
+                    spec.name
+                )));
+            }
             let id = DimId::from_name(&spec.name);
+            if standard_dims.contains(&id) {
+                return Err(StageError(format!(
+                    "Dimension '{}' specified in extra_dim option is already in the point format.",
+                    spec.name
+                )));
+            }
             let ty = dim_type_from_interpretation(&spec.type_name).ok_or_else(|| {
                 StageError(format!(
                     "Invalid extra_dim type '{}' for dimension '{}'.",
@@ -514,7 +582,7 @@ fn add_enhanced_srs_vlrs(
             user_id: TRANSFORM_USER_ID.to_string(),
             record_id: WKT2_RECORD_ID,
             description: "PDAL WKT2 Record".to_string(),
-            data: data.to_vec(),
+            data: null_terminated(data),
         });
         builder.has_wkt_crs = true;
     }
@@ -523,7 +591,7 @@ fn add_enhanced_srs_vlrs(
             user_id: PDAL_USER_ID.to_string(),
             record_id: PROJJSON_RECORD_ID,
             description: "PDAL PROJJSON Record".to_string(),
-            data: data.to_vec(),
+            data: null_terminated(data),
         });
     }
     if let Some(data) = wkt1 {
@@ -531,16 +599,24 @@ fn add_enhanced_srs_vlrs(
             user_id: TRANSFORM_USER_ID.to_string(),
             record_id: WKT_RECORD_ID,
             description: "OGC Transformation Record".to_string(),
-            data: data.to_vec(),
+            data: null_terminated(data),
         });
         builder.vlrs.push(Vlr {
             user_id: LIBLAS_USER_ID.to_string(),
             record_id: WKT_RECORD_ID,
             description: "OGR variant of OpenGIS WKT SRS".to_string(),
-            data: data.to_vec(),
+            data: null_terminated(data),
         });
         builder.has_wkt_crs = true;
     }
+}
+
+fn null_terminated(data: &[u8]) -> Vec<u8> {
+    let mut out = data.to_vec();
+    if !out.ends_with(&[0]) {
+        out.push(0);
+    }
+    out
 }
 
 fn add_user_vlrs(builder: &mut Builder, user_vlrs: &[UserVlr]) -> Result<(), StageError> {
@@ -655,11 +731,19 @@ fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Option<&str>) 
         .unwrap_or(wkt);
     builder.vlrs.retain(|vlr| !vlr.is_crs());
     builder.evlrs.retain(|vlr| !vlr.is_crs());
+    let mut wkt_bytes = wkt.into_bytes();
+    wkt_bytes.push(0);
     builder.vlrs.push(Vlr {
         user_id: TRANSFORM_USER_ID.to_string(),
         record_id: WKT_RECORD_ID,
-        description: String::new(),
-        data: wkt.into_bytes(),
+        description: "OGC Transformation Record".to_string(),
+        data: wkt_bytes.clone(),
+    });
+    builder.vlrs.push(Vlr {
+        user_id: LIBLAS_USER_ID.to_string(),
+        record_id: WKT_RECORD_ID,
+        description: "OGR variant of OpenGIS WKT SRS".to_string(),
+        data: wkt_bytes,
     });
     builder.has_wkt_crs = true;
 }

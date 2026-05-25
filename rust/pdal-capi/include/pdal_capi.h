@@ -56,18 +56,18 @@ extern "C"
     char* pdal_artifact_manager_get(const pdal_artifact_manager_t* manager,
                                     const char* name, const char* type_name);
     bool pdal_artifact_manager_replace(pdal_artifact_manager_t* manager,
-                                       const char* name,
-                                       const char* type_name,
+                                       const char* name, const char* type_name,
                                        const char* value);
-    bool pdal_artifact_manager_replace_or_put(
-        pdal_artifact_manager_t* manager, const char* name,
-        const char* type_name, const char* value);
+    bool pdal_artifact_manager_replace_or_put(pdal_artifact_manager_t* manager,
+                                              const char* name,
+                                              const char* type_name,
+                                              const char* value);
     bool pdal_artifact_manager_erase(pdal_artifact_manager_t* manager,
                                      const char* name);
     bool pdal_artifact_manager_exists(const pdal_artifact_manager_t* manager,
                                       const char* name);
-    char* pdal_artifact_manager_keys_json(
-        const pdal_artifact_manager_t* manager);
+    char*
+    pdal_artifact_manager_keys_json(const pdal_artifact_manager_t* manager);
 
     // ProgramArgs
     char* pdal_program_args_parse_json(const char* specs_json,
@@ -85,8 +85,7 @@ extern "C"
     char* pdal_rust_stage_list_json();
     pdal_stage_extensions_t* pdal_stage_extensions_create();
     void pdal_stage_extensions_set(pdal_stage_extensions_t* extensions,
-                                   const char* stage,
-                                   const char* const* values,
+                                   const char* stage, const char* const* values,
                                    uint64_t value_count);
     char* pdal_stage_extensions_default_reader(
         const pdal_stage_extensions_t* extensions, const char* extension);
@@ -101,8 +100,8 @@ extern "C"
 
     // Log
     const char* pdal_log_level_string(int32_t level);
-    char* pdal_log_format_prefix(const char* leader, int32_t level,
-                                 bool timing, double elapsed_seconds);
+    char* pdal_log_format_prefix(const char* leader, int32_t level, bool timing,
+                                 double elapsed_seconds);
     char* pdal_app_unknown_command_message(const char* command);
 
     // FileSpec
@@ -302,6 +301,7 @@ extern "C"
     char* pdal_plugin_valid_name(const char* path, const char** types,
                                  uint64_t type_count,
                                  const char* dynamic_lib_extension);
+    bool pdal_stage_registry_has(const char* stage_name);
 
     // PointLayout
     pdal_point_layout_t* pdal_point_layout_create();
@@ -763,6 +763,13 @@ extern "C"
     pdal_stage_t* pdal_stage_create_voxeldownsize(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_sample(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_hexbin(const pdal_options_t* ops);
+    char* pdal_hexgrid_wkt(double height, int32_t dense_limit,
+                           const int32_t* hexes, uint64_t pair_count,
+                           uint64_t precision);
+    char* pdal_h3grid_wkt(uint8_t resolution, int32_t dense_limit,
+                          double origin_lat_degrees,
+                          double origin_lng_degrees, const int32_t* hexes,
+                          uint64_t pair_count, uint64_t precision);
     pdal_stage_t* pdal_stage_create_faceraster(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_radialdensity(double radius);
     pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);
@@ -1097,10 +1104,8 @@ extern "C"
     /// the supplied outputs. `out_bounds` is laid out as
     /// `[min_x, min_y, min_z, max_x, max_y, max_z]`. Returns 0 on success
     /// and -1 on error (use `pdal_last_error()` for details).
-    int32_t pdal_copc_preview(
-        const pdal_options_t* ops,
-        uint64_t* out_point_count,
-        double* out_bounds);
+    int32_t pdal_copc_preview(const pdal_options_t* ops,
+                              uint64_t* out_point_count, double* out_bounds);
     pdal_reader_t* pdal_reader_create_ept(const pdal_options_t* ops);
     pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
     pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);
@@ -1175,6 +1180,9 @@ extern "C"
     pdal_ept_reader_preview_dim_name(const pdal_ept_reader_preview_t* handle,
                                      uint64_t index);
     void pdal_ept_reader_preview_destroy(pdal_ept_reader_preview_t* handle);
+    bool pdal_ept_validate_origin(const char* filename, const char* origin);
+    bool pdal_ept_validate_bounds(const char* filename, const char* bounds);
+    char* pdal_stac_preview_json(const pdal_options_t* ops);
 
     pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);
     // OGR writer option validation. Returns null on success, otherwise an
@@ -1217,6 +1225,12 @@ extern "C"
                                      pdal_writer_t* writer);
     int64_t pdal_pipeline_add_dependency(pdal_pipeline_t* pipeline,
                                          uint64_t target, uint64_t input);
+    int64_t pdal_pipeline_replace_stage(pdal_pipeline_t* pipeline, uint64_t idx,
+                                        pdal_stage_t* stage);
+    int64_t pdal_pipeline_input_count(const pdal_pipeline_t* pipeline,
+                                      uint64_t idx);
+    int64_t pdal_pipeline_input(const pdal_pipeline_t* pipeline, uint64_t idx,
+                                uint64_t input_idx);
     pdal_point_view_t* pdal_pipeline_execute(pdal_pipeline_t* pipeline,
                                              pdal_point_view_t* input_view);
     int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline,

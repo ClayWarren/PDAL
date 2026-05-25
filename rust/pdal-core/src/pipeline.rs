@@ -177,6 +177,53 @@ impl Pipeline {
         Ok(())
     }
 
+    /// Replace a stage while preserving graph edges that referenced it.
+    pub fn replace_stage(
+        &mut self,
+        idx: usize,
+        name: &str,
+        stage: Box<dyn StageWrapper>,
+        options: Options,
+    ) -> Result<(), StageError> {
+        let old_node = self
+            .nodes
+            .get(idx)
+            .ok_or_else(|| StageError(format!("stage index {idx} out of range")))?;
+        let inputs = old_node.inputs.clone();
+        let tag = old_node.tag.clone();
+        let kind = old_node.kind;
+
+        self.nodes[idx] = StageNode {
+            name: name.to_string(),
+            stage,
+            inputs,
+            options,
+            tag,
+            kind,
+        };
+        Ok(())
+    }
+
+    /// Return the number of direct input edges for a stage.
+    pub fn input_count(&self, idx: usize) -> Result<usize, StageError> {
+        self.nodes
+            .get(idx)
+            .map(|node| node.inputs.len())
+            .ok_or_else(|| StageError(format!("stage index {idx} out of range")))
+    }
+
+    /// Return one direct input stage index for a stage.
+    pub fn input(&self, idx: usize, input_idx: usize) -> Result<usize, StageError> {
+        self.nodes
+            .get(idx)
+            .and_then(|node| node.inputs.get(input_idx).copied())
+            .ok_or_else(|| {
+                StageError(format!(
+                    "stage input out of range: stage={idx}, input={input_idx}"
+                ))
+            })
+    }
+
     /// Find a stage index by its tag.
     pub fn find_by_tag(&self, tag: &str) -> Option<usize> {
         self.tags.get(tag).copied()

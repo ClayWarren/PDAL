@@ -8,12 +8,15 @@
 
 use crate::tindex::append_view;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
+use pdal_core::geometry::Geometry;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
+use pdal_core::ogr_spec::parse_ogr_spec_json;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointId, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
+use pdal_native::srs::{user_input_to_wkt, GdalSrsTransform};
 use serde_json::Value;
 use std::collections::{BTreeSet, VecDeque};
 use std::io::Cursor;
@@ -25,7 +28,12 @@ pub struct EptReader {
     bounds: String,
     origin: String,
     resolution: String,
+    polygons: Vec<String>,
+    polygon_srs: Vec<String>,
+    ogr: String,
+    source_srs: String,
     ignore_unreadable: bool,
+    addons: String,
     metadata: MetadataNode,
 }
 
@@ -36,9 +44,30 @@ impl EptReader {
             bounds: options.get_str("bounds", ""),
             origin: options.get_str("origin", ""),
             resolution: options.get_str("resolution", ""),
+            polygons: option_values(options, "polygon"),
+            polygon_srs: option_values(options, "polygon_srs"),
+            ogr: options.get_str("ogr", ""),
+            source_srs: options.get_str("source_srs", ""),
             ignore_unreadable: options.get_bool("ignore_unreadable", false),
+            addons: options.get_str("addons", ""),
             metadata: MetadataNode::new("readers.ept"),
         }
+    }
+
+    pub fn validate_origin(&self) -> Result<(), StageError> {
+        let ept_path = Path::new(&self.filename);
+        let root = ept_path.parent().unwrap_or(Path::new(""));
+        self.origin_filter(root).map(|_| ())
+    }
+
+    pub fn validate_bounds(&self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "EptReader requires a filename option.".to_string(),
+            ));
+        }
+        let info = read_json_location(&self.filename)?;
+        self.bounds_filter(&info).map(|_| ())
     }
 }
 
@@ -54,14 +83,10 @@ impl Reader for EptReader {
             ));
         }
 
-        let ept_path = Path::new(&self.filename);
-        let root = ept_path.parent().unwrap_or(Path::new(""));
-        let info = read_json(ept_path)?;
+        let root = location_parent(&self.filename);
+        let info = read_json_location(&self.filename)?;
         let data_type = info["dataType"].as_str().ok_or_else(|| {
-            StageError(format!(
-                "EPT file '{}' is missing dataType.",
-                ept_path.display()
-            ))
+            StageError(format!("EPT file '{}' is missing dataType.", self.filename))
         })?;
         if data_type != "laszip" && data_type != "binary" && data_type != "zstandard" {
             return Err(StageError(format!(
@@ -71,24 +96,32 @@ impl Reader for EptReader {
 
         self.metadata = metadata_from_info(&info);
         let max_depth = self.resolution_filter(&info)?;
-        let bounds = self.bounds_filter()?;
+        let bounds = self.bounds_filter(&info)?;
+        let polygons = self.polygon_filters()?;
         let root_bounds = ept_bounds(&info)?;
-        let tiles = hierarchy_tiles(root, max_depth, bounds.as_ref(), root_bounds)?;
+        let hierarchy_bounds = bounds
+            .as_ref()
+            .and_then(|filter| filter.hierarchy_query_bounds());
+        let tiles = hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
+        let addons = EptAddon::parse_specs(&self.addons)?;
         // Register EptNodeId/EptPointId tracking dims. These are set by the C++
         // reader in processPoint() and used by streamTest to sort points by
         // (nodeId, pointId) before comparing dimension values.
         let ept_node_id = DimId::from_name("EptNodeId");
         let ept_point_id = DimId::from_name("EptPointId");
         if let Some(layout) = Rc::get_mut(&mut schema.layout) {
+            for addon in &addons {
+                layout.register(addon.dim.clone(), addon.ty);
+            }
             layout.register(ept_node_id.clone(), DimType::U32);
             layout.register(ept_point_id.clone(), DimType::U32);
         }
         let mut node_id: u32 = 1;
         let srs = info["srs"]["wkt"].as_str().unwrap_or("");
-        let origin = self.origin_filter(root)?;
+        let origin = self.origin_filter(Path::new(&root))?;
         let tile_count = tiles.len();
         for tile in tiles {
             let extension = match data_type {
@@ -97,17 +130,15 @@ impl Reader for EptReader {
                 "zstandard" => "zst",
                 _ => unreachable!(),
             };
-            let path = root
-                .join("ept-data")
-                .join(format!("{}.{extension}", tile.key));
+            let path = join_location(&root, &format!("ept-data/{}.{extension}", tile.key));
             let views = if data_type == "laszip" {
                 let mut options = Options::new();
-                options.add("filename", path.display());
+                options.add("filename", path.as_str());
                 crate::las::LasReader::new(&options).read()
             } else if data_type == "zstandard" {
-                read_zstandard_tile(&path, &schema, srs).map(|view| vec![view])
+                read_zstandard_tile(Path::new(&path), &schema, srs).map(|view| vec![view])
             } else {
-                read_binary_tile(&path, &schema, srs).map(|view| vec![view])
+                read_binary_tile(Path::new(&path), &schema, srs).map(|view| vec![view])
             };
             let views = match views {
                 Ok(views) => views,
@@ -116,8 +147,7 @@ impl Reader for EptReader {
                         "warning",
                         MetadataValue::String(format!(
                             "Ignored unreadable EPT tile '{}': {}",
-                            path.display(),
-                            err.0
+                            path, err.0
                         )),
                     );
                     continue;
@@ -125,34 +155,38 @@ impl Reader for EptReader {
                 Err(err) => return Err(err),
             };
             validate_tile_count(&path, &views, tile.expected_points)?;
-            // LasReader views lack EptNodeId/EptPointId tracking dims.
-            // Add them so the EPT reader can set values that match C++.
-            // For laszip tiles, LasReader views lack EptNodeId/EptPointId
-            // tracking dims.  Pre-create a layout that includes them so the
-            // set_f64 calls below actually persist those values.
             let views = if data_type == "laszip" {
                 views
                     .into_iter()
                     .map(|v| {
-                        v.with_dimensions(&[
-                            (ept_node_id.clone(), DimType::U32),
-                            (ept_point_id.clone(), DimType::U32),
-                        ])
+                        let dims = addons
+                            .iter()
+                            .map(|addon| (addon.dim.clone(), addon.ty))
+                            .chain([
+                                (ept_node_id.clone(), DimType::U32),
+                                (ept_point_id.clone(), DimType::U32),
+                            ])
+                            .collect::<Vec<_>>();
+                        v.with_dimensions(&dims)
                     })
                     .collect::<Vec<_>>()
             } else {
                 views
             };
             for view in views {
-                let mut view = apply_origin(apply_bounds(view, bounds.as_ref()), origin);
-                let base_point = point_count;
+                let mut view = view;
+                apply_addons(&mut view, &addons, &tile.key)?;
                 for idx in 0..view.len() {
                     view.set_f64(idx, &ept_node_id, node_id as f64);
-                    view.set_f64(idx, &ept_point_id, (base_point + idx) as f64);
+                    view.set_f64(idx, &ept_point_id, idx as f64);
                 }
+                let view = apply_origin(
+                    apply_polygons(apply_bounds(view, bounds.as_ref()), &polygons),
+                    origin,
+                );
                 point_count += view.len();
                 node_id += 1;
-                append_view(&mut merged, &view, &path)?;
+                append_view(&mut merged, &view, Path::new(&path))?;
             }
         }
         self.metadata
@@ -263,17 +297,38 @@ fn ept_bounds_field(info: &Value, field: &str) -> Result<Bounds3D, StageError> {
     })
 }
 
+fn option_values(options: &Options, key: &str) -> Vec<String> {
+    options
+        .values(key)
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 impl EptReader {
-    fn bounds_filter(&self) -> Result<Option<QueryBounds>, StageError> {
+    fn bounds_filter(&self, info: &Value) -> Result<Option<BoundsFilter>, StageError> {
         if self.bounds.is_empty() {
             return Ok(None);
         }
         if let Ok(parsed) = parse_bounds3d(&self.bounds, 0) {
-            return Ok(Some(QueryBounds::Three(parsed.bounds)));
+            let target_srs = parsed_bounds_srs(&self.bounds, parsed.pos);
+            return BoundsFilter::new(QueryBounds::Three(parsed.bounds), &target_srs, info)
+                .map(Some);
         }
-        parse_bounds2d(&self.bounds, 0)
-            .map(|parsed| Some(QueryBounds::Two(parsed.bounds)))
-            .map_err(|err| StageError(format!("Invalid EPT bounds option: {err}")))
+        let parsed = parse_bounds2d(&self.bounds, 0)
+            .map_err(|err| StageError(format!("Invalid EPT bounds option: {err}")))?;
+        let target_srs = parsed_bounds_srs(&self.bounds, parsed.pos);
+        if !target_srs.is_empty() {
+            return Err(StageError(
+                "For lon/lat 'bounds', bounds must be 3D".to_string(),
+            ));
+        }
+        Ok(Some(BoundsFilter {
+            query: QueryBounds::Two(parsed.bounds),
+            transform: None,
+        }))
     }
 
     fn origin_filter(&self, root: &Path) -> Result<Option<u64>, StageError> {
@@ -328,11 +383,120 @@ impl EptReader {
         let depth = (cube_width / resolution).log2().ceil().max(0.0) as u64;
         Ok(Some(depth))
     }
+
+    fn polygon_filters(&self) -> Result<Vec<PolygonFilter>, StageError> {
+        let mut filters: Vec<PolygonFilter> = self
+            .polygons
+            .iter()
+            .enumerate()
+            .map(|(idx, wkt)| {
+                let geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
+                let polygon_srs = self.polygon_srs.get(idx).map_or("", String::as_str);
+                Ok(PolygonFilter {
+                    geometry,
+                    transform: polygon_transform(&self.source_srs, polygon_srs)?,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        filters.extend(self.ogr_polygon_filters()?);
+        Ok(filters)
+    }
+
+    fn ogr_polygon_filters(&self) -> Result<Vec<PolygonFilter>, StageError> {
+        if self.ogr.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let spec = parse_ogr_spec_json(&self.ogr).map_err(StageError)?;
+        let text = std::fs::read_to_string(&spec.datasource).map_err(|err| {
+            StageError(format!(
+                "Can't open OGR datasource '{}': {err}",
+                spec.datasource
+            ))
+        })?;
+        let json: Value = serde_json::from_str(&text).map_err(|err| {
+            StageError(format!(
+                "OGR datasource '{}' is not valid GeoJSON: {err}",
+                spec.datasource
+            ))
+        })?;
+        let features = json["features"].as_array().ok_or_else(|| {
+            StageError(format!(
+                "OGR datasource '{}' is missing GeoJSON features.",
+                spec.datasource
+            ))
+        })?;
+        let mut filters = Vec::new();
+        for feature in features {
+            if feature["geometry"].is_null() {
+                continue;
+            }
+            let geometry =
+                Geometry::from_geojson(&feature["geometry"].to_string()).map_err(StageError)?;
+            filters.push(PolygonFilter {
+                geometry,
+                transform: polygon_transform(&self.source_srs, "EPSG:4326")?,
+            });
+        }
+        Ok(filters)
+    }
 }
 
 struct EptTile {
     key: String,
     expected_points: u64,
+}
+
+struct EptAddon {
+    dim: DimId,
+    ty: DimType,
+    size: usize,
+    data_dir: String,
+}
+
+impl EptAddon {
+    fn parse_specs(spec: &str) -> Result<Vec<Self>, StageError> {
+        if spec.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let value: Value = serde_json::from_str(spec)
+            .map_err(|err| StageError(format!("Unable to parse EPT addon option: {err}")))?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| StageError("EPT addons option must be a JSON object.".to_string()))?;
+        object
+            .iter()
+            .map(|(dim_name, path_value)| {
+                let path = path_value.as_str().ok_or_else(|| {
+                    StageError(format!(
+                        "EPT addon mapping for '{dim_name}' must be a string path."
+                    ))
+                })?;
+                Self::from_metadata(dim_name, path)
+            })
+            .collect()
+    }
+
+    fn from_metadata(dim_name: &str, path: &str) -> Result<Self, StageError> {
+        let metadata_path = addon_metadata_path(path);
+        let metadata = read_json_location(&metadata_path)?;
+        let kind = metadata["type"]
+            .as_str()
+            .ok_or_else(|| StageError(format!("EPT addon '{}' is missing type.", metadata_path)))?;
+        let size = metadata["size"]
+            .as_u64()
+            .ok_or_else(|| StageError(format!("EPT addon '{}' is missing size.", metadata_path)))?
+            as usize;
+        Ok(Self {
+            dim: DimId::from_name(dim_name),
+            ty: dim_type(kind, size)?,
+            size,
+            data_dir: format!("{}/ept-data", location_parent(&metadata_path)),
+        })
+    }
+
+    fn data_path(&self, key: &str) -> String {
+        join_location(&self.data_dir, &format!("{key}.bin"))
+    }
 }
 
 struct SourceOrigin {
@@ -357,8 +521,59 @@ fn read_json(path: &Path) -> Result<Value, StageError> {
     })
 }
 
+fn read_json_location(location: &str) -> Result<Value, StageError> {
+    if is_remote_location(location) || location.starts_with("/vsi") {
+        let vsi_path = if location.starts_with("http://") || location.starts_with("https://") {
+            format!("/vsicurl/{location}")
+        } else {
+            location.to_string()
+        };
+        let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
+            .map_err(|err| StageError(format!("Can't open EPT file '{location}': {err}")))?;
+        let mut text = String::new();
+        use std::io::Read as _;
+        file.read_to_string(&mut text)
+            .map_err(|err| StageError(format!("Can't read EPT file '{location}': {err}")))?;
+        serde_json::from_str(&text)
+            .map_err(|err| StageError(format!("EPT file '{location}' is not valid JSON: {err}")))
+    } else {
+        read_json(Path::new(location))
+    }
+}
+
+fn location_parent(location: &str) -> String {
+    location
+        .rsplit_once('/')
+        .map(|(parent, _)| parent.to_string())
+        .unwrap_or_default()
+}
+
+fn addon_metadata_path(path: &str) -> String {
+    if path.ends_with("ept-addon.json") {
+        path.to_string()
+    } else {
+        join_location(path, "ept-addon.json")
+    }
+}
+
+fn join_location(base: &str, relative: &str) -> String {
+    if is_remote_location(relative) || Path::new(relative).is_absolute() {
+        relative.to_string()
+    } else {
+        format!(
+            "{}/{}",
+            base.trim_end_matches('/'),
+            relative.trim_start_matches("./")
+        )
+    }
+}
+
+fn is_remote_location(value: &str) -> bool {
+    value.contains("://")
+}
+
 fn hierarchy_tiles(
-    root: &Path,
+    root: &str,
     max_depth: Option<u64>,
     query: Option<&QueryBounds>,
     root_bounds: Bounds3D,
@@ -370,14 +585,11 @@ fn hierarchy_tiles(
         if !seen.insert(key.clone()) {
             continue;
         }
-        let path = root.join("ept-hierarchy").join(format!("{key}.json"));
-        let hierarchy = read_json(&path)?;
-        let object = hierarchy.as_object().ok_or_else(|| {
-            StageError(format!(
-                "EPT hierarchy '{}' must be a JSON object.",
-                path.display()
-            ))
-        })?;
+        let path = join_location(root, &format!("ept-hierarchy/{key}.json"));
+        let hierarchy = read_json_location(&path)?;
+        let object = hierarchy
+            .as_object()
+            .ok_or_else(|| StageError(format!("EPT hierarchy '{path}' must be a JSON object.")))?;
         for (node, count) in object {
             let key = EptKey::parse(node, root_bounds)?;
             let depth = key.depth;
@@ -474,7 +686,7 @@ fn ept_bound_value(bounds: &[Value], index: usize, name: &str) -> Result<f64, St
 }
 
 fn validate_tile_count(
-    path: &Path,
+    path: &str,
     views: &[PointView],
     expected_points: u64,
 ) -> Result<(), StageError> {
@@ -482,7 +694,7 @@ fn validate_tile_count(
     if actual_points != expected_points {
         return Err(StageError(format!(
             "EPT tile '{}' has {actual_points} points but hierarchy expected {expected_points}.",
-            path.display()
+            path
         )));
     }
     Ok(())
@@ -553,13 +765,56 @@ enum QueryBounds {
     Three(Bounds3D),
 }
 
-impl QueryBounds {
+struct BoundsFilter {
+    query: QueryBounds,
+    transform: Option<GdalSrsTransform>,
+}
+
+impl BoundsFilter {
+    fn new(query: QueryBounds, target_srs: &str, info: &Value) -> Result<Self, StageError> {
+        let transform = if target_srs.is_empty() {
+            None
+        } else {
+            let source_srs = info["srs"]["wkt"].as_str().unwrap_or("");
+            let source = user_input_to_wkt(source_srs).map_err(StageError)?;
+            let target = user_input_to_wkt(target_srs).map_err(StageError)?;
+            Some(
+                GdalSrsTransform::new(
+                    &source.wkt2,
+                    source.epoch,
+                    &target.wkt2,
+                    target.epoch,
+                    &[],
+                    &[],
+                )
+                .map_err(StageError)?,
+            )
+        };
+        Ok(Self { query, transform })
+    }
+
     fn contains(&self, view: &PointView, idx: PointId) -> bool {
-        let x = view.get_f64(idx, &DimId::X);
-        let y = view.get_f64(idx, &DimId::Y);
+        let mut x = view.get_f64(idx, &DimId::X);
+        let mut y = view.get_f64(idx, &DimId::Y);
+        let mut z = view.get_f64(idx, &DimId::Z);
+        if let Some(transform) = &self.transform {
+            if !transform.transform_xyz(&mut x, &mut y, &mut z) {
+                return false;
+            }
+        }
+        self.query.contains_point(x, y, z)
+    }
+
+    fn hierarchy_query_bounds(&self) -> Option<&QueryBounds> {
+        self.transform.is_none().then_some(&self.query)
+    }
+}
+
+impl QueryBounds {
+    fn contains_point(&self, x: f64, y: f64, z: f64) -> bool {
         match self {
             QueryBounds::Two(bounds) => bounds.contains_point(x, y),
-            QueryBounds::Three(bounds) => bounds.contains_point(x, y, view.get_f64(idx, &DimId::Z)),
+            QueryBounds::Three(bounds) => bounds.contains_point(x, y, z),
         }
     }
 
@@ -576,7 +831,18 @@ impl QueryBounds {
     }
 }
 
-fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
+fn parsed_bounds_srs(input: &str, pos: usize) -> String {
+    input
+        .get(pos..)
+        .unwrap_or("")
+        .trim()
+        .strip_prefix('/')
+        .map(str::trim)
+        .unwrap_or("")
+        .to_string()
+}
+
+fn apply_bounds(view: PointView, bounds: Option<&BoundsFilter>) -> PointView {
     let Some(bounds) = bounds else {
         return view;
     };
@@ -587,6 +853,64 @@ fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
         }
     }
     output
+}
+
+struct PolygonFilter {
+    geometry: Geometry,
+    transform: Option<GdalSrsTransform>,
+}
+
+fn polygon_transform(
+    source_srs: &str,
+    polygon_srs: &str,
+) -> Result<Option<GdalSrsTransform>, StageError> {
+    if source_srs.trim().is_empty() || polygon_srs.trim().is_empty() {
+        return Ok(None);
+    }
+    let source = user_input_to_wkt(source_srs).map_err(StageError)?;
+    let target = user_input_to_wkt(polygon_srs).map_err(StageError)?;
+    if source.wkt == target.wkt {
+        return Ok(None);
+    }
+    Ok(Some(
+        GdalSrsTransform::new(
+            &source.wkt2,
+            source.epoch,
+            &target.wkt2,
+            target.epoch,
+            &[],
+            &[],
+        )
+        .map_err(StageError)?,
+    ))
+}
+
+fn apply_polygons(view: PointView, polygons: &[PolygonFilter]) -> PointView {
+    if polygons.is_empty() {
+        return view;
+    }
+    let mut output = view.make_new();
+    for idx in 0..view.len() {
+        let x = view.get_f64(idx, &DimId::X);
+        let y = view.get_f64(idx, &DimId::Y);
+        if polygons
+            .iter()
+            .any(|polygon| polygon_contains(polygon, x, y))
+        {
+            output.append_point(&view, idx);
+        }
+    }
+    output
+}
+
+fn polygon_contains(polygon: &PolygonFilter, mut x: f64, mut y: f64) -> bool {
+    let mut z = 0.0;
+    if let Some(transform) = &polygon.transform {
+        if !transform.transform_xyz(&mut x, &mut y, &mut z) {
+            return false;
+        }
+    }
+    polygon.geometry.contains(x, y)
 }
 
 fn apply_origin(view: PointView, origin: Option<u64>) -> PointView {
@@ -781,6 +1105,35 @@ fn read_binary_value(bytes: &[u8], ty: DimType) -> f64 {
         DimType::F32 => f64::from(f32::from_le_bytes(bytes.try_into().unwrap())),
         DimType::F64 => f64::from_le_bytes(bytes.try_into().unwrap()),
     }
+}
+
+fn apply_addons(view: &mut PointView, addons: &[EptAddon], key: &str) -> Result<(), StageError> {
+    for addon in addons {
+        let path = addon.data_path(key);
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => {
+                return Err(StageError(format!(
+                    "Can't open EPT addon data '{}': {err}",
+                    path
+                )))
+            }
+        };
+        let expected_len = view.len() as usize * addon.size;
+        if bytes.len() != expected_len {
+            return Err(StageError(format!(
+                "EPT addon data '{}' has {} bytes but expected {}.",
+                path,
+                bytes.len(),
+                expected_len
+            )));
+        }
+        for (idx, record) in bytes.chunks_exact(addon.size).enumerate() {
+            view.set_f64(idx as u64, &addon.dim, read_binary_value(record, addon.ty));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1420,6 +1773,21 @@ mod tests {
             assert!((-8242746.0..=-8242600.0).contains(&x));
             assert!((4966506.0..=4966706.0).contains(&y));
         }
+    }
+
+    #[test]
+    fn applies_reprojected_3d_bounds_filter() {
+        let mut options = Options::new();
+        options.add("filename", data_path("ept/bcbf/ept.json").display());
+        options.add(
+            "bounds",
+            "([-180,180],[80,90],[-50,50]) / +proj=longlat +R=1000 +no_defs +type=crs",
+        );
+        let mut reader = EptReader::new(&options);
+        let views = reader.read().unwrap();
+
+        let count: u64 = views.iter().map(PointView::len).sum();
+        assert_eq!(count, 5);
     }
 
     #[test]

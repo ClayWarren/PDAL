@@ -2,13 +2,11 @@
 //! grid that can identify contiguous dense regions and emit a WKT
 //! MULTIPOLYGON boundary, mirroring `hexer::HexGrid` / `hexer::BaseGrid`.
 //!
-//! Only the standard (non-H3) hex grid is ported here; the H3 indexing path
-//! still lives in C++.
-//!
 //! The output formatting matches the C++ `Path::toWKT` byte layout when
 //! callers wrap `format_wkt` with the same precision/locale conventions used
 //! by `Utils::OStringStreamClassicLocale`.
 
+use h3o::{CellIndex, CoordIJ, LatLng, LocalIJ, Resolution};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write as _;
 
@@ -137,6 +135,17 @@ pub struct HexGrid {
     /// Minimum j coordinate seen for any horizontal segment, used as the
     /// stop condition when walking down through nested paths.
     min_y: i32,
+}
+
+pub struct H3Grid {
+    dense_limit: i32,
+    origin: CellIndex,
+    counts: HashMap<HexId, i32>,
+    possible_roots: BTreeSet<HexId>,
+    hex_paths: HashMap<HexId, usize>,
+    paths: Vec<Path>,
+    roots: Vec<usize>,
+    min_i: i32,
 }
 
 impl HexGrid {
@@ -498,6 +507,241 @@ impl HexGrid {
     #[cfg(test)]
     fn root_count(&self) -> usize {
         self.roots.len()
+    }
+}
+
+impl H3Grid {
+    pub fn new(resolution: u8, dense_limit: i32, origin: CellIndex) -> Result<Self, String> {
+        Resolution::try_from(resolution).map_err(|err| format!("Invalid H3 resolution: {err}"))?;
+        Ok(Self {
+            dense_limit,
+            origin,
+            counts: HashMap::new(),
+            possible_roots: BTreeSet::new(),
+            hex_paths: HashMap::new(),
+            paths: Vec::new(),
+            roots: Vec::new(),
+            min_i: i32::MAX,
+        })
+    }
+
+    pub fn origin_from_degrees(lat: f64, lng: f64, resolution: u8) -> Result<CellIndex, String> {
+        let resolution = Resolution::try_from(resolution)
+            .map_err(|err| format!("Invalid H3 resolution: {err}"))?;
+        LatLng::new(lat, lng)
+            .map(|ll| ll.to_cell(resolution))
+            .map_err(|err| format!("Invalid H3 origin: {err}"))
+    }
+
+    pub fn set_hexes(&mut self, hexes: &[HexId]) {
+        for &h in hexes {
+            self.counts.insert(h, self.dense_limit + 1);
+            let above = self.edge_hex(h, 0);
+            let below = self.edge_hex(h, 3);
+            if !self.is_dense(above) {
+                self.possible_roots.insert(h);
+            }
+            self.possible_roots.remove(&below);
+        }
+    }
+
+    pub fn find_shapes(&mut self) -> Result<(), String> {
+        if self.possible_roots.is_empty() {
+            return Err("No areas of sufficient density - no shapes. \
+                 Decrease density or area size."
+                .to_string());
+        }
+        while let Some(&root) = self.possible_roots.iter().next() {
+            self.find_shape(root)?;
+        }
+        Ok(())
+    }
+
+    pub fn find_parent_paths(&mut self) {
+        for idx in 0..self.paths.len() {
+            self.parent_or_child(idx);
+        }
+        for idx in 0..self.paths.len() {
+            if self.paths[idx].parent.is_none() {
+                self.roots.push(idx);
+            } else if let Some(parent) = self.paths[idx].parent {
+                self.paths[parent].children.push(idx);
+            }
+        }
+        for &root in &self.roots.clone() {
+            self.finalize(root, false);
+        }
+    }
+
+    pub fn sort_paths(&mut self) {
+        self.roots
+            .sort_by(|&a, &b| self.paths[a].root_hex.cmp(&self.paths[b].root_hex));
+        for idx in 0..self.paths.len() {
+            let mut children = self.paths[idx].children.clone();
+            children.sort_by(|&a, &b| self.paths[a].root_hex.cmp(&self.paths[b].root_hex));
+            self.paths[idx].children = children;
+        }
+    }
+
+    pub fn to_wkt(&self, precision: usize) -> String {
+        let mut out = String::from("MULTIPOLYGON (");
+        for (i, &root) in self.roots.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            self.write_path_polygon(root, precision, &mut out);
+        }
+        out.push(')');
+        out
+    }
+
+    fn is_dense(&self, h: HexId) -> bool {
+        self.counts.get(&h).copied().unwrap_or(0) >= self.dense_limit
+    }
+
+    fn find_shape(&mut self, root: HexId) -> Result<(), String> {
+        let path_idx = self.paths.len();
+        self.paths.push(Path::new(root));
+
+        let first = Segment::new(root, 0);
+        let mut cur = first;
+        loop {
+            if cur.horizontal() {
+                if cur.edge == 0 {
+                    self.possible_roots.remove(&cur.hex);
+                }
+                let path_hex = if cur.edge == 0 {
+                    cur.hex
+                } else {
+                    self.edge_hex(cur.hex, 3)
+                };
+                self.hex_paths.entry(path_hex).or_insert(path_idx);
+                if path_hex.i < self.min_i {
+                    self.min_i = path_hex.i;
+                }
+            }
+            let pt = self.find_point(cur)?;
+            self.paths[path_idx].points.push(pt);
+            cur = self.next_segment(cur);
+            if cur == first {
+                break;
+            }
+        }
+        let close = self.find_point(cur)?;
+        self.paths[path_idx].points.push(close);
+        Ok(())
+    }
+
+    fn parent_or_child(&mut self, idx: usize) {
+        let mut hex = self.paths[idx].root_hex;
+        while hex.i >= self.min_i {
+            if let Some(&parent_idx) = self.hex_paths.get(&hex) {
+                let current_parent = self.paths[idx].parent;
+                if current_parent == Some(parent_idx) {
+                    self.paths[idx].parent = None;
+                } else if current_parent.is_none() && parent_idx != idx {
+                    self.paths[idx].parent = Some(parent_idx);
+                }
+            }
+            hex = HexId::new(hex.i - 1, hex.j);
+        }
+    }
+
+    fn finalize(&mut self, idx: usize, anticlockwise: bool) {
+        self.paths[idx].anticlockwise = anticlockwise;
+        let children = self.paths[idx].children.clone();
+        for child in children {
+            self.finalize(child, !anticlockwise);
+        }
+        if anticlockwise {
+            self.paths[idx].points.reverse();
+        }
+    }
+
+    fn write_path_polygon(&self, idx: usize, precision: usize, out: &mut String) {
+        let islands = self.write_polygon(idx, precision, out);
+        let mut pending = islands;
+        while !pending.is_empty() {
+            let next = std::mem::take(&mut pending);
+            for sub in next {
+                out.push_str(", ");
+                pending.extend(self.write_polygon(sub, precision, out));
+            }
+        }
+    }
+
+    fn write_polygon(&self, idx: usize, precision: usize, out: &mut String) -> Vec<usize> {
+        let mut islands = Vec::new();
+        out.push('(');
+        self.write_ring(idx, precision, out);
+        for &child in &self.paths[idx].children {
+            out.push_str(", ");
+            self.write_ring(child, precision, out);
+            islands.extend(self.paths[child].children.iter().copied());
+        }
+        out.push(')');
+        islands
+    }
+
+    fn write_ring(&self, idx: usize, precision: usize, out: &mut String) {
+        let pts = &self.paths[idx].points;
+        debug_assert!(pts.len() > 2);
+        out.push('(');
+        write_point(out, pts[0], precision);
+        for pt in &pts[1..] {
+            out.push_str(", ");
+            write_point(out, *pt, precision);
+        }
+        out.push(')');
+    }
+
+    fn next_segment(&self, s: Segment) -> Segment {
+        const NEXT: [i32; 6] = [1, 2, 3, 4, 5, 0];
+        const PREV: [i32; 6] = [5, 0, 1, 2, 3, 4];
+        let right = Segment::new(s.hex, NEXT[s.edge as usize]);
+        let left = Segment::new(self.edge_hex(s.hex, right.edge), PREV[s.edge as usize]);
+        if self.is_dense(left.hex) {
+            left
+        } else {
+            right
+        }
+    }
+
+    fn edge_hex(&self, hex: HexId, edge: i32) -> HexId {
+        const OFFSETS: [HexId; 6] = [
+            HexId { i: 1, j: 0 },
+            HexId { i: 0, j: -1 },
+            HexId { i: -1, j: -1 },
+            HexId { i: -1, j: 0 },
+            HexId { i: 0, j: 1 },
+            HexId { i: 1, j: 1 },
+        ];
+        hex + OFFSETS[edge as usize]
+    }
+
+    fn find_point(&self, segment: Segment) -> Result<Point, String> {
+        let origin = self.ij_to_h3(segment.hex)?;
+        let neighbor = self.ij_to_h3(self.edge_hex(segment.hex, segment.edge))?;
+        let edge = origin
+            .edge(neighbor)
+            .ok_or_else(|| "Can't get directed edge between H3 cells.".to_string())?;
+        let boundary = edge.boundary();
+        let point = boundary
+            .get(1)
+            .ok_or_else(|| "H3 directed edge boundary is missing endpoint.".to_string())?;
+        Ok(Point::new(point.lng(), point.lat()))
+    }
+
+    fn ij_to_h3(&self, ij: HexId) -> Result<CellIndex, String> {
+        CellIndex::try_from(LocalIJ::new(self.origin, CoordIJ::new(ij.i, ij.j)))
+            .map_err(|err| format!("Can't convert IJ ({}, {}) to H3Index: {err}", ij.i, ij.j))
+    }
+
+    #[allow(dead_code)]
+    fn h3_to_ij(&self, cell: CellIndex) -> Result<HexId, String> {
+        cell.to_local_ij(self.origin)
+            .map(|ij| HexId::new(ij.coord.i, ij.coord.j))
+            .map_err(|err| format!("Can't convert H3 index to IJ: {err}"))
     }
 }
 
