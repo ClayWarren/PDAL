@@ -1,10 +1,12 @@
 //! GDAL VSI byte-range helpers for local and remote object-store style paths.
 
 use std::ffi::CString;
+use std::io;
 use std::os::raw::c_void;
 use std::ptr;
 
 const SEEK_SET: i32 = 0;
+const SEEK_CUR: i32 = 1;
 const SEEK_END: i32 = 2;
 
 #[derive(Debug)]
@@ -64,6 +66,33 @@ impl VsiFile {
         } else {
             Err(format!("VSI seek failed at offset {offset}"))
         }
+    }
+}
+
+impl io::Read for VsiFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let len = buf.len();
+        let read =
+            unsafe { gdal_sys::VSIFReadL(buf.as_mut_ptr().cast::<c_void>(), 1, len, self.handle) };
+        Ok(read)
+    }
+}
+
+impl io::Seek for VsiFile {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        let (offset, whence) = match pos {
+            io::SeekFrom::Start(n) => (n as i64, SEEK_SET),
+            io::SeekFrom::Current(n) => (n, SEEK_CUR),
+            io::SeekFrom::End(n) => (n, SEEK_END),
+        };
+        let result = unsafe { gdal_sys::VSIFSeekL(self.handle, offset as u64, whence) };
+        if result != 0 {
+            return Err(io::Error::other(format!(
+                "VSI seek failed (offset={offset}, whence={whence})"
+            )));
+        }
+        let position = unsafe { gdal_sys::VSIFTellL(self.handle) };
+        Ok(position as u64)
     }
 }
 

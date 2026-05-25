@@ -1,9 +1,17 @@
-//! `readers.copc` -- local COPC full-file slice.
+//! `readers.copc` -- local + remote COPC reader.
 //!
-//! This currently reuses the LAS/LAZ reader for local COPC files and applies
-//! simple post-read filters. COPC hierarchy traversal, bounds pruning,
-//! resolution queries, remote reads, and writer behavior are deferred.
+//! `read()` still reuses the LAS/LAZ reader (with VSI byte-range support for
+//! http(s)/`/vsi*` paths) for full-file materialization. `preview()` walks the
+//! COPC hierarchy directly, applying 2D/3D bounds and resolution pruning to
+//! match the C++ `CopcReader::inspect()` semantics for the remote/sample-mode
+//! use case.
 
+use std::fs::File;
+use std::io::BufReader;
+
+use crate::copc_hierarchy::{
+    self, CopcInfo, CopcPreview, LasBounds, QueryBounds as HierarchyBounds,
+};
 use crate::las::LasReader;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
 use pdal_core::metadata::MetadataNode;
@@ -14,7 +22,9 @@ use pdal_core::stage::StageError;
 
 pub struct CopcReader {
     inner: LasReader,
+    filename: String,
     bounds: String,
+    resolution: f64,
     metadata: MetadataNode,
 }
 
@@ -22,9 +32,37 @@ impl CopcReader {
     pub fn new(options: &Options) -> Self {
         Self {
             inner: LasReader::new(options),
+            filename: options.get_str("filename", ""),
             bounds: options.get_str("bounds", ""),
+            resolution: options.get_f64("resolution", 0.0),
             metadata: MetadataNode::new("readers.copc"),
         }
+    }
+
+    /// Hierarchy-driven preview: returns (point_count, bounds[6]) after
+    /// applying the bounds and resolution options. Mirrors the C++
+    /// `CopcReader::inspect()` count/bbox behavior for sample-mode queries.
+    pub fn preview(&self) -> Result<CopcPreview, StageError> {
+        let query = self
+            .bounds_filter()
+            .map_err(|e| StageError(e.0))?
+            .map(|b| match b {
+                QueryBounds::Two(b) => HierarchyBounds::Two(b),
+                QueryBounds::Three(b) => HierarchyBounds::Three(b),
+            });
+        let resolution = self.resolution;
+        with_byte_source(&self.filename, |reader| {
+            let (info, full_bounds) = copc_hierarchy::read_copc_info(reader)?;
+            copc_hierarchy::walk_preview(reader, &info, full_bounds, query.as_ref(), resolution)
+        })
+        .map_err(StageError)
+    }
+
+    pub fn copc_info(&self) -> Result<(CopcInfo, LasBounds), StageError> {
+        with_byte_source(&self.filename, |reader| {
+            copc_hierarchy::read_copc_info(reader)
+        })
+        .map_err(StageError)
     }
 }
 
@@ -81,6 +119,41 @@ impl QueryBounds {
     }
 }
 
+fn is_vsi_path(filename: &str) -> bool {
+    filename.starts_with("/vsi")
+        || filename.starts_with("http://")
+        || filename.starts_with("https://")
+}
+
+fn with_byte_source<T>(
+    filename: &str,
+    mut f: impl FnMut(&mut dyn ReadSeek) -> Result<T, String>,
+) -> Result<T, String> {
+    if filename.is_empty() {
+        return Err("COPC: missing filename option".to_string());
+    }
+    if is_vsi_path(filename) {
+        let vsi_path = if filename.starts_with("http://") || filename.starts_with("https://") {
+            format!("/vsicurl/{filename}")
+        } else {
+            filename.to_string()
+        };
+        let mut vsi = pdal_native::vsi::VsiFile::open(&vsi_path)
+            .map_err(|e| format!("COPC: failed to open VSI path {vsi_path}: {e}"))?;
+        f(&mut vsi)
+    } else {
+        let file =
+            File::open(filename).map_err(|e| format!("COPC: failed to open {filename}: {e}"))?;
+        let mut buf = BufReader::new(file);
+        f(&mut buf)
+    }
+}
+
+/// Combined Read+Seek so we can pass either `BufReader<File>` or `VsiFile`
+/// through a single trait object.
+pub trait ReadSeek: std::io::Read + std::io::Seek {}
+impl<T: std::io::Read + std::io::Seek + ?Sized> ReadSeek for T {}
+
 fn apply_bounds(view: PointView, bounds: Option<&QueryBounds>) -> PointView {
     let Some(bounds) = bounds else {
         return view;
@@ -104,6 +177,53 @@ mod tests {
             .join("../..")
             .join("test/data")
             .join(path)
+    }
+
+    /// Network smoke test mirroring the C++ `pdal_io_copc_remote_reader_test`:
+    /// hits the canonical autzen-classified COPC over https and `/vsicurl/`
+    /// and expects the 61201/2D-bounds preview after bounds + resolution
+    /// pruning. Ignored by default to keep CI hermetic.
+    #[test]
+    #[ignore = "network smoke for remote COPC preview"]
+    fn preview_remote_autzen_matches_cpp_expectation() {
+        for filename in [
+            "https://github.com/PDAL/data/raw/refs/heads/main/autzen/autzen-classified.copc.laz",
+            "/vsicurl/https://github.com/PDAL/data/raw/refs/heads/main/autzen/autzen-classified.copc.laz",
+        ] {
+            let mut options = Options::new();
+            options.add("filename", filename.to_string());
+            options.add("bounds", "([635700,637000],[848900,853300])");
+            options.add("resolution", 1000.0_f64);
+            let reader = CopcReader::new(&options);
+            let preview = reader.preview().unwrap();
+            assert_eq!(preview.point_count, 61_201, "url={filename}");
+            assert!(preview.bounds.min_x >= 635_700.0);
+            assert!(preview.bounds.max_x <= 637_000.0);
+            assert!(preview.bounds.min_y >= 848_900.0);
+            assert!(preview.bounds.max_y <= 853_300.0);
+        }
+    }
+
+    #[test]
+    fn preview_unfiltered_local_matches_full_count() {
+        let mut options = Options::new();
+        options.add("filename", data_path("copc/lone-star.copc.laz").display());
+        let reader = CopcReader::new(&options);
+        let preview = reader.preview().unwrap();
+        assert_eq!(preview.point_count, 518_862);
+    }
+
+    #[test]
+    fn preview_with_2d_bounds_prunes_count_below_full() {
+        let mut options = Options::new();
+        options.add("filename", data_path("copc/lone-star.copc.laz").display());
+        options.add("bounds", "([515380,515400],[4918350,4918370])");
+        let reader = CopcReader::new(&options);
+        let preview = reader.preview().unwrap();
+        assert!(preview.point_count > 0);
+        assert!(preview.point_count < 518_862);
+        assert!(preview.bounds.min_x >= 515380.0);
+        assert!(preview.bounds.max_x <= 515400.0);
     }
 
     #[test]

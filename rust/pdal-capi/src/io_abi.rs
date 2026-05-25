@@ -324,6 +324,52 @@ pub unsafe extern "C" fn pdal_reader_create_copc(ops: *const Options) -> *mut Re
     }
 }
 
+/// Compute a hierarchy-driven COPC preview: writes the bounds-and-resolution-
+/// limited point count and dataset-coordinate bbox into the supplied outputs.
+/// Returns 0 on success, -1 on error (last error is set via the standard
+/// `pdal_last_error()` channel).
+///
+/// `out_bounds` receives `[min_x, min_y, min_z, max_x, max_y, max_z]`.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `out_point_count` and `out_bounds` must point to writable storage with
+/// space for `u64` and 6 `f64` respectively.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_copc_preview(
+    ops: *const Options,
+    out_point_count: *mut u64,
+    out_bounds: *mut f64,
+) -> i32 {
+    let Some(options) = ops.as_ref() else {
+        crate::error::set_last_error("pdal_copc_preview: options pointer is null");
+        return -1;
+    };
+    let reader = pdal_io::copc::CopcReader::new(options);
+    match reader.preview() {
+        Ok(preview) => {
+            if !out_point_count.is_null() {
+                *out_point_count = preview.point_count;
+            }
+            if !out_bounds.is_null() {
+                let b = preview.bounds;
+                let slots = std::slice::from_raw_parts_mut(out_bounds, 6);
+                slots[0] = b.min_x;
+                slots[1] = b.min_y;
+                slots[2] = b.min_z;
+                slots[3] = b.max_x;
+                slots[4] = b.max_y;
+                slots[5] = b.max_z;
+            }
+            0
+        }
+        Err(err) => {
+            crate::error::set_last_error(&err.0);
+            -1
+        }
+    }
+}
+
 /// Create an EptReader local LASzip read slice from options.
 ///
 /// # Safety

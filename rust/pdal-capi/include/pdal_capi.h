@@ -1064,6 +1064,15 @@ extern "C"
     pdal_reader_t* pdal_reader_create_spz(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_stac(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_copc(const pdal_options_t* ops);
+    /// Walk the COPC hierarchy applying `bounds` and `resolution` options.
+    /// Writes the resulting point count and dataset-coordinate bbox into
+    /// the supplied outputs. `out_bounds` is laid out as
+    /// `[min_x, min_y, min_z, max_x, max_y, max_z]`. Returns 0 on success
+    /// and -1 on error (use `pdal_last_error()` for details).
+    int32_t pdal_copc_preview(
+        const pdal_options_t* ops,
+        uint64_t* out_point_count,
+        double* out_bounds);
     pdal_reader_t* pdal_reader_create_ept(const pdal_options_t* ops);
     pdal_point_view_t* pdal_reader_read_first(pdal_reader_t* reader);
     pdal_metadata_node_t* pdal_reader_metadata(const pdal_reader_t* reader);

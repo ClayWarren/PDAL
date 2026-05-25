@@ -44,7 +44,7 @@ Status definitions:
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, full-file GDAL VSI URL reads, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
-| COPC reader | prototype | Local `.copc.laz` full-file reads and no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. A GDAL VSI byte-range adapter now exists in `pdal-native` and LAS/LAZ can full-read remote COPC files through it, but that is not COPC hierarchy/resolution parity. COPC hierarchy traversal, bounds pruning, resolution queries, remote previews, and writer behavior are still deferred until the adapter is consumed by a real COPC hierarchy reader/writer. |
+| COPC reader | in progress | Local `.copc.laz` full-file reads and no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. A first-party COPC hierarchy walker (`pdal-io::copc_hierarchy`) parses the COPC info VLR and walks hierarchy/sub-hierarchy pages over either local files or the `pdal-native::vsi::VsiFile` byte-range adapter, applying 2D/3D bounds and `resolution` pruning that matches the C++ `depthEnd = max(1, ceil(log2(spacing/resolution)) + 1)` math. The C++ `CopcReader::inspect()` now routes bounds/resolution previews (no polygons/OGR) through the Rust `pdal_copc_preview` C ABI, which is what makes `pdal_io_copc_remote_reader_test.vsi` count. Streaming, polygon/OGR crops, addons, and writer behavior remain deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
@@ -65,7 +65,7 @@ Status definitions:
 | Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 248 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, no unsafe extern blocks, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
-| Remote/object-store I/O | prototype | `pdal-native::vsi::VsiFile` can open local, URL, and `/vsicurl/` paths through GDAL VSI and perform byte-range reads. Local deterministic tests run by default; a network smoke is ignored by default. COPC/EPT/STAC readers still need to consume this shared adapter before remote behavior counts. |
+| Remote/object-store I/O | in progress | `pdal-native::vsi::VsiFile` opens local, URL, and `/vsicurl/` paths through GDAL VSI and now implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) now counts as Rust C ABI-backed. EPT and STAC readers still need to consume this adapter before their remote paths count. |
 | Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. `apps/pdal.cpp` and the standalone tools have C ABI-backed dispatch shells, but broad command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
 
 ## Root-Level Migration Status
@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `749 / 819` baseline C++ GoogleTest cases, or
-`91.45%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `750 / 819` baseline C++ GoogleTest cases, or
+`91.58%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
 test set from `3df1668e0^`, before both the local C++ guard-test additions and
 the Rust port, so newly added guard tests do not move the headline denominator.
 The branch-wide health metric, including guard tests added before and during
-the port, is `874 / 953` currently built C++ GoogleTest cases, or `91.71%`;
+the port, is `875 / 953` currently built C++ GoogleTest cases, or `91.82%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -186,10 +186,8 @@ tell/seek stream behavior, and the EPT addon writer input invariant through the
 Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-The audit script currently lists 2 pre-port built test binaries as unclassified.
-Of these:
-   - 2 are explicitly deferred or baseline/toolchain-sensitive I/O tests
-     (COPC remote/writer)
+The audit script currently lists 1 pre-port built test binary as unclassified
+(`pdal_io_copc_writer_test`), pending COPC writer chunk-table generation.
   No easy audit wins remain among the uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
@@ -449,6 +447,12 @@ Known mixed binaries:
   dataset-coordinate bounds, and multi-input diamond pipelines route through
   the Rust C ABI. Resolution, streaming, preview, and
   polygon/OGR/reprojection crops remain C++.
+- `pdal_io_copc_remote_reader_test`: `vsi` counts. The autzen-classified
+  COPC over both `https://` and `/vsicurl/` URLs is opened through
+  `pdal-native::vsi::VsiFile`, the COPC info VLR and hierarchy pages are
+  parsed by `pdal-io::copc_hierarchy`, and the C++ `CopcReader::inspect()`
+  routes its bounds-and-resolution preview through `pdal_copc_preview`
+  for the resulting point count and clipped bbox.
 - `pdal_io_ept_reader_test`: `inspect`, `fullReadLaszip`, `fullReadBinary`,
   `fullReadZstandard`, `boundedRead2d`, `boundedRead3d`, `resolutionLimit`,
   `originReadVersion1_0_0`, `originRead`, `unreadableDataFailure`,

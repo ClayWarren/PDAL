@@ -684,6 +684,37 @@ QuickInfo CopcReader::inspect()
     for (Dimension::Id dim : layout.dims())
         qi.m_dimNames.push_back(layout.dimName(dim));
 
+    // If the spatial filter is purely a bounds box (no polygons / OGR / origin
+    // selection), route the hierarchy walk through the Rust C ABI so the
+    // remote bounded-preview case counts as Rust-backed.
+    bool boundsOnly = m_args->polys.empty() && m_args->ogr.empty();
+    bool needBoundedPreview = boundsOnly &&
+        (m_p->clip.box.valid() || m_args->resolution > 0);
+    if (needBoundedPreview)
+    {
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        const std::string bounds = boundsOption(m_args->clip);
+        if (!bounds.empty())
+            addOption(options, "bounds", bounds);
+        if (m_args->resolution > 0)
+            addOption(options, "resolution",
+                std::to_string(m_args->resolution));
+
+        uint64_t count = 0;
+        double bbox[6] = {0, 0, 0, 0, 0, 0};
+        int32_t rc = pdal_copc_preview(options, &count, bbox);
+        pdal_options_destroy(options);
+        if (rc == 0)
+        {
+            qi.m_pointCount = count;
+            qi.m_bounds = BOX3D(bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5]);
+            qi.m_valid = true;
+            return qi;
+        }
+        // Fall through to the C++ path if Rust preview fails.
+    }
+
     // If there is a spatial filter from an explicit --bounds, an origin query,
     // or polygons, then we'll limit our number of points to be an upper bound,
     // and clip our bounds to the selected region.

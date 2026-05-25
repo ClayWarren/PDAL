@@ -577,6 +577,9 @@ COVERED: dict[str, object] = {
         "boundedRead3d",
         "multipleInputs",
     },
+    "pdal_io_copc_remote_reader_test": {
+        "vsi",
+    },
     "pdal_io_ept_reader_test": {
         "inspect",
         "fullReadLaszip",
