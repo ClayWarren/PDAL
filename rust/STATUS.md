@@ -44,7 +44,7 @@ Status definitions:
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, full-file GDAL VSI URL reads, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
-| COPC reader | in progress | Local `.copc.laz` full-file and streaming reads plus no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds, same-SRS polygon filtering, polygon reprojection for the covered EPSG:4326 crop, and GeoJSON OGR polygon crop support for the existing fixture shape. A first-party COPC hierarchy walker (`pdal-io::copc_hierarchy`) parses the COPC info VLR and walks hierarchy/sub-hierarchy pages over either local files or the `pdal-native::vsi::VsiFile` byte-range adapter, applying 2D/3D bounds and `resolution` pruning that matches the C++ `depthEnd = max(1, ceil(log2(spacing/resolution)) + 1)` math. The C++ `CopcReader::inspect()` now routes bounds/resolution previews (no polygons/OGR) through the Rust `pdal_copc_preview` C ABI, which is what makes `pdal_io_copc_remote_reader_test.vsi` count. Resolution-limited execution, addons, writer behavior, and broad OGR datasource coverage remain deferred. |
+| COPC reader | in progress | Local `.copc.laz` full-file and streaming reads plus no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds, same-SRS polygon filtering, polygon reprojection for the covered EPSG:4326 crop, and GeoJSON OGR polygon crop support for the existing fixture shape. A first-party COPC hierarchy walker (`pdal-io::copc_hierarchy`) parses the COPC info VLR and walks hierarchy/sub-hierarchy pages over either local files or the `pdal-native::vsi::VsiFile` byte-range adapter, applying 2D/3D bounds and `resolution` pruning that matches the C++ `depthEnd = max(1, ceil(log2(spacing/resolution)) + 1)` math. Resolution-limited execution materializes only the kept LAZ chunks by reading the LAZ chunk table to map each hierarchy entry's file offset to a `(start_point_idx, count)` range and streaming the LAS reader past unwanted records (the `laz` crate's variable-chunk seek is buggy, so we deliberately stay on a sequential read). The C++ `CopcReader::inspect()` now routes bounds/resolution previews (no polygons/OGR) through the Rust `pdal_copc_preview` C ABI, which is what makes `pdal_io_copc_remote_reader_test.vsi` count. Addons, writer behavior, and broad OGR datasource coverage remain deferred. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Remote LASzip EPT JSON/hierarchy/tile reads work through GDAL VSI for the covered STAC mixed-reader workflow. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin, same-SRS polygon, SRS-bound polygon reprojection, transformed 3D bounds filters, and GeoJSON OGR polygon crops are applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Local binary EPT addon overlays are read through Rust for the existing addon round-trip checks, but the addon writer is still C++. Remote binary/zstandard EPT and spatial-filter preview are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
@@ -148,13 +148,13 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `811 / 819` baseline C++ GoogleTest cases, or
-`99.02%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `812 / 819` baseline C++ GoogleTest cases, or
+`99.15%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. The
 branch-wide health metric, including guard tests added before and during the
-port, is `943 / 953` currently built C++ GoogleTest cases, or `98.95%`;
+port, is `944 / 953` currently built C++ GoogleTest cases, or `99.06%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -462,13 +462,13 @@ Known mixed binaries:
 - `pdal_io_copc_reader_test`: `inspect`, `fullRead`, `boundedRead2d`,
   `boundedRead3d`, `stream`, `boundedCrop`, `boundedCropGeoJSON`,
   `polygonAndBoundsCrop`, `boundedCropReprojection`, `ogrCrop`,
-  `multipleInputs`, and
-  `boundedpreview` count. Local COPC point materialization, simple
-  dataset-coordinate bounds, same-SRS WKT and GeoJSON polygon crops,
-  EPSG:4326-to-source polygon reprojection, GeoJSON OGR polygon crops,
-  streaming row-by-row materialization, multi-input diamond pipelines, and
-  bounds-backed preview route through the Rust C ABI. Resolution execution
-  remains C++.
+  `multipleInputs`, `boundedpreview`, and `resolutionLimit` count. Local COPC
+  point materialization, simple dataset-coordinate bounds, same-SRS WKT and
+  GeoJSON polygon crops, EPSG:4326-to-source polygon reprojection, GeoJSON
+  OGR polygon crops, streaming row-by-row materialization, multi-input
+  diamond pipelines, bounds-backed preview, and resolution-limited
+  execution (LAZ chunk-table-mapped point ranges streamed through the LAS
+  reader) route through the Rust C ABI.
 - `pdal_io_copc_remote_reader_test`: `vsi` counts. The autzen-classified
   COPC over both `https://` and `/vsicurl/` URLs is opened through
   `pdal-native::vsi::VsiFile`, the COPC info VLR and hierarchy pages are

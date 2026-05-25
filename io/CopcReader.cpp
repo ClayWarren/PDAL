@@ -789,8 +789,7 @@ void CopcReader::ready(PointTableRef table)
         m_p->connector.reset(new connector::Connector(m_filespec));
     }
 
-    if (!Utils::isRemote(m_filename) && m_args->resolution == 0 &&
-        !m_args->nosrs)
+    if (!Utils::isRemote(m_filename) && !m_args->nosrs)
     {
         pdal_options_t* options = pdal_options_create();
         addOption(options, "filename", m_filename);
@@ -799,6 +798,9 @@ void CopcReader::ready(PointTableRef table)
         const std::string bounds = boundsOption(m_args->clip);
         if (!bounds.empty())
             addOption(options, "bounds", bounds);
+        if (m_args->resolution > 0)
+            addOption(options, "resolution",
+                      std::to_string(m_args->resolution));
         for (const Polygon& poly : m_args->polys)
         {
             addOption(options, "polygon", poly.wkt(20));

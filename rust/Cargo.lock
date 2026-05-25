@@ -1055,6 +1055,7 @@ dependencies = [
  "glob",
  "las",
  "las-crs",
+ "laz",
  "lzf-rust",
  "pdal-core",
  "pdal-filters",

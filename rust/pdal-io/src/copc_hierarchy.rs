@@ -155,6 +155,64 @@ pub fn read_copc_info<R: Read + Seek + ?Sized>(
     ))
 }
 
+/// One LAZ chunk's position in a COPC file. `file_offset` is the byte offset
+/// of the chunk's first compressed point; `point_start` is the cumulative
+/// point index (i.e. the value to pass to `las::Reader::seek`) before that
+/// chunk's first point.
+#[derive(Debug, Clone, Copy)]
+pub struct ChunkLocator {
+    pub file_offset: u64,
+    pub point_start: u64,
+    pub point_count: u64,
+}
+
+/// Read the LAZ chunk table from `path` and return a map from each chunk's
+/// file offset to its cumulative point index and point count. Hierarchy
+/// entries' `offset` values are matched against the keys here.
+pub fn read_chunk_locators(path: &std::path::Path) -> Result<Vec<ChunkLocator>, String> {
+    use std::fs::File;
+    use std::io::BufReader;
+
+    // Read offset_to_point_data directly from the LAS header (u32 at byte 96).
+    let mut file = File::open(path).map_err(|e| format!("COPC: open chunk table failed: {e}"))?;
+    file.seek(SeekFrom::Start(96))
+        .map_err(|e| format!("COPC: seek header offset_to_point_data failed: {e}"))?;
+    let offset_to_point_data = u64::from(
+        file.read_u32::<LittleEndian>()
+            .map_err(|e| format!("COPC: read offset_to_point_data failed: {e}"))?,
+    );
+
+    // Use a fresh BufReader so las can parse VLRs without consuming our handle.
+    let file2 = File::open(path).map_err(|e| format!("COPC: open for laz vlr failed: {e}"))?;
+    let buffered = BufReader::new(file2);
+    let reader = las::Reader::new(buffered)
+        .map_err(|e| format!("COPC: open las reader for laz vlr failed: {e}"))?;
+    let laz_vlr = reader
+        .header()
+        .laz_vlr()
+        .map_err(|e| format!("COPC: missing LAZ VLR: {e}"))?;
+    drop(reader);
+
+    file.seek(SeekFrom::Start(offset_to_point_data))
+        .map_err(|e| format!("COPC: seek to point data failed: {e}"))?;
+    let chunk_table = laz::laszip::ChunkTable::read_from(&mut file, &laz_vlr)
+        .map_err(|e| format!("COPC: read chunk table failed: {e}"))?;
+
+    let mut locators = Vec::with_capacity(chunk_table.as_ref().len());
+    let mut cumulative_byte = offset_to_point_data + 8;
+    let mut cumulative_point: u64 = 0;
+    for entry in chunk_table.as_ref() {
+        locators.push(ChunkLocator {
+            file_offset: cumulative_byte,
+            point_start: cumulative_point,
+            point_count: entry.point_count,
+        });
+        cumulative_byte += entry.byte_count;
+        cumulative_point += entry.point_count;
+    }
+    Ok(locators)
+}
+
 fn read_hierarchy_page<R: Read + Seek + ?Sized>(
     reader: &mut R,
     offset: u64,
@@ -273,6 +331,46 @@ pub fn depth_end(spacing: f64, resolution: f64) -> Option<i32> {
     Some(depth)
 }
 
+/// Walk the hierarchy collecting leaf entries (`point_count >= 0`) that pass
+/// optional bounds and resolution filters. Mirrors the same depth math as
+/// `walk_preview` but returns the individual entries so callers can read just
+/// the matching LAZ chunks.
+pub fn walk_entries<R: Read + Seek + ?Sized>(
+    reader: &mut R,
+    info: &CopcInfo,
+    query_bounds: Option<&QueryBounds>,
+    resolution: f64,
+) -> Result<Vec<HierarchyEntry>, String> {
+    let depth_limit = depth_end(info.spacing, resolution);
+    let mut out: Vec<HierarchyEntry> = Vec::new();
+    let mut pending: Vec<(u64, u64)> = vec![(info.root_hier_offset, info.root_hier_size)];
+    while let Some((offset, size)) = pending.pop() {
+        if size == 0 {
+            continue;
+        }
+        let entries = read_hierarchy_page(reader, offset, size)?;
+        for entry in entries {
+            if let Some(limit) = depth_limit {
+                if entry.key.level >= limit {
+                    continue;
+                }
+            }
+            let bbox = voxel_bounds(info, &entry.key);
+            if let Some(qb) = query_bounds {
+                if !key_intersects(&bbox, qb) {
+                    continue;
+                }
+            }
+            if entry.point_count < 0 {
+                pending.push((entry.offset, entry.byte_size as u64));
+            } else {
+                out.push(entry);
+            }
+        }
+    }
+    Ok(out)
+}
+
 pub fn walk_preview<R: Read + Seek + ?Sized>(
     reader: &mut R,
     info: &CopcInfo,
@@ -347,6 +445,35 @@ mod tests {
         assert!(info.halfsize > 0.0);
         let preview = walk_preview(&mut reader, &info, bounds, None, 0.0).unwrap();
         assert_eq!(preview.point_count, 518_862);
+    }
+
+    #[test]
+    fn chunk_locators_sum_to_header_count() {
+        // Every COPC chunk should appear in the LAZ chunk table, and chunk
+        // point counts should sum to `header.number_of_points()`. This is the
+        // invariant `read_resolution_limited` relies on when mapping
+        // hierarchy entries to (start_point_idx, count) ranges.
+        let path = data_path("copc/lone-star.copc.laz");
+        let locators = read_chunk_locators(&path).unwrap();
+        let total: u64 = locators.iter().map(|l| l.point_count).sum();
+        let file = std::fs::File::open(&path).unwrap();
+        let reader = las::Reader::new(std::io::BufReader::new(file)).unwrap();
+        assert_eq!(total, reader.header().number_of_points());
+    }
+
+    #[test]
+    fn walk_entries_at_resolution_matches_cpp_count() {
+        // The `pdal_io_copc_reader_test.resolutionLimit` test expects 163,993
+        // points from depths 0 and 1 of `lone-star.copc.laz` at
+        // resolution=0.2. Verify the Rust hierarchy walker reaches the same
+        // filtered point count before the LAS reader materializes them.
+        let path = data_path("copc/lone-star.copc.laz");
+        let file = std::fs::File::open(&path).unwrap();
+        let mut buffered = BufReader::new(file);
+        let (info, _) = read_copc_info(&mut buffered).unwrap();
+        let entries = walk_entries(&mut buffered, &info, None, 0.2).unwrap();
+        let total: i64 = entries.iter().map(|e| e.point_count as i64).sum();
+        assert_eq!(total, 163_993);
     }
 
     #[test]

@@ -596,6 +596,7 @@ COVERED: dict[str, object] = {
         "polygonAndBoundsCrop",
         "boundedCropReprojection",
         "ogrCrop",
+        "resolutionLimit",
     },
     "pdal_io_copc_writer_test": {
         "scaling",

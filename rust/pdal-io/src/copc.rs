@@ -86,6 +86,9 @@ impl Reader for CopcReader {
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
         let bounds = self.bounds_filter()?;
         let polygons = self.polygon_filters()?;
+        if self.resolution > 0.0 {
+            return self.read_resolution_limited(bounds, polygons);
+        }
         let views = self
             .inner
             .read()?
@@ -104,6 +107,70 @@ impl Reader for CopcReader {
 }
 
 impl CopcReader {
+    fn read_resolution_limited(
+        &mut self,
+        bounds: Option<QueryBounds>,
+        polygons: Vec<PolygonFilter>,
+    ) -> Result<Vec<PointView>, StageError> {
+        let path = std::path::Path::new(&self.filename);
+        // Walk hierarchy collecting leaf entries that pass the resolution
+        // and (optional) bounds filter.
+        let hierarchy_bounds = bounds.as_ref().map(|b| match b {
+            QueryBounds::Two(b) => HierarchyBounds::Two(*b),
+            QueryBounds::Three(b) => HierarchyBounds::Three(*b),
+        });
+        let file = File::open(path)
+            .map_err(|e| StageError(format!("Failed to open COPC file: {e}")))?;
+        let mut buffered = BufReader::new(file);
+        let entries = {
+            let (info, _) = copc_hierarchy::read_copc_info(&mut buffered).map_err(StageError)?;
+            copc_hierarchy::walk_entries(
+                &mut buffered,
+                &info,
+                hierarchy_bounds.as_ref(),
+                self.resolution,
+            )
+            .map_err(StageError)?
+        };
+        if entries.is_empty() {
+            self.metadata = self.inner.metadata();
+            return Ok(Vec::new());
+        }
+
+        // Read the LAZ chunk table to map each entry's file offset to a
+        // (start_point_idx, count) range we can hand to `LasReader::read_ranges`.
+        let locators = copc_hierarchy::read_chunk_locators(path).map_err(StageError)?;
+        let by_offset: std::collections::HashMap<u64, copc_hierarchy::ChunkLocator> = locators
+            .iter()
+            .map(|loc| (loc.file_offset, *loc))
+            .collect();
+        let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(entries.len());
+        for entry in &entries {
+            let Some(loc) = by_offset.get(&entry.offset) else {
+                return Err(StageError(format!(
+                    "COPC entry at offset {} not found in chunk table",
+                    entry.offset
+                )));
+            };
+            ranges.push((loc.point_start, loc.point_count));
+        }
+        ranges.sort_by_key(|(s, _)| *s);
+
+        let view = self.inner.read_ranges(&ranges)?;
+        self.metadata = self.inner.metadata();
+
+        // Post-filter by polygons (bounds were already applied via hierarchy
+        // pruning, but the COPC voxel can extend slightly past the query box;
+        // re-apply for exact dataset-coordinate parity).
+        let view = apply_bounds(view, bounds.as_ref());
+        let view = apply_polygons(view, &polygons);
+        if view.is_empty() {
+            Ok(Vec::new())
+        } else {
+            Ok(vec![view])
+        }
+    }
+
     fn bounds_filter(&self) -> Result<Option<QueryBounds>, StageError> {
         if self.bounds.is_empty() {
             return Ok(None);

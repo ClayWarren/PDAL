@@ -179,6 +179,59 @@ impl LasReader {
         Ok(())
     }
 
+    /// Read only the points whose indices fall inside `ranges`. Returns the
+    /// materialized view; callers can read `metadata()` afterward. Used by
+    /// `readers.copc` for `resolution`-pruned execution. Each range is
+    /// `(start_point_idx, count)`; behavior is the union of all ranges, which
+    /// must be sorted and disjoint.
+    ///
+    /// Implementation note: `laz::LasZipDecompressor::seek` is buggy for
+    /// variable-size chunks (which COPC always uses) — its delta formula
+    /// assumes uniform chunk sizes. We side-step it by streaming the LAZ
+    /// points sequentially and dropping records outside the kept ranges.
+    pub fn read_ranges(
+        &mut self,
+        ranges: &[(u64, u64)],
+    ) -> Result<PointView, StageError> {
+        let path = Path::new(&self.filename);
+        let mut reader = las::Reader::from_path(path)
+            .map_err(|e| StageError(format!("Failed to open LAS/LAZ file: {}", e)))?;
+        let header = reader.header();
+        let point_format = header.point_format().to_u8().unwrap_or(3);
+        self.add_metadata(header);
+        let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
+        let mut view = PointView::new(Rc::new(layout));
+        self.set_spatial_reference(&mut view, header)?;
+
+        if ranges.is_empty() {
+            return Ok(view);
+        }
+        let max_end = ranges.iter().map(|(s, c)| s + c).max().unwrap_or(0);
+        let mut range_idx = 0usize;
+        for (idx, point_result) in (0_u64..).zip(reader.points()) {
+            if idx >= max_end {
+                break;
+            }
+            let point = point_result
+                .map_err(|e| StageError(format!("Failed to read LAS/LAZ point: {}", e)))?;
+            while range_idx < ranges.len() {
+                let (start, count) = ranges[range_idx];
+                if idx >= start + count {
+                    range_idx += 1;
+                } else {
+                    break;
+                }
+            }
+            if range_idx < ranges.len() {
+                let (start, count) = ranges[range_idx];
+                if idx >= start && idx < start + count {
+                    append_point(&mut view, &point, point_format, &extra_dims)?;
+                }
+            }
+        }
+        Ok(view)
+    }
+
     fn read_standard_reader(&mut self, reader: &mut las::Reader) -> Result<PointView, StageError> {
         let header = reader.header();
         let point_count = header.number_of_points();
