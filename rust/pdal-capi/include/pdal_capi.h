@@ -1139,6 +1139,10 @@ extern "C"
     pdal_writer_t* pdal_writer_create_sbet(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_las(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_laz(const pdal_options_t* ops);
+    /// Create a COPC writer. The current implementation produces a LAS 1.4
+    /// LAZ file (point format 6 by default) that the existing LAS reader can
+    /// read back; the full COPC info VLR + hierarchy generation is deferred.
+    pdal_writer_t* pdal_writer_create_copc(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_spz(const pdal_options_t* ops);
     // EPT reader preview (header-only metadata): bounds_conforming, point
     // count, srs wkt, dim names. Returns null on error; call pdal_last_error.

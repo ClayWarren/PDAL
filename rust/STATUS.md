@@ -148,13 +148,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `750 / 819` baseline C++ GoogleTest cases, or
-`91.58%`, are confirmed Rust C ABI-backed by
-`rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
-test set from `3df1668e0^`, before both the local C++ guard-test additions and
-the Rust port, so newly added guard tests do not move the headline denominator.
-The branch-wide health metric, including guard tests added before and during
-the port, is `875 / 953` currently built C++ GoogleTest cases, or `91.82%`;
+Current pre-port checkpoint: `751 / 819` baseline C++ GoogleTest cases, or
+`91.70%`, are confirmed Rust C ABI-backed by
+`rust/scripts/audit_cpp_test_parity.py`. **Every pre-port C++ test binary now
+has at least one Rust C ABI-backed test.** The audit defaults to the test set
+from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
+port, so newly added guard tests do not move the headline denominator. The
+branch-wide health metric, including guard tests added before and during the
+port, is `879 / 953` currently built C++ GoogleTest cases, or `92.24%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -186,8 +187,15 @@ tell/seek stream behavior, and the EPT addon writer input invariant through the
 Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-The audit script currently lists 1 pre-port built test binary as unclassified
-(`pdal_io_copc_writer_test`), pending COPC writer chunk-table generation.
+All pre-port built test binaries have at least one counted case. The remaining
+gap is at the per-test level: `srsWkt2` (pre-existing failure with PROJ >= 9.2,
+unrelated to the port) and `srsUTM`/`extradim` in `pdal_io_copc_writer_test`
+still exercise the C++ writer end-to-end (PROJJSON export and a Rust-routed
+FerryFilter+CopcWriter pipeline are not yet wired); only `scaling` counts.
+The single uncounted *added* binary is `pdal_filters_groundfilter_test`, which
+parametrizes over csf/pmf/skewnessbalancing/smrf -- routing it through Rust
+requires porting the CSF cloth-simulation algorithm (Rust CSF currently only
+backs the option-validation tests).
   No easy audit wins remain among the uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a

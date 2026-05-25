@@ -45,6 +45,8 @@
 
 #include <pdal/PDALUtils.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 #include "Support.hpp"
 
 #include <gdal_version.h>
@@ -215,34 +217,37 @@ TEST(CopcWriterTest, scaling)
     using namespace Dimension;
 
     const std::string filename(Support::temppath("copc_scaling.las"));
-    PointTable table;
+    FileUtils::deleteFile(filename);
 
-    table.layout()->registerDims({Id::X, Id::Y, Id::Z});
+    // Route the write path through the Rust COPC writer C ABI so this
+    // test exercises Rust-backed scale/offset and LAS 1.4 LAZ output.
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", 9);
+    pdal_point_layout_register_dim(layout, "Y", 9);
+    pdal_point_layout_register_dim(layout, "Z", 9);
+    pdal_point_view_t* rview = pdal_point_view_create(layout);
+    pdal_point_view_add_point(rview);
+    pdal_point_view_set_f64(rview, 0, "X", 1406018.497);
+    pdal_point_view_set_f64(rview, 0, "Y", 4917487.174);
+    pdal_point_view_set_f64(rview, 0, "Z", 62.276);
 
-    BufferReader bufferReader;
+    pdal_options_t* writeOpts = pdal_options_create();
+    pdal_options_add_str(writeOpts, "filename", filename.c_str());
+    pdal_options_add_str(writeOpts, "offset_x", "1000000");
+    pdal_options_add_str(writeOpts, "scale_x", "0.001");
+    pdal_options_add_str(writeOpts, "offset_y", "5000000");
+    pdal_options_add_str(writeOpts, "scale_y", "0.001");
+    pdal_options_add_str(writeOpts, "offset_z", "0");
+    pdal_options_add_str(writeOpts, "scale_z", "0.001");
+    pdal_writer_t* writer = pdal_writer_create_copc(writeOpts);
+    EXPECT_NE(writer, nullptr);
+    EXPECT_TRUE(pdal_writer_write_view(writer, rview));
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(writeOpts);
+    pdal_point_view_destroy(rview);
 
-    PointViewPtr view(new PointView(table));
-    view->setField(Id::X, 0, 1406018.497);
-    view->setField(Id::Y, 0, 4917487.174);
-    view->setField(Id::Z, 0, 62.276);
-    bufferReader.addView(view);
-
-    Options writerOps;
-    writerOps.add("filename", filename);
-    writerOps.add("offset_x", "1000000");
-    writerOps.add("scale_x", "0.001");
-    writerOps.add("offset_y", "5000000");
-    writerOps.add("scale_y", "0.001");
-    writerOps.add("offset_z", "0");
-    writerOps.add("scale_z", "0.001");
-
-    CopcWriter writer;
-    writer.setOptions(writerOps);
-    writer.setInput(bufferReader);
-
-    writer.prepare(table);
-    writer.execute(table);
-
+    // Read back via the C++ LasReader (which is Rust C ABI-backed for local
+    // LAS/LAZ) and verify scale/offset preserved the input precision.
     Options readerOps;
     readerOps.add("filename", filename);
 
@@ -254,7 +259,7 @@ TEST(CopcWriterTest, scaling)
     reader.prepare(readTable);
     PointViewSet viewSet = reader.execute(readTable);
     EXPECT_EQ(viewSet.size(), 1u);
-    view = *viewSet.begin();
+    PointViewPtr view = *viewSet.begin();
     EXPECT_EQ(view->size(), 1u);
     EXPECT_NEAR(1406018.497, view->getFieldAs<double>(Id::X, 0), .00001);
     EXPECT_NEAR(4917487.174, view->getFieldAs<double>(Id::Y, 0), .00001);

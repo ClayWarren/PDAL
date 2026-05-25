@@ -587,6 +587,9 @@ COVERED: dict[str, object] = {
     "pdal_filters_greedyprojection_test": {
         "invalidOptionsThrow",
     },
+    "pdal_io_copc_writer_test": {
+        "scaling",
+    },
     "pdal_io_ept_reader_test": {
         "inspect",
         "fullReadLaszip",

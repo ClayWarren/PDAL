@@ -726,11 +726,11 @@ pub extern "C" fn pdal_filter_greedyprojection_validate_options(
     multiplier: f64,
     radius: f64,
 ) -> i32 {
-    if !(multiplier > 0.0) {
+    if multiplier <= 0.0 || multiplier.is_nan() {
         set_last_error("Option 'multiplier' must be greater than 0.");
         return -1;
     }
-    if !(radius > 0.0) {
+    if radius <= 0.0 || radius.is_nan() {
         set_last_error("Option 'radius' must be greater than 0.");
         return -1;
     }
