@@ -208,6 +208,80 @@ fn driver_inference_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn rust_stage_list_reports_core_registry_entries() {
+    unsafe {
+        let stages: serde_json::Value =
+            serde_json::from_str(&take_string(pdal_rust_stage_list_json())).unwrap();
+        let stages = stages.as_array().unwrap();
+
+        assert!(stages.iter().any(|stage| stage == "filters.crop"));
+        assert!(stages.iter().any(|stage| stage == "readers.las"));
+        assert!(stages.iter().any(|stage| stage == "writers.bpf"));
+    }
+}
+
+#[test]
+fn stage_extensions_custom_mappings_roundtrip_through_c_abi() {
+    unsafe {
+        let extensions = pdal_stage_extensions_create();
+        assert!(!extensions.is_null());
+
+        let reader_stage = CString::new("readers.custom").unwrap();
+        let reader_pcd = CString::new("pcd").unwrap();
+        let reader_custom = CString::new("customreader").unwrap();
+        let reader_values = [reader_pcd.as_ptr(), reader_custom.as_ptr()];
+        pdal_stage_extensions_set(
+            extensions,
+            reader_stage.as_ptr(),
+            reader_values.as_ptr(),
+            reader_values.len() as u64,
+        );
+
+        let writer_stage = CString::new("writers.custom").unwrap();
+        let writer_pcd = CString::new("pcd").unwrap();
+        let writer_custom = CString::new("customwriter").unwrap();
+        let writer_values = [writer_pcd.as_ptr(), writer_custom.as_ptr()];
+        pdal_stage_extensions_set(
+            extensions,
+            writer_stage.as_ptr(),
+            writer_values.as_ptr(),
+            writer_values.len() as u64,
+        );
+
+        assert_eq!(
+            take_string(pdal_stage_extensions_default_reader(
+                extensions,
+                reader_pcd.as_ptr()
+            )),
+            "readers.custom"
+        );
+        assert_eq!(
+            take_string(pdal_stage_extensions_default_reader(
+                extensions,
+                reader_custom.as_ptr()
+            )),
+            "readers.custom"
+        );
+        assert_eq!(
+            take_string(pdal_stage_extensions_default_writer(
+                extensions,
+                writer_pcd.as_ptr()
+            )),
+            "writers.custom"
+        );
+        assert_eq!(
+            take_string(pdal_stage_extensions_default_writer(
+                extensions,
+                writer_custom.as_ptr()
+            )),
+            "writers.custom"
+        );
+
+        pdal_stage_extensions_destroy(extensions);
+    }
+}
+
+#[test]
 fn config_helpers_roundtrip_through_c_abi() {
     unsafe {
         assert_eq!(pdal_config_version_integer(2, 10, 1), 21001);

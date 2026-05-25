@@ -63,6 +63,31 @@ mod tests {
     }
 
     #[test]
+    fn reader_detects_vsi_paths() {
+        assert!(is_vsi_path("/vsicurl/https://example.com/file.laz"));
+        assert!(is_vsi_path("https://example.com/file.laz"));
+        assert!(is_vsi_path("http://example.com/file.laz"));
+        assert!(!is_vsi_path("/tmp/file.laz"));
+    }
+
+    #[test]
+    #[ignore = "network smoke for LAS/LAZ reader over GDAL /vsicurl/"]
+    fn reader_reads_remote_copc_through_vsi() {
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            "/vsicurl/https://github.com/PDAL/data/raw/refs/heads/main/autzen/autzen-classified.copc.laz",
+        );
+        options.add("count", "1");
+        let mut reader = LasReader::new(&options);
+        let views = reader.read().expect("read remote COPC through VSI");
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 1);
+        assert!(views[0].layout().dim(&DimId::X).is_some());
+    }
+
+    #[test]
     fn detect_copc_matches_signature_at_offset_377() {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         let mut data = vec![0u8; 381];

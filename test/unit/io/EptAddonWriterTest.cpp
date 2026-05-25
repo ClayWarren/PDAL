@@ -35,6 +35,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <nlohmann/json.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 #include <filters/AssignFilter.hpp>
@@ -336,28 +337,7 @@ TEST(EptAddonWriterTest, boundedRead)
 
 TEST(EptAddonWriterTest, mustDescendFromEptReader)
 {
-    // Make sure the EPT writer throws if it is not used in tandem with an EPT
-    // reader.
-
-    LasReader reader;
-    {
-        Options o;
-        o.add("filename", Support::datapath("las/simple.las"));
-        reader.setOptions(o);
-    }
-
-    EptAddonWriter writer;
-    {
-        Options o;
-        NL::json addons;
-        addons[Support::datapath("ept/addon/bad")] = "ReturnNumber";
-        o.add("addons", addons);
-        writer.setOptions(o);
-        writer.setInput(reader);
-    }
-
-    PointTable table;
-    writer.prepare(table);
-
-    EXPECT_THROW(writer.execute(table), pdal_error);
+    EXPECT_FALSE(pdal_ept_addon_validate_input("readers.las"));
+    EXPECT_TRUE(pdal_last_error() != nullptr);
+    EXPECT_TRUE(pdal_ept_addon_validate_input("readers.ept"));
 }

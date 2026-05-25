@@ -43,6 +43,7 @@
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal/util/portable_endian.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #ifdef _WIN32
 #include <winioctl.h>
@@ -50,6 +51,13 @@
 
 namespace pdal
 {
+
+std::string takeRustString(char* value)
+{
+    std::string out(value ? value : "");
+    pdal_string_free(value);
+    return out;
+}
 
 TEST(UtilsTest, test_random)
 {
@@ -81,7 +89,7 @@ TEST(UtilsTest, test_env)
 {
     const std::string varName = "PDAL_RUST_TEST_VAR_CPP";
     std::string val;
-    
+
     EXPECT_EQ(Utils::getenv(varName, val), -1);
     EXPECT_TRUE(val.empty());
 
@@ -552,35 +560,33 @@ TEST(UtilsTest, escapeJSON)
 TEST(UtilsTest, extractor)
 {
     {
-        std::vector<char> buf(5);
-        LeExtractor ext(buf.data(), buf.size());
-
-        std::string s;
-        ext.get(s, 5);
-        EXPECT_EQ(s.size(), 0);
+        std::vector<uint8_t> buf(5);
+        EXPECT_EQ(takeRustString(
+                      pdal_utils_extract_c_string(buf.data(), buf.size(), 0, 5))
+                      .size(),
+                  0u);
     }
 
     {
-        std::vector<char> buf{'a', 'b', 'c', 0, 0};
-        LeExtractor ext(buf.data(), buf.size());
+        std::vector<uint8_t> buf{'a', 'b', 'c', 0, 0};
 
-        std::string s;
-        ext.get(s, 5);
+        std::string s = takeRustString(
+            pdal_utils_extract_c_string(buf.data(), buf.size(), 0, 5));
         EXPECT_EQ(s.size(), 3);
         EXPECT_EQ(s, "abc");
 
-        ext.seek(0);
-        ext.get(s, 3);
+        s = takeRustString(
+            pdal_utils_extract_c_string(buf.data(), buf.size(), 0, 3));
         EXPECT_EQ(s.size(), 3);
         EXPECT_EQ(s, "abc");
 
-        ext.seek(0);
-        ext.get(s, 1);
+        s = takeRustString(
+            pdal_utils_extract_c_string(buf.data(), buf.size(), 0, 1));
         EXPECT_EQ(s.size(), 1);
         EXPECT_EQ(s, "a");
 
-        ext.seek(0);
-        ext.get(s, 0);
+        s = takeRustString(
+            pdal_utils_extract_c_string(buf.data(), buf.size(), 0, 0));
         EXPECT_EQ(s.size(), 0);
         EXPECT_TRUE(s.empty());
     }

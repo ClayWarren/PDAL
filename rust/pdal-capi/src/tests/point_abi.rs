@@ -48,6 +48,21 @@ fn point_view_exposes_layout_dimensions() {
 }
 
 #[test]
+fn point_view_ids_are_monotonic_through_c_abi() {
+    unsafe {
+        let first = pdal_point_view_create(pdal_point_layout_create());
+        let second = pdal_point_view_create(pdal_point_layout_create());
+
+        assert!(pdal_point_view_id(first) > 0);
+        assert!(pdal_point_view_id(second) > pdal_point_view_id(first));
+        assert_eq!(pdal_point_view_id(std::ptr::null()), 0);
+
+        pdal_point_view_destroy(first);
+        pdal_point_view_destroy(second);
+    }
+}
+
+#[test]
 fn point_view_typed_getters_match_pdal_cast_contract() {
     unsafe {
         let layout = pdal_point_layout_create();

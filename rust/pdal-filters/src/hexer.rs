@@ -216,6 +216,33 @@ impl HexGrid {
         self.height
     }
 
+    pub fn width(&self) -> f64 {
+        self.width
+    }
+
+    pub fn offsets(&self) -> &[Point; 6] {
+        &self.offsets
+    }
+
+    pub fn counts(&self) -> &HashMap<HexId, i32> {
+        &self.counts
+    }
+
+    /// Vertices for a hexagon, walking edges 0..6 (closing with edge 0).
+    /// Useful for emitting hex polygons in density output.
+    pub fn hex_vertices(&self, hex: HexId) -> [Point; 7] {
+        let mut out = [Point::new(0.0, 0.0); 7];
+        for edge in 0..=6 {
+            out[edge as usize] = self.find_point(Segment::new(hex, edge % 6));
+        }
+        out
+    }
+
+    /// C++ `hexer::HexGrid::getID` — packs (i, j) into a stable u64.
+    pub fn hex_id_u64(hex: HexId) -> u64 {
+        ((hex.i as u64) << 32) | (hex.j as u32 as u64)
+    }
+
     /// Map a point to the hexagon that contains it, ported from
     /// `hexer::HexGrid::findHexagon`. The first point added defines the
     /// grid origin and lands at hex (0, 0).
@@ -317,11 +344,9 @@ impl HexGrid {
     /// Discover every boundary path around the dense region(s).
     pub fn find_shapes(&mut self) -> Result<(), String> {
         if self.possible_roots.is_empty() {
-            return Err(
-                "No areas of sufficient density - no shapes. \
+            return Err("No areas of sufficient density - no shapes. \
                  Decrease density or area size."
-                    .to_string(),
-            );
+                .to_string());
         }
         while let Some(&root) = self.possible_roots.iter().next() {
             self.find_shape(root);
@@ -410,7 +435,8 @@ impl HexGrid {
     /// Sort roots/children for deterministic test output, matching
     /// `BaseGrid::sortPaths`.
     pub fn sort_paths(&mut self) {
-        self.roots.sort_by(|&a, &b| self.paths[a].root_hex.cmp(&self.paths[b].root_hex));
+        self.roots
+            .sort_by(|&a, &b| self.paths[a].root_hex.cmp(&self.paths[b].root_hex));
         for idx in 0..self.paths.len() {
             let mut children = self.paths[idx].children.clone();
             children.sort_by(|&a, &b| self.paths[a].root_hex.cmp(&self.paths[b].root_hex));
@@ -534,11 +560,44 @@ mod tests {
     fn hexgrid_issue_2507_matches_cpp_wkt() {
         let mut grid = HexGrid::with_height(1.0, 1);
         let hexes: Vec<HexId> = [
-            (0, 3), (0, 4), (0, 5), (0, 6), (1, 2), (1, 6), (2, 2), (2, 4),
-            (2, 5), (2, 7), (3, 1), (3, 3), (3, 5), (3, 7), (4, 1), (4, 2),
-            (4, 4), (4, 5), (4, 8), (5, 0), (5, 2), (5, 6), (5, 8), (6, 1),
-            (6, 3), (6, 4), (6, 8), (7, 1), (7, 3), (7, 4), (7, 5), (7, 7),
-            (8, 2), (8, 3), (8, 4), (8, 5), (8, 6), (8, 7),
+            (0, 3),
+            (0, 4),
+            (0, 5),
+            (0, 6),
+            (1, 2),
+            (1, 6),
+            (2, 2),
+            (2, 4),
+            (2, 5),
+            (2, 7),
+            (3, 1),
+            (3, 3),
+            (3, 5),
+            (3, 7),
+            (4, 1),
+            (4, 2),
+            (4, 4),
+            (4, 5),
+            (4, 8),
+            (5, 0),
+            (5, 2),
+            (5, 6),
+            (5, 8),
+            (6, 1),
+            (6, 3),
+            (6, 4),
+            (6, 8),
+            (7, 1),
+            (7, 3),
+            (7, 4),
+            (7, 5),
+            (7, 7),
+            (8, 2),
+            (8, 3),
+            (8, 4),
+            (8, 5),
+            (8, 6),
+            (8, 7),
         ]
         .into_iter()
         .map(|(i, j)| HexId::new(i, j))

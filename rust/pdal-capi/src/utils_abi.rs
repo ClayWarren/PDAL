@@ -1,9 +1,10 @@
 use pdal_core::utils::{
     base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, diff_files,
-    diff_text_files, escape_json, escape_nonprinting_bytes, format_f64, format_i32, get_env,
-    iequals, looks_like_json, normalize_longitude, parse_f64, parse_i32, random, random_seed,
-    replace_all, run_shell_command, set_env, simple_wordexp, split2_char, split_char, starts_with,
-    to_lower, to_upper, trim_leading, trim_trailing, unset_env, word_wrap, word_wrap2,
+    diff_text_files, escape_json, escape_nonprinting_bytes, extract_c_string, format_f64,
+    format_i32, get_env, iequals, looks_like_json, normalize_longitude, parse_f64, parse_i32,
+    random, random_seed, replace_all, run_shell_command, set_env, simple_wordexp, split2_char,
+    split_char, starts_with, to_lower, to_upper, trim_leading, trim_trailing, unset_env, word_wrap,
+    word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -226,6 +227,24 @@ pub unsafe extern "C" fn pdal_u8_array_free(ptr: *mut u8, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_utils_extract_c_string(
+    bytes: *const u8,
+    len: u64,
+    offset: u64,
+    count: u64,
+) -> *mut c_char {
+    if bytes.is_null() && len != 0 {
+        return ptr::null_mut();
+    }
+    let bytes = if len == 0 {
+        &[]
+    } else {
+        std::slice::from_raw_parts(bytes, len as usize)
+    };
+    string_to_c(extract_c_string(bytes, offset as usize, count as usize))
 }
 
 #[no_mangle]

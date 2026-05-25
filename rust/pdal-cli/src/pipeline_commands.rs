@@ -150,18 +150,48 @@ impl App {
     pub(super) fn run_info(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
-            println!("  pdal info [--summary] <file>");
+            println!("  pdal info [--summary|--metadata] <file>");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
                 0
             };
         }
+        enum InfoOutput {
+            Summary,
+            Metadata,
+        }
+
         let mut filename: Option<&str> = None;
         let mut driver_override: Option<&str> = None;
+        let mut output = InfoOutput::Summary;
         let mut args = self.command_args.iter();
         while let Some(arg) = args.next() {
             if arg == "--summary" {
+                output = InfoOutput::Summary;
+            } else if arg == "--metadata" {
+                output = InfoOutput::Metadata;
+            } else if arg == "--schema"
+                || arg == "--all"
+                || arg == "--stac"
+                || arg == "--boundary"
+                || arg == "--pipeline-serialization"
+                || arg == "--dimensions"
+                || arg == "--enumerate"
+                || arg == "--breakout"
+                || arg == "--pc_type"
+                || arg == "--stdin"
+            {
+                eprintln!("Error: unsupported option '{arg}' for info");
+                return 1;
+            } else if arg == "-p" || arg == "--point" || arg == "--query" {
+                let Some(_) = args.next() else {
+                    eprintln!("Error: {arg} requires a value");
+                    return 1;
+                };
+                eprintln!("Error: unsupported option '{arg}' for info");
+                return 1;
+            } else if arg == "--stats" {
                 continue;
             } else if arg == "--driver" {
                 let Some(driver) = args.next() else {
@@ -247,7 +277,13 @@ impl App {
                     object.insert("filename".to_string(), serde_json::json!(filename));
                     object.insert("driver".to_string(), serde_json::json!(driver));
                 }
-                serde_json::to_string(&value).unwrap_or(summary)
+                let output_value = match output {
+                    InfoOutput::Summary => value,
+                    InfoOutput::Metadata => serde_json::json!({
+                        "metadata": value.get("metadata").cloned().unwrap_or_default(),
+                    }),
+                };
+                serde_json::to_string(&output_value).unwrap_or(summary)
             }
             Err(_) => summary,
         };

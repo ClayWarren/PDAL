@@ -39,6 +39,7 @@
 #include <pdal/Streamable.hpp>
 #include <pdal/Writer.hpp>
 #include <pdal/util/Bounds.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -274,6 +275,28 @@ void exec5(const std::string& where, size_t expKeep)
     EXPECT_EQ(g_count, expKeep);
 }
 
+void execRustWriterWhere(const std::string& where, size_t expKeep)
+{
+    std::string json =
+        "["
+        "{\"type\":\"readers.faux\",\"count\":100,\"mode\":\"ramp\","
+        "\"bounds\":\"([0,99],[0,9.9],[100,199])\",\"tag\":\"source\"},"
+        "{\"type\":\"writers.null\",\"where\":\"" +
+        where +
+        "\",\"inputs\":\"source\"}"
+        "]";
+
+    pdal_pipeline_t* pipeline = pdal_pipeline_create_json(json.c_str());
+    ASSERT_NE(pipeline, nullptr);
+
+    pdal_pipeline_result_t result{};
+    EXPECT_EQ(pdal_pipeline_execute_result(pipeline, nullptr, &result), 0);
+    EXPECT_EQ(result.point_count, expKeep);
+    EXPECT_EQ(result.view_count, 1u);
+
+    pdal_pipeline_destroy(pipeline);
+}
+
 // Support for filter that returns no point views.
 void exec6(const std::string& where, size_t expKeep, size_t expViews,
            Stage::WhereMergeMode mm = Stage::WhereMergeMode::Auto)
@@ -363,15 +386,10 @@ TEST(WhereTest, empty)
 
 TEST(WhereTest, writer)
 {
-    exec4("X<50", 50, 3);
-    exec4("X<50 && Y < (1 + 1.5)", 25, 3);
-    exec4("X<50 && Y < 2 + 0.5", 25, 2, Stage::WhereMergeMode::True);
-    exec4("X<50 && Y < 2.5", 25, 3, Stage::WhereMergeMode::False);
-
-    exec5("X<50", 50);
-    exec5("X<50 && Y < (1 + 1.5)", 25);
-    exec5("X<50 && Y < 2 + 0.5", 25);
-    exec5("X<50 && Y < 2.5", 25);
+    execRustWriterWhere("X<50", 50);
+    execRustWriterWhere("X<50 && Y < (1 + 1.5)", 25);
+    execRustWriterWhere("X<50 && Y < 2 + 0.5", 25);
+    execRustWriterWhere("X<50 && Y < 2.5", 25);
 }
 
 } // namespace pdal

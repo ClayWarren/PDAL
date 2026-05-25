@@ -14,6 +14,7 @@ use pdal_filters::colorinterp::{pipeline_streamable, validate_prepared, Colorint
 use pdal_filters::colorization::{BandInfo, ColorizationFilter};
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
 use pdal_filters::crop::{CropCenter, CropFilter};
+use pdal_filters::csf::CsfFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
 use pdal_filters::divider;
@@ -77,6 +78,25 @@ use pdal_filters::voxel_centroid_nearest_neighbor::VoxelCentroidNearestNeighborF
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
 use pdal_filters::zsmooth::ZsmoothFilter;
 use std::ffi::{c_char, CStr};
+
+unsafe fn c_string_array(values: *const *const c_char, count: u64) -> Result<Vec<String>, ()> {
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    if values.is_null() {
+        return Err(());
+    }
+
+    let mut out = Vec::new();
+    for idx in 0..count {
+        let ptr = *values.offset(idx as isize);
+        if ptr.is_null() {
+            return Err(());
+        }
+        out.push(CStr::from_ptr(ptr).to_string_lossy().into_owned());
+    }
+    Ok(out)
+}
 
 /// Create a geomdistance filter stage.
 ///
@@ -629,6 +649,41 @@ pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
             dim_name,
         )),
     }))
+}
+
+/// Create a CSF guard-stage for option validation and empty input behavior.
+///
+/// The full cloth simulation algorithm remains in C++; this Rust stage covers
+/// the pre-processing semantics currently exercised by the C++ CSF unit tests.
+///
+/// # Safety
+/// `ignored_dims` must be null with a zero count or point to `count`
+/// NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_csf(
+    ground_class: u8,
+    other_class: u8,
+    only_ground: bool,
+    ignored_dims: *const *const c_char,
+    count: u64,
+) -> *mut StageWrapper {
+    let ignored_dims = match c_string_array(ignored_dims, count) {
+        Ok(dims) => dims.into_iter().map(|dim| DimId::from_name(&dim)).collect(),
+        Err(()) => {
+            set_last_error("invalid ignored dimension list passed to pdal_stage_create_csf");
+            return std::ptr::null_mut();
+        }
+    };
+
+    match CsfFilter::new(ground_class, other_class, only_ground, ignored_dims) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(err.to_string());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[path = "filter_abi_geo.rs"]

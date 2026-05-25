@@ -2,6 +2,7 @@ use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
 use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
+use pdal_core::expr::ConditionalExpression;
 use pdal_core::gdal::{LayerHandle, Vector};
 use pdal_core::point::DimId;
 use pdal_filters::hexer::{HexGrid, SQRT_3};
@@ -20,6 +21,7 @@ struct BoundaryOptions {
     sample_size: u32,
     smooth: bool,
     fast_boundary: bool,
+    where_expr: Option<String>,
 }
 
 impl Default for BoundaryOptions {
@@ -30,6 +32,7 @@ impl Default for BoundaryOptions {
             sample_size: 5000,
             smooth: true,
             fast_boundary: false,
+            where_expr: None,
         }
     }
 }
@@ -53,6 +56,8 @@ struct CreateArgs {
     boundary: BoundaryOptions,
     stdin_requested: bool,
     input_methods: u8,
+    filelists: Vec<String>,
+    skip_different_srs: bool,
     unsupported_input: bool,
 }
 
@@ -135,6 +140,11 @@ fn run_create(args: &[String]) -> i32 {
         Ok(entries) => entries,
         Err(()) => return 1,
     };
+    if args.driver_name.eq_ignore_ascii_case("ESRI Shapefile") && first_srs.len() > 254 {
+        println!(
+            "PDAL: kernels.tindex: ESRI Shapefile field 'srs' supports a maximum of 254 characters."
+        );
+    }
     let layer = match dataset.open_or_create_layer(&args.layer_name, &first_srs) {
         Ok(layer) => layer,
         Err(err) => {
@@ -167,6 +177,8 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
         boundary: BoundaryOptions::default(),
         stdin_requested: false,
         input_methods: 0,
+        filelists: Vec::new(),
+        skip_different_srs: false,
         unsupported_input: false,
     };
 
@@ -176,8 +188,8 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--tindex" => parsed.tindex_file = next_value(&mut iter, "--tindex")?.clone(),
             "--filelist" => {
                 parsed.input_methods += 1;
-                let _ = next_value(&mut iter, "--filelist")?;
-                parsed.unsupported_input = true;
+                let path = next_value(&mut iter, "--filelist")?;
+                parsed.filelists.push(path.clone());
             }
             "--glob" => {
                 parsed.input_methods += 1;
@@ -222,11 +234,13 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                 let value = next_value(&mut iter, arg)?;
                 parsed.boundary.fast_boundary = parse_bool(value, arg)?;
             }
+            "--skip_different_srs" => {
+                let value = next_value(&mut iter, arg)?;
+                parsed.skip_different_srs = parse_bool(value, arg)?;
+            }
             "--where" => {
-                // Point-level expression filtering for hexer is not yet
-                // wired; fall back to C++ for that case.
-                let _ = next_value(&mut iter, arg)?;
-                return Err(ParseResult::Unsupported);
+                parsed.rich_boundary_options = true;
+                parsed.boundary.where_expr = Some(next_value(&mut iter, arg)?.clone());
             }
             _ if let Some(value) = arg.strip_prefix("--filespec=") => {
                 parsed.input_methods += 1;
@@ -240,9 +254,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                 parsed.input_methods += 1;
                 parsed.files.extend(read_glob(pattern)?);
             }
-            _ if arg.starts_with("--filelist=") => {
+            _ if let Some(path) = arg.strip_prefix("--filelist=") => {
                 parsed.input_methods += 1;
-                parsed.unsupported_input = true;
+                parsed.filelists.push(path.to_string());
             }
             _ if let Some(value) = arg.strip_prefix("--write_absolute_path=") => {
                 parsed.write_absolute_path = matches!(
@@ -280,8 +294,12 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                 parsed.rich_boundary_options = true;
                 parsed.boundary.fast_boundary = parse_bool(value, "--fast_boundary")?;
             }
-            _ if arg.starts_with("--where=") => {
-                return Err(ParseResult::Unsupported);
+            _ if let Some(value) = arg.strip_prefix("--skip_different_srs=") => {
+                parsed.skip_different_srs = parse_bool(value, "--skip_different_srs")?;
+            }
+            _ if let Some(value) = arg.strip_prefix("--where=") => {
+                parsed.rich_boundary_options = true;
+                parsed.boundary.where_expr = Some(value.to_string());
             }
             _ if arg.starts_with("--filters.hexbin.smooth") => {
                 return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
@@ -311,6 +329,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
     }
     if parsed.unsupported_input {
         return Err(ParseResult::Unsupported);
+    }
+    for path in &parsed.filelists {
+        parsed.files.extend(read_filelist(path)?);
     }
     if parsed.stdin_requested {
         parsed.files.extend(read_stdin_files()?);
@@ -420,6 +441,23 @@ fn read_stdin_files() -> Result<Vec<String>, ParseResult> {
     Ok(files)
 }
 
+fn read_filelist(path: &str) -> Result<Vec<String>, ParseResult> {
+    let input = std::fs::read_to_string(path)
+        .map_err(|err| ParseResult::Error(format!("unable to read filelist '{path}': {err}")))?;
+    let files = input
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if files.is_empty() {
+        return Err(ParseResult::Error(format!(
+            "filelist '{path}' contained no tindex input files"
+        )));
+    }
+    Ok(files)
+}
+
 fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {
     let mut first_srs = String::new();
     let mut entries = Vec::new();
@@ -427,6 +465,16 @@ fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {
         let mut entry = create_entry(file, args)?;
         if first_srs.is_empty() && !entry.wkt.is_empty() {
             first_srs.clone_from(&entry.wkt);
+        } else if !first_srs.is_empty() && !entry.wkt.is_empty() && entry.wkt != first_srs {
+            print!(
+                "PDAL: kernels.tindex: SRS of file '{}' does not match the SRS of other files in the tileindex",
+                entry.location
+            );
+            if args.skip_different_srs {
+                println!(". Skipping this file");
+                continue;
+            }
+            println!();
         }
         if let Some(prefix) = &args.path_prefix {
             entry.location = format!("{prefix}{}", entry.location);
@@ -439,10 +487,13 @@ fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {
 fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
     let summary = summary_for_file(file)?;
     let (minx, miny, maxx, maxy) = bounds_from_summary(file, &summary)?;
-    let wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
+    let mut wkt = summary["metadata"]["pipeline"]["stage_0"]["srs"]["wkt"]
         .as_str()
         .unwrap_or("")
         .to_string();
+    if wkt.is_empty() {
+        wkt = srs_for_file(file)?;
+    }
     let location = tindex_location(file, args.write_absolute_path)?;
 
     let boundary_wkt = if args.rich_boundary_options && args.boundary.exact() {
@@ -500,8 +551,30 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
             None => return Ok(None),
         }
     };
+    let mut where_expr = match &opts.where_expr {
+        Some(source) => match ConditionalExpression::parse(source) {
+            Ok(expr) => Some(expr),
+            Err(err) => {
+                eprintln!("PDAL: kernels.tindex: Invalid where expression '{source}': {err}");
+                return Err(());
+            }
+        },
+        None => None,
+    };
+
     for view in &views {
+        if let Some(expr) = where_expr.as_mut() {
+            if let Err(err) = expr.prepare(view.layout().as_ref()) {
+                eprintln!("PDAL: kernels.tindex: Invalid where expression: {err}");
+                return Err(());
+            }
+        }
         for idx in 0..view.len() {
+            if let Some(expr) = &where_expr {
+                if !expr.eval(view, idx) {
+                    continue;
+                }
+            }
             let x = view.get_f64(idx, &DimId::X);
             let y = view.get_f64(idx, &DimId::Y);
             grid.add_xy(x, y);
@@ -516,7 +589,10 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
         return Ok(Some(wkt));
     }
     let tolerance = 1.1 * grid.height() / 2.0;
-    match Geometry::from_wkt(&wkt).and_then(|g| g.simplify(tolerance, true)).and_then(|g| g.to_wkt()) {
+    match Geometry::from_wkt(&wkt)
+        .and_then(|g| g.simplify(tolerance, true))
+        .and_then(|g| g.to_wkt())
+    {
         Ok(simplified) => Ok(Some(ensure_multipolygon(&simplified))),
         Err(err) => {
             eprintln!("PDAL: kernels.tindex: GEOS simplify failed for '{file}': {err}");
@@ -596,6 +672,34 @@ fn summary_for_file(file: &str) -> Result<serde_json::Value, ()> {
                 },
             )
         }
+        Err(err) => {
+            eprintln!("PDAL: kernels.tindex: {err}");
+            Err(())
+        }
+    }
+}
+
+fn srs_for_file(file: &str) -> Result<String, ()> {
+    let Some(driver) = infer_reader_driver(file) else {
+        eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{file}'.");
+        return Err(());
+    };
+    let mut pipeline = match pipeline_from_json(
+        &serde_json::json!([{ "type": driver, "filename": file }]).to_string(),
+    ) {
+        Ok(pipeline) => pipeline,
+        Err(err) => {
+            eprintln!("PDAL: kernels.tindex: {err}");
+            return Err(());
+        }
+    };
+    match pipeline.execute(Vec::new()) {
+        Ok(views) => Ok(views
+            .iter()
+            .map(|view| view.spatial_reference().wkt())
+            .find(|wkt| !wkt.is_empty())
+            .unwrap_or("")
+            .to_string()),
         Err(err) => {
             eprintln!("PDAL: kernels.tindex: {err}");
             Err(())
@@ -694,22 +798,34 @@ fn print_geojson_tindex(args: &CreateArgs, entries: Vec<Entry>) {
     let features = entries
         .into_iter()
         .map(|entry| {
+            let geometry = entry
+                .boundary_wkt
+                .as_deref()
+                .and_then(|wkt| {
+                    Geometry::from_wkt(wkt)
+                        .and_then(|g| g.to_gdal_geojson(8))
+                        .ok()
+                })
+                .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+                .unwrap_or_else(|| {
+                    serde_json::json!({
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [entry.minx, entry.miny],
+                            [entry.maxx, entry.miny],
+                            [entry.maxx, entry.maxy],
+                            [entry.minx, entry.maxy],
+                            [entry.minx, entry.miny],
+                        ]],
+                    })
+                });
             serde_json::json!({
                 "type": "Feature",
                 "properties": {
                     args.location_field.clone(): entry.location,
                     "srs": entry.wkt,
                 },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [entry.minx, entry.miny],
-                        [entry.maxx, entry.miny],
-                        [entry.maxx, entry.maxy],
-                        [entry.minx, entry.maxy],
-                        [entry.minx, entry.miny],
-                    ]],
-                },
+                "geometry": geometry,
             })
         })
         .collect::<Vec<_>>();

@@ -39,6 +39,7 @@
 #include <pdal/StageExtensions.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/Algorithm.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -47,12 +48,17 @@ namespace pdal
 
 TEST(StageFactoryTest, Load)
 {
-    StageFactory f(false);
+    auto takeString = [](char* value)
+    {
+        std::string output(value ? value : "");
+        pdal_string_free(value);
+        return output;
+    };
 
-    StringList ns = PluginManager<Stage>::names();
-    ASSERT_TRUE(Utils::contains(ns, "filters.crop"));
-    ASSERT_TRUE(Utils::contains(ns, "readers.las"));
-    ASSERT_TRUE(Utils::contains(ns, "writers.bpf"));
+    const std::string stages = takeString(pdal_rust_stage_list_json());
+    ASSERT_NE(stages.find("\"filters.crop\""), std::string::npos);
+    ASSERT_NE(stages.find("\"readers.las\""), std::string::npos);
+    ASSERT_NE(stages.find("\"writers.bpf\""), std::string::npos);
 }
 
 TEST(StageFactoryTest, extensionTest)
@@ -86,14 +92,35 @@ TEST(StageFactoryTest, stageExtensionsLoadPerInstance)
 
 TEST(StageFactoryTest, stageExtensionsCustomMappingsOverrideDefaults)
 {
-    StageExtensions extensions{LogPtr()};
-    extensions.set("readers.custom", {"pcd", "customreader"});
-    extensions.set("writers.custom", {"pcd", "customwriter"});
+    auto takeString = [](char* value)
+    {
+        std::string output(value ? value : "");
+        pdal_string_free(value);
+        return output;
+    };
 
-    EXPECT_EQ(extensions.defaultReader("pcd"), "readers.custom");
-    EXPECT_EQ(extensions.defaultReader("customreader"), "readers.custom");
-    EXPECT_EQ(extensions.defaultWriter("pcd"), "writers.custom");
-    EXPECT_EQ(extensions.defaultWriter("customwriter"), "writers.custom");
+    pdal_stage_extensions_t* extensions = pdal_stage_extensions_create();
+    ASSERT_NE(extensions, nullptr);
+
+    const char* readerExts[] = {"pcd", "customreader"};
+    pdal_stage_extensions_set(extensions, "readers.custom", readerExts, 2);
+    const char* writerExts[] = {"pcd", "customwriter"};
+    pdal_stage_extensions_set(extensions, "writers.custom", writerExts, 2);
+
+    EXPECT_EQ(
+        takeString(pdal_stage_extensions_default_reader(extensions, "pcd")),
+        "readers.custom");
+    EXPECT_EQ(takeString(pdal_stage_extensions_default_reader(extensions,
+                                                              "customreader")),
+              "readers.custom");
+    EXPECT_EQ(
+        takeString(pdal_stage_extensions_default_writer(extensions, "pcd")),
+        "writers.custom");
+    EXPECT_EQ(takeString(pdal_stage_extensions_default_writer(extensions,
+                                                              "customwriter")),
+              "writers.custom");
+
+    pdal_stage_extensions_destroy(extensions);
 }
 
 } // namespace pdal

@@ -43,8 +43,8 @@ Status definitions:
 | OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims` and `multicount` constraints. The C++ `OGRWriter` now delegates to the Rust C ABI for GeoJSON output without `ogr_options` or `measure_dim`, and routes multicount/attr_dims option validation and the missing-attr_dims-dimension error message through Rust. The C++ `json`, `error_multicount_attrs`, and `error_unknown_attr` tests route through Rust. Shapefile, GeoPackage, native OGR layer creation/options, transactions, and measure dimensions are deferred. |
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
-| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
-| COPC reader | prototype | Local `.copc.laz` full-file reads and no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. COPC hierarchy traversal, bounds pruning, resolution queries, remote reads, and writer behavior are deferred. |
+| LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, full-file GDAL VSI URL reads, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
+| COPC reader | prototype | Local `.copc.laz` full-file reads and no-filter `inspect()` metadata route through the LAS/LAZ path, with post-read 2D/3D bounds filtering. A GDAL VSI byte-range adapter now exists in `pdal-native` and LAS/LAZ can full-read remote COPC files through it, but that is not COPC hierarchy/resolution parity. COPC hierarchy traversal, bounds pruning, resolution queries, remote previews, and writer behavior are still deferred until the adapter is consumed by a real COPC hierarchy reader/writer. |
 | EPT reader | prototype | Local LASzip, uncompressed binary, and zstandard EPT full-file reads walk JSON hierarchy and merge local tiles. Resolution limits and query bounds prune hierarchy nodes before tile reads; origin filtering is applied after tile reads. Tile point counts are validated and `ignore_unreadable` can skip unreadable tiles, with the C++ wrapper routing through the Rust path even when `ignore_unreadable` is set (an empty view is returned when every tile is skipped). Reprojection, polygon/OGR filters, addons, remote access, and streaming are deferred. |
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
@@ -57,15 +57,15 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. `kernels.fauxplugin`, `pipeline`, `translate`, `random`, `density`, `ground`, `split`, `hausdorff`, `chamfer`, `delta`, `eval`, scoped `info --summary`/point/query/stats/schema/all/STAC, scoped `tindex create/merge`, installed-app `sort`/`merge`, and existing `tile` app workflows now dispatch through Rust-owned kernel code via that bridge; unsupported tindex boundary options fall back to C++. `pdal_app_test.option_file`, `pdal_app_test.load`, and `pdal_app_test.log` all count. `option_file` routes through the Rust translate option-file path, `load` exercises Rust kernel listing/dispatch plus the Rust-formatted unknown-command message (`pdal_app_unknown_command_message`), and `log` exercises Rust-formatted log line prefixes through `pdal_log_format_prefix` (the C++ `Log::get` only owns sink selection now). |
-| Implemented commands | in progress | `pipeline`, `info`, `translate`, `merge`, `sort`, `split`, `random`, `hausdorff`, `chamfer`, `delta`, `density`, `eval`, `tile`, and `tindex` have installed-PDAL regression coverage for their scoped workflows. `info` owns summary, point lookup, nearest query, stats, schema, all-mode schema/stat output, and the existing STAC app guard. Full STAC feature geometry/projection parity remains limited. `tile` owns the existing app tests, including globbed input, text/LAS output, per-source reprojection to `out_srs`, and writer text options. `tindex` now owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, GeoJSON stdout layer-description option, **and exact (hexer-driven) boundary generation when `--threshold`/`--resolution`/`--simplify`/`--fast_boundary` are set**, with GEOS topology-preserving simplification applied through `pdal-native`. The `--where` boundary-expression filter still falls back to C++. `ground` now compares per-point classification against installed PDAL (≥99.8% agreement on `interesting.las` with `cell=10`) after the Rust SMRF implementation gained the low-outlier mask, net cutting, KD-tree inpainting, and full validation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
+| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. Every first-party C++ kernel command name has a Rust dispatch guard, and `pdal_app_test.option_file`, `pdal_app_test.load`, and `pdal_app_test.log` all count. `option_file` routes through the Rust translate option-file path, `load` exercises Rust kernel listing/dispatch plus the Rust-formatted unknown-command message (`pdal_app_unknown_command_message`), and `log` exercises Rust-formatted log line prefixes through `pdal_log_format_prefix` (the C++ `Log::get` only owns sink selection now). |
+| Implemented commands | in progress | All 15 first-party C++ kernel commands (`chamfer`, `delta`, `density`, `eval`, `ground`, `hausdorff`, `info`, `merge`, `pipeline`, `random`, `sort`, `split`, `tile`, `tindex`, `translate`) are Rust-dispatchable through the C ABI and listed in Rust command metadata. They have installed-PDAL regression coverage for scoped workflows. `info` owns summary, metadata, point lookup, nearest query, stats with `--dimensions`, schema, all-mode schema/stat output, pipeline serialization, and the existing STAC app guard. Full STAC feature geometry/projection parity remains limited. `tile` owns the existing app tests, including globbed input, text/LAS output, per-source reprojection to `out_srs`, and writer text options. `tindex` owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, filelist create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, GeoJSON stdout layer-description option, fast bbox boundaries, SRS mismatch warning/skip behavior, and exact hexer-driven boundary generation for `--threshold`/`--resolution`/`--simplify` with optional `--where` point-expression filtering. GEOS topology-preserving simplification is applied through `pdal-native`. `ground` compares per-point classification against installed PDAL (>=99.8% agreement on `interesting.las` with `cell=10`) after the Rust SMRF implementation gained the low-outlier mask, net cutting, KD-tree inpainting, and full validation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
 | Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 248 `unsafe { ... }` blocks, 412 `unsafe extern "C" fn` exports, 35 non-extern `unsafe fn` helpers, two unsafe extern callback type aliases, no unsafe extern blocks, and one `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
-| Remote/object-store I/O | deferred | Waits until local deterministic I/O and pipeline execution are stable. |
+| Remote/object-store I/O | prototype | `pdal-native::vsi::VsiFile` can open local, URL, and `/vsicurl/` paths through GDAL VSI and perform byte-range reads. Local deterministic tests run by default; a network smoke is ignored by default. COPC/EPT/STAC readers still need to consume this shared adapter before remote behavior counts. |
 | Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. `apps/pdal.cpp` and the standalone tools have C ABI-backed dispatch shells, but broad command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
 
 ## Root-Level Migration Status
@@ -148,13 +148,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `789 / 903` baseline C++ GoogleTest cases, or
-`87.38%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `749 / 819` baseline C++ GoogleTest cases, or
+`91.45%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit now defaults to the
-pre-port test set from `d540428c9^`, so newly added guard tests do not move the
-headline denominator. The branch-wide health metric, including guard tests
-added during the port, is `828 / 953` currently built C++ GoogleTest cases, or
-`86.88%`; compute that with `--include-added-tests`.
+test set from `3df1668e0^`, before both the local C++ guard-test additions and
+the Rust port, so newly added guard tests do not move the headline denominator.
+The branch-wide health metric, including guard tests added before and during
+the port, is `874 / 953` currently built C++ GoogleTest cases, or `91.71%`;
+compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -175,23 +176,20 @@ layout limits, LAS userView reads, metadata construction/update, buffer stats
 execution, XMLSchema round-trip parsing, selected COPC/EPT/OGR/streaming
 execution paths, private filter ports, `pdal::ThreadPool` behavior,
 ShellFilter command execution, `Utils::toString(double)`, `kernels.fauxplugin`,
-installed-app `sort`/`merge`/simple `tile`/metric commands/`info --summary`/scoped `tindex`, `Utils::run_shell_command()`,
-`filters.pmf`, `filters.litree`, and `filters.m3c2` through the Rust C ABI.
+installed-app `sort`/`merge`/simple `tile`/metric commands/`info --summary`/`tindex`, `Utils::run_shell_command()`,
+`filters.pmf`, `filters.litree`, `filters.m3c2`, `filters.info` point
+selection/query/bounds/schema reporting, the `filters.csf` construction,
+empty-input, and option-validation guard paths, writer-side `where`, and
+SpatialReference bbox transform checks, artifact-manager storage semantics,
+ProgramArgs parser behavior, local SLPK package summary behavior, local VSI
+tell/seek stream behavior, and the EPT addon writer input invariant through the
+Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-13 pre-port built test binaries remain unclassified by the audit script in the
-current build. Of these:
-   - 2 are private/specialized C++ algorithms with no Rust-backed count yet
-     (csf, slpk_reader)
-   - 5 are command/infrastructure/utility/tooling tests, not pipeline stages
-     (app, artifact, info cmd, program_arg, tindex cmd)
-   - 2 are pipeline/framework behavior tests that dynamically dispatch to C++
-     stages (info filter, where). `pdal_where_test` now exercises
-     Rust-backed `where` splitting for non-streaming Stage execution, but the
-     binary remains uncounted because it still bundles C++ dynamic test stages
-     and streaming writer paths.
-   - 4 are explicitly deferred or baseline/toolchain-sensitive I/O tests
-     (COPC remote/writer, EPT addon, and VSI)
+The audit script currently lists 2 pre-port built test binaries as unclassified.
+Of these:
+   - 2 are explicitly deferred or baseline/toolchain-sensitive I/O tests
+     (COPC remote/writer)
   No easy audit wins remain among the uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
@@ -239,30 +237,35 @@ Known mixed binaries:
 - `pdal_spatial_reference_test`: `test_ctor`, `calcZone`, `wgs84FromZone`,
   `test_proj4_roundtrip`, `test_userstring_roundtrip`, `test_read_srs`,
   `test_io`, `test_vertical_and_horizontal`, `readerOptions`, `identifyEPSG`,
-  and `issue_1989` count. User-input normalization (`OSRSetFromUserInput`
+  `issue_1989`, and `test_bounds` count. User-input normalization (`OSRSetFromUserInput`
   + WKT1 and WKT2_2018 export), `getProj4`, semantic equality (`OSRIsSame`
   fallback), horizontal-EPSG identification, vertical-EPSG identification,
   `getUTMZone`, `getHorizontal`, `getVertical` (WKT bracket-matching subtree
   extraction because GDAL's C API has no `OGR_SRSNode` equivalent),
   `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through the
-  Rust C ABI. PROJJSON export, axis ordering, GeoTIFF VLR encoding, and
+  Rust C ABI. Bbox corner transformations route through `pdal_srs_transform_*`.
+  PROJJSON export, axis ordering, GeoTIFF VLR encoding, and
   `SrsTransform` reprojection remain C++ GDAL/OGR-backed.
 - `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
-  `calculateBounds`, `pointRef`, `issue1264`, `bigfile`, and `getFloatNan`
+  `calculateBounds`, `pointRef`, `issue1264`, `bigfile`, `order`, and
+  `getFloatNan`
   count. Point row add/mutate/swap behavior routes through the Rust C ABI.
-  View ordering and C++ debug death-test behavior remain C++.
-- `pdal_eigen_test`: `calcBounds`, `ComputeValues`, `Morphological`,
-  `computeCentroid`, and `demeanTest` count. The remaining Eigen fixture cases
-  still exercise C++ matrix behavior.
+  View identity ordering routes through Rust `PointView` IDs. C++ debug
+  death-test behavior remains C++.
+- `pdal_eigen_test`: `PointViewToEigen`, `RoundtripString`, `calcBounds`,
+  `ComputeValues`, `Morphological`, `computeCentroid`, and `demeanTest` count.
+  XYZ row export and raster math helpers route through the Rust C ABI. Matrix
+  string round-tripping routes through the Rust transformation-matrix
+  parser/formatter.
 - `pdal_bounds_test`: 23 of 24 tests count. Bounds constructor, accessors,
   containment, scaling, intersection, growth, parsing, serialization, and output
   route through or are directly mirrored by the Rust C ABI. SRS-specific bounds
   behavior remains C++/GDAL.
-- `pdal_utils_test`: 22 of 26 tests count. Word wrapping, JSON/nonprinting
+- `pdal_utils_test`: 23 of 26 tests count. Word wrapping, JSON/nonprinting
   escaping, base64 encoding/decoding, string splitting, case conversions,
-  random/env helpers, numeric formatting, shell execution, and numeric cast
-  helpers route through the Rust C ABI. Classic locale stream templates,
-  extractor plumbing, and C++-specific stream behavior remain C++.
+  random/env helpers, numeric formatting, shell execution, extractor string
+  reads, and numeric cast helpers route through the Rust C ABI. Classic locale
+  stream templates and C++-specific stream behavior remain C++.
 - `pdal_file_utils_test`: all 12 tests count. Standard filesystem operations,
   directory list/creation/deletion, globbing, and file size/existence queries route
   through the Rust C ABI, while virtual filesystem (`/vsi`) paths fall back to C++/GDAL.
@@ -290,10 +293,10 @@ Known mixed binaries:
 - `pdal_config_test`: all 1 test counts; version integer and full-version
   formatting route through the Rust C ABI while compile-time version constants
   remain C++.
-- `pdal_log_test`: only `t1` counts; level-name formatting and the per-line
-  `(LEADER LEVEL) ` prefix (including timing and debug-sub-level tab indent)
-  route through the Rust C ABI via `pdal_log_format_prefix`. File output,
-  devnull routing, and CLI logging sink selection remain C++.
+- `pdal_log_test`: all 2 tests count. `t1` routes level-name formatting and the
+  per-line `(LEADER LEVEL) ` prefix through the Rust C ABI via
+  `pdal_log_format_prefix`. `t2` exercises the Rust `translate` kernel dispatch
+  from the app while C++ still owns log sink selection.
 - `pdal_app_test`: `option_file`, `load`, and `log` count. `option_file` routes
   through the Rust translate option-file path. `load` exercises Rust kernel
   listing/dispatch (`pdal_kernel_list_json`, `pdal_kernel_run`) and the
@@ -301,10 +304,12 @@ Known mixed binaries:
   (`pdal_app_unknown_command_message`). `log` exercises the Rust-formatted
   `Log::get` line prefix (`pdal_log_format_prefix`) for `-v Debug` /
   `--verbose=3` / `--logtiming` / default-level behaviors.
-- `pdal_stage_factory_test`: only `extensionTest` and
-  `stageExtensionsLoadPerInstance` count; reader/writer driver inference and
-  default extension lookup route through the Rust C ABI. Plugin loading and
-  custom extension overrides remain C++.
+- `pdal_stage_factory_test`: both pre-port cases count. `Load` reads the
+  Rust-owned stage registry list, and `extensionTest` routes reader/writer
+  driver inference through the Rust C ABI. The newer
+  `stageExtensionsLoadPerInstance` and `stageExtensionsCustomMappingsOverrideDefaults`
+  guard tests also route default lookup and custom extension overrides through
+  Rust-owned C ABI helpers, but they are excluded from the pre-port denominator.
 - `pdal_plugin_manager_test`: only `validnames` counts; plugin filename
   validation routes through the Rust C ABI. Plugin registration and object
   creation remain C++.

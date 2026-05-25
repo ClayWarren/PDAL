@@ -23,6 +23,7 @@ pub mod options;
 pub mod pipeline;
 pub mod plugin;
 pub mod point;
+pub mod program_args;
 pub mod raster;
 pub mod scaling;
 pub mod segmentation;

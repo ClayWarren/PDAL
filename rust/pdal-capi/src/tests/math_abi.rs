@@ -70,6 +70,37 @@ fn math_abi_compute_centroid() {
 }
 
 #[test]
+fn math_abi_point_view_to_xyz_copies_rows() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let x = CString::new("X").unwrap();
+        let y = CString::new("Y").unwrap();
+        let z = CString::new("Z").unwrap();
+        pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        pdal_point_layout_register_dim(layout, y.as_ptr(), 9);
+        pdal_point_layout_register_dim(layout, z.as_ptr(), 9);
+        let view = pdal_point_view_create(layout);
+
+        let point = pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, point, x.as_ptr(), 1.0);
+        pdal_point_view_set_f64(view, point, y.as_ptr(), 2.0);
+        pdal_point_view_set_f64(view, point, z.as_ptr(), 3.0);
+
+        let mut out = [0.0; 3];
+        assert_eq!(pdal_math_point_view_to_xyz(view, out.as_mut_ptr(), 0), 3);
+        assert_eq!(out, [0.0; 3]);
+        assert_eq!(pdal_math_point_view_to_xyz(view, out.as_mut_ptr(), 3), 3);
+        assert_eq!(out, [1.0, 2.0, 3.0]);
+        assert_eq!(
+            pdal_math_point_view_to_xyz(std::ptr::null(), out.as_mut_ptr(), 3),
+            0
+        );
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
 fn math_abi_tolerates_null_and_empty() {
     let mut out = [0.0f64; 4];
     unsafe {

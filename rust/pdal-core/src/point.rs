@@ -11,9 +11,16 @@ use crate::raster::{RasterData, RasterLimits};
 use crate::srs::SpatialReference;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Index of a point within a view.
 pub type PointId = u64;
+
+static NEXT_POINT_VIEW_ID: AtomicU64 = AtomicU64::new(0);
+
+fn next_point_view_id() -> u64 {
+    NEXT_POINT_VIEW_ID.fetch_add(1, Ordering::Relaxed) + 1
+}
 
 /// Identifier for a point dimension.
 ///
@@ -602,8 +609,8 @@ pub struct DimensionSummary {
     pub mean: f64,
 }
 
-#[derive(Clone)]
 pub struct PointView {
+    id: u64,
     layout: Rc<PointLayout>,
     data: Vec<u8>,
     source_indices: Vec<PointId>,
@@ -612,10 +619,25 @@ pub struct PointView {
     rasters: Vec<RasterData>,
 }
 
+impl Clone for PointView {
+    fn clone(&self) -> Self {
+        Self {
+            id: next_point_view_id(),
+            layout: Rc::clone(&self.layout),
+            data: self.data.clone(),
+            source_indices: self.source_indices.clone(),
+            spatial_reference: self.spatial_reference.clone(),
+            meshes: self.meshes.clone(),
+            rasters: self.rasters.clone(),
+        }
+    }
+}
+
 impl PointView {
     /// A new, empty view over the given layout.
     pub fn new(layout: Rc<PointLayout>) -> Self {
         PointView {
+            id: next_point_view_id(),
             layout,
             data: Vec::new(),
             source_indices: Vec::new(),
@@ -628,6 +650,7 @@ impl PointView {
     /// A new empty view sharing this view's layout (PDAL's `makeNew`).
     pub fn make_new(&self) -> PointView {
         PointView {
+            id: next_point_view_id(),
             layout: Rc::clone(&self.layout),
             data: Vec::new(),
             source_indices: Vec::new(),
@@ -672,6 +695,11 @@ impl PointView {
     /// The view's layout.
     pub fn layout(&self) -> &Rc<PointLayout> {
         &self.layout
+    }
+
+    /// Stable monotonically increasing identity for this view.
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     /// The view's spatial reference.

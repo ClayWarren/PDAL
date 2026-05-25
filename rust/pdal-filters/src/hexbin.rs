@@ -1,27 +1,48 @@
-//! `filters.hexbin` -- hexagonal tessellation and point density.
+//! `filters.hexbin` -- hexagonal tessellation, density, and boundary.
 //!
-//! Port of `filters/HexBinFilter.cpp` and the `hexer` `HexGrid`. This is a
-//! simplified port: it builds the hexagonal grid over the point's X/Y domain
-//! and, when a `density` output path is given, writes the dense-cell
-//! tessellation as GeoJSON polygons (one `Feature` per dense hexagon, carrying
-//! `ID` and `COUNT` properties, mirroring PDAL's OGR density writer). The
-//! boundary tessellation and the H3 grid are not modeled.
+//! Port of `filters/HexBinFilter.cpp` and the `hexer` `HexGrid`. The Rust
+//! filter computes the hexagonal binning over the input's X/Y domain and
+//! exposes:
+//!
+//! - `threshold`, `sample_size`, `edge_length`, `estimated_edge`, `hex_offsets`
+//!   metadata (pass-through values + computed grid geometry);
+//! - the raw `hex_boundary` MULTIPOLYGON WKT emitted by hexer (when
+//!   `output_tesselation`);
+//! - the unsmoothed boundary as `hex_boundary_raw` so the C++ wrapper can
+//!   apply `pdal::Polygon::simplify` to produce the user-facing `boundary`
+//!   metadata using the existing GEOS path;
+//! - a GeoJSON density tessellation when `density` output is requested.
+//!
+//! H3 grids stay in C++ for now.
 
-use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
 
-use pdal_core::metadata::MetadataNode;
+use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
-const SQRT_3: f64 = 1.732_050_808;
+use crate::hexer::{HexGrid, HexId, SQRT_3};
 
 pub struct HexBinFilter {
     edge_length: Option<f64>,
     threshold: u32,
     sample_size: usize,
     density_output: Option<String>,
+    output_tesselation: bool,
+    /// Built grid + outputs. Populated by `run_one`; consumed by
+    /// `metadata()`.
+    state: Option<HexBinState>,
+}
+
+struct HexBinState {
+    height: f64,
+    width: f64,
+    offsets: [(f64, f64); 6],
+    hex_boundary_wkt: Option<String>,
+    point_count: u64,
+    dense_hex_count: u64,
+    dense_point_count: u64,
 }
 
 impl HexBinFilter {
@@ -31,159 +52,24 @@ impl HexBinFilter {
         sample_size: usize,
         density_output: Option<String>,
     ) -> Self {
+        Self::with_options(edge_length, threshold, sample_size, density_output, false)
+    }
+
+    pub fn with_options(
+        edge_length: Option<f64>,
+        threshold: u32,
+        sample_size: usize,
+        density_output: Option<String>,
+        output_tesselation: bool,
+    ) -> Self {
         Self {
             edge_length,
             threshold,
             sample_size,
             density_output,
+            output_tesselation,
+            state: None,
         }
-    }
-}
-
-/// A tessellation of regular hexagons (one side parallel to the X axis),
-/// accumulating a point count per hexagon.
-struct HexGrid {
-    /// Hexagon height (twice the apothem).
-    height: f64,
-    /// Hexagon column width.
-    width: f64,
-    /// Vertex offsets, anti-clockwise from the upper-left.
-    offsets: [(f64, f64); 6],
-    /// Grid origin -- the first point added defines hexagon (0, 0).
-    origin: (f64, f64),
-    has_origin: bool,
-    /// Point count per `(i, j)` hexagon coordinate.
-    counts: HashMap<(i32, i32), u32>,
-}
-
-impl HexGrid {
-    fn new(height: f64) -> Self {
-        let width = (3.0 / (2.0 * SQRT_3)) * height;
-        let offsets = [
-            (0.0, 0.0),
-            (-width / 3.0, height / 2.0),
-            (0.0, height),
-            (2.0 * width / 3.0, height),
-            (width, height / 2.0),
-            (2.0 * width / 3.0, 0.0),
-        ];
-        Self {
-            height,
-            width,
-            offsets,
-            origin: (0.0, 0.0),
-            has_origin: false,
-            counts: HashMap::new(),
-        }
-    }
-
-    fn add_point(&mut self, x: f64, y: f64) {
-        let hex = self.find_hexagon(x, y);
-        *self.counts.entry(hex).or_insert(0) += 1;
-    }
-
-    /// Map a point to the hexagon that contains it. Ported verbatim from
-    /// `hexer::HexGrid::findHexagon`.
-    fn find_hexagon(&mut self, x: f64, y: f64) -> (i32, i32) {
-        if !self.has_origin {
-            self.origin = (x, y);
-            self.has_origin = true;
-            return (0, 0);
-        }
-
-        let px = x - self.origin.0;
-        let py = y - self.origin.1;
-        let col = px / self.width;
-
-        // Treat the columns as offset rectangles first; correct for the
-        // overlapping "mini-column" strip below.
-        let mut hx = col.floor() as i32;
-        let mut hy = if hx % 2 == 0 {
-            (py / self.height).floor() as i32
-        } else {
-            ((py - self.height / 2.0) / self.height).floor() as i32
-        };
-
-        let mut xcol_offset = col - col.floor();
-        if xcol_offset > 2.0 / 3.0 {
-            // Re-scale the offset to the width of the 1/3-wide mini-column.
-            xcol_offset -= 2.0 / 3.0;
-            xcol_offset *= 3.0;
-
-            let halfrow = py / (self.height / 2.0);
-            let halfy = halfrow as i32;
-            let yrow_offset = halfrow - halfrow.floor();
-
-            if (halfy % 2 == 0 && hx % 2 == 0) || (hx % 2 != 0 && halfy % 2 != 0) {
-                // Negative slope case.
-                if xcol_offset > yrow_offset {
-                    if hx % 2 == 0 {
-                        hy -= 1;
-                    }
-                    hx += 1;
-                }
-            } else {
-                // Positive slope case.
-                if yrow_offset > xcol_offset {
-                    if hx % 2 != 0 {
-                        hy += 1;
-                    }
-                    hx += 1;
-                }
-            }
-        }
-
-        (hx, hy)
-    }
-
-    /// Point coordinates of one vertex of a hexagon, identified by an edge
-    /// index. Ported from `hexer::HexGrid::findPoint`.
-    fn find_point(&self, hex: (i32, i32), edge: i32) -> (f64, f64) {
-        let side = if edge - 1 < 0 { 5 } else { (edge - 1) as usize };
-        let mut pos_y = hex.1 as f64 * self.height;
-        if hex.0 % 2 != 0 {
-            pos_y += self.height / 2.0;
-        }
-        let pos_x = hex.0 as f64 * self.width;
-        let (ox, oy) = self.offsets[side];
-        (pos_x + ox + self.origin.0, pos_y + oy + self.origin.1)
-    }
-
-    /// Stable 64-bit identifier for a hexagon, matching `hexer`'s `getID`.
-    fn id(hex: (i32, i32)) -> u64 {
-        (((hex.0 as i64) as u64) << 32) | ((hex.1 as u32) as u64)
-    }
-
-    /// Serialize the dense hexagons as a GeoJSON `FeatureCollection`.
-    fn density_geojson(&self, dense_limit: u32) -> String {
-        let mut dense: Vec<(&(i32, i32), &u32)> = self
-            .counts
-            .iter()
-            .filter(|(_, &count)| count >= dense_limit)
-            .collect();
-        dense.sort_by_key(|(hex, _)| **hex);
-
-        let mut out = String::from("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [");
-        for (idx, (hex, count)) in dense.iter().enumerate() {
-            if idx > 0 {
-                out.push(',');
-            }
-            out.push_str("\n    {\"type\": \"Feature\", \"properties\": {\"ID\": ");
-            let _ = write!(out, "{}", Self::id(**hex));
-            let _ = write!(out, ", \"COUNT\": {count}}}, \"geometry\": ");
-            out.push_str("{\"type\": \"Polygon\", \"coordinates\": [[");
-            // Edges 0..=5, then back to 0 to close the ring.
-            for edge in 0..=6 {
-                let (vx, vy) = self.find_point(**hex, edge % 6);
-                if edge > 0 {
-                    out.push_str(", ");
-                }
-                let _ = write!(out, "[{vx}, {vy}]");
-            }
-            out.push_str("]]}}");
-        }
-        out.push_str("\n  ]\n}\n");
-        out
     }
 }
 
@@ -208,6 +94,50 @@ fn compute_hex_size(
         dist += (dx * dx + dy * dy).sqrt();
     }
     Ok(dense_limit as f64 * dist / count as f64)
+}
+
+/// Serialize the dense hexagons as a GeoJSON `FeatureCollection`, matching
+/// the C++ OGR density writer's per-cell `ID`/`COUNT` schema.
+fn density_geojson(grid: &HexGrid, dense_limit: u32) -> String {
+    let mut dense: Vec<(&HexId, &i32)> = grid
+        .counts()
+        .iter()
+        .filter(|(_, &count)| count as u32 >= dense_limit)
+        .collect();
+    dense.sort_by_key(|(hex, _)| **hex);
+
+    let mut out = String::from("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [");
+    for (idx, (hex, count)) in dense.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        out.push_str("\n    {\"type\": \"Feature\", \"properties\": {\"ID\": ");
+        let _ = write!(out, "{}", HexGrid::hex_id_u64(**hex));
+        let _ = write!(out, ", \"COUNT\": {count}}}, \"geometry\": ");
+        out.push_str("{\"type\": \"Polygon\", \"coordinates\": [[");
+        let verts = grid.hex_vertices(**hex);
+        for (vi, v) in verts.iter().enumerate() {
+            if vi > 0 {
+                out.push_str(", ");
+            }
+            let _ = write!(out, "[{}, {}]", v.x, v.y);
+        }
+        out.push_str("]]}}");
+    }
+    out.push_str("\n  ]\n}\n");
+    out
+}
+
+fn format_hex_offsets(offsets: &[(f64, f64); 6]) -> String {
+    let mut out = String::from("MULTIPOINT (");
+    for (i, (x, y)) in offsets.iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        let _ = write!(out, "{x} {y}");
+    }
+    out.push(')');
+    out
 }
 
 impl Filter for HexBinFilter {
@@ -235,13 +165,14 @@ impl Filter for HexBinFilter {
             ));
         }
 
-        let mut grid = HexGrid::new(height);
+        let mut grid = HexGrid::with_height(height, self.threshold as i32);
         for &(x, y) in &xy {
-            grid.add_point(x, y);
+            grid.add_xy(x, y);
         }
 
+        // Density output (GeoJSON) is independent of boundary tracing.
         if let Some(path) = &self.density_output {
-            let geojson = grid.density_geojson(self.threshold);
+            let geojson = density_geojson(&grid, self.threshold);
             fs::write(path, geojson).map_err(|err| {
                 StageError(format!(
                     "filters.hexbin: unable to write density output '{path}': {err}"
@@ -249,18 +180,98 @@ impl Filter for HexBinFilter {
             })?;
         }
 
-        // hexbin is a pass-through filter: it writes side files but leaves the
-        // point stream untouched.
+        // Trace the boundary. If there's no dense region, hexer returns an
+        // error and we leave hex_boundary unset so the C++ wrapper can emit
+        // `MULTIPOLYGON EMPTY` (matching the failure path).
+        let hex_boundary_wkt = if grid.find_shapes().is_ok() {
+            grid.find_parent_paths();
+            Some(grid.to_wkt(8))
+        } else {
+            None
+        };
+        let (dense_hex_count, dense_point_count) = dense_stats(&grid, self.threshold);
+
+        let offsets = {
+            let o = grid.offsets();
+            [
+                (o[0].x, o[0].y),
+                (o[1].x, o[1].y),
+                (o[2].x, o[2].y),
+                (o[3].x, o[3].y),
+                (o[4].x, o[4].y),
+                (o[5].x, o[5].y),
+            ]
+        };
+
+        self.state = Some(HexBinState {
+            height: grid.height(),
+            width: grid.width(),
+            offsets,
+            hex_boundary_wkt,
+            point_count: xy.len() as u64,
+            dense_hex_count,
+            dense_point_count,
+        });
+
+        // hexbin is a pass-through filter: it writes side files and computes
+        // metadata but leaves the point stream untouched.
         Ok(vec![input.clone()])
     }
 
     fn metadata(&self) -> MetadataNode {
-        MetadataNode::new("filters.hexbin")
+        let mut node = MetadataNode::new("filters.hexbin");
+        node.add_value("threshold", MetadataValue::U64(self.threshold as u64));
+        node.add_value("sample_size", MetadataValue::U64(self.sample_size as u64));
+        node.add_value(
+            "edge_length",
+            MetadataValue::F64(self.edge_length.unwrap_or(0.0)),
+        );
+        if let Some(state) = &self.state {
+            node.add_value("estimated_edge", MetadataValue::F64(state.height));
+            node.add_value(
+                "hex_offsets",
+                MetadataValue::String(format_hex_offsets(&state.offsets)),
+            );
+            node.add_value("point_count", MetadataValue::U64(state.point_count));
+            // Convenience for the C++ wrapper: hex width helps compute area
+            // bookkeeping without re-deriving from height.
+            node.add_value("hex_width", MetadataValue::F64(state.width));
+            // hex_boundary_raw is the unsmoothed MULTIPOLYGON; the C++ side
+            // applies Polygon::simplify to produce the user `boundary`. We
+            // also emit the same WKT as `hex_boundary` when
+            // `output_tesselation` is requested, matching the C++ filter.
+            if let Some(wkt) = &state.hex_boundary_wkt {
+                node.add_value("hex_boundary_raw", MetadataValue::String(wkt.clone()));
+                if self.output_tesselation {
+                    node.add_value("hex_boundary", MetadataValue::String(wkt.clone()));
+                }
+                node.add_value("dense_hex_count", MetadataValue::U64(state.dense_hex_count));
+                node.add_value(
+                    "dense_point_count",
+                    MetadataValue::U64(state.dense_point_count),
+                );
+            } else {
+                node.add_value(
+                    "hex_boundary_raw",
+                    MetadataValue::String("MULTIPOLYGON EMPTY".to_string()),
+                );
+            }
+        }
+        node
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+}
+
+fn dense_stats(grid: &HexGrid, threshold: u32) -> (u64, u64) {
+    grid.counts()
+        .values()
+        .filter(|&&count| count as u32 >= threshold)
+        .fold((0, 0), |(hexes, points), &count| {
+            (hexes + 1, points + count as u64)
+        })
 }
 
 impl Streamable for HexBinFilter {
@@ -275,176 +286,82 @@ impl Streamable for HexBinFilter {
 mod tests {
     use super::*;
     use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
 
-    #[test]
-    fn first_point_defines_the_origin_hexagon() {
-        let mut grid = HexGrid::new(3.0_f64.sqrt());
-        assert_eq!(grid.find_hexagon(100.0, 200.0), (0, 0));
-        assert_eq!(grid.origin, (100.0, 200.0));
-    }
-
-    #[test]
-    fn dense_cells_are_emitted_as_geojson_features() {
-        let mut grid = HexGrid::new(10.0);
-        // Pile every point into the origin hexagon.
-        for _ in 0..20 {
-            grid.add_point(0.0, 0.0);
-        }
-        let geojson = grid.density_geojson(15);
-        let parsed: serde_json::Value = serde_json::from_str(&geojson).unwrap();
-        assert_eq!(parsed["type"], "FeatureCollection");
-        let features = parsed["features"].as_array().unwrap();
-        assert_eq!(features.len(), 1);
-        assert_eq!(features[0]["properties"]["COUNT"], 20);
-        let ring = features[0]["geometry"]["coordinates"][0]
-            .as_array()
-            .unwrap();
-        assert_eq!(ring.len(), 7);
-    }
-
-    #[test]
-    fn sparse_cells_are_dropped() {
-        let mut grid = HexGrid::new(10.0);
-        grid.add_point(0.0, 0.0);
-        let parsed: serde_json::Value = serde_json::from_str(&grid.density_geojson(15)).unwrap();
-        assert!(parsed["features"].as_array().unwrap().is_empty());
-    }
-
-    #[test]
-    fn compute_hex_size_with_sufficient_points() {
-        let xy = vec![(0.0, 0.0), (3.0, 4.0)];
-        let size = compute_hex_size(&xy, 10, 5).unwrap();
-        assert!(size > 0.0);
-    }
-
-    #[test]
-    fn compute_hex_size_not_enough_points_is_error() {
-        let xy = vec![(1.0, 2.0)];
-        assert!(compute_hex_size(&xy, 10, 5).is_err());
-    }
-
-    #[test]
-    fn compute_hex_size_empty_input_is_error() {
-        let xy: Vec<(f64, f64)> = vec![];
-        assert!(compute_hex_size(&xy, 10, 5).is_err());
-    }
-
-    #[test]
-    fn hex_grid_new_sets_defaults() {
-        let grid = HexGrid::new(10.0);
-        assert!(!grid.has_origin);
-        assert_eq!(grid.origin, (0.0, 0.0));
-        assert!(grid.counts.is_empty());
-        assert!((grid.height - 10.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn hex_grid_id_combines_coordinates() {
-        assert_eq!(HexGrid::id((0, 0)), 0);
-        let id = HexGrid::id((1, 2));
-        assert_eq!(id >> 32, 1);
-        assert_eq!(id as u32, 2);
-    }
-
-    #[test]
-    fn hex_grid_find_point_returns_coordinates() {
-        let grid = HexGrid::new(SQRT_3);
-        let pt = grid.find_point((0, 0), 0);
-        assert!((pt.0 - 1.0).abs() < 0.001);
-        assert!((pt.1 - 0.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn multiple_points_map_to_different_hexagons() {
-        let mut grid = HexGrid::new(10.0);
-        grid.add_point(0.0, 0.0);
-        grid.add_point(0.0, 0.0);
-        assert_eq!(*grid.counts.get(&(0, 0)).unwrap(), 2);
-
-        grid.add_point(100.0, 50.0);
-        assert_eq!(grid.counts.len(), 2);
-    }
-
-    #[test]
-    fn hexbin_filter_name() {
-        let filter = HexBinFilter::new(Some(1.0), 5, 10, None);
-        assert_eq!(filter.name(), "filters.hexbin");
-    }
-
-    #[test]
-    fn hexbin_filter_metadata() {
-        let filter = HexBinFilter::new(Some(1.0), 5, 10, None);
-        let meta = filter.metadata();
-        assert_eq!(meta.name(), "filters.hexbin");
-    }
-
-    #[test]
-    fn hexbin_streamable_process_one_passes_through() {
-        let mut filter = HexBinFilter::new(Some(1.0), 5, 10, None);
-        let mut layout = PointLayout::new();
-        layout.register(DimId::X, DimType::F64);
-        let mut view = PointView::new(std::rc::Rc::new(layout));
-        let pt = view.add_point();
-        assert!(filter.process_one(&mut view, pt));
-    }
-
-    #[test]
-    fn hexbin_empty_input_is_error() {
-        let mut filter = HexBinFilter::new(Some(1.0), 5, 10, None);
-        let layout = PointLayout::new();
-        let view = PointView::new(std::rc::Rc::new(layout));
-        assert!(filter.run_one(&view).is_err());
-    }
-
-    #[test]
-    fn hexbin_zero_height_is_error() {
-        let mut filter = HexBinFilter::new(Some(0.0), 5, 10, None);
-        let mut layout = PointLayout::new();
-        layout.register(DimId::X, DimType::F64);
-        layout.register(DimId::Y, DimType::F64);
-        let mut view = PointView::new(std::rc::Rc::new(layout));
-        view.add_point();
-        view.set_f64(0, &DimId::X, 1.0);
-        view.set_f64(0, &DimId::Y, 2.0);
-        assert!(filter.run_one(&view).is_err());
-    }
-
-    #[test]
-    fn hexbin_default_height_with_fewer_points_than_sample() {
-        let mut filter = HexBinFilter::new(None, 5, 100, None);
-        let mut layout = PointLayout::new();
-        layout.register(DimId::X, DimType::F64);
-        layout.register(DimId::Y, DimType::F64);
-        let mut view = PointView::new(std::rc::Rc::new(layout));
-        for (x, y) in &[(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)] {
-            let pt = view.add_point();
-            view.set_f64(pt, &DimId::X, *x);
-            view.set_f64(pt, &DimId::Y, *y);
-        }
-        let result = filter.run_one(&view).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].len(), 3);
-    }
-
-    #[test]
-    fn hexbin_passes_through_points() {
-        let mut filter = HexBinFilter::new(Some(10.0), 5, 10, None);
+    fn flat_view(n: usize) -> PointView {
         let mut layout = PointLayout::new();
         layout.register(DimId::X, DimType::F64);
         layout.register(DimId::Y, DimType::F64);
         layout.register(DimId::Z, DimType::F64);
-        let mut view = PointView::new(std::rc::Rc::new(layout));
-        for (x, y, z) in &[(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)] {
-            let pt = view.add_point();
-            view.set_f64(pt, &DimId::X, *x);
-            view.set_f64(pt, &DimId::Y, *y);
-            view.set_f64(pt, &DimId::Z, *z);
+        let mut view = PointView::new(Rc::new(layout));
+        for i in 0..n {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, i as f64 * 0.5);
+            view.set_f64(id, &DimId::Y, i as f64 * 0.5);
+            view.set_f64(id, &DimId::Z, 0.0);
         }
-        let result = filter.run_one(&view).unwrap();
-        assert_eq!(result.len(), 1);
-        let output = &result[0];
-        assert_eq!(output.len(), 2);
-        assert_eq!(output.get_f64(0, &DimId::Z), 3.0);
-        assert_eq!(output.get_f64(1, &DimId::X), 4.0);
+        view
+    }
+
+    #[test]
+    fn name_and_metadata_root() {
+        let f = HexBinFilter::new(Some(1.0), 1, 10, None);
+        assert_eq!(f.name(), "filters.hexbin");
+        let m = f.metadata();
+        assert_eq!(m.name(), "filters.hexbin");
+    }
+
+    #[test]
+    fn empty_input_errors() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let view = PointView::new(Rc::new(layout));
+        let mut f = HexBinFilter::new(Some(1.0), 1, 10, None);
+        let err = match f.run_one(&view) {
+            Ok(_) => panic!("expected empty input to fail"),
+            Err(err) => err,
+        };
+        assert!(err.to_string().contains("no points"));
+    }
+
+    #[test]
+    fn run_populates_grid_state_and_boundary_metadata() {
+        let view = flat_view(50);
+        let mut f = HexBinFilter::new(Some(1.0), 1, 10, None);
+        f.run_one(&view).unwrap();
+        let m = f.metadata();
+        // The boundary should be non-empty for a non-trivial input.
+        let raw = m.find_child("hex_boundary_raw").expect("hex_boundary_raw");
+        assert!(raw
+            .value()
+            .map(|v| v.as_string().starts_with("MULTIPOLYGON ("))
+            .unwrap_or(false));
+        assert!(m.find_child("estimated_edge").is_some());
+        assert!(m.find_child("hex_offsets").is_some());
+    }
+
+    #[test]
+    fn no_dense_region_emits_empty_multipolygon() {
+        // A 1-point input with threshold=2 -> no dense hex -> no boundary
+        let view = flat_view(1);
+        let mut f = HexBinFilter::new(Some(1.0), 2, 10, None);
+        f.run_one(&view).unwrap();
+        let m = f.metadata();
+        let raw = m.find_child("hex_boundary_raw").unwrap();
+        assert_eq!(
+            raw.value().map(|v| v.as_string()).unwrap_or_default(),
+            "MULTIPOLYGON EMPTY"
+        );
+    }
+
+    #[test]
+    fn output_tesselation_emits_hex_boundary() {
+        let view = flat_view(50);
+        let mut f = HexBinFilter::with_options(Some(1.0), 1, 10, None, true);
+        f.run_one(&view).unwrap();
+        let m = f.metadata();
+        assert!(m.find_child("hex_boundary").is_some());
     }
 }

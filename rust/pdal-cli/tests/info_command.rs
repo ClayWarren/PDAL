@@ -77,6 +77,28 @@ fn info_supports_driver_override_and_input_option() {
 }
 
 #[test]
+fn info_reports_metadata_only() {
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("info")
+        .arg("--metadata")
+        .arg(data_path("test/data/las/autzen_trim.las"))
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs info failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(json["metadata"].is_object());
+    assert_eq!(json["metadata"]["stage_0"]["count"], 110000);
+    assert!(json.get("point_count").is_none());
+}
+
+#[test]
 fn info_without_a_file_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("info")
@@ -84,7 +106,9 @@ fn info_without_a_file_prints_usage_and_fails() {
         .unwrap();
 
     assert!(!result.status.success());
-    assert!(String::from_utf8_lossy(&result.stdout).contains("pdal info [--summary] <file>"));
+    assert!(
+        String::from_utf8_lossy(&result.stdout).contains("pdal info [--summary|--metadata] <file>")
+    );
 }
 
 #[test]

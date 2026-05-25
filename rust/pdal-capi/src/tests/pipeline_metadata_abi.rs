@@ -72,6 +72,42 @@ fn pipeline_result_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn pipeline_writer_where_filters_input_points() {
+    unsafe {
+        let json = CString::new(
+            r#"[
+                    {
+                        "type":"readers.faux",
+                        "count":100,
+                        "mode":"ramp",
+                        "bounds":"([0,99],[0,9.9],[100,199])",
+                        "tag":"source"
+                    },
+                    {
+                        "type":"writers.null",
+                        "where":"X<50 && Y < (1 + 1.5)",
+                        "inputs":"source"
+                    }
+                ]"#,
+        )
+        .unwrap();
+        let pipeline = pdal_pipeline_create_json(json.as_ptr());
+        assert!(!pipeline.is_null());
+
+        let mut result = empty_pipeline_result();
+        assert_eq!(
+            pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result),
+            0
+        );
+
+        assert_eq!(result.point_count, 25);
+        assert_eq!(result.view_count, 1);
+
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
 fn pipeline_result_c_abi_rejects_missing_output() {
     unsafe {
         let pipeline = pdal_pipeline_create();

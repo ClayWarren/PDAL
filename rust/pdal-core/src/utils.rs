@@ -505,6 +505,20 @@ pub fn charbuf_seekoff(off: i64, dir: u8, offset: i64, len: i64, current: i64) -
     (0..=len).contains(&target).then_some(target)
 }
 
+pub fn extract_c_string(buffer: &[u8], offset: usize, count: usize) -> String {
+    if count == 0 || offset >= buffer.len() {
+        return String::new();
+    }
+
+    let end = offset.saturating_add(count).min(buffer.len());
+    let bytes = &buffer[offset..end];
+    let end = bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(bytes.len());
+    String::from_utf8_lossy(&bytes[..end]).into_owned()
+}
+
 use std::sync::{Mutex, OnceLock};
 
 static RNG_STATE: OnceLock<Mutex<u64>> = OnceLock::new();

@@ -174,6 +174,26 @@ impl LasReader {
         Ok(())
     }
 
+    fn read_standard_reader(&mut self, reader: &mut las::Reader) -> Result<PointView, StageError> {
+        let header = reader.header();
+        let point_count = header.number_of_points();
+        let point_format = header.point_format().to_u8().unwrap_or(3);
+        if self.start >= point_count && point_count > 0 {
+            return Err(StageError(format!(
+                "LAS start point {} is outside the file's {} points.",
+                self.start, point_count
+            )));
+        }
+
+        self.add_metadata(header);
+        let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
+
+        let mut view = PointView::new(Rc::new(layout));
+        self.set_spatial_reference(&mut view, header);
+        self.read_points(reader, point_count, point_format, &mut view, &extra_dims)?;
+        Ok(view)
+    }
+
     fn read_points_from_stream<R: Read + Seek>(
         &self,
         read: &mut R,
@@ -216,6 +236,27 @@ pub fn detect_copc(path: &Path) -> bool {
     file.read_exact(&mut signature).is_ok() && signature == *b"copc"
 }
 
+fn is_vsi_path(filename: &str) -> bool {
+    filename.starts_with("/vsi")
+        || filename.starts_with("http://")
+        || filename.starts_with("https://")
+}
+
+fn read_vsi_file(filename: &str) -> Result<Vec<u8>, StageError> {
+    let vsi_path = if filename.starts_with("http://") || filename.starts_with("https://") {
+        format!("/vsicurl/{filename}")
+    } else {
+        filename.to_string()
+    };
+    let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
+        .map_err(|err| StageError(format!("Failed to open LAS VSI path: {err}")))?;
+    let len = file
+        .len()
+        .map_err(|err| StageError(format!("Failed to size LAS VSI path: {err}")))?;
+    file.read_exact_at(0, len as usize)
+        .map_err(|err| StageError(format!("Failed to read LAS VSI path: {err}")))
+}
+
 impl Reader for LasReader {
     fn name(&self) -> &str {
         "readers.las"
@@ -232,7 +273,13 @@ impl Reader for LasReader {
         }
 
         let path = Path::new(&self.filename);
-        let view = if self.start_offset > 0 {
+        let view = if is_vsi_path(&self.filename) {
+            let data = read_vsi_file(&self.filename)?;
+            let cursor = Cursor::new(data);
+            let mut reader = las::Reader::new(cursor)
+                .map_err(|e| StageError(format!("Failed to open LAS VSI path: {e}")))?;
+            self.read_standard_reader(&mut reader)?
+        } else if self.start_offset > 0 {
             // NITF-embedded LAS: open the file, shift past the wrapper bytes,
             // and let the standard `las` reader walk the embedded payload.
             let file = File::open(path)
@@ -298,29 +345,7 @@ impl Reader for LasReader {
             let mut reader = las::Reader::from_path(path)
                 .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
 
-            let header = reader.header();
-            let point_count = header.number_of_points();
-            let point_format = header.point_format().to_u8().unwrap_or(3);
-            if self.start >= point_count && point_count > 0 {
-                return Err(StageError(format!(
-                    "LAS start point {} is outside the file's {} points.",
-                    self.start, point_count
-                )));
-            }
-
-            self.add_metadata(header);
-            let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
-
-            let mut view = PointView::new(Rc::new(layout));
-            self.set_spatial_reference(&mut view, header);
-            self.read_points(
-                &mut reader,
-                point_count,
-                point_format,
-                &mut view,
-                &extra_dims,
-            )?;
-            view
+            self.read_standard_reader(&mut reader)?
         };
 
         Ok(vec![view])

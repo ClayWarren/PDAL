@@ -424,6 +424,21 @@ pub unsafe extern "C" fn pdal_point_view_spatial_reference(
     }
 }
 
+/// Return the view's stable identity, or zero for a null view.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`, or
+/// returned by `pdal_stage_run`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_id(view: *const PointView) -> u64 {
+    if let Some(view) = view.as_ref() {
+        view.id()
+    } else {
+        0
+    }
+}
+
 /// Return the number of points in the view.
 ///
 /// # Safety

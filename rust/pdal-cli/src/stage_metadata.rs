@@ -449,6 +449,19 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             ),
             option("class", "Ground classification value.", Some(json!(2))),
         ],
+        "filters.hag_delaunay" => vec![
+            option(
+                "count",
+                "Neighbor count for ground interpolation.",
+                Some(json!(10)),
+            ),
+            option(
+                "allow_extrapolation",
+                "Allow interpolation outside the ground point bounds.",
+                Some(json!(true)),
+            ),
+            option("class", "Ground classification value.", Some(json!(2))),
+        ],
         "filters.hexbin" => vec![
             option(
                 "sample_size",
@@ -473,6 +486,23 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Comma-separated dimensions used to identify adjacent duplicates.",
             Some(json!("X,Y,Z")),
         )],
+        "filters.litree" => vec![
+            option(
+                "min_points",
+                "Minimum point count for a tree.",
+                Some(json!(10)),
+            ),
+            option(
+                "min_height",
+                "Minimum height above ground.",
+                Some(json!(3.0)),
+            ),
+            option(
+                "radius",
+                "Search radius for dummy points.",
+                Some(json!(100.0)),
+            ),
+        ],
         "filters.lloydkmeans" => vec![
             option("k", "Number of clusters to segment.", Some(json!(10))),
             option(
@@ -484,6 +514,34 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "maxiters",
                 "Maximum number of Lloyd iterations.",
                 Some(json!(10)),
+            ),
+        ],
+        "filters.m3c2" => vec![
+            option(
+                "normal_radius",
+                "Radius used to estimate normals.",
+                Some(json!(2.0)),
+            ),
+            option(
+                "cyl_radius",
+                "Cylinder radius for point comparisons.",
+                Some(json!(2.0)),
+            ),
+            option(
+                "cyl_halflen",
+                "Cylinder half length for point comparisons.",
+                Some(json!(5.0)),
+            ),
+            option("reg_error", "Registration error term.", Some(json!(0.0))),
+            option(
+                "orientation",
+                "Normal orientation policy.",
+                Some(json!("up")),
+            ),
+            option(
+                "min_points",
+                "Minimum points required per cloud.",
+                Some(json!(1)),
             ),
         ],
         "filters.locate" => vec![
@@ -578,7 +636,56 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Number of nearest neighbors to inspect.",
             Some(json!(8)),
         )],
+        "filters.pmf" => vec![
+            option("cell_size", "Cell size.", Some(json!(1.0))),
+            option(
+                "exponential",
+                "Use exponentially increasing window sizes.",
+                Some(json!(true)),
+            ),
+            option(
+                "initial_distance",
+                "Initial elevation distance threshold.",
+                Some(json!(0.15)),
+            ),
+            option(
+                "returns",
+                "Comma-separated return groups to include.",
+                Some(json!("last,only")),
+            ),
+            option(
+                "max_distance",
+                "Maximum elevation distance threshold.",
+                Some(json!(2.5)),
+            ),
+            option(
+                "max_window_size",
+                "Maximum morphological window size.",
+                Some(json!(33.0)),
+            ),
+            option("slope", "Terrain slope factor.", Some(json!(1.0))),
+            option(
+                "ground_class",
+                "Classification value for ground points.",
+                Some(json!(2)),
+            ),
+            option(
+                "other_class",
+                "Classification value for non-ground points.",
+                Some(json!(1)),
+            ),
+            option(
+                "only_ground",
+                "Only modify classification for detected ground points.",
+                Some(json!(false)),
+            ),
+        ],
         "filters.randomize" => vec![option("seed", "Optional deterministic shuffle seed.", None)],
+        "filters.range" => vec![option(
+            "limits",
+            "Dimension range expression used to keep points.",
+            None,
+        )],
         "filters.reciprocity" => vec![option(
             "knn",
             "Number of nearest neighbors to inspect.",
@@ -694,6 +801,14 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Global offset for the straightened X coordinate.",
                 Some(json!(0.0)),
             ),
+        ],
+        "filters.supervoxel" => vec![
+            option(
+                "knn",
+                "Neighbor count for local graph construction.",
+                Some(json!(32)),
+            ),
+            option("resolution", "Voxel resolution.", Some(json!(1.0))),
         ],
         "filters.stats" => vec![
             option(

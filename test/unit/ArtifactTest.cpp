@@ -10,132 +10,128 @@
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in
- *       the documentation and/or other materials provided
- *       with the distribution.
- *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
- *       names of its contributors may be used to endorse or promote
- *       products derived from this software without specific prior
- *       written permission.
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of Hobu, Inc. nor the names of its contributors may
+ *       be used to endorse or promote products derived from this software
+ *       without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
- * OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  ****************************************************************************/
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <pdal/Artifact.hpp>
-#include <pdal/ArtifactManager.hpp>
-#include <pdal/PointTable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <pdal/Options.hpp>
-
-#include "Support.hpp"
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <vendor/nlohmann/nlohmann/json.hpp>
 
 namespace pdal
 {
 
-class TestArtifact : public Artifact
+namespace
 {
-public:
-    TestArtifact(const std::string& s) : m_val(s) {}
 
-    std::string m_val;
-};
+constexpr const char* TestArtifact = "TestArtifact";
+constexpr const char* TestArtifact2 = "TestArtifact2";
+constexpr const char* Foo = "Foo";
 
-class Foo
+std::string takeString(char* raw)
 {
-};
+    if (!raw)
+        return std::string();
+    std::string out(raw);
+    pdal_string_free(raw);
+    return out;
+}
 
-class TestArtifact2 : public Artifact
+std::vector<std::string> keys(pdal_artifact_manager_t* manager)
 {
-};
+    return NL::json::parse(takeString(pdal_artifact_manager_keys_json(manager)))
+        .get<std::vector<std::string>>();
+}
+
+} // namespace
 
 TEST(ArtifactTest, simple)
 {
-    using TAPtr = std::shared_ptr<TestArtifact>;
-    TAPtr ta(new TestArtifact("MyTest"));
-
-    PointTable t;
-    t.artifactManager().put("MyTest", ta);
-    EXPECT_EQ(t.artifactManager().get<TestArtifact>("foo"), nullptr);
-    EXPECT_NE(t.artifactManager().get<TestArtifact>("MyTest"), nullptr);
-    EXPECT_EQ(t.artifactManager().get<TestArtifact>("MyTest")->m_val, "MyTest");
-    EXPECT_EQ(t.artifactManager().get<Foo>("MyTest"), nullptr);
-    EXPECT_EQ(t.artifactManager().get<TestArtifact2>("MyTest"), nullptr);
+    pdal_artifact_manager_t* t = pdal_artifact_manager_create();
+    EXPECT_TRUE(pdal_artifact_manager_put(t, "MyTest", TestArtifact, "MyTest"));
+    EXPECT_EQ(pdal_artifact_manager_get(t, "foo", TestArtifact), nullptr);
+    EXPECT_EQ(takeString(pdal_artifact_manager_get(t, "MyTest", TestArtifact)),
+              "MyTest");
+    EXPECT_EQ(pdal_artifact_manager_get(t, "MyTest", Foo), nullptr);
+    EXPECT_EQ(pdal_artifact_manager_get(t, "MyTest", TestArtifact2), nullptr);
+    pdal_artifact_manager_destroy(t);
 }
 
 TEST(ArtifactTest, replace)
 {
-    using TAPtr = std::shared_ptr<TestArtifact>;
-    using TAPtr2 = std::shared_ptr<TestArtifact2>;
-    TAPtr ta(new TestArtifact("MyTest"));
-    TAPtr taa(new TestArtifact("MyTestA"));
-    TAPtr2 ta2(new TestArtifact2);
-
-    PointTable t;
-    EXPECT_FALSE(t.artifactManager().exists("MyTest"));
-    EXPECT_FALSE(t.artifactManager().replace("MyTest", ta));
-    t.artifactManager().put("MyTest", ta);
-    EXPECT_FALSE(t.artifactManager().replace("MyTest", ta2));
-    EXPECT_TRUE(t.artifactManager().replace("MyTest", taa));
-    EXPECT_TRUE(t.artifactManager().exists("MyTest"));
-    EXPECT_EQ(t.artifactManager().get<TestArtifact>("MyTest")->m_val,
+    pdal_artifact_manager_t* t = pdal_artifact_manager_create();
+    EXPECT_FALSE(pdal_artifact_manager_exists(t, "MyTest"));
+    EXPECT_FALSE(
+        pdal_artifact_manager_replace(t, "MyTest", TestArtifact, "MyTest"));
+    EXPECT_TRUE(pdal_artifact_manager_put(t, "MyTest", TestArtifact, "MyTest"));
+    EXPECT_FALSE(pdal_artifact_manager_replace(t, "MyTest", TestArtifact2, ""));
+    EXPECT_TRUE(
+        pdal_artifact_manager_replace(t, "MyTest", TestArtifact, "MyTestA"));
+    EXPECT_TRUE(pdal_artifact_manager_exists(t, "MyTest"));
+    EXPECT_EQ(takeString(pdal_artifact_manager_get(t, "MyTest", TestArtifact)),
               "MyTestA");
-    EXPECT_FALSE(t.artifactManager().erase("MyOtherTest"));
-    EXPECT_TRUE(t.artifactManager().erase("MyTest"));
-    EXPECT_FALSE(t.artifactManager().exists("MyTest"));
+    EXPECT_FALSE(pdal_artifact_manager_erase(t, "MyOtherTest"));
+    EXPECT_TRUE(pdal_artifact_manager_erase(t, "MyTest"));
+    EXPECT_FALSE(pdal_artifact_manager_exists(t, "MyTest"));
+    pdal_artifact_manager_destroy(t);
 }
 
 TEST(ArtifactTest, replaceOrPut)
 {
-    using TAPtr = std::shared_ptr<TestArtifact>;
-    using TAPtr2 = std::shared_ptr<TestArtifact2>;
-
-    TAPtr ta(new TestArtifact("MyTest"));
-    TAPtr taa(new TestArtifact("MyTestA"));
-    TAPtr2 ta2(new TestArtifact2);
-
-    PointTable t;
-    EXPECT_FALSE(t.artifactManager().exists("MyTest"));
-    EXPECT_TRUE(t.artifactManager().replaceOrPut("MyTest", ta));
-    EXPECT_EQ(t.artifactManager().get<TestArtifact>("MyTest")->m_val, "MyTest");
-    EXPECT_TRUE(t.artifactManager().exists("MyTest"));
-    EXPECT_TRUE(t.artifactManager().replaceOrPut("MyTest", taa));
-    EXPECT_TRUE(t.artifactManager().exists("MyTest"));
-    EXPECT_EQ(t.artifactManager().get<TestArtifact>("MyTest")->m_val,
+    pdal_artifact_manager_t* t = pdal_artifact_manager_create();
+    EXPECT_FALSE(pdal_artifact_manager_exists(t, "MyTest"));
+    EXPECT_TRUE(pdal_artifact_manager_replace_or_put(t, "MyTest", TestArtifact,
+                                                     "MyTest"));
+    EXPECT_EQ(takeString(pdal_artifact_manager_get(t, "MyTest", TestArtifact)),
+              "MyTest");
+    EXPECT_TRUE(pdal_artifact_manager_exists(t, "MyTest"));
+    EXPECT_TRUE(pdal_artifact_manager_replace_or_put(t, "MyTest", TestArtifact,
+                                                     "MyTestA"));
+    EXPECT_TRUE(pdal_artifact_manager_exists(t, "MyTest"));
+    EXPECT_EQ(takeString(pdal_artifact_manager_get(t, "MyTest", TestArtifact)),
               "MyTestA");
-    EXPECT_FALSE(t.artifactManager().replaceOrPut("MyTest", ta2));
+    EXPECT_FALSE(
+        pdal_artifact_manager_replace_or_put(t, "MyTest", TestArtifact2, ""));
+    pdal_artifact_manager_destroy(t);
 }
 
 TEST(ArtifactTest, key_access)
 {
-    using TAPtr = std::shared_ptr<TestArtifact>;
-    TAPtr ta(new TestArtifact("MyTest"));
+    pdal_artifact_manager_t* t = pdal_artifact_manager_create();
+    EXPECT_TRUE(keys(t).empty());
 
-    PointTable t;
-    EXPECT_TRUE(t.artifactManager().keys().empty());
+    EXPECT_TRUE(pdal_artifact_manager_put(t, "MyTest", TestArtifact, "MyTest"));
+    EXPECT_EQ(keys(t).size(), 1U);
+    EXPECT_EQ(keys(t).at(0), "MyTest");
 
-    t.artifactManager().put("MyTest", ta);
-    EXPECT_EQ(t.artifactManager().keys().size(), 1U);
-    EXPECT_EQ(t.artifactManager().keys().at(0), "MyTest");
-
-    t.artifactManager().put("MyTest2", ta);
-    auto keys = t.artifactManager().keys();
-    EXPECT_EQ(keys.size(), 2U);
-    EXPECT_EQ(std::find(keys.begin(), keys.end(), "Foo"), keys.end());
-    EXPECT_NE(std::find(keys.begin(), keys.end(), "MyTest"), keys.end());
-    EXPECT_NE(std::find(keys.begin(), keys.end(), "MyTest2"), keys.end());
+    EXPECT_TRUE(
+        pdal_artifact_manager_put(t, "MyTest2", TestArtifact, "MyTest"));
+    std::vector<std::string> ks = keys(t);
+    EXPECT_EQ(ks.size(), 2U);
+    EXPECT_EQ(std::find(ks.begin(), ks.end(), "Foo"), ks.end());
+    EXPECT_NE(std::find(ks.begin(), ks.end(), "MyTest"), ks.end());
+    EXPECT_NE(std::find(ks.begin(), ks.end(), "MyTest2"), ks.end());
+    pdal_artifact_manager_destroy(t);
 }
 
 } // namespace pdal

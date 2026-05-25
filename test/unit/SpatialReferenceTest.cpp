@@ -49,6 +49,8 @@
 #include <pdal/pdal_features.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
+#include <algorithm>
+
 #include "Support.hpp"
 
 namespace pdal
@@ -514,8 +516,6 @@ TEST(SpatialReferenceTest, test_bounds)
         "AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS["
         "\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32617\"]]";
 
-    SpatialReference utm17(utm17_wkt);
-
     std::string wgs84_wkt =
         "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS "
         "84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY["
@@ -523,16 +523,24 @@ TEST(SpatialReferenceTest, test_bounds)
         "\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\","
         "\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]";
 
-    BOX2D box17(289814.15, 4320978.61, 289818.50, 4320980.59);
-    pdal::Polygon p(box17);
-    p.setSpatialReference(utm17);
-    p.transform(wgs84_wkt);
+    pdal_srs_transform_t* transform = pdal_srs_transform_create(
+        utm17_wkt.c_str(), 0.0, wgs84_wkt.c_str(), 0.0, nullptr, 0, nullptr, 0);
+    ASSERT_NE(transform, nullptr);
 
-    BOX3D b2 = p.bounds();
-    EXPECT_FLOAT_EQ(static_cast<float>(b2.minx), -83.427597f);
-    EXPECT_FLOAT_EQ(static_cast<float>(b2.miny), 39.0126f);
-    EXPECT_FLOAT_EQ(static_cast<float>(b2.maxx), -83.427551f);
-    EXPECT_FLOAT_EQ(static_cast<float>(b2.maxy), 39.01261f);
+    std::array<double, 4> xs{289814.15, 289814.15, 289818.50, 289818.50};
+    std::array<double, 4> ys{4320978.61, 4320980.59, 4320978.61, 4320980.59};
+    std::array<double, 4> zs{0, 0, 0, 0};
+    ASSERT_TRUE(pdal_srs_transform_xyz_array(transform, xs.data(), ys.data(),
+                                             zs.data(), xs.size()));
+
+    const auto [minx, maxx] = std::minmax_element(xs.begin(), xs.end());
+    const auto [miny, maxy] = std::minmax_element(ys.begin(), ys.end());
+    EXPECT_FLOAT_EQ(static_cast<float>(*minx), -83.427597f);
+    EXPECT_FLOAT_EQ(static_cast<float>(*miny), 39.0126f);
+    EXPECT_FLOAT_EQ(static_cast<float>(*maxx), -83.427551f);
+    EXPECT_FLOAT_EQ(static_cast<float>(*maxy), 39.01261f);
+
+    pdal_srs_transform_destroy(transform);
 }
 
 TEST(SpatialReferenceTest, identifyEPSG)

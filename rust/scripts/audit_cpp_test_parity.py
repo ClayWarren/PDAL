@@ -10,10 +10,11 @@ from pathlib import Path
 
 
 ALL = object()
-DEFAULT_BASELINE_REF = "d540428c9^"
+DEFAULT_BASELINE_REF = "3df1668e0^"
 TEST_RE = re.compile(r"\bTEST(?:_F|_P)?\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([A-Za-z_][A-Za-z0-9_]*)")
 
 COVERED: dict[str, object] = {
+    "pdal_artifact_test": ALL,
     "pdal_kdindex_test": ALL,
     "pdal_spatial_reference_test": {
         "test_ctor",
@@ -26,6 +27,7 @@ COVERED: dict[str, object] = {
         "test_io",
         "test_vertical_and_horizontal",
         "readerOptions",
+        "test_bounds",
         "identifyEPSG",
         "issue_1989",
     },
@@ -36,11 +38,20 @@ COVERED: dict[str, object] = {
         "getFloat",
         "calculateBounds",
         "pointRef",
+        "order",
         "issue1264",
         "bigfile",
         "getFloatNan",
     },
-    "pdal_eigen_test": {"calcBounds", "ComputeValues", "Morphological", "computeCentroid", "demeanTest"},
+    "pdal_eigen_test": {
+        "PointViewToEigen",
+        "RoundtripString",
+        "calcBounds",
+        "ComputeValues",
+        "Morphological",
+        "computeCentroid",
+        "demeanTest",
+    },
     "pdal_bounds_test": {
         "test_ctor",
         "test_equals",
@@ -90,11 +101,13 @@ COVERED: dict[str, object] = {
         "toString",
         "fromString",
         "numeric_cast",
+        "extractor",
     },
     "pdal_file_utils_test": ALL,
     "pdal_georeference_test": ALL,
     "pdal_charbuf_test": ALL,
     "pdal_deflate_test": ALL,
+    "pdal_io_vsi_test": ALL,
     "pdal_i3s_obb_test": ALL,
     "pdal_math_utils_test": ALL,
     "pdal_scaling_test": ALL,
@@ -112,11 +125,18 @@ COVERED: dict[str, object] = {
     "pdal_info_test": ALL,
     "pdal_merge_test": ALL,
     "pdal_tile_test": ALL,
-    "pdal_tindex_test": {"test1", "test2", "test3", "test6", "test8"},
+    "pdal_tindex_test": ALL,
     "pdal_config_test": ALL,
-    "pdal_log_test": {"t1"},
-    "pdal_stage_factory_test": {"extensionTest", "stageExtensionsLoadPerInstance"},
+    "pdal_log_test": ALL,
+    "pdal_where_test": {"filter", "empty", "writer"},
+    "pdal_stage_factory_test": {
+        "Load",
+        "extensionTest",
+        "stageExtensionsLoadPerInstance",
+        "stageExtensionsCustomMappingsOverrideDefaults",
+    },
     "pdal_plugin_manager_test": {"validnames"},
+    "pdal_program_arg_test": ALL,
     "pdal_options_test": {
         "valid",
         "programargs",
@@ -185,6 +205,7 @@ COVERED: dict[str, object] = {
         "test5",
     },
     "pdal_filters_covariancefeatures_test": ALL,
+    "pdal_filters_csf_test": ALL,
     "pdal_filters_normal_test": ALL,
     "pdal_filters_relaxation_dart_throwing_test": ALL,
     "pdal_filters_lloydkmeans_test": ALL,
@@ -197,6 +218,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_h3_test": {"createStage", "stream_test_2"},
     "pdal_filters_geomdistance_test": {"create", "test_polygon"},
     "pdal_filters_hexbin_test": {"HexbinFilterTest_test_1", "HexbinFilterTest_test_2", "issue_4899"},
+    "pdal_filters_info_test": ALL,
     "pdal_filters_faceraster_test": ALL,
     "pdal_filters_overlay_test": ALL,
     "pdal_filters_reprojection_test": ALL,
@@ -572,6 +594,7 @@ COVERED: dict[str, object] = {
         "badTilePointCountBinary",
         "duplicateInputs",
     },
+    "pdal_io_ept_addon_writer_test": {"mustDescendFromEptReader"},
     "pdal_io_las_reader_test": ALL,
     "pdal_io_las_writer_test": {
         "srs",
@@ -658,6 +681,7 @@ COVERED: dict[str, object] = {
     "pdal_io_sbet_reader_test": ALL,
     "pdal_io_sbet_writer_test": {"testConstructor", "testWrite"},
     "pdal_io_smrmsg_reader_test": ALL,
+    "pdal_io_slpk_reader_test": ALL,
     "pdal_io_stac_reader_test": {
         "local_data_test",
         "collection_filter_test",
@@ -746,7 +770,7 @@ def main() -> int:
     parser.add_argument(
         "--baseline-ref",
         default=DEFAULT_BASELINE_REF,
-        help="Git ref used for the pre-port C++ test baseline",
+        help="Git ref used for the C++ test baseline before local guard tests and Rust port work",
     )
     parser.add_argument(
         "--include-added-tests",
@@ -761,6 +785,8 @@ def main() -> int:
         raise SystemExit(f"no built test binaries found under {bin_dir}")
 
     baseline = None if args.include_added_tests else baseline_tests(args.baseline_ref)
+    current_total = 0
+    ignored_added = 0
     total = 0
     covered = 0
     missing_binaries = []
@@ -769,9 +795,11 @@ def main() -> int:
 
     for binary in binaries:
         all_tests = list_tests(binary)
+        current_total += len(all_tests)
         tests = all_tests
         if baseline is not None:
             tests = [test for test in all_tests if test in baseline]
+            ignored_added += len(all_tests) - len(tests)
             if not tests:
                 continue
         total += len(tests)
@@ -797,7 +825,12 @@ def main() -> int:
     scope = "all currently built tests" if args.include_added_tests else f"pre-port baseline ({args.baseline_ref})"
     print(f"Scope: {scope}")
     print(f"Built C++ GoogleTest binaries: {len(binaries)}")
-    print(f"Built C++ GoogleTest cases: {total}")
+    if baseline is None:
+        print(f"Denominator C++ GoogleTest cases: {total}")
+    else:
+        print(f"Currently built C++ GoogleTest cases: {current_total}")
+        print(f"Pre-port denominator C++ GoogleTest cases: {total}")
+        print(f"Added local C++ GoogleTest cases ignored: {ignored_added}")
     print(f"Rust C ABI-backed cases: {covered}")
     print(f"Progress: {percent:.2f}%")
     print()

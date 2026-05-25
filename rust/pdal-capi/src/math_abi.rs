@@ -3,6 +3,7 @@
 //! Exposes the numerical gradient and diamond morphology routines, reusing the
 //! Rust implementations that already back the `filters.smrf` port.
 
+use pdal_core::point::{DimId, PointView};
 use pdal_filters::math;
 
 /// Compute the numerical gradient in the X direction.
@@ -107,4 +108,35 @@ pub unsafe extern "C" fn pdal_math_compute_centroid(
     let points = std::slice::from_raw_parts(xyz, count.saturating_mul(3));
     let centroid = math::compute_centroid(points, count);
     std::ptr::copy_nonoverlapping(centroid.as_ptr(), out_xyz, 3);
+}
+
+/// Copy a point view's XYZ dimensions into an interleaved row-major buffer.
+///
+/// Returns the required number of `f64` entries (`view.len() * 3`). If `out_xyz`
+/// is null or `out_len` is too small, no values are copied.
+///
+/// # Safety
+/// `view` must be a valid point view pointer. `out_xyz`, when non-null, must be
+/// valid for `out_len` `f64` values.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_math_point_view_to_xyz(
+    view: *const PointView,
+    out_xyz: *mut f64,
+    out_len: usize,
+) -> usize {
+    let Some(view) = view.as_ref() else {
+        return 0;
+    };
+    let required = view.len() as usize * 3;
+    if out_xyz.is_null() || out_len < required {
+        return required;
+    }
+    let out = std::slice::from_raw_parts_mut(out_xyz, required);
+    for point_idx in 0..view.len() {
+        let offset = point_idx as usize * 3;
+        out[offset] = view.get_f64(point_idx, &DimId::X);
+        out[offset + 1] = view.get_f64(point_idx, &DimId::Y);
+        out[offset + 2] = view.get_f64(point_idx, &DimId::Z);
+    }
+    required
 }

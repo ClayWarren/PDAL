@@ -8,6 +8,7 @@ pub mod gdal;
 pub mod geometry;
 pub mod nitf;
 pub mod srs;
+pub mod vsi;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeCapability {

@@ -1,6 +1,37 @@
 use super::*;
 
 #[test]
+fn command_metadata_lists_all_cpp_kernel_commands() {
+    let names = crate::stage_metadata::kernel_list()
+        .into_iter()
+        .map(|kernel| kernel.name)
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for command in [
+        "chamfer",
+        "delta",
+        "density",
+        "eval",
+        "ground",
+        "hausdorff",
+        "info",
+        "merge",
+        "pipeline",
+        "random",
+        "sort",
+        "split",
+        "tile",
+        "tindex",
+        "translate",
+    ] {
+        assert!(
+            names.contains(command),
+            "{command} missing from command metadata"
+        );
+    }
+}
+
+#[test]
 fn parse_preserves_command_arguments() {
     let mut app = App::new();
     app.parse_args(&[

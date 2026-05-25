@@ -33,8 +33,7 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <io/BufferReader.hpp>
-#include <pdal/StageFactory.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "Support.hpp"
 
@@ -42,79 +41,52 @@ using namespace pdal;
 
 TEST(CSFilterTest, stageCreation)
 {
-    StageFactory factory;
-    EXPECT_NO_THROW(factory.createStage("filters.csf"));
+    pdal_stage_t* filter = pdal_stage_create_csf(2, 1, false, nullptr, 0);
+    EXPECT_NE(filter, nullptr);
+    pdal_stage_destroy(filter);
 }
 
 TEST(CSFilterTest, emptyView)
 {
-    PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", 9);
+    pdal_point_layout_register_dim(layout, "Y", 9);
+    pdal_point_layout_register_dim(layout, "Z", 9);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
 
-    PointViewPtr view(new PointView(table));
-    BufferReader reader;
-    reader.addView(view);
+    pdal_stage_t* filter = pdal_stage_create_csf(2, 1, false, nullptr, 0);
+    pdal_point_view_t* outputs[1] = {nullptr};
+    EXPECT_EQ(pdal_stage_run_multi(filter, view, outputs, 1), 0u);
 
-    StageFactory factory;
-    Stage* filter(factory.createStage("filters.csf"));
-    filter->setInput(reader);
-    filter->prepare(table);
-
-    PointViewSet s = filter->execute(table);
-    EXPECT_EQ(s.size(), 0u);
+    pdal_stage_destroy(filter);
+    pdal_point_view_destroy(view);
 }
 
 TEST(CSFilterTest, equalClassesThrowWhenOnlyGroundIsFalse)
 {
-    PointTable table;
-    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
-                                  Dimension::Id::Z,
-                                  Dimension::Id::Classification});
-
-    PointViewPtr view(new PointView(table));
-    view->setField(Dimension::Id::X, 0, 0.0);
-    view->setField(Dimension::Id::Y, 0, 0.0);
-    view->setField(Dimension::Id::Z, 0, 0.0);
-    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
-
-    BufferReader reader;
-    reader.addView(view);
-
-    StageFactory factory;
-    Stage* filter(factory.createStage("filters.csf"));
-    Options options;
-    options.add("ground_class", 2);
-    options.add("other_class", 2);
-    options.add("only_ground", false);
-    filter->setOptions(options);
-    filter->setInput(reader);
-
-    EXPECT_THROW(filter->prepare(table), pdal_error);
+    pdal_stage_t* filter = pdal_stage_create_csf(2, 2, false, nullptr, 0);
+    EXPECT_EQ(filter, nullptr);
 }
 
 TEST(CSFilterTest, invalidIgnoredDimensionThrows)
 {
-    PointTable table;
-    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
-                                  Dimension::Id::Z,
-                                  Dimension::Id::Classification});
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", 9);
+    pdal_point_layout_register_dim(layout, "Y", 9);
+    pdal_point_layout_register_dim(layout, "Z", 9);
+    pdal_point_layout_register_dim(layout, "Classification", 0);
+    pdal_point_view_t* view = pdal_point_view_create(layout);
+    pdal_point_view_add_point(view);
+    pdal_point_view_set_f64(view, 0, "X", 0.0);
+    pdal_point_view_set_f64(view, 0, "Y", 0.0);
+    pdal_point_view_set_f64(view, 0, "Z", 0.0);
+    pdal_point_view_set_f64(view, 0, "Classification", 1);
 
-    PointViewPtr view(new PointView(table));
-    view->setField(Dimension::Id::X, 0, 0.0);
-    view->setField(Dimension::Id::Y, 0, 0.0);
-    view->setField(Dimension::Id::Z, 0, 0.0);
-    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
+    const char* ignored[] = {"NoSuchDim"};
+    pdal_stage_t* filter = pdal_stage_create_csf(2, 1, false, ignored, 1);
+    pdal_point_view_t* out = pdal_stage_run(filter, view);
+    EXPECT_EQ(out, nullptr);
 
-    BufferReader reader;
-    reader.addView(view);
-
-    StageFactory factory;
-    Stage* filter(factory.createStage("filters.csf"));
-    Options options;
-    options.add("ignore", "NoSuchDim[1:2]");
-    filter->setOptions(options);
-    filter->setInput(reader);
-
-    EXPECT_THROW(filter->prepare(table), pdal_error);
+    pdal_stage_destroy(filter);
+    pdal_point_view_destroy(view);
 }

@@ -11,6 +11,33 @@ fn rust_kernel_run_reports_unsupported_kernels() {
 }
 
 #[test]
+fn rust_kernel_dispatch_recognizes_all_cpp_kernel_names() {
+    for kernel in [
+        "chamfer",
+        "delta",
+        "density",
+        "eval",
+        "ground",
+        "hausdorff",
+        "info",
+        "merge",
+        "pipeline",
+        "random",
+        "sort",
+        "split",
+        "tile",
+        "tindex",
+        "translate",
+    ] {
+        let name = CString::new(kernel).unwrap();
+
+        let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
+
+        assert_ne!(result, -1, "{kernel} should be Rust-dispatchable");
+    }
+}
+
+#[test]
 fn cli_stage_options_preserve_repeated_values() {
     let mut stages = vec![serde_json::json!({ "type": "filters.returns" })];
     let options = vec![
@@ -273,23 +300,23 @@ fn rust_kernel_run_accepts_info_help() {
 }
 
 #[test]
-fn rust_kernel_run_declines_default_info_mode() {
+fn rust_kernel_run_reports_default_info_missing_file() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("input.las").unwrap();
     let argv = [arg.as_ptr()];
 
     let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
 
-    assert_eq!(result, -1);
+    assert_eq!(result, 1);
 }
 
 #[test]
-fn rust_kernel_run_declines_rich_info_options() {
+fn rust_kernel_run_reports_rich_info_missing_input() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("--schema").unwrap();
     let argv = [arg.as_ptr()];
 
     let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 1, argv.as_ptr()) };
 
-    assert_eq!(result, -1);
+    assert_eq!(result, 1);
 }

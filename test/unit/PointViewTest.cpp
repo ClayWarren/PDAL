@@ -346,29 +346,33 @@ TEST(PointViewTest, bigfile)
 
 TEST(PointViewTest, order)
 {
-    PointTable table;
-
     const size_t COUNT(1000);
-    std::array<PointViewPtr, COUNT> views;
+    std::array<pdal_point_view_t*, COUNT> views;
 
     std::random_device dev;
     std::mt19937 generator(dev());
 
     for (size_t i = 0; i < COUNT; ++i)
-        views[i] = PointViewPtr(new PointView(table));
+    {
+        pdal_point_layout_t* layout = pdal_point_layout_create();
+        views[i] = pdal_point_view_create(layout);
+        ASSERT_NE(views[i], nullptr);
+    }
     std::shuffle(views.begin(), views.end(), generator);
 
-    PointViewSet set;
-    for (size_t i = 0; i < COUNT; ++i)
-        set.insert(views[i]);
+    std::sort(views.begin(), views.end(), [](const auto* lhs, const auto* rhs)
+              { return pdal_point_view_id(lhs) < pdal_point_view_id(rhs); });
 
-    PointViewSet::iterator pi;
-    for (auto si = set.begin(); si != set.end(); ++si)
+    uint64_t prev = 0;
+    for (const auto* view : views)
     {
-        if (si != set.begin())
-            EXPECT_TRUE((*pi)->id() < (*si)->id());
-        pi = si;
+        const uint64_t id = pdal_point_view_id(view);
+        EXPECT_GT(id, prev);
+        prev = id;
     }
+
+    for (auto* view : views)
+        pdal_point_view_destroy(view);
 }
 
 TEST(PointViewTest, issue1264)

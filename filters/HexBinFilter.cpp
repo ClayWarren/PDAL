@@ -37,6 +37,7 @@
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal_capi.h>
 
+#include "private/RustMetadata.hpp"
 #include "private/hexer/H3grid.hpp"
 #include "private/hexer/HexGrid.hpp"
 
@@ -118,7 +119,8 @@ void HexBin::addArgs(ProgramArgs& args)
 
 bool HexBin::useRustPath() const
 {
-    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1;
+    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1 &&
+           m_edgeLength > 0.0;
 }
 
 PointViewSet HexBin::run(PointViewPtr view)
@@ -133,6 +135,8 @@ PointViewSet HexBin::run(PointViewPtr view)
             pdal_options_add_f64(ops, "edge_length", m_edgeLength);
         pdal_options_add_u64(ops, "threshold", m_density);
         pdal_options_add_u64(ops, "sample_size", m_sampleSize);
+        pdal_options_add_str(ops, "output_tesselation",
+                             m_outputTesselation ? "true" : "false");
         if (!m_DensityOutput.empty())
             pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
 
@@ -284,6 +288,13 @@ void HexBin::done(PointTableRef table)
 {
     if (m_usedRust)
     {
+        pdal_metadata_node_t* rustMetadata = pdal_stage_metadata(m_rustStage);
+        if (rustMetadata)
+        {
+            rust_metadata::addChildrenTo(m_metadata, rustMetadata);
+            pdal_metadata_node_destroy(rustMetadata);
+        }
+
         m_metadata.add("threshold", m_density,
                        "Minimum number of points inside a hexagon to be "
                        "considered full");
@@ -292,6 +303,29 @@ void HexBin::done(PointTableRef table)
             "Number of samples used for "
             "estimating hexagon edge size. Only used if 'edge_length' or "
             "'h3_resolution' is not set.");
+
+        MetadataNode rawNode = m_metadata.findChild("hex_boundary_raw");
+        std::string rawWkt = rawNode.valid() ? rawNode.value() : std::string();
+        MetadataNode heightNode = m_metadata.findChild("estimated_edge");
+        double gridHeight =
+            heightNode.valid() ? heightNode.value<double>() : 0.0;
+
+        pdal::Polygon p(
+            rawWkt.empty() ? std::string("MULTIPOLYGON EMPTY") : rawWkt, m_srs);
+        if (m_doSmooth && gridHeight > 0.0 && !rawWkt.empty() &&
+            rawWkt != "MULTIPOLYGON EMPTY")
+        {
+            double tolerance = 1.1 * gridHeight / 2.0;
+            double cull =
+                m_cullArg->set() ? m_cullArea : (6 * tolerance * tolerance);
+            p.simplify(tolerance, cull, m_preserve_topology);
+        }
+
+        m_metadata.add("boundary", p.wkt(m_precision),
+                       "Approximated MULTIPOLYGON of domain");
+        m_metadata.addWithType("boundary_json", p.json(), "json",
+                               "Approximated MULTIPOLYGON of domain");
+
         if (m_rustStage)
         {
             pdal_stage_destroy(m_rustStage);

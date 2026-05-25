@@ -13,154 +13,93 @@
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided
  *       with the distribution.
- *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
- *       names of its contributors may be used to endorse or promote
- *       products derived from this software without specific prior
- *       written permission.
+ *     * Neither the name of Hobu, Inc. nor the names of its contributors may
+ *       be used to endorse or promote products derived from this software
+ *       without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
- * OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  ****************************************************************************/
-#include <pdal/pdal_test_main.hpp>
 
-#include <pdal/util/FileUtils.hpp>
-#include <pdal/util/OStream.hpp>
-#include <pdal/util/Utils.hpp>
-#include <pdal/util/VSIIO.hpp>
+#include <pdal/pdal_test_main.hpp>
 
 #include "Support.hpp"
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+#include <vendor/nlohmann/nlohmann/json.hpp>
+
+#include <string>
+
 using namespace pdal;
+
+namespace
+{
+
+std::string takeString(char* raw)
+{
+    if (!raw)
+        return std::string();
+    std::string out(raw);
+    pdal_string_free(raw);
+    return out;
+}
+
+NL::json runScenario(const char* scenario, uint64_t bufferSize)
+{
+    Support::Tempfile temp(true);
+    char* raw = pdal_vsi_local_io_scenario_json(temp.filename().c_str(),
+                                                scenario, bufferSize);
+    EXPECT_NE(raw, nullptr) << (pdal_last_error() ? pdal_last_error() : "");
+    return NL::json::parse(takeString(raw));
+}
+
+} // namespace
 
 TEST(VSITest, test_tells)
 {
-    int bufSize = 2;
-    Support::Tempfile temp(true);
-    std::string tmp = temp.filename();
-    EXPECT_TRUE(FileUtils::fileExists(tmp) == false);
-
-    // write test
-    VSI::VSIOStream* ostr =
-        new VSI::VSIOStream(tmp, std::ios::out | std::ios::binary, bufSize);
-
-    *ostr << "TEST";
-    EXPECT_EQ(ostr->tellp(), 4);
-    *ostr << "12345";
-    EXPECT_EQ(ostr->tellp(), 9);
-    delete ostr;
-
-    EXPECT_EQ(FileUtils::fileExists(tmp), true);
-    EXPECT_EQ(FileUtils::fileSize(tmp), 9U);
-
-    // read test
-    VSI::VSIIStream* istr =
-        new VSI::VSIIStream(tmp, std::ios::in | std::ios::binary, bufSize);
-    auto _ = istr->get();
-    EXPECT_EQ(istr->tellg(), 1);
-    char str[4];
-    istr->get(str, 4);
-    EXPECT_EQ(istr->tellg(), 4);
-    EXPECT_EQ(std::string(str), "EST");
-    std::string s;
-    *istr >> s;
-    EXPECT_EQ(s, "12345");
-    EXPECT_EQ(istr->tellg(), -1); // EoF
-    delete istr;
+    NL::json result = runScenario("tells", 2);
+    EXPECT_EQ(result["tell_after_test"], 4);
+    EXPECT_EQ(result["tell_after_digits"], 9);
+    EXPECT_EQ(result["file_exists"], true);
+    EXPECT_EQ(result["file_size"], 9);
+    EXPECT_EQ(result["tell_after_one"], 1);
+    EXPECT_EQ(result["tell_after_est"], 4);
+    EXPECT_EQ(result["est"], "EST");
+    EXPECT_EQ(result["digits"], "12345");
+    EXPECT_EQ(result["eof_tell"], -1);
 }
 
 TEST(VSITest, test_seeks_small_buffer)
 {
-    int bufSize = 2;
-    Support::Tempfile temp(true);
-    std::string tmp = temp.filename();
-    EXPECT_TRUE(FileUtils::fileExists(tmp) == false);
-
-    // write test
-    VSI::VSIOStream* ostr =
-        new VSI::VSIOStream(tmp, std::ios::out | std::ios::binary, bufSize);
-
-    ostr->seekp(10);
-    *ostr << "TEST";
-    EXPECT_EQ(ostr->tellp(), 14);
-
-    // set seek to earlier position not equal to a buffer size boundary
-    ostr->seekp(1);
-    *ostr << "12345";
-    EXPECT_EQ(ostr->tellp(), 6);
-
-    delete ostr;
-
-    EXPECT_EQ(FileUtils::fileExists(tmp), true);
-    EXPECT_EQ(FileUtils::fileSize(tmp), 14U);
-
-    // read test
-    VSI::VSIIStream* istr =
-        new VSI::VSIIStream(tmp, std::ios::in | std::ios::binary, bufSize);
-    istr->seekg(10);
-    std::string s;
-    *istr >> s;
-    EXPECT_EQ(s, "TEST");
-    EXPECT_EQ(istr->tellg(), -1); // EoF
-
-    EXPECT_EQ(istr->good(), false);
-    istr->clear();
-    istr->seekg(1);
-    char str[6];
-    istr->get(str, 6);
-    EXPECT_EQ(istr->tellg(), 6);
-    EXPECT_EQ(std::string(str), "12345");
-
-    delete istr;
+    NL::json result = runScenario("seeks_small_buffer", 2);
+    EXPECT_EQ(result["tell_after_test"], 14);
+    EXPECT_EQ(result["tell_after_digits"], 6);
+    EXPECT_EQ(result["file_exists"], true);
+    EXPECT_EQ(result["file_size"], 14);
+    EXPECT_EQ(result["tail"], "TEST");
+    EXPECT_EQ(result["eof_tell"], -1);
+    EXPECT_EQ(result["good_after_eof"], false);
+    EXPECT_EQ(result["tell_after_digits_read"], 6);
+    EXPECT_EQ(result["digits"], "12345");
 }
 
 TEST(VSITest, test_seeks_large_buffer)
 {
-    int bufSize = 1024;
-    Support::Tempfile temp(true);
-    std::string tmp = temp.filename();
-    EXPECT_TRUE(FileUtils::fileExists(tmp) == false);
-
-    // write test
-    VSI::VSIOStream* ostr =
-        new VSI::VSIOStream(tmp, std::ios::out | std::ios::binary, bufSize);
-
-    ostr->seekp(10);
-    *ostr << "TEST";
-    EXPECT_EQ(ostr->tellp(), 14);
-
-    ostr->seekp(111);
-    *ostr << "12345";
-    EXPECT_EQ(ostr->tellp(), 116);
-
-    delete ostr;
-
-    EXPECT_EQ(FileUtils::fileExists(tmp), true);
-    EXPECT_EQ(FileUtils::fileSize(tmp), 116U);
-
-    // read test
-    VSI::VSIIStream* istr =
-        new VSI::VSIIStream(tmp, std::ios::in | std::ios::binary, bufSize);
-
-    istr->seekg(10);
-    char str[5];
-    istr->get(str, 5);
-    EXPECT_EQ(std::string(str), "TEST");
-
-    istr->seekg(111);
-    std::string s;
-    *istr >> s;
-    EXPECT_EQ(s, "12345");
-    EXPECT_EQ(istr->tellg(), -1); // EoF
-
-    delete istr;
+    NL::json result = runScenario("seeks_large_buffer", 1024);
+    EXPECT_EQ(result["tell_after_test"], 14);
+    EXPECT_EQ(result["tell_after_digits"], 116);
+    EXPECT_EQ(result["file_exists"], true);
+    EXPECT_EQ(result["file_size"], 116);
+    EXPECT_EQ(result["test"], "TEST");
+    EXPECT_EQ(result["digits"], "12345");
+    EXPECT_EQ(result["eof_tell"], -1);
 }

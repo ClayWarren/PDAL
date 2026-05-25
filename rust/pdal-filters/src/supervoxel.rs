@@ -24,11 +24,7 @@ impl Filter for SupervoxelFilter {
             return Err(StageError("No normals found.".to_string()));
         }
 
-        let mut output = view.make_new();
-        for idx in 0..view.len() {
-            output.append_point(view, idx);
-        }
-
+        let mut output = copy_view(view);
         let n_points = output.len() as usize;
         if n_points == 0 {
             return Ok(vec![output]);
@@ -36,171 +32,12 @@ impl Filter for SupervoxelFilter {
 
         let ncluster = estimate_cluster_count(&output, self.resolution);
         let index = SpatialIndex3d::new(&output);
-        let mut neighbors = (0..output.len())
-            .map(|idx| {
-                index
-                    .knn(idx, self.knn)
-                    .into_iter()
-                    .map(|(id, _)| id)
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
-        let mut disjoint = DisjointSet::new(n_points);
-        let mut roots = (0..output.len()).collect::<BTreeSet<_>>();
-        let mut visited = vec![false; n_points];
-        let mut counts = vec![1_u32; n_points];
-        let mut lambda = initial_lambda(&output, &neighbors, self.resolution);
-
-        while roots.len() > ncluster {
-            let current_roots = roots.iter().copied().collect::<Vec<_>>();
-            for root in current_roots {
-                if !roots.contains(&root) || neighbors[root as usize].is_empty() {
-                    continue;
-                }
-
-                let mut queue = Vec::with_capacity(n_points);
-                visited[root as usize] = true;
-                queue.push(root);
-                let mut front = 1_usize;
-                let mut back = 1_usize;
-
-                for candidate in neighbors[root as usize].clone() {
-                    let found = disjoint.find(candidate);
-                    if !visited[found as usize] {
-                        visited[found as usize] = true;
-                        queue.push(found);
-                        back += 1;
-                    }
-                }
-
-                let mut retained = Vec::new();
-                while front < back {
-                    let other = queue[front];
-                    front += 1;
-                    if lambda
-                        - counts[other as usize] as f64
-                            * distance(&output, root, other, self.resolution)
-                        > 0.0
-                    {
-                        disjoint.unite(root, other);
-                        roots.remove(&other);
-                        counts[root as usize] += counts[other as usize];
-                        for candidate in neighbors[other as usize].clone() {
-                            let found = disjoint.find(candidate);
-                            if !visited[found as usize] {
-                                visited[found as usize] = true;
-                                queue.push(found);
-                                back += 1;
-                            }
-                        }
-                        neighbors[other as usize].clear();
-                        if roots.len() == ncluster {
-                            break;
-                        }
-                    } else {
-                        retained.push(other);
-                    }
-                }
-                neighbors[root as usize] = retained;
-
-                for id in queue.into_iter().take(back) {
-                    visited[id as usize] = false;
-                }
-                if roots.len() == ncluster {
-                    break;
-                }
-            }
-
-            if roots.len() == ncluster {
-                break;
-            }
-            lambda *= 2.0;
-            if lambda.is_infinite() {
-                break;
-            }
-        }
-
-        let mut labels = vec![0_u64; n_points];
-        let mut distances = vec![0.0; n_points];
-        for idx in 0..output.len() {
-            let root = disjoint.find(idx);
-            labels[idx as usize] = root;
-            distances[idx as usize] = if idx == root {
-                0.0
-            } else {
-                distance(&output, idx, root, self.resolution)
-            };
-            visited[idx as usize] = false;
-        }
-
-        for idx in 0..output.len() {
-            neighbors[idx as usize] = index
-                .knn(idx, self.knn)
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect();
-        }
-
-        let mut edge_queue = VecDeque::new();
-        for point in 0..output.len() {
-            for neighbor in &neighbors[point as usize] {
-                if labels[point as usize] == labels[*neighbor as usize] {
-                    continue;
-                }
-                if !visited[point as usize] {
-                    edge_queue.push_back(point);
-                    visited[point as usize] = true;
-                }
-                if !visited[*neighbor as usize] {
-                    edge_queue.push_back(*neighbor);
-                    visited[*neighbor as usize] = true;
-                }
-            }
-        }
-
-        while let Some(point) = edge_queue.pop_front() {
-            visited[point as usize] = false;
-            let mut changed = false;
-            for neighbor in &neighbors[point as usize] {
-                let point_root = labels[point as usize];
-                let neighbor_root = labels[*neighbor as usize];
-                if point_root == neighbor_root {
-                    continue;
-                }
-                let candidate_distance = distance(&output, point, neighbor_root, self.resolution);
-                if candidate_distance < distances[point as usize] {
-                    labels[point as usize] = neighbor_root;
-                    distances[point as usize] = candidate_distance;
-                    changed = true;
-                }
-            }
-
-            if changed {
-                for neighbor in &neighbors[point as usize] {
-                    if labels[point as usize] != labels[*neighbor as usize]
-                        && !visited[*neighbor as usize]
-                    {
-                        edge_queue.push_back(*neighbor);
-                        visited[*neighbor as usize] = true;
-                    }
-                }
-            }
-        }
-
-        let label_map = roots
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, root)| (root, idx as f64))
-            .collect::<BTreeMap<_, _>>();
-        for idx in 0..output.len() {
-            output.set_f64(
-                idx,
-                &DimId::ClusterID,
-                *label_map.get(&labels[idx as usize]).unwrap_or(&0.0),
-            );
-        }
+        let mut neighbors = knn_neighbors(&index, &output, self.knn);
+        let (mut labels, roots) =
+            merge_clusters(&output, &mut neighbors, ncluster, self.resolution);
+        neighbors = knn_neighbors(&index, &output, self.knn);
+        relax_boundary_labels(&output, &neighbors, &mut labels, self.resolution);
+        assign_cluster_ids(&mut output, &labels, &roots);
 
         Ok(vec![output])
     }
@@ -224,6 +61,295 @@ fn has_normals(view: &PointView) -> bool {
     view.layout().dim(&DimId::NormalX).is_some()
         && view.layout().dim(&DimId::NormalY).is_some()
         && view.layout().dim(&DimId::NormalZ).is_some()
+}
+
+fn copy_view(view: &PointView) -> PointView {
+    let mut output = view.make_new();
+    for idx in 0..view.len() {
+        output.append_point(view, idx);
+    }
+    output
+}
+
+fn knn_neighbors(index: &SpatialIndex3d, view: &PointView, knn: usize) -> Vec<Vec<PointId>> {
+    (0..view.len())
+        .map(|idx| index.knn(idx, knn).into_iter().map(|(id, _)| id).collect())
+        .collect()
+}
+
+fn merge_clusters(
+    view: &PointView,
+    neighbors: &mut [Vec<PointId>],
+    ncluster: usize,
+    resolution: f64,
+) -> (Vec<PointId>, BTreeSet<PointId>) {
+    let n_points = view.len() as usize;
+    let mut disjoint = DisjointSet::new(n_points);
+    let mut roots = (0..view.len()).collect::<BTreeSet<_>>();
+    let mut visited = vec![false; n_points];
+    let mut counts = vec![1_u32; n_points];
+    let mut lambda = initial_lambda(view, neighbors, resolution);
+
+    while roots.len() > ncluster {
+        merge_pass(
+            view,
+            neighbors,
+            &mut disjoint,
+            &mut roots,
+            &mut visited,
+            &mut counts,
+            lambda,
+            ncluster,
+            resolution,
+        );
+        if roots.len() == ncluster {
+            break;
+        }
+        lambda *= 2.0;
+        if lambda.is_infinite() {
+            break;
+        }
+    }
+
+    (labels_from_roots(view, &mut disjoint, resolution).0, roots)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn merge_pass(
+    view: &PointView,
+    neighbors: &mut [Vec<PointId>],
+    disjoint: &mut DisjointSet,
+    roots: &mut BTreeSet<PointId>,
+    visited: &mut [bool],
+    counts: &mut [u32],
+    lambda: f64,
+    ncluster: usize,
+    resolution: f64,
+) {
+    for root in roots.iter().copied().collect::<Vec<_>>() {
+        if !roots.contains(&root) || neighbors[root as usize].is_empty() {
+            continue;
+        }
+        merge_root(
+            view, neighbors, disjoint, roots, visited, counts, lambda, root, ncluster, resolution,
+        );
+        if roots.len() == ncluster {
+            break;
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn merge_root(
+    view: &PointView,
+    neighbors: &mut [Vec<PointId>],
+    disjoint: &mut DisjointSet,
+    roots: &mut BTreeSet<PointId>,
+    visited: &mut [bool],
+    counts: &mut [u32],
+    lambda: f64,
+    root: PointId,
+    ncluster: usize,
+    resolution: f64,
+) {
+    let mut queue = Vec::with_capacity(view.len() as usize);
+    visited[root as usize] = true;
+    queue.push(root);
+    let mut front = 1_usize;
+    let mut back = seed_merge_queue(disjoint, neighbors, visited, root, &mut queue);
+    let mut retained = Vec::new();
+
+    while front < back {
+        let other = queue[front];
+        front += 1;
+        if should_merge(view, counts, lambda, root, other, resolution) {
+            disjoint.unite(root, other);
+            roots.remove(&other);
+            counts[root as usize] += counts[other as usize];
+            back = extend_merge_queue(disjoint, neighbors, visited, other, &mut queue, back);
+            neighbors[other as usize].clear();
+            if roots.len() == ncluster {
+                break;
+            }
+        } else {
+            retained.push(other);
+        }
+    }
+    neighbors[root as usize] = retained;
+    clear_visited(visited, queue, back);
+}
+
+fn seed_merge_queue(
+    disjoint: &mut DisjointSet,
+    neighbors: &[Vec<PointId>],
+    visited: &mut [bool],
+    root: PointId,
+    queue: &mut Vec<PointId>,
+) -> usize {
+    extend_merge_queue(disjoint, neighbors, visited, root, queue, 1)
+}
+
+fn extend_merge_queue(
+    disjoint: &mut DisjointSet,
+    neighbors: &[Vec<PointId>],
+    visited: &mut [bool],
+    point: PointId,
+    queue: &mut Vec<PointId>,
+    mut back: usize,
+) -> usize {
+    for candidate in neighbors[point as usize].clone() {
+        let found = disjoint.find(candidate);
+        if !visited[found as usize] {
+            visited[found as usize] = true;
+            queue.push(found);
+            back += 1;
+        }
+    }
+    back
+}
+
+fn should_merge(
+    view: &PointView,
+    counts: &[u32],
+    lambda: f64,
+    root: PointId,
+    other: PointId,
+    resolution: f64,
+) -> bool {
+    lambda - counts[other as usize] as f64 * distance(view, root, other, resolution) > 0.0
+}
+
+fn clear_visited(visited: &mut [bool], queue: Vec<PointId>, back: usize) {
+    for id in queue.into_iter().take(back) {
+        visited[id as usize] = false;
+    }
+}
+
+fn labels_from_roots(
+    view: &PointView,
+    disjoint: &mut DisjointSet,
+    resolution: f64,
+) -> (Vec<PointId>, Vec<f64>) {
+    let mut labels = vec![0_u64; view.len() as usize];
+    let mut distances = vec![0.0; view.len() as usize];
+    for idx in 0..view.len() {
+        let root = disjoint.find(idx);
+        labels[idx as usize] = root;
+        distances[idx as usize] = if idx == root {
+            0.0
+        } else {
+            distance(view, idx, root, resolution)
+        };
+    }
+    (labels, distances)
+}
+
+fn relax_boundary_labels(
+    view: &PointView,
+    neighbors: &[Vec<PointId>],
+    labels: &mut [PointId],
+    resolution: f64,
+) {
+    let mut visited = vec![false; view.len() as usize];
+    let mut distances = labels
+        .iter()
+        .enumerate()
+        .map(|(idx, &root)| {
+            if idx as PointId == root {
+                0.0
+            } else {
+                distance(view, idx as PointId, root, resolution)
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut edge_queue = boundary_queue(neighbors, labels, &mut visited);
+
+    while let Some(point) = edge_queue.pop_front() {
+        visited[point as usize] = false;
+        if relax_point(view, neighbors, labels, &mut distances, point, resolution) {
+            queue_changed_neighbors(neighbors, labels, &mut visited, &mut edge_queue, point);
+        }
+    }
+}
+
+fn boundary_queue(
+    neighbors: &[Vec<PointId>],
+    labels: &[PointId],
+    visited: &mut [bool],
+) -> VecDeque<PointId> {
+    let mut edge_queue = VecDeque::new();
+    for point in 0..neighbors.len() as PointId {
+        for neighbor in &neighbors[point as usize] {
+            if labels[point as usize] == labels[*neighbor as usize] {
+                continue;
+            }
+            push_unvisited(&mut edge_queue, visited, point);
+            push_unvisited(&mut edge_queue, visited, *neighbor);
+        }
+    }
+    edge_queue
+}
+
+fn relax_point(
+    view: &PointView,
+    neighbors: &[Vec<PointId>],
+    labels: &mut [PointId],
+    distances: &mut [f64],
+    point: PointId,
+    resolution: f64,
+) -> bool {
+    let mut changed = false;
+    for neighbor in &neighbors[point as usize] {
+        let point_root = labels[point as usize];
+        let neighbor_root = labels[*neighbor as usize];
+        if point_root == neighbor_root {
+            continue;
+        }
+        let candidate_distance = distance(view, point, neighbor_root, resolution);
+        if candidate_distance < distances[point as usize] {
+            labels[point as usize] = neighbor_root;
+            distances[point as usize] = candidate_distance;
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn queue_changed_neighbors(
+    neighbors: &[Vec<PointId>],
+    labels: &[PointId],
+    visited: &mut [bool],
+    edge_queue: &mut VecDeque<PointId>,
+    point: PointId,
+) {
+    for neighbor in &neighbors[point as usize] {
+        if labels[point as usize] != labels[*neighbor as usize] {
+            push_unvisited(edge_queue, visited, *neighbor);
+        }
+    }
+}
+
+fn push_unvisited(queue: &mut VecDeque<PointId>, visited: &mut [bool], point: PointId) {
+    if !visited[point as usize] {
+        queue.push_back(point);
+        visited[point as usize] = true;
+    }
+}
+
+fn assign_cluster_ids(output: &mut PointView, labels: &[PointId], roots: &BTreeSet<PointId>) {
+    let label_map = roots
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, root)| (root, idx as f64))
+        .collect::<BTreeMap<_, _>>();
+    for idx in 0..output.len() {
+        output.set_f64(
+            idx,
+            &DimId::ClusterID,
+            *label_map.get(&labels[idx as usize]).unwrap_or(&0.0),
+        );
+    }
 }
 
 fn estimate_cluster_count(view: &PointView, resolution: f64) -> usize {

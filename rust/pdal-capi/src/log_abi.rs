@@ -41,9 +41,7 @@ pub unsafe extern "C" fn pdal_log_format_prefix(
 /// Returns an owned C string that must be released via `pdal_capi_free`.
 /// A null or empty `command` produces an empty quoted name.
 #[no_mangle]
-pub unsafe extern "C" fn pdal_app_unknown_command_message(
-    command: *const c_char,
-) -> *mut c_char {
+pub unsafe extern "C" fn pdal_app_unknown_command_message(command: *const c_char) -> *mut c_char {
     let command = if command.is_null() {
         String::new()
     } else {

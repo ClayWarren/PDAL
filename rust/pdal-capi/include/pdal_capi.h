@@ -23,6 +23,8 @@ extern "C"
     typedef struct pdal_deflate_compressor pdal_deflate_compressor_t;
     typedef struct pdal_deflate_decompressor pdal_deflate_decompressor_t;
     typedef struct pdal_thread_pool pdal_thread_pool_t;
+    typedef struct pdal_stage_extensions pdal_stage_extensions_t;
+    typedef struct pdal_artifact_manager pdal_artifact_manager_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -45,9 +47,52 @@ extern "C"
     bool pdal_option_name_valid(const char* name);
     void pdal_options_destroy(pdal_options_t* ops);
 
+    // Artifact manager
+    pdal_artifact_manager_t* pdal_artifact_manager_create();
+    void pdal_artifact_manager_destroy(pdal_artifact_manager_t* manager);
+    bool pdal_artifact_manager_put(pdal_artifact_manager_t* manager,
+                                   const char* name, const char* type_name,
+                                   const char* value);
+    char* pdal_artifact_manager_get(const pdal_artifact_manager_t* manager,
+                                    const char* name, const char* type_name);
+    bool pdal_artifact_manager_replace(pdal_artifact_manager_t* manager,
+                                       const char* name,
+                                       const char* type_name,
+                                       const char* value);
+    bool pdal_artifact_manager_replace_or_put(
+        pdal_artifact_manager_t* manager, const char* name,
+        const char* type_name, const char* value);
+    bool pdal_artifact_manager_erase(pdal_artifact_manager_t* manager,
+                                     const char* name);
+    bool pdal_artifact_manager_exists(const pdal_artifact_manager_t* manager,
+                                      const char* name);
+    char* pdal_artifact_manager_keys_json(
+        const pdal_artifact_manager_t* manager);
+
+    // ProgramArgs
+    char* pdal_program_args_parse_json(const char* specs_json,
+                                       const char* args_json, bool simple);
+    char* pdal_slpk_summary_json(const char* filename,
+                                 const char* dimensions_csv);
+    char* pdal_vsi_local_io_scenario_json(const char* filename,
+                                          const char* scenario,
+                                          uint64_t buffer_size);
+    bool pdal_ept_addon_validate_input(const char* reader_name);
+
     // Driver inference
     char* pdal_infer_reader_driver(const char* filename);
     char* pdal_infer_writer_driver(const char* filename);
+    char* pdal_rust_stage_list_json();
+    pdal_stage_extensions_t* pdal_stage_extensions_create();
+    void pdal_stage_extensions_set(pdal_stage_extensions_t* extensions,
+                                   const char* stage,
+                                   const char* const* values,
+                                   uint64_t value_count);
+    char* pdal_stage_extensions_default_reader(
+        const pdal_stage_extensions_t* extensions, const char* extension);
+    char* pdal_stage_extensions_default_writer(
+        const pdal_stage_extensions_t* extensions, const char* extension);
+    void pdal_stage_extensions_destroy(pdal_stage_extensions_t* extensions);
 
     // Config
     int32_t pdal_config_version_integer(int32_t major, int32_t minor,
@@ -88,6 +133,8 @@ extern "C"
     char* pdal_utils_base64_encode(const uint8_t* bytes, uint64_t len);
     uint8_t* pdal_utils_base64_decode(const char* value, uint64_t* out_len);
     void pdal_u8_array_free(uint8_t* ptr, uint64_t len);
+    char* pdal_utils_extract_c_string(const uint8_t* bytes, uint64_t len,
+                                      uint64_t offset, uint64_t count);
     bool pdal_uuid_parse(const char* input, uint8_t* out_bytes);
     char* pdal_uuid_unparse(const uint8_t* bytes);
     bool pdal_uuid_random(uint8_t* out_bytes);
@@ -214,6 +261,8 @@ extern "C"
                                  int32_t iterations);
     void pdal_math_compute_centroid(const double* xyz, size_t count,
                                     double* out_xyz);
+    size_t pdal_math_point_view_to_xyz(const pdal_point_view_t* view,
+                                       double* out_xyz, size_t out_len);
 
     // Oriented bounding box intersection
     bool pdal_obb_intersect(const double* center_a, const double* half_a,
@@ -335,6 +384,9 @@ extern "C"
                                uint32_t precision);
     char* pdal_bounds2d_to_geojson(const pdal_bounds2d_t* bounds,
                                    uint32_t precision);
+    char* pdal_info_summary_json(const pdal_point_view_t* view,
+                                 const char* point_spec,
+                                 const char* query_spec);
 
     typedef struct
     {
@@ -373,6 +425,7 @@ extern "C"
                                           const pdal_spatial_reference_t* srs);
     pdal_spatial_reference_t*
     pdal_point_view_spatial_reference(const pdal_point_view_t* view);
+    uint64_t pdal_point_view_id(const pdal_point_view_t* view);
     uint64_t pdal_point_view_length(pdal_point_view_t* view);
     uint64_t pdal_point_view_source_index(pdal_point_view_t* view,
                                           uint64_t idx);
@@ -851,6 +904,10 @@ extern "C"
     pdal_stage_create_neighborclassifier(const pdal_range_limit_t* domain,
                                          uint64_t domain_count, uint64_t k,
                                          const char* dim_name);
+    pdal_stage_t* pdal_stage_create_csf(uint8_t ground_class,
+                                        uint8_t other_class, bool only_ground,
+                                        const char* const* ignored_dims,
+                                        uint64_t count);
 
     typedef struct
     {

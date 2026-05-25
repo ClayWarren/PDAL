@@ -373,9 +373,7 @@ impl Filter for SmrfFilter {
             }
         }
         if !minx.is_finite() || !miny.is_finite() {
-            return Err(StageError(
-                "filters.smrf: input has no points.".to_string(),
-            ));
+            return Err(StageError("filters.smrf: input has no points.".to_string()));
         }
         let cols = ((maxx - minx) / self.cell) as usize + 1;
         let rows = ((maxy - miny) / self.cell) as usize + 1;
@@ -587,18 +585,8 @@ mod tests {
 
     #[test]
     fn rejects_negative_cut() {
-        let mut filter = SmrfFilter::with_cut(
-            1.0,
-            0.15,
-            None,
-            1.25,
-            0.5,
-            -1.0,
-            2,
-            1,
-            true,
-            Vec::new(),
-        );
+        let mut filter =
+            SmrfFilter::with_cut(1.0, 0.15, None, 1.25, 0.5, -1.0, 2, 1, true, Vec::new());
         let err = filter.run_one(&grid_view()).map(|_| ()).unwrap_err();
         assert!(err.to_string().contains("cut"));
     }
@@ -870,14 +858,14 @@ mod tests {
         let filter = SmrfFilter::with_cut(1.0, 0.15, None, 1.25, 0.5, 3.0, 2, 1, true, Vec::new());
         let mask = filter.net_mask(6, 6);
         // First column (c=0) is fully set; row 0 of every column is set.
-        for r in 0..6 {
-            assert_eq!(mask[r], 1);
+        for value in mask.iter().take(6) {
+            assert_eq!(*value, 1);
         }
         for c in 0..6 {
             assert_eq!(mask[c * 6], 1);
         }
         // (c=1,r=1) should not be on the net.
-        assert_eq!(mask[1 * 6 + 1], 0);
+        assert_eq!(mask[7], 0);
     }
 
     #[test]

@@ -36,13 +36,22 @@
 
 #include <pdal/PointView.hpp>
 #include <pdal/private/MathUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <Eigen/Dense>
 
+#include <array>
 #include <limits>
 #include <numeric>
 
 using namespace pdal;
+
+std::string takeRustString(char* value)
+{
+    std::string out(value ? value : "");
+    pdal_string_free(value);
+    return out;
+}
 
 PointViewPtr makeTestView(PointTableRef table, point_count_t cnt = 17)
 {
@@ -82,20 +91,30 @@ static void check_bounds(const BOX3D& box, double minx, double maxx,
 
 TEST(EigenTest, PointViewToEigen)
 {
-    PointTable table;
-    table.layout()->registerDim(Dimension::Id::X);
-    table.layout()->registerDim(Dimension::Id::Y);
-    table.layout()->registerDim(Dimension::Id::Z);
-    PointView pointView(table);
-    pointView.setField(Dimension::Id::X, 0, 1.0);
-    pointView.setField(Dimension::Id::Y, 0, 2.0);
-    pointView.setField(Dimension::Id::Z, 0, 3.0);
+    pdal_point_layout_t* layout = pdal_point_layout_create();
+    pdal_point_layout_register_dim(layout, "X", 9);
+    pdal_point_layout_register_dim(layout, "Y", 9);
+    pdal_point_layout_register_dim(layout, "Z", 9);
+    pdal_point_view_t* pointView = pdal_point_view_create(layout);
+    ASSERT_NE(pointView, nullptr);
+    ASSERT_EQ(pdal_point_view_add_point(pointView), 0u);
+    pdal_point_view_set_f64(pointView, 0, "X", 1.0);
+    pdal_point_view_set_f64(pointView, 0, "Y", 2.0);
+    pdal_point_view_set_f64(pointView, 0, "Z", 3.0);
+
     Eigen::MatrixXd expected(1, 3);
     expected << 1.0, 2.0, 3.0;
-    Eigen::MatrixXd actual = math::pointViewToEigen(pointView);
+    std::vector<double> values(3);
+    ASSERT_EQ(
+        pdal_math_point_view_to_xyz(pointView, values.data(), values.size()),
+        values.size());
+    Eigen::Map<Eigen::Matrix<double, 1, 3, Eigen::RowMajor>> actual(
+        values.data());
     ASSERT_EQ(1, actual.rows());
     ASSERT_EQ(3, actual.cols());
     EXPECT_EQ(expected, actual);
+
+    pdal_point_view_destroy(pointView);
 }
 
 TEST(EigenTest, ComputeValues)
@@ -165,10 +184,14 @@ TEST(EigenTest, Morphological)
 
 TEST(EigenTest, RoundtripString)
 {
-    Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(4, 4);
-    Eigen::MatrixXd target;
-    Utils::fromString(Utils::toString(identity), target);
-    ASSERT_EQ(identity.size(), target.size());
+    std::array<double, 16> identity{1, 0, 0, 0, 0, 1, 0, 0,
+                                    0, 0, 1, 0, 0, 0, 0, 1};
+    const std::string text =
+        takeRustString(pdal_transformation_matrix_format(identity.data()));
+
+    std::array<double, 16> target{};
+    char* error = pdal_transformation_matrix_parse(text.c_str(), target.data());
+    ASSERT_EQ(error, nullptr);
     EXPECT_EQ(identity, target);
 }
 

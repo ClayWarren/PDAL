@@ -225,13 +225,18 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
 
     let mut filename = None;
     let mut driver_override = None;
-    let mut mode = InfoMode::Stats;
+    let mut mode = InfoMode::Stats { dimensions: None };
+    let mut serialization_file = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         if arg == "--summary" {
             mode = InfoMode::Summary;
+        } else if arg == "--stats" {
+            mode = InfoMode::Stats { dimensions: None };
         } else if arg == "--schema" {
             mode = InfoMode::Schema;
+        } else if arg == "--metadata" {
+            mode = InfoMode::Metadata;
         } else if arg == "--all" {
             mode = InfoMode::All;
         } else if arg == "--stac" {
@@ -269,6 +274,28 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 return -1;
             };
             mode = InfoMode::Query(query);
+        } else if arg == "--dimensions" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--dimensions'.");
+                return 1;
+            };
+            mode = InfoMode::Stats {
+                dimensions: Some(parse_dimension_list(value)),
+            };
+        } else if let Some(value) = arg.strip_prefix("--dimensions=") {
+            mode = InfoMode::Stats {
+                dimensions: Some(parse_dimension_list(value)),
+            };
+        } else if arg == "--pipeline-serialization" {
+            let Some(path) = iter.next() else {
+                eprintln!(
+                    "PDAL: kernels.info: Missing value for option '--pipeline-serialization'."
+                );
+                return 1;
+            };
+            serialization_file = Some(path.clone());
+        } else if let Some(path) = arg.strip_prefix("--pipeline-serialization=") {
+            serialization_file = Some(path.to_string());
         } else if arg == "--driver" {
             let Some(driver) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '--driver'.");
@@ -305,6 +332,25 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         return 1;
     };
 
+    if let Some(path) = serialization_file {
+        let serialized = serde_json::json!({
+            "pipeline": [
+                {
+                    "type": driver,
+                    "filename": filename,
+                }
+            ]
+        });
+        let Ok(text) = serde_json::to_string_pretty(&serialized) else {
+            eprintln!("PDAL: kernels.info: Unable to serialize pipeline.");
+            return 1;
+        };
+        if let Err(err) = std::fs::write(&path, text + "\n") {
+            eprintln!("PDAL: kernels.info: Unable to write pipeline serialization '{path}': {err}");
+            return 1;
+        }
+    }
+
     let mut pipeline = match info_pipeline(&driver, &filename) {
         Ok(pipeline) => pipeline,
         Err(err) => {
@@ -325,8 +371,9 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 1
             }
         },
-        InfoMode::Stats
+        InfoMode::Stats { .. }
         | InfoMode::Schema
+        | InfoMode::Metadata
         | InfoMode::All
         | InfoMode::Stac
         | InfoMode::Point(_)
@@ -344,11 +391,11 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
     }
 }
 
-#[derive(Clone, Copy)]
 enum InfoMode {
     Summary,
-    Stats,
+    Stats { dimensions: Option<Vec<DimId>> },
     Schema,
+    Metadata,
     All,
     Stac,
     Point(PointId),
@@ -374,15 +421,22 @@ fn info_report(
     filename: &str,
 ) -> String {
     match mode {
-        InfoMode::Stats => stats_report(views),
+        InfoMode::Stats { dimensions } => stats_report(views, dimensions.as_deref()),
         InfoMode::Schema => schema_report(views),
+        InfoMode::Metadata => metadata_report(metadata),
         InfoMode::All => {
             let mut output = String::from("{\n");
             output.push_str("  \"schema\":\n");
             output.push_str(&schema_body(views, 2));
             output.push_str(",\n");
             output.push_str("  \"stats\":\n");
-            output.push_str(&stats_body(views, 2));
+            output.push_str(&stats_body(views, 2, None));
+            output.push_str(",\n");
+            output.push_str("  \"metadata\": ");
+            let metadata_json = crate::metadata_abi::metadata_node_to_json_flat(metadata);
+            output.push_str(
+                &serde_json::to_string_pretty(&metadata_json).unwrap_or_else(|_| "{}".into()),
+            );
             output.push_str("\n}\n");
             output
         }
@@ -391,6 +445,22 @@ fn info_report(
         InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
     }
+}
+
+fn metadata_report(metadata: &MetadataNode) -> String {
+    let value = serde_json::json!({
+        "metadata": crate::metadata_abi::metadata_node_to_json_flat(metadata),
+    });
+    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+}
+
+fn parse_dimension_list(value: &str) -> Vec<DimId> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(DimId::from_name)
+        .collect()
 }
 
 fn stac_report(views: &[PointView], metadata: &MetadataNode, filename: &str) -> String {
@@ -580,16 +650,19 @@ fn schema_body(views: &[PointView], indent: usize) -> String {
     output
 }
 
-fn stats_report(views: &[PointView]) -> String {
-    format!("{{\n  \"stats\":\n{}\n}}\n", stats_body(views, 2))
+fn stats_report(views: &[PointView], dimensions: Option<&[DimId]>) -> String {
+    format!(
+        "{{\n  \"stats\":\n{}\n}}\n",
+        stats_body(views, 2, dimensions)
+    )
 }
 
-fn stats_body(views: &[PointView], indent: usize) -> String {
+fn stats_body(views: &[PointView], indent: usize, dimensions: Option<&[DimId]>) -> String {
     let pad = " ".repeat(indent);
     let list_pad = " ".repeat(indent + 2);
     let item_pad = " ".repeat(indent + 4);
     let value_pad = " ".repeat(indent + 6);
-    let stats = dimension_stats(views);
+    let stats = dimension_stats(views, dimensions);
     let mut output = format!("{pad}{{\n{list_pad}\"statistic\":\n{list_pad}[\n");
     for (idx, stat) in stats.iter().enumerate() {
         if idx > 0 {
@@ -621,16 +694,24 @@ struct InfoDimensionStats {
     stddev: f64,
 }
 
-fn dimension_stats(views: &[PointView]) -> Vec<InfoDimensionStats> {
+fn dimension_stats(views: &[PointView], dimensions: Option<&[DimId]>) -> Vec<InfoDimensionStats> {
     let Some(first) = views.first() else {
         return Vec::new();
     };
     let layout = first.layout();
     let mut output = Vec::new();
-    for idx in 0..layout.dim_count() {
-        let Some((dim, _)) = layout.dim_at(idx) else {
-            continue;
-        };
+    let mut selected = Vec::new();
+    if let Some(dimensions) = dimensions {
+        selected.extend(dimensions.iter().cloned());
+    } else {
+        for idx in 0..layout.dim_count() {
+            if let Some((dim, _)) = layout.dim_at(idx) {
+                selected.push(dim.clone());
+            }
+        }
+    }
+
+    for dim in &selected {
         let mut values = Vec::new();
         for view in views {
             if view.layout().dim(dim).is_none() {

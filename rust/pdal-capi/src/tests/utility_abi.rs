@@ -152,6 +152,35 @@ fn utils_abi_roundtrips_bytes_and_charbuf_seeks() {
         assert!(pdal_utils_base64_decode(cstring("").as_ptr(), &mut out_len).is_null());
         assert_eq!(out_len, 0);
 
+        let padded = [b'a', b'b', b'c', 0, 0];
+        assert_eq!(
+            take_string(pdal_utils_extract_c_string(
+                padded.as_ptr(),
+                padded.len() as u64,
+                0,
+                5
+            )),
+            "abc"
+        );
+        assert_eq!(
+            take_string(pdal_utils_extract_c_string(
+                padded.as_ptr(),
+                padded.len() as u64,
+                0,
+                1
+            )),
+            "a"
+        );
+        assert_eq!(
+            take_string(pdal_utils_extract_c_string(
+                padded.as_ptr(),
+                padded.len() as u64,
+                0,
+                0
+            )),
+            ""
+        );
+
         assert_eq!(pdal_charbuf_seekpos(3, 0, 10, false), 3);
         assert_eq!(pdal_charbuf_seekpos(10, 0, 10, false), -1);
         assert_eq!(pdal_charbuf_seekpos(10, 0, 10, true), 10);

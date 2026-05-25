@@ -53,11 +53,12 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
             None
         };
         let density = options.get_str("density", "");
-        let filter = HexBinFilter::new(
+        let filter = HexBinFilter::with_options(
             edge,
             options.get_u64("threshold", 15) as u32,
             options.get_u64("sample_size", 5000) as usize,
             (!density.is_empty()).then_some(density),
+            options.get_bool("output_tesselation", false),
         );
         Box::into_raw(Box::new(StageWrapper {
             filter: Box::new(filter),
