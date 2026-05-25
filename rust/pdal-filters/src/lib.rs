@@ -7,6 +7,7 @@ pub mod colorization;
 pub mod covariancefeatures;
 pub mod crop;
 pub mod csf;
+pub mod csf_algorithm;
 pub mod dbscan;
 pub mod decimation;
 pub mod delaunay;

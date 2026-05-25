@@ -590,6 +590,12 @@ COVERED: dict[str, object] = {
     "pdal_io_copc_writer_test": {
         "scaling",
     },
+    "pdal_filters_groundfilter_test": {
+        "CustomGroundClass/0",
+        "CustomGroundClass/1",
+        "CustomGroundClass/2",
+        "CustomGroundClass/3",
+    },
     "pdal_io_ept_reader_test": {
         "inspect",
         "fullReadLaszip",

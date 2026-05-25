@@ -42,6 +42,7 @@
 #include <pdal/KDIndex.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+#include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 #include "private/Segmentation.hpp"
@@ -239,44 +240,39 @@ PointViewSet CSFilter::run(PointViewPtr view)
     if (!firstView->size())
         throwError("No returns to process.");
 
-    csf::PointCloud csfPC;
-    for (const PointRef& point : *firstView)
+    // Route cloth-simulation classification through the Rust C ABI.
+    const std::size_t count = firstView->size();
+    std::vector<double> xyz(count * 3);
+    std::vector<uint8_t> groundMask(count, 0);
     {
-        csf::Point p;
-        p.x = point.getFieldAs<double>(Id::X);
-        p.y = point.getFieldAs<double>(Id::Y);
-        p.z = point.getFieldAs<double>(Id::Z);
-        csfPC.push_back(p);
+        std::size_t i = 0;
+        for (const PointRef& point : *firstView)
+        {
+            xyz[i * 3 + 0] = point.getFieldAs<double>(Id::X);
+            xyz[i * 3 + 1] = point.getFieldAs<double>(Id::Y);
+            xyz[i * 3 + 2] = point.getFieldAs<double>(Id::Z);
+            ++i;
+        }
+    }
+    if (pdal_filter_csf_classify(
+            xyz.data(), static_cast<uint64_t>(count), m_args->m_smooth,
+            m_args->m_step, m_args->m_threshold, m_args->m_hdiff,
+            m_args->m_resolution, m_args->m_rigid, m_args->m_iterations,
+            groundMask.data()) != 0)
+    {
+        const char* err = pdal_last_error();
+        throwError(err ? std::string(err)
+                       : std::string("Rust CSF classification failed."));
     }
 
-    CSF c(0);
-    c.params.bSloopSmooth = m_args->m_smooth;
-    c.params.time_step = m_args->m_step;
-    c.params.class_threshold = m_args->m_threshold;
-    c.params.height_threshold = m_args->m_hdiff;
-    c.params.cloth_resolution = m_args->m_resolution;
-    c.params.rigidness = m_args->m_rigid;
-    c.params.interations = m_args->m_iterations;
-    c.params.debug = m_args->m_debug;
-    c.params.m_dir = m_args->m_dir;
-    std::vector<int> groundIdx, offGroundIdx;
-    c.setLog(log());
-    c.setPointCloud(csfPC);
-    try
+    for (std::size_t i = 0; i < count; ++i)
     {
-        c.do_filtering(groundIdx, offGroundIdx, true);
-    }
-    catch (std::exception& e)
-    {
-        throwError(e.what());
-    }
-
-    for (auto const& i : groundIdx)
-        firstView->setField(Id::Classification, i, m_groundClass);
-    if (!m_onlyGround)
-    {
-        for (auto const& i : offGroundIdx)
-            firstView->setField(Id::Classification, i, m_otherClass);
+        if (groundMask[i])
+            firstView->setField(Id::Classification, static_cast<PointId>(i),
+                                m_groundClass);
+        else if (!m_onlyGround)
+            firstView->setField(Id::Classification, static_cast<PointId>(i),
+                                m_otherClass);
     }
 
     return viewSet;

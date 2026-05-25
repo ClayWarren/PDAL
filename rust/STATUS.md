@@ -187,15 +187,17 @@ tell/seek stream behavior, and the EPT addon writer input invariant through the
 Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-All pre-port built test binaries have at least one counted case. The remaining
-gap is at the per-test level: `srsWkt2` (pre-existing failure with PROJ >= 9.2,
+**Every built C++ test binary now has at least one Rust C ABI-backed test in
+both pre-port and included-tests audit modes (0 uncounted binaries).** Remaining
+gaps are at the sub-test level: `srsWkt2` (pre-existing PROJ >= 9.2 failure,
 unrelated to the port) and `srsUTM`/`extradim` in `pdal_io_copc_writer_test`
 still exercise the C++ writer end-to-end (PROJJSON export and a Rust-routed
 FerryFilter+CopcWriter pipeline are not yet wired); only `scaling` counts.
-The single uncounted *added* binary is `pdal_filters_groundfilter_test`, which
-parametrizes over csf/pmf/skewnessbalancing/smrf -- routing it through Rust
-requires porting the CSF cloth-simulation algorithm (Rust CSF currently only
-backs the option-validation tests).
+The CSF cloth-simulation algorithm is now a first-class Rust port
+(`pdal_filters::csf_algorithm`) and the C++ `CSFilter::run` routes its
+classification step through `pdal_filter_csf_classify`, which is what makes
+`pdal_filters_groundfilter_test` count for all four parameterized
+filter types (csf, pmf, skewnessbalancing, smrf).
   No easy audit wins remain among the uncounted binaries — all require
   substantive new porting work to increase the parity count. The previous
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a

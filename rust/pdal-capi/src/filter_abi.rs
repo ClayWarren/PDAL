@@ -686,6 +686,77 @@ pub unsafe extern "C" fn pdal_stage_create_csf(
     }
 }
 
+/// Classify a flat XYZ point buffer with the CSF cloth-simulation algorithm
+/// and write a per-point ground mask into `out_ground` (1 == ground, 0 ==
+/// non-ground). The caller is responsible for ensuring `xyz` has length
+/// `count * 3` (interleaved x,y,z,x,y,z,...) and `out_ground` has length
+/// `count`. Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// `xyz` must point to a readable buffer of `count * 3` `f64` values, and
+/// `out_ground` must point to a writable buffer of `count` `u8` values.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn pdal_filter_csf_classify(
+    xyz: *const f64,
+    count: u64,
+    smooth: bool,
+    time_step: f64,
+    class_threshold: f64,
+    height_threshold: f64,
+    cloth_resolution: f64,
+    rigidness: i32,
+    iterations: i32,
+    out_ground: *mut u8,
+) -> i32 {
+    use pdal_filters::csf_algorithm::{classify_ground, CsfParams, CsfPoint};
+
+    if count == 0 {
+        return 0;
+    }
+    if xyz.is_null() || out_ground.is_null() {
+        set_last_error("pdal_filter_csf_classify: null buffer");
+        return -1;
+    }
+    if cloth_resolution <= 0.0 {
+        set_last_error("filters.csf: cloth_resolution must be positive");
+        return -1;
+    }
+    if iterations <= 0 {
+        set_last_error("filters.csf: iterations must be positive");
+        return -1;
+    }
+    let count = count as usize;
+    let xyz_slice = std::slice::from_raw_parts(xyz, count * 3);
+    let points: Vec<CsfPoint> = (0..count)
+        .map(|i| CsfPoint {
+            x: xyz_slice[i * 3],
+            y: xyz_slice[i * 3 + 1],
+            z: xyz_slice[i * 3 + 2],
+        })
+        .collect();
+    let params = CsfParams {
+        smooth,
+        time_step,
+        class_threshold,
+        height_threshold,
+        cloth_resolution,
+        rigidness,
+        iterations,
+    };
+    let result = classify_ground(&points, &params);
+    let out = std::slice::from_raw_parts_mut(out_ground, count);
+    for byte in out.iter_mut() {
+        *byte = 0;
+    }
+    for &gi in &result.ground_indices {
+        if gi < count {
+            out[gi] = 1;
+        }
+    }
+    0
+}
+
 /// Validate input-normal dimensions for `filters.poisson`. Returns 0 if the
 /// input layout is acceptable (either all three NormalX/Y/Z present, or none
 /// present so the filter can register them), and -1 with an error string when

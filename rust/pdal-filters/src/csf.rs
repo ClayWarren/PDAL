@@ -1,11 +1,19 @@
+//! `filters.csf` -- Cloth Simulation Filter wiring.
+//!
+//! The full algorithm lives in [`crate::csf_algorithm`]; this module exposes
+//! the filter handle that the C ABI / pipeline construct and owns the
+//! point-classification step on the output view.
+
+use crate::csf_algorithm::{classify_ground, CsfParams, CsfPoint};
 use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct CsfFilter {
-    ground_class: u8,
-    other_class: u8,
-    only_ground: bool,
-    ignored_dims: Vec<DimId>,
+    pub ground_class: u8,
+    pub other_class: u8,
+    pub only_ground: bool,
+    pub ignored_dims: Vec<DimId>,
+    pub params: CsfParams,
 }
 
 impl CsfFilter {
@@ -26,7 +34,13 @@ impl CsfFilter {
             other_class,
             only_ground,
             ignored_dims,
+            params: CsfParams::default(),
         })
+    }
+
+    pub fn with_params(mut self, params: CsfParams) -> Self {
+        self.params = params;
+        self
     }
 }
 
@@ -49,8 +63,38 @@ impl Filter for CsfFilter {
             return Ok(Vec::new());
         }
 
-        let _ = (self.ground_class, self.other_class, self.only_ground);
-        Ok(vec![input.clone()])
+        // Collect XYZ points.
+        let n = input.len() as usize;
+        let mut points: Vec<CsfPoint> = Vec::with_capacity(n);
+        for idx in 0..(n as u64) {
+            points.push(CsfPoint {
+                x: input.get_f64(idx, &DimId::X),
+                y: input.get_f64(idx, &DimId::Y),
+                z: input.get_f64(idx, &DimId::Z),
+            });
+        }
+
+        let result = classify_ground(&points, &self.params);
+
+        // Build the output view. Clone the input so we preserve all other
+        // dimensions, then overwrite Classification per the ground/other split.
+        let mut output = input.clone();
+        let mut is_ground = vec![false; n];
+        for &gi in &result.ground_indices {
+            if gi < n {
+                is_ground[gi] = true;
+            }
+        }
+
+        for (idx, &ground) in is_ground.iter().enumerate() {
+            if ground {
+                output.set_f64(idx as u64, &DimId::Classification, self.ground_class as f64);
+            } else if !self.only_ground {
+                output.set_f64(idx as u64, &DimId::Classification, self.other_class as f64);
+            }
+            // only_ground == true: leave non-ground points untouched.
+        }
+        Ok(vec![output])
     }
 
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {

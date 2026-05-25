@@ -909,6 +909,18 @@ extern "C"
                                         const char* const* ignored_dims,
                                         uint64_t count);
 
+    // Run the CSF cloth-simulation classifier on an interleaved XYZ buffer.
+    // `xyz` is a flat array of `count * 3` f64 values (x0, y0, z0, x1, ...).
+    // Writes a per-point ground mask (1 == ground, 0 == non-ground) into
+    // `out_ground`. Returns 0 on success, -1 with pdal_last_error() set on
+    // option/parameter validation failures.
+    int32_t pdal_filter_csf_classify(const double* xyz, uint64_t count,
+                                     bool smooth, double time_step,
+                                     double class_threshold,
+                                     double height_threshold,
+                                     double cloth_resolution, int32_t rigidness,
+                                     int32_t iterations, uint8_t* out_ground);
+
     // filters.poisson input-normal layout validation: returns 0 if the input
     // layout is acceptable, -1 with pdal_last_error() set otherwise.
     int32_t pdal_filter_poisson_validate_normals(bool has_normal_x,
