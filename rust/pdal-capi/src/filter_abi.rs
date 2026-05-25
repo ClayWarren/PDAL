@@ -686,6 +686,57 @@ pub unsafe extern "C" fn pdal_stage_create_csf(
     }
 }
 
+/// Validate input-normal dimensions for `filters.poisson`. Returns 0 if the
+/// input layout is acceptable (either all three NormalX/Y/Z present, or none
+/// present so the filter can register them), and -1 with an error string when
+/// only some normals are present.
+#[no_mangle]
+pub extern "C" fn pdal_filter_poisson_validate_normals(
+    has_normal_x: bool,
+    has_normal_y: bool,
+    has_normal_z: bool,
+) -> i32 {
+    let any = has_normal_x || has_normal_y || has_normal_z;
+    let all = has_normal_x && has_normal_y && has_normal_z;
+    if any && !all {
+        set_last_error(
+            "If normals are provided as part of the input dataset, all of X, Y and Z must be provided.",
+        );
+        return -1;
+    }
+    0
+}
+
+/// Whether `filters.poisson` must register NormalX/Y/Z given the input layout.
+/// True when none of the three normal dimensions are present.
+#[no_mangle]
+pub extern "C" fn pdal_filter_poisson_needs_normal_dims(
+    has_normal_x: bool,
+    has_normal_y: bool,
+    has_normal_z: bool,
+) -> bool {
+    !(has_normal_x || has_normal_y || has_normal_z)
+}
+
+/// Validate `filters.greedyprojection` options. The C++ filter requires
+/// `multiplier > 0` and `radius > 0`. Returns 0 on success, -1 with an error
+/// string otherwise.
+#[no_mangle]
+pub extern "C" fn pdal_filter_greedyprojection_validate_options(
+    multiplier: f64,
+    radius: f64,
+) -> i32 {
+    if !(multiplier > 0.0) {
+        set_last_error("Option 'multiplier' must be greater than 0.");
+        return -1;
+    }
+    if !(radius > 0.0) {
+        set_last_error("Option 'radius' must be greater than 0.");
+        return -1;
+    }
+    0
+}
+
 #[path = "filter_abi_geo.rs"]
 mod filter_abi_geo;
 pub use filter_abi_geo::*;

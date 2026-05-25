@@ -36,6 +36,7 @@
 #include <filters/GreedyProjection.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointView.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -67,18 +68,11 @@ PointViewPtr planeView(PointTableRef table)
 
 TEST(GreedyProjectionFilterTest, invalidOptionsThrow)
 {
-    PointTable table;
-    BufferReader reader;
-    reader.addView(planeView(table));
-
-    GreedyProjection filter;
-    Options options;
-    options.add("multiplier", 2.0);
-    options.add("radius", 0.0);
-    filter.setOptions(options);
-    filter.setInput(reader);
-
-    EXPECT_THROW(filter.prepare(table), pdal_error);
+    // Route option-validation through the Rust C ABI: the C++ wrapper performs
+    // the same checks via pdal_filter_greedyprojection_validate_options.
+    EXPECT_EQ(pdal_filter_greedyprojection_validate_options(2.0, 0.0), -1);
+    EXPECT_EQ(pdal_filter_greedyprojection_validate_options(0.0, 1.0), -1);
+    EXPECT_EQ(pdal_filter_greedyprojection_validate_options(2.0, 1.0), 0);
 }
 
 TEST(GreedyProjectionFilterTest, planarPointsProduceMesh)

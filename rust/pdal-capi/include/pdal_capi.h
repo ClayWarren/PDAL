@@ -909,6 +909,22 @@ extern "C"
                                         const char* const* ignored_dims,
                                         uint64_t count);
 
+    // filters.poisson input-normal layout validation: returns 0 if the input
+    // layout is acceptable, -1 with pdal_last_error() set otherwise.
+    int32_t pdal_filter_poisson_validate_normals(bool has_normal_x,
+                                                 bool has_normal_y,
+                                                 bool has_normal_z);
+    // Whether filters.poisson must register NormalX/Y/Z given the current input
+    // layout. True when none of the three normal dimensions are present.
+    bool pdal_filter_poisson_needs_normal_dims(bool has_normal_x,
+                                               bool has_normal_y,
+                                               bool has_normal_z);
+
+    // filters.greedyprojection option validation: returns 0 on success,
+    // -1 with pdal_last_error() set when multiplier <= 0 or radius <= 0.
+    int32_t pdal_filter_greedyprojection_validate_options(double multiplier,
+                                                          double radius);
+
     typedef struct
     {
         uint64_t count;

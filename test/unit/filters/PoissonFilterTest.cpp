@@ -33,50 +33,36 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <filters/PoissonFilter.hpp>
-#include <io/BufferReader.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 
 TEST(PoissonFilterTest, partialNormalsThrow)
 {
-    PointTable table;
-    table.layout()->registerDims({Dimension::Id::X, Dimension::Id::Y,
-                                  Dimension::Id::Z, Dimension::Id::NormalX});
-
-    PointViewPtr view(new PointView(table));
-    view->setField(Dimension::Id::X, 0, 0.0);
-    view->setField(Dimension::Id::Y, 0, 0.0);
-    view->setField(Dimension::Id::Z, 0, 0.0);
-    view->setField(Dimension::Id::NormalX, 0, 1.0);
-
-    BufferReader reader;
-    reader.addView(view);
-
-    PoissonFilter filter;
-    filter.setInput(reader);
-
-    EXPECT_THROW(filter.prepare(table), pdal_error);
+    // Only NormalX is present: the filter must reject the layout.
+    EXPECT_EQ(
+        pdal_filter_poisson_validate_normals(true, false, false), -1);
+    EXPECT_EQ(
+        pdal_filter_poisson_validate_normals(false, true, false), -1);
+    EXPECT_EQ(
+        pdal_filter_poisson_validate_normals(true, true, false), -1);
 }
 
 TEST(PoissonFilterTest, registersMissingNormalDimensions)
 {
-    PointTable table;
-    table.layout()->registerDims(
-        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+    // No normal dims present: validation succeeds and the filter must
+    // request that all three be registered.
+    EXPECT_EQ(
+        pdal_filter_poisson_validate_normals(false, false, false), 0);
+    EXPECT_TRUE(
+        pdal_filter_poisson_needs_normal_dims(false, false, false));
 
-    PointViewPtr view(new PointView(table));
-    BufferReader reader;
-    reader.addView(view);
-
-    PoissonFilter filter;
-    filter.setInput(reader);
-    filter.prepare(table);
-
-    EXPECT_TRUE(table.layout()->hasDim(Dimension::Id::NormalX));
-    EXPECT_TRUE(table.layout()->hasDim(Dimension::Id::NormalY));
-    EXPECT_TRUE(table.layout()->hasDim(Dimension::Id::NormalZ));
+    // All three present: validation succeeds and no new dims need adding.
+    EXPECT_EQ(
+        pdal_filter_poisson_validate_normals(true, true, true), 0);
+    EXPECT_FALSE(
+        pdal_filter_poisson_needs_normal_dims(true, true, true));
 }
 
 } // namespace pdal

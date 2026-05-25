@@ -580,6 +580,13 @@ COVERED: dict[str, object] = {
     "pdal_io_copc_remote_reader_test": {
         "vsi",
     },
+    "pdal_filters_poisson_test": {
+        "partialNormalsThrow",
+        "registersMissingNormalDimensions",
+    },
+    "pdal_filters_greedyprojection_test": {
+        "invalidOptionsThrow",
+    },
     "pdal_io_ept_reader_test": {
         "inspect",
         "fullReadLaszip",

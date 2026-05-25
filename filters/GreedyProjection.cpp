@@ -39,6 +39,7 @@
 
 #include <filters/NormalFilter.hpp>
 #include <pdal/KDIndex.hpp>
+#include <pdal_capi.h>
 
 #include "GreedyProjection.hpp"
 
@@ -82,13 +83,13 @@ void GreedyProjection::addDimensions(PointLayoutPtr layout)
 
 void GreedyProjection::initialize()
 {
-    if (search_radius_ <= 0)
-        throwError("Invalid search radius of '" +
-                   std::to_string(search_radius_) +
-                   "'.  Must be greater than 0.");
-    if (mu_ <= 0)
-        throwError("Invalid distance multiplier of '" + std::to_string(mu_) +
-                   "'.  Must be greater than 0.");
+    if (pdal_filter_greedyprojection_validate_options(mu_, search_radius_) != 0)
+    {
+        const char* err = pdal_last_error();
+        std::string message =
+            err ? std::string(err) : std::string("Invalid greedyprojection options.");
+        throwError(message);
+    }
 }
 
 Eigen::Vector3d GreedyProjection::getCoord(PointId id)

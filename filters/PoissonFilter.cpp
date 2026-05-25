@@ -36,6 +36,8 @@
 #include "NormalFilter.hpp"
 #include "TransformationFilter.hpp"
 
+#include <pdal_capi.h>
+
 #include <kazhdan/PoissonRecon.h>
 #include <kazhdan/point_source/PointSource.h>
 
@@ -255,17 +257,21 @@ void PoissonFilter::addDimensions(PointLayoutPtr layout)
         layout->hasDim(Dimension::Id::Blue))
         m_doColor = true;
 
-    if (layout->hasDim(Dimension::Id::NormalX))
+    const bool hx = layout->hasDim(Dimension::Id::NormalX);
+    const bool hy = layout->hasDim(Dimension::Id::NormalY);
+    const bool hz = layout->hasDim(Dimension::Id::NormalZ);
+    if (pdal_filter_poisson_validate_normals(hx, hy, hz) != 0)
     {
-        if ((!layout->hasDim(Dimension::Id::NormalY)) ||
-            (!layout->hasDim(Dimension::Id::NormalZ)))
-            throwError("If normals are provided as part of the input "
-                       "dataset, all of X, Y and Z must be provided.");
-        m_normalsProvided = true;
+        const char* err = pdal_last_error();
+        std::string message =
+            err ? std::string(err) : std::string("Invalid poisson normals.");
+        throwError(message);
     }
-    else
+    if (pdal_filter_poisson_needs_normal_dims(hx, hy, hz))
         layout->registerDims({Dimension::Id::NormalX, Dimension::Id::NormalY,
                               Dimension::Id::NormalZ});
+    else
+        m_normalsProvided = true;
     if (m_density)
         layout->registerDim(Dimension::Id::Density);
 }
