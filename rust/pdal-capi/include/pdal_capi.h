@@ -79,6 +79,36 @@ extern "C"
                                           uint64_t buffer_size);
     bool pdal_ept_addon_validate_input(const char* reader_name);
 
+    typedef struct pdal_ept_overlap_t
+    {
+        int32_t depth;
+        int32_t x;
+        int32_t y;
+        int32_t z;
+        uint64_t count;
+        uint64_t node_id;
+    } pdal_ept_overlap_t;
+
+    typedef struct pdal_ept_root_bounds_t
+    {
+        double minx;
+        double miny;
+        double minz;
+        double maxx;
+        double maxy;
+        double maxz;
+    } pdal_ept_root_bounds_t;
+
+    int32_t pdal_ept_addon_write(const pdal_point_view_t* view,
+                                 const char* node_id_dim,
+                                 const char* point_id_dim,
+                                 const char* source_dim,
+                                 const char* addon_file, int32_t addon_type,
+                                 uint64_t hierarchy_step,
+                                 const pdal_ept_root_bounds_t* root_bounds,
+                                 const pdal_ept_overlap_t* overlaps,
+                                 uint64_t overlap_count);
+
     // Driver inference
     char* pdal_infer_reader_driver(const char* filename);
     char* pdal_infer_writer_driver(const char* filename);

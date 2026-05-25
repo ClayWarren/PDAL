@@ -8,6 +8,7 @@ pub mod copc;
 pub mod copc_hierarchy;
 pub mod ept;
 pub mod ept_addon;
+pub mod ept_addon_writer;
 pub mod faux;
 pub mod fbi;
 pub mod fbi_writer;

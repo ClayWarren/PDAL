@@ -646,7 +646,12 @@ COVERED: dict[str, object] = {
         "bcbfToLonLat2dBoundsThrows",
         "duplicateInputs",
     },
-    "pdal_io_ept_addon_writer_test": {"mustDescendFromEptReader"},
+    "pdal_io_ept_addon_writer_test": {
+        "fullLoop",
+        "boundedWrite",
+        "boundedRead",
+        "mustDescendFromEptReader",
+    },
     "pdal_io_las_reader_test": ALL,
     "pdal_io_las_writer_test": {
         "srs",
