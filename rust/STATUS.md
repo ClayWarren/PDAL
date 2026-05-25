@@ -148,19 +148,14 @@ The first target is the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `818 / 819` baseline C++ GoogleTest cases, or
-`99.88%`, are confirmed Rust C ABI-backed by
+Current pre-port checkpoint: `819 / 819` baseline C++ GoogleTest cases, or
+`100.00%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. The
 branch-wide health metric, including guard tests added before and during the
-port, is `950 / 953` currently built C++ GoogleTest cases, or `99.69%`;
+port, is `951 / 953` currently built C++ GoogleTest cases, or `99.79%`;
 compute that with `--include-added-tests`.
-
-The single remaining pre-port test (`pdal_plugin_manager_test.CreateObject`)
-is intentionally deferred to a later milestone; it exercises runtime plugin
-registration and C++ plugin-class object creation that depend on a Rust
-plugin loading SDK (milestone 7 per `rust/PORTING.md`).
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
@@ -327,9 +322,16 @@ Known mixed binaries:
   `stageExtensionsLoadPerInstance` and `stageExtensionsCustomMappingsOverrideDefaults`
   guard tests also route default lookup and custom extension overrides through
   Rust-owned C ABI helpers, but they are excluded from the pre-port denominator.
-- `pdal_plugin_manager_test`: `MissingPlugin` and `validnames` count; plugin
-  filename validation and unknown-stage lookup route through the Rust C ABI.
-  Runtime plugin registration and C++ plugin-class object creation remain C++.
+- `pdal_plugin_manager_test`: all 3 tests count. `validnames` checks plugin
+  filename validation, `MissingPlugin` checks unknown-stage lookup, and
+  `CreateObject` exercises runtime stage registration plus instantiation —
+  `PluginManager<T>::l_registerPlugin` now writes the (namespace, plugin
+  name, creator thunk, description, link) tuple into the Rust-owned runtime
+  registry (`pdal_runtime_plugin_register`) keyed by `typeid(T).name()`, and
+  `l_createObject` looks up the creator function pointer through
+  `pdal_runtime_plugin_lookup_creator` before invoking it from C++. The
+  legacy `m_plugins` map is still populated for any code that still walks
+  it, but the test's lookup path is Rust-authoritative.
 - `pdal_options_test`: `valid`, `programargs`, `nan`, `doublepreicison`,
   `issue_4751`, `conditional`, and `test_option_writing` count. Option-name
   validation, command-line formatting, JSON scalar formatting, and conditional

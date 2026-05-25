@@ -333,6 +333,23 @@ extern "C"
                                  const char* dynamic_lib_extension);
     bool pdal_stage_registry_has(const char* stage_name);
 
+    // Runtime plugin registry. Backed by a Rust-owned map keyed by
+    // (type_namespace, plugin_name); the C++ `PluginManager<T>` template uses
+    // `typeid(T).name()` for the namespace so each instantiation has its own
+    // slice. `creator` is an opaque `T* (*)()` function pointer that the C++
+    // caller invokes after looking it up.
+    void pdal_runtime_plugin_register(const char* type_ns, const char* name,
+                                      const void* creator,
+                                      const char* description,
+                                      const char* link);
+    const void* pdal_runtime_plugin_lookup_creator(const char* type_ns,
+                                                   const char* name);
+    bool pdal_runtime_plugin_has(const char* type_ns, const char* name);
+    char* pdal_runtime_plugin_names_json(const char* type_ns);
+    char* pdal_runtime_plugin_description(const char* type_ns,
+                                          const char* name);
+    char* pdal_runtime_plugin_link(const char* type_ns, const char* name);
+
     // PointLayout
     pdal_point_layout_t* pdal_point_layout_create();
     void pdal_point_layout_register_dim(pdal_point_layout_t* layout,

@@ -142,7 +142,7 @@ COVERED: dict[str, object] = {
         "stageExtensionsLoadPerInstance",
         "stageExtensionsCustomMappingsOverrideDefaults",
     },
-    "pdal_plugin_manager_test": {"MissingPlugin", "validnames"},
+    "pdal_plugin_manager_test": {"MissingPlugin", "validnames", "CreateObject"},
     "pdal_program_arg_test": ALL,
     "pdal_options_test": {
         "valid",

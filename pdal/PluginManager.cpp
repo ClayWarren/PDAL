@@ -321,26 +321,26 @@ T* PluginManager<T>::createObject(const std::string& objectType)
 template <typename T>
 T* PluginManager<T>::l_createObject(const std::string& objectType)
 {
-    // Static plugins already here.
-    auto find(
-        [this, &objectType]() -> bool
-        {
-            std::lock_guard<std::mutex> lock(m_pluginMutex);
-            return m_plugins.count(objectType);
-        });
+    // Look up first in the Rust-owned runtime plugin registry (the
+    // authoritative source after `l_registerPlugin` writes to it). If the
+    // plugin isn't there, try `l_loadDynamic` once to give a `.so`/`.dylib`
+    // a chance to register itself, then re-check Rust.
+    const char* ns = typeid(T).name();
+    auto find([&]() -> bool {
+        return pdal_runtime_plugin_has(ns, objectType.c_str());
+    });
 
     if (find() || (l_loadDynamic(objectType) && find()))
     {
-        // Kernels contain a PipelineManager, which may load other plugins,
-        // so the lock must be released prior to invoking the ctor to
-        // avoid deadlock.
-        std::function<T*()> f;
+        const void* creator = pdal_runtime_plugin_lookup_creator(
+            ns, objectType.c_str());
+        if (creator)
         {
-            // Lock must be released before the creation function is invoked.
-            std::lock_guard<std::mutex> lock(m_pluginMutex);
-            f = m_plugins[objectType].create;
+            using CreatorFn = void* (*)();
+            CreatorFn fn = reinterpret_cast<CreatorFn>(
+                const_cast<void*>(creator));
+            return static_cast<T*>(fn());
         }
-        return f();
     }
     return nullptr;
 }

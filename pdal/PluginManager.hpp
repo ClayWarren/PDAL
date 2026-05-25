@@ -43,11 +43,14 @@
 #include <pdal/PluginInfo.hpp>
 #include <pdal/StageExtensions.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 #include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 namespace pdal
@@ -108,16 +111,31 @@ private:
     DynamicLibrary* libraryLoaded(const std::string& path);
     DynamicLibrary* loadLibrary(const std::string& path);
     T* l_createObject(const std::string& objectType);
+    // Stateless thunk that the Rust runtime registry stores as a `void*`
+    // function pointer. Returning `void*` keeps the cast-back inside
+    // `l_createObject` typeless and avoids tying the C ABI to a C++ type.
+    template <class C> static void* createPluginThunk()
+    {
+        return static_cast<void*>(dynamic_cast<T*>(new C));
+    }
+
     template <class C> bool l_registerPlugin(const PluginInfo& pi)
     {
-        auto f = [&]()
-        {
-            T* t = dynamic_cast<T*>(new C);
-            return t;
-        };
+        // Stateless lambda decays to a function pointer for callers (like
+        // `loadByPath`) that still walk `m_plugins`.
+        auto f = []() { return dynamic_cast<T*>(new C); };
         Info info{pi.name, pi.link, pi.description, f};
-        std::lock_guard<std::mutex> lock(m_pluginMutex);
-        m_plugins.insert(std::make_pair(pi.name, info));
+        {
+            std::lock_guard<std::mutex> lock(m_pluginMutex);
+            m_plugins.insert(std::make_pair(pi.name, info));
+        }
+        // Register in the Rust-owned runtime registry as well; this is the
+        // authoritative source for `l_createObject` lookups and lets
+        // `pdal_plugin_manager_test.CreateObject` run through the Rust C ABI.
+        pdal_runtime_plugin_register(
+            typeid(T).name(), pi.name.c_str(),
+            reinterpret_cast<const void*>(&createPluginThunk<C>),
+            pi.description.c_str(), pi.link.c_str());
         return true;
     }
     template <class C> bool l_registerPlugin(const StaticPluginInfo& pi)
