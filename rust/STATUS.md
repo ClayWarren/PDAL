@@ -677,7 +677,9 @@ are deliberately added to the registry with option parsing and coverage.
 These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
-- Private or specialized algorithms: `Georeference`, `Poisson`.
+- Private or specialized algorithms: trajectory-backed `Georeference` and
+  Kazhdan-backed `Poisson`. Do not confuse `filters.georeference` with the
+  already Rust-backed `pdal/util/Georeference` math or simple SRS transforms.
 - Now Rust C ABI-backed: `Delaunay`.
 - Now Rust C ABI-backed: `DEM`.
 - Now Rust C ABI-backed: `HagDelaunay`.
@@ -704,7 +706,10 @@ algorithm decision.
 - Now Rust C ABI-backed: `CS`; the C++ wrapper keeps return filtering,
   ignore-range segmentation, debug-directory validation, and class assignment
   plumbing around the Rust cloth classifier.
-- Pipeline/process/framework behavior: `Info`, `StreamCallback`.
+- Pipeline/process/framework behavior: `Info` streaming metadata accumulation
+  and `StreamCallback`. `StreamCallback` is a C++ compatibility callback over
+  `PointRef`; do not route C++ callable objects through the C ABI without a
+  deliberate callback ABI design.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source
 material. Its C++ wiring passed C++ object pointers across the C ABI and broke
