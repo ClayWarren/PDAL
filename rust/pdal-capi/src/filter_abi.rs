@@ -3,9 +3,9 @@ use crate::point_abi::dim_id_from_name;
 use crate::stage_abi::StageWrapper;
 use pdal_core::georeference::{validate_coordinate_system, validate_transform_beam_layout};
 use pdal_core::options::Options;
-use pdal_core::point::DimId;
 use pdal_core::point::PointLayout;
 use pdal_core::point::PointView;
+use pdal_core::point::{DimId, DimType};
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign;
 use pdal_filters::chipper::ChipperFilter;
@@ -55,7 +55,7 @@ use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
-use pdal_filters::radiusassign::{RadiusAssignFilter, RadiusAssignment};
+use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
@@ -569,27 +569,119 @@ pub unsafe extern "C" fn pdal_stage_create_radiusassign(
                 set_last_error("invalid assignment passed to pdal_stage_create_radiusassign");
                 return std::ptr::null_mut();
             }
-            rust_assignments.push(RadiusAssignment {
-                dim_name: CStr::from_ptr(assignment.dim_name)
-                    .to_string_lossy()
-                    .into_owned(),
-                value: assignment.value,
-            });
+            let dim_name = CStr::from_ptr(assignment.dim_name).to_string_lossy();
+            rust_assignments.push(format!("{dim_name} = {}", assignment.value));
         }
     }
 
-    if assignment_count == 0 {
-        set_last_error(
-            "Empty 'update_epxression' option, must be set to apply any change on the data",
-        );
-        return std::ptr::null_mut();
+    let mut layout = PointLayout::default();
+    for expression in &rust_assignments {
+        if let Some((dim, _)) = expression.split_once('=') {
+            layout.register(DimId::from_name(dim.trim()), DimType::F64);
+        }
     }
+    let assignments = match parse_assignments(&rust_assignments, &layout) {
+        Ok(assignments) => assignments,
+        Err(err) => {
+            set_last_error(&err.0);
+            return std::ptr::null_mut();
+        }
+    };
 
     Box::into_raw(Box::new(StageWrapper {
         filter: Box::new(RadiusAssignFilter::new(
             src_domain,
             reference_domain,
-            rust_assignments,
+            assignments,
+            radius,
+            search_3d,
+            max_2d_above,
+            max_2d_below,
+        )),
+    }))
+}
+
+/// Create a radiusassign filter stage from parsed update expressions.
+///
+/// # Safety
+///
+/// Range pointers and assignment string pointers must be valid for their
+/// matching counts, or null with a zero count.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_radiusassign_expr(
+    src_limits: *const pdal_range_limit_t,
+    src_count: u64,
+    reference_limits: *const pdal_range_limit_t,
+    reference_count: u64,
+    assignment_exprs: *const *const c_char,
+    assignment_count: u64,
+    radius: f64,
+    search_3d: bool,
+    max_2d_above: f64,
+    max_2d_below: f64,
+    view: *const PointView,
+) -> *mut StageWrapper {
+    let Some(view) = view.as_ref() else {
+        set_last_error("null view passed to pdal_stage_create_radiusassign_expr");
+        return std::ptr::null_mut();
+    };
+
+    unsafe fn collect_limits(
+        limits: *const pdal_range_limit_t,
+        count: u64,
+    ) -> Option<Vec<RangeLimit>> {
+        let mut out = Vec::new();
+        if limits.is_null() {
+            return (count == 0).then_some(out);
+        }
+
+        for idx in 0..count {
+            let limit = &*limits.add(idx as usize);
+            if limit.dim_name.is_null() {
+                return None;
+            }
+            out.push(RangeLimit {
+                dim_name: CStr::from_ptr(limit.dim_name)
+                    .to_string_lossy()
+                    .into_owned(),
+                lower_bound: limit.lower_bound,
+                upper_bound: limit.upper_bound,
+                inclusive_lower: limit.inclusive_lower,
+                inclusive_upper: limit.inclusive_upper,
+                negate: limit.negate,
+            });
+        }
+        Some(out)
+    }
+
+    let Some(src_domain) = collect_limits(src_limits, src_count) else {
+        set_last_error("invalid source domain passed to pdal_stage_create_radiusassign_expr");
+        return std::ptr::null_mut();
+    };
+    let Some(reference_domain) = collect_limits(reference_limits, reference_count) else {
+        set_last_error("invalid reference domain passed to pdal_stage_create_radiusassign_expr");
+        return std::ptr::null_mut();
+    };
+
+    let Ok(expressions) = c_string_array(assignment_exprs, assignment_count) else {
+        set_last_error(
+            "invalid assignment expressions passed to pdal_stage_create_radiusassign_expr",
+        );
+        return std::ptr::null_mut();
+    };
+    let assignments = match parse_assignments(&expressions, view.layout().as_ref()) {
+        Ok(assignments) => assignments,
+        Err(err) => {
+            set_last_error(&err.0);
+            return std::ptr::null_mut();
+        }
+    };
+
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(RadiusAssignFilter::new(
+            src_domain,
+            reference_domain,
+            assignments,
             radius,
             search_3d,
             max_2d_above,

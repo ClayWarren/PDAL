@@ -1,18 +1,13 @@
+use pdal_core::expr::AssignStatement;
 use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 use crate::range::RangeLimit;
 
-#[derive(Clone)]
-pub struct RadiusAssignment {
-    pub dim_name: String,
-    pub value: f64,
-}
-
 pub struct RadiusAssignFilter {
     src_domain: Vec<RangeLimit>,
     reference_domain: Vec<RangeLimit>,
-    assignments: Vec<RadiusAssignment>,
+    assignments: Vec<AssignStatement>,
     radius: f64,
     search_3d: bool,
     max_2d_above: f64,
@@ -23,7 +18,7 @@ impl RadiusAssignFilter {
     pub fn new(
         src_domain: Vec<RangeLimit>,
         reference_domain: Vec<RangeLimit>,
-        assignments: Vec<RadiusAssignment>,
+        assignments: Vec<AssignStatement>,
         radius: f64,
         search_3d: bool,
         max_2d_above: f64,
@@ -116,11 +111,15 @@ impl Filter for RadiusAssignFilter {
             }
 
             for assignment in &self.assignments {
-                output.set_f64(
-                    idx,
-                    &DimId::from_name(&assignment.dim_name),
-                    assignment.value,
-                );
+                if !assignment.condition().eval(view, idx) {
+                    continue;
+                }
+                let Some(dim) = assignment.ident().dim() else {
+                    return Err(StageError(
+                        "filters.radiusassign: invalid assignment target.".to_string(),
+                    ));
+                };
+                output.set_f64(idx, &dim, assignment.value().eval(view, idx));
             }
         }
 
@@ -130,6 +129,28 @@ impl Filter for RadiusAssignFilter {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+}
+
+pub fn parse_assignments(
+    expressions: &[String],
+    layout: &pdal_core::point::PointLayout,
+) -> Result<Vec<AssignStatement>, StageError> {
+    let mut assignments = Vec::new();
+    for expression in expressions {
+        let mut statement = AssignStatement::parse(expression)
+            .map_err(|err| StageError(format!("filters.radiusassign: {err}")))?;
+        statement
+            .prepare(layout)
+            .map_err(|err| StageError(format!("filters.radiusassign: {err}")))?;
+        assignments.push(statement);
+    }
+    if assignments.is_empty() {
+        return Err(StageError(
+            "Empty 'update_expression' option, must be set to apply any change on the data"
+                .to_string(),
+        ));
+    }
+    Ok(assignments)
 }
 
 impl Streamable for RadiusAssignFilter {
@@ -183,10 +204,11 @@ mod tests {
         let mut filter = RadiusAssignFilter::new(
             Vec::new(),
             class_one_domain(),
-            vec![RadiusAssignment {
-                dim_name: "Classification".to_string(),
-                value: 2.0,
-            }],
+            parse_assignments(
+                &[String::from("Classification = 2")],
+                view.layout().as_ref(),
+            )
+            .unwrap(),
             1.0,
             true,
             -1.0,
@@ -205,10 +227,11 @@ mod tests {
         let mut filter = RadiusAssignFilter::new(
             Vec::new(),
             class_one_domain(),
-            vec![RadiusAssignment {
-                dim_name: "Classification".to_string(),
-                value: 2.0,
-            }],
+            parse_assignments(
+                &[String::from("Classification = 2")],
+                view.layout().as_ref(),
+            )
+            .unwrap(),
             1.0,
             false,
             1.0,

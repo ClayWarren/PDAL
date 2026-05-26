@@ -398,6 +398,7 @@ COVERED: dict[str, object] = {
         "basic_usage",
         "with_z_limit",
         "with_src_domain",
+        "update_expression_uses_math_and_condition",
         "missing_param",
     },
     "pdal_filters_radialdensity_test": {"create", "density"},

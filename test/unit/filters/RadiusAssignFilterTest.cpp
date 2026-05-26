@@ -176,6 +176,48 @@ TEST(RadiusAssignFilterTest, with_src_domain)
         << "expected: '5'" << '\n';
 }
 
+TEST(RadiusAssignFilterTest, update_expression_uses_math_and_condition)
+{
+    Options ro;
+    ro.add("filename",
+           Support::datapath("filters/radiusassign/grid_20x10x10.txt"));
+    StageFactory factory;
+    Stage& r = *(factory.createStage("readers.text"));
+    r.setOptions(ro);
+
+    Options ao;
+    ao.add("value", "Classification=1");
+    ao.add("where", "(X == 5) && (Y == 5) && (Z == 5)");
+
+    Stage& a = *(factory.createStage("filters.assign"));
+    a.setInput(r);
+    a.setOptions(ao);
+
+    Options fo;
+    fo.add("is3d", "true");
+    fo.add("reference_domain", "Classification[1:1]");
+    fo.add("update_expression", "Classification = Z + 10 WHERE Z == 5");
+    fo.add("radius", 1);
+
+    Stage& f = *(factory.createStage("filters.radiusassign"));
+    f.setInput(a);
+    f.setOptions(fo);
+
+    PointTable table;
+    f.prepare(table);
+    PointViewSet viewSet = f.execute(table);
+    PointViewPtr view = *viewSet.begin();
+
+    size_t updated = 0;
+    for (PointId id = 0; id < view->size(); ++id)
+    {
+        if (view->getFieldAs<unsigned int>(Dimension::Id::Classification, id) ==
+            15)
+            ++updated;
+    }
+    EXPECT_EQ(updated, 1u);
+}
+
 TEST(RadiusAssignFilterTest, missing_param)
 {
     Options ro;
@@ -199,7 +241,6 @@ TEST(RadiusAssignFilterTest, missing_param)
     PointTable table;
     // Expect error due to missing update_expression argument
     EXPECT_ANY_THROW(f.prepare(table));
-    PointViewSet viewSet = f.execute(table);
 }
 
 } // namespace pdal

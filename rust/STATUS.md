@@ -692,8 +692,10 @@ algorithm decision.
 - Now Rust C ABI-backed: `Straighten`.
 - Now Rust C ABI-backed: `Supervoxel`.
 - Now Rust C ABI-backed: `Normal`, including optional MST refinement.
+- Now Rust C ABI-backed: `RadiusAssign`, including computed and conditional
+  update expressions.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
-- Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,
+- Expression/KD-tree hybrid behavior needing a design pass:
   `NeighborClassifier`, `CovarianceFeatures`.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source

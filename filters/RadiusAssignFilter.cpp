@@ -8,12 +8,38 @@
 
 #include "private/DimRange.hpp"
 
-#include <cstdlib>
-#include <iostream>
-#include <limits>
-#include <utility>
+#include <string>
+#include <vector>
+
 namespace pdal
 {
+
+namespace
+{
+
+pdal_range_limit_t toRustLimit(const DimRange& r)
+{
+    pdal_range_limit_t limit;
+    limit.dim_name = r.m_name.c_str();
+    limit.lower_bound = r.m_lower_bound;
+    limit.upper_bound = r.m_upper_bound;
+    limit.inclusive_lower = r.m_inclusive_lower_bound;
+    limit.inclusive_upper = r.m_inclusive_upper_bound;
+    limit.negate = r.m_negate;
+    return limit;
+}
+
+std::string toAssignmentExpression(expr::AssignStatement& expr)
+{
+    std::string out =
+        expr.identExpr().name() + " = " + expr.valueExpr().print();
+    std::string condition = expr.conditionalExpr().print();
+    if (!condition.empty())
+        out += " WHERE " + condition;
+    return out;
+}
+
+} // unnamed namespace
 
 static PluginInfo const s_info = PluginInfo(
     "filters.radiusassign", "Re-assign some point attributes based KNN voting",
@@ -85,28 +111,9 @@ void RadiusAssignFilter::initialize()
         throwError("Invalid 'radius' option: " + std::to_string(m_radius) +
                    ", must be > 0");
 
-    std::vector<pdal_assign_range_t> assignments;
-    std::vector<std::string> assignment_dims;
-    assignment_dims.reserve(m_updateExpr.size());
-    for (expr::AssignStatement& expr : m_updateExpr)
-        assignment_dims.push_back(expr.identExpr().name());
-
-    assignments.reserve(assignment_dims.size());
-    for (const std::string& dim : assignment_dims)
-    {
-        pdal_assign_range_t assignment;
-        assignment.dim_name = dim.c_str();
-        assignment.value = 0;
-        assignments.push_back(assignment);
-    }
-
-    pdal_stage_t* stage = pdal_stage_create_radiusassign(
-        nullptr, 0, nullptr, 0,
-        assignments.empty() ? nullptr : assignments.data(), assignments.size(),
-        m_radius, m_search3d, m_max2dAbove, m_max2dBelow);
-    if (!stage)
-        rust_view_converter::throwLastError("Rust C ABI call failed.");
-    pdal_stage_destroy(stage);
+    if (m_updateExpr.empty())
+        throwError("Empty 'update_expression' option, must be set to apply any "
+                   "change on the data");
 }
 
 void RadiusAssignFilter::preparedDomain(std::vector<DimRange>& domain,
@@ -138,185 +145,40 @@ void RadiusAssignFilter::prepared(PointTableRef table)
     }
 }
 
-void RadiusAssignFilter::ready(PointTableRef)
-{
-    m_ptsToUpdate.clear();
-}
-
-void RadiusAssignFilter::doOneNoDomain(PointRef& pointSrc)
-{
-    PointIdList iNeighbors;
-    if (m_search3d)
-        iNeighbors = refView->build3dIndex().radius(pointSrc, m_radius);
-    else
-        iNeighbors = refView->build2dIndex().radius(pointSrc, m_radius);
-
-    if (iNeighbors.size() == 0)
-        return;
-
-    if (!m_search3d && (m_max2dBelow >= 0 || m_max2dAbove >= 0))
-    {
-        double Zsrc = pointSrc.getFieldAs<double>(Dimension::Id::Z);
-
-        bool take(false);
-        for (PointId ptId : iNeighbors)
-        {
-            double Zref =
-                refView->point(ptId).getFieldAs<double>(Dimension::Id::Z);
-            if (m_max2dAbove >= 0 && Zref > Zsrc &&
-                (Zref - Zsrc) > m_max2dAbove)
-                continue;
-            if (m_max2dBelow >= 0 && Zsrc > Zref &&
-                (Zsrc - Zref) > m_max2dBelow)
-                continue;
-            take = true;
-            break;
-        }
-
-        if (!take)
-            return;
-    }
-
-    m_ptsToUpdate.push_back(pointSrc.pointId());
-}
-
-// update point.  kdi and temp both reference the NN point cloud
-bool RadiusAssignFilter::doOne(PointRef& pointSrc)
-{
-    if (m_srcDomain.empty()) // No domain, process all points
-        doOneNoDomain(pointSrc);
-
-    for (DimRange& r : m_srcDomain)
-    { // process only points that satisfy a domain condition
-        if (r.valuePasses(pointSrc.getFieldAs<double>(r.m_id)))
-        {
-            doOneNoDomain(pointSrc);
-            break;
-        }
-    }
-    return true;
-}
-
 void RadiusAssignFilter::filter(PointView& view)
 {
-    std::vector<std::string> assignmentNames;
-    std::vector<pdal_assign_range_t> assignments;
-    bool rustSupported = true;
+    std::vector<pdal_range_limit_t> srcLimits;
+    for (const DimRange& r : m_srcDomain)
+        srcLimits.push_back(toRustLimit(r));
 
+    std::vector<pdal_range_limit_t> referenceLimits;
+    for (const DimRange& r : m_referenceDomain)
+        referenceLimits.push_back(toRustLimit(r));
+
+    std::vector<std::string> assignmentExpressions;
     for (expr::AssignStatement& expr : m_updateExpr)
-    {
-        if (!expr.conditionalExpr().print().empty())
-        {
-            rustSupported = false;
-            break;
-        }
+        assignmentExpressions.push_back(toAssignmentExpression(expr));
 
-        std::string valueText = expr.valueExpr().print();
-        char* end = nullptr;
-        double value = std::strtod(valueText.c_str(), &end);
-        if (!end || *end != '\0')
-        {
-            rustSupported = false;
-            break;
-        }
+    std::vector<const char*> assignmentPtrs;
+    assignmentPtrs.reserve(assignmentExpressions.size());
+    for (const std::string& expression : assignmentExpressions)
+        assignmentPtrs.push_back(expression.c_str());
 
-        assignmentNames.push_back(expr.identExpr().name());
-        if (assignmentNames.back().empty())
-        {
-            rustSupported = false;
-            break;
-        }
+    pdal_point_view_t* rustView = rust_view_converter::toRust(view);
+    pdal_stage_t* stage = pdal_stage_create_radiusassign_expr(
+        srcLimits.empty() ? nullptr : srcLimits.data(), srcLimits.size(),
+        referenceLimits.empty() ? nullptr : referenceLimits.data(),
+        referenceLimits.size(),
+        assignmentPtrs.empty() ? nullptr : assignmentPtrs.data(),
+        assignmentPtrs.size(), m_radius, m_search3d, m_max2dAbove, m_max2dBelow,
+        rustView);
+    pdal_point_view_destroy(rustView);
+    if (!stage)
+        rust_view_converter::throwLastError(
+            "Failed to create Rust radiusassign stage.");
 
-        pdal_assign_range_t assignment;
-        assignment.dim_name = assignmentNames.back().c_str();
-        assignment.value = value;
-        assignment.lower_bound = -std::numeric_limits<double>::infinity();
-        assignment.upper_bound = std::numeric_limits<double>::infinity();
-        assignment.inclusive_lower = true;
-        assignment.inclusive_upper = true;
-        assignment.negate = false;
-        assignments.push_back(assignment);
-    }
-
-    if (rustSupported && !assignments.empty())
-    {
-        std::vector<pdal_range_limit_t> srcLimits;
-        for (const DimRange& r : m_srcDomain)
-        {
-            pdal_range_limit_t limit;
-            limit.dim_name = r.m_name.c_str();
-            limit.lower_bound = r.m_lower_bound;
-            limit.upper_bound = r.m_upper_bound;
-            limit.inclusive_lower = r.m_inclusive_lower_bound;
-            limit.inclusive_upper = r.m_inclusive_upper_bound;
-            limit.negate = r.m_negate;
-            srcLimits.push_back(limit);
-        }
-
-        std::vector<pdal_range_limit_t> referenceLimits;
-        for (const DimRange& r : m_referenceDomain)
-        {
-            pdal_range_limit_t limit;
-            limit.dim_name = r.m_name.c_str();
-            limit.lower_bound = r.m_lower_bound;
-            limit.upper_bound = r.m_upper_bound;
-            limit.inclusive_lower = r.m_inclusive_lower_bound;
-            limit.inclusive_upper = r.m_inclusive_upper_bound;
-            limit.negate = r.m_negate;
-            referenceLimits.push_back(limit);
-        }
-
-        pdal_stage_t* stage = pdal_stage_create_radiusassign(
-            srcLimits.empty() ? nullptr : srcLimits.data(), srcLimits.size(),
-            referenceLimits.empty() ? nullptr : referenceLimits.data(),
-            referenceLimits.size(), assignments.data(), assignments.size(),
-            m_radius, m_search3d, m_max2dAbove, m_max2dBelow);
-        if (!stage)
-            throwError("Failed to create Rust radiusassign stage.");
-
-        rust_view_converter::runInPlace(stage, view);
-        pdal_stage_destroy(stage);
-        return;
-    }
-
-    PointRef pointTemp(view, 0);
-
-    // Create reference domain view
-    refView = view.makeNew();
-    if (m_referenceDomain.empty())
-        for (PointId id = 0; id < view.size(); ++id)
-            refView->appendPoint(view, id);
-    else
-    {
-        for (PointId id = 0; id < view.size(); ++id)
-        {
-            for (DimRange& r : m_referenceDomain)
-            {
-                pointTemp.setPointId(id);
-                if (r.valuePasses(pointTemp.getFieldAs<double>(r.m_id)))
-                {
-                    refView->appendPoint(view, id);
-                    break;
-                }
-            }
-        }
-    }
-
-    // Process all points (mark them if they need to be updated)
-    for (PointId id = 0; id < view.size(); ++id)
-    {
-        pointTemp.setPointId(id);
-        doOne(pointTemp);
-    }
-
-    for (auto id : m_ptsToUpdate)
-    {
-        pointTemp.setPointId(id);
-        for (expr::AssignStatement& expr : m_updateExpr)
-            if (expr.conditionalExpr().eval(pointTemp))
-                pointTemp.setField(expr.identExpr().eval(),
-                                   expr.valueExpr().eval(pointTemp));
-    }
+    rust_view_converter::runInPlace(stage, view);
+    pdal_stage_destroy(stage);
 }
 
 } // namespace pdal
