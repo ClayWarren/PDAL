@@ -1156,6 +1156,7 @@ extern "C"
     pdal_reader_t* pdal_reader_create_smrmsg(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_optech(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_terrasolid(const pdal_options_t* ops);
+    pdal_reader_t* pdal_reader_create_tindex(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_fbi(const pdal_options_t* ops);
     typedef struct
     {

@@ -23,6 +23,7 @@ fn reader_and_writer_constructors_cover_supported_driver_handles() {
             pdal_reader_create_smrmsg(options),
             pdal_reader_create_optech(options),
             pdal_reader_create_terrasolid(options),
+            pdal_reader_create_tindex(options),
             pdal_reader_create_fbi(options),
             pdal_reader_create_bpf(options),
             pdal_reader_create_gdal(options),

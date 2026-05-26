@@ -57,6 +57,32 @@ static StaticPluginInfo const s_info{
 
 CREATE_STATIC_STAGE(TIndexReader, s_info)
 
+namespace
+{
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+bool hasSuffix(const std::string& value, const std::string& suffix)
+{
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) ==
+               0;
+}
+
+} // namespace
+
 std::string TIndexReader::getName() const
 {
     return s_info.name;
@@ -83,6 +109,12 @@ struct TIndexReader::Args
 TIndexReader::TIndexReader()
     : m_args(new TIndexReader::Args), m_dataset(nullptr), m_layer(nullptr)
 {
+}
+
+TIndexReader::~TIndexReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
 }
 
 TIndexReader::FieldIndexes TIndexReader::getFields()
@@ -181,6 +213,26 @@ void TIndexReader::addArgs(ProgramArgs& args)
 
 void TIndexReader::addDimensions(PointLayoutPtr layout)
 {
+    if (m_useRustReader)
+    {
+        m_rustDims.clear();
+        m_rustDimNames.clear();
+        uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+        for (uint64_t idx = 0; idx < dimCount; ++idx)
+        {
+            char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+            if (!rawName)
+                continue;
+            std::string name(rawName);
+            pdal_string_free(rawName);
+            Dimension::Id id =
+                layout->registerOrAssignDim(name, Dimension::Type::Double);
+            m_rustDims.push_back(id);
+            m_rustDimNames.push_back(name);
+        }
+        return;
+    }
+
     layout->registerDim(pdal::Dimension::Id::X);
     layout->registerDim(pdal::Dimension::Id::Y);
     layout->registerDim(pdal::Dimension::Id::Z);
@@ -188,6 +240,13 @@ void TIndexReader::addDimensions(PointLayoutPtr layout)
 
 void TIndexReader::initialize()
 {
+    m_useRustReader = canUseRustReader();
+    if (m_useRustReader)
+    {
+        loadRustView();
+        return;
+    }
+
     if (!m_args->m_bounds.empty())
         m_args->m_wkt = m_args->m_bounds.toWKT();
     m_out_ref.reset(new gdal::SpatialRef());
@@ -336,6 +395,19 @@ void TIndexReader::initialize()
 
 point_count_t TIndexReader::read(PointViewPtr view, point_count_t num)
 {
+    if (m_useRustReader)
+    {
+        point_count_t count = 0;
+        while (count < num && m_rustIndex < pdal_point_view_length(m_rustView))
+        {
+            PointRef point(view->point(view->size()));
+            copyRustPoint(point, m_rustIndex);
+            ++m_rustIndex;
+            ++count;
+        }
+        return count;
+    }
+
     point_count_t cnt(0);
 
     PointRef point(view->point(0));
@@ -350,23 +422,94 @@ point_count_t TIndexReader::read(PointViewPtr view, point_count_t num)
 
 bool TIndexReader::processOne(PointRef& point)
 {
+    if (!m_useRustReader)
+        return true;
+    if (m_rustIndex >= pdal_point_view_length(m_rustView))
+        return false;
+    copyRustPoint(point, m_rustIndex);
+    ++m_rustIndex;
     return true;
 }
 
 void TIndexReader::prepared(PointTableRef table)
 {
+    if (m_useRustReader)
+        return;
+
     m_merge.prepare(table);
     m_merge.setLog(log());
 }
 
 void TIndexReader::ready(PointTableRef table)
 {
+    if (m_useRustReader)
+    {
+        m_rustIndex = 0;
+        return;
+    }
+
     StageWrapper::ready(m_merge, table);
 }
 
 PointViewSet TIndexReader::run(PointViewPtr view)
 {
+    if (m_useRustReader)
+    {
+        PointViewSet viewSet;
+        read(view, m_count);
+        viewSet.insert(view);
+        return viewSet;
+    }
+
     return StageWrapper::run(m_merge, view);
+}
+
+bool TIndexReader::canUseRustReader() const
+{
+    if (!hasSuffix(m_filename, ".json") && !hasSuffix(m_filename, ".geojson"))
+        return false;
+
+    return m_args->m_srsColumnName.empty() && m_args->m_wkt.empty() &&
+           m_args->m_ogr.empty() && m_args->m_attributeFilter.empty() &&
+           m_args->m_sql.empty() && m_args->m_rawReaderArgs.empty() &&
+           m_args->m_bounds.empty() && m_args->m_tgtSrsString.empty();
+}
+
+void TIndexReader::loadRustView()
+{
+    if (m_rustView)
+    {
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_rustIndex = 0;
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", m_filename);
+    addOption(options, "tindex_name", m_args->m_tileIndexColumnName);
+
+    pdal_reader_t* reader = pdal_reader_create_tindex(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust TIndex reader.");
+    }
+
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust TIndex reader failed.");
+}
+
+void TIndexReader::copyRustPoint(PointRef& point, PointId rustIndex)
+{
+    for (size_t dimIdx = 0; dimIdx < m_rustDims.size(); ++dimIdx)
+    {
+        point.setField(m_rustDims[dimIdx],
+                       pdal_point_view_get_f64(m_rustView, rustIndex,
+                                               m_rustDimNames[dimIdx].c_str()));
+    }
 }
 
 } // namespace pdal

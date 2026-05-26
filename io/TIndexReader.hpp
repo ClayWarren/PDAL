@@ -38,6 +38,7 @@
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/StageFactory.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 // Get GDAL's forward decls if available
 // otherwise make our own
@@ -77,6 +78,7 @@ class PDAL_EXPORT TIndexReader : public Reader, public Streamable
 
 public:
     TIndexReader();
+    ~TIndexReader() override;
 
     std::string getName() const override;
 
@@ -99,9 +101,17 @@ private:
 
     StageFactory m_factory;
     MergeFilter m_merge;
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_rustDims;
+    StringList m_rustDimNames;
+    PointId m_rustIndex = 0;
+    bool m_useRustReader = false;
 
     std::vector<FileInfo> getFiles();
     FieldIndexes getFields();
+    bool canUseRustReader() const;
+    void loadRustView();
+    void copyRustPoint(PointRef& point, PointId rustIndex);
 };
 
 } // namespace pdal
