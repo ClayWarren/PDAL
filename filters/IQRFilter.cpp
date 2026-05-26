@@ -71,7 +71,7 @@ void IQRFilter::prepared(PointTableRef table)
     pdal_stage_t* stage =
         pdal_stage_create_iqr(m_multiplier, m_dimName.c_str());
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

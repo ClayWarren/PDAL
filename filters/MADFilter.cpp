@@ -70,10 +70,10 @@ void MADFilter::prepared(PointTableRef table)
     if (m_dimId == Dimension::Id::Unknown)
         throwError("Dimension '" + m_dimName + "' does not exist.");
 
-    pdal_stage_t* stage = pdal_stage_create_mad(
-        m_multiplier, m_dimName.c_str(), m_madMultiplier);
+    pdal_stage_t* stage =
+        pdal_stage_create_mad(m_multiplier, m_dimName.c_str(), m_madMultiplier);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

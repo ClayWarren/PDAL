@@ -34,6 +34,7 @@
 
 #include <pdal/Stage.hpp>
 #include <pdal/Writer.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/Uuid.hpp>
 
 #include <rust/pdal-capi/include/pdal_capi.h>
@@ -116,7 +117,7 @@ std::string Writer::replaceTags(std::string filename)
     // Replace '#uuid#' placeholder with an actual uuid (routed through Rust).
     char* replaced = pdal_writer_replace_tags(filename.c_str());
     if (!replaced)
-        throw pdal_error(pdal_last_error());
+        rust_view_converter::throwLastError("Failed to replace writer tags.");
     std::string result(replaced);
     pdal_string_free(replaced);
     return result;
@@ -129,7 +130,8 @@ Writer::handleFilenameTemplate(const std::string& filename)
     // PDAL_WRITER_NO_TEMPLATE matches std::string::npos.
     size_t pos = 0;
     if (!pdal_writer_handle_filename_template(filename.c_str(), &pos))
-        throw pdal_error(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to handle writer filename template.");
     return pos;
 }
 

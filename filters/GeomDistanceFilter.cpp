@@ -112,7 +112,7 @@ void GeomDistanceFilter::prepared(PointTableRef table)
     pdal_stage_t* stage = pdal_stage_create_geomdistance(
         "POLYGON((0 0,1 0,1 1,0 1,0 0))", m_args->m_dimName.c_str(), false);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

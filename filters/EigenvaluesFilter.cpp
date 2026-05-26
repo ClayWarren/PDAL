@@ -112,7 +112,7 @@ void EigenvaluesFilter::prepared(PointTableRef table)
         m_args->m_knn, m_args->m_normalize, m_args->m_stride,
         m_args->m_radiusArg->set(), m_args->m_radius, m_args->m_minK);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

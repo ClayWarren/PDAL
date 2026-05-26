@@ -73,7 +73,7 @@ void EstimateRankFilter::prepared(PointTableRef table)
     (void)table;
     pdal_stage_t* stage = pdal_stage_create_estimaterank(m_knn, m_thresh);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

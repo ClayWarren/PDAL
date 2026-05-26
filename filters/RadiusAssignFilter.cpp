@@ -1,8 +1,8 @@
 #include "RadiusAssignFilter.hpp"
 
-#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/StageFactory.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
@@ -105,7 +105,7 @@ void RadiusAssignFilter::initialize()
         assignments.empty() ? nullptr : assignments.data(), assignments.size(),
         m_radius, m_search3d, m_max2dAbove, m_max2dBelow);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

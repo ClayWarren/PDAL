@@ -68,7 +68,7 @@ std::istream& operator>>(std::istream& in,
     if (pdal::FileUtils::fileExists(arg))
         matrix_str = pdal::FileUtils::readFileIntoString(arg);
 
-    double matrix[TransformationFilter::Transform::Size] {};
+    double matrix[TransformationFilter::Transform::Size]{};
     char* error = pdal_transformation_matrix_parse(matrix_str.c_str(), matrix);
     if (error)
     {
@@ -87,7 +87,7 @@ std::istream& operator>>(std::istream& in,
 std::ostream& operator<<(std::ostream& out,
                          const pdal::TransformationFilter::Transform& xform)
 {
-    double matrix[TransformationFilter::Transform::Size] {};
+    double matrix[TransformationFilter::Transform::Size]{};
     for (size_t i = 0; i < xform.Size; ++i)
         matrix[i] = xform[i];
 
@@ -163,7 +163,7 @@ void TransformationFilter::prepared(PointTableRef table)
 
     pdal_stage_t* stage = pdal_stage_create_transformation(mat_vals.data());
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

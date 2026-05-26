@@ -42,6 +42,7 @@
 
 #include <io/private/las/Header.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
 
@@ -105,8 +106,8 @@ std::string make_temp_las_path(const std::string& hint)
     static std::atomic<uint64_t> counter{0};
     uint64_t id = counter.fetch_add(1) ^
                   static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&counter));
-    std::string base = "pdal_nitf_payload_" + std::to_string(id) + "_" + hint
-                       + ".las";
+    std::string base =
+        "pdal_nitf_payload_" + std::to_string(id) + "_" + hint + ".las";
     return (dir / base).string();
 }
 
@@ -119,8 +120,8 @@ void NitfWriter::readyFile(const std::string& filename,
     // payload is staged in a temp file that LasWriter writes through its
     // standard (now Rust-backed) flow.
     m_nitf.setFilename(filename);
-    m_payloadPath = make_temp_las_path(
-        std::filesystem::path(filename).stem().string());
+    m_payloadPath =
+        make_temp_las_path(std::filesystem::path(filename).stem().string());
     LasWriter::readyFile(m_payloadPath, srs);
 }
 
@@ -132,9 +133,9 @@ void NitfWriter::doneFile()
     BOX3D bounds = reprojectBoxToDD(m_srs, header().bounds);
 
     pdal_nitf_write_options_t opts{};
-    std::string title =
-        m_nitf.m_fileTitle.empty() ? FileUtils::getFilename(m_nitf.m_filename)
-                                   : m_nitf.m_fileTitle;
+    std::string title = m_nitf.m_fileTitle.empty()
+                            ? FileUtils::getFilename(m_nitf.m_filename)
+                            : m_nitf.m_fileTitle;
     opts.file_title = title.c_str();
     opts.complexity_level =
         m_nitf.m_cLevel.empty() ? nullptr : m_nitf.m_cLevel.c_str();
@@ -155,9 +156,9 @@ void NitfWriter::doneFile()
                       ? nullptr
                       : m_nitf.m_securityControlAndHandling.c_str();
     opts.fscltx = m_nitf.m_sic.empty() ? nullptr : m_nitf.m_sic.c_str();
-    opts.image_security_class =
-        m_nitf.m_imgSecurityClass.empty() ? nullptr
-                                          : m_nitf.m_imgSecurityClass.c_str();
+    opts.image_security_class = m_nitf.m_imgSecurityClass.empty()
+                                    ? nullptr
+                                    : m_nitf.m_imgSecurityClass.c_str();
     opts.image_date_time =
         m_nitf.m_imgDate.empty() ? nullptr : m_nitf.m_imgDate.c_str();
     opts.image_id2 = m_nitf.m_imgIdentifier2.empty()
@@ -188,7 +189,7 @@ void NitfWriter::doneFile()
     std::remove(m_payloadPath.c_str());
     m_payloadPath.clear();
     if (!ok)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust NITF writer failed.");
 }
 
 } // namespace pdal

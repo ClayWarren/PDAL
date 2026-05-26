@@ -94,7 +94,7 @@ void GpsTimeConvert::initialize()
     pdal_options_destroy(ops);
 
     if (!m_rustStage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
 }
 
 void GpsTimeConvert::prepared(PointTableRef table)

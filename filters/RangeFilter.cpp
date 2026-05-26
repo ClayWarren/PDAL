@@ -106,7 +106,7 @@ void RangeFilter::prepared(PointTableRef table)
 
     m_rust_stage = pdal_stage_create_range(limits.data(), limits.size());
     if (!m_rust_stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
 
     m_layout = layout;
 }

@@ -36,6 +36,7 @@
 
 #include <pdal/Options.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
 #include <ctime>
@@ -138,7 +139,8 @@ void FauxReader::prepared(PointTableRef table)
         pdal_reader_t* reader = pdal_reader_create_faux(options);
         pdal_options_destroy(options);
         if (!reader)
-            throwError(pdal_last_error());
+            rust_view_converter::throwLastError(
+                "Failed to create Rust faux reader.");
         pdal_reader_destroy(reader);
     }
 }

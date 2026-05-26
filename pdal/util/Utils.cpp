@@ -93,6 +93,12 @@ StringList takeRustStringList(char* value)
     }
 }
 
+std::string lastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    return message && message[0] ? message : fallback;
+}
+
 } // unnamed namespace
 #endif
 
@@ -137,7 +143,7 @@ Utils::StatusWithReason Utils::fromString(const std::string& from, int& to)
     pdal_clear_error();
     if (pdal_utils_from_string_i32(from.c_str(), &to) == 0)
         return true;
-    return {-1, pdal_last_error()};
+    return {-1, lastRustError("Rust integer parsing failed.")};
 #else
     static thread_local Utils::IStringStreamClassicLocale iss;
     iss.clear();

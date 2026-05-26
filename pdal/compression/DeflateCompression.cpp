@@ -45,6 +45,12 @@ namespace pdal
 namespace
 {
 
+compression_error lastCompressionError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    return compression_error(message && message[0] ? message : fallback);
+}
+
 // Forward Rust-produced output bytes to the block callback and release them.
 void emitRustBytes(const BlockCb& cb, uint8_t* buf, size_t len)
 {
@@ -80,7 +86,8 @@ public:
         size_t outlen = 0;
         if (!pdal_deflate_compressor_update(m_compressor, buf, bufsize, &out,
                                             &outlen))
-            throw compression_error(pdal_last_error());
+            throw lastCompressionError(
+                "Rust deflate compressor update failed.");
         emitRustBytes(m_cb, out, outlen);
     }
 
@@ -89,7 +96,8 @@ public:
         uint8_t* out = nullptr;
         size_t outlen = 0;
         if (!pdal_deflate_compressor_finish(m_compressor, &out, &outlen))
-            throw compression_error(pdal_last_error());
+            throw lastCompressionError(
+                "Rust deflate compressor finish failed.");
         emitRustBytes(m_cb, out, outlen);
     }
 
@@ -168,7 +176,8 @@ public:
             size_t outlen = 0;
             if (!pdal_deflate_decompressor_update(m_decompressor, buf, bufsize,
                                                   &out, &outlen))
-                throw compression_error(pdal_last_error());
+                throw lastCompressionError(
+                    "Rust deflate decompressor update failed.");
             emitRustBytes(m_cb, out, outlen);
         }
         else
@@ -183,7 +192,8 @@ public:
             size_t outlen = 0;
             if (!pdal_deflate_decompressor_finish(m_decompressor, &out,
                                                   &outlen))
-                throw compression_error(pdal_last_error());
+                throw lastCompressionError(
+                    "Rust deflate decompressor finish failed.");
             emitRustBytes(m_cb, out, outlen);
         }
         else

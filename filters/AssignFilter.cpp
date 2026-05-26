@@ -35,9 +35,9 @@
 
 #include "AssignFilter.hpp"
 #include "private/DimRange.hpp"
-#include <pdal/private/RustViewConverter.hpp>
 #include "private/expr/AssignStatement.hpp"
 #include <pdal/StageFactory.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
@@ -153,7 +153,7 @@ void AssignFilter::prepared(PointTableRef table)
     for (const std::string& value : m_args->m_valueStrings)
     {
         if (!pdal_stage_validate_assign_statement(value.c_str()))
-            throwError(pdal_last_error());
+            rust_view_converter::throwLastError("Rust C ABI call failed.");
 
         expr::AssignStatement stmt;
         Utils::StatusWithReason status = Utils::fromString(value, stmt);

@@ -160,10 +160,10 @@ void DividerFilter::prepared(PointTableRef table)
     if (m_args->m_sizeMode == SizeMode::Capacity)
         size_mode_val = 1;
 
-    pdal_stage_t* stage = pdal_stage_create_divider(
-        mode_val, size_mode_val, m_args->m_size, nullptr, 0);
+    pdal_stage_t* stage = pdal_stage_create_divider(mode_val, size_mode_val,
+                                                    m_args->m_size, nullptr, 0);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

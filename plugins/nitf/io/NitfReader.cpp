@@ -34,6 +34,7 @@
 
 #include "NitfReader.hpp"
 
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal_capi.h>
 
 namespace pdal
@@ -84,7 +85,8 @@ void NitfReader::initialize(PointTableRef table)
     uint64_t length = 0;
     if (!pdal_nitf_lidar_segment(m_filename.c_str(), &offset, &length))
     {
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to locate Rust NITF lidar segment.");
     }
     m_offset = offset;
     m_length = length;
@@ -93,7 +95,8 @@ void NitfReader::initialize(PointTableRef table)
     if (!pdal_nitf_read_metadata(m_filename.c_str(), &append_nitf_metadata,
                                  &m_metadata))
     {
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to read Rust NITF metadata.");
     }
     m_metadata.add("DESDATA_OFFSET", m_offset);
     m_metadata.add("DESDATA_LENGTH", m_length);

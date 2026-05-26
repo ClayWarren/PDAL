@@ -81,6 +81,7 @@ TEST(ZsmoothFilterTest, create)
 
     Options opts;
     opts.add("radius", 1.0);
+    opts.add("dim", "Zsmooth");
     filter->setOptions(opts);
 
     BufferReader reader;

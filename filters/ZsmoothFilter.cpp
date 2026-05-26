@@ -89,7 +89,7 @@ void ZsmoothFilter::prepared(PointTableRef)
     pdal_stage_t* stage =
         pdal_stage_create_zsmooth(m_p->radius, m_p->pos, m_p->dimName.c_str());
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

@@ -58,10 +58,7 @@ std::string MongoExpressionFilter::getName() const
     return s_info.name;
 }
 
-MongoExpressionFilter::MongoExpressionFilter()
-    : m_args(new Args())
-{
-}
+MongoExpressionFilter::MongoExpressionFilter() : m_args(new Args()) {}
 
 MongoExpressionFilter::~MongoExpressionFilter()
 {
@@ -81,7 +78,7 @@ void MongoExpressionFilter::initialize()
         pdal_stage_destroy(m_rust_stage);
     m_rust_stage = pdal_stage_create_mongoexpression(m_args->m_json.c_str());
     if (!m_rust_stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
 }
 
 void MongoExpressionFilter::prepared(PointTableRef table)

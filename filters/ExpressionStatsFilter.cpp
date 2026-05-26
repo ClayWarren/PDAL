@@ -34,9 +34,9 @@
 
 #include "ExpressionStatsFilter.hpp"
 
+#include "./private/expr/ConditionalExpression.hpp"
 #include "private/RustMetadata.hpp"
 #include <pdal/private/RustViewConverter.hpp>
-#include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal_capi.h>
@@ -105,10 +105,10 @@ void ExpressionStatsFilter::initialize()
 
     if (m_rust_stage)
         pdal_stage_destroy(m_rust_stage);
-    m_rust_stage = pdal_stage_create_expressionstats(m_args->m_dimName.c_str(),
-                                                     exprs.data(), exprs.size());
+    m_rust_stage = pdal_stage_create_expressionstats(
+        m_args->m_dimName.c_str(), exprs.data(), exprs.size());
     if (!m_rust_stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
 }
 
 void ExpressionStatsFilter::prepared(PointTableRef table)
@@ -137,7 +137,8 @@ void ExpressionStatsFilter::done(PointTableRef table)
 {
     pdal_metadata_node_t* rustMetadata = pdal_stage_metadata(m_rust_stage);
     if (!rustMetadata)
-        rust_view_converter::throwLastError("Rust expressionstats metadata failed.");
+        rust_view_converter::throwLastError(
+            "Rust expressionstats metadata failed.");
 
     rust_metadata::addChildrenTo(m_metadata, rustMetadata);
     pdal_metadata_node_destroy(rustMetadata);

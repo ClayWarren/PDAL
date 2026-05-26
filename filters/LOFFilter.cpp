@@ -72,7 +72,7 @@ void LOFFilter::prepared(PointTableRef table)
     (void)table;
     pdal_stage_t* stage = pdal_stage_create_lof(m_minpts);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
     pdal_stage_destroy(stage);
 }
 

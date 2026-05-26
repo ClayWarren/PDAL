@@ -78,7 +78,7 @@ TEST(ExpressionStatsFilterTest, create)
     ExpressionStatsFilter filter;
     Options opts;
     opts.add("dimension", "X");
-    opts.add("where", "X > 0");
+    opts.add("expressions", "X > 0");
     filter.setOptions(opts);
 
     BufferReader reader;

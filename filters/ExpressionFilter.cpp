@@ -97,7 +97,7 @@ void ExpressionFilter::initialize()
         pdal_stage_destroy(m_rust_stage);
     m_rust_stage = pdal_stage_create_expression(exprs.data(), exprs.size());
     if (!m_rust_stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError("Rust C ABI call failed.");
 }
 
 void ExpressionFilter::prepared(PointTableRef table)

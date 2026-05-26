@@ -91,6 +91,12 @@ std::string takeRustString(char* value)
     return result;
 }
 
+std::string lastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    return message && message[0] ? message : fallback;
+}
+
 } // unnamed namespace
 
 namespace FileUtils
@@ -238,7 +244,8 @@ bool createDirectory(const std::string& dirname)
         int32_t res = pdal_file_utils_create_directory(dirname.c_str());
         if (res == -1)
         {
-            throw std::runtime_error(pdal_last_error());
+            throw std::runtime_error(
+                lastRustError("Failed to create directory."));
         }
         return res == 1;
     }
@@ -266,7 +273,8 @@ bool createDirectories(const std::string& dirname)
         int32_t res = pdal_file_utils_create_directories(dirname.c_str());
         if (res == -1)
         {
-            throw std::runtime_error(pdal_last_error());
+            throw std::runtime_error(
+                lastRustError("Failed to create directories."));
         }
         return res == 1;
     }
