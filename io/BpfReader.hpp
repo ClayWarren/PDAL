@@ -37,18 +37,13 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
 #include <pdal/pdal_export.hpp>
-#include <pdal/util/Charbuf.hpp>
-#include <pdal/util/IStream.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
-
-#include "BpfHeader.hpp"
-
-#include <vector>
 
 namespace pdal
 {
@@ -67,31 +62,11 @@ public:
     {
         if (m_rustView)
             return (point_count_t)pdal_point_view_length(m_rustView);
-        return (point_count_t)m_header.m_numPts;
+        return 0;
     }
 
 private:
-    ILeStream m_stream;
-    BpfHeader m_header;
-    BpfDimensionList m_dims;
-    Dimension::IdList m_schemaDims;
-    BpfUlemHeader m_ulemHeader;
-    std::vector<BpfUlemFrame> m_ulemFrames;
-    BpfPolarHeader m_polarHeader;
-    std::vector<BpfPolarFrame> m_polarFrames;
-    /// Stream position at the beginning of point records.
-    std::streampos m_start;
-    /// Index of the next point to read.
-    point_count_t m_index;
-    /// Buffer for deflated data.
-    std::vector<char> m_deflateBuf;
-    /// Streambuf for deflated data.
-    Charbuf m_charbuf;
     std::unique_ptr<Args> m_args;
-
-    // For dimension-major point-at-a-time usage.
-    std::vector<std::unique_ptr<ILeStream>> m_streams;
-    std::vector<std::unique_ptr<Charbuf>> m_charbufs;
 
     std::string m_remoteFilename;
     pdal_point_view_t* m_rustView = nullptr;
@@ -108,23 +83,8 @@ private:
     point_count_t read(PointViewPtr data, point_count_t num) override;
     void done(PointTableRef table) override;
 
-    bool readUlemData();
-    bool readUlemFiles();
-    bool readHeaderExtraData();
-    bool readPolarData();
-    void readPointMajor(PointRef& point);
-    point_count_t readPointMajor(PointViewPtr data, point_count_t count);
-    void readDimMajor(PointRef& point);
-    point_count_t readDimMajor(PointViewPtr data, point_count_t count);
-    void readByteMajor(PointRef& point);
-    point_count_t readByteMajor(PointViewPtr data, point_count_t count);
-    size_t readBlock(std::vector<char>& outBuf, size_t index);
     bool eof();
-    int inflate(char* inbuf, uint32_t insize, char* outbuf, uint32_t outsize);
 
-    void seekPointMajor(PointId ptIdx);
-    void seekDimMajor(size_t dimIdx, PointId ptIdx);
-    void seekByteMajor(size_t dimIdx, size_t byteIdx, PointId ptIdx);
     void copyRustPoint(PointRef& point, PointId rustIndex);
     void cleanupRemoteFile();
 };
