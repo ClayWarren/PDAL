@@ -230,7 +230,7 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is about `47,797` code LOC for the main first-party
+C++ tests and vendor, is about `47,134` code LOC for the main first-party
 surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools/`) after
 subtracting the current file-level wrapper/adapter estimate. That is still a
 ceiling, not a precise backlog: mixed files count as wrapper when they include
@@ -250,8 +250,8 @@ C++ implementation ceilings by area are approximately:
 | `io/` | 25,171 | 8,457 | 16,714 |
 | `kernels/` | 3,306 | 0 | 3,306 |
 | `apps/` | 340 | 340 | 0 |
-| `tools/` | 675 | 12 | 663 |
-| Mainline total | 74,259 | 26,462 | 47,797 |
+| `tools/` | 12 | 12 | 0 |
+| Mainline total | 73,596 | 26,462 | 47,134 |
 | `plugins/` deferred | 36,738 | 262 | 36,476 |
 
 Recompute the wrapper LOC baseline with:
