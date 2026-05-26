@@ -37,7 +37,10 @@
 #include <cmath>
 
 #include <pdal/PDALUtils.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+
+#include <nlohmann/json.hpp>
 
 namespace pdal
 {
@@ -152,16 +155,36 @@ void InfoFilter::initialize(PointTableRef table)
 void InfoFilter::ready(PointTableRef)
 {
     m_count = 0;
+    m_summaryJson.clear();
     m_idCur = m_idList.begin();
 }
 
 void InfoFilter::filter(PointView& view)
 {
-    PointRef point(view, 0);
-    for (PointId idx = 0; idx < view.size(); ++idx)
+    pdal_point_view_t* rustView = rust_view_converter::toRust(view);
+    char* summary = pdal_info_summary_json(
+        rustView, m_pointSpec.empty() ? nullptr : m_pointSpec.c_str(),
+        m_querySpec.empty() ? nullptr : m_querySpec.c_str());
+    pdal_point_view_destroy(rustView);
+    if (!summary)
+        rust_view_converter::throwLastError(
+            "Failed to compute filters.info summary.");
+
+    m_summaryJson = rust_view_converter::takeString(summary);
+    NL::json parsed = NL::json::parse(m_summaryJson);
+    m_count = parsed.value("num_points", static_cast<PointId>(view.size()));
+    if (parsed.contains("bbox"))
     {
-        point.setPointId(idx);
-        processOne(point);
+        const NL::json& bbox = parsed["bbox"];
+        if (bbox.contains("minx"))
+        {
+            m_bounds.minx = bbox["minx"].get<double>();
+            m_bounds.maxx = bbox["maxx"].get<double>();
+            m_bounds.miny = bbox["miny"].get<double>();
+            m_bounds.maxy = bbox["maxy"].get<double>();
+            m_bounds.minz = bbox["minz"].get<double>();
+            m_bounds.maxz = bbox["maxz"].get<double>();
+        }
     }
 }
 
@@ -209,6 +232,44 @@ bool InfoFilter::processOne(PointRef& point)
 
 void InfoFilter::done(PointTableRef table)
 {
+    if (!m_summaryJson.empty())
+    {
+        NL::json summary = NL::json::parse(m_summaryJson);
+        if (summary.contains("points"))
+        {
+            MetadataNode points("points");
+            for (const NL::json& jp : summary["points"])
+            {
+                MetadataNode node("point");
+                for (DimType& dt : m_dims)
+                {
+                    std::string name = table.layout()->dimName(dt.m_id);
+                    if (jp.contains(name))
+                        node.add(name, jp[name].get<double>());
+                }
+                if (jp.contains("PointId"))
+                    node.add("PointId", jp["PointId"].get<PointId>());
+                points.add(node);
+            }
+            if (points.hasChildren())
+                getMetadata().add(points);
+        }
+
+        getMetadata().add(Utils::toMetadata(m_bounds));
+        getMetadata().add("num_points", m_count);
+
+        std::string dims;
+        for (auto di = m_dims.begin(); di != m_dims.end();)
+        {
+            dims += table.layout()->dimName(di->m_id);
+            if (++di != m_dims.end())
+                dims += ", ";
+        }
+        getMetadata().add("dimensions", dims);
+        getMetadata().add(table.anySpatialReference().toMetadata());
+        return;
+    }
+
     // Point list
     MetadataNode points("points");
     for (NearPoint& np : m_results)

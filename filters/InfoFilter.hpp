@@ -89,6 +89,7 @@ private:
     void parseQuerySpec();
 
     MetadataNode m_pointRoot;
+    std::string m_summaryJson;
 
     std::string m_querySpec;
     point_count_t m_queryCount;
