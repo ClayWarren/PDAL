@@ -88,10 +88,13 @@ std::ostream& operator<<(std::ostream& out,
     {
     case CovarianceFeaturesFilter::Mode::Raw:
         out << "raw";
+        break;
     case CovarianceFeaturesFilter::Mode::SQRT:
         out << "sqrt";
+        break;
     case CovarianceFeaturesFilter::Mode::Normalized:
         out << "normalized";
+        break;
     }
     return out;
 }
@@ -184,7 +187,8 @@ void CovarianceFeaturesFilter::filter(PointView& view)
         m_knn, m_radiusArg->set(), m_radius, m_minK, m_stride,
         static_cast<uint8_t>(m_mode), m_optimal, dims.data(), dims.size());
     if (!stage)
-        throwError("Failed to create Rust covariancefeatures stage.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust covariancefeatures stage.");
 
     rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);

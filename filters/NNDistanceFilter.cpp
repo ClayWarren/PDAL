@@ -76,8 +76,10 @@ std::ostream& operator<<(std::ostream& out, const NNDistanceFilter::Mode& mode)
     {
     case NNDistanceFilter::Mode::Kth:
         out << "kth";
+        break;
     case NNDistanceFilter::Mode::Average:
         out << "avg";
+        break;
     }
     return out;
 }
