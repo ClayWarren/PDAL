@@ -167,23 +167,16 @@ void SpatialReference::setEpoch(const double& epoch)
 
 std::string SpatialReference::getPROJJSON() const
 {
-    OGRScopedSpatialReference poSRS = ogrCreateSrs(m_wkt, m_epoch);
-    std::string json("");
-    if (!poSRS)
+    char* rust_json = nullptr;
+    if (pdal_srs_wkt_to_projjson(m_wkt.c_str(), m_epoch, &rust_json))
+    {
+        std::string json(rust_json ? rust_json : "");
+        pdal_string_free(rust_json);
         return json;
-
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 1, 0)
-    char* poJSON(nullptr);
-    char** papszOptions = nullptr;
-    papszOptions = CSLSetNameValue(papszOptions, "INDENTATION_WIDTH", "2");
-    papszOptions = CSLSetNameValue(papszOptions, "SCHEMA", "");
-    poSRS->exportToPROJJSON(&poJSON, papszOptions);
-    if (poJSON)
-        json = std::string(poJSON);
-    CPLFree(poJSON);
-    CSLDestroy(papszOptions);
-#endif
-    return json;
+    }
+    if (rust_json)
+        pdal_string_free(rust_json);
+    return std::string();
 }
 
 void SpatialReference::parse(const std::string& s, std::string::size_type& pos)

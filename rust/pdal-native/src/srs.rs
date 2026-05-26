@@ -317,6 +317,33 @@ pub fn wkt_to_proj4(wkt: &str) -> Result<String, String> {
     }
 }
 
+/// Translate WKT into the PROJJSON string PDAL's
+/// `SpatialReference::getPROJJSON()` returns.
+pub fn wkt_to_projjson(wkt: &str, epoch: f64) -> Result<String, String> {
+    if wkt.is_empty() {
+        return Ok(String::new());
+    }
+    let wkt_c = CString::new(wkt).map_err(|e| e.to_string())?;
+    unsafe {
+        let srs = gdal_sys::OSRNewSpatialReference(std::ptr::null());
+        if srs.is_null() {
+            return Err("OSRNewSpatialReference returned null".into());
+        }
+        let mut wkt_ptr = wkt_c.as_ptr() as *mut c_char;
+        let err = gdal_sys::OSRImportFromWkt(srs, &mut wkt_ptr);
+        if err != gdal_sys::OGRErr::OGRERR_NONE {
+            gdal_sys::OSRDestroySpatialReference(srs);
+            return Ok(String::new());
+        }
+        if epoch != 0.0 {
+            gdal_sys::OSRSetCoordinateEpoch(srs, epoch);
+        }
+        let out = export_to_projjson(srs).unwrap_or_default();
+        gdal_sys::OSRDestroySpatialReference(srs);
+        Ok(out)
+    }
+}
+
 /// Return true when GDAL `OSRIsSame` considers the two WKT strings equivalent
 /// at the given coordinate epoch. Returns false when either string is empty or
 /// fails to import.
@@ -700,6 +727,17 @@ mod tests {
             .projjson
             .starts_with("{\n  \"type\": \"GeographicCRS\","));
         assert_eq!(result.epoch, 0.0);
+    }
+
+    #[test]
+    fn wkt_to_projjson_matches_user_input_projjson_shape() {
+        let result = user_input_to_wkt("EPSG:4326").unwrap();
+        let json = wkt_to_projjson(&result.wkt, result.epoch).unwrap();
+        assert!(json.starts_with("{\n  \"type\": \"GeographicCRS\","));
+        assert!(json.contains("\"name\": \"WGS 84\""));
+
+        assert_eq!(wkt_to_projjson("", 0.0).unwrap(), "");
+        assert_eq!(wkt_to_projjson("not wkt", 0.0).unwrap(), "");
     }
 
     #[test]

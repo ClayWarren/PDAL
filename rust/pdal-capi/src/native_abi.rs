@@ -431,6 +431,37 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_proj4(
     })
 }
 
+/// Translate WKT into the PROJJSON string PDAL's
+/// `SpatialReference::getPROJJSON()` produces. Returns an empty string when
+/// the WKT cannot be imported. Caller owns the returned string and must free it
+/// with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_projjson` must
+/// be null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_wkt_to_projjson(
+    wkt: *const c_char,
+    epoch: f64,
+    out_projjson: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || {
+        match srs::wkt_to_projjson(&c_string_lossy(wkt), epoch) {
+            Ok(projjson) => {
+                if let Some(out_projjson) = out_projjson.as_mut() {
+                    *out_projjson = string_to_c_ptr(projjson);
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
 /// Mirror `OGRSpatialReference::IsSame` for two WKT strings at the given
 /// coordinate epoch. Pass `0.0` for `epoch` when neither side has a fixed
 /// epoch. Returns `false` and clears `out_same` if either side fails to import.

@@ -659,6 +659,8 @@ extern "C"
     bool pdal_srs_user_input_to_wkt(const char* input, char** out_wkt,
                                     char** out_wkt2, double* out_epoch);
     bool pdal_srs_wkt_to_proj4(const char* wkt, char** out_proj4);
+    bool pdal_srs_wkt_to_projjson(const char* wkt, double epoch,
+                                  char** out_projjson);
     bool pdal_srs_is_same(const char* wkt_a, const char* wkt_b, double epoch,
                           bool* out_same);
     bool pdal_srs_identify_horizontal_epsg(const char* wkt, double epoch,

@@ -627,6 +627,40 @@ fn srs_wkt_to_proj4_returns_trimmed_string() {
 }
 
 #[test]
+fn srs_wkt_to_projjson_returns_pdal_formatted_json() {
+    unsafe {
+        let input = CString::new("EPSG:4326").unwrap();
+        let mut wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            input.as_ptr(),
+            &mut wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let wkt_str = take_string(wkt);
+        let _ = take_string(wkt2);
+        let wkt_c = CString::new(wkt_str).unwrap();
+        let mut projjson = std::ptr::null_mut();
+
+        assert!(pdal_srs_wkt_to_projjson(
+            wkt_c.as_ptr(),
+            epoch,
+            &mut projjson
+        ));
+        let json = take_string(projjson);
+        assert!(json.starts_with("{\n  \"type\": \"GeographicCRS\","));
+        assert!(json.contains("\"name\": \"WGS 84\""));
+
+        let empty = CString::new("").unwrap();
+        let mut projjson = std::ptr::null_mut();
+        assert!(pdal_srs_wkt_to_projjson(empty.as_ptr(), 0.0, &mut projjson));
+        assert_eq!(take_string(projjson), "");
+    }
+}
+
+#[test]
 fn srs_is_same_matches_equivalent_srs_through_c_abi() {
     unsafe {
         let a = CString::new("EPSG:4326").unwrap();
