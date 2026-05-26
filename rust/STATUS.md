@@ -49,7 +49,7 @@ Status definitions:
 | FBI I/O | in progress | TerraScan Fast Binary local path has byte-for-byte installed-PDAL read/write parity for the covered behavior. |
 | TerraSolid reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic TerraSolid format 2 fixtures. `.bin` is not inferred because it conflicts with FBI. |
 | Optech reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Optech CSD fixture data and localized WGS84 georeference math. |
-| BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
+| BPF I/O | in progress | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, including uncompressed and compressed point/dimension/byte interleaves, preview point count/SRS/header bounds/dimension labels, scaling, flex filenames, output dimensions, auto UTM, and bundled-file metadata. Remote files and deeper ULEM/polar metadata parity are deferred. |
 | GDAL reader/writer | prototype | Existing C++ GDAL reader unit-test shapes pass through the Rust-backed path for local raster-to-point-cloud behavior. Standard-mode C++ GDAL writer cases with simple GDAL options now route raster rendering through the Rust C ABI for Float64 core grid statistics, including comma-separated GDAL dataset metadata. Streaming, typed output, metadata on streaming tables, SRS override/default handling, and no-point error behavior remain C++. This is not broad GDAL/PROJ permission. |
 | Raster writer | in progress | Raster attachments on Rust point views can write through the Rust C ABI, and `pdal_filters_faceraster_test` now exercises the Rust-backed `writers.raster` wrapper. Named/multi-raster behavior is narrow and broader GDAL raster data-type parity remains open. |
 | STAC reader | prototype | Local STAC Item/Collection/FeatureCollection traversal can read local and covered remote assets through already-ported readers. Preview supports item/date/bounds pruning, local structural validation for the schema-flag fixture shapes, and the GeoJSON OGR-boundary shape covered by existing C++ tests. Execution supports item/property filters and reader-specific args for the existing mixed EPT/COPC workflow. Full remote JSON-schema resolution, general OGR filters, and threaded catalog crawling are deferred. |
@@ -220,6 +220,38 @@ points, split approximately as `pdal/` 7,387 LOC, `filters/` 5,917 LOC, and
 `io/` 6,107 LOC. This is a coarse ceiling because several files still mix real
 legacy implementation with wrapper calls; the number should shrink as wrappers
 are split from implementation.
+
+Next implementation-replacement checkpoint: all portable first-party C++
+implementation has moved behind the Rust C ABI, leaving only compatibility
+glue/wrappers and documented intentional C++ holdouts. This is separate from
+final port completion: the C++ tests can pass before every portable
+implementation is replaced, and final completion still requires packaging,
+install/export, CI, performance, platform, and plugin decisions.
+
+Current remaining C++ port-candidate ceiling for that checkpoint, excluding
+C++ tests and vendor, is about `47,797` code LOC for the main first-party
+surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools/`) after
+subtracting the current file-level wrapper/adapter estimate. That is still a
+ceiling, not a precise backlog: mixed files count as wrapper when they include
+the C ABI even if they still contain legacy implementation, and intentional C++
+holdouts have not all been subtracted. Optional `plugins/` add another deferred
+ceiling of about `36,476` code LOC; plugin work should stay separate from the
+mainline implementation-replacement checkpoint until the plugin ABI/support
+decision is made.
+
+Using the same simple nonblank/noncomment line counter, the current first-party
+C++ implementation ceilings by area are approximately:
+
+| Area | First-party C++ LOC | Wrapper/adapter LOC | Port-candidate ceiling |
+|---|---:|---:|---:|
+| `pdal/` | 24,072 | 8,736 | 15,336 |
+| `filters/` | 20,695 | 8,917 | 11,778 |
+| `io/` | 25,171 | 8,457 | 16,714 |
+| `kernels/` | 3,306 | 0 | 3,306 |
+| `apps/` | 340 | 340 | 0 |
+| `tools/` | 675 | 12 | 663 |
+| Mainline total | 74,259 | 26,462 | 47,797 |
+| `plugins/` deferred | 36,738 | 262 | 36,476 |
 
 Recompute the wrapper LOC baseline with:
 

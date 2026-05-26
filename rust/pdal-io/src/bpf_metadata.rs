@@ -1,5 +1,5 @@
 use super::bpf_base64::encode_base64;
-use super::{fixed_label, io_error, BpfHeader};
+use super::{fixed_label, io_error, BpfDimension, BpfHeader};
 use byteorder::{LittleEndian, ReadBytesExt};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::stage::StageError;
@@ -8,6 +8,7 @@ use std::io::{Read, Seek, SeekFrom};
 pub(super) fn reader_metadata<R: Read + Seek>(
     reader: &mut R,
     header: &BpfHeader,
+    dims: &[BpfDimension],
 ) -> Result<MetadataNode, StageError> {
     let mut metadata = MetadataNode::new("readers.bpf");
     skip_ulem_data(reader)?;
@@ -29,6 +30,13 @@ pub(super) fn reader_metadata<R: Read + Seek>(
         metadata.add_child(child);
     }
     metadata.add_value("count", MetadataValue::U64(header.num_pts as u64));
+    for dim in dims {
+        let mut node = MetadataNode::new("dimension");
+        node.add_value("name", MetadataValue::String(dim.original_label.clone()));
+        node.add_value("min", MetadataValue::F64(dim.min));
+        node.add_value("max", MetadataValue::F64(dim.max));
+        metadata.add_child(node);
+    }
     Ok(metadata)
 }
 

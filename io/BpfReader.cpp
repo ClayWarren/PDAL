@@ -128,7 +128,7 @@ MetadataNode addMetadataChild(MetadataNode& parent,
                           description);
     case 3:
         return parent.add(name, pdal_metadata_node_value_f64(rustNode),
-                          description);
+                          description, 17);
     case 4:
         return parent.add(name, pdal_metadata_node_value_bool(rustNode),
                           description);
@@ -199,43 +199,31 @@ QuickInfo BpfReader::inspect()
         pdal_spatial_reference_destroy(srs);
     }
 
-    std::istream* streamPtr = Utils::openFile(m_filename);
-    if (!streamPtr)
-        throwError("Can't open file '" + m_filename + "'.");
-    ILeStream stream(streamPtr);
-    BpfHeader header;
-    header.setLog(log());
-    BpfDimensionList dims;
-    try
+    for (MetadataNode& dim : m_metadata.children("dimension"))
     {
-        if (!header.read(stream) ||
-            !header.readDimensions(stream, dims, m_args->m_fixNames))
-            throwError("Couldn't read BPF header.");
-    }
-    catch (const BpfHeader::error& err)
-    {
-        Utils::closeFile(streamPtr);
-        throwError(err.what());
-    }
-    Utils::closeFile(streamPtr);
+        MetadataNode name = dim.findChild("name");
+        if (name)
+            qi.m_dimNames.push_back(name.value());
 
-    for (BpfDimension& dim : dims)
-    {
-        qi.m_dimNames.push_back(dim.m_label);
-        if (dim.m_label == "X")
+        MetadataNode min = dim.findChild("min");
+        MetadataNode max = dim.findChild("max");
+        if (name && min && max)
         {
-            qi.m_bounds.minx = dim.m_min;
-            qi.m_bounds.maxx = dim.m_max;
-        }
-        if (dim.m_label == "Y")
-        {
-            qi.m_bounds.miny = dim.m_min;
-            qi.m_bounds.maxy = dim.m_max;
-        }
-        if (dim.m_label == "Z")
-        {
-            qi.m_bounds.minz = dim.m_min;
-            qi.m_bounds.maxz = dim.m_max;
+            if (name.value() == "X")
+            {
+                qi.m_bounds.minx = min.value<double>();
+                qi.m_bounds.maxx = max.value<double>();
+            }
+            if (name.value() == "Y")
+            {
+                qi.m_bounds.miny = min.value<double>();
+                qi.m_bounds.maxy = max.value<double>();
+            }
+            if (name.value() == "Z")
+            {
+                qi.m_bounds.minz = min.value<double>();
+                qi.m_bounds.maxz = max.value<double>();
+            }
         }
     }
     return qi;

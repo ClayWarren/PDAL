@@ -44,6 +44,7 @@ struct BpfDimension {
     min: f64,
     max: f64,
     label: String,
+    original_label: String,
     id: DimId,
 }
 
@@ -127,7 +128,7 @@ impl Reader for BpfReader {
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;
         let dims = read_dimensions(&mut reader, &header, self.fix_dims)?;
-        self.metadata = reader_metadata(&mut reader, &header)?;
+        self.metadata = reader_metadata(&mut reader, &header, &dims)?;
 
         reader
             .seek(SeekFrom::Start(header.len as u64))
@@ -395,6 +396,7 @@ fn read_dimensions<R: Read>(
         let mut label = [0u8; 32];
         reader.read_exact(&mut label).map_err(io_error)?;
         dim.label = fixed_label(&label);
+        dim.original_label = dim.label.clone();
         if fix_dims {
             dim.label = fix_dimension_name(&dim.label);
         }
@@ -581,6 +583,7 @@ fn bpf_dimension(
         min,
         max,
         label: id.name().to_string(),
+        original_label: id.name().to_string(),
         id: id.clone(),
     })
 }
@@ -952,6 +955,7 @@ impl BpfDimension {
             min: f64::MAX,
             max: f64::MIN,
             label: label.to_string(),
+            original_label: label.to_string(),
             id: DimId::from_name(label),
         }
     }
