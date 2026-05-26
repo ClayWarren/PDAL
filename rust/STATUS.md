@@ -694,9 +694,11 @@ algorithm decision.
 - Now Rust C ABI-backed: `Normal`, including optional MST refinement.
 - Now Rust C ABI-backed: `RadiusAssign`, including computed and conditional
   update expressions.
+- Now Rust C ABI-backed: `NeighborClassifier`; the C++ wrapper only keeps
+  option validation and candidate-reader loading.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass:
-  `NeighborClassifier`, `CovarianceFeatures`.
+  `CovarianceFeatures`.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source
 material. Its C++ wiring passed C++ object pointers across the C ABI and broke

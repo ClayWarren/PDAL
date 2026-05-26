@@ -35,13 +35,11 @@
 #pragma once
 
 #include <pdal/Filter.hpp>
-#include <unordered_map>
 
 namespace pdal
 {
 
 struct DimRange;
-class KD3Index;
 
 class PDAL_EXPORT NeighborClassifierFilter : public Filter
 {
@@ -53,11 +51,8 @@ public:
 private:
     void addArgs(ProgramArgs& args) override;
     void prepared(PointTableRef table) override;
-    bool doOne(PointRef& point, PointRef& temp, KD3Index& kdi);
     void filter(PointView& view) override;
     void initialize() override;
-    void ready(PointTableRef) override;
-    void doOneNoDomain(PointRef& point, PointRef& temp, KD3Index& kdi);
     PointViewPtr loadSet(const std::string& candFileName, PointTableRef table);
     NeighborClassifierFilter&
     operator=(const NeighborClassifierFilter&) = delete;
@@ -69,7 +64,6 @@ private:
     Dimension::Id m_dimId;
     std::string m_dimName;
     std::string m_candidateFile;
-    std::unordered_map<PointId, int> m_newClass;
 };
 
 } // namespace pdal

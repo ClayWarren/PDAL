@@ -34,9 +34,8 @@
 
 #include "NeighborClassifierFilter.hpp"
 
-#include <pdal/private/RustViewConverter.hpp>
-#include <pdal/KDIndex.hpp>
 #include <pdal/PipelineManager.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
@@ -111,58 +110,6 @@ void NeighborClassifierFilter::prepared(PointTableRef table)
     std::sort(m_domain.begin(), m_domain.end());
 }
 
-void NeighborClassifierFilter::ready(PointTableRef)
-{
-    m_newClass.clear();
-}
-
-void NeighborClassifierFilter::doOneNoDomain(PointRef& point, PointRef& temp,
-                                             KD3Index& kdi)
-{
-    PointIdList iSrc = kdi.neighbors(point, m_k);
-    double thresh = iSrc.size() / 2.0;
-
-    // vote NNs
-    using CountMap = std::map<int, unsigned int>;
-    CountMap counts;
-    // std::map<int, unsigned int> counts;
-    for (PointId id : iSrc)
-    {
-        temp.setPointId(id);
-        counts[temp.getFieldAs<int>(m_dimId)]++;
-    }
-
-    // pick winner of the vote
-    auto pr = *std::max_element(
-        counts.begin(), counts.end(),
-        [](CountMap::const_reference p1, CountMap::const_reference p2)
-        { return p1.second < p2.second; });
-
-    // update point
-    auto oldclass = point.getFieldAs<int>(m_dimId);
-    auto newclass = pr.first;
-    if (pr.second > thresh && oldclass != newclass)
-        m_newClass[point.pointId()] = newclass;
-}
-
-// update point.  kdi and temp both reference the NN point cloud
-bool NeighborClassifierFilter::doOne(PointRef& point, PointRef& temp,
-                                     KD3Index& kdi)
-{
-    if (m_domain.empty()) // No domain, process all points
-        doOneNoDomain(point, temp, kdi);
-
-    for (DimRange& r : m_domain)
-    { // process only points that satisfy a domain condition
-        if (r.valuePasses(point.getFieldAs<double>(r.m_id)))
-        {
-            doOneNoDomain(point, temp, kdi);
-            break;
-        }
-    }
-    return true;
-}
-
 PointViewPtr NeighborClassifierFilter::loadSet(const std::string& filename,
                                                PointTableRef table)
 {
@@ -194,7 +141,8 @@ void NeighborClassifierFilter::filter(PointView& view)
         domain.empty() ? nullptr : domain.data(), domain.size(), m_k,
         m_dimName.c_str());
     if (!stage)
-        throwError("Failed to create Rust neighborclassifier stage.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust neighborclassifier stage.");
 
     if (m_candidateFile.empty())
     { // No candidate file so NN comes from src file
