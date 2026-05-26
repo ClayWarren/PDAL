@@ -698,7 +698,9 @@ algorithm decision.
   option validation and candidate-reader loading.
 - Now Rust C ABI-backed: `CovarianceFeatures`; the C++ wrapper only keeps
   option parsing, output dimension registration, and input layout validation.
-- Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
+- Now Rust C ABI-backed: `Shell` command execution and environment lookup; the
+  C++ wrapper only keeps PDAL stage metadata/view plumbing.
+- Pipeline/process/framework behavior: `Info`, `StreamCallback`.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source
 material. Its C++ wiring passed C++ object pointers across the C ABI and broke

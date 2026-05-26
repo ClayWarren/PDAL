@@ -34,8 +34,10 @@
 
 #include "ShellFilter.hpp"
 
-#include <pdal/util/Algorithm.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
+
+#include <pdal_capi.h>
 
 #include <array>
 #include <cstdio>
@@ -66,11 +68,11 @@ void ShellFilter::addArgs(ProgramArgs& args)
 
 void ShellFilter::initialize()
 {
-    std::string allowed;
-    int set = Utils::getenv("PDAL_ALLOW_SHELL", allowed);
-    if (set == -1)
+    char* allowed = pdal_utils_getenv("PDAL_ALLOW_SHELL");
+    if (!allowed)
         throw pdal::pdal_error("PDAL_ALLOW_SHELL environment variable not set, "
                                "shell access is not allowed");
+    pdal_string_free(allowed);
 }
 
 PointViewSet ShellFilter::run(PointViewPtr view)
@@ -78,7 +80,9 @@ PointViewSet ShellFilter::run(PointViewPtr view)
     log()->get(LogLevel::Debug)
         << "running command : '" << m_command << "'" << '\n';
 
-    int status = Utils::run_shell_command(m_command.c_str(), m_command_output);
+    char* output = nullptr;
+    int status = pdal_utils_run_shell_command(m_command.c_str(), &output);
+    m_command_output = rust_view_converter::takeString(output);
     if (status)
     {
         std::stringstream msg;
