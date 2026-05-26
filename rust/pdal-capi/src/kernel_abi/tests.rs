@@ -1,5 +1,5 @@
 use super::*;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 #[test]
 fn rust_kernel_run_reports_unsupported_kernels() {
@@ -8,6 +8,43 @@ fn rust_kernel_run_reports_unsupported_kernels() {
     let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), 0, std::ptr::null()) };
 
     assert_eq!(result, -1);
+}
+
+#[test]
+fn rust_kernel_list_json_lists_command_metadata() {
+    let ptr = pdal_rust_kernel_list_json();
+    assert!(!ptr.is_null());
+
+    let text = unsafe { CStr::from_ptr(ptr) }.to_string_lossy();
+    let kernels: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let names: Vec<_> = kernels
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|kernel| kernel["name"].as_str().unwrap())
+        .collect();
+
+    assert_eq!(
+        names,
+        vec![
+            "chamfer",
+            "delta",
+            "density",
+            "eval",
+            "fauxplugin",
+            "ground",
+            "hausdorff",
+            "info",
+            "merge",
+            "pipeline",
+            "random",
+            "sort",
+            "split",
+            "tile",
+            "tindex",
+            "translate",
+        ]
+    );
 }
 
 #[test]

@@ -333,6 +333,7 @@ extern "C"
                                        char** option, char** value);
     int pdal_rust_kernel_run(const char* kernel_name, int argc,
                              const char* const* argv);
+    const char* pdal_rust_kernel_list_json(void);
 
     // Pipeline
     char* pdal_pipeline_generate_stage_tag(const char* stage_name,

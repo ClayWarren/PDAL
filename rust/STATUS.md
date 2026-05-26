@@ -58,7 +58,7 @@ Status definitions:
 | Pipeline JSON parsing | in progress | Narrow PDAL-style JSON arrays/root `pipeline` objects, filename string stages, scalar options, default linear dependencies, optional `tag`/`inputs`, and framework `where`/`where_merge` options work for command readiness. |
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
-| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. Every first-party C++ kernel command name has a Rust dispatch guard, and `pdal_app_test.option_file`, `pdal_app_test.load`, and `pdal_app_test.log` all count. `option_file` routes through the Rust translate option-file path, `load` exercises Rust kernel listing/dispatch plus the Rust-formatted unknown-command message (`pdal_app_unknown_command_message`), and `log` exercises Rust-formatted log line prefixes through `pdal_log_format_prefix` (the C++ `Log::get` only owns sink selection now). |
+| C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. Every first-party C++ kernel command name has a Rust dispatch guard, and `pdal_app_test.option_file`, `pdal_app_test.load`, `pdal_app_test.log`, and `pdal_app_test.listCommands` all count. `option_file` routes through the Rust translate option-file path, `load` exercises Rust kernel listing/dispatch plus the Rust-formatted unknown-command message (`pdal_app_unknown_command_message`), `listCommands` exercises Rust-owned command metadata for text and JSON output, and `log` exercises Rust-formatted log line prefixes through `pdal_log_format_prefix` (the C++ `Log::get` only owns sink selection now). |
 | Implemented commands | in progress | All 15 first-party C++ kernel commands (`chamfer`, `delta`, `density`, `eval`, `ground`, `hausdorff`, `info`, `merge`, `pipeline`, `random`, `sort`, `split`, `tile`, `tindex`, `translate`) are Rust-dispatchable through the C ABI and listed in Rust command metadata. They have installed-PDAL regression coverage for scoped workflows. `info` owns summary, metadata, point lookup, nearest query, stats with `--dimensions`, schema, all-mode schema/stat output, pipeline serialization, and the existing STAC app guard. Full STAC feature geometry/projection parity remains limited. `tile` owns the existing app tests, including globbed input, text/LAS output, per-source reprojection to `out_srs`, and writer text options. `tindex` owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, filelist create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, GeoJSON stdout layer-description option, fast bbox boundaries, SRS mismatch warning/skip behavior, and exact hexer-driven boundary generation for `--threshold`/`--resolution`/`--simplify` with optional `--where` point-expression filtering. GEOS topology-preserving simplification is applied through `pdal-native`. `ground` compares per-point classification against installed PDAL (>=99.8% agreement on `interesting.las` with `cell=10`) after the Rust SMRF implementation gained the low-outlier mask, net cutting, KD-tree inpainting, and full validation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
@@ -163,7 +163,7 @@ install/export/CI/regression/performance evidence strong enough for an
 upstreamable port.
 
 The branch-wide health metric, including guard tests added before and during
-the port, is `954 / 954` currently built C++ GoogleTest cases, or `100.00%`;
+the port, is `955 / 955` currently built C++ GoogleTest cases, or `100.00%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -355,13 +355,15 @@ Known mixed binaries:
   per-line `(LEADER LEVEL) ` prefix through the Rust C ABI via
   `pdal_log_format_prefix`. `t2` exercises the Rust `translate` kernel dispatch
   from the app while C++ still owns log sink selection.
-- `pdal_app_test`: `option_file`, `load`, and `log` count. `option_file` routes
-  through the Rust translate option-file path. `load` exercises Rust kernel
-  listing/dispatch (`pdal_kernel_list_json`, `pdal_kernel_run`) and the
+- `pdal_app_test`: `option_file`, `load`, `log`, and `listCommands` count.
+  `option_file` routes through the Rust translate option-file path. `load`
+  exercises Rust kernel listing/dispatch (`pdal_kernel_list_json`,
+  `pdal_kernel_run`) and the
   Rust-formatted unknown-command message
-  (`pdal_app_unknown_command_message`). `log` exercises the Rust-formatted
-  `Log::get` line prefix (`pdal_log_format_prefix`) for `-v Debug` /
-  `--verbose=3` / `--logtiming` / default-level behaviors.
+  (`pdal_app_unknown_command_message`). `listCommands` exercises the
+  Rust-owned command metadata list for text and JSON output. `log` exercises
+  the Rust-formatted `Log::get` line prefix (`pdal_log_format_prefix`) for
+  `-v Debug` / `--verbose=3` / `--logtiming` / default-level behaviors.
 - `pdal_stage_factory_test`: both pre-port cases count. `Load` reads the
   Rust-owned stage registry list, and `extensionTest` routes reader/writer
   driver inference through the Rust C ABI. The newer

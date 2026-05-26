@@ -132,7 +132,7 @@ COVERED: dict[str, object] = {
     },
     "pdal_kernel_test": ALL,
     "pdal_app_plugin_test": ALL,
-    "pdal_app_test": {"option_file", "load", "log"},
+    "pdal_app_test": {"option_file", "load", "log", "listCommands"},
     "chamfer_test": ALL,
     "hausdorff_test": ALL,
     "pdal_eval_test": ALL,

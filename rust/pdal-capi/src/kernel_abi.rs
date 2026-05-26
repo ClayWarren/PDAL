@@ -15,6 +15,34 @@ mod pipeline;
 mod split;
 mod tindex;
 
+const KERNEL_LIST_JSON: &str = concat!(
+    r#"[
+{"name":"chamfer","full_name":"kernels.chamfer","description":"Chamfer Kernel [DEPRECATED]"},
+{"name":"delta","full_name":"kernels.delta","description":"Delta Kernel [DEPRECATED]"},
+{"name":"density","full_name":"kernels.density","description":"Density Kernel [DEPRECATED]"},
+{"name":"eval","full_name":"kernels.eval","description":"Eval Kernel [DEPRECATED]"},
+{"name":"fauxplugin","full_name":"kernels.fauxplugin","description":"Faux Plugin Kernel"},
+{"name":"ground","full_name":"kernels.ground","description":"Ground Kernel [DEPRECATED]"},
+{"name":"hausdorff","full_name":"kernels.hausdorff","description":"Hausdorff Kernel [DEPRECATED]"},
+{"name":"info","full_name":"kernels.info","description":"Info Kernel"},
+{"name":"merge","full_name":"kernels.merge","description":"Merge Kernel"},
+{"name":"pipeline","full_name":"kernels.pipeline","description":"Pipeline Kernel"},
+{"name":"random","full_name":"kernels.random","description":"Random Kernel [DEPRECATED]"},
+{"name":"sort","full_name":"kernels.sort","description":"Sort Kernel"},
+{"name":"split","full_name":"kernels.split","description":"Split Kernel"},
+{"name":"tile","full_name":"kernels.tile","description":"Tile Kernel"},
+{"name":"tindex","full_name":"kernels.tindex","description":"TIndex Kernel"},
+{"name":"translate","full_name":"kernels.translate","description":"Translate Kernel"}
+]
+"#,
+    "\0"
+);
+
+#[no_mangle]
+pub extern "C" fn pdal_rust_kernel_list_json() -> *const c_char {
+    KERNEL_LIST_JSON.as_ptr().cast()
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn pdal_kernel_parse_stage_option(
     input: *const c_char,

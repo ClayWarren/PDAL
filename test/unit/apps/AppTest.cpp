@@ -84,6 +84,22 @@ TEST(PdalApp, log)
     EXPECT_TRUE(output.find("PDAL Debug)") == std::string::npos);
 }
 
+TEST(PdalApp, listCommands)
+{
+    std::string output;
+
+    Utils::run_shell_command(appName() + " --list-commands 2>&1", output);
+    EXPECT_TRUE(output.find("Usage") == std::string::npos);
+    EXPECT_TRUE(output.find("translate") != std::string::npos);
+
+    output.clear();
+    Utils::run_shell_command(appName() + " --list-commands --showjson 2>&1",
+                             output);
+    EXPECT_TRUE(output.find("\"name\": \"translate\"") != std::string::npos);
+    EXPECT_TRUE(output.find("\"full_name\": \"kernels.translate\"") !=
+                std::string::npos);
+}
+
 TEST(PdalApp, option_file)
 {
     std::string output;

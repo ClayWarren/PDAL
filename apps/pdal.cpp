@@ -204,6 +204,12 @@ void App::outputCommands(const std::string& leader)
     if (!kernels.is_array())
         return;
 
+    if (m_showJSON)
+    {
+        m_out << std::setw(4) << kernels;
+        return;
+    }
+
     for (auto const& kernel : kernels)
     {
         std::string name = stageField(kernel, "name");
@@ -374,11 +380,9 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
 
         LogLevel kernelLogLevel =
             m_logLevel != LogLevel::None ? m_logLevel : log->getLevel();
-        int ret = pdal_kernel_run(m_command.c_str(),
-                                  static_cast<int>(argv.size()), argv.data(),
-                                  m_log.c_str(),
-                                  static_cast<int>(kernelLogLevel),
-                                  m_logtiming);
+        int ret = pdal_kernel_run(
+            m_command.c_str(), static_cast<int>(argv.size()), argv.data(),
+            m_log.c_str(), static_cast<int>(kernelLogLevel), m_logtiming);
         if (ret != 0)
         {
             NL::json kernels = parseCapiJson(pdal_kernel_list_json());
@@ -390,8 +394,7 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
             }
             if (!found)
             {
-                char* raw =
-                    pdal_app_unknown_command_message(m_command.c_str());
+                char* raw = pdal_app_unknown_command_message(m_command.c_str());
                 std::string msg = raw ? raw : "";
                 pdal_string_free(raw);
                 log->get(LogLevel::Error) << msg << '\n' << '\n';
@@ -412,6 +415,8 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         outputVersion();
     else if (m_showDrivers)
         outputDrivers();
+    else if (m_showCommands)
+        outputCommands("");
     else if (m_showOptions.size())
     {
         if (m_showOptions == "all")

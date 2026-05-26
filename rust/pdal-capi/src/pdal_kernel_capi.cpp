@@ -73,6 +73,7 @@ extern "C"
 {
     int pdal_rust_kernel_run(const char* kernel_name, int argc,
                              const char* const* argv);
+    const char* pdal_rust_kernel_list_json();
 
     const char* pdal_version_string()
     {
@@ -84,23 +85,8 @@ extern "C"
     {
         try
         {
-            ensurePluginsLoaded();
-
-            NL::json arr = NL::json::array();
-            std::string kernelbase("kernels.");
-            for (const auto& name : PluginManager<Kernel>::names())
-            {
-                std::string shortName = name;
-                if (Utils::startsWith(name, kernelbase))
-                    shortName = name.substr(kernelbase.size());
-
-                arr.push_back({{"name", shortName},
-                               {"full_name", name},
-                               {"description",
-                                PluginManager<Kernel>::description(name)}});
-            }
-
-            return copyString(arr.dump());
+            const char* json = pdal_rust_kernel_list_json();
+            return json ? copyString(json) : nullptr;
         }
         catch (...)
         {
