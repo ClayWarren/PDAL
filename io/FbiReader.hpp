@@ -38,7 +38,6 @@
 #include <pdal/Reader.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <memory>
 #include <vector>
 
 #include "FbiHeader.hpp"
@@ -55,21 +54,16 @@ public:
 
     point_count_t getNumPoints() const
     {
-        return hdr->FastCnt;
+        return m_header.FastCnt;
     }
 
     const fbi::FbiHdr& getHeader() const
     {
-        return *hdr;
+        return m_header;
     }
 
-    // this is called by the stage's iterator
-    uint32_t processBuffer(PointViewPtr view, std::istream& stream,
-                           uint64_t numPointsLeft) const;
-
 private:
-    std::unique_ptr<fbi::FbiHdr> hdr;
-    std::istream* m_istreamPtr;
+    fbi::FbiHdr m_header;
     pdal_point_view_t* m_rustView = nullptr;
     PointId m_rustIndex = 0;
     Dimension::IdList m_dims;
@@ -81,6 +75,7 @@ private:
     void done(PointTableRef table) override;
     void addArgs(ProgramArgs& args) override;
     void copyPoint(PointViewPtr view, PointId outIdx);
+    void loadRustView();
 
     FbiReader& operator=(const FbiReader&); // not implemented
     FbiReader(const FbiReader&);            // not implemented

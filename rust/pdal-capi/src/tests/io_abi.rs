@@ -420,6 +420,31 @@ fn fbi_reader_returns_points_through_c_abi() {
 }
 
 #[test]
+fn fbi_header_info_returns_summary_through_c_abi() {
+    unsafe {
+        let filename = CString::new(data_path("fbi/1.2-with-color.fbi")).unwrap();
+        let mut info = pdal_fbi_header_info_t {
+            version: 0,
+            header_size: 0,
+            point_count: 0,
+            xyz_position: 0,
+        };
+
+        assert_eq!(pdal_fbi_header_info(filename.as_ptr(), &mut info), 0);
+        assert_eq!(info.version, 1);
+        assert_eq!(info.header_size, 1808);
+        assert_eq!(info.point_count, 1065);
+        assert_eq!(info.xyz_position, 1808);
+
+        assert_eq!(pdal_fbi_header_info(std::ptr::null(), &mut info), -1);
+        assert_eq!(
+            pdal_fbi_header_info(filename.as_ptr(), std::ptr::null_mut()),
+            -1
+        );
+    }
+}
+
+#[test]
 fn gdal_reader_honors_header_dimensions_through_c_abi() {
     unsafe {
         let options = pdal_options_create();

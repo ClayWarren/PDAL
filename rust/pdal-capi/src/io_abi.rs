@@ -218,6 +218,47 @@ pub unsafe extern "C" fn pdal_reader_create_fbi(ops: *const Options) -> *mut Rea
     }
 }
 
+#[repr(C)]
+pub struct pdal_fbi_header_info_t {
+    pub version: u32,
+    pub header_size: u32,
+    pub point_count: u64,
+    pub xyz_position: u64,
+}
+
+/// Read the FBI header summary needed by the C++ compatibility wrapper.
+///
+/// # Safety
+/// `filename` must be a valid NUL-terminated string and `out_info` must point
+/// to writable storage.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_fbi_header_info(
+    filename: *const c_char,
+    out_info: *mut pdal_fbi_header_info_t,
+) -> i32 {
+    if filename.is_null() || out_info.is_null() {
+        set_last_error("pdal_fbi_header_info received null input.");
+        return -1;
+    }
+
+    let path = CStr::from_ptr(filename).to_string_lossy().into_owned();
+    match pdal_io::fbi::header_info(Path::new(&path)) {
+        Ok(info) => {
+            *out_info = pdal_fbi_header_info_t {
+                version: info.version,
+                header_size: info.hdr_size,
+                point_count: info.fast_cnt,
+                xyz_position: info.pos_xyz,
+            };
+            0
+        }
+        Err(err) => {
+            set_last_error(err.to_string());
+            -1
+        }
+    }
+}
+
 /// Create a BpfReader from options.
 ///
 /// # Safety

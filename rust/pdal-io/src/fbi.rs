@@ -174,6 +174,26 @@ pub struct FbiReader {
     filename: String,
 }
 
+pub struct FbiHeaderInfo {
+    pub version: u32,
+    pub hdr_size: u32,
+    pub fast_cnt: u64,
+    pub pos_xyz: u64,
+}
+
+pub fn header_info(path: &Path) -> Result<FbiHeaderInfo, StageError> {
+    let file =
+        File::open(path).map_err(|_| StageError(format!("Couldn't open '{}'.", path.display())))?;
+    let mut reader = BufReader::new(file);
+    let header = read_header(&mut reader)?;
+    Ok(FbiHeaderInfo {
+        version: header.version,
+        hdr_size: header.hdr_size,
+        fast_cnt: header.fast_cnt,
+        pos_xyz: header.pos_xyz,
+    })
+}
+
 impl FbiReader {
     pub fn new(options: &Options) -> Self {
         Self {

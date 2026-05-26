@@ -1157,6 +1157,15 @@ extern "C"
     pdal_reader_t* pdal_reader_create_optech(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_terrasolid(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_fbi(const pdal_options_t* ops);
+    typedef struct
+    {
+        uint32_t version;
+        uint32_t header_size;
+        uint64_t point_count;
+        uint64_t xyz_position;
+    } pdal_fbi_header_info_t;
+    int32_t pdal_fbi_header_info(const char* filename,
+                                 pdal_fbi_header_info_t* out_info);
     pdal_reader_t* pdal_reader_create_bpf(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_gdal(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_las(const pdal_options_t* ops);
