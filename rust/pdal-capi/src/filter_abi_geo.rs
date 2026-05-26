@@ -223,6 +223,37 @@ pub unsafe extern "C" fn pdal_stage_create_colorization(
     }))
 }
 
+/// Create a DEM filter stage.
+///
+/// # Safety
+///
+/// `dim_name` and `raster_path` must be null-terminated strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_dem(
+    dim_name: *const c_char,
+    raster_path: *const c_char,
+    band: i32,
+    lower_bound: f64,
+    upper_bound: f64,
+) -> *mut StageWrapper {
+    if dim_name.is_null() || raster_path.is_null() {
+        set_last_error("null argument to pdal_stage_create_dem");
+        return std::ptr::null_mut();
+    }
+
+    let dim_name = CStr::from_ptr(dim_name).to_string_lossy();
+    let raster_path = CStr::from_ptr(raster_path).to_string_lossy();
+    Box::into_raw(Box::new(StageWrapper {
+        filter: Box::new(DEMFilter::new(
+            &dim_name,
+            &raster_path,
+            band,
+            lower_bound,
+            upper_bound,
+        )),
+    }))
+}
+
 #[no_mangle]
 pub extern "C" fn pdal_stage_create_h3(resolution: u64) -> *mut StageWrapper {
     Box::into_raw(Box::new(StageWrapper {

@@ -34,11 +34,10 @@
 
 #include "DEMFilter.hpp"
 
-#include <string>
-#include <vector>
-
 #include "private/DimRange.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/Raster.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -57,9 +56,13 @@ struct DEMArgs
     int32_t m_band;
 };
 
-DEMFilter::DEMFilter() : m_args(new DEMArgs) {}
+DEMFilter::DEMFilter() : m_args(new DEMArgs), m_rustStage(nullptr) {}
 
-DEMFilter::~DEMFilter() {}
+DEMFilter::~DEMFilter()
+{
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+}
 
 std::string DEMFilter::getName() const
 {
@@ -81,6 +84,14 @@ void DEMFilter::ready(PointTableRef table)
 {
     m_raster.reset(new gdal::Raster(m_args->m_raster));
     m_raster->open();
+    if (m_rustStage)
+        pdal_stage_destroy(m_rustStage);
+    m_rustStage = pdal_stage_create_dem(
+        m_args->m_range.m_name.c_str(), m_args->m_raster.c_str(),
+        m_args->m_band, m_args->m_range.m_lower_bound,
+        m_args->m_range.m_upper_bound);
+    if (!m_rustStage)
+        rust_view_converter::throwLastError("Unable to create Rust DEM stage.");
 }
 
 void DEMFilter::prepared(PointTableRef table)
@@ -96,41 +107,21 @@ void DEMFilter::prepared(PointTableRef table)
 
 bool DEMFilter::processOne(PointRef& point)
 {
-    static std::vector<double> data;
-    static std::array<double, 2> pix;
-
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    double z = point.getFieldAs<double>(m_args->m_dim);
-
-    bool passes(false);
-
-    if (m_raster->read(x, y, data, pix) == gdal::GDALError::None)
-    {
-        double v = data[m_args->m_band - 1];
-        double lb = v - m_args->m_range.m_lower_bound;
-        double ub = v + m_args->m_range.m_upper_bound;
-
-        if (z >= lb && z <= ub)
-            passes = true;
-    }
-    return passes;
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, point.layout());
+    bool keep = pdal_stage_process_one_at(m_rustStage, rustView, 0);
+    pdal_point_view_destroy(rustView);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust DEM stage failed.");
+    pdal_stage_reset(m_rustStage);
+    return keep;
 }
 
 PointViewSet DEMFilter::run(PointViewPtr inView)
 {
     PointViewSet viewSet;
 
-    PointViewPtr outView = inView->makeNew();
-
-    for (PointId i = 0; i < inView->size(); ++i)
-    {
-        PointRef point = inView->point(i);
-        if (processOne(point))
-            outView->appendPoint(*inView, i);
-    }
-
-    viewSet.insert(outView);
+    viewSet.insert(rust_view_converter::runSingle(m_rustStage, inView));
     return viewSet;
 }
 

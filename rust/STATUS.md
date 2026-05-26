@@ -30,7 +30,7 @@ Status definitions:
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
-| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; 51 are Rust-backed through the C ABI, 33 intentionally remain C++ for now, and 41 are visible through the Rust pipeline registry. Registry exposure is not the same as full pipeline parity. |
+| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; most now route meaningful behavior through the Rust C ABI, with `filters.dem` joining the Rust-backed set. Some wrappers still retain C++ validation, setup, or intentional holdouts; registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, and installed-PDAL regression coverage exists for scoped workflows. |
@@ -162,7 +162,7 @@ install/export/CI/regression/performance evidence strong enough for an
 upstreamable port.
 
 The branch-wide health metric, including guard tests added before and during
-the port, is `953 / 953` currently built C++ GoogleTest cases, or `100.00%`;
+the port, is `954 / 954` currently built C++ GoogleTest cases, or `100.00%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -641,10 +641,11 @@ are deliberately added to the registry with option parsing and coverage.
 These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
-- GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
-  option-complete behavior.
+- GDAL/PROJ/SRS/OGR-backed: `ProjPipeline` reverse-mode and option-complete
+  behavior.
 - Private or specialized algorithms: `CS`, `Georeference`, `Poisson`.
 - Now Rust C ABI-backed: `Delaunay`.
+- Now Rust C ABI-backed: `DEM`.
 - Now Rust C ABI-backed: `HagDelaunay`.
 - Now Rust C ABI-backed: `IterativeClosestPoint`.
 - Now Rust C ABI-backed: `M3C2`.

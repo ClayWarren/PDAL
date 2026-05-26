@@ -17,6 +17,7 @@ use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::csf::CsfFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
+use pdal_filters::dem::DEMFilter;
 use pdal_filters::divider;
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;

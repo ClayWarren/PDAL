@@ -312,6 +312,9 @@ COVERED: dict[str, object] = {
         "stream",
         "stream_fpstep",
     },
+    "pdal_filters_dem_test": {
+        "KeepsPointsInsideRasterRelativeLimits",
+    },
     "pdal_filters_ferry_test": {
         "create",
         "stream",

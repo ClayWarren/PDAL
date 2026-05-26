@@ -77,7 +77,7 @@ impl Streamable for DEMFilter {
         if let Some(ref r) = self.raster {
             if r.read_at(x, y, &mut data).is_ok() {
                 let v = data[self.band as usize - 1];
-                let lb = v + self.lower_bound; // PDAL adds limits to raster value
+                let lb = v - self.lower_bound;
                 let ub = v + self.upper_bound;
                 return z >= lb && z <= ub;
             }
@@ -126,7 +126,7 @@ mod tests {
     fn keeps_points_inside_dem_relative_bounds() {
         let temp = tempfile::NamedTempFile::with_suffix(".tif").unwrap();
         write_dem(temp.path().to_str().unwrap());
-        let mut filter = DEMFilter::new("Z", temp.path().to_str().unwrap(), 1, -1.0, 10.0);
+        let mut filter = DEMFilter::new("Z", temp.path().to_str().unwrap(), 1, 1.0, 10.0);
 
         let output = filter
             .run_one(&view(&[(0.5, 0.5, 105.0), (0.5, 0.5, 98.0)]))
@@ -141,12 +141,12 @@ mod tests {
     fn rejects_out_of_bounds_or_missing_rasters_and_resets() {
         let temp = tempfile::NamedTempFile::with_suffix(".tif").unwrap();
         write_dem(temp.path().to_str().unwrap());
-        let mut filter = DEMFilter::new("Z", temp.path().to_str().unwrap(), 1, -1.0, 10.0);
+        let mut filter = DEMFilter::new("Z", temp.path().to_str().unwrap(), 1, 1.0, 10.0);
         let mut input = view(&[(10.0, 10.0, 105.0)]);
 
         assert!(!filter.process_one(&mut input, 0));
         filter.reset();
-        assert!(DEMFilter::new("Z", "/no/such/dem.tif", 1, -1.0, 10.0)
+        assert!(DEMFilter::new("Z", "/no/such/dem.tif", 1, 1.0, 10.0)
             .run_one(&input)
             .is_err());
     }

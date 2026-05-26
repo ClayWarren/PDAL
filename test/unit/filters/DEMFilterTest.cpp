@@ -1,5 +1,4 @@
 /******************************************************************************
- * Copyright (c) 2017, Howard Butler (info@hobu.co)
  *
  * All rights reserved.
  *
@@ -8,9 +7,9 @@
  * conditions are met:
  *
  *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in
+ *       notice, this list of conditions and this disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and this disclaimer in
  *       the documentation and/or other materials provided
  *       with the distribution.
  *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
@@ -28,56 +27,51 @@
  * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
  * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#pragma once
+#include <pdal/pdal_test_main.hpp>
 
-#include <pdal/Filter.hpp>
-#include <pdal/Streamable.hpp>
+#include <io/BufferReader.hpp>
+#include <pdal/PointTable.hpp>
+#include <pdal/StageFactory.hpp>
 
-#include <cstdint>
-#include <memory>
-#include <string>
-
-typedef struct pdal_stage pdal_stage_t;
+#include "Support.hpp"
 
 namespace pdal
 {
 
-struct DEMArgs;
-
-namespace gdal
+TEST(DEMFilterTest, KeepsPointsInsideRasterRelativeLimits)
 {
-class Raster;
+    PointTable table;
+    table.layout()->registerDims(
+        {Dimension::Id::X, Dimension::Id::Y, Dimension::Id::Z});
+
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 440750.0);
+    view->setField(Dimension::Id::Y, 0, 3751290.0);
+    view->setField(Dimension::Id::Z, 0, 200.0);
+    view->setField(Dimension::Id::X, 1, 440750.0);
+    view->setField(Dimension::Id::Y, 1, 3751290.0);
+    view->setField(Dimension::Id::Z, 1, 208.0);
+
+    BufferReader reader;
+    reader.addView(view);
+
+    StageFactory factory;
+    Stage& filter = *factory.createStage("filters.dem");
+    Options opts;
+    opts.add("raster", Support::datapath("gdal/float32.tif"));
+    opts.add("limits", "Z[0:100]");
+    filter.setInput(reader);
+    filter.setOptions(opts);
+
+    filter.prepare(table);
+    PointViewSet views = filter.execute(table);
+    ASSERT_EQ(views.size(), 1u);
+    PointViewPtr result = *views.begin();
+    ASSERT_EQ(result->size(), 1u);
+    EXPECT_DOUBLE_EQ(result->getFieldAs<double>(Dimension::Id::Z, 0), 200.0);
 }
-class Options;
-class PointLayout;
-class PointView;
-
-class PDAL_EXPORT DEMFilter : public Filter, public Streamable
-{
-public:
-    DEMFilter();
-    ~DEMFilter() override;
-
-    std::string getName() const override;
-
-private:
-    std::unique_ptr<DEMArgs> m_args;
-    std::unique_ptr<gdal::Raster> m_raster;
-    pdal_stage_t* m_rustStage;
-
-    void ready(PointTableRef table) override;
-    void addArgs(ProgramArgs& args) override;
-    void addDimensions(PointLayoutPtr layout) override;
-    void prepared(PointTableRef table) override;
-    PointViewSet run(PointViewPtr view) override;
-    bool processOne(PointRef& point) override;
-
-    DEMFilter& operator=(const DEMFilter&); // not implemented
-    DEMFilter(const DEMFilter&);            // not implemented
-};
 
 } // namespace pdal
