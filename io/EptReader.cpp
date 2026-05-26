@@ -118,16 +118,41 @@ void publishRustEptArtifact(pdal_reader_t* reader, PointTableRef table,
         return;
     }
 
+    BOX3D rootBounds{};
+    if (parsed.contains("root_bounds") && parsed["root_bounds"].is_object())
+    {
+        const auto& b = parsed["root_bounds"];
+        rootBounds.minx = b.value<double>("minx", 0.0);
+        rootBounds.miny = b.value<double>("miny", 0.0);
+        rootBounds.minz = b.value<double>("minz", 0.0);
+        rootBounds.maxx = b.value<double>("maxx", 0.0);
+        rootBounds.maxy = b.value<double>("maxy", 0.0);
+        rootBounds.maxz = b.value<double>("maxz", 0.0);
+    }
+
+    auto keyWithBounds(
+        [&rootBounds](uint32_t d, uint32_t x, uint32_t y, uint32_t z)
+        {
+            ept::Key key;
+            key.b = rootBounds;
+            for (uint32_t level = 1; level <= d; ++level)
+            {
+                uint32_t shift = d - level;
+                uint64_t dir = ((x >> shift) & 1) | (((y >> shift) & 1) << 1) |
+                               (((z >> shift) & 1) << 2);
+                key = key.bisect(dir);
+            }
+            return key;
+        });
+
     auto hierarchy = std::make_unique<ept::Hierarchy>();
     if (parsed.contains("tiles") && parsed["tiles"].is_array())
     {
         for (const auto& t : parsed["tiles"])
         {
-            ept::Key k;
-            k.d = t.value<uint32_t>("d", 0);
-            k.x = t.value<uint32_t>("x", 0);
-            k.y = t.value<uint32_t>("y", 0);
-            k.z = t.value<uint32_t>("z", 0);
+            ept::Key k = keyWithBounds(
+                t.value<uint32_t>("d", 0), t.value<uint32_t>("x", 0),
+                t.value<uint32_t>("y", 0), t.value<uint32_t>("z", 0));
             point_count_t count = t.value<uint64_t>("count", 0);
             uint64_t nodeId = t.value<uint64_t>("node_id", 0);
             hierarchy->emplace(k, count, nodeId);
@@ -135,12 +160,12 @@ void publishRustEptArtifact(pdal_reader_t* reader, PointTableRef table,
     }
     size_t hierarchyStep = parsed.value<size_t>("hierarchy_step", 0);
 
-    auto info = std::make_unique<ept::EptInfo>(eptFilename,
-                                               connector::Connector());
+    auto info =
+        std::make_unique<ept::EptInfo>(eptFilename, connector::Connector());
     auto connector = std::make_unique<connector::Connector>();
-    auto artifact = std::make_shared<ept::Artifact>(
-        std::move(info), std::move(hierarchy), std::move(connector),
-        hierarchyStep);
+    auto artifact =
+        std::make_shared<ept::Artifact>(std::move(info), std::move(hierarchy),
+                                        std::move(connector), hierarchyStep);
     table.artifactManager().replaceOrPut("ept", artifact);
 }
 

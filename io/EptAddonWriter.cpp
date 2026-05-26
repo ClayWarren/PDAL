@@ -39,8 +39,10 @@
 #include <nlohmann/json.hpp>
 
 #include <pdal/ArtifactManager.hpp>
-#include <pdal/util/ThreadPool.hpp>
+#include <pdal/PDALUtils.hpp>
 #include <pdal/private/RustViewConverter.hpp>
+#include <pdal/util/ThreadPool.hpp>
+#include <pdal/util/Utils.hpp>
 
 #include <rust/pdal-capi/include/pdal_capi.h>
 
@@ -200,18 +202,83 @@ void EptAddonWriter::write(const PointViewPtr view)
 void EptAddonWriter::writeOne(const PointViewPtr view, const ept::Addon& addon,
                               HierarchyWriter& writer) const
 {
-    (void)writer; // Rust writer owns hierarchy emission now.
+    const bool connectorRequired = Utils::isRemote(addon.filename()) ||
+                                   Utils::startsWith(addon.filename(), "/vsi");
+    if (connectorRequired)
+    {
+        std::vector<std::vector<char>> buffers(m_hierarchy->size());
+
+        size_t itemSize = Dimension::size(addon.type());
+        for (const ept::Overlap& overlap : *m_hierarchy)
+        {
+            std::vector<char>& b = buffers[overlap.m_nodeId - 1];
+            b.resize(overlap.m_count * itemSize);
+        }
+
+        PointRef pr(*view);
+        uint64_t nodeId(0);
+        uint64_t pointId(0);
+        for (PointId i = 0; i < view->size(); ++i)
+        {
+            pr.setPointId(i);
+            nodeId = pr.getFieldAs<uint64_t>(m_nodeIdDim);
+
+            if (!nodeId)
+                continue;
+
+            pointId = pr.getFieldAs<uint64_t>(m_pointIdDim);
+
+            auto& buffer(buffers.at(nodeId - 1));
+            assert(pointId * itemSize + itemSize <= buffer.size());
+            char* dst = buffer.data() + pointId * itemSize;
+            pr.getField(dst, addon.externalId(), addon.type());
+        }
+
+        std::string dataDir = addon.dataDir();
+
+        m_connector->makeDir(dataDir);
+
+        for (const ept::Overlap& overlap : *m_hierarchy)
+        {
+            std::vector<char>& buffer = buffers.at(overlap.m_nodeId - 1);
+            std::string filename = dataDir + overlap.m_key.toString() + ".bin";
+            m_pool->add([this, filename, &buffer]()
+                        { m_connector->put(filename, buffer); });
+        }
+
+        m_pool->await();
+
+        NL::json h;
+        ept::Key key;
+        key.b = m_info->bounds();
+
+        std::string hierarchyDir = addon.hierarchyDir();
+        m_connector->makeDir(hierarchyDir);
+
+        writer.write(hierarchyDir, h, key);
+
+        std::string filename = hierarchyDir + key.toString() + ".json";
+        m_connector->put(filename, h.dump());
+
+        m_pool->await();
+
+        NL::json meta;
+        meta["type"] = Dimension::toName(Dimension::base(addon.type()));
+        meta["size"] = Dimension::size(addon.type());
+        meta["version"] = "1.0.0";
+        meta["dataType"] = "binary";
+
+        m_connector->put(addon.filename(), meta.dump());
+        return;
+    }
 
     // Hand the source view to Rust through the C ABI. The wrapper keeps owning
     // `view`; Rust borrows the materialized copy for the duration of the call.
     pdal_point_view_t* rustView = rust_view_converter::toRust(*view);
 
-    std::string nodeIdName =
-        view->layout()->dimName(m_nodeIdDim);
-    std::string pointIdName =
-        view->layout()->dimName(m_pointIdDim);
-    std::string sourceName =
-        view->layout()->dimName(addon.externalId());
+    std::string nodeIdName = view->layout()->dimName(m_nodeIdDim);
+    std::string pointIdName = view->layout()->dimName(m_pointIdDim);
+    std::string sourceName = view->layout()->dimName(addon.externalId());
 
     std::vector<pdal_ept_overlap_t> overlaps;
     overlaps.reserve(m_hierarchy->size());
@@ -248,8 +315,7 @@ void EptAddonWriter::writeOne(const PointViewPtr view, const ept::Addon& addon,
     pdal_point_view_destroy(rustView);
 
     if (rc != 0)
-        rust_view_converter::throwLastError(
-            "Rust EPT addon writer failed.");
+        rust_view_converter::throwLastError("Rust EPT addon writer failed.");
 }
 
 } // namespace pdal

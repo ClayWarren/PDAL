@@ -38,9 +38,8 @@ unsafe fn cstr_or_empty(ptr: *const c_char) -> String {
 
 /// Register a runtime stage plugin. `creator` is a C function pointer that
 /// returns a `T*` (the wrapper passes it as `void*`). Re-registering with the
-/// same key replaces the entry (mirrors the C++ map `insert` semantics, which
-/// silently keeps the original — we replace to keep last-writer-wins
-/// consistent with `loadByPath`).
+/// same key keeps the first entry, mirroring the C++ `std::map::insert`
+/// semantics used by `PluginManager<T>`.
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
