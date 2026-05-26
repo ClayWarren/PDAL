@@ -1,14 +1,14 @@
 //! `filters.projpipeline` -- transform coordinates using a PROJ pipeline.
 
 use pdal_core::point::{DimId, PointView};
-use pdal_core::srs::{SpatialReference, SrsTransform};
+use pdal_core::srs::{CoordOperationTransform, SpatialReference};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct ProjPipelineFilter {
     out_srs: SpatialReference,
     coord_op: String,
-    _reverse: bool,
-    transform: Option<SrsTransform>,
+    reverse: bool,
+    transform: Option<CoordOperationTransform>,
 }
 
 impl ProjPipelineFilter {
@@ -16,14 +16,16 @@ impl ProjPipelineFilter {
         Self {
             out_srs: SpatialReference::new(out_srs_wkt),
             coord_op: coord_op.to_string(),
-            _reverse: reverse,
+            reverse,
             transform: None,
         }
     }
 
     fn ensure_transform(&mut self) -> Result<(), StageError> {
         if self.transform.is_none() {
-            self.transform = Some(SrsTransform::new_pipeline(&self.coord_op).map_err(StageError)?);
+            self.transform = Some(
+                CoordOperationTransform::new(&self.coord_op, self.reverse).map_err(StageError)?,
+            );
         }
         Ok(())
     }
@@ -191,5 +193,29 @@ mod tests {
         assert!(f.transform.is_some());
         f.reset();
         assert!(f.transform.is_none());
+    }
+
+    #[test]
+    fn reverse_mode_uses_inverse_coordinate_operation() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let p = view.add_point();
+        view.set_f64(p, &DimId::X, std::f64::consts::PI);
+        view.set_f64(p, &DimId::Y, std::f64::consts::FRAC_PI_2);
+        view.set_f64(p, &DimId::Z, 3.0);
+
+        let mut f = ProjPipelineFilter::new(
+            "",
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=rad",
+            true,
+        );
+        let out = f.run_one(&view).unwrap().pop().unwrap();
+
+        assert!((out.get_f64(0, &DimId::X) - 180.0).abs() < 1e-9);
+        assert!((out.get_f64(0, &DimId::Y) - 90.0).abs() < 1e-9);
+        assert_eq!(out.get_f64(0, &DimId::Z), 3.0);
     }
 }

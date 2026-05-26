@@ -647,6 +647,7 @@ Pipeline JSON can currently construct this command-ready filter subset:
 - `outlier`
 - `planefit`
 - `pmf`
+- `projpipeline`
 - `radialdensity`
 - `randomize`
 - `reciprocity`
@@ -676,8 +677,6 @@ are deliberately added to the registry with option parsing and coverage.
 These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
-- GDAL/PROJ/SRS/OGR-backed: `ProjPipeline` reverse-mode and option-complete
-  behavior.
 - Private or specialized algorithms: `CS`, `Georeference`, `Poisson`.
 - Now Rust C ABI-backed: `Delaunay`.
 - Now Rust C ABI-backed: `DEM`.
@@ -698,6 +697,8 @@ algorithm decision.
   option validation and candidate-reader loading.
 - Now Rust C ABI-backed: `CovarianceFeatures`; the C++ wrapper only keeps
   option parsing, output dimension registration, and input layout validation.
+- Now Rust C ABI-backed: `ProjPipeline`, including reverse coordinate
+  operation mode through the native GDAL adapter.
 - Now Rust C ABI-backed: `Shell` command execution and environment lookup; the
   C++ wrapper only keeps PDAL stage metadata/view plumbing.
 - Pipeline/process/framework behavior: `Info`, `StreamCallback`.

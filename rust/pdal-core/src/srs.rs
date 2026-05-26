@@ -164,6 +164,22 @@ impl SrsTransform {
     }
 }
 
+/// A GDAL coordinate-operation transform used by `filters.projpipeline`.
+pub struct CoordOperationTransform {
+    inner: pdal_native::srs::GdalCoordOperationTransform,
+}
+
+impl CoordOperationTransform {
+    pub fn new(coord_op: &str, reverse: bool) -> Result<Self, String> {
+        let inner = pdal_native::srs::GdalCoordOperationTransform::new(coord_op, reverse)?;
+        Ok(Self { inner })
+    }
+
+    pub fn transform(&self, x: &mut f64, y: &mut f64, z: &mut f64) -> bool {
+        self.inner.transform_xyz(x, y, z)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

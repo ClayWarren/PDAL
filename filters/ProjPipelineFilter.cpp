@@ -37,11 +37,8 @@
 #include <pdal/private/RustViewConverter.hpp>
 
 #include <pdal/PointView.hpp>
-#include <pdal/private/SrsTransform.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
-
-#include <ogr_spatialref.h>
 
 namespace pdal
 {
@@ -80,7 +77,6 @@ void ProjPipelineFilter::addArgs(ProgramArgs& args)
 void ProjPipelineFilter::initialize()
 {
     setSpatialReference(m_outSRS);
-    createTransform(m_coordOperation, m_reverseTransfo);
 }
 
 void ProjPipelineFilter::prepared(PointTableRef table)
@@ -88,101 +84,43 @@ void ProjPipelineFilter::prepared(PointTableRef table)
     m_layout = table.layout();
 }
 
-void ProjPipelineFilter::createTransform(const std::string coordOperation,
-                                         bool reverseTransfo)
-{
-    m_coordTransform.reset(new CoordTransform(coordOperation, reverseTransfo));
-}
-
 PointViewSet ProjPipelineFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet;
 
-    if (!m_reverseTransfo)
+    pdal_stage_t* stage = pdal_stage_create_projpipeline(
+        m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), m_reverseTransfo);
+    if (!stage)
     {
-        pdal_stage_t* stage = pdal_stage_create_projpipeline(
-            m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), false);
-        if (!stage)
-        {
-            const char* message = pdal_last_error();
-            if (message && message[0])
-                throwError(std::string("filters.projpipeline: ") + message);
-            throwError("Failed to create Rust projpipeline stage.");
-        }
-
-        PointViewPtr outView = rust_view_converter::runSingle(stage, view);
-        pdal_stage_destroy(stage);
-        viewSet.insert(outView);
-        return viewSet;
+        const char* message = pdal_last_error();
+        if (message && message[0])
+            throwError(std::string("filters.projpipeline: ") + message);
+        throwError("Failed to create Rust projpipeline stage.");
     }
 
-    PointViewPtr outView = view->makeNew();
-
-    PointRef point(*view, 0);
-    for (PointId id = 0; id < view->size(); ++id)
-    {
-        point.setPointId(id);
-        if (processOne(point))
-            outView->appendPoint(*view, id);
-    }
-
+    PointViewPtr outView = rust_view_converter::runSingle(stage, view);
+    pdal_stage_destroy(stage);
     viewSet.insert(outView);
     return viewSet;
 }
 
 bool ProjPipelineFilter::processOne(PointRef& point)
 {
-    if (!m_reverseTransfo)
-    {
-        pdal_stage_t* stage = pdal_stage_create_projpipeline(
-            m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), false);
-        if (!stage)
-            rust_view_converter::throwLastError(
-                "Failed to create Rust projpipeline stage.");
+    pdal_stage_t* stage = pdal_stage_create_projpipeline(
+        m_outSRS.getWKT().c_str(), m_coordOperation.c_str(), m_reverseTransfo);
+    if (!stage)
+        rust_view_converter::throwLastError(
+            "Failed to create Rust projpipeline stage.");
 
-        pdal_point_view_t* rustView =
-            rust_view_converter::toRustPoint(point, m_layout);
-        bool ok = pdal_stage_process_one_at(stage, rustView, 0);
-        rust_view_converter::fromRustPoint(rustView, 0, point);
-        pdal_point_view_destroy(rustView);
-        pdal_stage_destroy(stage);
-        if (rust_view_converter::hasLastError())
-            rust_view_converter::throwLastError("Rust projpipeline failed.");
-        return ok;
-    }
-
-    double x(point.getFieldAs<double>(Dimension::Id::X));
-    double y(point.getFieldAs<double>(Dimension::Id::Y));
-    double z(point.getFieldAs<double>(Dimension::Id::Z));
-
-    bool ok = m_coordTransform->transform(x, y, z);
-    if (ok)
-    {
-        point.setField(Dimension::Id::X, x);
-        point.setField(Dimension::Id::Y, y);
-        point.setField(Dimension::Id::Z, z);
-    }
+    pdal_point_view_t* rustView =
+        rust_view_converter::toRustPoint(point, m_layout);
+    bool ok = pdal_stage_process_one_at(stage, rustView, 0);
+    rust_view_converter::fromRustPoint(rustView, 0, point);
+    pdal_point_view_destroy(rustView);
+    pdal_stage_destroy(stage);
+    if (rust_view_converter::hasLastError())
+        rust_view_converter::throwLastError("Rust projpipeline failed.");
     return ok;
-}
-
-ProjPipelineFilter::CoordTransform::CoordTransform() {}
-
-ProjPipelineFilter::CoordTransform::CoordTransform(
-    const std::string coordOperation, bool reverseTransfo)
-{
-    OGRCoordinateTransformationOptions coordTransfoOptions;
-    coordTransfoOptions.SetCoordinateOperation(coordOperation.c_str(),
-                                               reverseTransfo);
-    OGRSpatialReference nullSrs("");
-    m_transform.reset(OGRCreateCoordinateTransformation(&nullSrs, &nullSrs,
-                                                        coordTransfoOptions));
-}
-
-bool ProjPipelineFilter::CoordTransform::transform(double& x, double& y,
-                                                   double& z)
-{
-
-    return m_transform && m_transform->Transform(1, &x, &y, &z);
 }
 
 } // namespace pdal

@@ -47,6 +47,7 @@ use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
 use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
+use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
@@ -136,6 +137,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.outlier",
     "filters.planefit",
     "filters.pmf",
+    "filters.projpipeline",
     "filters.radialdensity",
     "filters.randomize",
     "filters.range",
@@ -429,6 +431,11 @@ pub fn create_filter(
             get_u64(options, "other_class", 1)? as u8,
             get_bool(options, "only_ground", false)?,
         )?))),
+        "filters.projpipeline" => Ok(Box::new(FilterWrapper::new(ProjPipelineFilter::new(
+            &options.get_str("out_srs", ""),
+            &options.get_str("coord_op", ""),
+            get_bool(options, "reverse_transfo", false)?,
+        )))),
         "filters.radialdensity" => Ok(Box::new(FilterWrapper::new(RadialDensityFilter::new(
             get_f64(options, "radius", 1.0)?,
         )))),

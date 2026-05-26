@@ -37,18 +37,12 @@
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
 
-#include <memory>
-
-class OGRCoordinateTransformation;
-
 namespace pdal
 {
 
 class PDAL_EXPORT ProjPipelineFilter : public Filter, public Streamable
 {
 public:
-    class CoordTransform;
-
     ProjPipelineFilter();
     ~ProjPipelineFilter() override;
 
@@ -64,25 +58,10 @@ private:
     PointViewSet run(PointViewPtr view) override;
     bool processOne(PointRef& point) override;
 
-    void createTransform(const std::string coordOperation, bool reverseTransfo);
-
     SpatialReference m_outSRS;
     bool m_reverseTransfo;
     std::string m_coordOperation;
-    std::unique_ptr<CoordTransform> m_coordTransform;
     PointLayoutPtr m_layout;
-};
-
-class ProjPipelineFilter::CoordTransform
-{
-public:
-    CoordTransform();
-    CoordTransform(const std::string coordOperation, bool reverseTransfo);
-
-    bool transform(double& x, double& y, double& z);
-
-private:
-    std::unique_ptr<OGRCoordinateTransformation> m_transform;
 };
 
 } // namespace pdal

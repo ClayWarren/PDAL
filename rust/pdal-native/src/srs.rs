@@ -89,6 +89,75 @@ impl Drop for GdalSrsTransform {
     }
 }
 
+/// A GDAL coordinate-operation transform used by `filters.projpipeline`.
+pub struct GdalCoordOperationTransform {
+    handle: gdal_sys::OGRCoordinateTransformationH,
+}
+
+impl GdalCoordOperationTransform {
+    pub fn new(coord_op: &str, reverse: bool) -> Result<Self, String> {
+        let coord_op = CString::new(coord_op).map_err(|e| e.to_string())?;
+        unsafe {
+            let options = gdal_sys::OCTNewCoordinateTransformationOptions();
+            if options.is_null() {
+                return Err("OCTNewCoordinateTransformationOptions returned null".into());
+            }
+
+            let set = gdal_sys::OCTCoordinateTransformationOptionsSetOperation(
+                options,
+                coord_op.as_ptr(),
+                if reverse { 1 } else { 0 },
+            );
+            if set == 0 {
+                gdal_sys::OCTDestroyCoordinateTransformationOptions(options);
+                return Err("OCTCoordinateTransformationOptionsSetOperation failed".into());
+            }
+
+            let src = gdal_sys::OSRNewSpatialReference(std::ptr::null());
+            let dst = gdal_sys::OSRNewSpatialReference(std::ptr::null());
+            if src.is_null() || dst.is_null() {
+                if !src.is_null() {
+                    gdal_sys::OSRDestroySpatialReference(src);
+                }
+                if !dst.is_null() {
+                    gdal_sys::OSRDestroySpatialReference(dst);
+                }
+                gdal_sys::OCTDestroyCoordinateTransformationOptions(options);
+                return Err("OSRNewSpatialReference returned null".into());
+            }
+
+            let handle = gdal_sys::OCTNewCoordinateTransformationEx(src, dst, options);
+            gdal_sys::OSRDestroySpatialReference(src);
+            gdal_sys::OSRDestroySpatialReference(dst);
+            gdal_sys::OCTDestroyCoordinateTransformationOptions(options);
+
+            if handle.is_null() {
+                let msg = last_cpl_error();
+                return Err(if msg.is_empty() {
+                    "Failed to create coordinate operation transform".into()
+                } else {
+                    msg
+                });
+            }
+            Ok(Self { handle })
+        }
+    }
+
+    pub fn transform_xyz(&self, x: &mut f64, y: &mut f64, z: &mut f64) -> bool {
+        unsafe { gdal_sys::OCTTransform(self.handle, 1, x, y, z) != 0 }
+    }
+}
+
+impl Drop for GdalCoordOperationTransform {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.handle.is_null() {
+                gdal_sys::OCTDestroyCoordinateTransformation(self.handle);
+            }
+        }
+    }
+}
+
 unsafe fn build_axis_aware_srs(
     wkt_c: &CString,
     epoch: f64,
@@ -827,6 +896,23 @@ mod tests {
         // We only assert the transform doesn't crash and returns finite numbers;
         // exact axis-mapping semantics depend on GDAL version.
         assert!(x.is_finite() && y.is_finite());
+    }
+
+    #[test]
+    fn gdal_coord_operation_reverse_uses_inverse_path() {
+        let transform = GdalCoordOperationTransform::new(
+            "+proj=pipeline +step +proj=unitconvert +xy_in=deg +xy_out=rad",
+            true,
+        )
+        .unwrap();
+        let mut x = std::f64::consts::PI;
+        let mut y = std::f64::consts::FRAC_PI_2;
+        let mut z = 3.0;
+
+        assert!(transform.transform_xyz(&mut x, &mut y, &mut z));
+        assert!((x - 180.0).abs() < 1e-9);
+        assert!((y - 90.0).abs() < 1e-9);
+        assert_eq!(z, 3.0);
     }
 
     #[test]
