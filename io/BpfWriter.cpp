@@ -34,13 +34,11 @@
 
 #include "BpfWriter.hpp"
 
-#include <climits>
-
 #include <pdal/Options.hpp>
+#include <pdal/pdal_features.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 
-#include "BpfCompressor.hpp"
 #include <arbiter/arbiter.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/Utils.hpp>
@@ -208,7 +206,6 @@ void BpfWriter::initialize()
 #endif
     m_header.m_compression = Utils::toNative(
         m_compression ? BpfCompression::Zlib : BpfCompression::None);
-    m_extraData = Utils::base64_decode(m_extraDataSpec);
 
     for (const auto& file : m_bundledFilesSpec)
     {
@@ -227,7 +224,6 @@ void BpfWriter::initialize()
             throwError("Bundled file '" + file +
                        "' name exceeds "
                        "maximum length of 32.");
-        m_bundledFiles.push_back(ulemFile);
     }
 
     // BPF coordinates are always in UTM meters, which can be quite large.
@@ -369,110 +365,6 @@ void BpfWriter::writeRustView()
     pdal_options_destroy(options);
     if (!ok)
         throwLastRustError("Rust BPF writer failed.");
-}
-
-void BpfWriter::writePointMajor(const PointView* data)
-{
-    // Blocks of 10,000 points will ensure that we're under 16MB, even
-    // for 255 dimensions.
-    size_t blockpoints = std::min<point_count_t>(10000UL, data->size());
-
-    // For compression we're going to write to a buffer so that it can be
-    // compressed before it's written to the file stream.
-    BpfCompressor compressor(m_stream,
-                             blockpoints * sizeof(float) * m_dims.size());
-    PointId idx = 0;
-    while (idx < data->size())
-    {
-        if (m_header.m_compression)
-            compressor.startBlock();
-        size_t blockId;
-        for (blockId = 0; idx < data->size() && blockId < blockpoints;
-             ++idx, ++blockId)
-        {
-            for (auto& bpfDim : m_dims)
-            {
-                double d = getAdjustedValue(data, bpfDim, idx);
-                m_stream << (float)d;
-            }
-        }
-        if (m_header.m_compression)
-        {
-            compressor.compress();
-            compressor.finish();
-        }
-    }
-}
-
-void BpfWriter::writeDimMajor(const PointView* data)
-{
-    // We're going to pretend for now that we only ever have one point buffer.
-    BpfCompressor compressor(m_stream, data->size() * sizeof(float));
-
-    for (auto& bpfDim : m_dims)
-    {
-        if (m_header.m_compression)
-            compressor.startBlock();
-        for (PointId idx = 0; idx < data->size(); ++idx)
-        {
-            double d = getAdjustedValue(data, bpfDim, idx);
-            m_stream << (float)d;
-        }
-        if (m_header.m_compression)
-        {
-            compressor.compress();
-            compressor.finish();
-        }
-    }
-}
-
-void BpfWriter::writeByteMajor(const PointView* data)
-{
-    union
-    {
-        float f;
-        uint32_t u32;
-    } uu;
-
-    // We're going to pretend for now that we only ever have one point buffer.
-    BpfCompressor compressor(m_stream,
-                             data->size() * sizeof(float) * m_dims.size());
-
-    if (m_header.m_compression)
-        compressor.startBlock();
-    for (auto& bpfDim : m_dims)
-    {
-        for (size_t b = 0; b < sizeof(float); b++)
-        {
-            for (PointId idx = 0; idx < data->size(); ++idx)
-            {
-                uu.f = (float)getAdjustedValue(data, bpfDim, idx);
-                uint8_t u8 = (uint8_t)(uu.u32 >> (b * CHAR_BIT));
-                m_stream << u8;
-            }
-        }
-    }
-    if (m_header.m_compression)
-    {
-        compressor.compress();
-        compressor.finish();
-    }
-}
-
-double BpfWriter::getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
-                                   PointId idx)
-{
-    double d = data->getFieldAs<double>(bpfDim.m_id, idx);
-    bpfDim.m_min = (std::min)(bpfDim.m_min, d);
-    bpfDim.m_max = (std::max)(bpfDim.m_max, d);
-
-    if (bpfDim.m_id == Dimension::Id::X)
-        d /= m_scaling.m_xXform.m_scale.m_val;
-    else if (bpfDim.m_id == Dimension::Id::Y)
-        d /= m_scaling.m_yXform.m_scale.m_val;
-    else if (bpfDim.m_id == Dimension::Id::Z)
-        d /= m_scaling.m_zXform.m_scale.m_val;
-    return (d - bpfDim.m_offset);
 }
 
 void BpfWriter::doneFile()

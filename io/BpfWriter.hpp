@@ -67,12 +67,9 @@ public:
 
 private:
     StringList m_outputDims; ///< List of dimensions to write
-    OLeStream m_stream;
     BpfHeader m_header;
     BpfDimensionList m_dims;
     std::vector<Dimension::Type> m_dimTypes;
-    std::vector<uint8_t> m_extraData;
-    std::vector<BpfUlemFile> m_bundledFiles;
     bool m_compression;
     CoordId m_coordId;
     std::string m_extraDataSpec;
@@ -91,15 +88,9 @@ private:
     void writeView(const PointViewPtr data) override;
     void doneFile() override;
 
-    double getAdjustedValue(const PointView* data, BpfDimension& bpfDim,
-                            PointId idx);
     void loadBpfDimensions(PointLayoutPtr layout);
     void copyViewToRust(const PointViewPtr data);
     void writeRustView();
-    void writePointMajor(const PointView* data);
-    void writeDimMajor(const PointView* data);
-    void writeByteMajor(const PointView* data);
-    void writeCompressedBlock(char* buf, size_t size);
 };
 
 } // namespace pdal
