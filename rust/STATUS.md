@@ -152,9 +152,17 @@ Current pre-port checkpoint: `819 / 819` baseline C++ GoogleTest cases, or
 `100.00%`, are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
-port, so newly added guard tests do not move the headline denominator. The
-branch-wide health metric, including guard tests added before and during the
-port, is `952 / 953` currently built C++ GoogleTest cases, or `99.90%`;
+port, so newly added guard tests do not move the headline denominator.
+
+This is the first major milestone, not the finish line. It proves the current
+C++ compatibility layer can satisfy the pre-port behavioral contract. The next
+target is to reduce the real implementation still living in C++ behind counted
+wrappers, broaden first-party I/O/filter/core replacement, and make
+install/export/CI/regression/performance evidence strong enough for an
+upstreamable port.
+
+The branch-wide health metric, including guard tests added before and during
+the port, is `953 / 953` currently built C++ GoogleTest cases, or `100.00%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -635,8 +643,7 @@ algorithm decision.
 
 - GDAL/PROJ/SRS/OGR-backed: `DEM`, `ProjPipeline` reverse-mode and
   option-complete behavior.
-- Private or specialized algorithms: `CS`, `Georeference`, `Poisson`,
-  `GreedyProjection`.
+- Private or specialized algorithms: `CS`, `Georeference`, `Poisson`.
 - Now Rust C ABI-backed: `Delaunay`.
 - Now Rust C ABI-backed: `HagDelaunay`.
 - Now Rust C ABI-backed: `IterativeClosestPoint`.
@@ -645,6 +652,7 @@ algorithm decision.
 - Now Rust C ABI-backed: `LloydKMeans`.
 - Now Rust C ABI-backed: `PMF`.
 - Now Rust C ABI-backed: `RelaxationDartThrowing`.
+- Now Rust C ABI-backed: `GreedyProjection`.
 - Now Rust C ABI-backed: `Straighten`.
 - Now Rust C ABI-backed: `Supervoxel`.
 - Now Rust C ABI-backed: `Normal` (compute path only; MST refinement remains C++).

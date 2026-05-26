@@ -9,8 +9,10 @@ tests remain the behavioral contract while the Rust implementation grows.
 - C++ code calls Rust only through `pdal-capi`.
 - The C ABI is the contract between languages. Python, CLI, and C++ should be
   peers above that contract over time.
-- Existing C++ tests are the first parity gate. Rust unit tests are necessary,
-  but not sufficient.
+- Existing C++ tests were the first parity gate. The pre-port GoogleTest
+  baseline now passes through Rust-backed C ABI paths, so the next work is
+  implementation replacement breadth, install/export readiness, and final
+  regression confidence. Rust unit tests are necessary, but not sufficient.
 
 ## Agent Guardrails
 
@@ -50,42 +52,49 @@ Work toward these milestones in order. A later milestone may receive a small
 boundary probe only when it directly unblocks an earlier one. Do not use this
 roadmap as permission to sweep a directory.
 
-0. Guard the contract continuously.
+0. Guard the contract continuously. **Always active.**
    Keep the existing C++ tests as the behavioral contract, keep Rust tests
    green, and keep every Rust-backed path behind the C ABI. No work counts if
    it weakens C++ validation, bypasses the C ABI, or lacks parity coverage.
-1. Stabilize the active Rust end-to-end path.
-   The current path is Rust core -> C ABI -> local readers/writers ->
-   command-ready filters -> `pdal-rs` commands. Close correctness gaps in
-   option parsing, metadata, bounds, dimensions, errors, and output artifacts
-   before broadening the surface.
-2. Finish simple command parity.
-   Commands are motivators for the lower layers, not an independent rewrite.
-   Add a command only when its reader/filter/writer dependencies are already
-   Rust-backed and it can be regression-tested against installed PDAL for exit
-   status, stdout/stderr shape, and produced artifacts.
-3. Complete deterministic first-party local I/O.
-   Continue one local reader/writer family at a time. Each family needs fixture
+1. Establish pre-port C++ test parity. **Complete for the current build.**
+   The audit baseline is the pre-port C++ GoogleTest set, before local guard
+   tests were added. It currently reports `819 / 819` Rust C ABI-backed cases.
+   This proves the compatibility wrapper can satisfy the existing tests, but it
+   is not the port finish line.
+2. Convert the parity win into real implementation replacement. **Active.**
+   For each area that already counts, identify whether Rust owns the actual
+   behavior or merely owns a compatibility guard around C++ work. Replace the
+   remaining substantial C++ implementation behind counted tests with Rust,
+   or document an intentional C++ holdout when the boundary is external,
+   vendor-heavy, or not worth porting yet. Track wrapper LOC so it shrinks
+   instead of silently becoming the new permanent implementation.
+3. Complete first-party filters by family.
+   Pure filters, spatial filters, and many linear/statistical filters are
+   represented. Remaining filters must start with the missing decision: Rust
+   implementation, native/FFI adapter, or intentional C++ holdout. Do not
+   revive broad pointer-sharing attempts across the C ABI.
+4. Complete deterministic first-party local I/O.
+   Continue one reader/writer family at a time. Each family needs fixture
    coverage, installed-PDAL regression where possible, option parity, metadata
    and bounds behavior, and an explicit compression/native-dependency story.
-4. Close the core behaviors exposed by real pipelines.
+   Local deterministic behavior closes before broad remote/object-store claims.
+5. Close the core behaviors exposed by real pipelines.
    Expand `pdal-core` only as needed by stages, I/O, and commands: pipeline
    JSON, stage registry, layout mutation, dimensions, metadata, SRS, options,
    bounds, scaling, and error/reporting behavior. Avoid a standalone rewrite of
    `pdal/` by source directory.
-5. Finish first-party filters by family.
-   Pure filters, spatial filters, and the first linear/statistical filters are
-   already represented. Remaining filters must start with the missing decision:
-   Rust implementation, native/FFI adapter, or intentional C++ holdout. Do not
-   revive broad pointer-sharing attempts across the C ABI.
-6. Close apps/tools and broad kernels.
-   `pdal-rs` can keep proving command parity, but the top-layer C++ app/tool
-   migration closes only after the lower library surface is stable. `lasdump`
-   may advance in narrow LAS-backed steps; LAZ checksum parity waits on the
-   compression strategy. `nitfwrap` may use a Nitro adapter because NITF writing
-   is a vendor-format boundary; full `readers.nitf`/`writers.nitf` parity remains
-   an I/O/plugin milestone. Broad kernels stay late.
-7. Define plugin compatibility after the first-party surface.
+6. Close apps, tools, and kernels as user-visible compatibility surfaces.
+   `pdal-rs` can keep proving command parity, but top-layer migration closes
+   only when commands, app dispatch, option/driver introspection, logging,
+   error text, stdout/stderr shape, and produced artifacts match installed
+   PDAL for agreed workflows. `lasdump` and `nitfwrap` remain narrow tool
+   checkpoints unless their underlying format strategies are complete.
+7. Stabilize build, install, packaging, CI, and downstream ABI exports.
+   The Rust C ABI must have an install/export story, versioned symbols or an
+   equivalent stability policy, CI coverage on supported platforms, release
+   packaging rules, license/vendor accounting, and downstream `find_package`
+   behavior before this can be treated as an upstreamable replacement.
+8. Define plugin compatibility after the first-party surface.
    Keep broad optional plugins in C++ until the first-party library, command
    surface, C ABI versioning, ownership/lifetime rules, dynamic loading, and
    metadata behavior are stable. Tiny compatibility checkpoints such as
@@ -93,21 +102,27 @@ roadmap as permission to sweep a directory.
    already-proven first-party path, may land earlier when they are
    regression-backed. `pdal-plugins` may hold discovery metadata earlier, but
    not a new plugin SDK.
-8. Prove final replacement readiness.
+9. Prove final replacement readiness.
    The port is not "done" until the Rust-backed stack can run the agreed
-   first-party PDAL workflows with C++ tests green, Rust tests green,
-   installed-PDAL regression deltas explained, stable/versioned C ABI symbols,
-   and recorded performance, memory, binary-size, and startup-time comparisons.
+   first-party PDAL workflows with C++ tests green, Rust tests green, installed
+   PDAL regression deltas explained, stable C ABI behavior, acceptable unsafe
+   and native boundaries, and recorded performance, memory, binary-size,
+   startup-time, compile-time, and full-suite timing comparisons.
 
 Current active milestone:
 
-1. Keep hardening the Rust-backed local I/O and command surface that already
+1. Treat `819 / 819` as complete checkpoint evidence, not as completion of the
+   port.
+2. Work down the compatibility-wrapper surface: where a C++ test now routes
+   through Rust, replace any remaining meaningful C++ implementation behind the
+   wrapper or record why it is an intentional holdout.
+3. Keep hardening the Rust-backed local I/O and command surface that already
    exists: regression coverage, option parity, metadata/bounds behavior, and
    error/output shape.
-2. Prove reader -> filter -> writer pipeline behavior through the Rust core
+4. Prove reader -> filter -> writer pipeline behavior through the Rust core
    boundary for each new format or command path.
-3. New I/O should still be narrow and fixture-scoped. Remote paths and broad
-   GDAL/PROJ coverage remain deferred until the local pipeline and command loop
+5. New I/O should still be narrow and fixture-scoped. Remote paths and broad
+   GDAL/PROJ coverage remain deferred until local pipeline and command behavior
    is reliable. Plugin-backed readers/writers may be added only one at a time
    when they reuse the existing Rust I/O/C ABI shape and come with fixture
    coverage.

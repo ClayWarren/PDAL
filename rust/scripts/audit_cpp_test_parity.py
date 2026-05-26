@@ -620,6 +620,7 @@ COVERED: dict[str, object] = {
     },
     "pdal_filters_greedyprojection_test": {
         "invalidOptionsThrow",
+        "planarPointsProduceMesh",
     },
     "pdal_filters_groundfilter_test": {
         "CustomGroundClass/0",
