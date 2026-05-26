@@ -39,22 +39,14 @@
 
 #include "CSFilter.hpp"
 
-#include <pdal/KDIndex.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
 #include "private/DimRange.hpp"
 #include "private/Segmentation.hpp"
-#include "private/csf/CSF.h"
-
-#include <Eigen/Dense>
 
 #include <algorithm>
-#include <cmath>
-#include <iterator>
-#include <limits>
-#include <numeric>
 #include <string>
 #include <vector>
 
@@ -62,7 +54,6 @@ namespace pdal
 {
 
 using namespace Dimension;
-using namespace Eigen;
 
 static StaticPluginInfo const s_info{
     "filters.csf", "Cloth Simulation Filter (Zhang et al., 2016)",
@@ -88,7 +79,8 @@ struct CSArgs
 CSFilter::CSFilter()
     : m_args(new CSArgs), m_groundClass(ClassLabel::Ground),
       m_otherClass(ClassLabel::Unclassified), m_onlyGround(false)
-{}
+{
+}
 
 CSFilter::~CSFilter() {}
 
@@ -254,11 +246,11 @@ PointViewSet CSFilter::run(PointViewPtr view)
             ++i;
         }
     }
-    if (pdal_filter_csf_classify(
-            xyz.data(), static_cast<uint64_t>(count), m_args->m_smooth,
-            m_args->m_step, m_args->m_threshold, m_args->m_hdiff,
-            m_args->m_resolution, m_args->m_rigid, m_args->m_iterations,
-            groundMask.data()) != 0)
+    if (pdal_filter_csf_classify(xyz.data(), static_cast<uint64_t>(count),
+                                 m_args->m_smooth, m_args->m_step,
+                                 m_args->m_threshold, m_args->m_hdiff,
+                                 m_args->m_resolution, m_args->m_rigid,
+                                 m_args->m_iterations, groundMask.data()) != 0)
     {
         const char* err = pdal_last_error();
         throwError(err ? std::string(err)

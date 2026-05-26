@@ -677,7 +677,7 @@ are deliberately added to the registry with option parsing and coverage.
 These are not missed easy ports. Start each with an ABI, dependency, or
 algorithm decision.
 
-- Private or specialized algorithms: `CS`, `Georeference`, `Poisson`.
+- Private or specialized algorithms: `Georeference`, `Poisson`.
 - Now Rust C ABI-backed: `Delaunay`.
 - Now Rust C ABI-backed: `DEM`.
 - Now Rust C ABI-backed: `HagDelaunay`.
@@ -701,6 +701,9 @@ algorithm decision.
   operation mode through the native GDAL adapter.
 - Now Rust C ABI-backed: `Shell` command execution and environment lookup; the
   C++ wrapper only keeps PDAL stage metadata/view plumbing.
+- Now Rust C ABI-backed: `CS`; the C++ wrapper keeps return filtering,
+  ignore-range segmentation, debug-directory validation, and class assignment
+  plumbing around the Rust cloth classifier.
 - Pipeline/process/framework behavior: `Info`, `StreamCallback`.
 
 The rejected broad sweep in commit `a1e67b5dc` is useful only as source

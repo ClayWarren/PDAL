@@ -63,8 +63,6 @@ private:
     void prepared(PointTableRef table) override;
     void ready(PointTableRef table) override;
     PointViewSet run(PointViewPtr view) override;
-
-    void classifyGround(PointViewPtr, std::vector<double>&);
 };
 
 } // namespace pdal
