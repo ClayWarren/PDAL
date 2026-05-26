@@ -75,7 +75,8 @@ void ApproximateCoplanarFilter::prepared(PointTableRef table)
     pdal_stage_t* stage =
         pdal_stage_create_approximatecoplanar(m_knn, m_thresh1, m_thresh2);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to create Rust approximate coplanar stage.");
     pdal_stage_destroy(stage);
 }
 
@@ -84,7 +85,8 @@ void ApproximateCoplanarFilter::filter(PointView& view)
     pdal_stage_t* stage =
         pdal_stage_create_approximatecoplanar(m_knn, m_thresh1, m_thresh2);
     if (!stage)
-        throwError("Failed to create Rust approximate coplanar stage.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust approximate coplanar stage.");
 
     rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);

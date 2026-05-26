@@ -396,7 +396,8 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
             {
                 char* raw = pdal_app_unknown_command_message(m_command.c_str());
                 std::string msg = raw ? raw : "";
-                pdal_string_free(raw);
+                if (raw)
+                    pdal_string_free(raw);
                 log->get(LogLevel::Error) << msg << '\n' << '\n';
             }
         }

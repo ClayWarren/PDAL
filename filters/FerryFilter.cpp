@@ -81,14 +81,16 @@ void FerryFilter::initialize()
     m_rust_stage = pdal_stage_create_ferry_specs(
         specs.empty() ? nullptr : specs.data(), specs.size());
     if (!m_rust_stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to create Rust ferry stage.");
 
     m_dims.clear();
     for (const std::string& dim : m_dimSpec)
     {
         StringList s = Utils::split(dim, '=');
         if (s.size() != 2)
-            throwError(pdal_last_error());
+            throwError("Invalid dimension specified '" + dim +
+                       "'. Need <from dimension>=><to dimension>.");
         if (s[1][0] == '>')
             s[1].erase(s[1].begin());
         Utils::trim(s[0]);

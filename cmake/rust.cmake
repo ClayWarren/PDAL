@@ -6,7 +6,7 @@ set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
 set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
 
-file(GLOB_RECURSE RUST_CAPI_SOURCES
+file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
     "${RUST_CAPI_DIR}/Cargo.toml"
     "${RUST_CAPI_DIR}/Cargo.lock"
     "${RUST_CAPI_DIR}/pdal-capi/*"

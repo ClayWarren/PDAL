@@ -72,7 +72,8 @@ void OptimalNeighborhood::prepared(PointTableRef table)
     (void)table;
     pdal_stage_t* stage = pdal_stage_create_optimalneighborhood(m_kMin, m_kMax);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to create Rust optimal neighborhood stage.");
     pdal_stage_destroy(stage);
 }
 
@@ -80,7 +81,8 @@ void OptimalNeighborhood::filter(PointView& view)
 {
     pdal_stage_t* stage = pdal_stage_create_optimalneighborhood(m_kMin, m_kMax);
     if (!stage)
-        throwError("Failed to create Rust optimal neighborhood stage.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust optimal neighborhood stage.");
 
     rust_view_converter::runInPlace(stage, view);
     pdal_stage_destroy(stage);

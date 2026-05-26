@@ -68,7 +68,8 @@ void FarthestPointSamplingFilter::prepared(PointTableRef table)
     (void)table;
     pdal_stage_t* stage = pdal_stage_create_farthestpointsampling(m_count);
     if (!stage)
-        throwError(pdal_last_error());
+        rust_view_converter::throwLastError(
+            "Failed to create Rust farthestpointsampling stage.");
     pdal_stage_destroy(stage);
 }
 
@@ -86,7 +87,8 @@ PointViewSet FarthestPointSamplingFilter::run(PointViewPtr inView)
 
     pdal_stage_t* stage = pdal_stage_create_farthestpointsampling(m_count);
     if (!stage)
-        throwError("Failed to create Rust farthestpointsampling stage.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust farthestpointsampling stage.");
 
     PointViewPtr outView = rust_view_converter::runSingle(stage, inView);
     pdal_stage_destroy(stage);
