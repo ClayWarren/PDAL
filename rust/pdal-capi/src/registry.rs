@@ -396,6 +396,7 @@ pub fn create_filter(
                     .transpose()?,
                 viewpoint,
                 get_bool(options, "always_up", true)?,
+                get_bool(options, "refine", false)?,
             ))))
         }
         "filters.optimalneighborhood" => Ok(Box::new(FilterWrapper::new(

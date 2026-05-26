@@ -691,7 +691,7 @@ algorithm decision.
 - Now Rust C ABI-backed: `GreedyProjection`.
 - Now Rust C ABI-backed: `Straighten`.
 - Now Rust C ABI-backed: `Supervoxel`.
-- Now Rust C ABI-backed: `Normal` (compute path only; MST refinement remains C++).
+- Now Rust C ABI-backed: `Normal`, including optional MST refinement.
 - Pipeline/process/framework behavior: `Info`, `Shell`, `StreamCallback`.
 - Expression/KD-tree hybrid behavior needing a design pass: `RadiusAssign`,
   `NeighborClassifier`, `CovarianceFeatures`.

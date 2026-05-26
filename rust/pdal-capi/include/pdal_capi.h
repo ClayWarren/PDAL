@@ -911,7 +911,8 @@ extern "C"
                                            double radius, bool has_viewpoint,
                                            double viewpoint_x,
                                            double viewpoint_y,
-                                           double viewpoint_z, bool always_up);
+                                           double viewpoint_z, bool always_up,
+                                           bool refine);
     pdal_stage_t* pdal_stage_create_relaxationdartthrowing(
         double decay, double radius, double terminal_radius, uint64_t count,
         bool shuffle, bool has_seed, uint32_t seed);

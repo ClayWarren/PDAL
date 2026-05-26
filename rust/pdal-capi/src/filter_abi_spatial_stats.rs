@@ -729,12 +729,14 @@ pub extern "C" fn pdal_stage_create_normal(
     viewpoint_y: f64,
     viewpoint_z: f64,
     always_up: bool,
+    refine: bool,
 ) -> *mut StageWrapper {
     let filter = Box::new(NormalFilter::new(
         knn as usize,
         has_radius.then_some(radius),
         has_viewpoint.then_some([viewpoint_x, viewpoint_y, viewpoint_z]),
         always_up,
+        refine,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

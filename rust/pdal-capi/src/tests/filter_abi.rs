@@ -426,7 +426,7 @@ fn more_spatial_stats_filters_constructors_through_c_abi() {
         destroy_stage(cov_null);
 
         // 2. Normal
-        let norm = pdal_stage_create_normal(8, true, 1.5, true, 0.0, 0.0, 10.0, true);
+        let norm = pdal_stage_create_normal(8, true, 1.5, true, 0.0, 0.0, 10.0, true, false);
         destroy_stage(norm);
 
         // 3. Relaxation Dart Throwing
