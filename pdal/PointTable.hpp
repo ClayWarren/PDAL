@@ -191,22 +191,23 @@ using PointTable = RowPointTable;
 
 // This provides a context for processing a set of points and allows the library
 // to be used to process multiple point sets simultaneously.
+struct pdal_column_storage;
+
 class PDAL_EXPORT ColumnPointTable : public SimplePointTable
 {
 private:
-    // Point storage.
-    using DimBlockList = std::vector<char*>;
-    using MemBlocks = std::vector<DimBlockList>;
-
-    // List of dimension memory block lists.
-    MemBlocks m_blocks;
-    point_count_t m_numPts;
+    // Per-dimension blocked typed storage owned by Rust (see
+    // `pdal_column_storage_*` in `rust/pdal-capi`). The C++ side keeps only
+    // an opaque handle and the per-dimension byte sizes needed to compute
+    // slot addresses.
+    pdal_column_storage* m_storage;
+    std::vector<uint64_t> m_dimSizes;
 
     // Make sure this is power-of-2 to facilitate fast div and mod ops.
     static const point_count_t m_blockPtCnt = 16384;
 
 public:
-    ColumnPointTable() : SimplePointTable(m_layout), m_numPts(0) {}
+    ColumnPointTable();
     ~ColumnPointTable() override;
     bool supportsView() const override
     {

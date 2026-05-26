@@ -154,7 +154,7 @@ Current pre-port checkpoint: `819 / 819` baseline C++ GoogleTest cases, or
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. The
 branch-wide health metric, including guard tests added before and during the
-port, is `951 / 953` currently built C++ GoogleTest cases, or `99.79%`;
+port, is `952 / 953` currently built C++ GoogleTest cases, or `99.90%`;
 compute that with `--include-added-tests`.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
@@ -294,12 +294,17 @@ Known mixed binaries:
   validation route through the Rust C ABI.
 - `pdal_dimension_test`: all 1 test counts; dimension-name sanitization routes
   through the Rust C ABI.
-- `pdal_point_table_test`: `resolveType`, `layoutLimit`, `userView`, `srs`, and
-  `simple` count; dimension type resolution routes through the Rust C ABI,
-  layout-limited dimension registration uses Rust-backed type resolution, LAS
-  user-view reads route through the Rust LAS reader, SRS list management routes
-  through Rust, and basic point storage uses Rust `PointView` storage through
-  the C ABI. `ColumnPointTable` typed storage remains C++.
+- `pdal_point_table_test`: all 6 tests count. `resolveType`, `layoutLimit`,
+  `userView`, `srs`, and `simple` route through the Rust C ABI as before, and
+  `ColumnPointTable.typedStorage` now routes through `pdal_column_storage_*`,
+  which owns the per-dimension blocked typed buffers in Rust. The C++
+  `ColumnPointTable` keeps only an opaque handle plus per-dimension byte sizes
+  and delegates `addPoint`, `finalize`, `getDimension`, and the
+  set/getFieldInternal slot lookup to Rust; block expansion across the
+  16384-point boundary is handled by `pdal_column_storage_add_point`, and
+  returned slot pointers are stable for the storage's lifetime because the
+  per-dim buffers are `Box<[u8]>` whose addresses do not move when the outer
+  `Vec` grows.
 - `pdal_kernel_test`: all 1 test counts; stage-option parsing routes through
   the Rust C ABI.
 - `pdal_config_test`: all 1 test counts; version integer and full-version

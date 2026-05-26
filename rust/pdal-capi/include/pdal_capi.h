@@ -25,6 +25,7 @@ extern "C"
     typedef struct pdal_thread_pool pdal_thread_pool_t;
     typedef struct pdal_stage_extensions pdal_stage_extensions_t;
     typedef struct pdal_artifact_manager pdal_artifact_manager_t;
+    typedef struct pdal_column_storage pdal_column_storage_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -185,6 +186,18 @@ extern "C"
     size_t pdal_thread_pool_num_threads(const pdal_thread_pool_t* handle);
     bool pdal_thread_pool_add(pdal_thread_pool_t* handle, void* data,
                               void (*run)(void*), void (*drop)(void*));
+
+    // ColumnPointTable storage: per-dimension blocked typed buffers.
+    pdal_column_storage_t* pdal_column_storage_create(uint64_t block_pt_cnt);
+    void pdal_column_storage_destroy(pdal_column_storage_t* handle);
+    void pdal_column_storage_set_dimensions(pdal_column_storage_t* handle,
+                                            const uint64_t* dim_sizes,
+                                            uint64_t dim_count);
+    uint64_t pdal_column_storage_add_point(pdal_column_storage_t* handle);
+    void* pdal_column_storage_dim_slot(pdal_column_storage_t* handle,
+                                       uint64_t dim_order, uint64_t dim_size,
+                                       uint64_t idx);
+    uint64_t pdal_column_storage_num_points(const pdal_column_storage_t* handle);
     char* pdal_file_utils_getcwd();
     char* pdal_file_utils_to_absolute_path(const char* filename);
     char* pdal_file_utils_to_absolute_path_with_base(const char* filename,

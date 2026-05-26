@@ -6,6 +6,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod artifact_abi;
+mod column_storage_abi;
 mod config_abi;
 mod deflate_abi;
 mod driver_abi;
@@ -50,6 +51,7 @@ mod writer_abi;
 mod xml_schema_abi;
 
 pub use artifact_abi::*;
+pub use column_storage_abi::*;
 pub use config_abi::*;
 pub use deflate_abi::*;
 pub use driver_abi::*;

@@ -33,40 +33,45 @@
  ****************************************************************************/
 
 #include <pdal/PointTable.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 
+ColumnPointTable::ColumnPointTable()
+    : SimplePointTable(m_layout),
+      m_storage(reinterpret_cast<pdal_column_storage*>(
+          pdal_column_storage_create(m_blockPtCnt)))
+{
+}
+
 ColumnPointTable::~ColumnPointTable()
 {
-    for (DimBlockList& l : m_blocks)
-        for (auto ptr : l)
-            delete[] ptr;
+    pdal_column_storage_destroy(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage));
 }
 
 void ColumnPointTable::finalize()
 {
     m_layoutRef.orderDimensions();
-    m_blocks.resize(m_layoutRef.dims().size());
+    const auto& dims = m_layoutRef.dims();
+    m_dimSizes.clear();
+    m_dimSizes.resize(dims.size(), 0);
+    for (Dimension::Id id : dims)
+    {
+        const Dimension::Detail* d = m_layoutRef.dimDetail(id);
+        m_dimSizes[d->order()] =
+            static_cast<uint64_t>(Dimension::size(d->type()));
+    }
+    pdal_column_storage_set_dimensions(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage),
+        m_dimSizes.data(), static_cast<uint64_t>(m_dimSizes.size()));
 }
 
 PointId ColumnPointTable::addPoint()
 {
-    if (m_numPts % m_blockPtCnt == 0)
-    {
-        for (Dimension::Id id : m_layoutRef.dims())
-        {
-            const Dimension::Detail* detail = m_layoutRef.dimDetail(id);
-
-            // Make a block that holds m_blockPtCnt values of a dimension.
-            size_t size = m_blockPtCnt * Dimension::size(detail->type());
-            char* buf = new char[size];
-            memset(buf, 0, size);
-            DimBlockList& dimBlocks = m_blocks[detail->order()];
-            dimBlocks.push_back(buf);
-        }
-    }
-    return m_numPts++;
+    return static_cast<PointId>(pdal_column_storage_add_point(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage)));
 }
 
 namespace
@@ -125,9 +130,10 @@ void ColumnPointTable::setFieldInternal(Dimension::Id dim, PointId idx,
                                         const void* src)
 {
     const Dimension::Detail* d = m_layoutRef.dimDetail(dim);
-    const DimBlockList& dimBlocks = m_blocks[d->order()];
-    char* buf = dimBlocks[idx / m_blockPtCnt];
-    char* dst = buf + (Dimension::size(d->type()) * (idx % m_blockPtCnt));
+    const uint64_t size = static_cast<uint64_t>(Dimension::size(d->type()));
+    char* dst = static_cast<char*>(pdal_column_storage_dim_slot(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage),
+        static_cast<uint64_t>(d->order()), size, static_cast<uint64_t>(idx)));
 
     copy(reinterpret_cast<const char*>(src), dst, d->type());
 }
@@ -136,18 +142,20 @@ void ColumnPointTable::getFieldInternal(Dimension::Id dim, PointId idx,
                                         void* dst) const
 {
     const Dimension::Detail* d = m_layoutRef.dimDetail(dim);
-    const DimBlockList& dimBlocks = m_blocks[d->order()];
-    const char* buf = dimBlocks[idx / m_blockPtCnt];
-    const char* src = buf + (Dimension::size(d->type()) * (idx % m_blockPtCnt));
+    const uint64_t size = static_cast<uint64_t>(Dimension::size(d->type()));
+    const char* src = static_cast<const char*>(pdal_column_storage_dim_slot(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage),
+        static_cast<uint64_t>(d->order()), size, static_cast<uint64_t>(idx)));
 
     copy(src, reinterpret_cast<char*>(dst), d->type());
 }
 
 char* ColumnPointTable::getDimension(const Dimension::Detail* d, PointId idx)
 {
-    DimBlockList& dimBlocks = m_blocks[d->order()];
-    char* buf = dimBlocks[idx / m_blockPtCnt];
-    return buf + (Dimension::size(d->type()) * (idx % m_blockPtCnt));
+    const uint64_t size = static_cast<uint64_t>(Dimension::size(d->type()));
+    return static_cast<char*>(pdal_column_storage_dim_slot(
+        reinterpret_cast<pdal_column_storage_t*>(m_storage),
+        static_cast<uint64_t>(d->order()), size, static_cast<uint64_t>(idx)));
 }
 
 const char* ColumnPointTable::getDimension(const Dimension::Detail* d,
