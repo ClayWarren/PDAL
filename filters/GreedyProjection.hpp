@@ -147,13 +147,7 @@ public:
           nnn_(100), minimum_angle_(M_PI / 18), // 10 degrees
           maximum_angle_(2 * M_PI / 3),         // 120 degrees
           eps_angle_(M_PI / 4),                 // 45 degrees,
-          consistent_(false), consistent_ordering_(false), angles_(), R_(),
-          state_(), source_(), ffn_(), sfn_(), part_(), fringe_queue_(),
-          is_current_free_(false), current_index_(), prev_is_ffn_(false),
-          prev_is_sfn_(false), next_is_ffn_(false), next_is_sfn_(false),
-          changed_1st_fn_(false), changed_2nd_fn_(false), new2boundary_(),
-          already_connected_(false), proj_qp_(), u_(), v_(), uvn_ffn_(),
-          uvn_sfn_(), uvn_next_ffn_(), uvn_next_sfn_(), tmp_(), view_(nullptr),
+          consistent_(false), consistent_ordering_(false),
           mesh_(nullptr) {};
 
     std::string getName() const override;
@@ -249,184 +243,12 @@ protected:
     bool consistent_ordering_;
 
 private:
-    /** \brief Struct for storing the angles to nearest neighbors **/
-    struct nnAngle
-    {
-        double angle;
-        PointId index;
-        int nnIndex;
-        bool visible;
-    };
-
-    /** \brief Struct for storing the edges starting from a fringe point **/
-    struct doubleEdge
-    {
-        doubleEdge() : index(0), first(), second() {}
-        PointId index;
-        Eigen::Vector2d first;
-        Eigen::Vector2d second;
-    };
-
-    // Variables made global to decrease the number of parameters to helper
-    // functions
-
-    /** \brief A list of angles to neighbors **/
-    std::vector<nnAngle> angles_;
-    /** \brief Index of the current query point **/
-    PointId R_;
-    /** \brief List of point states **/
-    std::vector<GP3Type> state_;
-    /** \brief List of sources **/
-    PointIdList source_;
-    /** \brief List of fringe neighbors in one direction **/
-    PointIdList ffn_;
-    /** \brief List of fringe neighbors in other direction **/
-    PointIdList sfn_;
-    /** \brief Connected component labels for each point **/
-    PointIdList part_;
-    /** \brief Points on the outer edge from which the mesh is grown **/
-    PointIdList fringe_queue_;
-
-    /** \brief Flag to set if the current point is free **/
-    bool is_current_free_;
-    /** \brief Current point's index **/
-    PointId current_index_;
-    /** \brief Flag set if the previous point is the first fringe neighbor **/
-    bool prev_is_ffn_;
-    /** \brief Flag to set if the next point is the second fringe neighbor **/
-    bool prev_is_sfn_;
-    /** \brief Flag to set if the next point is the first fringe neighbor **/
-    bool next_is_ffn_;
-    /** \brief Flag to set if the next point is the second fringe neighbor **/
-    bool next_is_sfn_;
-    /** \brief Flag to set if the first fringe neighbor was changed **/
-    bool changed_1st_fn_;
-    /** \brief Flag to set if the second fringe neighbor was changed **/
-    bool changed_2nd_fn_;
-    /** \brief New boundary point **/
-    PointId new2boundary_;
-    /** \brief Flag to set if the next neighbor was already connected in the
-     * previous step. To avoid inconsistency it should not be connected again.
-     */
-    bool already_connected_;
-
-    /** \brief Point coordinates projected onto the plane defined by the point
-     * normal **/
-    Eigen::Vector3d proj_qp_;
-    /** \brief First coordinate vector of the 2D coordinate frame **/
-    Eigen::Vector3d u_;
-    /** \brief Second coordinate vector of the 2D coordinate frame **/
-    Eigen::Vector3d v_;
-    /** \brief 2D coordinates of the first fringe neighbor **/
-    Eigen::Vector2d uvn_ffn_;
-    /** \brief 2D coordinates of the second fringe neighbor **/
-    Eigen::Vector2d uvn_sfn_;
-    /** \brief 2D coordinates of the 1st fringe neighbor of the next point **/
-    Eigen::Vector2d uvn_next_ffn_;
-    /** \brief 2D coordinates of the 2nd fringe neighbor of the next point **/
-    Eigen::Vector2d uvn_next_sfn_;
-    /** \brief Temporary variable to store 3 coordiantes **/
-    Eigen::Vector3d tmp_;
-    /** \brief Pointer to current point view. **/
-    PointView* view_;
-    /** \brief Pointer to the mesh we're creating. **/
     TriangularMesh* mesh_;
-
-    /** \brief Forms a new triangle by connecting the current neighbor to the
-     * query point and the previous neighbor
-     * \param[in] prev_index index of the previous point
-     * \param[in] next_index index of the next point
-     * \param[in] next_next_index index of the point after the next one
-     * \param[in] uvn_current 2D coordinate of the current point
-     * \param[in] uvn_prev 2D coordinates of the previous point
-     * \param[in] uvn_next 2D coordinates of the next point
-     */
-    void connectPoint(PointId prev_index, PointId next_index,
-                      PointId next_next_index,
-                      const Eigen::Vector2d& uvn_current,
-                      const Eigen::Vector2d& uvn_prev,
-                      const Eigen::Vector2d& uvn_next);
-
-    /** \brief Whenever a query point is part of a boundary loop containing 3
-     * points, that triangle is created (called if angle constraints make it
-     * possible)
-     * \param[out] polygons the polygon mesh to be updated
-     */
-    void closeTriangle();
-
-    /** \brief Get the list of containing triangles for each vertex in a
-     * PolygonMesh
-     * \param[in] polygonMesh the input polygon mesh
-     */
-    /**
-    std::vector<std::vector<size_t> >
-    getTriangleList (const pcl::PolygonMesh &input);
-    **/
-
-    /** \brief Add a new triangle to the current polygon mesh
-     * \param[in] a index of the first vertex
-     * \param[in] b index of the second vertex
-     * \param[in] c index of the third vertex
-     */
-
-    /**
-    inline void
-    addTriangle (PointId a, PointId b, PointId c)
-    {
-      triangle_.vertices.resize (3);
-      if (consistent_ordering_)
-      {
-        const PointInT p = input_->at (indices_->at (a));
-        const Eigen::Vector3f pv = p.getVector3fMap ();
-        if (p.getNormalVector3fMap ().dot (
-              (pv - input_->at (indices_->at (b)).getVector3fMap ()).cross (
-               pv - input_->at (indices_->at (c)).getVector3fMap ()) ) > 0)
-        {
-          triangle_.vertices[0] = a;
-          triangle_.vertices[1] = b;
-          triangle_.vertices[2] = c;
-        }
-        else
-        {
-          triangle_.vertices[0] = a;
-          triangle_.vertices[1] = c;
-          triangle_.vertices[2] = b;
-        }
-      }
-      else
-      {
-        triangle_.vertices[0] = a;
-        triangle_.vertices[1] = b;
-        triangle_.vertices[2] = c;
-      }
-      polygons.push_back (triangle_);
-    }
-**/
-
-    /** \brief Add a new vertex to the advancing edge front and set its source
-     * point
-     * \param[in] v index of the vertex that was connected
-     * \param[in] s index of the source point
-     */
-    inline void addFringePoint(PointId v, PointId s)
-    {
-        source_[v] = s;
-        part_[v] = part_[s];
-        fringe_queue_.push_back(v);
-    }
-
-    bool stateSet(PointId idx)
-    {
-        return state_[idx] != GP3Type::NONE && state_[idx] != GP3Type::FREE;
-    }
 
     void addArgs(ProgramArgs& args) override;
     void addDimensions(PointLayoutPtr layout) override;
     void initialize() override;
     void filter(PointView& view) override;
-    void addTriangle(PointId a, PointId b, PointId c);
-    Eigen::Vector3d getCoord(PointId id);
-    Eigen::Vector3d getNormalCoord(PointId id);
 };
 
 } // namespace pdal

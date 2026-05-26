@@ -126,9 +126,12 @@ void TextReader::checkHeader(const std::string& header)
                            [](char c) { return std::isalpha(c); });
 
     if (it == header.end())
+    {
+        fprintf(stderr, "DEBUG: checkHeader emitting warning\n");
         log()->get(LogLevel::Warning)
             << getName() << ": file '" << m_filename
             << "' doesn't appear to contain a header line." << '\n';
+    }
 }
 
 void TextReader::initialize(PointTableRef table)
@@ -167,6 +170,7 @@ void TextReader::initialize(PointTableRef table)
 
 void TextReader::warnIfHeaderMissing()
 {
+    fprintf(stderr, "DEBUG: warnIfHeaderMissing called, m_header='%s'\n", m_header.c_str());
     if (!m_header.empty())
         return;
 

@@ -68,9 +68,7 @@ pub unsafe extern "C" fn pdal_column_storage_set_dimensions(
 /// Allocate the next point slot, expanding per-dimension blocks lazily.
 /// Returns the new point id, or `u64::MAX` on error.
 #[no_mangle]
-pub unsafe extern "C" fn pdal_column_storage_add_point(
-    handle: *mut pdal_column_storage_t,
-) -> u64 {
+pub unsafe extern "C" fn pdal_column_storage_add_point(handle: *mut pdal_column_storage_t) -> u64 {
     let Some(storage) = handle.as_mut() else {
         set_last_error("pdal_column_storage_add_point: null handle".to_string());
         return u64::MAX;
@@ -113,7 +111,8 @@ pub unsafe extern "C" fn pdal_column_storage_dim_slot(
     if block_idx >= block_list.len() {
         return std::ptr::null_mut();
     }
-    let offset = ((idx % block_pt_cnt) as usize).checked_mul(dim_size as usize)
+    let offset = ((idx % block_pt_cnt) as usize)
+        .checked_mul(dim_size as usize)
         .expect("column storage offset overflow");
     let buf = &mut block_list[block_idx];
     buf.as_mut_ptr().add(offset) as *mut c_void

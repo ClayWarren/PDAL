@@ -189,10 +189,7 @@ impl LasReader {
     /// variable-size chunks (which COPC always uses) — its delta formula
     /// assumes uniform chunk sizes. We side-step it by streaming the LAZ
     /// points sequentially and dropping records outside the kept ranges.
-    pub fn read_ranges(
-        &mut self,
-        ranges: &[(u64, u64)],
-    ) -> Result<PointView, StageError> {
+    pub fn read_ranges(&mut self, ranges: &[(u64, u64)]) -> Result<PointView, StageError> {
         let path = Path::new(&self.filename);
         let mut reader = las::Reader::from_path(path)
             .map_err(|e| StageError(format!("Failed to open LAS/LAZ file: {}", e)))?;

@@ -150,13 +150,7 @@ pub fn write_addon(req: AddonWriteRequest<'_>) -> Result<(), String> {
     let _ = root_bounds; // bounds are informational; the hierarchy keys carry tree position
     let mut root_map: Map<String, Value> = Map::new();
     let root_key = KeyId::new(0, 0, 0, 0);
-    write_hierarchy_node(
-        &by_key,
-        hierarchy_step,
-        &hier_dir,
-        &mut root_map,
-        root_key,
-    )?;
+    write_hierarchy_node(&by_key, hierarchy_step, &hier_dir, &mut root_map, root_key)?;
     let root_filename = hier_dir.join(format!("{}.json", root_key));
     fs::write(&root_filename, Value::Object(root_map).to_string())
         .map_err(|e| format!("Failed to write '{}': {e}", root_filename.display()))?;
@@ -210,7 +204,10 @@ impl std::fmt::Display for KeyId {
 }
 
 fn key_to_string(overlap: &AddonOverlap) -> String {
-    format!("{}-{}-{}-{}", overlap.depth, overlap.x, overlap.y, overlap.z)
+    format!(
+        "{}-{}-{}-{}",
+        overlap.depth, overlap.x, overlap.y, overlap.z
+    )
 }
 
 fn write_hierarchy_node(

@@ -119,8 +119,8 @@ impl CopcReader {
             QueryBounds::Two(b) => HierarchyBounds::Two(*b),
             QueryBounds::Three(b) => HierarchyBounds::Three(*b),
         });
-        let file = File::open(path)
-            .map_err(|e| StageError(format!("Failed to open COPC file: {e}")))?;
+        let file =
+            File::open(path).map_err(|e| StageError(format!("Failed to open COPC file: {e}")))?;
         let mut buffered = BufReader::new(file);
         let entries = {
             let (info, _) = copc_hierarchy::read_copc_info(&mut buffered).map_err(StageError)?;
@@ -140,10 +140,8 @@ impl CopcReader {
         // Read the LAZ chunk table to map each entry's file offset to a
         // (start_point_idx, count) range we can hand to `LasReader::read_ranges`.
         let locators = copc_hierarchy::read_chunk_locators(path).map_err(StageError)?;
-        let by_offset: std::collections::HashMap<u64, copc_hierarchy::ChunkLocator> = locators
-            .iter()
-            .map(|loc| (loc.file_offset, *loc))
-            .collect();
+        let by_offset: std::collections::HashMap<u64, copc_hierarchy::ChunkLocator> =
+            locators.iter().map(|loc| (loc.file_offset, *loc)).collect();
         let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(entries.len());
         for entry in &entries {
             let Some(loc) = by_offset.get(&entry.offset) else {

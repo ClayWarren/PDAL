@@ -928,6 +928,12 @@ extern "C"
     void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
     uint64_t* pdal_delaunay_triangulate(const pdal_point_view_t* view,
                                         uint64_t* out_len);
+    uint64_t* pdal_greedyprojection_triangulate(const pdal_point_view_t* view,
+                                                double mu, double search_radius,
+                                                uint64_t nnn, double min_angle,
+                                                double max_angle, double eps_angle,
+                                                bool consistent,
+                                                uint64_t* out_len);
     pdal_point_view_t* pdal_icp_register(
         const pdal_point_view_t* fixed, const pdal_point_view_t* moving,
         int32_t max_iters, int32_t max_similar, double rotation_threshold,

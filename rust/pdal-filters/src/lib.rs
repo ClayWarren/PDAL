@@ -24,6 +24,7 @@ pub mod ferry;
 pub mod geom_distance;
 pub mod georeference;
 pub mod gpstimeconvert;
+pub mod greedyprojection;
 pub mod griddecimation;
 pub mod groupby;
 pub mod h3;
