@@ -661,6 +661,69 @@ fn srs_wkt_to_projjson_returns_pdal_formatted_json() {
 }
 
 #[test]
+fn srs_kind_and_axis_ordering_route_through_c_abi() {
+    unsafe {
+        let geographic = CString::new("EPSG:4326").unwrap();
+        let mut geographic_wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            geographic.as_ptr(),
+            &mut geographic_wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let geographic_wkt = CString::new(take_string(geographic_wkt)).unwrap();
+        let _ = take_string(wkt2);
+
+        let projected = CString::new("EPSG:32617").unwrap();
+        let mut projected_wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        assert!(pdal_srs_user_input_to_wkt(
+            projected.as_ptr(),
+            &mut projected_wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let projected_wkt = CString::new(take_string(projected_wkt)).unwrap();
+        let _ = take_string(wkt2);
+
+        let mut value = false;
+        assert!(pdal_srs_is_geographic(
+            geographic_wkt.as_ptr(),
+            0.0,
+            &mut value
+        ));
+        assert!(value);
+        assert!(pdal_srs_is_projected(
+            projected_wkt.as_ptr(),
+            0.0,
+            &mut value
+        ));
+        assert!(value);
+        assert!(pdal_srs_is_geocentric(
+            geographic_wkt.as_ptr(),
+            0.0,
+            &mut value
+        ));
+        assert!(!value);
+
+        let mut len = 0;
+        let ordering = pdal_srs_axis_ordering(geographic_wkt.as_ptr(), 0.0, &mut len);
+        assert!(!ordering.is_null());
+        assert!(len >= 2);
+        let values = std::slice::from_raw_parts(ordering, len as usize);
+        assert!(values.iter().all(|axis| *axis > 0));
+        pdal_i32_array_free(ordering, len);
+
+        let empty = CString::new("").unwrap();
+        let ordering = pdal_srs_axis_ordering(empty.as_ptr(), 0.0, &mut len);
+        assert!(ordering.is_null());
+        assert_eq!(len, 0);
+    }
+}
+
+#[test]
 fn srs_is_same_matches_equivalent_srs_through_c_abi() {
     unsafe {
         let a = CString::new("EPSG:4326").unwrap();

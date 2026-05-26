@@ -339,40 +339,38 @@ const std::string& SpatialReference::getName() const
 
 bool SpatialReference::isGeographic() const
 {
-    OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
-    if (!current)
-        return false;
-
-    bool output = current->IsGeographic();
-    return output;
+    bool output = false;
+    if (pdal_srs_is_geographic(m_wkt.c_str(), m_epoch, &output))
+        return output;
+    return false;
 }
 
 bool SpatialReference::isGeocentric() const
 {
-    OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
-    if (!current)
-        return false;
-
-    bool output = current->IsGeocentric();
-    return output;
+    bool output = false;
+    if (pdal_srs_is_geocentric(m_wkt.c_str(), m_epoch, &output))
+        return output;
+    return false;
 }
 
 bool SpatialReference::isProjected() const
 {
-    OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
-    if (!current)
-        return false;
-
-    bool output = current->IsProjected();
-    return output;
+    bool output = false;
+    if (pdal_srs_is_projected(m_wkt.c_str(), m_epoch, &output))
+        return output;
+    return false;
 }
 
 std::vector<int> SpatialReference::getAxisOrdering() const
 {
     std::vector<int> output;
-    OGRScopedSpatialReference current = ogrCreateSrs(m_wkt, m_epoch);
-    if (current)
-        output = current->GetDataAxisToSRSAxisMapping();
+    uint64_t len = 0;
+    int32_t* ordering = pdal_srs_axis_ordering(m_wkt.c_str(), m_epoch, &len);
+    if (ordering)
+    {
+        output.assign(ordering, ordering + len);
+        pdal_i32_array_free(ordering, len);
+    }
     return output;
 }
 

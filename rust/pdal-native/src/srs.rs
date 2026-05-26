@@ -344,6 +344,44 @@ pub fn wkt_to_projjson(wkt: &str, epoch: f64) -> Result<String, String> {
     }
 }
 
+/// Classify a WKT string with GDAL's `OSRIsGeographic`.
+pub fn is_geographic(wkt: &str, epoch: f64) -> bool {
+    with_imported_srs(wkt, epoch, |srs| unsafe {
+        gdal_sys::OSRIsGeographic(srs) == 1
+    })
+    .unwrap_or(false)
+}
+
+/// Classify a WKT string with GDAL's `OSRIsGeocentric`.
+pub fn is_geocentric(wkt: &str, epoch: f64) -> bool {
+    with_imported_srs(wkt, epoch, |srs| unsafe {
+        gdal_sys::OSRIsGeocentric(srs) == 1
+    })
+    .unwrap_or(false)
+}
+
+/// Classify a WKT string with GDAL's `OSRIsProjected`.
+pub fn is_projected(wkt: &str, epoch: f64) -> bool {
+    with_imported_srs(wkt, epoch, |srs| unsafe {
+        gdal_sys::OSRIsProjected(srs) == 1
+    })
+    .unwrap_or(false)
+}
+
+/// Return GDAL's data-axis to SRS-axis mapping. Empty input or unimportable WKT
+/// returns an empty vector, matching the C++ wrapper behavior.
+pub fn axis_ordering(wkt: &str, epoch: f64) -> Vec<i32> {
+    with_imported_srs(wkt, epoch, |srs| unsafe {
+        let mut count = 0;
+        let mapping = gdal_sys::OSRGetDataAxisToSRSAxisMapping(srs, &mut count);
+        if mapping.is_null() || count <= 0 {
+            return Vec::new();
+        }
+        std::slice::from_raw_parts(mapping, count as usize).to_vec()
+    })
+    .unwrap_or_default()
+}
+
 /// Return true when GDAL `OSRIsSame` considers the two WKT strings equivalent
 /// at the given coordinate epoch. Returns false when either string is empty or
 /// fails to import.
@@ -686,6 +724,33 @@ unsafe fn export_to_projjson(srs: gdal_sys::OGRSpatialReferenceH) -> Result<Stri
     Ok(out)
 }
 
+fn with_imported_srs<T, F>(wkt: &str, epoch: f64, f: F) -> Result<T, String>
+where
+    F: FnOnce(gdal_sys::OGRSpatialReferenceH) -> T,
+{
+    if wkt.is_empty() {
+        return Err("empty WKT".into());
+    }
+    let wkt_c = CString::new(wkt).map_err(|e| e.to_string())?;
+    unsafe {
+        let srs = gdal_sys::OSRNewSpatialReference(std::ptr::null());
+        if srs.is_null() {
+            return Err("OSRNewSpatialReference returned null".into());
+        }
+        let mut wkt_ptr = wkt_c.as_ptr() as *mut c_char;
+        if gdal_sys::OSRImportFromWkt(srs, &mut wkt_ptr) != gdal_sys::OGRErr::OGRERR_NONE {
+            gdal_sys::OSRDestroySpatialReference(srs);
+            return Err("OSRImportFromWkt failed".into());
+        }
+        if epoch != 0.0 {
+            gdal_sys::OSRSetCoordinateEpoch(srs, epoch);
+        }
+        let out = f(srs);
+        gdal_sys::OSRDestroySpatialReference(srs);
+        Ok(out)
+    }
+}
+
 unsafe fn last_cpl_error() -> String {
     let msg = gdal_sys::CPLGetLastErrorMsg();
     if msg.is_null() {
@@ -738,6 +803,38 @@ mod tests {
 
         assert_eq!(wkt_to_projjson("", 0.0).unwrap(), "");
         assert_eq!(wkt_to_projjson("not wkt", 0.0).unwrap(), "");
+    }
+
+    #[test]
+    fn srs_kind_helpers_match_known_crs_types() {
+        let geographic = user_input_to_wkt("EPSG:4326").unwrap();
+        assert!(is_geographic(&geographic.wkt, 0.0));
+        assert!(!is_geocentric(&geographic.wkt, 0.0));
+        assert!(!is_projected(&geographic.wkt, 0.0));
+
+        let projected = user_input_to_wkt("EPSG:32617").unwrap();
+        assert!(!is_geographic(&projected.wkt, 0.0));
+        assert!(!is_geocentric(&projected.wkt, 0.0));
+        assert!(is_projected(&projected.wkt, 0.0));
+
+        let geocentric = user_input_to_wkt("EPSG:4978").unwrap();
+        assert!(!is_geographic(&geocentric.wkt, 0.0));
+        assert!(is_geocentric(&geocentric.wkt, 0.0));
+        assert!(!is_projected(&geocentric.wkt, 0.0));
+
+        assert!(!is_geographic("", 0.0));
+        assert!(!is_projected("not wkt", 0.0));
+    }
+
+    #[test]
+    fn axis_ordering_returns_gdal_mapping() {
+        let geographic = user_input_to_wkt("EPSG:4326").unwrap();
+        let ordering = axis_ordering(&geographic.wkt, 0.0);
+        assert!(!ordering.is_empty());
+        assert!(ordering.iter().all(|axis| *axis > 0));
+
+        assert!(axis_ordering("", 0.0).is_empty());
+        assert!(axis_ordering("not wkt", 0.0).is_empty());
     }
 
     #[test]

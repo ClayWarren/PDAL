@@ -462,6 +462,100 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_projjson(
     })
 }
 
+/// Mirror `SpatialReference::isGeographic()` through Rust GDAL.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_is_geographic(
+    wkt: *const c_char,
+    epoch: f64,
+    out_value: *mut bool,
+) -> bool {
+    ffi_catch(false, || {
+        let value = srs::is_geographic(&c_string_lossy(wkt), epoch);
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = value;
+        }
+        true
+    })
+}
+
+/// Mirror `SpatialReference::isGeocentric()` through Rust GDAL.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_is_geocentric(
+    wkt: *const c_char,
+    epoch: f64,
+    out_value: *mut bool,
+) -> bool {
+    ffi_catch(false, || {
+        let value = srs::is_geocentric(&c_string_lossy(wkt), epoch);
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = value;
+        }
+        true
+    })
+}
+
+/// Mirror `SpatialReference::isProjected()` through Rust GDAL.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_is_projected(
+    wkt: *const c_char,
+    epoch: f64,
+    out_value: *mut bool,
+) -> bool {
+    ffi_catch(false, || {
+        let value = srs::is_projected(&c_string_lossy(wkt), epoch);
+        if let Some(out_value) = out_value.as_mut() {
+            *out_value = value;
+        }
+        true
+    })
+}
+
+/// Return GDAL's data-axis to SRS-axis mapping. Caller must release the
+/// returned pointer with `pdal_i32_array_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_len` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_axis_ordering(
+    wkt: *const c_char,
+    epoch: f64,
+    out_len: *mut u64,
+) -> *mut i32 {
+    ffi_catch(std::ptr::null_mut(), || {
+        let values = srs::axis_ordering(&c_string_lossy(wkt), epoch);
+        leak_i32s(values, out_len)
+    })
+}
+
+/// Free an `i32` array returned by the C ABI.
+///
+/// # Safety
+///
+/// `ptr` must have been returned by this ABI with the same `len`, or null.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_i32_array_free(ptr: *mut i32, len: u64) {
+    if !ptr.is_null() {
+        drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
+    }
+}
+
 /// Mirror `OGRSpatialReference::IsSame` for two WKT strings at the given
 /// coordinate epoch. Pass `0.0` for `epoch` when neither side has a fixed
 /// epoch. Returns `false` and clears `out_same` if either side fails to import.
@@ -796,6 +890,19 @@ unsafe fn c_string_lossy(ptr: *const c_char) -> String {
     } else {
         CStr::from_ptr(ptr).to_string_lossy().into_owned()
     }
+}
+
+unsafe fn leak_i32s(values: Vec<i32>, out_len: *mut u64) -> *mut i32 {
+    if !out_len.is_null() {
+        *out_len = values.len() as u64;
+    }
+    if values.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let mut values = values.into_boxed_slice();
+    let ptr = values.as_mut_ptr();
+    std::mem::forget(values);
+    ptr
 }
 
 // --- NITF native bridge (readers.nitf / writers.nitf) ---
