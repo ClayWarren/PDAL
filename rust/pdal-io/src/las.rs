@@ -742,12 +742,19 @@ fn resolve_spatial_reference_from_vlrs(
 fn spatial_reference_from_geotiff_vlrs(
     header: &Header,
 ) -> Result<Option<pdal_core::srs::SpatialReference>, StageError> {
-    let geotiff = header
-        .get_geotiff_crs()
-        .map_err(|err| StageError(format!("Could not create an SRS: {err}")))?
-        .ok_or_else(|| StageError("Could not create an SRS: missing GeoTIFF keys.".to_string()))?;
-    let crs = get_epsg_from_geotiff_crs(&geotiff)
-        .map_err(|err| StageError(format!("Could not create an SRS: {err}")))?;
+    // Match C++ las::Srs::extractGeotiff: a GeoTIFF directory that cannot be
+    // turned into a CRS -- empty/missing ascii or double VLRs, or keys that
+    // libgeotiff rejects -- is tolerated as "no SRS", not a hard read failure.
+    // The points still load; downstream stages that need an SRS (e.g.
+    // filters.reprojection) error on the resulting empty SRS instead.
+    let geotiff = match header.get_geotiff_crs() {
+        Ok(Some(geotiff)) => geotiff,
+        Ok(None) | Err(_) => return Ok(None),
+    };
+    let crs = match get_epsg_from_geotiff_crs(&geotiff) {
+        Ok(crs) => crs,
+        Err(_) => return Ok(None),
+    };
     Ok(Some(pdal_core::srs::SpatialReference::new(&format!(
         "EPSG:{}",
         crs.get_horizontal()
