@@ -63,6 +63,11 @@ pub struct LasWriter {
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     discard_high_return_numbers: bool,
     forward_vlrs: Vec<ForwardedVlr>,
+    // writers.copc rejects extra_dims that name a standard point-format
+    // dimension ("is a standard dimension"); writers.las allows them (it may
+    // write a standard dimension as an additional extra-bytes field). Mirrors
+    // the C++ CopcWriter vs LasWriter difference.
+    reject_standard_extra_dims: bool,
 }
 
 #[derive(Clone)]
@@ -103,6 +108,14 @@ impl LasWriter {
         Self::new_with_compression(options, true)
     }
 
+    /// LAS/LAZ writer configured for `writers.copc`: like `new_laz` but rejects
+    /// extra_dims that name a standard point-format dimension.
+    pub fn new_copc(options: &Options) -> Self {
+        let mut writer = Self::new_laz(options);
+        writer.reject_standard_extra_dims = true;
+        writer
+    }
+
     fn new_with_compression(options: &Options, driver_requests_compression: bool) -> Self {
         let point_format = ["dataformat_id", "format", "point_format"]
             .into_iter()
@@ -141,6 +154,7 @@ impl LasWriter {
             configured_extra_dims: configured_extra_dims_from_options(options),
             discard_high_return_numbers: options.get_bool("discard_high_return_numbers", false),
             forward_vlrs: forward_vlrs_from_options(options),
+            reject_standard_extra_dims: false,
         }
     }
 
@@ -251,7 +265,12 @@ impl Writer for LasWriter {
             self.pdal_metadata_json.as_deref(),
             self.pdal_pipeline_json.as_deref(),
         );
-        let extra_dims = resolve_extra_dims(views, self.point_format, &self.configured_extra_dims)?;
+        let extra_dims = resolve_extra_dims(
+            views,
+            self.point_format,
+            &self.configured_extra_dims,
+            self.reject_standard_extra_dims,
+        )?;
         add_extra_bytes_vlr(&mut builder, &extra_dims)?;
         add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
@@ -391,6 +410,7 @@ fn resolve_extra_dims(
     views: &[PointView],
     point_format: u8,
     configured_extra_dims: &[ConfiguredExtraDim],
+    reject_standard_extra_dims: bool,
 ) -> Result<Vec<ExtraDim>, StageError> {
     if configured_extra_dims.is_empty() {
         return Ok(extra_dims_from_views(views, point_format));
@@ -417,9 +437,11 @@ fn resolve_extra_dims(
                 )));
             }
             let id = DimId::from_name(&spec.name);
-            if standard_dims.contains(&id) {
+            // writers.copc rejects standard dimensions as extra_dims; writers.las
+            // does not (C++ CopcWriter validates this, C++ LasWriter does not).
+            if reject_standard_extra_dims && standard_dims.contains(&id) {
                 return Err(StageError(format!(
-                    "Dimension '{}' specified in extra_dim option is already in the point format.",
+                    "Dimension '{}' specified in 'extra_dim' option is a standard dimension.",
                     spec.name
                 )));
             }

@@ -993,7 +993,7 @@ pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut Wr
         // does not yet perform automatic format upconversion from older
         // formats. Keep the caller's format if specified, otherwise let
         // LasWriter pick from the input view.
-        let writer = Box::new(pdal_io::las_writer::LasWriter::new_laz(&opts));
+        let writer = Box::new(pdal_io::las_writer::LasWriter::new_copc(&opts));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()
