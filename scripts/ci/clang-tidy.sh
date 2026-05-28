@@ -47,8 +47,6 @@ excluded = (
     "plugins/e57/libE57Format/",
     "filters/private/csf/",
     "filters/private/miniball/",
-    "filters/private/delaunator.cpp",
-    "filters/private/delaunator.hpp",
     "plugins/nitf/io/nitflib.h",
 )
 
