@@ -1117,15 +1117,25 @@ mod tests {
     }
 
     #[test]
-    fn writer_with_extra_dims_option_rejects_standard_dim() {
-        let path = temp_las("extra-standard-dim.las");
-        let mut options = Options::new();
-        options.add("filename", path.display().to_string());
-        options.add("extra_dims", "X=int32");
-        let mut writer = LasWriter::new(&options);
-        let view = synthetic_point_view();
-        assert!(writer.write(&[view]).is_err());
-        let _ = std::fs::remove_file(path);
+    fn copc_writer_rejects_standard_dim_extra_dim_but_las_allows_it() {
+        // C++ CopcWriter rejects an extra_dim that names a standard point-format
+        // dimension ("is a standard dimension"); C++ LasWriter allows it (a
+        // standard dimension may be written as an additional extra-bytes field).
+        let copc_path = temp_las("extra-standard-dim-copc.las");
+        let mut copc_opts = Options::new();
+        copc_opts.add("filename", copc_path.display().to_string());
+        copc_opts.add("extra_dims", "X=int32");
+        let mut copc = LasWriter::new_copc(&copc_opts);
+        assert!(copc.write(&[synthetic_point_view()]).is_err());
+        let _ = std::fs::remove_file(&copc_path);
+
+        let las_path = temp_las("extra-standard-dim-las.las");
+        let mut las_opts = Options::new();
+        las_opts.add("filename", las_path.display().to_string());
+        las_opts.add("extra_dims", "X=int32");
+        let mut las = LasWriter::new(&las_opts);
+        assert!(las.write(&[synthetic_point_view()]).is_ok());
+        let _ = std::fs::remove_file(&las_path);
     }
 
     #[test]
