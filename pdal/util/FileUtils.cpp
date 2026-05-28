@@ -394,8 +394,17 @@ std::string readFileIntoString(const std::string& filename)
 {
     if (!isVsiPath(filename))
     {
-        char* res = pdal_file_utils_read_file_into_string(filename.c_str());
-        return takeRustString(res);
+        // Read raw bytes with an explicit length so binary files survive: a
+        // NUL-terminated C string would truncate at the first interior NUL.
+        uint64_t len = 0;
+        uint8_t* res =
+            pdal_file_utils_read_file_into_string(filename.c_str(), &len);
+        if (!res)
+            return std::string();
+        std::string out(reinterpret_cast<const char*>(res),
+                        static_cast<std::size_t>(len));
+        pdal_u8_array_free(res, len);
+        return out;
     }
     std::string str;
 

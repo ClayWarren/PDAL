@@ -215,7 +215,8 @@ extern "C"
     void pdal_file_utils_rename_file(const char* dest, const char* src);
     bool pdal_file_utils_file_exists(const char* filename);
     uint64_t pdal_file_utils_file_size(const char* filename);
-    char* pdal_file_utils_read_file_into_string(const char* filename);
+    uint8_t* pdal_file_utils_read_file_into_string(const char* filename,
+                                                   uint64_t* out_len);
     char* pdal_file_utils_directory_list(const char* dirname);
     char* pdal_file_utils_glob(const char* pattern);
     char* pdal_utils_getenv(const char* name);

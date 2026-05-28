@@ -561,14 +561,42 @@ pub unsafe extern "C" fn pdal_file_utils_file_size(filename: *const c_char) -> u
         .unwrap_or(0)
 }
 
+/// Read a file's full contents as raw bytes. Returns a heap buffer of
+/// `*out_len` bytes (free with [`pdal_u8_array_free`]), or null on error or an
+/// empty file. Uses `fs::read`, not `read_to_string`, so binary files (and
+/// interior NUL bytes) round-trip exactly like the C++ `istreambuf_iterator`
+/// path in `FileUtils::readFileIntoString` -- `read_to_string` would reject
+/// non-UTF-8 content, and a NUL-terminated C string would truncate it.
+///
+/// # Safety
+///
+/// `filename` must be null or a valid NUL-terminated C string. `out_len` must
+/// be null or valid for writes.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(
     filename: *const c_char,
-) -> *mut c_char {
+    out_len: *mut u64,
+) -> *mut u8 {
     let path_str = c_string(filename);
-    match std::fs::read_to_string(Path::new(&path_str)) {
-        Ok(content) => string_to_c(content),
-        Err(_) => std::ptr::null_mut(),
+    match std::fs::read(Path::new(&path_str)) {
+        Ok(bytes) => {
+            if !out_len.is_null() {
+                *out_len = bytes.len() as u64;
+            }
+            if bytes.is_empty() {
+                return std::ptr::null_mut();
+            }
+            let mut bytes = bytes.into_boxed_slice();
+            let ptr = bytes.as_mut_ptr();
+            std::mem::forget(bytes);
+            ptr
+        }
+        Err(_) => {
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            std::ptr::null_mut()
+        }
     }
 }
 

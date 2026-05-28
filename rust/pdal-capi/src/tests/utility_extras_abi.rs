@@ -199,7 +199,12 @@ fn file_utils_file_round_trip() {
         assert!(pdal_file_utils_file_exists(path_c.as_ptr()));
         assert_eq!(pdal_file_utils_file_size(path_c.as_ptr()), 12);
 
-        let contents = take_string(pdal_file_utils_read_file_into_string(path_c.as_ptr()));
+        let mut len = 0u64;
+        let ptr = pdal_file_utils_read_file_into_string(path_c.as_ptr(), &mut len);
+        assert!(!ptr.is_null());
+        let contents =
+            String::from_utf8(std::slice::from_raw_parts(ptr, len as usize).to_vec()).unwrap();
+        pdal_u8_array_free(ptr, len);
         assert_eq!(contents, "hello world\n");
 
         let dst = temp.path().join("hello-renamed.txt");
@@ -213,7 +218,10 @@ fn file_utils_file_round_trip() {
 
         // read_file_into_string of a missing file returns null.
         let missing = cstring(temp.path().join("missing").to_string_lossy().as_ref());
-        assert!(pdal_file_utils_read_file_into_string(missing.as_ptr()).is_null());
+        let mut missing_len = 0u64;
+        assert!(
+            pdal_file_utils_read_file_into_string(missing.as_ptr(), &mut missing_len).is_null()
+        );
     }
 }
 
@@ -281,7 +289,8 @@ fn test_utils_abi_nulls_and_errors() {
         assert!(!pdal_file_utils_delete_file(std::ptr::null()));
         pdal_file_utils_delete_directory(std::ptr::null());
         pdal_file_utils_rename_file(std::ptr::null(), std::ptr::null());
-        assert!(pdal_file_utils_read_file_into_string(std::ptr::null()).is_null());
+        let mut null_len = 0u64;
+        assert!(pdal_file_utils_read_file_into_string(std::ptr::null(), &mut null_len).is_null());
         assert!(pdal_file_utils_directory_list(std::ptr::null()).is_null());
         let glob_err = pdal_file_utils_glob(std::ptr::null());
         assert!(!glob_err.is_null());
