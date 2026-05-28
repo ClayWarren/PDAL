@@ -195,14 +195,17 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 39,330 | 374 |
+| port-candidate | 35,808 | 335 |
 | c-abi-backed | 29,018 | 241 |
 | native-adapter | 1,428 | 10 |
 | holdout | 339 | 4 |
-| total | 70,115 | 629 |
+| total | 66,593 | 590 |
 
-Port-candidate backlog by area: `io` 16,276 · `pdal` 10,450 · `filters` 9,237 ·
-`kernels` 3,305 · `tools` 62. This is a heuristic ceiling, not a precise
+Port-candidate backlog by area: `io` 16,276 · `pdal` 10,450 · `filters` 5,715 ·
+`kernels` 3,305 · `tools` 62. (A dead-code sweep removed the orphaned C++
+delaunator, CSF, miniball, straighten, mongoexpression, and DisjointSet
+implementations once their filters routed through Rust; rerun the audit after
+each change.) This is a heuristic ceiling, not a precise
 backlog: header-only files that still hold C++ data structures count even when
 some of their behavior already routes through Rust, and the holdout list is
 deliberately conservative. Drive the number down by porting the ranked
