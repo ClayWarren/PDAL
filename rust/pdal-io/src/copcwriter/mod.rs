@@ -5,8 +5,12 @@
 //! chunks) on top of a LAS 1.4 / LAZ file. Built up incrementally:
 //!
 //! - `voxel_key`: octree node key (`VoxelKey`).
+//! - `common`: shared constants (`MAX_POINTS_PER_NODE`, cell counts).
+//! - `grid`: octree depth sizing and point-to-voxel mapping (`Grid`).
 //!
-//! Higher layers (grid binning, pyramid build, hierarchy/info-VLR output) land
-//! in later increments; the C++ `writers.copc` remains the contract.
+//! Higher layers (pyramid build, hierarchy/info-VLR output) land in later
+//! increments; the C++ `writers.copc` remains the contract.
 
+pub mod common;
+pub mod grid;
 pub mod voxel_key;
