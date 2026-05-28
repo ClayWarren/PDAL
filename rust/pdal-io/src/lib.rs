@@ -6,6 +6,7 @@
 pub mod bpf;
 pub mod copc;
 pub mod copc_hierarchy;
+pub mod copcwriter;
 pub mod ept;
 pub mod ept_addon;
 pub mod ept_addon_writer;
