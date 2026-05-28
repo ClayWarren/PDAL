@@ -7,10 +7,14 @@
 //! - `voxel_key`: octree node key (`VoxelKey`).
 //! - `common`: shared constants (`MAX_POINTS_PER_NODE`, cell counts).
 //! - `grid`: octree depth sizing and point-to-voxel mapping (`Grid`).
+//! - `octant_info`: per-octant point storage (`OctantInfo`).
+//! - `cell_manager`: `VoxelKey` -> point view map (`CellManager`).
 //!
 //! Higher layers (pyramid build, hierarchy/info-VLR output) land in later
 //! increments; the C++ `writers.copc` remains the contract.
 
+pub mod cell_manager;
 pub mod common;
 pub mod grid;
+pub mod octant_info;
 pub mod voxel_key;

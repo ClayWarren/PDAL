@@ -899,6 +899,14 @@ impl PointView {
         self.source_indices.push(src.source_index(src_idx));
     }
 
+    /// Append every point of `src` onto the end of this view (PDAL's
+    /// `PointView::append`). The two views must share an identical layout; the
+    /// raw point buffer and source indices are copied in bulk.
+    pub fn append(&mut self, src: &PointView) {
+        self.data.extend_from_slice(&src.data);
+        self.source_indices.extend_from_slice(&src.source_indices);
+    }
+
     /// Swap the stored data and source indices for two point rows.
     pub fn swap_points(&mut self, a: PointId, b: PointId) -> bool {
         if a >= self.len() || b >= self.len() {
