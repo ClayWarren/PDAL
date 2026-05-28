@@ -53,6 +53,14 @@ ColumnPointTable::~ColumnPointTable()
 
 void ColumnPointTable::finalize()
 {
+    // finalize() must be idempotent: Stage::execute() finalizes the table a
+    // second time after points have been added, and pdal_column_storage_set_
+    // dimensions() resets storage to zero points. Re-running it would discard
+    // already-stored data (and leave subsequent reads dereferencing null
+    // slots). Guard on the layout's finalized flag like BasePointTable does.
+    if (m_layoutRef.finalized())
+        return;
+
     m_layoutRef.orderDimensions();
     const auto& dims = m_layoutRef.dims();
     m_dimSizes.clear();
@@ -66,6 +74,8 @@ void ColumnPointTable::finalize()
     pdal_column_storage_set_dimensions(
         reinterpret_cast<pdal_column_storage_t*>(m_storage),
         m_dimSizes.data(), static_cast<uint64_t>(m_dimSizes.size()));
+
+    m_layoutRef.finalize();
 }
 
 PointId ColumnPointTable::addPoint()
