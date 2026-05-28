@@ -292,11 +292,13 @@ Known mixed binaries:
   fallback), horizontal-EPSG identification, vertical-EPSG identification,
   `getUTMZone`, `getHorizontal`, `getVertical` (WKT bracket-matching subtree
   extraction because GDAL's C API has no `OGR_SRSNode` equivalent),
-  `getHorizontalUnits`, `getVerticalUnits`, and `valid` route through the
-  Rust C ABI. Bbox corner transformations route through `pdal_srs_transform_*`.
+  `getHorizontalUnits`, `getVerticalUnits`, `getPROJJSON`, `getWKT1`,
+  `prettyWkt`, WKT1-to-WKT2 normalization in `set`, and `valid` route through
+  the Rust C ABI; `SpatialReference.cpp` no longer includes GDAL/OGR headers
+  directly. Bbox corner transformations route through `pdal_srs_transform_*`.
   LAS 1.4 WKT/libLAS SRS VLR writing, no-axis-ordering LAS reprojection
   pipelines, and explicit axis-ordering transforms route through Rust.
-  PROJJSON export and GeoTIFF VLR encoding remain C++ GDAL/libgeotiff-backed.
+  GeoTIFF VLR encoding remains C++ libgeotiff-backed.
   Strict bad-GeoTIFF-key detection for LAS reads now fails from the Rust LAS
   reader when a GeoTIFF SRS VLR is present but invalid.
 - `pdal_point_view_test`: `getSet`, `getAsUint8`, `getAsInt32`, `getFloat`,
