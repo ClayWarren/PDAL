@@ -462,6 +462,90 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_projjson(
     })
 }
 
+/// Translate WKT into WKT1_GDAL. Caller owns the returned string and must free
+/// it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_wkt_to_wkt1(
+    wkt: *const c_char,
+    epoch: f64,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || {
+        match srs::wkt_to_wkt1(&c_string_lossy(wkt), epoch) {
+            Ok(value) => {
+                if let Some(out_wkt) = out_wkt.as_mut() {
+                    *out_wkt = string_to_c_ptr(value);
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
+/// Translate WKT into WKT2_2018. Caller owns the returned string and must free
+/// it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_wkt_to_wkt2(
+    wkt: *const c_char,
+    epoch: f64,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || {
+        match srs::wkt_to_wkt2(&c_string_lossy(wkt), epoch) {
+            Ok(value) => {
+                if let Some(out_wkt) = out_wkt.as_mut() {
+                    *out_wkt = string_to_c_ptr(value);
+                }
+                true
+            }
+            Err(err) => {
+                set_last_error(err);
+                false
+            }
+        }
+    })
+}
+
+/// Pretty-format WKT with GDAL's multiline exporter. Caller owns the returned
+/// string and must free it with `pdal_string_free`.
+///
+/// # Safety
+///
+/// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
+/// null or valid for writes.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_srs_pretty_wkt(
+    wkt: *const c_char,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    ffi_catch(false, || match srs::pretty_wkt(&c_string_lossy(wkt)) {
+        Ok(value) => {
+            if let Some(out_wkt) = out_wkt.as_mut() {
+                *out_wkt = string_to_c_ptr(value);
+            }
+            true
+        }
+        Err(err) => {
+            set_last_error(err);
+            false
+        }
+    })
+}
+
 /// Mirror `SpatialReference::isGeographic()` through Rust GDAL.
 ///
 /// # Safety

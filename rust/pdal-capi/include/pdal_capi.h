@@ -661,6 +661,9 @@ extern "C"
     bool pdal_srs_wkt_to_proj4(const char* wkt, char** out_proj4);
     bool pdal_srs_wkt_to_projjson(const char* wkt, double epoch,
                                   char** out_projjson);
+    bool pdal_srs_wkt_to_wkt1(const char* wkt, double epoch, char** out_wkt);
+    bool pdal_srs_wkt_to_wkt2(const char* wkt, double epoch, char** out_wkt);
+    bool pdal_srs_pretty_wkt(const char* wkt, char** out_wkt);
     bool pdal_srs_is_geographic(const char* wkt, double epoch, bool* out_value);
     bool pdal_srs_is_geocentric(const char* wkt, double epoch, bool* out_value);
     bool pdal_srs_is_projected(const char* wkt, double epoch, bool* out_value);

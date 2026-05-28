@@ -32,64 +32,22 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <memory>
-
 #include <pdal/Metadata.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/private/SrsTransform.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
-
-// gdal
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-#include <ogr_spatialref.h>
-#pragma GCC diagnostic pop
-
-#include <cpl_conv.h>
 
 #include <pdal/util/Utils.hpp>
 
 namespace
 {
 
-using OGRScopedSpatialReference = std::unique_ptr<OGRSpatialReference>;
-
-OGRScopedSpatialReference ogrCreateSrs(std::string s = "", double epoch = 0.0)
+std::string takePdalString(char* ptr)
 {
-    OGRScopedSpatialReference r(
-        new OGRSpatialReference(s.size() ? s.c_str() : nullptr));
-    if (!pdal::Utils::compare_approx(epoch, 0.0f, 0.00001f))
-    {
-#if GDAL_VERSION_NUM >= GDAL_COMPUTE_VERSION(3, 4, 0)
-        r->SetCoordinateEpoch(epoch);
-#endif
-    }
-
-    return r;
-}
-
-std::string exportToWkt(OGRSpatialReference* srs,
-                        const std::vector<std::string>& options = {})
-{
-    std::string wkt;
-    if (!srs)
-        return wkt;
-
-    // Make one more pointer than option to terminate the list with a nullptr.
-    std::vector<const char*> copts(options.size() + 1, nullptr);
-    for (size_t i = 0; i < options.size(); ++i)
-        copts[i] = options[i].c_str();
-
-    char* buf = nullptr;
-    srs->exportToWkt(&buf, copts.data());
-    if (buf)
-    {
-        wkt = buf;
-        CPLFree(buf);
-    }
-    return wkt;
+    std::string output(ptr ? ptr : "");
+    pdal_string_free(ptr);
+    return output;
 }
 
 } // namespace
@@ -203,9 +161,11 @@ void SpatialReference::set(std::string v)
     else if (isWKT1(v))
     {
         m_wkt = v;
-        OGRScopedSpatialReference srs = ogrCreateSrs(m_wkt);
-        if (srs)
-            m_wkt2 = exportToWkt(srs.get(), {"FORMAT=WKT2_2018"});
+        char* rust_wkt2 = nullptr;
+        if (pdal_srs_wkt_to_wkt2(m_wkt.c_str(), m_epoch, &rust_wkt2))
+            m_wkt2 = takePdalString(rust_wkt2);
+        else if (rust_wkt2)
+            pdal_string_free(rust_wkt2);
         return;
     }
 
@@ -430,15 +390,12 @@ bool SpatialReference::isWKT(const std::string& wkt)
 
 std::string SpatialReference::prettyWkt(const std::string& wkt)
 {
-    std::string outWkt;
-
-    OGRScopedSpatialReference srs = ogrCreateSrs(wkt);
-    if (!srs)
-        return outWkt;
-
-    outWkt = exportToWkt(srs.get(),
-                         {"MULTILINE=YES"}); // equivalent to exportToPrettyWkt
-    return outWkt;
+    char* rust_wkt = nullptr;
+    if (pdal_srs_pretty_wkt(wkt.c_str(), &rust_wkt))
+        return takePdalString(rust_wkt);
+    if (rust_wkt)
+        pdal_string_free(rust_wkt);
+    return std::string();
 }
 
 std::string SpatialReference::getWKT1() const
@@ -447,10 +404,12 @@ std::string SpatialReference::getWKT1() const
     if (wkt.empty())
         return wkt;
 
-    OGRScopedSpatialReference srs = ogrCreateSrs(wkt, m_epoch);
-    std::string wkt1 = exportToWkt(
-        srs.get(),
-        {"FORMAT=WKT1_GDAL", "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS=YES"});
+    char* rust_wkt = nullptr;
+    std::string wkt1;
+    if (pdal_srs_wkt_to_wkt1(wkt.c_str(), m_epoch, &rust_wkt))
+        wkt1 = takePdalString(rust_wkt);
+    else if (rust_wkt)
+        pdal_string_free(rust_wkt);
     if (wkt1.empty())
         throw pdal_error(
             "Couldn't convert spatial reference to WKT version 1.");

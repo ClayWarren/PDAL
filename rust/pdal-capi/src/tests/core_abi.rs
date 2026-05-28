@@ -661,6 +661,43 @@ fn srs_wkt_to_projjson_returns_pdal_formatted_json() {
 }
 
 #[test]
+fn srs_wkt_export_helpers_route_through_c_abi() {
+    unsafe {
+        let input = CString::new("EPSG:32617").unwrap();
+        let mut wkt = std::ptr::null_mut();
+        let mut wkt2 = std::ptr::null_mut();
+        let mut epoch = 0.0;
+        assert!(pdal_srs_user_input_to_wkt(
+            input.as_ptr(),
+            &mut wkt,
+            &mut wkt2,
+            &mut epoch
+        ));
+        let wkt = CString::new(take_string(wkt)).unwrap();
+        let wkt2 = CString::new(take_string(wkt2)).unwrap();
+
+        let mut out = std::ptr::null_mut();
+        assert!(pdal_srs_wkt_to_wkt1(wkt2.as_ptr(), epoch, &mut out));
+        let wkt1 = take_string(out);
+        assert!(wkt1.starts_with("PROJCS["));
+        assert!(wkt1.contains("WGS 84 / UTM zone 17N"));
+
+        assert!(pdal_srs_wkt_to_wkt2(wkt.as_ptr(), epoch, &mut out));
+        let wkt2 = take_string(out);
+        assert!(wkt2.starts_with("PROJCRS["));
+        assert!(wkt2.contains("WGS 84 / UTM zone 17N"));
+
+        assert!(pdal_srs_pretty_wkt(wkt.as_ptr(), &mut out));
+        let pretty = take_string(out);
+        assert!(pretty.contains('\n'));
+        assert!(pretty.contains("WGS 84 / UTM zone 17N"));
+
+        let bad = CString::new("not wkt").unwrap();
+        assert!(!pdal_srs_wkt_to_wkt1(bad.as_ptr(), 0.0, &mut out));
+    }
+}
+
+#[test]
 fn srs_kind_and_axis_ordering_route_through_c_abi() {
     unsafe {
         let geographic = CString::new("EPSG:4326").unwrap();

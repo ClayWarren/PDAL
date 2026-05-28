@@ -344,6 +344,29 @@ pub fn wkt_to_projjson(wkt: &str, epoch: f64) -> Result<String, String> {
     }
 }
 
+/// Translate WKT into GDAL WKT1 using PDAL's LAS writer-compatible options.
+pub fn wkt_to_wkt1(wkt: &str, epoch: f64) -> Result<String, String> {
+    export_imported_wkt(
+        wkt,
+        epoch,
+        &[
+            ("FORMAT", "WKT1_GDAL"),
+            ("ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS", "YES"),
+        ],
+    )
+}
+
+/// Translate WKT into WKT2_2018.
+pub fn wkt_to_wkt2(wkt: &str, epoch: f64) -> Result<String, String> {
+    export_imported_wkt(wkt, epoch, &[("FORMAT", "WKT2_2018")])
+}
+
+/// Format WKT across multiple lines, matching `OGRSpatialReference`'s
+/// `MULTILINE=YES` export option.
+pub fn pretty_wkt(wkt: &str) -> Result<String, String> {
+    export_imported_wkt(wkt, 0.0, &[("MULTILINE", "YES")])
+}
+
 /// Classify a WKT string with GDAL's `OSRIsGeographic`.
 pub fn is_geographic(wkt: &str, epoch: f64) -> bool {
     with_imported_srs(wkt, epoch, |srs| unsafe {
@@ -380,6 +403,10 @@ pub fn axis_ordering(wkt: &str, epoch: f64) -> Vec<i32> {
         std::slice::from_raw_parts(mapping, count as usize).to_vec()
     })
     .unwrap_or_default()
+}
+
+fn export_imported_wkt(wkt: &str, epoch: f64, options: &[(&str, &str)]) -> Result<String, String> {
+    with_imported_srs(wkt, epoch, |srs| unsafe { export_to_wkt(srs, options) })?
 }
 
 /// Return true when GDAL `OSRIsSame` considers the two WKT strings equivalent
@@ -803,6 +830,27 @@ mod tests {
 
         assert_eq!(wkt_to_projjson("", 0.0).unwrap(), "");
         assert_eq!(wkt_to_projjson("not wkt", 0.0).unwrap(), "");
+    }
+
+    #[test]
+    fn wkt_export_helpers_match_expected_formats() {
+        let result = user_input_to_wkt("EPSG:32617").unwrap();
+
+        let wkt1 = wkt_to_wkt1(&result.wkt2, result.epoch).unwrap();
+        assert!(wkt1.starts_with("PROJCS["));
+        assert!(wkt1.contains("WGS 84 / UTM zone 17N"));
+
+        let wkt2 = wkt_to_wkt2(&result.wkt, result.epoch).unwrap();
+        assert!(wkt2.starts_with("PROJCRS["));
+        assert!(wkt2.contains("WGS 84 / UTM zone 17N"));
+
+        let pretty = pretty_wkt(&result.wkt).unwrap();
+        assert!(pretty.contains('\n'));
+        assert!(pretty.contains("WGS 84 / UTM zone 17N"));
+
+        assert!(wkt_to_wkt1("", 0.0).is_err());
+        assert!(wkt_to_wkt2("not wkt", 0.0).is_err());
+        assert!(pretty_wkt("not wkt").is_err());
     }
 
     #[test]
