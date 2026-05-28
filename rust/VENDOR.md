@@ -78,6 +78,13 @@ segfaults in `pdal_filters_crop_test`, `pdal_filters_geomdistance_test`, and
 `pdal_filters_overlay_test` on macOS. Keep C++ geometry on its existing
 GDAL/OGR path unless a future milestone proves a safe boundary.
 
+With C++ geometry kept on the GDAL/OGR path, all three of those tests pass
+today. (The `crop` test additionally needed an unrelated fix: a
+`ColumnPointTable::finalize()` double-call wiped Rust-owned column storage and
+segfaulted `CropFilterTest.issue_3114`; finalize is now idempotent.) The caveat
+above remains as guidance about the rejected GEOS-hook approach, not a
+description of currently-failing tests.
+
 ## Already Chosen Rust Replacements
 
 - H3: `h3o`
