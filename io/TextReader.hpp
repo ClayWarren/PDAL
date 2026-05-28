@@ -106,16 +106,6 @@ private:
 
     bool processOne(PointRef& point) override;
 
-    void warnIfHeaderMissing();
-
-    /**
-      Check a header line to see if it appears header-like.  Display a
-      warning if it doesn't look like a header.
-
-      \param header  Header string to test.
-    */
-    void checkHeader(const std::string& header);
-
 private:
     char m_separator;
     Arg* m_separatorArg;

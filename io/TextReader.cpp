@@ -119,21 +119,6 @@ QuickInfo TextReader::inspect()
     return qi;
 }
 
-// Make sure we have a header line.
-void TextReader::checkHeader(const std::string& header)
-{
-    auto it = std::find_if(header.begin(), header.end(),
-                           [](char c) { return std::isalpha(c); });
-
-    if (it == header.end())
-    {
-        fprintf(stderr, "DEBUG: checkHeader emitting warning\n");
-        log()->get(LogLevel::Warning)
-            << getName() << ": file '" << m_filename
-            << "' doesn't appear to contain a header line." << '\n';
-    }
-}
-
 void TextReader::initialize(PointTableRef table)
 {
     m_line = 0;
@@ -144,7 +129,9 @@ void TextReader::initialize(PointTableRef table)
         m_rustView = nullptr;
     }
 
-    warnIfHeaderMissing();
+    // The missing-header warning is emitted by the Rust text reader (see
+    // pdal-io::text), which owns header parsing. Emitting it here too would
+    // double-warn now that reading is delegated across the C ABI.
 
     pdal_options_t* options = pdal_options_create();
     addOption(options, "filename", m_filename);
@@ -166,27 +153,6 @@ void TextReader::initialize(PointTableRef table)
     pdal_options_destroy(options);
     if (!m_rustView)
         throwLastRustError("Rust text reader failed.");
-}
-
-void TextReader::warnIfHeaderMissing()
-{
-    fprintf(stderr, "DEBUG: warnIfHeaderMissing called, m_header='%s'\n", m_header.c_str());
-    if (!m_header.empty())
-        return;
-
-    m_istream = Utils::openFile(m_filename, false);
-    if (!m_istream)
-        throwError("Unable to open text file '" + m_filename + "'.");
-
-    std::string line;
-    for (size_t i = 0; i < m_skip && std::getline(*m_istream, line); ++i)
-        ;
-
-    if (std::getline(*m_istream, line))
-        checkHeader(line);
-
-    Utils::closeFile(m_istream);
-    m_istream = nullptr;
 }
 
 void TextReader::addArgs(ProgramArgs& args)

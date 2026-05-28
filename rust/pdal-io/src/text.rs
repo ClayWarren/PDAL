@@ -176,10 +176,24 @@ impl Reader for TextReader {
         let lines: Vec<&str> = text.lines().collect();
         let header = match &self.header {
             Some(header) => header.clone(),
-            None => lines
-                .get(self.skip)
-                .ok_or_else(|| StageError("Text file is missing a header line.".to_string()))?
-                .to_string(),
+            None => {
+                let line = lines
+                    .get(self.skip)
+                    .ok_or_else(|| {
+                        StageError("Text file is missing a header line.".to_string())
+                    })?
+                    .to_string();
+                // Mirror C++ TextReader::checkHeader: a file-derived header with
+                // no alphabetic character almost certainly is not a header.
+                if !line.chars().any(|c| c.is_alphabetic()) {
+                    eprintln!(
+                        "(readers.text Warning) readers.text: file '{}' doesn't \
+                         appear to contain a header line.",
+                        self.filename
+                    );
+                }
+                line
+            }
         };
         let dims = self.parse_header(&header)?;
 
