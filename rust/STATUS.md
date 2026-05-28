@@ -145,22 +145,69 @@ place only when a ported stage needs it.
 
 ## C++ Test Parity Accounting
 
-The first target is the pre-existing C++ test suite running against Rust
+The first target was the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-Current pre-port checkpoint: `819 / 819` baseline C++ GoogleTest cases, or
-`100.00%`, are confirmed Rust C ABI-backed by
+**This milestone is complete.** `819 / 819` baseline C++ GoogleTest cases
+(`100.00%`) and `956 / 956` currently built cases (`100.00%`, with
+`--include-added-tests`) are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
-port, so newly added guard tests do not move the headline denominator.
+port, so newly added guard tests do not move the headline denominator. Keep this
+audit green as a regression gate, but it no longer measures remaining work.
 
-This is the first major milestone, not the finish line. It proves the current
-C++ compatibility layer can satisfy the pre-port behavioral contract. The next
-target is to reduce the real implementation still living in C++ behind counted
-wrappers, broaden first-party I/O/filter/core replacement, and make
+This proves the current C++ compatibility layer can satisfy the pre-port
+behavioral contract; it is not the finish line. The active goal is now the
+**implementation-replacement backlog** below: reduce the real implementation
+still living in C++ to glue/wrappers plus documented holdouts, broaden
+first-party I/O/filter/core replacement, and make
 install/export/CI/regression/performance evidence strong enough for an
 upstreamable port.
+
+## C++ Implementation-Replacement Backlog
+
+With test parity at 100%, the next-goal metric is how much first-party C++ is
+*real implementation* still to be ported, versus glue/wrappers and documented
+holdouts. Measure it with:
+
+```sh
+python3 rust/scripts/audit_cpp_port_backlog.py
+python3 rust/scripts/audit_cpp_port_backlog.py --area io --top 40
+python3 rust/scripts/audit_cpp_port_backlog.py --show holdout
+```
+
+The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
+`kernels/`, `apps/`, `tools/`) by `cloc` code LOC into:
+
+- `c-abi-backed`: includes the Rust C ABI header (or is a known Rust bridge
+  header). A header inherits its sibling `.cpp`'s category, so interface headers
+  over a Rust-backed implementation are not counted as backlog.
+- `native-adapter`: C++ bindings over an external native library whose Rust home
+  is `pdal-native`/FFI (e.g. `pdal/private/gdal/`), not a from-scratch port.
+- `holdout`: a documented intentional C++ holdout (libgeotiff GeoKey encoding,
+  the `StreamCallback` callback ABI). Keep this list small and cited in the
+  script.
+- `port-candidate`: pure C++ with no C ABI reference — the actionable backlog.
+
+Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
+`plugins/`):
+
+| category | LOC | files |
+|---|---:|---:|
+| port-candidate | 39,330 | 374 |
+| c-abi-backed | 29,018 | 241 |
+| native-adapter | 1,428 | 10 |
+| holdout | 339 | 4 |
+| total | 70,115 | 629 |
+
+Port-candidate backlog by area: `io` 16,276 · `pdal` 10,450 · `filters` 9,237 ·
+`kernels` 3,305 · `tools` 62. This is a heuristic ceiling, not a precise
+backlog: header-only files that still hold C++ data structures count even when
+some of their behavior already routes through Rust, and the holdout list is
+deliberately conservative. Drive the number down by porting the ranked
+`port-candidate` files (or by reclassifying one with a cited holdout/backed
+entry when that is the honest answer).
 
 The branch-wide health metric, including guard tests added before and during
 the port, is `955 / 955` currently built C++ GoogleTest cases, or `100.00%`;
@@ -254,7 +301,12 @@ C++ implementation ceilings by area are approximately:
 | Mainline total | 73,596 | 26,462 | 47,134 |
 | `plugins/` deferred | 36,738 | 262 | 36,476 |
 
-Recompute the wrapper LOC baseline with:
+The numbers in this section are the older coarse manual estimate. The
+`rust/scripts/audit_cpp_port_backlog.py` audit (see "C++
+Implementation-Replacement Backlog" above) is now the authoritative,
+repeatable measurement; it folds interface headers into their backed `.cpp`
+and separates native adapters and documented holdouts. The legacy recompute
+recipe below is kept only for cross-checking that coarse ceiling:
 
 ```sh
 tmp=$(mktemp)
