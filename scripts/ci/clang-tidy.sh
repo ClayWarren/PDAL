@@ -45,8 +45,6 @@ compile_commands = Path(sys.argv[2])
 excluded = (
     "vendor/",
     "plugins/e57/libE57Format/",
-    "filters/private/csf/",
-    "filters/private/miniball/",
     "plugins/nitf/io/nitflib.h",
 )
 
