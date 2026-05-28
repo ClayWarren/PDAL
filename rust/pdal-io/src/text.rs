@@ -179,9 +179,7 @@ impl Reader for TextReader {
             None => {
                 let line = lines
                     .get(self.skip)
-                    .ok_or_else(|| {
-                        StageError("Text file is missing a header line.".to_string())
-                    })?
+                    .ok_or_else(|| StageError("Text file is missing a header line.".to_string()))?
                     .to_string();
                 // Mirror C++ TextReader::checkHeader: a file-derived header with
                 // no alphabetic character almost certainly is not a header.

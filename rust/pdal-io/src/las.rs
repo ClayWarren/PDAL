@@ -133,7 +133,12 @@ impl LasReader {
         // Surface VLRs as metadata, matching C++ las::addVlrMetadata (called per
         // VLR from LasReader). Without this the pure-Rust read path (e.g.
         // `pdal info --metadata`) drops all VLR records.
-        for (index, vlr) in header.vlrs().iter().chain(header.evlrs().iter()).enumerate() {
+        for (index, vlr) in header
+            .vlrs()
+            .iter()
+            .chain(header.evlrs().iter())
+            .enumerate()
+        {
             self.add_vlr_metadata(vlr, index);
         }
     }
