@@ -9,6 +9,8 @@
 //! - `grid`: octree depth sizing and point-to-voxel mapping (`Grid`).
 //! - `octant_info`: per-octant point storage (`OctantInfo`).
 //! - `cell_manager`: `VoxelKey` -> point view map (`CellManager`).
+//! - `grid_key`: packed sampling-grid cell key (`GridKey`).
+//! - `voxel_info`: per-node bounds, children, and occupancy grid (`VoxelInfo`).
 //!
 //! Higher layers (pyramid build, hierarchy/info-VLR output) land in later
 //! increments; the C++ `writers.copc` remains the contract.
@@ -16,5 +18,7 @@
 pub mod cell_manager;
 pub mod common;
 pub mod grid;
+pub mod grid_key;
 pub mod octant_info;
+pub mod voxel_info;
 pub mod voxel_key;
