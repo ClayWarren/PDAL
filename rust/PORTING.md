@@ -3,6 +3,34 @@
 This directory is a Rust port spike behind a C ABI. The existing C++ API and
 tests remain the behavioral contract while the Rust implementation grows.
 
+## Goal: A Behavior-Preserving Port
+
+The objective is a port to Rust that **keeps all existing functionality**. The
+target is full functional parity with C++ PDAL: every user-visible feature —
+stages, options, metadata, dimensions, spatial references, error/validation
+behavior, streaming, and output artifacts — must remain available and behave the
+same.
+
+Functionality is never dropped to make progress. Each piece of first-party C++
+must end up in exactly one of these states:
+
+1. ported to Rust behind the C ABI, with parity coverage;
+2. an explicit, documented C++ holdout still reached through the C ABI; or
+3. a known, written-down parity gap (in `rust/STATUS.md`) — not a silent loss.
+
+Hard rules that follow from this goal:
+
+- Do not remove a feature, weaken validation, or delete/relax a behavioral test
+  to make the port build or "pass". That is a regression, not progress.
+- Passing tests are necessary but **not sufficient** evidence of parity. If an
+  existing C++ test is weak, strengthen it before relying on a Rust port.
+- Removing genuinely dead or duplicate C++ (code no translation unit compiles or
+  references) is allowed and encouraged — that removes unused code, not
+  functionality. Verify it is truly unreferenced and that the behavior already
+  runs through Rust before deleting.
+- A discovered pre-existing bug or test failure is part of the contract too:
+  fix it or record it explicitly; do not leave it silently broken.
+
 ## Architecture
 
 - Rust code owns Rust `PointLayout`, `PointView`, and `Stage` values.
