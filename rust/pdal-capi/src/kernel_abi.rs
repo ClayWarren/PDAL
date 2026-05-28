@@ -458,10 +458,10 @@ fn apply_writer_stage_option(
     arg: &str,
     writer_options: &mut serde_json::Map<String, serde_json::Value>,
 ) -> bool {
-    let Some(value) = arg.strip_prefix("--") else {
-        return false;
-    };
-    let parsed = parse_stage_option(value, true);
+    // parse_stage_option strips the leading "--" itself; pass `arg` unstripped.
+    // (Stripping it here too made every --writers.* option fail to parse,
+    // breaking `pdal merge`/`pdal tile` stage-option forwarding.)
+    let parsed = parse_stage_option(arg, true);
     if parsed.result != ParseStageResult::Ok || !parsed.stage.starts_with("writers.") {
         return false;
     }
