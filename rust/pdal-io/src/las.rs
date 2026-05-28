@@ -129,6 +129,54 @@ impl LasReader {
             .add_value("offset_z", MetadataValue::F64(header.transforms().z.offset));
         self.metadata
             .add_value("count", MetadataValue::U64(header.number_of_points()));
+
+        // Surface VLRs as metadata, matching C++ las::addVlrMetadata (called per
+        // VLR from LasReader). Without this the pure-Rust read path (e.g.
+        // `pdal info --metadata`) drops all VLR records.
+        for (index, vlr) in header.vlrs().iter().chain(header.evlrs().iter()).enumerate() {
+            self.add_vlr_metadata(vlr, index);
+        }
+    }
+
+    fn add_vlr_metadata(&mut self, vlr: &las::Vlr, index: usize) {
+        // C++ las::addVlrMetadata skips VLRs larger than 1 MB.
+        const DATA_LEN_MAX: usize = 1_000_000;
+        if vlr.data.len() > DATA_LEN_MAX {
+            return;
+        }
+
+        // PDAL metadata/pipeline VLRs carry (NUL-terminated) JSON, not opaque
+        // bytes. Match the C++ pdal_metadata / pdal_pipeline naming.
+        const PDAL_USER_ID: &str = "PDAL";
+        const PDAL_METADATA_RECORD_ID: u16 = 12;
+        const PDAL_PIPELINE_RECORD_ID: u16 = 13;
+        if vlr.user_id == PDAL_USER_ID
+            && (vlr.record_id == PDAL_METADATA_RECORD_ID
+                || vlr.record_id == PDAL_PIPELINE_RECORD_ID)
+        {
+            let name = if vlr.record_id == PDAL_METADATA_RECORD_ID {
+                "pdal_metadata"
+            } else {
+                "pdal_pipeline"
+            };
+            let bytes: Vec<u8> = vlr.data.iter().copied().filter(|&b| b != 0).collect();
+            let json = String::from_utf8_lossy(&bytes).into_owned();
+            self.metadata.add_value(name, MetadataValue::String(json));
+            return;
+        }
+
+        let mut node = MetadataNode::new(format!("vlr_{index}"));
+        node.add_value(
+            "data",
+            MetadataValue::String(pdal_core::utils::base64_encode(&vlr.data)),
+        );
+        node.add_value("user_id", MetadataValue::String(vlr.user_id.clone()));
+        node.add_value("record_id", MetadataValue::U64(vlr.record_id as u64));
+        node.add_value(
+            "description",
+            MetadataValue::String(vlr.description.clone()),
+        );
+        self.metadata.add_child(node);
     }
 
     fn set_spatial_reference(
