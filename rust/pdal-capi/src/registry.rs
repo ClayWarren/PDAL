@@ -569,7 +569,11 @@ pub fn create_filter(
                 comma_list(&options.get_str("returns", "last,only")),
                 ignore,
                 classbits,
-            ))))
+            )
+            .with_dir(match options.get_str("dir", "") {
+                ref d if d.is_empty() => None,
+                d => Some(d),
+            }))))
         }
         "filters.sample" => Ok(Box::new(FilterWrapper::new(
             SampleFilter::new(options).map_err(StageError)?,

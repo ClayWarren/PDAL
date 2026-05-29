@@ -42,6 +42,9 @@ pub struct SmrfFilter {
     /// Mask of Classification-flag bits whose set points are excluded from
     /// segmentation (the `classbits` option).
     classbits: u8,
+    /// Optional debug-output directory (the `dir` option). When set, the
+    /// intermediate grids are written as GeoTIFFs, matching the C++ wrapper.
+    dir: Option<String>,
 }
 
 impl SmrfFilter {
@@ -131,7 +134,55 @@ impl SmrfFilter {
             returns: returns.into_iter().map(|r| r.trim().to_string()).collect(),
             ignore,
             classbits,
+            dir: None,
         }
+    }
+
+    /// Set the debug-output directory (the `dir` option). When `Some`, the
+    /// intermediate grids are written as GeoTIFFs during `run_one`.
+    pub fn with_dir(mut self, dir: Option<String>) -> Self {
+        self.dir = dir.filter(|d| !d.is_empty());
+        self
+    }
+
+    /// Write one grid to `<dir>/<name>` as a single-band Float64 GeoTIFF, using
+    /// the same south-up geotransform `[minx, cell, 0, miny, 0, cell]`, nodata
+    /// (-9999), and row-major layout as the C++ `math::writeMatrix`. The Rust
+    /// grid is column-major (`c*rows + r`), matching the C++ Eigen
+    /// `Map(data, rows, cols)`, so pixel (row i, col j) = `grid[j*rows + i]`.
+    fn write_grid(
+        &self,
+        dir: &str,
+        name: &str,
+        grid: &[f64],
+        rows: usize,
+        cols: usize,
+        minx: f64,
+        miny: f64,
+        srs_wkt: &str,
+    ) -> Result<(), StageError> {
+        use pdal_core::gdal::Raster;
+        let path = format!("{dir}/{name}");
+        let gt = [minx, self.cell, 0.0, miny, 0.0, self.cell];
+        // Prefer a georeferenced raster, but a debug dump must not fail the whole
+        // SMRF run when the view's SRS can't be set (e.g. the LAS 32767
+        // "no CRS" sentinel) — fall back to writing without a projection.
+        let mut raster =
+            match Raster::create_float64(&path, "GTiff", cols as i32, rows as i32, 1, gt, srs_wkt) {
+                Ok(raster) => raster,
+                Err(_) => Raster::create_float64(&path, "GTiff", cols as i32, rows as i32, 1, gt, "")
+                    .map_err(StageError)?,
+            };
+        let mut buf = vec![0.0f64; rows * cols];
+        for i in 0..rows {
+            for j in 0..cols {
+                buf[i * cols + j] = grid[j * rows + i];
+            }
+        }
+        raster
+            .write_band_f64(1, cols, rows, &buf, -9999.0, name)
+            .map_err(StageError)?;
+        Ok(())
     }
 
     fn validate(&self) -> Result<(), StageError> {
@@ -486,6 +537,7 @@ impl Filter for SmrfFilter {
                 zimin[idx] = z;
             }
         }
+        let zimin_pre = self.dir.is_some().then(|| zimin.clone());
         self.knn_fill(&mut zimin, rows, cols, minx, miny);
 
         // Step 2: low-outlier mask via inverted-Z progressive filter.
@@ -506,6 +558,7 @@ impl Filter for SmrfFilter {
                 zipro[i] = f64::NAN;
             }
         }
+        let zipro_pre = self.dir.is_some().then(|| zipro.clone());
         self.knn_fill(&mut zipro, rows, cols, minx, miny);
 
         // Step 6: gradient magnitude of ZIpro/cell, inpainted to fill edges.
@@ -517,7 +570,38 @@ impl Filter for SmrfFilter {
             .zip(gy.iter())
             .map(|(x, y)| (x * x + y * y).sqrt())
             .collect();
+        let gsurfs_pre = self.dir.is_some().then(|| gsurfs.clone());
         self.knn_fill(&mut gsurfs, rows, cols, minx, miny);
+
+        // Optional debug output: write the intermediate grids as GeoTIFFs,
+        // matching the C++ wrapper's `dir` behavior (12 rasters).
+        if let Some(dir) = &self.dir {
+            // Ensure the GDAL/GTiff driver is available (idempotent); the C++
+            // app registers drivers at startup, but the Rust pipeline path may
+            // reach here without that.
+            pdal_core::gdal::register_drivers();
+            let srs_wkt = input.spatial_reference().wkt().to_string();
+            let as_f64 = |m: &[u8]| -> Vec<f64> { m.iter().map(|&v| v as f64).collect() };
+            let thresh: Vec<f64> = gsurfs
+                .iter()
+                .map(|g| self.threshold + self.scalar * g)
+                .collect();
+            let w = |name: &str, grid: &[f64]| {
+                self.write_grid(dir, name, grid, rows, cols, minx, miny, &srs_wkt)
+            };
+            w("zimin.tif", zimin_pre.as_ref().unwrap())?;
+            w("zimin_fill.tif", &zimin)?;
+            w("zilow.tif", &as_f64(&low))?;
+            w("zinet.tif", &zinet)?;
+            w("ziobj.tif", &as_f64(&obj))?;
+            w("zipro.tif", zipro_pre.as_ref().unwrap())?;
+            w("zipro_fill.tif", &zipro)?;
+            w("gx.tif", &gx)?;
+            w("gy.tif", &gy)?;
+            w("gsurfs.tif", gsurfs_pre.as_ref().unwrap())?;
+            w("gsurfs_fill.tif", &gsurfs)?;
+            w("thresh.tif", &thresh)?;
+        }
 
         // Step 7: classify each inlier point against the provisional DEM.
         for &id in &inlier_ids {
@@ -1053,6 +1137,48 @@ mod tests {
             SmrfFilter::with_cut(1.0, 0.15, None, 1.25, 0.5, 0.0, 2, 1, false, Vec::new());
         let result = filter.run_one(&view).unwrap();
         assert_eq!(result[0].get_f64(marked, &DimId::Classification), 2.0);
+    }
+
+    #[test]
+    fn dir_writes_intermediate_rasters() {
+        use pdal_core::gdal::Raster;
+        let dir = std::env::temp_dir().join(format!("pdal-rs-smrf-dir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut filter = SmrfFilter::new(2.0, 0.15, None, 1.25, 0.5, 2, 1, true, Vec::new())
+            .with_dir(Some(dir.to_str().unwrap().to_string()));
+        filter.run_one(&flat_3x3_view()).unwrap();
+
+        // The 3x3 flat view (X,Y from 0.5..4.5, cell 2) yields a 3x3 grid.
+        for name in [
+            "zimin.tif",
+            "zimin_fill.tif",
+            "zilow.tif",
+            "zinet.tif",
+            "ziobj.tif",
+            "zipro.tif",
+            "zipro_fill.tif",
+            "gx.tif",
+            "gy.tif",
+            "gsurfs.tif",
+            "gsurfs_fill.tif",
+            "thresh.tif",
+        ] {
+            let path = dir.join(name);
+            assert!(path.exists(), "missing debug raster {name}");
+            let raster = Raster::open(path.to_str().unwrap()).unwrap();
+            assert_eq!(raster.width(), 3, "{name} width");
+            assert_eq!(raster.height(), 3, "{name} height");
+            let gt = raster.get_geo_transform().unwrap();
+            // South-up geotransform [minx, cell, 0, miny, 0, +cell].
+            assert_eq!(gt[0], 0.5, "{name} minx");
+            assert_eq!(gt[1], 2.0, "{name} x pixel size");
+            assert_eq!(gt[3], 0.5, "{name} miny");
+            assert_eq!(gt[5], 2.0, "{name} y pixel size");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
