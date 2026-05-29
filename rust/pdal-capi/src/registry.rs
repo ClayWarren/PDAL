@@ -20,6 +20,7 @@ use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::mongo::MongoExpressionFilter;
+use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -143,6 +144,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.miniball",
     "filters.mongo",
     "filters.mortonorder",
+    "filters.neighborclassifier",
     "filters.nndistance",
     "filters.normal",
     "filters.optimalneighborhood",
@@ -396,6 +398,46 @@ pub fn create_filter(
         "filters.mortonorder" => Ok(Box::new(FilterWrapper::new(MortonOrderFilter::new(
             get_bool(options, "reverse", false)?,
         )))),
+        "filters.neighborclassifier" => {
+            // The `candidate` mode loads neighbors from another file; that
+            // requires a reader the Rust pipeline registry can't drive here, so
+            // reject it explicitly rather than silently classify from self.
+            if !options.get_str("candidate", "").trim().is_empty() {
+                return Err(StageError(
+                    "filters.neighborclassifier: the 'candidate' file option is not \
+                     supported in the Rust pipeline registry."
+                        .to_string(),
+                ));
+            }
+            if !options.has("k") {
+                return Err(StageError(
+                    "filters.neighborclassifier: missing required option 'k'.".to_string(),
+                ));
+            }
+            let domain = options
+                .values("domain")
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    parse_range_limit(value).map(|limit| RangeLimit {
+                        dim_name: limit.dim_name,
+                        lower_bound: limit.lower_bound,
+                        upper_bound: limit.upper_bound,
+                        inclusive_lower: limit.inclusive_lower,
+                        inclusive_upper: limit.inclusive_upper,
+                        negate: limit.negate,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(NeighborClassifierFilter::new(
+                domain,
+                get_u64(options, "k", 8)? as usize,
+                options.get_str("dimension", "Classification"),
+            ))))
+        }
         "filters.nndistance" => Ok(Box::new(FilterWrapper::new(NNDistanceFilter::new(
             get_u64(options, "knn", get_u64(options, "k", 8)?)? as usize,
             nn_distance_mode(&options.get_str("mode", "kth"))?,

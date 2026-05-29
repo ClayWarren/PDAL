@@ -383,6 +383,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.mongo" => {
             options.add("expression", "{\"Z\":{\"$gt\":0}}");
         }
+        "filters.neighborclassifier" => {
+            options.add("k", 8u64);
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }
