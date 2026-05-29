@@ -19,6 +19,7 @@
 //! on `output_format`; the C++ `writers.copc` remains the contract until then.
 
 pub mod cell_manager;
+pub mod chunk_writer;
 pub mod common;
 pub mod grid;
 pub mod grid_key;

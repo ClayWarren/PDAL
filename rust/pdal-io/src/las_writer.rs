@@ -93,10 +93,10 @@ struct ForwardedVlr {
     data: Vec<u8>,
 }
 
-struct ExtraDim {
-    id: DimId,
-    ty: DimType,
-    size: usize,
+pub(crate) struct ExtraDim {
+    pub(crate) id: DimId,
+    pub(crate) ty: DimType,
+    pub(crate) size: usize,
 }
 
 impl LasWriter {
@@ -865,7 +865,7 @@ fn scan_angle_f32_for_i16(target: i16) -> f32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn point_from_view(
+pub(crate) fn point_from_view(
     view: &PointView,
     i: u64,
     extra_dims: &[ExtraDim],
