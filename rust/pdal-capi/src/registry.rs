@@ -13,6 +13,7 @@ use pdal_core::point::DimId;
 use pdal_core::stage::StageError;
 
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
+use pdal_filters::transformation::{invert_affine, parse_transformation_matrix, TransformationFilter};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -156,6 +157,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.straighten",
     "filters.supervoxel",
     "filters.tail",
+    "filters.transformation",
     "filters.voxelcenternearestneighbor",
     "filters.voxelcentroidnearestneighbor",
     "filters.voxeldownsize",
@@ -621,6 +623,21 @@ pub fn create_filter(
             get_u64(options, "count", 10)?,
             get_bool(options, "invert", false)?,
         )))),
+        "filters.transformation" => {
+            let matrix_str = options.get_str("matrix", "");
+            if matrix_str.trim().is_empty() {
+                return Err(StageError(
+                    "filters.transformation: missing 'matrix' option.".to_string(),
+                ));
+            }
+            let mut matrix = parse_transformation_matrix(&matrix_str).map_err(StageError)?;
+            // The C++ TransformationFilter inverts the matrix (Affine3d::inverse)
+            // up front when `invert` is set, then applies it; mirror that here.
+            if get_bool(options, "invert", false)? {
+                matrix = invert_affine(&matrix).map_err(StageError)?;
+            }
+            Ok(Box::new(FilterWrapper::new(TransformationFilter::new(matrix))))
+        }
         "filters.voxelcenternearestneighbor" => Ok(Box::new(FilterWrapper::new(
             VoxelCenterNearestNeighborFilter::new(get_f64(options, "cell", 1.0)?),
         ))),

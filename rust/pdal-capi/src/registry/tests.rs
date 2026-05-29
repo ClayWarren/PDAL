@@ -371,6 +371,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.assign" => {
             options.add("assignment", "Classification[:]=0");
         }
+        "filters.transformation" => {
+            options.add("matrix", "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }

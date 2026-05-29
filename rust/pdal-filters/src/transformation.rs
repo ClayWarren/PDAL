@@ -31,6 +31,46 @@ pub fn parse_transformation_matrix(input: &str) -> Result<[f64; 16], String> {
     Ok(matrix)
 }
 
+/// Invert a 4x4 affine transformation matrix (row-major), matching the C++
+/// `TransformationFilter`'s `Eigen::Affine3d::inverse()` for the `invert`
+/// option: invert the 3x3 linear block and set the translation to
+/// `-linear_inverse * translation`, with last row `[0,0,0,1]`. Returns an error
+/// if the linear block is singular.
+pub fn invert_affine(m: &[f64; 16]) -> Result<[f64; 16], String> {
+    // 3x3 linear block.
+    let (a, b, c) = (m[0], m[1], m[2]);
+    let (d, e, f) = (m[4], m[5], m[6]);
+    let (g, h, i) = (m[8], m[9], m[10]);
+    // Translation.
+    let (tx, ty, tz) = (m[3], m[7], m[11]);
+
+    let det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+    if det.abs() < 1e-12 || !det.is_finite() {
+        return Err("filters.transformation: matrix is not invertible.".to_string());
+    }
+    let inv_det = 1.0 / det;
+
+    // Inverse of the 3x3 linear block (adjugate / det).
+    let r00 = (e * i - f * h) * inv_det;
+    let r01 = (c * h - b * i) * inv_det;
+    let r02 = (b * f - c * e) * inv_det;
+    let r10 = (f * g - d * i) * inv_det;
+    let r11 = (a * i - c * g) * inv_det;
+    let r12 = (c * d - a * f) * inv_det;
+    let r20 = (d * h - e * g) * inv_det;
+    let r21 = (b * g - a * h) * inv_det;
+    let r22 = (a * e - b * d) * inv_det;
+
+    // Inverted translation: -R_inv * t.
+    let it0 = -(r00 * tx + r01 * ty + r02 * tz);
+    let it1 = -(r10 * tx + r11 * ty + r12 * tz);
+    let it2 = -(r20 * tx + r21 * ty + r22 * tz);
+
+    Ok([
+        r00, r01, r02, it0, r10, r11, r12, it1, r20, r21, r22, it2, 0.0, 0.0, 0.0, 1.0,
+    ])
+}
+
 pub fn format_transformation_matrix(matrix: &[f64; 16]) -> String {
     let mut out = String::new();
     for row in 0..MATRIX_ROW_SIZE {
@@ -158,6 +198,31 @@ mod tests {
         let formatted = format_transformation_matrix(&matrix);
         let reparsed = parse_transformation_matrix(&formatted).unwrap();
         assert_eq!(matrix, reparsed);
+    }
+
+    #[test]
+    fn invert_affine_translation_scale_and_singular() {
+        // Translation by (5,0,0) inverts to (-5,0,0).
+        let t = [
+            1.0, 0.0, 0.0, 5.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let ti = invert_affine(&t).unwrap();
+        let expected = [
+            1.0, 0.0, 0.0, -5.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        for (a, b) in ti.iter().zip(expected.iter()) {
+            assert!((a - b).abs() < 1e-12, "{a} vs {b}");
+        }
+        // Uniform scale by 2 inverts to 0.5.
+        let s = [
+            2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let si = invert_affine(&s).unwrap();
+        assert!((si[0] - 0.5).abs() < 1e-12);
+        assert!((si[5] - 0.5).abs() < 1e-12);
+        assert!((si[10] - 0.5).abs() < 1e-12);
+        // Singular linear block errors.
+        assert!(invert_affine(&[0.0; 16]).is_err());
     }
 
     #[test]
