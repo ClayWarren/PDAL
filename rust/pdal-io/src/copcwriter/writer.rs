@@ -291,3 +291,69 @@ impl CopcWriter {
         vlrs
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::copc::CopcReader;
+    use pdal_core::pipeline::Reader;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
+
+    /// Write a multi-node COPC (points spread across the cube so the octree
+    /// keeps more than the root node) and read every point back through the
+    /// Rust COPC reader, verifying nothing is lost.
+    #[test]
+    fn multi_node_copc_round_trips_through_reader() {
+        let dir = std::env::temp_dir();
+        let path = dir
+            .join("copcwriter_multinode_test.copc.laz")
+            .to_string_lossy()
+            .into_owned();
+        let _ = std::fs::remove_file(&path);
+
+        // ~2000 points spread across all 8 octants of a 100^3 cube. This is
+        // above MINIMUM_TOTAL_POINTS, so the children are not all merged into
+        // the root -> a real multi-node octree.
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let mut count = 0u64;
+        for xi in 0..2 {
+            for yi in 0..2 {
+                for zi in 0..2 {
+                    for p in 0..260 {
+                        let id = view.add_point();
+                        let f = p as f64 * 0.1;
+                        view.set_f64(id, &DimId::X, xi as f64 * 50.0 + f);
+                        view.set_f64(id, &DimId::Y, yi as f64 * 50.0 + f);
+                        view.set_f64(id, &DimId::Z, zi as f64 * 50.0 + (p as f64 * 0.05));
+                        count += 1;
+                    }
+                }
+            }
+        }
+
+        let mut wopts = Options::new();
+        wopts.add("filename", path.clone());
+        let mut writer = CopcWriter::new(&wopts);
+        writer.write(&[view]).unwrap();
+
+        // The octree is non-trivial: more than just the root entry.
+        let mut ropts = Options::new();
+        ropts.add("filename", path.clone());
+        let reader = CopcReader::new(&ropts);
+        let (info, _bounds) = reader.copc_info().unwrap();
+        assert!(info.root_hier_size as usize > super::super::output_format::HIERARCHY_ENTRY_SIZE);
+
+        // Every written point reads back.
+        let mut reader = CopcReader::new(&ropts);
+        let views = reader.read().unwrap();
+        let total: u64 = views.iter().map(|v| v.len()).sum();
+        assert_eq!(total, count);
+
+        let _ = std::fs::remove_file(&path);
+    }
+}
