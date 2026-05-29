@@ -23,6 +23,8 @@ use pdal_filters::ferry::FerryFilter;
 use pdal_filters::mongo::MongoExpressionFilter;
 use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
+use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
+use pdal_core::point::{DimType, PointLayout};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -157,6 +159,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.pmf",
     "filters.projpipeline",
     "filters.radialdensity",
+    "filters.radiusassign",
     "filters.randomize",
     "filters.range",
     "filters.reciprocity",
@@ -335,6 +338,64 @@ pub fn create_filter(
                 size_mode,
                 size,
                 Vec::new(),
+            ))))
+        }
+        "filters.radiusassign" => {
+            if !options.has("radius") {
+                return Err(StageError(
+                    "filters.radiusassign: missing required option 'radius'.".to_string(),
+                ));
+            }
+            let parse_domain = |key: &str| -> Result<Vec<RangeLimit>, StageError> {
+                options
+                    .values(key)
+                    .iter()
+                    .flat_map(|value| value.split(','))
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(|value| {
+                        parse_range_limit(value).map(|limit| RangeLimit {
+                            dim_name: limit.dim_name,
+                            lower_bound: limit.lower_bound,
+                            upper_bound: limit.upper_bound,
+                            inclusive_lower: limit.inclusive_lower,
+                            inclusive_upper: limit.inclusive_upper,
+                            negate: limit.negate,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(StageError)
+            };
+            let src_domain = parse_domain("src_domain")?;
+            let reference_domain = parse_domain("reference_domain")?;
+            let update_exprs: Vec<String> = options.values("update_expression").to_vec();
+            if update_exprs.is_empty() {
+                return Err(StageError(
+                    "filters.radiusassign: missing required option 'update_expression'.".to_string(),
+                ));
+            }
+            // Build a synthetic layout from the assignment LHS dimensions so the
+            // statements can be prepared at build time (matching the C ABI
+            // pdal_stage_create_radiusassign). Expressions referencing other
+            // dimensions error here rather than silently misbehaving.
+            let mut layout = PointLayout::default();
+            for expr in &update_exprs {
+                if let Some((dim, _)) = expr.split_once('=') {
+                    layout.register(DimId::from_name(dim.trim()), DimType::F64);
+                }
+            }
+            let assignments = parse_assignments(&update_exprs, &layout).map_err(|e| {
+                StageError(format!("{} (expressions referencing other dimensions are not \
+                    supported in the Rust pipeline registry)", e.0))
+            })?;
+            Ok(Box::new(FilterWrapper::new(RadiusAssignFilter::new(
+                src_domain,
+                reference_domain,
+                assignments,
+                get_f64(options, "radius", 0.0)?,
+                get_bool(options, "is3d", false)?,
+                get_f64(options, "max2d_above", -1.0)?,
+                get_f64(options, "max2d_below", -1.0)?,
             ))))
         }
         "filters.eigenvalues" => Ok(Box::new(FilterWrapper::new(EigenvaluesFilter::new(

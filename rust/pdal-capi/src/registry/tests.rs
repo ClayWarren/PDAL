@@ -390,6 +390,10 @@ fn default_filter_options(name: &str) -> Options {
         "filters.neighborclassifier" => {
             options.add("k", 8u64);
         }
+        "filters.radiusassign" => {
+            options.add("radius", 1.0);
+            options.add("update_expression", "Classification = 2");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }
