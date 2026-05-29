@@ -50,6 +50,7 @@ use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
 use pdal_filters::randomize::RandomizeFilter;
+use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::relaxation_dart_throwing::RelaxationDartThrowingFilter;
@@ -103,6 +104,7 @@ pub const READER_DRIVERS: &[&str] = &[
 
 pub const FILTER_DRIVERS: &[&str] = &[
     "filters.approximatecoplanar",
+    "filters.assign",
     "filters.chipper",
     "filters.cluster",
     "filters.covariancefeatures",
@@ -407,6 +409,40 @@ pub fn create_filter(
                 get_u64(options, "max_k", 8)? as usize,
             ),
         ))),
+        "filters.assign" => {
+            // The expression-based `value` option needs the full assign-statement
+            // parser, which is not yet ported; reject it explicitly rather than
+            // silently ignore it.
+            if !options.values("value").is_empty() {
+                return Err(StageError(
+                    "filters.assign: the expression-based 'value' option is not \
+                     supported in the Rust pipeline registry."
+                        .to_string(),
+                ));
+            }
+            let assignments = options
+                .values("assignment")
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(parse_assign_range)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(StageError)?;
+            let condition = match options.get_str("condition", "") {
+                ref c if c.trim().is_empty() => None,
+                c => Some(parse_assign_condition(c.trim()).map_err(StageError)?),
+            };
+            if assignments.is_empty() && condition.is_none() {
+                return Err(StageError(
+                    "filters.assign: no 'assignment' provided.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(AssignFilter::new(
+                condition,
+                assignments,
+            ))))
+        }
         "filters.outlier" => Ok(Box::new(FilterWrapper::new(OutlierFilter::new(
             options.get_str("method", "statistical"),
             get_u64(options, "min_k", 2)? as usize,
@@ -608,6 +644,46 @@ fn comma_list(value: &str) -> Vec<String> {
         .filter(|item| !item.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+/// Parse a simple `filters.assign` assignment statement of the form
+/// `Dim[range]=value`, matching the C++ `AssignRange::parse`. The expression
+/// form (the separate `value` option) is not handled here.
+fn parse_assign_range(spec: &str) -> Result<AssignRange, String> {
+    let limit = parse_range_limit(spec)?;
+    let rest = spec[limit.consumed..].trim_start();
+    let value_str = rest
+        .strip_prefix('=')
+        .ok_or_else(|| "filters.assign: Missing '=' assignment separator.".to_string())?
+        .trim();
+    let value: f64 = value_str
+        .parse()
+        .map_err(|_| "filters.assign: Missing value to assign following '='.".to_string())?;
+    Ok(AssignRange {
+        dim_name: limit.dim_name,
+        value,
+        lower_bound: limit.lower_bound,
+        upper_bound: limit.upper_bound,
+        inclusive_lower: limit.inclusive_lower,
+        inclusive_upper: limit.inclusive_upper,
+        negate: limit.negate,
+    })
+}
+
+/// Parse a `filters.assign` `condition` DimRange (`Dim[range]`).
+fn parse_assign_condition(spec: &str) -> Result<AssignCondition, String> {
+    let limit = parse_range_limit(spec)?;
+    if !spec[limit.consumed..].trim().is_empty() {
+        return Err("filters.assign: Invalid characters following condition range.".to_string());
+    }
+    Ok(AssignCondition {
+        dim_name: limit.dim_name,
+        lower_bound: limit.lower_bound,
+        upper_bound: limit.upper_bound,
+        inclusive_lower: limit.inclusive_lower,
+        inclusive_upper: limit.inclusive_upper,
+        negate: limit.negate,
+    })
 }
 
 /// Parse a `filters.smrf` `classbits` option (comma-separated

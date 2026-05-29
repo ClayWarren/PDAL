@@ -3,56 +3,156 @@ use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
+/// `pdal ground` -- progressive morphological ground segmentation.
+///
+/// Faithful port of the C++ `GroundKernel`: it builds a
+/// reader -> [assign] -> [outlier] -> smrf -> [range] -> writer pipeline,
+/// mapping the kernel's options onto `filters.smrf` and optionally inserting
+/// `filters.assign` (reset), `filters.outlier` (denoise), and `filters.range`
+/// (extract). The `--filters.smrf.<key>` passthrough is also accepted as a
+/// superset convenience. Any option the C++ kernel did not understand now
+/// errors (return 1) rather than falling back to the deleted C++ kernel.
 pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
         Err(code) => return code,
     };
 
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.ground: Missing value for positional argument 'input'.");
-            return 1;
-        }
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!("Usage:");
-        println!("  pdal ground <input> <output> [--<stage>.<key>=<value> ...]");
+        println!("  pdal ground <input> <output> [options]");
+        println!("    --max_window_size  Max window size [18.0]");
+        println!("    --slope            Slope [0.15]");
+        println!("    --cell_size        Cell size [1.0]");
+        println!("    --scalar           Elevation scalar [1.25]");
+        println!("    --threshold        Elevation threshold [0.5]");
+        println!("    --cut              Cut net size [0.0]");
+        println!("    --returns          Return types to consider [last,only]");
+        println!("    --ignore           Range query to ignore (repeatable)");
+        println!("    --reset            Reset classifications before segmenting");
+        println!("    --denoise          Apply outlier removal before segmenting");
+        println!("    --extract          Extract ground returns only");
         return 0;
     }
 
     let mut input = None;
     let mut output = None;
     let mut reader_override = None;
-    let mut smrf_stage = serde_json::json!({
-        "type": "filters.smrf",
-    });
 
-    let mut iter = args.iter();
+    // GroundKernel defaults. The C++ kernel always passes these to filters.smrf,
+    // so we set them explicitly rather than relying on the smrf defaults.
+    let mut max_window_size = 18.0_f64;
+    let mut slope = 0.15_f64;
+    let mut cell_size = 1.0_f64;
+    let mut scalar = 1.25_f64;
+    let mut threshold = 0.5_f64;
+    let mut cut = 0.0_f64;
+    let mut returns: Vec<String> = vec!["last".to_string(), "only".to_string()];
+    let mut returns_set = false;
+    let mut ignore: Vec<String> = Vec::new();
+    let mut reset = false;
+    let mut denoise = false;
+    let mut extract = false;
+    // Extra `--filters.smrf.<key>=<value>` overrides applied last.
+    let mut smrf_overrides: Vec<(String, serde_json::Value)> = Vec::new();
+
+    let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
+        macro_rules! value_for {
+            ($name:expr) => {{
+                match split_value(arg) {
+                    Some(v) => v,
+                    None => match iter.next() {
+                        Some(v) => v.clone(),
+                        None => {
+                            eprintln!("PDAL: kernels.ground: Missing value for option '{}'.", $name);
+                            return 1;
+                        }
+                    },
+                }
+            }};
+        }
+
         if arg == "--input" || arg == "-i" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.ground: Missing value for option '{arg}'.");
-                return 1;
-            };
-            input = Some(value.clone());
+            input = Some(value_for!("--input"));
         } else if arg == "--output" || arg == "-o" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.ground: Missing value for option '{arg}'.");
-                return 1;
+            output = Some(value_for!("--output"));
+        } else if arg == "--driver" || arg.starts_with("--driver=") {
+            reader_override = Some(value_for!("--driver"));
+        } else if arg == "--label" || arg.starts_with("--label=") {
+            // Process label: accepted and ignored, matching the C++ basic switch.
+            let _ = value_for!("--label");
+        } else if arg == "--developer-debug" || arg == "--developer-debug=true"
+            || arg == "--developer-debug=false"
+        {
+            // Accepted and ignored.
+        } else if arg.starts_with("--max_window_size") {
+            max_window_size = match value_for!("--max_window_size").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("max_window_size"),
             };
-            output = Some(value.clone());
-        } else if arg == "--driver" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.ground: Missing value for option '--driver'.");
-                return 1;
+        } else if arg.starts_with("--slope") {
+            slope = match value_for!("--slope").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("slope"),
             };
-            reader_override = Some(value.clone());
-        } else if let Some(value) = arg.strip_prefix("--driver=") {
-            reader_override = Some(value.to_string());
+        } else if arg.starts_with("--cell_size") {
+            cell_size = match value_for!("--cell_size").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("cell_size"),
+            };
+        } else if arg.starts_with("--scalar") {
+            scalar = match value_for!("--scalar").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("scalar"),
+            };
+        } else if arg.starts_with("--threshold") {
+            threshold = match value_for!("--threshold").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("threshold"),
+            };
+        } else if arg.starts_with("--cut") {
+            cut = match value_for!("--cut").parse() {
+                Ok(v) => v,
+                Err(_) => return invalid_value("cut"),
+            };
+        } else if arg.starts_with("--max_distance") {
+            // Declared by the C++ kernel but unused; accept and ignore.
+            let _ = value_for!("--max_distance");
+        } else if arg.starts_with("--initial_distance") {
+            let _ = value_for!("--initial_distance");
+        } else if arg.starts_with("--returns") {
+            // Replaces the default set; accepts comma-separated or repeated.
+            let value = value_for!("--returns");
+            let parsed: Vec<String> = value
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !returns_set {
+                returns.clear();
+                returns_set = true;
+            }
+            returns.extend(parsed);
+        } else if arg.starts_with("--ignore") {
+            ignore.push(value_for!("--ignore"));
+        } else if arg == "--reset" || arg == "--reset=true" {
+            reset = true;
+        } else if arg == "--reset=false" {
+            reset = false;
+        } else if arg == "--denoise" || arg == "--denoise=true" {
+            denoise = true;
+        } else if arg == "--denoise=false" {
+            denoise = false;
+        } else if arg == "--extract" || arg == "--extract=true" {
+            extract = true;
+        } else if arg == "--extract=false" {
+            extract = false;
+        } else if let Some(over) = parse_smrf_override(arg) {
+            smrf_overrides.push(over);
         } else if arg.starts_with("--") {
-            let Some(option) = parse_smrf_option(arg) else {
-                return -1;
-            };
-            smrf_stage[option.key.as_str()] = parse_option_value(&option.value);
+            eprintln!("PDAL: kernels.ground: Unknown option '{arg}'.");
+            return 1;
         } else if input.is_none() {
             input = Some(arg.clone());
         } else if output.is_none() {
@@ -81,11 +181,56 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
         return 1;
     };
 
-    execute_ground_pipeline(serde_json::json!([
-        { "type": reader, "filename": input },
-        smrf_stage,
-        { "type": writer, "filename": output },
-    ]))
+    let mut smrf = serde_json::json!({
+        "type": "filters.smrf",
+        "window": max_window_size,
+        "threshold": threshold,
+        "slope": slope,
+        "cell": cell_size,
+        "cut": cut,
+        "scalar": scalar,
+        "returns": returns.join(","),
+    });
+    if !ignore.is_empty() {
+        smrf["ignore"] = serde_json::Value::Array(
+            ignore.into_iter().map(serde_json::Value::String).collect(),
+        );
+    }
+    for (key, value) in smrf_overrides {
+        smrf[key] = value;
+    }
+
+    let mut stages = vec![serde_json::json!({ "type": reader, "filename": input })];
+    if reset {
+        stages.push(serde_json::json!({
+            "type": "filters.assign",
+            "assignment": "Classification[:]=0",
+        }));
+    }
+    if denoise {
+        stages.push(serde_json::json!({ "type": "filters.outlier" }));
+    }
+    stages.push(smrf);
+    if extract {
+        stages.push(serde_json::json!({
+            "type": "filters.range",
+            "limits": "Classification[2:2]",
+        }));
+    }
+    stages.push(serde_json::json!({ "type": writer, "filename": output }));
+
+    execute_ground_pipeline(serde_json::Value::Array(stages))
+}
+
+fn invalid_value(name: &str) -> i32 {
+    eprintln!("PDAL: kernels.ground: Invalid value for option '--{name}'.");
+    1
+}
+
+/// Split an `--option=value` argument into its value, or `None` for the
+/// space-separated `--option value` form.
+fn split_value(arg: &str) -> Option<String> {
+    arg.split_once('=').map(|(_, v)| v.to_string())
 }
 
 unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<String>, i32> {
@@ -100,22 +245,15 @@ unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<Strin
     Ok(args)
 }
 
-struct SmrfOption {
-    key: String,
-    value: String,
-}
-
-fn parse_smrf_option(arg: &str) -> Option<SmrfOption> {
+/// Parse a `--filters.smrf.<key>=<value>` (or `--smrf.<key>=<value>`) override.
+fn parse_smrf_override(arg: &str) -> Option<(String, serde_json::Value)> {
     let spec = arg.strip_prefix("--")?;
     let (lhs, value) = spec.split_once('=')?;
     let (stage, key) = lhs.rsplit_once('.')?;
     if stage != "filters.smrf" && stage != "smrf" {
         return None;
     }
-    Some(SmrfOption {
-        key: key.to_string(),
-        value: value.to_string(),
-    })
+    Some((key.to_string(), parse_option_value(value)))
 }
 
 fn parse_option_value(value: &str) -> serde_json::Value {

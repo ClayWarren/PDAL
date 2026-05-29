@@ -368,6 +368,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.range" => {
             options.add("limits", "Z[0:10]");
         }
+        "filters.assign" => {
+            options.add("assignment", "Classification[:]=0");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }
