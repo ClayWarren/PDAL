@@ -59,7 +59,7 @@ Status definitions:
 | `pdal-rs` command shell | in progress | Rust-native shell lists Rust-backed stages/commands and owns the Rust command implementations. It is not yet the installed `pdal` executable. |
 | Command metadata | in progress | `--drivers`, `--list-commands`, and `--options <stage>` are backed by Rust-owned metadata for the implemented Rust surface. |
 | C++ `pdal` app shell | in progress | The top-level app uses a C ABI-shaped compatibility bridge for version, driver listing, command listing, stage option metadata, and kernel dispatch. Every first-party C++ kernel command name has a Rust dispatch guard, and `pdal_app_test.option_file`, `pdal_app_test.load`, `pdal_app_test.log`, and `pdal_app_test.listCommands` all count. `option_file` routes through the Rust translate option-file path, `load` exercises Rust kernel listing/dispatch plus the Rust-formatted unknown-command message (`pdal_app_unknown_command_message`), `listCommands` exercises Rust-owned command metadata for text and JSON output, and `log` exercises Rust-formatted log line prefixes through `pdal_log_format_prefix` (the C++ `Log::get` only owns sink selection now). |
-| Implemented commands | in progress | All 15 first-party C++ kernel commands (`chamfer`, `delta`, `density`, `eval`, `ground`, `hausdorff`, `info`, `merge`, `pipeline`, `random`, `sort`, `split`, `tile`, `tindex`, `translate`) are Rust-dispatchable through the C ABI and listed in Rust command metadata. They have installed-PDAL regression coverage for scoped workflows. `info` owns summary, metadata, point lookup, nearest query, stats with `--dimensions`, schema, all-mode schema/stat output, pipeline serialization, and the existing STAC app guard. Full STAC feature geometry/projection parity remains limited. `tile` owns the existing app tests, including globbed input, text/LAS output, per-source reprojection to `out_srs`, and writer text options. `tindex` owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, filelist create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, GeoJSON stdout layer-description option, fast bbox boundaries, SRS mismatch warning/skip behavior, and exact hexer-driven boundary generation for `--threshold`/`--resolution`/`--simplify` with optional `--where` point-expression filtering. GEOS topology-preserving simplification is applied through `pdal-native`. `ground` compares per-point classification against installed PDAL (>=99.8% agreement on `interesting.las` with `cell=10`) after the Rust SMRF implementation gained the low-outlier mask, net cutting, KD-tree inpainting, and full validation. `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
+| Implemented commands | in progress | All 15 first-party C++ kernel commands (`chamfer`, `delta`, `density`, `eval`, `ground`, `hausdorff`, `info`, `merge`, `pipeline`, `random`, `sort`, `split`, `tile`, `tindex`, `translate`) are Rust-dispatchable through the C ABI and listed in Rust command metadata. They have installed-PDAL regression coverage for scoped workflows. `info` owns summary, metadata, point lookup, nearest query, stats with `--dimensions`, schema, all-mode schema/stat output, pipeline serialization, and the existing STAC app guard. Full STAC feature geometry/projection parity remains limited. `tile` owns the existing app tests, including globbed input, text/LAS output, per-source reprojection to `out_srs`, and writer text options. `tindex` owns the existing local GeoJSON create + bounds-filtered merge workflow, stdin-fed create workflow, filelist create workflow, input-source conflict guard, invalid forwarded-filter diagnostic, GeoJSON stdout layer-description option, fast bbox boundaries, SRS mismatch warning/skip behavior, and exact hexer-driven boundary generation for `--threshold`/`--resolution`/`--simplify` with optional `--where` point-expression filtering. GEOS topology-preserving simplification is applied through `pdal-native`. `ground` compares per-point classification against installed PDAL (>=99.8% agreement on `interesting.las` with `cell=10`) after the Rust SMRF implementation gained the low-outlier mask, net cutting, KD-tree inpainting, and full validation. The Rust runner now owns the full `GroundKernel` option surface (max_window_size/slope/cell_size/scalar/threshold/cut/returns/ignore mapped onto `filters.smrf`, `--reset` -> `filters.assign`, `--denoise` -> `filters.outlier`, `--extract` -> `filters.range`, accept-and-ignore max_distance/initial_distance and the basic switches), never returns the -1 C++ fallback sentinel, and the dead C++ `kernels/GroundKernel.{cpp,hpp}` were deleted. `pdal ground` smoke-tested across basic/extract/reset/denoise/combined/ignore/smrf-passthrough; an installed-PDAL app-path regression test for the option mapping is still TODO (currently covered by the per-point classification regression plus manual smoke tests). `tools.lasdump` and `tools.nitfwrap` have Rust command paths for their scoped fixture-backed workflows. |
 | Performance visibility | prototype | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. They are visibility tools, not hard gates yet. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
@@ -195,17 +195,21 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 35,808 | 335 |
-| c-abi-backed | 29,018 | 241 |
+| port-candidate | 24,151 | 222 |
+| c-abi-backed | 37,205 | 315 |
 | native-adapter | 1,428 | 10 |
 | holdout | 339 | 4 |
-| total | 66,593 | 590 |
+| total | 63,123 | 551 |
 
-Port-candidate backlog by area: `io` 16,276 · `pdal` 10,450 · `filters` 5,715 ·
-`kernels` 3,305 · `tools` 62. (A dead-code sweep removed the orphaned C++
+Port-candidate backlog by area: `pdal` 9,332 · `io` 7,979 · `filters` 4,465 ·
+`kernels` 2,313 · `tools` 62. (A dead-code sweep removed the orphaned C++
 delaunator, CSF, miniball, straighten, mongoexpression, and DisjointSet
-implementations once their filters routed through Rust; rerun the audit after
-each change.) This is a heuristic ceiling, not a precise
+implementations once their filters routed through Rust; later sweeps removed the
+dead metric/merge/sort/split/random kernels, the retired copcwriter subsystem,
+the dead `io/PcdHeader.cpp`, the dead `io/FbiHeader.cpp` dumper, the dead BPF
+header (de)serialization in `io/BpfHeader.cpp`, and `kernels/GroundKernel.{cpp,
+hpp}` once the Rust ground runner owned the command; rerun the audit after each
+change — the totals above are a stale snapshot.) This is a heuristic ceiling, not a precise
 backlog: header-only files that still hold C++ data structures count even when
 some of their behavior already routes through Rust, and the holdout list is
 deliberately conservative. Drive the number down by porting the ranked
@@ -706,6 +710,9 @@ Known mixed binaries:
 Pipeline JSON can currently construct this command-ready filter subset:
 
 - `approximatecoplanar`
+- `assign` (simple `Dim[range]=value` assignments and the `condition` DimRange;
+  the expression-based `value` option is rejected explicitly, not silently
+  ignored — see the parity gap note below)
 - `chipper`
 - `cluster`
 - `covariancefeatures`
@@ -798,6 +805,20 @@ algorithm decision.
 - Now Rust C ABI-backed: `CS`; the C++ wrapper keeps return filtering,
   ignore-range segmentation, debug-directory validation, and class assignment
   plumbing around the Rust cloth classifier.
+- `SMR` (`filters.smrf`): the Rust filter now performs the `ignore` DimRange and
+  `synthetic|keypoint|withheld` `classbits` pre-segmentation itself (matching the
+  C++ `ignoreDimRanges`/`ignoreClassBits`), so the Rust pipeline registry path
+  honors both. **Parity gap:** the `dir` debug-raster output is not ported; the
+  C++ `SMRFilter` still falls back to its legacy non-delegating path when `dir`
+  is set, so `dir` remains a C++ holdout (it is unreachable from the Rust-owned
+  `pdal ground` command, which never sets it).
+- `Assign` (`filters.assign`): registered in the pipeline registry from the
+  simple `Dim[range]=value` `assignment` list plus the `condition` DimRange,
+  reusing the existing Rust `AssignFilter` and DimRange parser. **Parity gap:**
+  the expression-based `value` option (the `expr::AssignStatement` form) is not
+  yet parsed in the Rust registry path and is rejected with a clear error rather
+  than silently ignored. The C++ `AssignFilter` (and its full `value` support)
+  is unchanged and still reached for the non-registry C++ paths.
 - Pipeline/process/framework behavior: `Info` streaming metadata accumulation
   and `StreamCallback`. `StreamCallback` is a C++ compatibility callback over
   `PointRef`; do not route C++ callable objects through the C ABI without a
