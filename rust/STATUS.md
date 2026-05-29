@@ -857,10 +857,22 @@ algorithm decision.
   but it means the Rust `dir` rasters are NOT a value-faithful reproduction of
   the C++ debug rasters. So `SMRFilter::run` still uses the legacy C++ path when
   `dir` is set (it dumps the C++ engine's grids), and the Rust `dir` output
-  reflects the Rust engine's own grids. **Finding/TODO:** reconcile Rust
-  `knn_fill` with C++ `knnfill` (void-cell fill values diverge up to ~20m;
-  harmless to classification but the obvious next lever for tighter SMRF
-  parity). Only after the fills match should the legacy C++ dir path be retired.
+  reflects the Rust engine's own grids.
+
+  **Root cause of the void-cell divergence (investigated 2026-05-29 — NOT a
+  fixable bug):** `knn_fill`/`knnfill` average the 8 nearest filled cells (an
+  order-independent mean), so identical neighbor *sets* give identical fills.
+  The divergence is purely in *which* 8 cells are selected: on SMRF's regular
+  cell-center lattice inter-cell distances are highly degenerate
+  (`cell*sqrt(dc^2+dr^2)`), so k-NN selection is pervasively tie-broken, and
+  PDAL's KD-index (nanoflann) breaks those ties differently than Rust's `rstar`.
+  This is the same cause `ground_command.rs` already documents ("tie-breaking
+  inside the KD-tree inpainter"): ~96% of *void* cells differ, but only ~0.2% of
+  *points* flip (points sit in non-void cells whose min-Z matches; only a point
+  whose cell was stripped-then-filled is exposed). Matching it bit-for-bit would
+  require replicating nanoflann's internal tie order in rstar — impractical, and
+  it is the accepted >=99.8% SMRF parity floor. So the legacy C++ `dir` path is
+  kept as an intentional debug holdout; it is not a "TODO to close".
 - `Assign` (`filters.assign`): registered in the pipeline registry from the
   simple `Dim[range]=value` `assignment` list plus the `condition` DimRange,
   reusing the existing Rust `AssignFilter` and DimRange parser. **Parity gap:**
