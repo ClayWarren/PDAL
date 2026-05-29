@@ -9,11 +9,6 @@
 //! Replaces the lazperf usage in `io/private/copcwriter/Output.cpp`'s
 //! `writeCompressed`/chunk-table paths with the `laz` crate.
 
-// The encoder's outputs are consumed by the Output/file-assembly layer (the
-// next increment); until then they are exercised only by this module's
-// encode/decompress round-trip tests.
-#![allow(dead_code)]
-
 use std::io::Cursor;
 
 use las::point::Format;

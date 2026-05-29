@@ -6,8 +6,6 @@
 //! is built with `las::raw::Header`; VLR/EVLR headers and the `copc` info VLR
 //! are written by hand to match the COPC 1.0 layout the reader expects.
 
-#![allow(dead_code)]
-
 use std::io::Write;
 
 use byteorder::{LittleEndian, WriteBytesExt};

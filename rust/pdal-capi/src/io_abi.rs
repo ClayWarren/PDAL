@@ -987,13 +987,9 @@ pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut Wr
         if !opts.has("minor_version") {
             opts.add("minor_version", "4");
         }
-        // COPC nominally requires extended point formats (6/7/8), but the
-        // existing PDAL unit tests for `writers.copc` only verify
-        // LAZ-readability via the regular LAS reader, and the Rust LAS writer
-        // does not yet perform automatic format upconversion from older
-        // formats. Keep the caller's format if specified, otherwise let
-        // LasWriter pick from the input view.
-        let writer = Box::new(pdal_io::las_writer::LasWriter::new_copc(&opts));
+        // Real COPC writer: builds the octree (copc info VLR + hierarchy EVLR +
+        // per-node LAZ chunks) via the ported copcwriter subsystem.
+        let writer = Box::new(pdal_io::copcwriter::writer::CopcWriter::new(&opts));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
         std::ptr::null_mut()

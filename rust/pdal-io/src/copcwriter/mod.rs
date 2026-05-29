@@ -31,3 +31,4 @@ pub mod processor;
 pub mod pyramid;
 pub mod voxel_info;
 pub mod voxel_key;
+pub mod writer;

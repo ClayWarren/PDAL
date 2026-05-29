@@ -11,10 +11,6 @@
 //! sub-pages it references, so their offsets are known. Small/shallow trees
 //! produce a single root page.
 
-// Consumed by the Output/file-assembly layer (next increment); until then it is
-// exercised by this module's own emit/parse round-trip test.
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 
 use super::output_format::HierarchyEntry;

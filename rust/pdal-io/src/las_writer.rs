@@ -466,6 +466,26 @@ fn resolve_extra_dims(
         .collect()
 }
 
+/// For `writers.copc`: resolve the configured `extra_dims` (rejecting standard
+/// point-format dimensions, as the COPC writer does) and build the `LASF_Spec`
+/// Extra Bytes VLR payload. Returns the dims and the VLR data (if any).
+pub(crate) fn copc_extra_dims(
+    options: &Options,
+    views: &[PointView],
+    point_format: u8,
+) -> Result<(Vec<ExtraDim>, Option<Vec<u8>>), StageError> {
+    let configured = configured_extra_dims_from_options(options);
+    let dims = resolve_extra_dims(views, point_format, &configured, true)?;
+    if dims.is_empty() {
+        return Ok((dims, None));
+    }
+    let mut data = Vec::new();
+    for ed in &dims {
+        write_extra_dim_vlr_record(&mut data, ed)?;
+    }
+    Ok((dims, Some(data)))
+}
+
 fn dim_type_from_interpretation(name: &str) -> Option<DimType> {
     let normalized = name.trim().to_ascii_lowercase();
     if normalized.contains("int8") {
