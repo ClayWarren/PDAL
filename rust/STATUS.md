@@ -264,7 +264,20 @@ occupancy cell, so exact per-node membership is not byte-reproducible in Rust;
 the algorithm and observable COPC contract (all points retained, valid octree,
 resolution/bounds queryable) are preserved. Faithful bottom-up pyramid
 threading and deeper hierarchy sub-paging beyond the covered shapes can still
-grow.
+grow. The C++ `writers.copc` *stage* (`io/CopcWriter.cpp`) now delegates the
+whole write to this Rust writer through the C ABI (the same pattern
+`LasWriter` uses): it parses options, resolves the forward list / SRS, and
+collects forwarded/user/pipeline/metadata VLRs, then converts the view via
+`rust_view_converter::toRust` and passes scale/offset/ids/SRS/extra_dims plus
+its VLRs (encoded as `user_vlr_*` options) to `pdal_writer_create_copc`. The
+Rust writer gained the matching stage options: `system_id`, `software_id`,
+`project_id` (→ LAS GUID) and ingestion of user/forward/PDAL metadata+pipeline
+VLRs. With this, the entire ~1,800 LOC C++ octree/sampling/output subsystem in
+`io/private/copcwriter/` (BuPyramid, Grid, CellManager, Processor,
+PyramidManager, Reprocessor, Output, VoxelInfo/Key, …) is dead and has been
+deleted; only a slimmed `Common.hpp` (the stage's option/VLR storage) remains.
+`LasWriterTest.issue2235` (COPC written via the C++ stage, asserts extended
+per-return counts) and the full `CopcReaderTest` confirm the delegated stage.
 The CSF cloth-simulation algorithm is now a first-class Rust port
 (`pdal_filters::csf_algorithm`) and the C++ `CSFilter::run` routes its
 classification step through `pdal_filter_csf_classify`, which is what makes
