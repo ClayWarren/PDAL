@@ -12,9 +12,10 @@
 //! - `grid_key`: packed sampling-grid cell key (`GridKey`).
 //! - `voxel_info`: per-node bounds, children, and occupancy grid (`VoxelInfo`).
 //! - `processor`: per-node redistribution + occupancy-grid subsampling.
+//! - `pyramid`: bottom-up octree build driver (`Pyramid`).
 //!
-//! Higher layers (pyramid driver, hierarchy/info-VLR output) land in later
-//! increments; the C++ `writers.copc` remains the contract.
+//! The remaining layer (LAZ chunk encoding + hierarchy/info-VLR file output)
+//! lands in a later increment; the C++ `writers.copc` remains the contract.
 
 pub mod cell_manager;
 pub mod common;
@@ -22,5 +23,6 @@ pub mod grid;
 pub mod grid_key;
 pub mod octant_info;
 pub mod processor;
+pub mod pyramid;
 pub mod voxel_info;
 pub mod voxel_key;
