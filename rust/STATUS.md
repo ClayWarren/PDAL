@@ -833,13 +833,26 @@ algorithm decision.
 - Now Rust C ABI-backed: `CS`; the C++ wrapper keeps return filtering,
   ignore-range segmentation, debug-directory validation, and class assignment
   plumbing around the Rust cloth classifier.
-- `SMR` (`filters.smrf`): the Rust filter now performs the `ignore` DimRange and
+- `SMR` (`filters.smrf`): the Rust filter performs the `ignore` DimRange and
   `synthetic|keypoint|withheld` `classbits` pre-segmentation itself (matching the
-  C++ `ignoreDimRanges`/`ignoreClassBits`), so the Rust pipeline registry path
-  honors both. **Parity gap:** the `dir` debug-raster output is not ported; the
-  C++ `SMRFilter` still falls back to its legacy non-delegating path when `dir`
-  is set, so `dir` remains a C++ holdout (it is unreachable from the Rust-owned
-  `pdal ground` command, which never sets it).
+  C++ `ignoreDimRanges`/`ignoreClassBits`). Both the Rust pipeline registry path
+  AND the C++ `SMRFilter` stage now delegate the ignore/classbits case to Rust:
+  `pdal_stage_create_smrf` was extended with `ignore` (a `pdal_dim_range_t[]`
+  passed by component) and `classbits`, and `SMRFilter::run` delegates whenever
+  `dir` is empty. `SMRFilterTest.ignoreDimRange` covers the C++->Rust ignore
+  delegation. **Remaining C++ (the only thing keeping the legacy algorithm):**
+  the `dir` debug-raster output — when `dir` is set, `SMRFilter::run` still uses
+  the legacy C++ path that writes ~12 intermediate grids (zimin/zinet/zipro/
+  gx/gy/gsurfs/thresh/low/obj + *_fill) as GeoTIFFs via `math::writeMatrix`. To
+  finish the SMRFilter port: thread a `dir` option into the Rust SmrfFilter and
+  write those same grids via the existing `pdal-native` GDAL raster API
+  (`create_float64`/`write_band_f64`, geotransform from cell+bounds, SRS) — the
+  Rust algorithm already computes every one of those grids — then delete the
+  legacy `createZImin`/.../`classifyGround` private methods (internal methods of
+  the still-present, still-exported `SMRFilter` class, so removing them is
+  consistent with the nm-audit conclusion). `dir` is debug-only and untested in
+  C++; verify the Rust rasters against a C++ `dir` run (the legacy path is the
+  oracle until it is removed).
 - `Assign` (`filters.assign`): registered in the pipeline registry from the
   simple `Dim[range]=value` `assignment` list plus the `condition` DimRange,
   reusing the existing Rust `AssignFilter` and DimRange parser. **Parity gap:**
