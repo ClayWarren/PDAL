@@ -11,8 +11,9 @@
 //! - `cell_manager`: `VoxelKey` -> point view map (`CellManager`).
 //! - `grid_key`: packed sampling-grid cell key (`GridKey`).
 //! - `voxel_info`: per-node bounds, children, and occupancy grid (`VoxelInfo`).
+//! - `processor`: per-node redistribution + occupancy-grid subsampling.
 //!
-//! Higher layers (pyramid build, hierarchy/info-VLR output) land in later
+//! Higher layers (pyramid driver, hierarchy/info-VLR output) land in later
 //! increments; the C++ `writers.copc` remains the contract.
 
 pub mod cell_manager;
@@ -20,5 +21,6 @@ pub mod common;
 pub mod grid;
 pub mod grid_key;
 pub mod octant_info;
+pub mod processor;
 pub mod voxel_info;
 pub mod voxel_key;

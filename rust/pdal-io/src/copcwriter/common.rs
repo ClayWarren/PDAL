@@ -4,6 +4,14 @@
 /// Target maximum number of points stored in a single octree node.
 pub const MAX_POINTS_PER_NODE: i32 = 100_000;
 
+/// A child octant with fewer than this many points is merged up into its
+/// parent rather than kept as its own node.
+pub const MINIMUM_POINTS: usize = 100;
+
+/// If a node's children hold fewer than this many points in total, all of them
+/// are merged up into the parent.
+pub const MINIMUM_TOTAL_POINTS: usize = 1500;
+
 /// `sqrt(3)`, used to size the per-node sampling grid.
 pub const SQRT3: f64 = 1.732_050_807_57;
 
