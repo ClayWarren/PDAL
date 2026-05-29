@@ -25,6 +25,7 @@ pub mod grid;
 pub mod grid_key;
 pub mod hierarchy;
 pub mod octant_info;
+pub mod output;
 pub mod output_format;
 pub mod processor;
 pub mod pyramid;
