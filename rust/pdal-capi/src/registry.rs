@@ -497,21 +497,44 @@ pub fn create_filter(
         "filters.returns" => Ok(Box::new(FilterWrapper::new(ReturnsFilter::new(
             comma_list(&options.get_str("groups", "last")),
         )))),
-        "filters.smrf" => Ok(Box::new(FilterWrapper::new(SmrfFilter::with_cut(
-            get_f64(options, "cell", 1.0)?,
-            get_f64(options, "slope", 0.15)?,
-            options
-                .has("window")
-                .then(|| get_f64(options, "window", 18.0))
-                .transpose()?,
-            get_f64(options, "scalar", 1.25)?,
-            get_f64(options, "threshold", 0.5)?,
-            get_f64(options, "cut", 0.0)?,
-            get_u64(options, "ground_class", 2)? as u8,
-            get_u64(options, "other_class", 1)? as u8,
-            get_bool(options, "only_ground", false)?,
-            comma_list(&options.get_str("returns", "last,only")),
-        )))),
+        "filters.smrf" => {
+            let ignore = options
+                .values("ignore")
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    parse_range_limit(value).map(|limit| RangeLimit {
+                        dim_name: limit.dim_name,
+                        lower_bound: limit.lower_bound,
+                        upper_bound: limit.upper_bound,
+                        inclusive_lower: limit.inclusive_lower,
+                        inclusive_upper: limit.inclusive_upper,
+                        negate: limit.negate,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(StageError)?;
+            let classbits = parse_classbits(&options.get_str("classbits", "")).map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(SmrfFilter::with_segmentation(
+                get_f64(options, "cell", 1.0)?,
+                get_f64(options, "slope", 0.15)?,
+                options
+                    .has("window")
+                    .then(|| get_f64(options, "window", 18.0))
+                    .transpose()?,
+                get_f64(options, "scalar", 1.25)?,
+                get_f64(options, "threshold", 0.5)?,
+                get_f64(options, "cut", 0.0)?,
+                get_u64(options, "ground_class", 2)? as u8,
+                get_u64(options, "other_class", 1)? as u8,
+                get_bool(options, "only_ground", false)?,
+                comma_list(&options.get_str("returns", "last,only")),
+                ignore,
+                classbits,
+            ))))
+        }
         "filters.sample" => Ok(Box::new(FilterWrapper::new(
             SampleFilter::new(options).map_err(StageError)?,
         ))),
@@ -585,6 +608,25 @@ fn comma_list(value: &str) -> Vec<String> {
         .filter(|item| !item.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+/// Parse a `filters.smrf` `classbits` option (comma-separated
+/// `synthetic|keypoint|withheld`) into the Classification-flag bit mask,
+/// matching the C++ `Segmentation::PointClasses` stream operator.
+fn parse_classbits(value: &str) -> Result<u8, String> {
+    use pdal_filters::smrf::{CLASSBIT_KEYPOINT, CLASSBIT_SYNTHETIC, CLASSBIT_WITHHELD};
+    let mut bits = 0u8;
+    for token in value.split(',').map(str::trim).filter(|t| !t.is_empty()) {
+        match token.to_ascii_lowercase().as_str() {
+            "keypoint" => bits |= CLASSBIT_KEYPOINT,
+            "synthetic" => bits |= CLASSBIT_SYNTHETIC,
+            "withheld" => bits |= CLASSBIT_WITHHELD,
+            other => {
+                return Err(format!("filters.smrf: Invalid 'classbits' value: '{other}'."));
+            }
+        }
+    }
+    Ok(bits)
 }
 
 fn crop_filter_from_options(options: &Options) -> Result<CropFilter, StageError> {

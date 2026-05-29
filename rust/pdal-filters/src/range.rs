@@ -138,6 +138,44 @@ impl RangeLimit {
     }
 }
 
+/// Test whether a point satisfies a set of dimension ranges, matching C++
+/// `DimRange::pointPasses`: ranges are grouped by dimension; within a dimension
+/// the point passes if it satisfies any range (OR), and it must pass every
+/// dimension that has ranges (AND). An empty range set passes everything.
+///
+/// Shared by `filters.range` and by `filters.smrf`'s `ignore` option, which
+/// uses the identical DimRange semantics to exclude points from segmentation.
+pub fn ranges_point_passes(limits: &[RangeLimit], view: &PointView, idx: u64) -> bool {
+    if limits.is_empty() {
+        return true;
+    }
+
+    // Sort limits by dimension name to ensure contiguous grouping
+    // (matches C++ std::sort on m_ranges)
+    let mut sorted_limits = limits.to_vec();
+    sorted_limits.sort_by(|a, b| a.dim_name.cmp(&b.dim_name));
+
+    let mut last_dim = &sorted_limits[0].dim_name;
+    let mut passes = false;
+
+    for r in &sorted_limits {
+        if &r.dim_name != last_dim {
+            if !passes {
+                return false;
+            }
+            last_dim = &r.dim_name;
+        } else if passes {
+            continue;
+        }
+
+        let dim_id = DimId::from_name(&r.dim_name);
+        let val = view.get_f64(idx, &dim_id);
+        passes = r.value_passes(val);
+    }
+
+    passes
+}
+
 pub struct RangeFilter {
     pub limits: Vec<RangeLimit>,
 }
@@ -148,34 +186,7 @@ impl RangeFilter {
     }
 
     pub fn point_passes(&self, view: &PointView, idx: u64) -> bool {
-        if self.limits.is_empty() {
-            return true;
-        }
-
-        // Sort limits by dimension name to ensure contiguous grouping
-        // (matches C++ std::sort on m_ranges)
-        let mut sorted_limits = self.limits.clone();
-        sorted_limits.sort_by(|a, b| a.dim_name.cmp(&b.dim_name));
-
-        let mut last_dim = &sorted_limits[0].dim_name;
-        let mut passes = false;
-
-        for r in &sorted_limits {
-            if &r.dim_name != last_dim {
-                if !passes {
-                    return false;
-                }
-                last_dim = &r.dim_name;
-            } else if passes {
-                continue;
-            }
-
-            let dim_id = DimId::from_name(&r.dim_name);
-            let val = view.get_f64(idx, &dim_id);
-            passes = r.value_passes(val);
-        }
-
-        passes
+        ranges_point_passes(&self.limits, view, idx)
     }
 }
 

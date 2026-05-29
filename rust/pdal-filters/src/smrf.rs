@@ -8,6 +8,7 @@
 //! per-point ground/object classification.
 
 use crate::math;
+use crate::range::{ranges_point_passes, RangeLimit};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::point::{DimId, DimType, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
@@ -16,6 +17,13 @@ use rstar::RTree;
 use std::collections::HashSet;
 
 const VALID_RETURNS: &[&str] = &["first", "intermediate", "last", "only"];
+
+/// Classification-flag bits the `classbits` option can mask out (LAS-style
+/// flags packed into the Classification byte), matching the C++
+/// `Segmentation::PointClasses` constants.
+pub const CLASSBIT_SYNTHETIC: u8 = 32;
+pub const CLASSBIT_KEYPOINT: u8 = 64;
+pub const CLASSBIT_WITHHELD: u8 = 128;
 
 pub struct SmrfFilter {
     cell: f64,
@@ -28,6 +36,12 @@ pub struct SmrfFilter {
     other_class: u8,
     only_ground: bool,
     returns: HashSet<String>,
+    /// DimRanges whose matching points are excluded from segmentation (the
+    /// `ignore` option); ignored points keep their original classification.
+    ignore: Vec<RangeLimit>,
+    /// Mask of Classification-flag bits whose set points are excluded from
+    /// segmentation (the `classbits` option).
+    classbits: u8,
 }
 
 impl SmrfFilter {
@@ -70,6 +84,40 @@ impl SmrfFilter {
         only_ground: bool,
         returns: Vec<String>,
     ) -> Self {
+        Self::with_segmentation(
+            cell,
+            slope,
+            window,
+            scalar,
+            threshold,
+            cut,
+            ground_class,
+            other_class,
+            only_ground,
+            returns,
+            Vec::new(),
+            0,
+        )
+    }
+
+    /// Full constructor including the `ignore` DimRanges and `classbits` mask
+    /// that exclude points from segmentation. Matches the C++ SMRFilter's
+    /// `ignoreDimRanges`/`ignoreClassBits` pre-segmentation step.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_segmentation(
+        cell: f64,
+        slope: f64,
+        window: Option<f64>,
+        scalar: f64,
+        threshold: f64,
+        cut: f64,
+        ground_class: u8,
+        other_class: u8,
+        only_ground: bool,
+        returns: Vec<String>,
+        ignore: Vec<RangeLimit>,
+        classbits: u8,
+    ) -> Self {
         Self {
             cell,
             slope,
@@ -81,6 +129,8 @@ impl SmrfFilter {
             other_class,
             only_ground,
             returns: returns.into_iter().map(|r| r.trim().to_string()).collect(),
+            ignore,
+            classbits,
         }
     }
 
@@ -271,23 +321,32 @@ impl SmrfFilter {
     }
 }
 
-/// Choose inlier point ids based on optional return-number filtering.
+/// Choose inlier point ids among `candidates` based on optional return-number
+/// filtering.
+///
+/// `candidates` are the points that survived the `ignore`/`classbits`
+/// pre-segmentation step (the C++ `realView`); the zero-return checks and the
+/// all-zero fallback operate over that subset only, matching the C++ wrapper.
 ///
 /// Returns the inlier id list, or an error if NumberOfReturns/ReturnNumber
 /// values mix zero and non-zero entries. When all values are zero, return
-/// filtering is silently dropped and every point becomes an inlier.
-fn select_inliers(view: &PointView, returns: &HashSet<String>) -> Result<Vec<PointId>, StageError> {
+/// filtering is silently dropped and every candidate becomes an inlier.
+fn select_inliers(
+    view: &PointView,
+    returns: &HashSet<String>,
+    candidates: &[PointId],
+) -> Result<Vec<PointId>, StageError> {
     let has_returns = view.layout().dim(&DimId::ReturnNumber).is_some()
         && view.layout().dim(&DimId::NumberOfReturns).is_some();
     if !has_returns || returns.is_empty() {
-        return Ok((0..view.len()).collect());
+        return Ok(candidates.to_vec());
     }
 
     let mut nr_has_zero = false;
     let mut rn_has_zero = false;
     let mut nr_all_zero = true;
     let mut rn_all_zero = true;
-    for i in 0..view.len() {
+    for &i in candidates {
         let nr = view.get_f64(i, &DimId::NumberOfReturns) as i32;
         let rn = view.get_f64(i, &DimId::ReturnNumber) as i32;
         if nr == 0 {
@@ -309,11 +368,11 @@ fn select_inliers(view: &PointView, returns: &HashSet<String>) -> Result<Vec<Poi
         ));
     }
     if nr_all_zero && rn_all_zero {
-        return Ok((0..view.len()).collect());
+        return Ok(candidates.to_vec());
     }
 
     let mut inliers = Vec::new();
-    for i in 0..view.len() {
+    for &i in candidates {
         let rn = view.get_f64(i, &DimId::ReturnNumber) as i32;
         let nr = view.get_f64(i, &DimId::NumberOfReturns) as i32;
         let mut keep = false;
@@ -336,6 +395,27 @@ fn select_inliers(view: &PointView, returns: &HashSet<String>) -> Result<Vec<Poi
     Ok(inliers)
 }
 
+/// Points that survive the `ignore` DimRanges and `classbits` mask — the C++
+/// `keptView` after `ignoreDimRanges` then `ignoreClassBits`. A point is
+/// excluded if it matches the ignore ranges, or if any masked Classification
+/// flag bit is set on it.
+fn segmentation_candidates(view: &PointView, ignore: &[RangeLimit], classbits: u8) -> Vec<PointId> {
+    let mut candidates = Vec::new();
+    for i in 0..view.len() {
+        if !ignore.is_empty() && ranges_point_passes(ignore, view, i) {
+            continue;
+        }
+        if classbits != 0 {
+            let c = view.get_f64(i, &DimId::Classification) as u8;
+            if classbits & c != 0 {
+                continue;
+            }
+        }
+        candidates.push(i);
+    }
+    candidates
+}
+
 impl Filter for SmrfFilter {
     fn name(&self) -> &str {
         "filters.smrf"
@@ -344,7 +424,8 @@ impl Filter for SmrfFilter {
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.validate()?;
 
-        let inlier_ids = select_inliers(input, &self.returns)?;
+        let candidates = segmentation_candidates(input, &self.ignore, self.classbits);
+        let inlier_ids = select_inliers(input, &self.returns, &candidates)?;
         if inlier_ids.is_empty() {
             return Err(StageError(
                 "filters.smrf: No returns to process.".to_string(),
@@ -483,8 +564,21 @@ impl Streamable for SmrfFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::range::parse_range_limit;
     use pdal_core::point::{DimType, PointLayout};
     use std::rc::Rc;
+
+    fn to_limit(spec: &str) -> RangeLimit {
+        let parsed = parse_range_limit(spec).unwrap();
+        RangeLimit {
+            dim_name: parsed.dim_name,
+            lower_bound: parsed.lower_bound,
+            upper_bound: parsed.upper_bound,
+            inclusive_lower: parsed.inclusive_lower,
+            inclusive_upper: parsed.inclusive_upper,
+            negate: parsed.negate,
+        }
+    }
 
     fn grid_view() -> PointView {
         let mut layout = PointLayout::new();
@@ -866,6 +960,99 @@ mod tests {
         }
         // (c=1,r=1) should not be on the net.
         assert_eq!(mask[7], 0);
+    }
+
+    fn flat_with_marked_point(class_value: f64) -> (PointView, PointId) {
+        // 4x4 flat ground at z=10 plus one extra point sharing a ground cell
+        // but pre-tagged with `class_value` so we can watch whether smrf
+        // reclassifies it.
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Classification, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for cx in 0..4 {
+            for cy in 0..4 {
+                let id = view.add_point();
+                view.set_f64(id, &DimId::X, cx as f64 + 0.5);
+                view.set_f64(id, &DimId::Y, cy as f64 + 0.5);
+                view.set_f64(id, &DimId::Z, 10.0);
+            }
+        }
+        let marked = view.add_point();
+        view.set_f64(marked, &DimId::X, 1.5);
+        view.set_f64(marked, &DimId::Y, 1.5);
+        view.set_f64(marked, &DimId::Z, 10.0);
+        view.set_f64(marked, &DimId::Classification, class_value);
+        (view, marked)
+    }
+
+    #[test]
+    fn ignore_dimrange_leaves_matching_points_untouched() {
+        let (view, marked) = flat_with_marked_point(7.0);
+        let ignore = vec![to_limit("Classification[7:7]")];
+        let mut filter = SmrfFilter::with_segmentation(
+            1.0,
+            0.15,
+            None,
+            1.25,
+            0.5,
+            0.0,
+            2,
+            1,
+            false,
+            Vec::new(),
+            ignore,
+            0,
+        );
+        let result = filter.run_one(&view).unwrap();
+        // The ignored point keeps its original Classification (7), never reset
+        // to other_class or reclassified as ground.
+        assert_eq!(result[0].get_f64(marked, &DimId::Classification), 7.0);
+        // The surrounding flat ground is still segmented.
+        assert_eq!(result[0].get_f64(0, &DimId::Classification), 2.0);
+    }
+
+    #[test]
+    fn classbits_excludes_flagged_points() {
+        // Mark the extra point synthetic (bit 32) and ask smrf to ignore it.
+        let (view, marked) = flat_with_marked_point(CLASSBIT_SYNTHETIC as f64);
+        let mut filter = SmrfFilter::with_segmentation(
+            1.0,
+            0.15,
+            None,
+            1.25,
+            0.5,
+            0.0,
+            2,
+            1,
+            false,
+            Vec::new(),
+            Vec::new(),
+            CLASSBIT_SYNTHETIC,
+        );
+        let result = filter.run_one(&view).unwrap();
+        // Synthetic point untouched; flat ground still classified.
+        assert_eq!(
+            result[0].get_f64(marked, &DimId::Classification),
+            CLASSBIT_SYNTHETIC as f64
+        );
+        assert_eq!(result[0].get_f64(0, &DimId::Classification), 2.0);
+    }
+
+    #[test]
+    fn classbits_zero_keeps_every_point_in_segmentation() {
+        // With classbits unset, a synthetic-flagged point is still segmented
+        // (reset to other_class here since it sits on flat ground that classifies
+        // as ground -> 2).
+        let (view, marked) = flat_with_marked_point(CLASSBIT_SYNTHETIC as f64);
+        let candidates = segmentation_candidates(&view, &[], 0);
+        assert!(candidates.contains(&marked));
+        let mut filter =
+            SmrfFilter::with_cut(1.0, 0.15, None, 1.25, 0.5, 0.0, 2, 1, false, Vec::new());
+        let result = filter.run_one(&view).unwrap();
+        assert_eq!(result[0].get_f64(marked, &DimId::Classification), 2.0);
     }
 
     #[test]
