@@ -35,14 +35,15 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-
 #include <pdal/Dimension.hpp>
-#include <pdal/util/OStream.hpp>
 
 namespace pdal
 {
 
+// PCD field/dimension typing shared by the (Rust-delegating) PCD writer. The
+// header parsing and serialization that once lived alongside these types moved
+// into the Rust PCD reader/writer behind the C ABI, so only the dimension
+// descriptors remain on the C++ side.
 enum class PcdFieldType
 {
     unknown,
@@ -50,27 +51,6 @@ enum class PcdFieldType
     U,
     F
 };
-std::istream& operator>>(std::istream& in, PcdFieldType& type);
-std::ostream& operator<<(std::ostream& out, PcdFieldType& type);
-
-enum class PcdVersion
-{
-    unknown,
-    PCD_V6,
-    PCD_V7
-};
-std::istream& operator>>(std::istream& in, PcdVersion& version);
-std::ostream& operator<<(std::ostream& out, PcdVersion& version);
-
-enum class PcdDataStorage
-{
-    unknown,
-    ASCII,
-    BINARY,
-    COMPRESSED
-};
-std::istream& operator>>(std::istream& in, PcdDataStorage& storage);
-std::ostream& operator<<(std::ostream& out, PcdDataStorage& storage);
 
 struct PcdField
 {
@@ -92,30 +72,5 @@ struct PcdField
     PcdFieldType m_type;
     uint32_t m_count;
 };
-typedef std::vector<PcdField> PcdFieldList;
-
-struct PcdHeader
-{
-    PcdHeader();
-
-    void clear();
-
-    PcdVersion m_version;
-    PcdFieldList m_fields;
-    point_count_t m_width;
-    point_count_t m_height;
-    point_count_t m_pointCount;
-
-    Eigen::Vector4f m_origin;
-    Eigen::Quaternionf m_orientation;
-
-    PcdDataStorage m_dataStorage;
-    std::istream::pos_type m_dataOffset;
-    size_t m_numLines;
-};
-
-std::istream& operator>>(std::istream& in, PcdHeader& header);
-std::ostream& operator<<(std::ostream& out, PcdHeader& header);
-OLeStream& operator<<(OLeStream& out, PcdHeader& header);
 
 } // namespace pdal
