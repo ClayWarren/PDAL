@@ -14,6 +14,7 @@ use pdal_core::stage::StageError;
 
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::transformation::{invert_affine, parse_transformation_matrix, TransformationFilter};
+use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -151,6 +152,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.smrf",
     "filters.sample",
     "filters.separatescanline",
+    "filters.skewnessbalancing",
     "filters.splitter",
     "filters.sort",
     "filters.stats",
@@ -582,6 +584,13 @@ pub fn create_filter(
         ))),
         "filters.separatescanline" => Ok(Box::new(FilterWrapper::new(
             SeparateScanLineFilter::new(get_u64(options, "groupby", 1)?),
+        ))),
+        "filters.skewnessbalancing" => Ok(Box::new(FilterWrapper::new(
+            SkewnessBalancingFilter::new(
+                get_u64(options, "ground_class", 2)? as u8,
+                get_u64(options, "other_class", 1)? as u8,
+                get_bool(options, "only_ground", false)?,
+            ),
         ))),
         "filters.splitter" => Ok(Box::new(FilterWrapper::new(SplitterFilter::new(
             get_f64(options, "length", 1000.0)?,
