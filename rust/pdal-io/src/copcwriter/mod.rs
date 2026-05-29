@@ -13,15 +13,17 @@
 //! - `voxel_info`: per-node bounds, children, and occupancy grid (`VoxelInfo`).
 //! - `processor`: per-node redistribution + occupancy-grid subsampling.
 //! - `pyramid`: bottom-up octree build driver (`Pyramid`).
+//! - `output_format`: byte-exact `copc` info VLR + hierarchy entries.
 //!
-//! The remaining layer (LAZ chunk encoding + hierarchy/info-VLR file output)
-//! lands in a later increment; the C++ `writers.copc` remains the contract.
+//! The remaining layer (LAS header + LAZ chunk encoding + file assembly) builds
+//! on `output_format`; the C++ `writers.copc` remains the contract until then.
 
 pub mod cell_manager;
 pub mod common;
 pub mod grid;
 pub mod grid_key;
 pub mod octant_info;
+pub mod output_format;
 pub mod processor;
 pub mod pyramid;
 pub mod voxel_info;
