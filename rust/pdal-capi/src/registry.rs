@@ -17,6 +17,7 @@ use pdal_filters::transformation::{invert_affine, parse_transformation_matrix, T
 use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
+use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -119,6 +120,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.eigenvalues",
     "filters.elm",
     "filters.estimaterank",
+    "filters.expression",
     "filters.faceraster",
     "filters.gpstimeconvert",
     "filters.groupby",
@@ -599,6 +601,14 @@ pub fn create_filter(
         "filters.farthestpointsampling" => Ok(Box::new(FilterWrapper::new(
             FarthestPointSamplingFilter::new(get_u64(options, "count", 1000)?),
         ))),
+        "filters.expression" => {
+            // `expression` is the positional option; `limits` is its synonym.
+            let mut sources: Vec<String> = options.values("expression").to_vec();
+            if sources.is_empty() {
+                sources = options.values("limits").to_vec();
+            }
+            Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(&sources)?)))
+        }
         "filters.sparsesurface" => {
             let ground = get_u64(options, "ground_class", 2)? as u8;
             let low = get_u64(options, "low_point_class", 7)? as u8;

@@ -374,6 +374,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.transformation" => {
             options.add("matrix", "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
         }
+        "filters.expression" => {
+            options.add("expression", "Z > 0");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }
