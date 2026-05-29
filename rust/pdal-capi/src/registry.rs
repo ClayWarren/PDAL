@@ -15,6 +15,8 @@ use pdal_core::stage::StageError;
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::transformation::{invert_affine, parse_transformation_matrix, TransformationFilter};
 use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
+use pdal_filters::sparse_surface::SparseSurfaceFilter;
+use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -150,9 +152,11 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.reprojection",
     "filters.returns",
     "filters.smrf",
+    "filters.farthestpointsampling",
     "filters.sample",
     "filters.separatescanline",
     "filters.skewnessbalancing",
+    "filters.sparsesurface",
     "filters.splitter",
     "filters.sort",
     "filters.stats",
@@ -592,6 +596,24 @@ pub fn create_filter(
                 get_bool(options, "only_ground", false)?,
             ),
         ))),
+        "filters.farthestpointsampling" => Ok(Box::new(FilterWrapper::new(
+            FarthestPointSamplingFilter::new(get_u64(options, "count", 1000)?),
+        ))),
+        "filters.sparsesurface" => {
+            let ground = get_u64(options, "ground_class", 2)? as u8;
+            let low = get_u64(options, "low_point_class", 7)? as u8;
+            if ground == low {
+                return Err(StageError(
+                    "filters.sparsesurface: Ground and low point class cannot be equal."
+                        .to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(SparseSurfaceFilter::new(
+                get_f64(options, "radius", 1.0)?,
+                ground,
+                low,
+            ))))
+        }
         "filters.splitter" => Ok(Box::new(FilterWrapper::new(SplitterFilter::new(
             get_f64(options, "length", 1000.0)?,
             if options.has("origin_x") {
