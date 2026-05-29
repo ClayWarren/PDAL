@@ -203,19 +203,31 @@ PointViewSet SMRFilter::run(PointViewPtr view)
 {
     PointViewSet viewSet{view};
 
-    if (m_args->m_dir.empty() && m_args->m_ignored.empty() &&
-        m_args->m_classbits.isNone())
+    // The Rust SMRF now performs the `ignore` DimRange and `classbits`
+    // pre-segmentation itself, so everything except the debug `dir` raster
+    // output is delegated. Only fall back to the legacy C++ algorithm when a
+    // debug directory is requested.
+    if (m_args->m_dir.empty())
     {
         std::vector<const char*> returns;
         returns.reserve(m_args->m_returns.size());
         for (const std::string& r : m_args->m_returns)
             returns.push_back(r.c_str());
 
+        // Pass the parsed ignore ranges by component (no string round-trip).
+        std::vector<pdal_dim_range_t> ignore;
+        ignore.reserve(m_args->m_ignored.size());
+        for (const DimRange& r : m_args->m_ignored)
+            ignore.push_back({r.m_name.c_str(), r.m_lower_bound, r.m_upper_bound,
+                              r.m_inclusive_lower_bound,
+                              r.m_inclusive_upper_bound, r.m_negate});
+
         pdal_stage_t* stage = pdal_stage_create_smrf(
             m_args->m_cell, m_args->m_slope, m_args->m_windowArg->set(),
             m_args->m_window, m_args->m_scalar, m_args->m_threshold,
             m_args->m_cut, m_groundClass, m_otherClass, m_onlyGround,
-            returns.data(), returns.size());
+            returns.data(), returns.size(), ignore.data(), ignore.size(),
+            static_cast<uint8_t>(m_args->m_classbits.bits()));
         if (!stage)
             throwError("Failed to create Rust SMRF stage.");
 

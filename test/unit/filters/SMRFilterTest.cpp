@@ -94,3 +94,47 @@ TEST(SMRFFilterTest, noreturns)
     EXPECT_EQ(classCount.size(), 1U);
     EXPECT_EQ(classCount[ClassLabel::Ground], 10);
 }
+
+// The `ignore` DimRange segmentation is performed by the Rust SMRF; this
+// exercises the C++ -> Rust delegation of that option (the C++ wrapper now
+// only keeps the legacy path for the debug `dir` output). Without `ignore`,
+// noreturns above shows all 10 points classify as ground; ignoring the four
+// points with Z >= 170.70 must leave them untouched (Classification 0) while
+// the remaining six are still segmented.
+TEST(SMRFFilterTest, ignoreDimRange)
+{
+    StageFactory factory;
+
+    Stage* r = factory.createStage("readers.text");
+    Stage* f = factory.createStage("filters.smrf");
+
+    Options rOptions;
+    rOptions.add("filename", Support::datapath("text/utm17_1.txt"));
+    r->setOptions(rOptions);
+
+    Options fOptions;
+    fOptions.add("ignore", "Z[170.70:200]");
+    f->setOptions(fOptions);
+
+    f->setInput(*r);
+
+    PointTable t;
+    f->prepare(t);
+    PointViewSet s = f->execute(t);
+    ASSERT_EQ(s.size(), 1U);
+    PointViewPtr v = *s.begin();
+    EXPECT_EQ(v->size(), 10U);
+
+    int ignored = 0;
+    int processed = 0;
+    for (PointId idx = 0; idx < v->size(); ++idx)
+    {
+        uint8_t c = v->getFieldAs<uint8_t>(Dimension::Id::Classification, idx);
+        if (c == 0)
+            ignored++;
+        else
+            processed++;
+    }
+    EXPECT_EQ(ignored, 4);
+    EXPECT_EQ(processed, 6);
+}

@@ -308,13 +308,29 @@ pub extern "C" fn pdal_stage_create_elm(
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
+/// A dimension range (`Dim[lo:hi]`) passed across the C ABI by component,
+/// mirroring the C++ `DimRange` fields. Used by the SMRF `ignore` option so the
+/// C++ wrapper doesn't have to re-serialize parsed ranges to strings.
+#[repr(C)]
+pub struct pdal_dim_range_t {
+    pub dim_name: *const c_char,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub inclusive_lower: bool,
+    pub inclusive_upper: bool,
+    pub negate: bool,
+}
+
 /// Create an SMRF stage.
 ///
 /// # Safety
 ///
 /// `returns` must either be null with a zero count or point to `count`
+/// NUL-terminated C strings. `ignore` must either be null with a zero count or
+/// point to `ignore_count` `pdal_dim_range_t` whose `dim_name` are
 /// NUL-terminated C strings.
 #[no_mangle]
+#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_stage_create_smrf(
     cell: f64,
     slope: f64,
@@ -328,6 +344,9 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
     only_ground: bool,
     returns: *const *const c_char,
     count: u64,
+    ignore: *const pdal_dim_range_t,
+    ignore_count: u64,
+    classbits: u8,
 ) -> *mut StageWrapper {
     let mut rust_returns = Vec::new();
     if !returns.is_null() {
@@ -340,7 +359,25 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
         }
     }
 
-    let filter = Box::new(SmrfFilter::with_cut(
+    let mut rust_ignore = Vec::new();
+    if !ignore.is_null() {
+        for i in 0..ignore_count {
+            let range = &*ignore.offset(i as isize);
+            if range.dim_name.is_null() {
+                return std::ptr::null_mut();
+            }
+            rust_ignore.push(pdal_filters::range::RangeLimit {
+                dim_name: CStr::from_ptr(range.dim_name).to_string_lossy().into_owned(),
+                lower_bound: range.lower_bound,
+                upper_bound: range.upper_bound,
+                inclusive_lower: range.inclusive_lower,
+                inclusive_upper: range.inclusive_upper,
+                negate: range.negate,
+            });
+        }
+    }
+
+    let filter = Box::new(SmrfFilter::with_segmentation(
         cell,
         slope,
         if has_window { Some(window) } else { None },
@@ -351,6 +388,8 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
         other_class,
         only_ground,
         rust_returns,
+        rust_ignore,
+        classbits,
     ));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }

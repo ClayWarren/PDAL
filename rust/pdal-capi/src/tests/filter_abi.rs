@@ -330,6 +330,9 @@ fn spatial_and_statistical_filter_stages_construct_through_c_abi() {
                 false,
                 returns.as_ptr(),
                 returns.len() as u64,
+                std::ptr::null(),
+                0,
+                0,
             ),
             pdal_stage_create_skewnessbalancing(2, 1, false),
             pdal_stage_create_iqr(1.5, x.as_ptr()),
@@ -365,7 +368,10 @@ fn spatial_and_statistical_filter_stages_construct_through_c_abi() {
             1,
             false,
             bad_returns.as_ptr(),
-            1
+            1,
+            std::ptr::null(),
+            0,
+            0,
         )
         .is_null());
         assert!(pdal_stage_create_iqr(1.5, std::ptr::null()).is_null());
@@ -868,6 +874,9 @@ fn test_filter_abi_nulls_and_errors() {
             0,
             false,
             std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0,
             0,
         );
         assert!(!smrf.is_null());

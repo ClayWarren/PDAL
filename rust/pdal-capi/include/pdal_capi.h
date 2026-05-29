@@ -862,13 +862,26 @@ extern "C"
     pdal_stage_t* pdal_stage_create_lof(uint64_t minpts);
     pdal_stage_t* pdal_stage_create_elm(double cell, uint8_t class_label,
                                         double threshold);
+    typedef struct pdal_dim_range_t
+    {
+        const char* dim_name;
+        double lower_bound;
+        double upper_bound;
+        bool inclusive_lower;
+        bool inclusive_upper;
+        bool negate;
+    } pdal_dim_range_t;
+
     pdal_stage_t* pdal_stage_create_smrf(double cell, double slope,
                                          bool has_window, double window,
                                          double scalar, double threshold,
                                          double cut, uint8_t ground_class,
                                          uint8_t other_class, bool only_ground,
                                          const char* const* returns,
-                                         uint64_t count);
+                                         uint64_t count,
+                                         const pdal_dim_range_t* ignore,
+                                         uint64_t ignore_count,
+                                         uint8_t classbits);
     pdal_stage_t* pdal_stage_create_pmf(
         double cell_size, bool exponential, double initial_distance,
         double max_distance, double max_window_size, double slope,
