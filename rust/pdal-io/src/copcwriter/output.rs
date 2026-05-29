@@ -47,6 +47,8 @@ pub(crate) struct CopcWriteParams {
     pub spacing: f64,
     pub gpstime_min: f64,
     pub gpstime_max: f64,
+    /// Extended per-return point counts (LAS 1.4 large-file fields, returns 1..15).
+    pub points_by_return: [u64; 15],
     pub file_source_id: u16,
     pub global_encoding: u16,
     pub creation_day: u16,
@@ -158,7 +160,7 @@ fn header_bytes(
         }),
         large_file: Some(las::raw::header::LargeFile {
             number_of_point_records: total_points,
-            number_of_points_by_return: [0; 15],
+            number_of_points_by_return: params.points_by_return,
         }),
         padding: Vec::new(),
     };
@@ -369,6 +371,7 @@ mod tests {
             spacing: 1.0,
             gpstime_min: 0.0,
             gpstime_max: 0.0,
+            points_by_return: [0; 15],
             file_source_id: 0,
             global_encoding: 0,
             creation_day: 1,

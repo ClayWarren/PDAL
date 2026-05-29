@@ -54,6 +54,8 @@ struct Stats {
     bounds: [f64; 6], // minx, miny, minz, maxx, maxy, maxz
     gps_min: f64,
     gps_max: f64,
+    /// LAS 1.4 extended points-by-return (returns 1..=15).
+    points_by_return: [u64; 15],
     total: u64,
 }
 
@@ -66,10 +68,12 @@ fn gather_stats(views: &[PointView]) -> Stats {
     let mut maxz = f64::NEG_INFINITY;
     let mut gps_min = f64::INFINITY;
     let mut gps_max = f64::NEG_INFINITY;
+    let mut points_by_return = [0u64; 15];
     let mut total = 0u64;
 
     for view in views {
         let has_gps = view.layout().dim(&DimId::GpsTime).is_some();
+        let has_return = view.layout().dim(&DimId::ReturnNumber).is_some();
         for idx in 0..view.len() {
             let x = view.get_f64(idx, &DimId::X);
             let y = view.get_f64(idx, &DimId::Y);
@@ -85,6 +89,15 @@ fn gather_stats(views: &[PointView]) -> Stats {
                 gps_min = gps_min.min(g);
                 gps_max = gps_max.max(g);
             }
+            // Return number 1..=15 maps to slots 0..=14; absent/0 defaults to 1
+            // (the LAS convention) so every point is counted once.
+            let rn = if has_return {
+                view.get_f64(idx, &DimId::ReturnNumber) as i64
+            } else {
+                1
+            };
+            let rn = if (1..=15).contains(&rn) { rn } else { 1 };
+            points_by_return[(rn - 1) as usize] += 1;
             total += 1;
         }
     }
@@ -94,6 +107,7 @@ fn gather_stats(views: &[PointView]) -> Stats {
             bounds: [0.0; 6],
             gps_min: 0.0,
             gps_max: 0.0,
+            points_by_return: [0; 15],
             total: 0,
         };
     }
@@ -101,6 +115,7 @@ fn gather_stats(views: &[PointView]) -> Stats {
         bounds: [minx, miny, minz, maxx, maxy, maxz],
         gps_min: if gps_min.is_finite() { gps_min } else { 0.0 },
         gps_max: if gps_max.is_finite() { gps_max } else { 0.0 },
+        points_by_return,
         total,
     }
 }
@@ -204,6 +219,7 @@ impl Writer for CopcWriter {
             spacing,
             gpstime_min: stats.gps_min,
             gpstime_max: stats.gps_max,
+            points_by_return: stats.points_by_return,
             file_source_id: self.options.get_u64("filesource_id", 0) as u16,
             global_encoding: self.options.get_u64("global_encoding", 0) as u16,
             creation_day: self.options.get_u64("creation_doy", 0) as u16,
