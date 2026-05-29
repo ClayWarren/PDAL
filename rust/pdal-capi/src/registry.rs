@@ -18,6 +18,7 @@ use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::expression::ExpressionFilter;
+use pdal_filters::ferry::FerryFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -121,6 +122,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.elm",
     "filters.estimaterank",
     "filters.expression",
+    "filters.ferry",
     "filters.faceraster",
     "filters.gpstimeconvert",
     "filters.groupby",
@@ -608,6 +610,17 @@ pub fn create_filter(
                 sources = options.values("limits").to_vec();
             }
             Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(&sources)?)))
+        }
+        "filters.ferry" => {
+            let specs: Vec<String> = options
+                .values("dimensions")
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let dims = FerryFilter::parse_specs(&specs).map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(FerryFilter::new(dims))))
         }
         "filters.sparsesurface" => {
             let ground = get_u64(options, "ground_class", 2)? as u8;

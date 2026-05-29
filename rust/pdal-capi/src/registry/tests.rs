@@ -377,6 +377,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.expression" => {
             options.add("expression", "Z > 0");
         }
+        "filters.ferry" => {
+            options.add("dimensions", "X=>X2");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }
