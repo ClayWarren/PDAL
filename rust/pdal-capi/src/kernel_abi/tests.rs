@@ -180,6 +180,69 @@ fn rust_kernel_run_reports_ground_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_rejects_ground_unknown_option() {
+    let name = CString::new("ground").unwrap();
+    let input = CString::new("in.las").unwrap();
+    let output = CString::new("out.las").unwrap();
+    let bogus = CString::new("--bogus").unwrap();
+    let argv = [input.as_ptr(), output.as_ptr(), bogus.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    // Unknown options now error in the Rust runner instead of returning the -1
+    // C++ fallback sentinel.
+    assert_eq!(result, 1);
+}
+
+/// End-to-end check of the GroundKernel option mapping the Rust runner now owns.
+/// A plain run keeps every point; `--extract` inserts the filters.range
+/// "Classification[2:2]" stage and yields only the ground subset.
+#[test]
+fn ground_kernel_basic_and_extract_option_mapping() {
+    use crate::metrics_abi::read_cloud;
+    use pdal_core::point::DimId;
+
+    let input = "../../test/data/las/interesting.las";
+    let dir = std::env::temp_dir();
+    let basic_out = dir.join(format!("pdal-rs-ground-basic-{}.las", std::process::id()));
+    let extract_out = dir.join(format!("pdal-rs-ground-extract-{}.las", std::process::id()));
+    let _ = std::fs::remove_file(&basic_out);
+    let _ = std::fs::remove_file(&extract_out);
+
+    let run = |out: &std::path::Path, extra: &[&str]| -> i32 {
+        let name = CString::new("ground").unwrap();
+        let mut owned = vec![
+            CString::new(input).unwrap(),
+            CString::new(out.to_str().unwrap()).unwrap(),
+            CString::new("--cell_size=10").unwrap(),
+        ];
+        for arg in extra {
+            owned.push(CString::new(*arg).unwrap());
+        }
+        let argv: Vec<_> = owned.iter().map(|c| c.as_ptr()).collect();
+        unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) }
+    };
+
+    assert_eq!(run(&basic_out, &[]), 0);
+    assert_eq!(run(&extract_out, &["--extract"]), 0);
+
+    let basic = read_cloud(basic_out.to_str().unwrap()).unwrap();
+    let extract = read_cloud(extract_out.to_str().unwrap()).unwrap();
+
+    // interesting.las has 1065 points; a plain ground run keeps them all.
+    assert_eq!(basic.len(), 1065);
+    // --extract keeps only the ground (Classification 2) subset: fewer points,
+    // and every surviving point is classified ground.
+    assert!(extract.len() > 0 && extract.len() < basic.len());
+    for i in 0..extract.len() {
+        assert_eq!(extract.get_f64(i, &DimId::Classification), 2.0);
+    }
+
+    let _ = std::fs::remove_file(&basic_out);
+    let _ = std::fs::remove_file(&extract_out);
+}
+
+#[test]
 fn rust_kernel_run_reports_sort_missing_input() {
     let name = CString::new("sort").unwrap();
 
