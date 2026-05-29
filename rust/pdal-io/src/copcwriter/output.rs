@@ -55,6 +55,8 @@ pub(crate) struct CopcWriteParams {
     pub creation_year: u16,
     pub system_id: String,
     pub software_id: String,
+    /// LAS project-id GUID (16 bytes), from the `project_id` option.
+    pub guid: [u8; 16],
     /// SRS / eb / user VLRs to write after the copc info and laz VLRs.
     pub extra_vlrs: Vec<RawVlr>,
 }
@@ -119,7 +121,7 @@ fn header_bytes(
         file_source_id: params.file_source_id,
         // Bit 4 (WKT) set, like the C++ writer.
         global_encoding: params.global_encoding | (1 << 4),
-        guid: [0u8; 16],
+        guid: params.guid,
         version: las::Version::new(1, 4),
         system_identifier: {
             let mut a = [0u8; 32];
@@ -378,6 +380,7 @@ mod tests {
             creation_year: 2026,
             system_id: "PDAL".into(),
             software_id: "pdal-rs".into(),
+            guid: [0u8; 16],
             extra_vlrs: Vec::new(),
         };
 

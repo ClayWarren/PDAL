@@ -43,12 +43,12 @@
 #include "CopcWriter.hpp"
 #include <arbiter/arbiter.hpp>
 
-#include "private/copcwriter/BuPyramid.hpp"
-#include "private/copcwriter/CellManager.hpp"
-#include "private/copcwriter/Grid.hpp"
-#include "private/copcwriter/Reprocessor.hpp"
+#include "private/copcwriter/Common.hpp"
 #include "private/las/Header.hpp"
 #include "private/las/Utils.hpp"
+
+#include <pdal/private/RustViewConverter.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -60,6 +60,31 @@ const StaticPluginInfo s_info{"writers.copc",
                               "COPC Writer",
                               "https://pdal.org/stages/writer.copc.html",
                               {}};
+
+void addOption(pdal_options_t* options, const std::string& key,
+               const std::string& value)
+{
+    pdal_options_add_str(options, key.c_str(), value.c_str());
+}
+
+// Encode the writer's collected VLRs (forwarded, user, pipeline, metadata) as
+// user_vlr_* options so the Rust COPC writer re-emits them. Matches the
+// encoding LasWriter uses for delegation.
+void addVlrsToOptions(pdal_options_t* options,
+                      const std::vector<las::Evlr>& vlrs)
+{
+    for (const las::Evlr& v : vlrs)
+    {
+        addOption(options, "user_vlr_user_id", v.userId);
+        addOption(options, "user_vlr_record_id", Utils::toString(v.recordId));
+        addOption(options, "user_vlr_description", v.description);
+        const unsigned char* data(
+            reinterpret_cast<const unsigned char*>(v.data()));
+        addOption(options, "user_vlr_data",
+                  Utils::base64_encode(data, v.dataSize()));
+        addOption(options, "user_vlr_evlr", v.writeAsEVLR ? "true" : "false");
+    }
+}
 
 }
 
@@ -212,13 +237,6 @@ void CopcWriter::handleHeaderForwards(MetadataNode& forward)
     handleHeaderForward("offset_x", b->opts.offsetX, forward);
     handleHeaderForward("offset_y", b->opts.offsetY, forward);
     handleHeaderForward("offset_z", b->opts.offsetZ, forward);
-
-    b->scaling.m_xXform.m_scale.set(b->opts.scaleX.val());
-    b->scaling.m_yXform.m_scale.set(b->opts.scaleY.val());
-    b->scaling.m_zXform.m_scale.set(b->opts.scaleZ.val());
-    b->scaling.m_xXform.m_offset.set(b->opts.offsetX.val());
-    b->scaling.m_yXform.m_offset.set(b->opts.offsetY.val());
-    b->scaling.m_zXform.m_offset.set(b->opts.offsetZ.val());
 }
 
 void CopcWriter::handleForwardVlrs(MetadataNode& forwards)
@@ -366,8 +384,6 @@ void CopcWriter::handleUserVlrs(MetadataNode m)
 
 void CopcWriter::write(const PointViewPtr v)
 {
-    using namespace copcwriter;
-
     if (v->empty())
     {
         log()->get(LogLevel::Warning)
@@ -381,109 +397,80 @@ void CopcWriter::write(const PointViewPtr v)
                "and will overwrite files for earlier views. Consider adding a "
                "merge filter.\n";
 
-    BOX3D box;
-    v->calculateBounds(box);
-
-    Grid grid(box, v->size());
-
-    CellManager mgr(v);
-
-    for (const PointRef& p : *v)
-    {
-        double x = p.getFieldAs<double>(Dimension::Id::X);
-        double y = p.getFieldAs<double>(Dimension::Id::Y);
-        double z = p.getFieldAs<double>(Dimension::Id::Z);
-        double t = p.getFieldAs<double>(Dimension::Id::GpsTime);
-        double r = p.getFieldAs<double>(Dimension::Id::ReturnNumber);
-        b->stats[(int)stats::Index::X].insert(x);
-        b->stats[(int)stats::Index::Y].insert(y);
-        b->stats[(int)stats::Index::Z].insert(z);
-        b->stats[(int)stats::Index::GpsTime].insert(t);
-        b->stats[(int)stats::Index::ReturnNumber].insert(r);
-
-        VoxelKey key = grid.key(x, y, z);
-        PointViewPtr& cell = mgr.get(key);
-        cell->appendPoint(*v, p.pointId());
-    }
-
-    // New cells from reprocessing go on the reprocessing manager. They get
-    // merged at the end.
-    // ABELL - This should be threaded. These reprocessors should be able to run
-    // independently
-    // since their data doesn't overlap spatially. Probably need a separate
-    // CellManager for each that is merged under lock at completion.
-    CellManager reprocessMgr(v);
-    auto it = mgr.begin();
-    while (it != mgr.end())
-    {
-        PointViewPtr& v = it->second;
-        if (v->size() >= MaxPointsPerNode)
-        {
-            Reprocessor r(reprocessMgr, v, grid);
-            r.run();
-            // Remove the reprocessed cell from the manager.
-            it = mgr.erase(it);
-        }
-        else
-            it++;
-    }
-    mgr.merge(reprocessMgr);
-
-    b->bounds = grid.processingBounds();
-    b->trueBounds = grid.conformingBounds();
+    // Resolve the spatial reference: an explicit a_srs overrides the view's.
     if (!b->opts.aSrs.empty())
         b->srs = b->opts.aSrs;
     else
         b->srs = v->spatialReference();
 
-    if (b->opts.enhancedSrsVlrs)
+    // The octree build, occupancy-grid sampling, LAZ chunk compression, COPC
+    // hierarchy and file assembly are all performed by the Rust COPC writer
+    // (writers.copc). Convert the view and hand off through the C ABI.
+    pdal_point_view_t* rustView = rust_view_converter::toRust(v);
+    rust_view_converter::setSpatialReference(rustView, b->srs);
+
+    pdal_options_t* options = pdal_options_create();
+    addOption(options, "filename", filename());
+    addOption(options, "dataformat_id", Utils::toString(b->pointFormatId));
+
+    addOption(options, "scale_x", b->opts.scaleX.val());
+    addOption(options, "scale_y", b->opts.scaleY.val());
+    addOption(options, "scale_z", b->opts.scaleZ.val());
+    // Leave offsets unset to let the Rust writer auto-center, matching the
+    // C++ grid offset; pass through only explicit (or forwarded) values.
+    if (b->opts.offsetX.valSet())
+        addOption(options, "offset_x", b->opts.offsetX.val());
+    if (b->opts.offsetY.valSet())
+        addOption(options, "offset_y", b->opts.offsetY.val());
+    if (b->opts.offsetZ.valSet())
+        addOption(options, "offset_z", b->opts.offsetZ.val());
+
+    if (b->opts.filesourceId.valSet())
+        addOption(options, "filesource_id",
+                  Utils::toString(b->opts.filesourceId.val()));
+    addOption(options, "global_encoding",
+              Utils::toString(b->opts.globalEncoding.val()));
+    if (b->opts.systemId.valSet())
+        addOption(options, "system_id", b->opts.systemId.val());
+    if (b->opts.softwareId.valSet())
+        addOption(options, "software_id", b->opts.softwareId.val());
+    if (b->opts.creationDoy.valSet())
+        addOption(options, "creation_doy",
+                  Utils::toString(b->opts.creationDoy.val()));
+    if (b->opts.creationYear.valSet())
+        addOption(options, "creation_year",
+                  Utils::toString(b->opts.creationYear.val()));
+    if (b->opts.projectId.valSet())
+        addOption(options, "project_id", b->opts.projectId.val().toString());
+
+    if (b->srs.valid())
     {
-        auto addVlr = [&](const std::string& userId, uint16_t recordId,
-                          const std::string& desc, const std::string& str)
-        {
-            if (!str.empty())
-            {
-                std::vector<char> strBytes(str.begin(), str.end());
-                strBytes.resize(strBytes.size() + 1, 0);
-                las::Evlr v(userId, recordId, desc, std::move(strBytes));
-                b->vlrs.push_back(v);
-            }
-        };
-        addVlr(las::TransformUserId, las::LASFWkt2recordId, "PDAL WKT2 Record",
-               b->srs.getWKT2());
-        addVlr(las::PdalUserId, las::PdalProjJsonRecordId,
-               "PDAL PROJJSON Record", b->srs.getPROJJSON());
+        addOption(options, "a_srs", b->srs.getWKT());
+        if (b->opts.enhancedSrsVlrs)
+            addOption(options, "enhanced_srs_vlrs", "true");
     }
 
-    // Set the input string into scaling.
-    b->scaling.m_xXform.m_scale.set(b->opts.scaleX.val());
-    b->scaling.m_yXform.m_scale.set(b->opts.scaleY.val());
-    b->scaling.m_zXform.m_scale.set(b->opts.scaleZ.val());
-    b->scaling.m_xXform.m_offset.set(b->opts.offsetX.val());
-    b->scaling.m_yXform.m_offset.set(b->opts.offsetY.val());
-    b->scaling.m_zXform.m_offset.set(b->opts.offsetZ.val());
+    for (const std::string& spec : b->opts.extraDimSpec)
+        addOption(options, "extra_dims", spec);
 
-    // Update scale and offset according to our computed value if "auto" is set.
-    std::array<double, 3> t;
-    grid.scale(t);
-    if (b->scaling.m_xXform.m_scale.m_auto)
-        b->scaling.m_xXform.m_scale = XForm::XFormComponent(t[0]);
-    if (b->scaling.m_yXform.m_scale.m_auto)
-        b->scaling.m_yXform.m_scale = XForm::XFormComponent(t[1]);
-    if (b->scaling.m_zXform.m_scale.m_auto)
-        b->scaling.m_zXform.m_scale = XForm::XFormComponent(t[2]);
+    // Forwarded / user / pipeline / metadata VLRs collected during ready().
+    addVlrsToOptions(options, b->vlrs);
 
-    grid.offset(t);
-    if (b->scaling.m_xXform.m_offset.m_auto)
-        b->scaling.m_xXform.m_offset = XForm::XFormComponent(t[0]);
-    if (b->scaling.m_yXform.m_offset.m_auto)
-        b->scaling.m_yXform.m_offset = XForm::XFormComponent(t[1]);
-    if (b->scaling.m_zXform.m_offset.m_auto)
-        b->scaling.m_zXform.m_offset = XForm::XFormComponent(t[2]);
+    pdal_writer_t* writer = pdal_writer_create_copc(options);
+    if (!writer)
+    {
+        pdal_options_destroy(options);
+        pdal_point_view_destroy(rustView);
+        rust_view_converter::throwLastError(
+            "Failed to create Rust COPC writer.");
+    }
 
-    b->filename = filename();
-    BuPyramid bu(*b);
-    bu.run(mgr);
+    bool ok = pdal_writer_write_view(writer, rustView);
+    pdal_writer_destroy(writer);
+    pdal_options_destroy(options);
+    pdal_point_view_destroy(rustView);
+    if (!ok)
+        rust_view_converter::throwLastError("Rust COPC writer failed.");
 }
 
 void CopcWriter::done(PointTableRef table)

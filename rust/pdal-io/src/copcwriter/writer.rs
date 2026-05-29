@@ -10,6 +10,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
 use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::StageError;
+use pdal_core::utils::base64_decode;
 
 use crate::las_writer::copc_extra_dims;
 
@@ -25,6 +26,8 @@ const PROJJSON_RECORD_ID: u16 = 4225;
 const TRANSFORM_USER_ID: &str = "LASF_Projection";
 const LIBLAS_USER_ID: &str = "liblas";
 const PDAL_USER_ID: &str = "PDAL";
+const PDAL_METADATA_RECORD_ID: u16 = 12;
+const PDAL_PIPELINE_RECORD_ID: u16 = 13;
 
 pub struct CopcWriter {
     options: Options,
@@ -195,9 +198,9 @@ impl Writer for CopcWriter {
         // Build the octree.
         let result = Pyramid::new(cube, 1234).run(cells);
 
-        // SRS VLRs.
-        let extra_vlrs = self.srs_vlrs(views);
-        let mut extra_vlrs = extra_vlrs;
+        // SRS VLRs, then the Extra Bytes VLR, then any user/forward/PDAL VLRs
+        // forwarded from the C++ stage (or set directly via options).
+        let mut extra_vlrs = self.srs_vlrs(views);
         if let Some(data) = eb_vlr_data {
             extra_vlrs.push(RawVlr {
                 user_id: "LASF_Spec".to_string(),
@@ -206,6 +209,7 @@ impl Writer for CopcWriter {
                 data,
             });
         }
+        extra_vlrs.extend(self.user_and_pdal_vlrs());
 
         let params = CopcWriteParams {
             point_format,
@@ -224,8 +228,9 @@ impl Writer for CopcWriter {
             global_encoding: self.options.get_u64("global_encoding", 0) as u16,
             creation_day: self.options.get_u64("creation_doy", 0) as u16,
             creation_year: self.options.get_u64("creation_year", 0) as u16,
-            system_id: "PDAL".to_string(),
-            software_id: "pdal-rs (copc)".to_string(),
+            system_id: self.options.get_str("system_id", "PDAL"),
+            software_id: self.options.get_str("software_id", "pdal-rs (copc)"),
+            guid: self.project_id_guid(),
             extra_vlrs,
         };
 
@@ -305,6 +310,71 @@ impl CopcWriter {
             });
         }
         vlrs
+    }
+
+    /// Parse `project_id` (a UUID string) into the 16-byte LAS GUID. Matches
+    /// the C++ writer's `projectId.val().pack()` (UUID bytes in spec order).
+    fn project_id_guid(&self) -> [u8; 16] {
+        self.options
+            .value("project_id")
+            .and_then(|v| uuid::Uuid::parse_str(v.trim()).ok())
+            .map(|u| *u.as_bytes())
+            .unwrap_or([0u8; 16])
+    }
+
+    /// User VLRs, forwarded VLRs, and the PDAL metadata/pipeline VLRs, gathered
+    /// from options. The C++ COPC stage encodes these the same way the LAS
+    /// writer does (`user_vlr_*`, `forward_vlr_*`, `pdal_metadata_json`,
+    /// `pdal_pipeline_json`); we replay that here so the stage's forwarded and
+    /// user VLRs survive delegation. Port of `CopcWriter::handle*Vlrs` +
+    /// `Output::writeEvlrs`.
+    fn user_and_pdal_vlrs(&self) -> Vec<RawVlr> {
+        let mut out = Vec::new();
+
+        let zip = |prefix: &str, with_evlr: bool| -> Vec<RawVlr> {
+            let user_ids = self.options.values(&format!("{prefix}_user_id"));
+            let record_ids = self.options.values(&format!("{prefix}_record_id"));
+            let descriptions = self.options.values(&format!("{prefix}_description"));
+            let data_values = self.options.values(&format!("{prefix}_data"));
+            let _ = with_evlr;
+            let count = user_ids
+                .len()
+                .min(record_ids.len())
+                .min(descriptions.len())
+                .min(data_values.len());
+            (0..count)
+                .filter_map(|i| {
+                    let record_id = record_ids[i].trim().parse::<u16>().ok()?;
+                    Some(RawVlr {
+                        user_id: user_ids[i].clone(),
+                        record_id,
+                        description: descriptions[i].clone(),
+                        data: base64_decode(data_values[i].trim()),
+                    })
+                })
+                .collect()
+        };
+
+        out.extend(zip("forward_vlr", false));
+        out.extend(zip("user_vlr", true));
+
+        if let Some(json) = self.options.value("pdal_metadata_json") {
+            out.push(RawVlr {
+                user_id: PDAL_USER_ID.to_string(),
+                record_id: PDAL_METADATA_RECORD_ID,
+                description: "PDAL metadata".to_string(),
+                data: json.as_bytes().to_vec(),
+            });
+        }
+        if let Some(json) = self.options.value("pdal_pipeline_json") {
+            out.push(RawVlr {
+                user_id: PDAL_USER_ID.to_string(),
+                record_id: PDAL_PIPELINE_RECORD_ID,
+                description: "PDAL pipeline".to_string(),
+                data: json.as_bytes().to_vec(),
+            });
+        }
+        out
     }
 }
 
