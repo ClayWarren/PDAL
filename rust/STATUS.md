@@ -247,11 +247,24 @@ tell/seek stream behavior, and the EPT addon writer input invariant through the
 Rust C ABI.
 This remains a conservative lower bound, not a final port-completion
 percentage:
-The COPC writer audit count is intentionally narrow: `scaling`, `srsUTM`,
-`srsWkt2`, and `extradim` are Rust-backed through the LAS/LAZ writer
-compatibility path because those tests assert scale/offset, enhanced SRS VLRs,
-and extra-dimension readback. A real Rust COPC hierarchy/info-VLR writer still
-does not exist yet.
+`writers.copc` is now a real first-party Rust COPC writer
+(`pdal-io::copcwriter`), not the old plain-LAZ delegation. It ports the C++
+`io/private/copcwriter/` subsystem: `VoxelKey`/`Grid` octree sizing,
+`OctantInfo`/`CellManager` point storage, `VoxelInfo` node state, the
+`Processor` occupancy-grid subsampling, the bottom-up `Pyramid` build driver,
+per-node LAZ variable-chunk encoding via the `laz` crate (`chunk_writer`), the
+hierarchy EVLR page emission (`hierarchy`), and the file assembly (`output`)
+producing a `copc` info VLR (record 1) + laszip VLR + SRS/eb VLRs + per-node
+LAZ chunks + hierarchy EVLR. `pdal_writer_create_copc` drives it from a
+`PointView` through `copcwriter::writer::CopcWriter`. `pdal_io_copc_writer_test`
+(`scaling`, `srsUTM`, `srsWkt2`, `extradim`) passes against it, and the output
+round-trips through the Rust COPC reader and `las::Reader`. Parity note: the
+C++ `sample()` shuffles with `std::mt19937` before selecting one point per
+occupancy cell, so exact per-node membership is not byte-reproducible in Rust;
+the algorithm and observable COPC contract (all points retained, valid octree,
+resolution/bounds queryable) are preserved. Faithful bottom-up pyramid
+threading and deeper hierarchy sub-paging beyond the covered shapes can still
+grow.
 The CSF cloth-simulation algorithm is now a first-class Rust port
 (`pdal_filters::csf_algorithm`) and the C++ `CSFilter::run` routes its
 classification step through `pdal_filter_csf_classify`, which is what makes
