@@ -45,9 +45,6 @@
 namespace pdal
 {
 
-class ILeStream;
-class OLeStream;
-
 struct BpfMuellerMatrix
 {
     BpfMuellerMatrix()
@@ -85,8 +82,6 @@ struct BpfMuellerMatrix
         z = (x * m_vals[8] + y * m_vals[9] + z * m_vals[10] + m_vals[11]) / w;
     }
 };
-ILeStream& operator>>(ILeStream& stream, BpfMuellerMatrix& m);
-OLeStream& operator<<(OLeStream& stream, BpfMuellerMatrix& m);
 
 enum class BpfFormat
 {
@@ -128,10 +123,6 @@ struct BpfDimension
     double m_max;
     std::string m_label;
     Dimension::Id m_id;
-
-    static bool read(ILeStream& stream, std::vector<BpfDimension>& dims,
-                     size_t start);
-    static bool write(OLeStream& stream, std::vector<BpfDimension>& dims);
 };
 typedef std::vector<BpfDimension> BpfDimensionList;
 
@@ -170,49 +161,12 @@ struct BpfHeader
     {
         m_log = log;
     }
-    PDAL_EXPORT bool read(ILeStream& stream);
-    bool write(OLeStream& stream);
-    bool readV3(ILeStream& stream);
-    bool readV1(ILeStream& stream);
     bool trySetSpatialReference(const pdal::SpatialReference&);
-    PDAL_EXPORT bool readDimensions(ILeStream& stream,
-                                    std::vector<BpfDimension>& dims,
-                                    bool fixNames);
-    void writeDimensions(OLeStream& stream, std::vector<BpfDimension>& dims);
-    void dump();
 };
 
-struct BpfUlemHeader
-{
-    uint32_t m_numFrames;
-    uint16_t m_year;
-    uint8_t m_month;
-    uint8_t m_day;
-    uint16_t m_lidarMode;
-    uint16_t m_wavelen;   // In nm.
-    uint16_t m_pulseFreq; // In Hz.
-    uint16_t m_focalWidth;
-    uint16_t m_focalHeight;
-    float m_pixelPitchWidth;
-    float m_pixelPitchHeight;
-    std::string m_classCode;
-
-    bool read(ILeStream& stream);
-};
-
-struct BpfUlemFrame
-{
-    int32_t m_num;
-    double m_roll;    // x
-    double m_pitch;   // y
-    double m_heading; // z
-    BpfMuellerMatrix m_xform;
-    int16_t m_shortEncoder;
-    int16_t m_longEncoder;
-
-    bool read(ILeStream& stream);
-};
-
+// Bundled-file descriptor used by the writer to validate the names of files
+// embedded via the "bundledfile" option before they are handed to the Rust
+// writer.
 struct BpfUlemFile
 {
     uint32_t m_len;
@@ -227,44 +181,6 @@ struct BpfUlemFile
         : m_len(len), m_filename(filename), m_filespec(filespec)
     {
     }
-
-    bool read(ILeStream& stream);
-    bool write(OLeStream& stream);
-};
-
-struct BpfPolarStokesParam
-{
-    float m_x;
-    float m_y;
-    float m_z;
-    float m_a;
-
-    bool read(ILeStream& stream);
-};
-
-struct BpfPolarHeader
-{
-    uint32_t m_numFrames;
-    uint16_t m_fpaId;
-    uint32_t m_numXmit;
-    uint32_t m_numRcv;
-    std::vector<BpfPolarStokesParam> m_xmitStates;
-    std::vector<BpfMuellerMatrix> m_psaSettings;
-
-    bool read(ILeStream& stream);
-};
-
-struct BpfPolarFrame
-{
-public:
-    uint32_t m_num;
-    int16_t m_stokesIdx;
-    float m_stokesParam[4];
-    float m_stokesOutParam[4];
-    BpfMuellerMatrix m_xform;
-    int16_t m_truncation;
-
-    bool read(ILeStream& stream);
 };
 
 } // namespace pdal
