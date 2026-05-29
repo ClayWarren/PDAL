@@ -220,7 +220,24 @@ HausdorffPair}` — all kept as exported API while behavior runs through the Rus
 runners. The retired copcwriter subsystem files carried no `PDAL_EXPORT` symbols
 (internal `io/private`), and the Pcd/Fbi header removals dropped only
 non-exported code, so those stay removed. A branch-vs-master sweep found no
-other exported file net-deleted and no header that net-lost exported symbols.) This is a heuristic ceiling, not a precise
+other exported file net-deleted and no header that net-lost exported symbols.
+
+**Exported-symbol audit (nm vs released 2.10.1).** Diffed
+`nm -gjU build/lib/libpdalcpp.20.1.0.dylib` against Homebrew's `pdal` 2.10.1
+(identical upstream version, zero version skew). 167 `pdal::` symbols are in the
+released library but not the branch — and on triage every one is a
+`pdal::Class::method` whose class still exists (e.g. `BpfReader::readByteMajor`,
+`GltfWriter::writeBinHeader`, `GpsTimeConvert::*`, `Ilvis2MetadataReader::*`),
+i.e. internal implementation methods removed as those stages' implementations
+moved to Rust. No public class lost its vtable/typeinfo (only `PlyReader`'s
+nested `ListProperty`/`SimpleProperty` impl structs), and zero free functions,
+operators, or core-namespace API (`Utils`/`FileUtils`/`Stage`/`PointView`/
+`Options`/`Metadata`/`gdal`/…) were removed. So the public class/method/free-
+function surface is intact; the only exported-symbol delta is implementation
+internals, which is the expected footprint of a behind-the-C-ABI port. Re-run
+after future delegation work: `nm -gjU <lib> | c++filt | sort -u` on both and
+`comm -23`, then confirm any `pdal::` diff is an internal method of a
+still-present class, never a vtable/typeinfo/ctor or a public method.) This is a heuristic ceiling, not a precise
 backlog: header-only files that still hold C++ data structures count even when
 some of their behavior already routes through Rust, and the holdout list is
 deliberately conservative. Drive the number down by porting the ranked
