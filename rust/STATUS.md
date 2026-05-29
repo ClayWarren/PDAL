@@ -212,10 +212,15 @@ only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
 exported classes/methods must be preserved (hollowed to delegate to Rust, not
 deleted) until the whole port is done — that is what makes this a port and not a
-rewrite. The earlier removals of the exported metric/merge/sort/split/random
-kernel classes and any exported copcwriter symbols therefore need API-parity
-review and likely restoration; `kernels/GroundKernel` and the exported
-`BpfHeader::read`/`readDimensions` were already restored on this basis.) This is a heuristic ceiling, not a precise
+rewrite. On this basis the exported symbols that earlier deletions had removed
+were RESTORED: `kernels/GroundKernel`, the metric/merge/sort/split/random kernel
+classes (`Chamfer/Hausdorff/Delta/Eval/Merge/Sort/Split/Random`), the exported
+`BpfHeader::read`/`readDimensions`, and `PDALUtils::compute{Chamfer,Hausdorff,
+HausdorffPair}` — all kept as exported API while behavior runs through the Rust
+runners. The retired copcwriter subsystem files carried no `PDAL_EXPORT` symbols
+(internal `io/private`), and the Pcd/Fbi header removals dropped only
+non-exported code, so those stay removed. A branch-vs-master sweep found no
+other exported file net-deleted and no header that net-lost exported symbols.) This is a heuristic ceiling, not a precise
 backlog: header-only files that still hold C++ data structures count even when
 some of their behavior already routes through Rust, and the holdout list is
 deliberately conservative. Drive the number down by porting the ranked
