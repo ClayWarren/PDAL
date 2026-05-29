@@ -21,6 +21,7 @@ use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::mongo::MongoExpressionFilter;
 use pdal_filters::neighborclassifier::NeighborClassifierFilter;
+use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -120,6 +121,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.csf",
     "filters.dbscan",
     "filters.decimation",
+    "filters.divider",
     "filters.eigenvalues",
     "filters.elm",
     "filters.estimaterank",
@@ -292,6 +294,46 @@ pub fn create_filter(
             comma_list(&options.get_str("dimensions", "X,Y,Z")),
         )))),
         "filters.decimation" => Ok(Box::new(FilterWrapper::new(DecimationFilter::new(options)))),
+        "filters.divider" => {
+            // `expression` mode (implicit when the `expression` option is set)
+            // splits on a per-point conditional whose delegation is not wired
+            // through the registry; reject it explicitly.
+            let mode_str = options.get_str("mode", "partition");
+            if mode_str == "expression" || options.has("expression") {
+                return Err(StageError(
+                    "filters.divider: 'expression' mode is not supported in the Rust \
+                     pipeline registry."
+                        .to_string(),
+                ));
+            }
+            let mode = match mode_str.as_str() {
+                "partition" => DividerMode::Partition,
+                "round_robin" => DividerMode::RoundRobin,
+                other => {
+                    return Err(StageError(format!(
+                        "filters.divider: invalid 'mode' '{other}'. Valid options are \
+                         'partition' and 'round_robin'."
+                    )));
+                }
+            };
+            // `capacity` (split every N points) vs `count` (N output views).
+            let (size_mode, size) = if options.has("capacity") {
+                (DividerSizeMode::Capacity, get_u64(options, "capacity", 0)?)
+            } else {
+                (DividerSizeMode::Count, get_u64(options, "count", 1)?)
+            };
+            if size_mode == DividerSizeMode::Capacity && size == 0 {
+                return Err(StageError(
+                    "filters.divider: option 'capacity' must be greater than 0.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(DividerFilter::new(
+                mode,
+                size_mode,
+                size,
+                Vec::new(),
+            ))))
+        }
         "filters.eigenvalues" => Ok(Box::new(FilterWrapper::new(EigenvaluesFilter::new(
             get_u64(options, "knn", 8)? as usize,
             get_bool(options, "normalize", false)?,
