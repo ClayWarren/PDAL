@@ -394,6 +394,9 @@ fn default_filter_options(name: &str) -> Options {
             options.add("radius", 1.0);
             options.add("update_expression", "Classification = 2");
         }
+        "filters.geomdistance" => {
+            options.add("geometry", "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }

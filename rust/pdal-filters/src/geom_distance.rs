@@ -1,7 +1,7 @@
 //! `filters.geomdistance` -- compute distance to a given geometry.
 
 use pdal_core::geometry::Geometry;
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct GeomDistanceFilter {
@@ -40,6 +40,10 @@ impl Filter for GeomDistanceFilter {
             self.process_one(&mut output, idx);
         }
         Ok(vec![output])
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![(DimId::from_name(&self.dim_name), DimType::F64)]
     }
 }
 

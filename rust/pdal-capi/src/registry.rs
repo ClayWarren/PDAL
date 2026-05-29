@@ -25,6 +25,7 @@ use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
 use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
 use pdal_core::point::{DimType, PointLayout};
+use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -132,6 +133,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.expressionstats",
     "filters.ferry",
     "filters.faceraster",
+    "filters.geomdistance",
     "filters.gpstimeconvert",
     "filters.groupby",
     "filters.hag_delaunay",
@@ -418,6 +420,28 @@ pub fn create_filter(
             get_f64(options, "threshold", 0.01)?,
         )))),
         "filters.faceraster" => Ok(Box::new(FilterWrapper::new(FaceRasterFilter::new(options)))),
+        "filters.geomdistance" => {
+            // The Rust filter takes an inline WKT/GeoJSON geometry; the OGR
+            // vector-source option needs a reader the registry can't drive.
+            if !options.get_str("ogr", "").trim().is_empty() {
+                return Err(StageError(
+                    "filters.geomdistance: the 'ogr' geometry source is not supported in \
+                     the Rust pipeline registry."
+                        .to_string(),
+                ));
+            }
+            let geometry = options.get_str("geometry", "");
+            if geometry.trim().is_empty() {
+                return Err(StageError(
+                    "filters.geomdistance: missing 'geometry' option.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(GeomDistanceFilter::new(
+                &geometry,
+                &options.get_str("dimension", "distance"),
+                get_bool(options, "ring", false)?,
+            )?)))
+        }
         "filters.gpstimeconvert" => Ok(Box::new(FilterWrapper::new(GpsTimeConvert::from_options(
             options,
         )?))),
