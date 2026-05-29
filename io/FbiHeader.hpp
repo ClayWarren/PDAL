@@ -143,8 +143,6 @@ struct FbiHdr
     UINT64 PosImgNbr;       // File position of image number list
     UINT ImgNbrCnt;         // Number of 64 bit image numbers at PosImgNbr
     char Reserved6[1260]{}; // Fill with zeroes
-
-    void dump(const LogPtr& log);
 };
 
 } // namespace fbi
