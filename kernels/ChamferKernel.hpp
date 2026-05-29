@@ -41,8 +41,6 @@
 namespace pdal
 {
 
-class PointView;
-
 class PDAL_EXPORT ChamferKernel : public Kernel
 {
 public:
@@ -51,7 +49,6 @@ public:
 
 private:
     void addSwitches(ProgramArgs& args) override;
-    PointViewPtr loadSet(const std::string& filename, PointTableRef table);
 
     std::string m_sourceFile;
     std::string m_candidateFile;

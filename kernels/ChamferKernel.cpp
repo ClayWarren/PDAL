@@ -34,11 +34,10 @@
 
 #include "ChamferKernel.hpp"
 
-#include <memory>
-
 #include <pdal/PDALUtils.hpp>
-#include <pdal/PointView.hpp>
 #include <pdal/pdal_config.hpp>
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -63,25 +62,18 @@ void ChamferKernel::addSwitches(ProgramArgs& args)
     candidate.setPositional();
 }
 
-PointViewPtr ChamferKernel::loadSet(const std::string& filename,
-                                    PointTableRef table)
-{
-    Stage& reader = makeReader(filename, "");
-    reader.prepare(table);
-    PointViewSet viewSet = reader.execute(table);
-    assert(viewSet.size() == 1);
-    return *viewSet.begin();
-}
-
 int ChamferKernel::execute()
 {
-    ColumnPointTable srcTable;
-    PointViewPtr srcView = loadSet(m_sourceFile, srcTable);
-
-    ColumnPointTable candTable;
-    PointViewPtr candView = loadSet(m_candidateFile, candTable);
-
-    double chamfer = Utils::computeChamfer(srcView, candView);
+    // The Chamfer distance is computed by the Rust metrics engine
+    // (pdal-core::metrics::chamfer_distance) via the C ABI, which loads both
+    // clouds through the Rust readers.
+    double chamfer = 0.0;
+    if (pdal_chamfer(m_sourceFile.c_str(), m_candidateFile.c_str(), &chamfer) !=
+        0)
+    {
+        const char* message = pdal_last_error();
+        throw pdal_error(message ? message : "Rust chamfer computation failed.");
+    }
 
     MetadataNode root;
     root.add("filenames", m_sourceFile);

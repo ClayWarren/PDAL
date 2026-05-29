@@ -34,11 +34,10 @@
 
 #include "HausdorffKernel.hpp"
 
-#include <memory>
-
 #include <pdal/PDALUtils.hpp>
-#include <pdal/PointView.hpp>
 #include <pdal/pdal_config.hpp>
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -63,32 +62,26 @@ void HausdorffKernel::addSwitches(ProgramArgs& args)
     candidate.setPositional();
 }
 
-PointViewPtr HausdorffKernel::loadSet(const std::string& filename,
-                                      PointTableRef table)
-{
-    Stage& reader = makeReader(filename, "");
-    reader.prepare(table);
-    PointViewSet viewSet = reader.execute(table);
-    assert(viewSet.size() == 1);
-    return *viewSet.begin();
-}
-
 int HausdorffKernel::execute()
 {
-    ColumnPointTable srcTable;
-    PointViewPtr srcView = loadSet(m_sourceFile, srcTable);
-
-    ColumnPointTable candTable;
-    PointViewPtr candView = loadSet(m_candidateFile, candTable);
-
-    std::pair<double, double> result =
-        Utils::computeHausdorffPair(srcView, candView);
+    // The Hausdorff and modified-Hausdorff distances are computed by the Rust
+    // metrics engine (pdal-core::metrics::hausdorff_pair) via the C ABI, which
+    // loads both clouds through the Rust readers.
+    double hausdorff = 0.0;
+    double modified = 0.0;
+    if (pdal_hausdorff(m_sourceFile.c_str(), m_candidateFile.c_str(),
+                       &hausdorff, &modified) != 0)
+    {
+        const char* message = pdal_last_error();
+        throw pdal_error(message ? message
+                                 : "Rust hausdorff computation failed.");
+    }
 
     MetadataNode root;
     root.add("filenames", m_sourceFile);
     root.add("filenames", m_candidateFile);
-    root.add("hausdorff", result.first);
-    root.add("modified_hausdorff", result.second);
+    root.add("hausdorff", hausdorff);
+    root.add("modified_hausdorff", modified);
     root.add("pdal_version", Config::fullVersionString());
     Utils::toJSON(root, std::cout);
 
