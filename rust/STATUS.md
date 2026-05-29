@@ -840,19 +840,27 @@ algorithm decision.
   `pdal_stage_create_smrf` was extended with `ignore` (a `pdal_dim_range_t[]`
   passed by component) and `classbits`, and `SMRFilter::run` delegates whenever
   `dir` is empty. `SMRFilterTest.ignoreDimRange` covers the C++->Rust ignore
-  delegation. **Remaining C++ (the only thing keeping the legacy algorithm):**
-  the `dir` debug-raster output — when `dir` is set, `SMRFilter::run` still uses
-  the legacy C++ path that writes ~12 intermediate grids (zimin/zinet/zipro/
-  gx/gy/gsurfs/thresh/low/obj + *_fill) as GeoTIFFs via `math::writeMatrix`. To
-  finish the SMRFilter port: thread a `dir` option into the Rust SmrfFilter and
-  write those same grids via the existing `pdal-native` GDAL raster API
-  (`create_float64`/`write_band_f64`, geotransform from cell+bounds, SRS) — the
-  Rust algorithm already computes every one of those grids — then delete the
-  legacy `createZImin`/.../`classifyGround` private methods (internal methods of
-  the still-present, still-exported `SMRFilter` class, so removing them is
-  consistent with the nm-audit conclusion). `dir` is debug-only and untested in
-  C++; verify the Rust rasters against a C++ `dir` run (the legacy path is the
-  oracle until it is removed).
+  delegation. The Rust SMRF also implements the `dir` debug-raster output (12
+  GeoTIFFs via `pdal-native`, format matching C++ `math::writeMatrix`), wired
+  through the registry — so `pdal pipeline` smrf+`dir` now writes the rasters,
+  closing a real gap (the Rust pipeline previously ran the Rust SMRF and
+  *silently ignored* `dir`).
+
+  **The C++ legacy `dir` path is intentionally RETAINED, not replaced.** An
+  oracle comparison (Rust dir vs the C++ stage's legacy dir on interesting.las,
+  cell=10) showed: the raw grids match (zimin pre-fill 0.55% cells differ,
+  zilow 0%, ziobj 0.18%), but the knn-FILLED grids (zimin_fill/zinet/zipro/
+  gsurfs) differ in ~96% of cells by up to ~20m. Cause: the Rust `knn_fill`
+  diverges from C++ `knnfill` in the EMPTY cells (here ~99% of the 155k-cell
+  grid — only 1065 sparse points). This does NOT affect classification (points
+  sit in non-empty cells whose values match, hence ground agreement >=99.8%),
+  but it means the Rust `dir` rasters are NOT a value-faithful reproduction of
+  the C++ debug rasters. So `SMRFilter::run` still uses the legacy C++ path when
+  `dir` is set (it dumps the C++ engine's grids), and the Rust `dir` output
+  reflects the Rust engine's own grids. **Finding/TODO:** reconcile Rust
+  `knn_fill` with C++ `knnfill` (void-cell fill values diverge up to ~20m;
+  harmless to classification but the obvious next lever for tighter SMRF
+  parity). Only after the fills match should the legacy C++ dir path be retired.
 - `Assign` (`filters.assign`): registered in the pipeline registry from the
   simple `Dim[range]=value` `assignment` list plus the `condition` DimRange,
   reusing the existing Rust `AssignFilter` and DimRange parser. **Parity gap:**
