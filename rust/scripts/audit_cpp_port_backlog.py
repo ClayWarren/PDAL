@@ -11,9 +11,13 @@ intentional holdout, i.e. the real porting backlog.
 Each first-party C++ file under the mainline areas (`pdal/`, `filters/`, `io/`,
 `kernels/`, `apps/`, `tools/`) is classified as:
 
-  - c-abi-backed: includes the Rust C ABI header, or is a known Rust bridge
-    header. Already routes meaningful behavior through Rust (pure wrapper or a
-    mixed file that still hides some implementation).
+  - c-abi-backed: includes the Rust C ABI header (`pdal_capi.h`) or the
+    `RustViewConverter.hpp` bridge (which itself pulls in `pdal_capi.h`), or is
+    a known Rust bridge header. Already routes meaningful behavior through Rust
+    (pure wrapper or a mixed file that still hides some implementation). A
+    `.cpp`/`.hpp` pair is treated as one unit: a `.cpp` that delegates usually
+    pulls the ABI in through its own paired header, so the signal propagates
+    across the stem in both directions.
   - native-adapter: a C++ binding over an external native library (GDAL/OGR,
     libgeotiff, GEOS, PROJ) whose Rust home is `pdal-native`/explicit FFI, not a
     pure-Rust reimplementation. Tracked separately from the pure-Rust backlog.
@@ -44,8 +48,11 @@ MAINLINE_AREAS = ["pdal", "filters", "io", "kernels", "apps", "tools"]
 SOURCE_EXTS = (".cpp", ".hpp", ".h", ".cc", ".cxx")
 
 # The reliable wrapper signal: you cannot call the Rust C ABI without including
-# its header. A handful of bridge headers are glue by definition.
-C_ABI_HEADER_MARKERS = ("pdal_capi.h",)
+# its header, and you cannot convert a PointView/raster across that ABI without
+# the RustViewConverter bridge header (which itself includes pdal_capi.h). A
+# file that includes either is, by construction, routing meaningful behavior
+# through Rust -- a pure wrapper or a mixed file that still hides some C++.
+C_ABI_HEADER_MARKERS = ("pdal_capi.h", "RustViewConverter.hpp")
 KNOWN_BRIDGE_FILES = {
     "filters/private/RustMetadata.hpp",
     "filters/private/RustPipeline.hpp",
@@ -116,22 +123,26 @@ def stem(path: str) -> str:
 
 
 def classify_all(files: list[str]) -> dict[str, str]:
-    """Classify every file. A header inherits its sibling .cpp's category when
-    one exists, so interface headers paired with a Rust-backed implementation
-    are not double-counted as backlog. Header-only files are classified on their
-    own content (they are the real implementation)."""
-    impl_category: dict[str, str] = {}
-    for path in files:
-        if path.endswith(IMPL_EXTS):
-            impl_category[path] = classify_own(path)
-    impl_by_stem = {stem(p): cat for p, cat in impl_category.items()}
+    """Classify every file, treating a `.cpp`/`.hpp` pair sharing a stem as one
+    translation unit. A `.cpp` routinely pulls the C ABI in through its own
+    paired header (e.g. `BpfWriter.cpp` includes `BpfWriter.hpp`, which includes
+    `pdal_capi.h`), and conversely an interface header is backed by its `.cpp`'s
+    delegation. So the wrapper signal propagates in both directions: if either
+    file of a stem is c-abi-backed, the whole stem is. Header-only files are
+    classified on their own content (they are the real implementation)."""
+    own = {path: classify_own(path) for path in files}
 
-    result: dict[str, str] = dict(impl_category)
+    # A stem is c-abi-backed if any of its files is.
+    abi_stems = {
+        stem(path) for path, cat in own.items() if cat == "c-abi-backed"
+    }
+
+    result: dict[str, str] = {}
     for path in files:
-        if path in result:
-            continue
-        inherited = impl_by_stem.get(stem(path))
-        result[path] = inherited if inherited is not None else classify_own(path)
+        cat = own[path]
+        if cat == "port-candidate" and stem(path) in abi_stems:
+            cat = "c-abi-backed"
+        result[path] = cat
     return result
 
 
