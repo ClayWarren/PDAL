@@ -18,6 +18,7 @@ use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::expression::ExpressionFilter;
+use pdal_filters::expressionstats::ExpressionStatsFilter;
 use pdal_filters::ferry::FerryFilter;
 use pdal_filters::mongo::MongoExpressionFilter;
 use pdal_filters::neighborclassifier::NeighborClassifierFilter;
@@ -126,6 +127,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.elm",
     "filters.estimaterank",
     "filters.expression",
+    "filters.expressionstats",
     "filters.ferry",
     "filters.faceraster",
     "filters.gpstimeconvert",
@@ -696,6 +698,18 @@ pub fn create_filter(
                 sources = options.values("limits").to_vec();
             }
             Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(&sources)?)))
+        }
+        "filters.expressionstats" => {
+            let dim = options.get_str("dimension", "");
+            if dim.trim().is_empty() {
+                return Err(StageError(
+                    "filters.expressionstats: missing 'dimension' option.".to_string(),
+                ));
+            }
+            let sources: Vec<String> = options.values("expressions").to_vec();
+            Ok(Box::new(FilterWrapper::new(ExpressionStatsFilter::new(
+                &dim, &sources,
+            )?)))
         }
         "filters.mongo" => {
             let expr = options.get_str("expression", "");

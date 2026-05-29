@@ -377,6 +377,10 @@ fn default_filter_options(name: &str) -> Options {
         "filters.expression" => {
             options.add("expression", "Z > 0");
         }
+        "filters.expressionstats" => {
+            options.add("dimension", "Classification");
+            options.add("expressions", "Z > 0");
+        }
         "filters.ferry" => {
             options.add("dimensions", "X=>X2");
         }
