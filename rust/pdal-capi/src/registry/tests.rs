@@ -380,6 +380,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.ferry" => {
             options.add("dimensions", "X=>X2");
         }
+        "filters.mongo" => {
+            options.add("expression", "{\"Z\":{\"$gt\":0}}");
+        }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
         }

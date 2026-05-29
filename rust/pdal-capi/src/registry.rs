@@ -19,6 +19,7 @@ use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
 use pdal_filters::expression::ExpressionFilter;
 use pdal_filters::ferry::FerryFilter;
+use pdal_filters::mongo::MongoExpressionFilter;
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -140,6 +141,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.mad",
     "filters.merge",
     "filters.miniball",
+    "filters.mongo",
     "filters.mortonorder",
     "filters.nndistance",
     "filters.normal",
@@ -610,6 +612,15 @@ pub fn create_filter(
                 sources = options.values("limits").to_vec();
             }
             Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(&sources)?)))
+        }
+        "filters.mongo" => {
+            let expr = options.get_str("expression", "");
+            if expr.trim().is_empty() {
+                return Err(StageError(
+                    "filters.mongo: missing 'expression' option.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(MongoExpressionFilter::new(&expr)?)))
         }
         "filters.ferry" => {
             let specs: Vec<String> = options
@@ -1106,9 +1117,14 @@ fn options_from_object(object: &serde_json::Map<String, Value>) -> Result<Option
                     .join(",");
                 options.add(key, joined);
             }
-            Value::Null | Value::Object(_) => {
+            // A nested object option value is stored as its JSON text, matching
+            // C++ PDAL (e.g. filters.mongo's `expression` query object).
+            Value::Object(_) => {
+                options.add(key, value.to_string());
+            }
+            Value::Null => {
                 return Err(StageError(format!(
-                    "Option '{key}' must be a scalar or scalar array."
+                    "Option '{key}' must be a scalar, scalar array, or object."
                 )));
             }
         }
