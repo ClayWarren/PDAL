@@ -23,6 +23,7 @@ pub mod chunk_writer;
 pub mod common;
 pub mod grid;
 pub mod grid_key;
+pub mod hierarchy;
 pub mod octant_info;
 pub mod output_format;
 pub mod processor;
