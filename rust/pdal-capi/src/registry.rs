@@ -185,6 +185,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
 pub const WRITER_DRIVERS: &[&str] = &[
     "writers.null",
     "writers.bpf",
+    "writers.copc",
     "writers.fbi",
     "writers.gltf",
     "writers.text",
@@ -1063,6 +1064,14 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.sbet" => Ok(Box::new(pdal_io::sbet_writer::SbetWriter::new(options))),
         "writers.las" => Ok(Box::new(pdal_io::las_writer::LasWriter::new(options))),
         "writers.laz" => Ok(Box::new(pdal_io::las_writer::LasWriter::new_laz(options))),
+        "writers.copc" => {
+            // COPC requires LAS 1.4; default minor_version to 4 like the C ABI.
+            let mut opts = options.clone();
+            if !opts.has("minor_version") {
+                opts.add("minor_version", "4");
+            }
+            Ok(Box::new(pdal_io::copcwriter::writer::CopcWriter::new(&opts)))
+        }
         "writers.nitf" => Ok(Box::new(pdal_io::nitf_writer::NitfWriter::new(options)?)),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options)?)),
         "writers.ogr" => Ok(Box::new(pdal_io::ogr_writer::OgrWriter::new(options))),
