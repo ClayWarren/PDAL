@@ -753,28 +753,36 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
             return 1;
         }
         println!("Usage:");
-        println!("  pdal random <output> [--count=N]");
+        println!(
+            "  pdal random <output> [--count=N] [--bounds=([minx,maxx],[miny,maxy],[minz,maxz])] \
+             [--distribution=uniform|normal|random] [--compress]"
+        );
         return 0;
     }
 
     let mut output = None;
     let mut count = 1000_u64;
+    let mut bounds: Option<String> = None;
+    // C++ RandomKernel default distribution is "uniform".
+    let mut distribution = String::from("uniform");
+    let mut compress = false;
     let mut writer_options = serde_json::Map::new();
 
-    let mut iter = args.iter();
+    // Consume the value for an option given either as `--opt value` or
+    // `--opt=value`; `None` signals a missing value.
+    let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
-        if let Some(value) = arg.strip_prefix("--count=") {
-            match value.parse::<u64>() {
-                Ok(parsed) => count = parsed,
-                Err(_) => {
-                    eprintln!("PDAL: kernels.random: --count must be a non-negative integer.");
-                    return 1;
-                }
-            }
-        } else if arg == "--count" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.random: Missing value for option '--count'.");
-                return 1;
+        let split = |arg: &str| arg.split_once('=').map(|(_, v)| v.to_string());
+        if arg == "--count" || arg.starts_with("--count=") {
+            let value = match split(arg) {
+                Some(v) => v,
+                None => match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("PDAL: kernels.random: Missing value for option '--count'.");
+                        return 1;
+                    }
+                },
             };
             match value.parse::<u64>() {
                 Ok(parsed) => count = parsed,
@@ -782,6 +790,40 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
                     eprintln!("PDAL: kernels.random: --count must be a non-negative integer.");
                     return 1;
                 }
+            }
+        } else if arg == "--bounds" || arg.starts_with("--bounds=") {
+            bounds = Some(match split(arg) {
+                Some(v) => v,
+                None => match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!("PDAL: kernels.random: Missing value for option '--bounds'.");
+                        return 1;
+                    }
+                },
+            });
+        } else if arg == "--distribution" || arg.starts_with("--distribution=") {
+            distribution = match split(arg) {
+                Some(v) => v,
+                None => match iter.next() {
+                    Some(v) => v.clone(),
+                    None => {
+                        eprintln!(
+                            "PDAL: kernels.random: Missing value for option '--distribution'."
+                        );
+                        return 1;
+                    }
+                },
+            };
+        } else if arg == "--compress" || arg == "-z" {
+            compress = true;
+        } else if arg == "--mean" || arg.starts_with("--mean=") || arg == "--stdev"
+            || arg.starts_with("--stdev=")
+        {
+            // Declared by the C++ kernel but unused in its execute(); accept
+            // (consuming any separate value) and ignore for parity.
+            if split(arg).is_none() {
+                iter.next();
             }
         } else if arg == "--output" || arg == "-o" {
             let Some(value) = iter.next() else {
@@ -791,7 +833,8 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
             output = Some(value.clone());
         } else if arg.starts_with("--") {
             if !apply_writer_stage_option(arg, &mut writer_options) {
-                return -1;
+                eprintln!("PDAL: kernels.random: Unexpected argument '{arg}'.");
+                return 1;
             }
         } else if output.is_none() {
             output = Some(arg.clone());
@@ -800,6 +843,17 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
             return 1;
         }
     }
+
+    // Map the distribution to a readers.faux mode, matching C++ RandomKernel.
+    let mode = match distribution.to_lowercase().as_str() {
+        "uniform" => "uniform",
+        "normal" => "normal",
+        "random" => "random",
+        other => {
+            eprintln!("PDAL: kernels.random: invalid distribution: {other}");
+            return 1;
+        }
+    };
 
     let Some(output) = output else {
         eprintln!("PDAL: kernels.random: Missing value for positional argument 'output'.");
@@ -810,25 +864,39 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         return 1;
     };
 
+    let mut reader_stage = serde_json::Map::new();
+    reader_stage.insert("type".to_string(), serde_json::json!("readers.faux"));
+    reader_stage.insert("count".to_string(), serde_json::json!(count));
+    reader_stage.insert("mode".to_string(), serde_json::json!(mode));
+    if let Some(bounds) = bounds {
+        reader_stage.insert("bounds".to_string(), serde_json::json!(bounds));
+    } else {
+        // readers.faux's own defaults are the unit cube; spell them out so the
+        // pipeline is identical regardless of the reader's default handling.
+        for (k, v) in [
+            ("minx", 0.0),
+            ("maxx", 1.0),
+            ("miny", 0.0),
+            ("maxy", 1.0),
+            ("minz", 0.0),
+            ("maxz", 1.0),
+        ] {
+            reader_stage.insert(k.to_string(), serde_json::json!(v));
+        }
+    }
+
     let mut writer_stage = serde_json::Map::new();
     writer_stage.insert("type".to_string(), serde_json::json!(writer));
     writer_stage.insert("filename".to_string(), serde_json::json!(output));
+    if compress {
+        writer_stage.insert("compression".to_string(), serde_json::json!(true));
+    }
     writer_stage.extend(writer_options);
 
     execute_kernel_pipeline(
         "random",
         serde_json::json!([
-            {
-                "type": "readers.faux",
-                "count": count,
-                "mode": "uniform",
-                "minx": 0.0,
-                "maxx": 1.0,
-                "miny": 0.0,
-                "maxy": 1.0,
-                "minz": 0.0,
-                "maxz": 1.0,
-            },
+            serde_json::Value::Object(reader_stage),
             serde_json::Value::Object(writer_stage),
         ]),
     )
