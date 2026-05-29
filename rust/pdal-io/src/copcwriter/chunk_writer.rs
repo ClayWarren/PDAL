@@ -9,6 +9,11 @@
 //! Replaces the lazperf usage in `io/private/copcwriter/Output.cpp`'s
 //! `writeCompressed`/chunk-table paths with the `laz` crate.
 
+// The encoder's outputs are consumed by the Output/file-assembly layer (the
+// next increment); until then they are exercised only by this module's
+// encode/decompress round-trip tests.
+#![allow(dead_code)]
+
 use std::io::Cursor;
 
 use las::point::Format;
@@ -26,7 +31,7 @@ use super::voxel_key::VoxelKey;
 /// `point_data_offset + offset`. Empty nodes have `offset/byte_size/point_count`
 /// all zero, matching the C++ `Output::newChunk` empty path.
 #[derive(Clone, Copy, Debug)]
-pub struct NodeChunk {
+pub(crate) struct NodeChunk {
     pub key: VoxelKey,
     pub offset: u64,
     pub byte_size: i32,
@@ -34,7 +39,7 @@ pub struct NodeChunk {
 }
 
 /// The encoded LAZ point data plus per-node chunk positions.
-pub struct EncodedChunks {
+pub(crate) struct EncodedChunks {
     /// `[chunk_table_offset:8][chunk 0][chunk 1]...[chunk table]` -- the full
     /// LAZ point data section written after the LAS header + VLRs.
     pub point_data: Vec<u8>,
@@ -44,7 +49,7 @@ pub struct EncodedChunks {
 
 /// Encode the ordered `chunks` (one per octree node) into a single LAZ
 /// variable-chunk stream.
-pub fn encode_chunks(
+pub(crate) fn encode_chunks(
     chunks: &[Chunk],
     point_format: u8,
     extra_dims: &[ExtraDim],
