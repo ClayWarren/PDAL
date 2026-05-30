@@ -275,6 +275,228 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
             "Maximum number of points per chip.",
             Some(json!(5000)),
         )],
+        "filters.assign" => vec![
+            option(
+                "assignment",
+                "Dimension assignment of the form 'Dim[range]=value'.",
+                None,
+            ),
+            option(
+                "condition",
+                "Only assign where this 'Dim[range]' condition holds.",
+                None,
+            ),
+            option(
+                "value",
+                "Assignment expression(s): 'Dim = expression WHERE condition'.",
+                None,
+            ),
+        ],
+        "filters.colorization" => vec![
+            option(
+                "raster",
+                "Raster filename to sample band values from.",
+                None,
+            ),
+            option(
+                "dimensions",
+                "Comma-separated 'dimension:band:scale' mappings to populate.",
+                None,
+            ),
+        ],
+        "filters.dem" => vec![
+            option("raster", "Raster filename to compare points against.", None),
+            option(
+                "limits",
+                "Dimension range the raster comparison applies to.",
+                None,
+            ),
+            option("band", "Raster band to sample.", Some(json!(1))),
+        ],
+        "filters.divider" => vec![
+            option(
+                "mode",
+                "Partitioning mode ('partition' or 'round_robin').",
+                Some(json!("partition")),
+            ),
+            option(
+                "capacity",
+                "Maximum number of points per output view.",
+                None,
+            ),
+            option("count", "Number of output views to create.", Some(json!(1))),
+        ],
+        "filters.expression" => vec![
+            option(
+                "expression",
+                "Keep points where this expression is true.",
+                None,
+            ),
+            option(
+                "limits",
+                "Legacy dimension-range form of the keep condition.",
+                None,
+            ),
+        ],
+        "filters.expressionstats" => vec![
+            option("dimension", "Dimension to summarize.", None),
+            option(
+                "expressions",
+                "Expressions whose matching points are counted.",
+                None,
+            ),
+        ],
+        "filters.farthestpointsampling" => vec![option(
+            "count",
+            "Number of points to retain.",
+            Some(json!(1000)),
+        )],
+        "filters.ferry" => vec![option(
+            "dimensions",
+            "Comma-separated 'from=>to' dimension copy mappings.",
+            None,
+        )],
+        "filters.geomdistance" => vec![
+            option(
+                "geometry",
+                "WKT/GeoJSON polygon to measure distance from.",
+                None,
+            ),
+            option(
+                "ogr",
+                "OGR datasource JSON to load the geometry from.",
+                None,
+            ),
+            option(
+                "dimension",
+                "Dimension to store the computed distance in.",
+                Some(json!("distance")),
+            ),
+            option(
+                "ring",
+                "Measure distance to the ring instead of the filled polygon.",
+                Some(json!(false)),
+            ),
+        ],
+        "filters.hag_dem" => vec![
+            option("raster", "Ground-surface raster filename.", None),
+            option("band", "Raster band to sample.", Some(json!(1))),
+            option(
+                "zero_ground",
+                "Set HeightAboveGround to 0 for ground-classified points.",
+                Some(json!(true)),
+            ),
+            option("min_clamp", "Minimum HeightAboveGround clamp.", None),
+            option("max_clamp", "Maximum HeightAboveGround clamp.", None),
+            option(
+                "nodata_hag",
+                "HeightAboveGround assigned where the raster has no data.",
+                Some(json!(0.0)),
+            ),
+            option(
+                "class",
+                "Classification value treated as ground.",
+                Some(json!(2)),
+            ),
+        ],
+        "filters.mongo" => vec![option(
+            "expression",
+            "MongoDB-style JSON filter expression.",
+            None,
+        )],
+        "filters.neighborclassifier" => vec![
+            option(
+                "candidate",
+                "Candidate filename providing reference classifications.",
+                None,
+            ),
+            option("k", "Number of nearest neighbors to vote.", Some(json!(8))),
+            option(
+                "dimension",
+                "Dimension to assign by majority vote.",
+                Some(json!("Classification")),
+            ),
+        ],
+        "filters.overlay" => vec![
+            option("datasource", "OGR datasource to read polygons from.", None),
+            option(
+                "column",
+                "Attribute column providing the value to assign.",
+                None,
+            ),
+            option(
+                "dimension",
+                "Dimension to assign the polygon value to.",
+                None,
+            ),
+        ],
+        "filters.projpipeline" => vec![
+            option("coord_op", "PROJ coordinate operation pipeline.", None),
+            option("out_srs", "Output spatial reference.", None),
+            option(
+                "reverse_transfo",
+                "Apply the coordinate operation in reverse.",
+                Some(json!(false)),
+            ),
+        ],
+        "filters.radiusassign" => vec![
+            option(
+                "radius",
+                "Search radius for the assignment.",
+                Some(json!(0.0)),
+            ),
+            option(
+                "update_expression",
+                "Assignment expression(s) applied within the radius.",
+                None,
+            ),
+        ],
+        "filters.skewnessbalancing" => vec![
+            option(
+                "ground_class",
+                "Classification assigned to ground points.",
+                Some(json!(2)),
+            ),
+            option(
+                "other_class",
+                "Classification assigned to non-ground points.",
+                Some(json!(1)),
+            ),
+            option(
+                "only_ground",
+                "Only set the ground class, leaving others unchanged.",
+                Some(json!(false)),
+            ),
+        ],
+        "filters.sparsesurface" => vec![
+            option(
+                "ground_class",
+                "Classification value treated as ground.",
+                Some(json!(2)),
+            ),
+            option(
+                "low_point_class",
+                "Classification assigned to suppressed points.",
+                Some(json!(7)),
+            ),
+            option(
+                "radius",
+                "Suppression radius around retained points.",
+                Some(json!(1.0)),
+            ),
+        ],
+        "filters.transformation" => vec![
+            option(
+                "matrix",
+                "Row-major 4x4 affine transformation matrix.",
+                None,
+            ),
+            option(
+                "invert",
+                "Invert the matrix before applying it.",
+                Some(json!(false)),
+            ),
+        ],
         "filters.cluster" => vec![
             option(
                 "min_points",
@@ -943,6 +1165,23 @@ pub(crate) fn stage_options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Input coordinate orientation name.",
                 None,
             ),
+        ],
+        "writers.copc" => vec![
+            filename(),
+            option(
+                "minor_version",
+                "LAS minor version (COPC requires 4).",
+                Some(json!(4)),
+            ),
+            option("scale_x", "X coordinate scale.", None),
+            option("scale_y", "Y coordinate scale.", None),
+            option("scale_z", "Z coordinate scale.", None),
+            option("offset_x", "X coordinate offset.", None),
+            option("offset_y", "Y coordinate offset.", None),
+            option("offset_z", "Z coordinate offset.", None),
+            option("system_id", "LAS system identifier.", None),
+            option("software_id", "LAS generating software identifier.", None),
+            option("project_id", "LAS project GUID.", None),
         ],
         "writers.las" | "writers.laz" => vec![
             filename(),
