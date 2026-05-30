@@ -12,6 +12,7 @@ use std::os::raw::c_char;
 /// (extract). The `--filters.smrf.<key>` passthrough is also accepted as a
 /// superset convenience. Any option the C++ kernel did not understand now
 /// errors (return 1) rather than falling back to the deleted C++ kernel.
+#[allow(clippy::cognitive_complexity)]
 pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,

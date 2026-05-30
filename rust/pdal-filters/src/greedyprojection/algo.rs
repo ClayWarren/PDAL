@@ -5,7 +5,13 @@
 use super::*;
 
 impl<'a> Algo<'a> {
-    pub(super) fn knn(&self, idx: PointId, k: usize, nn_idx: &mut Vec<PointId>, sqr: &mut Vec<f64>) {
+    pub(super) fn knn(
+        &self,
+        idx: PointId,
+        k: usize,
+        nn_idx: &mut Vec<PointId>,
+        sqr: &mut Vec<f64>,
+    ) {
         let neighbors = self.spatial.knn(idx, k);
         nn_idx.clear();
         sqr.clear();

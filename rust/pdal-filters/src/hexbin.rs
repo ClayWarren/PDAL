@@ -171,11 +171,7 @@ impl HexBinFilter {
     }
 
     /// H3 grid path (`hexer::H3Grid`). `xy` is `(lng, lat)` in degrees.
-    fn run_h3(
-        &self,
-        xy: &[(f64, f64)],
-        resolution: Option<u8>,
-    ) -> Result<HexBinState, StageError> {
+    fn run_h3(&self, xy: &[(f64, f64)], resolution: Option<u8>) -> Result<HexBinState, StageError> {
         let estimated = resolution.is_none();
         let res = match resolution {
             Some(r) => r,
@@ -191,8 +187,8 @@ impl HexBinFilter {
                 h3_resolution_from_height(height_rad).map_err(StageError)?
             }
         };
-        let res_enum =
-            Resolution::try_from(res).map_err(|err| StageError(format!("filters.hexbin: {err}")))?;
+        let res_enum = Resolution::try_from(res)
+            .map_err(|err| StageError(format!("filters.hexbin: {err}")))?;
 
         // The origin cell (from the first point) fixes the local IJ frame.
         let (lng0, lat0) = xy[0];

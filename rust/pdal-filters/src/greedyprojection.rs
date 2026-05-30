@@ -207,7 +207,6 @@ struct Algo<'a> {
 mod algo;
 mod algo_run;
 
-
 /// Run greedy projection triangulation. `view` must have X/Y/Z plus
 /// NormalX/NormalY/NormalZ populated (the C++ wrapper runs `filters.normal`
 /// before calling this). Returns triangles as `(a, b, c)` index triples.

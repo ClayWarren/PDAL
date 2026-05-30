@@ -491,7 +491,13 @@ impl HexGrid {
         }
     }
 
-    fn write_polygon(&self, idx: usize, precision: usize, fixed: bool, out: &mut String) -> Vec<usize> {
+    fn write_polygon(
+        &self,
+        idx: usize,
+        precision: usize,
+        fixed: bool,
+        out: &mut String,
+    ) -> Vec<usize> {
         let mut islands = Vec::new();
         out.push('(');
         self.write_ring(idx, precision, fixed, out);

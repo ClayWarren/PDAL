@@ -28,7 +28,7 @@ fn close_enough(d1: f64, d2: f64) -> bool {
     }
     let b1 = sam_to_biased(d1.to_bits());
     let b2 = sam_to_biased(d2.to_bits());
-    let dist = if b1 >= b2 { b1 - b2 } else { b2 - b1 };
+    let dist = b1.abs_diff(b2);
     dist <= MAX_ULPS
 }
 
@@ -238,8 +238,7 @@ impl GridPnp {
         self.x_max = p.0;
         self.y_min = p.1;
         self.y_max = p.1;
-        for id in 0..outer.len() - 1 {
-            let p1 = outer[id];
+        for p1 in &outer[..outer.len() - 1] {
             self.x_min = self.x_min.min(p1.0);
             self.x_max = self.x_max.max(p1.0);
             self.y_min = self.y_min.min(p1.1);
@@ -365,7 +364,10 @@ impl GridPnp {
             );
             for c in vrt.emit() {
                 // Cells from emit are within grid bounds for polygon edges.
-                if c.0 >= 0 && c.1 >= 0 && (c.0 as usize) < self.grid_w && (c.1 as usize) < self.grid_h
+                if c.0 >= 0
+                    && c.1 >= 0
+                    && (c.0 as usize) < self.grid_w
+                    && (c.1 as usize) < self.grid_h
                 {
                     let i = self.idx(c.0 as usize, c.1 as usize);
                     self.cells[i].edges.push(id);
@@ -466,11 +468,10 @@ impl GridPnp {
         let here = self.idx(x, y);
         let p1 = self.cells[here].point.unwrap();
         let edges_here = self.cells[here].edges.clone();
-        let intersect_count;
-        if x == 0 {
+        let intersect_count = if x == 0 {
             let x2 = p1.0 - self.cell_width;
             let edge = (p1, (x2, p1.1));
-            intersect_count = self.intersections(edge, &edges_here);
+            self.intersections(edge, &edges_here)
         } else {
             let previ = self.idx(x - 1, y);
             if self.cells[previ].point.is_none() {
@@ -488,8 +489,8 @@ impl GridPnp {
             if prev_inside {
                 count += 1;
             }
-            intersect_count = count;
-        }
+            count
+        };
         self.cells[here].inside = intersect_count % 2 == 1;
     }
 
@@ -537,7 +538,13 @@ mod tests {
     use super::*;
 
     fn square() -> Vec<Point> {
-        vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0), (0.0, 0.0)]
+        vec![
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 10.0),
+            (0.0, 10.0),
+            (0.0, 0.0),
+        ]
     }
 
     #[test]

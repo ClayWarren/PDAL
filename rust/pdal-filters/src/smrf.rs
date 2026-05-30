@@ -150,6 +150,7 @@ impl SmrfFilter {
     /// (-9999), and row-major layout as the C++ `math::writeMatrix`. The Rust
     /// grid is column-major (`c*rows + r`), matching the C++ Eigen
     /// `Map(data, rows, cols)`, so pixel (row i, col j) = `grid[j*rows + i]`.
+    #[allow(clippy::too_many_arguments)]
     fn write_grid(
         &self,
         dir: &str,
