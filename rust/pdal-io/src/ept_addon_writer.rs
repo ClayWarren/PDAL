@@ -269,3 +269,261 @@ fn write_dim_value(value: f64, ty: DimType, dst: &mut [u8]) -> Result<(), String
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::PointLayout;
+    use std::rc::Rc;
+
+    const ROOT: AddonRootBounds = AddonRootBounds {
+        minx: 0.0,
+        miny: 0.0,
+        minz: 0.0,
+        maxx: 1.0,
+        maxy: 1.0,
+        maxz: 1.0,
+    };
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "pdal-ept-addon-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Build a view with EptNodeId/EptPointId/Classification. `points` is a list
+    /// of (node_id, point_id, classification).
+    fn make_view(points: &[(u64, u64, f64)]) -> PointView {
+        let mut layout = PointLayout::new();
+        for d in [
+            DimId::from_name("EptNodeId"),
+            DimId::from_name("EptPointId"),
+            DimId::Classification,
+        ] {
+            layout.register(d, DimType::F64);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        let node = DimId::from_name("EptNodeId");
+        let pid = DimId::from_name("EptPointId");
+        for &(n, p, cls) in points {
+            let id = view.add_point();
+            view.set_f64(id, &node, n as f64);
+            view.set_f64(id, &pid, p as f64);
+            view.set_f64(id, &DimId::Classification, cls);
+        }
+        view
+    }
+
+    #[test]
+    fn writes_binary_chunks_hierarchy_and_metadata() {
+        let dir = temp_dir("roundtrip");
+        let addon_file = dir.join("ept-addon.json");
+        // node 1 = root (3 points), node 2 = a child tile (2 points); the
+        // node_id == 0 point is dropped.
+        let view = make_view(&[
+            (1, 0, 2.0),
+            (1, 1, 3.0),
+            (1, 2, 4.0),
+            (2, 0, 5.0),
+            (2, 1, 6.0),
+            (0, 0, 99.0),
+        ]);
+        let overlaps = [
+            AddonOverlap {
+                depth: 0,
+                x: 0,
+                y: 0,
+                z: 0,
+                count: 3,
+                node_id: 1,
+            },
+            AddonOverlap {
+                depth: 1,
+                x: 0,
+                y: 0,
+                z: 0,
+                count: 2,
+                node_id: 2,
+            },
+        ];
+        write_addon(AddonWriteRequest {
+            view: &view,
+            node_id_dim: "EptNodeId",
+            point_id_dim: "EptPointId",
+            source_dim: "Classification",
+            addon_file: addon_file.to_str().unwrap(),
+            addon_type: DimType::U8,
+            hierarchy_step: 0,
+            root_bounds: ROOT,
+            overlaps: &overlaps,
+        })
+        .unwrap();
+
+        // Binary chunks: one byte per point, in EptPointId order.
+        let root_bin = fs::read(dir.join("ept-data/0-0-0-0.bin")).unwrap();
+        assert_eq!(root_bin, vec![2u8, 3, 4]);
+        let child_bin = fs::read(dir.join("ept-data/1-0-0-0.bin")).unwrap();
+        assert_eq!(child_bin, vec![5u8, 6]);
+
+        // Metadata.
+        let meta: Value = serde_json::from_str(&fs::read_to_string(&addon_file).unwrap()).unwrap();
+        assert_eq!(meta["type"], "unsigned");
+        assert_eq!(meta["size"], 1);
+        assert_eq!(meta["dataType"], "binary");
+
+        // Hierarchy: single (unsplit) root file with both node counts.
+        let hier: Value = serde_json::from_str(
+            &fs::read_to_string(dir.join("ept-hierarchy/0-0-0-0.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(hier["0-0-0-0"], 3);
+        assert_eq!(hier["1-0-0-0"], 2);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn hierarchy_step_splits_subtree_into_its_own_file() {
+        let dir = temp_dir("split");
+        let addon_file = dir.join("ept-addon.json");
+        let view = make_view(&[(1, 0, 1.0), (2, 0, 2.0)]);
+        let overlaps = [
+            AddonOverlap {
+                depth: 0,
+                x: 0,
+                y: 0,
+                z: 0,
+                count: 1,
+                node_id: 1,
+            },
+            AddonOverlap {
+                depth: 1,
+                x: 0,
+                y: 0,
+                z: 0,
+                count: 1,
+                node_id: 2,
+            },
+        ];
+        write_addon(AddonWriteRequest {
+            view: &view,
+            node_id_dim: "EptNodeId",
+            point_id_dim: "EptPointId",
+            source_dim: "Classification",
+            addon_file: addon_file.to_str().unwrap(),
+            addon_type: DimType::F64,
+            hierarchy_step: 1,
+            root_bounds: ROOT,
+            overlaps: &overlaps,
+        })
+        .unwrap();
+
+        // step == 1 forces a split at depth 1: the root file points at the
+        // subtree with -1, and the subtree gets its own hierarchy file.
+        let root: Value = serde_json::from_str(
+            &fs::read_to_string(dir.join("ept-hierarchy/0-0-0-0.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(root["1-0-0-0"], -1);
+        let sub: Value = serde_json::from_str(
+            &fs::read_to_string(dir.join("ept-hierarchy/1-0-0-0.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(sub["1-0-0-0"], 1);
+
+        // F64 chunk round-trips the source value.
+        let bin = fs::read(dir.join("ept-data/0-0-0-0.bin")).unwrap();
+        assert_eq!(f64::from_le_bytes(bin[..8].try_into().unwrap()), 1.0);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn write_dim_value_covers_every_type() {
+        let cases = [
+            (DimType::U8, 1usize),
+            (DimType::U16, 2),
+            (DimType::U32, 4),
+            (DimType::U64, 8),
+            (DimType::I8, 1),
+            (DimType::I16, 2),
+            (DimType::I32, 4),
+            (DimType::I64, 8),
+            (DimType::F32, 4),
+            (DimType::F64, 8),
+        ];
+        for (ty, size) in cases {
+            let mut dst = vec![0u8; size];
+            write_dim_value(7.0, ty, &mut dst).unwrap();
+            assert_eq!(dst.len(), ty.size());
+            assert!(dst.iter().any(|&b| b != 0), "type {ty:?} wrote nonzero");
+        }
+    }
+
+    #[test]
+    fn errors_on_point_id_out_of_range() {
+        let dir = temp_dir("bad-pid");
+        let addon_file = dir.join("ept-addon.json");
+        // node 1 has count 1 but a point claims point_id 5.
+        let view = make_view(&[(1, 5, 1.0)]);
+        let overlaps = [AddonOverlap {
+            depth: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            count: 1,
+            node_id: 1,
+        }];
+        let err = write_addon(AddonWriteRequest {
+            view: &view,
+            node_id_dim: "EptNodeId",
+            point_id_dim: "EptPointId",
+            source_dim: "Classification",
+            addon_file: addon_file.to_str().unwrap(),
+            addon_type: DimType::U8,
+            hierarchy_step: 0,
+            root_bounds: ROOT,
+            overlaps: &overlaps,
+        })
+        .unwrap_err();
+        assert!(err.contains("out of range"), "got: {err}");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn errors_on_node_id_out_of_range() {
+        let dir = temp_dir("bad-node");
+        let addon_file = dir.join("ept-addon.json");
+        // point references node 9 but only node 1 has an overlap.
+        let view = make_view(&[(9, 0, 1.0)]);
+        let overlaps = [AddonOverlap {
+            depth: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            count: 1,
+            node_id: 1,
+        }];
+        let err = write_addon(AddonWriteRequest {
+            view: &view,
+            node_id_dim: "EptNodeId",
+            point_id_dim: "EptPointId",
+            source_dim: "Classification",
+            addon_file: addon_file.to_str().unwrap(),
+            addon_type: DimType::U8,
+            hierarchy_step: 0,
+            root_bounds: ROOT,
+            overlaps: &overlaps,
+        })
+        .unwrap_err();
+        assert!(err.contains("out of range"), "got: {err}");
+        fs::remove_dir_all(&dir).ok();
+    }
+}
