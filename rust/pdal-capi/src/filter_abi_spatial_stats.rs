@@ -367,7 +367,9 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
                 return std::ptr::null_mut();
             }
             rust_ignore.push(pdal_filters::range::RangeLimit {
-                dim_name: CStr::from_ptr(range.dim_name).to_string_lossy().into_owned(),
+                dim_name: CStr::from_ptr(range.dim_name)
+                    .to_string_lossy()
+                    .into_owned(),
                 lower_bound: range.lower_bound,
                 upper_bound: range.upper_bound,
                 inclusive_lower: range.inclusive_lower,

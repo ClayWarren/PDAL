@@ -65,7 +65,10 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
                     None => match iter.next() {
                         Some(v) => v.clone(),
                         None => {
-                            eprintln!("PDAL: kernels.ground: Missing value for option '{}'.", $name);
+                            eprintln!(
+                                "PDAL: kernels.ground: Missing value for option '{}'.",
+                                $name
+                            );
                             return 1;
                         }
                     },
@@ -82,7 +85,8 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
         } else if arg == "--label" || arg.starts_with("--label=") {
             // Process label: accepted and ignored, matching the C++ basic switch.
             let _ = value_for!("--label");
-        } else if arg == "--developer-debug" || arg == "--developer-debug=true"
+        } else if arg == "--developer-debug"
+            || arg == "--developer-debug=true"
             || arg == "--developer-debug=false"
         {
             // Accepted and ignored.
@@ -192,9 +196,8 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
         "returns": returns.join(","),
     });
     if !ignore.is_empty() {
-        smrf["ignore"] = serde_json::Value::Array(
-            ignore.into_iter().map(serde_json::Value::String).collect(),
-        );
+        smrf["ignore"] =
+            serde_json::Value::Array(ignore.into_iter().map(serde_json::Value::String).collect());
     }
     for (key, value) in smrf_overrides {
         smrf[key] = value;

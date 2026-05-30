@@ -240,6 +240,36 @@ fn pipeline_json_runs_newly_registry_visible_filter_families() {
 }
 
 #[test]
+fn registry_dem_filter_keeps_points_within_raster_limits() {
+    // Mirrors the C++ DEMFilterTest: keep points whose Z is within
+    // [v, v + 100] of the float32.tif raster sample at their X/Y.
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let raster = repo.join("test/data/gdal/float32.tif");
+
+    let mut options = Options::new();
+    options.add("raster", raster.display());
+    options.add("limits", "Z[0:100]");
+    let mut filter = create_filter("filters.dem", &options).unwrap();
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    let mut view = PointView::new(Rc::new(layout));
+    for z in [200.0, 208.0] {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, 440750.0);
+        view.set_f64(idx, &DimId::Y, 3751290.0);
+        view.set_f64(idx, &DimId::Z, z);
+    }
+
+    let views = filter.run(&[view]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 1, "only the in-range point should remain");
+    assert_eq!(views[0].get_f64(0, &DimId::Z), 200.0);
+}
+
+#[test]
 fn sort_rejects_unknown_order() {
     let mut options = Options::new();
     options.add("dimensions", "X").add("order", "sideways");
@@ -396,6 +426,10 @@ fn default_filter_options(name: &str) -> Options {
         }
         "filters.geomdistance" => {
             options.add("geometry", "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))");
+        }
+        "filters.dem" => {
+            options.add("raster", "dummy.tif");
+            options.add("limits", "Z[0:100]");
         }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");

@@ -12,20 +12,9 @@ use pdal_core::pipeline::{FilterWrapper, Pipeline, Reader, Writer};
 use pdal_core::point::DimId;
 use pdal_core::stage::StageError;
 
-use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
-use pdal_filters::transformation::{invert_affine, parse_transformation_matrix, TransformationFilter};
-use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
-use pdal_filters::sparse_surface::SparseSurfaceFilter;
-use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
-use pdal_filters::expression::ExpressionFilter;
-use pdal_filters::expressionstats::ExpressionStatsFilter;
-use pdal_filters::ferry::FerryFilter;
-use pdal_filters::mongo::MongoExpressionFilter;
-use pdal_filters::neighborclassifier::NeighborClassifierFilter;
-use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
-use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
 use pdal_core::point::{DimType, PointLayout};
-use pdal_filters::geom_distance::GeomDistanceFilter;
+use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
+use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
@@ -33,10 +22,17 @@ use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::csf::CsfFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
+use pdal_filters::dem::DEMFilter;
+use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
 use pdal_filters::eigenvalues::EigenvaluesFilter;
 use pdal_filters::elm::ElmFilter;
 use pdal_filters::estimate_rank::EstimateRankFilter;
+use pdal_filters::expression::ExpressionFilter;
+use pdal_filters::expressionstats::ExpressionStatsFilter;
 use pdal_filters::faceraster::FaceRasterFilter;
+use pdal_filters::farthestpointsampling::FarthestPointSamplingFilter;
+use pdal_filters::ferry::FerryFilter;
+use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hag_delaunay::HagDelaunayFilter;
@@ -53,7 +49,9 @@ use pdal_filters::m3c2::{M3C2Filter, NormalOrientation as M3C2NormalOrientation}
 use pdal_filters::mad::MadFilter;
 use pdal_filters::merge::MergeFilter;
 use pdal_filters::miniball::MiniballFilter;
+use pdal_filters::mongo::MongoExpressionFilter;
 use pdal_filters::mortonorder::MortonOrderFilter;
+use pdal_filters::neighborclassifier::NeighborClassifierFilter;
 use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
@@ -62,8 +60,8 @@ use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
+use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
 use pdal_filters::randomize::RandomizeFilter;
-use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
 use pdal_filters::relaxation_dart_throwing::RelaxationDartThrowingFilter;
@@ -71,13 +69,18 @@ use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_filters::returns::ReturnsFilter;
 use pdal_filters::sample::SampleFilter;
 use pdal_filters::separatescanline::SeparateScanLineFilter;
+use pdal_filters::skewnessbalancing::SkewnessBalancingFilter;
 use pdal_filters::smrf::SmrfFilter;
 use pdal_filters::sort::{SortAlgorithm, SortFilter, SortOrder};
+use pdal_filters::sparse_surface::SparseSurfaceFilter;
 use pdal_filters::splitter::SplitterFilter;
 use pdal_filters::stats::StatsFilter;
 use pdal_filters::straighten::StraightenFilter;
 use pdal_filters::supervoxel::SupervoxelFilter;
 use pdal_filters::tail::TailFilter;
+use pdal_filters::transformation::{
+    invert_affine, parse_transformation_matrix, TransformationFilter,
+};
 use pdal_filters::voxel_center_nearest_neighbor::VoxelCenterNearestNeighborFilter;
 use pdal_filters::voxel_centroid_nearest_neighbor::VoxelCentroidNearestNeighborFilter;
 use pdal_filters::voxeldownsize::VoxelDownsizeFilter;
@@ -125,6 +128,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.csf",
     "filters.dbscan",
     "filters.decimation",
+    "filters.dem",
     "filters.divider",
     "filters.eigenvalues",
     "filters.elm",
@@ -373,7 +377,8 @@ pub fn create_filter(
             let update_exprs: Vec<String> = options.values("update_expression").to_vec();
             if update_exprs.is_empty() {
                 return Err(StageError(
-                    "filters.radiusassign: missing required option 'update_expression'.".to_string(),
+                    "filters.radiusassign: missing required option 'update_expression'."
+                        .to_string(),
                 ));
             }
             // Build a synthetic layout from the assignment LHS dimensions so the
@@ -387,8 +392,11 @@ pub fn create_filter(
                 }
             }
             let assignments = parse_assignments(&update_exprs, &layout).map_err(|e| {
-                StageError(format!("{} (expressions referencing other dimensions are not \
-                    supported in the Rust pipeline registry)", e.0))
+                StageError(format!(
+                    "{} (expressions referencing other dimensions are not \
+                    supported in the Rust pipeline registry)",
+                    e.0
+                ))
             })?;
             Ok(Box::new(FilterWrapper::new(RadiusAssignFilter::new(
                 src_domain,
@@ -398,6 +406,32 @@ pub fn create_filter(
                 get_bool(options, "is3d", false)?,
                 get_f64(options, "max2d_above", -1.0)?,
                 get_f64(options, "max2d_below", -1.0)?,
+            ))))
+        }
+        "filters.dem" => {
+            // C++ DEMFilter parses `limits` (a DimRange like "Z[0:100]") into a
+            // dimension name plus lower/upper bounds, reads `raster`/`band`, then
+            // keeps points whose dim value lies within [v - lower, v + upper] of
+            // the raster sample. Parse the same way here.
+            let raster = options.get_str("raster", "");
+            if raster.trim().is_empty() {
+                return Err(StageError(
+                    "filters.dem: missing 'raster' option.".to_string(),
+                ));
+            }
+            let limits = options.get_str("limits", "");
+            if limits.trim().is_empty() {
+                return Err(StageError(
+                    "filters.dem: missing 'limits' option.".to_string(),
+                ));
+            }
+            let limit = parse_range_limit(&limits).map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(DEMFilter::new(
+                &limit.dim_name,
+                &raster,
+                get_u64(options, "band", 1)? as i32,
+                limit.lower_bound,
+                limit.upper_bound,
             ))))
         }
         "filters.eigenvalues" => Ok(Box::new(FilterWrapper::new(EigenvaluesFilter::new(
@@ -738,28 +772,31 @@ pub fn create_filter(
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(StageError)?;
-            let classbits = parse_classbits(&options.get_str("classbits", "")).map_err(StageError)?;
-            Ok(Box::new(FilterWrapper::new(SmrfFilter::with_segmentation(
-                get_f64(options, "cell", 1.0)?,
-                get_f64(options, "slope", 0.15)?,
-                options
-                    .has("window")
-                    .then(|| get_f64(options, "window", 18.0))
-                    .transpose()?,
-                get_f64(options, "scalar", 1.25)?,
-                get_f64(options, "threshold", 0.5)?,
-                get_f64(options, "cut", 0.0)?,
-                get_u64(options, "ground_class", 2)? as u8,
-                get_u64(options, "other_class", 1)? as u8,
-                get_bool(options, "only_ground", false)?,
-                comma_list(&options.get_str("returns", "last,only")),
-                ignore,
-                classbits,
-            )
-            .with_dir(match options.get_str("dir", "") {
-                ref d if d.is_empty() => None,
-                d => Some(d),
-            }))))
+            let classbits =
+                parse_classbits(&options.get_str("classbits", "")).map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(
+                SmrfFilter::with_segmentation(
+                    get_f64(options, "cell", 1.0)?,
+                    get_f64(options, "slope", 0.15)?,
+                    options
+                        .has("window")
+                        .then(|| get_f64(options, "window", 18.0))
+                        .transpose()?,
+                    get_f64(options, "scalar", 1.25)?,
+                    get_f64(options, "threshold", 0.5)?,
+                    get_f64(options, "cut", 0.0)?,
+                    get_u64(options, "ground_class", 2)? as u8,
+                    get_u64(options, "other_class", 1)? as u8,
+                    get_bool(options, "only_ground", false)?,
+                    comma_list(&options.get_str("returns", "last,only")),
+                    ignore,
+                    classbits,
+                )
+                .with_dir(match options.get_str("dir", "") {
+                    ref d if d.is_empty() => None,
+                    d => Some(d),
+                }),
+            )))
         }
         "filters.sample" => Ok(Box::new(FilterWrapper::new(
             SampleFilter::new(options).map_err(StageError)?,
@@ -767,13 +804,13 @@ pub fn create_filter(
         "filters.separatescanline" => Ok(Box::new(FilterWrapper::new(
             SeparateScanLineFilter::new(get_u64(options, "groupby", 1)?),
         ))),
-        "filters.skewnessbalancing" => Ok(Box::new(FilterWrapper::new(
-            SkewnessBalancingFilter::new(
+        "filters.skewnessbalancing" => {
+            Ok(Box::new(FilterWrapper::new(SkewnessBalancingFilter::new(
                 get_u64(options, "ground_class", 2)? as u8,
                 get_u64(options, "other_class", 1)? as u8,
                 get_bool(options, "only_ground", false)?,
-            ),
-        ))),
+            ))))
+        }
         "filters.farthestpointsampling" => Ok(Box::new(FilterWrapper::new(
             FarthestPointSamplingFilter::new(get_u64(options, "count", 1000)?),
         ))),
@@ -783,7 +820,9 @@ pub fn create_filter(
             if sources.is_empty() {
                 sources = options.values("limits").to_vec();
             }
-            Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(&sources)?)))
+            Ok(Box::new(FilterWrapper::new(ExpressionFilter::new(
+                &sources,
+            )?)))
         }
         "filters.expressionstats" => {
             let dim = options.get_str("dimension", "");
@@ -804,7 +843,9 @@ pub fn create_filter(
                     "filters.mongo: missing 'expression' option.".to_string(),
                 ));
             }
-            Ok(Box::new(FilterWrapper::new(MongoExpressionFilter::new(&expr)?)))
+            Ok(Box::new(FilterWrapper::new(MongoExpressionFilter::new(
+                &expr,
+            )?)))
         }
         "filters.ferry" => {
             let specs: Vec<String> = options
@@ -885,7 +926,9 @@ pub fn create_filter(
             if get_bool(options, "invert", false)? {
                 matrix = invert_affine(&matrix).map_err(StageError)?;
             }
-            Ok(Box::new(FilterWrapper::new(TransformationFilter::new(matrix))))
+            Ok(Box::new(FilterWrapper::new(TransformationFilter::new(
+                matrix,
+            ))))
         }
         "filters.voxelcenternearestneighbor" => Ok(Box::new(FilterWrapper::new(
             VoxelCenterNearestNeighborFilter::new(get_f64(options, "cell", 1.0)?),
@@ -968,7 +1011,9 @@ fn parse_classbits(value: &str) -> Result<u8, String> {
             "synthetic" => bits |= CLASSBIT_SYNTHETIC,
             "withheld" => bits |= CLASSBIT_WITHHELD,
             other => {
-                return Err(format!("filters.smrf: Invalid 'classbits' value: '{other}'."));
+                return Err(format!(
+                    "filters.smrf: Invalid 'classbits' value: '{other}'."
+                ));
             }
         }
     }
@@ -1155,7 +1200,9 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
             if !opts.has("minor_version") {
                 opts.add("minor_version", "4");
             }
-            Ok(Box::new(pdal_io::copcwriter::writer::CopcWriter::new(&opts)))
+            Ok(Box::new(pdal_io::copcwriter::writer::CopcWriter::new(
+                &opts,
+            )))
         }
         "writers.nitf" => Ok(Box::new(pdal_io::nitf_writer::NitfWriter::new(options)?)),
         "writers.ply" => Ok(Box::new(pdal_io::ply::PlyWriter::new(options)?)),

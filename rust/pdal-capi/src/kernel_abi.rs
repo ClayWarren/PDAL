@@ -817,7 +817,9 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
             };
         } else if arg == "--compress" || arg == "-z" {
             compress = true;
-        } else if arg == "--mean" || arg.starts_with("--mean=") || arg == "--stdev"
+        } else if arg == "--mean"
+            || arg.starts_with("--mean=")
+            || arg == "--stdev"
             || arg.starts_with("--stdev=")
         {
             // Declared by the C++ kernel but unused in its execute(); accept
