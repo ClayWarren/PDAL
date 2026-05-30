@@ -715,6 +715,12 @@ extern "C"
                                    double* roll, double* pitch, double* azimuth,
                                    double* wander_angle, double* x, double* y,
                                    double* z, double* out_time);
+    bool pdal_georeference_process_point(
+        const pdal_trajectory_t* traj, const double* scan2imu, bool reverse,
+        bool ned, bool transform_beam, double time_offset, double gpstime,
+        double* x, double* y, double* z, double* beam_origin_x,
+        double* beam_origin_y, double* beam_origin_z, double* beam_direction_x,
+        double* beam_direction_y, double* beam_direction_z);
 
     // XML schema
     char* pdal_xml_schema_remap_old_name(const char* name);

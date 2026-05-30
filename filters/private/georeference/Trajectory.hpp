@@ -57,6 +57,9 @@ public:
     ~Trajectory();
 
     bool getTrajPoint(double time, TrajPoint& trajPoint) const;
+
+    // Raw Rust handle, for per-point georeferencing through the C ABI.
+    pdal_trajectory* handle() const { return m_handle; }
 };
 
 struct TrajPoint

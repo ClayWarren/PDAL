@@ -43,7 +43,6 @@ namespace pdal
 namespace georeference
 {
 class TransformationFilter;
-class LocalCartesian;
 } // namespace georeference
 class PDAL_EXPORT GeoreferenceFilter : public Filter, public Streamable
 {
@@ -65,7 +64,6 @@ private:
 
     struct Config;
     std::unique_ptr<Config> m_config;
-    std::unique_ptr<georeference::LocalCartesian> m_localCartesian;
 };
 
 } // namespace pdal
