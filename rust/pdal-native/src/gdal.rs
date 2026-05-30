@@ -825,10 +825,14 @@ impl Drop for Vector {
 }
 
 pub fn register_drivers() {
-    unsafe {
+    // GDAL's driver-manager registration mutates global state and is not safe
+    // to run concurrently from multiple threads; guard it so it happens exactly
+    // once even when several stages register drivers in parallel.
+    static REGISTER: std::sync::Once = std::sync::Once::new();
+    REGISTER.call_once(|| unsafe {
         gdal_sys::GDALAllRegister();
         gdal_sys::OGRRegisterAll();
-    }
+    });
 }
 
 pub fn version() -> String {
