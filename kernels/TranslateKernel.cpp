@@ -35,17 +35,9 @@
 
 #include "TranslateKernel.hpp"
 
-#include <pdal/PipelineReaderJSON.hpp>
-#include <pdal/PipelineWriter.hpp>
-#include <pdal/PointTable.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/Reader.hpp>
-#include <pdal/StageFactory.hpp>
-#include <pdal/Writer.hpp>
-#include <pdal/util/FileUtils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <memory>
-#include <string>
+#include <sstream>
 #include <vector>
 
 namespace pdal
@@ -104,136 +96,67 @@ void TranslateKernel::validateSwitches(ProgramArgs&)
                          "--overwrite option was provided!");
 }
 
-/*
-  Build a pipeline from a JSON filter specification.
-*/
-void TranslateKernel::makeJSONPipeline()
-{
-    std::string json;
-
-    if (pdal::FileUtils::fileExists(m_filterJSON))
-        json = pdal::FileUtils::readFileIntoString(m_filterJSON);
-
-    if (json.empty())
-        json = m_filterJSON;
-    std::stringstream in(json);
-    m_manager.readPipeline(in);
-
-    std::vector<Stage*> roots = m_manager.roots();
-    if (roots.size() > 1)
-        throw pdal_error("Can't process pipeline with more than one root.");
-
-    Stage* r(nullptr);
-    if (roots.size())
-        r = dynamic_cast<Reader*>(roots[0]);
-    if (r)
-    {
-        StageCreationOptions ops{m_inputFile, m_readerType, nullptr, Options(),
-                                 r->tag()};
-        m_manager.replace(r, &m_manager.makeReader(ops));
-    }
-    else
-    {
-        r = &m_manager.makeReader(m_inputFile, m_readerType);
-        if (roots.size())
-            roots[0]->setInput(*r);
-    }
-
-    std::vector<Stage*> leaves = m_manager.leaves();
-    if (leaves.size() != 1)
-        throw pdal_error("Can't process pipeline with more than one "
-                         "terminal stage.");
-
-    Stage* w = dynamic_cast<Writer*>(leaves[0]);
-    if (w)
-        m_manager.replace(w, &m_manager.makeWriter(m_outputFile, m_writerType));
-    else
-    {
-        // We know we have a leaf because we added a reader.
-        StageCreationOptions ops{
-            m_outputFile, m_writerType, leaves[0], Options(),
-            ""}; // These last two args just keep compiler quiet.
-        m_manager.makeWriter(ops);
-    }
-}
-
-/*
-  Build a pipeline from filters specified as command-line arguments.
-*/
-void TranslateKernel::makeArgPipeline()
-{
-    std::string readerType(m_readerType);
-    if (!readerType.empty() && !Utils::startsWith(readerType, "readers."))
-        readerType.insert(0, "readers.");
-    Stage& reader = m_manager.makeReader(m_inputFile, readerType);
-    Stage* stage = &reader;
-
-    // add each filter provided on the command-line,
-    // updating the stage pointer
-    for (auto const& f : m_filterType)
-    {
-        std::string filter_name(f);
-
-        if (!Utils::startsWith(f, "filters."))
-            filter_name.insert(0, "filters.");
-
-        Stage& filter = m_manager.makeFilter(filter_name, *stage);
-        stage = &filter;
-    }
-    std::string writerType(m_writerType);
-    if (!writerType.empty() && !Utils::startsWith(writerType, "writers."))
-        writerType.insert(0, "writers.");
-    m_manager.makeWriter(m_outputFile, writerType, *stage);
-}
-
 int TranslateKernel::execute()
 {
-    std::ostream* metaOut(nullptr);
-
     if (m_filterJSON.size() && m_filterType.size())
         throw pdal_error("Cannot set both --filter options and --json options");
 
-    if (m_metadataFile.size())
-    {
-        if (m_pipelineOutputFile.size())
-            m_log->get(LogLevel::Info)
-                << "Metadata will not be written. "
-                   "'pipeline' option prevents execution.";
-        else
-        {
-            metaOut = FileUtils::createFile(m_metadataFile);
-            if (!metaOut)
-                throw pdal_error("Couldn't output metadata output file '" +
-                                 m_metadataFile + "'.");
-        }
-    }
-
+    StringList args;
+    args.push_back(m_inputFile);
+    args.push_back(m_outputFile);
+    for (const std::string& filter : m_filterType)
+        args.push_back(filter);
     if (!m_filterJSON.empty())
-        makeJSONPipeline();
-    else
-        makeArgPipeline();
-
-    // If we write pipeline output, we don't run, and therefore don't write
-    if (m_pipelineOutputFile.size() > 0)
     {
-        PipelineWriter::writePipeline(m_manager.getStage(),
-                                      m_pipelineOutputFile);
-        return 0;
+        args.push_back("--json");
+        args.push_back(m_filterJSON);
+    }
+    if (!m_pipelineOutputFile.empty())
+    {
+        args.push_back("--pipeline");
+        args.push_back(m_pipelineOutputFile);
+    }
+    if (!m_metadataFile.empty())
+    {
+        args.push_back("--metadata");
+        args.push_back(m_metadataFile);
+    }
+    if (!m_readerType.empty())
+    {
+        args.push_back("--reader");
+        args.push_back(m_readerType);
+    }
+    if (!m_writerType.empty())
+    {
+        args.push_back("--writer");
+        args.push_back(m_writerType);
+    }
+    if (m_noStream)
+        args.push_back("--nostream");
+    if (m_stream)
+        args.push_back("--stream");
+    if (m_overwriteInput)
+        args.push_back("--overwrite");
+    if (m_dimNames.size())
+    {
+        std::ostringstream dims;
+        for (size_t i = 0; i < m_dimNames.size(); ++i)
+        {
+            if (i)
+                dims << ',';
+            dims << m_dimNames[i];
+        }
+        args.push_back("--dims");
+        args.push_back(dims.str());
     }
 
-    m_manager.pointTable().layout()->setAllowedDims(m_dimNames);
-    if (m_manager.execute(m_mode).m_mode == ExecMode::None)
-        throw pdal_error("Couldn't run translation pipeline in requested "
-                         "execution mode.");
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    if (metaOut)
-    {
-        MetadataNode m = m_manager.getMetadata();
-        *metaOut << Utils::toJSON(m);
-        FileUtils::closeFile(metaOut);
-    }
-
-    return 0;
+    return pdal_rust_kernel_run("translate", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

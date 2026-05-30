@@ -36,11 +36,6 @@
 #pragma once
 
 #include <pdal/Kernel.hpp>
-#include <pdal/PipelineManager.hpp>
-
-#include <memory>
-#include <string>
-#include <vector>
 
 namespace pdal
 {
@@ -55,8 +50,6 @@ public:
 private:
     void addSwitches(ProgramArgs& args) override;
     void validateSwitches(ProgramArgs& args) override;
-    void makeJSONPipeline();
-    void makeArgPipeline();
 
     std::string m_inputFile;
     std::string m_outputFile;

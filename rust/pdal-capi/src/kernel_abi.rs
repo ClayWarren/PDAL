@@ -571,6 +571,8 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let mut writer_override = None;
     let mut filters = Vec::new();
     let mut stage_options = Vec::new();
+    let mut metadata_file = None;
+    let mut serialization_file = None;
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -604,6 +606,30 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
                 return 1;
             };
             filters.push(value.clone());
+        } else if arg == "--metadata" || arg == "-m" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            metadata_file = Some(value.clone());
+        } else if arg == "--pipeline" || arg == "-p" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '{arg}'.");
+                return 1;
+            };
+            serialization_file = Some(value.clone());
+        } else if arg == "--stream" || arg == "--nostream" || arg == "--overwrite" {
+        } else if arg == "--dims" {
+            let Some(_) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '--dims'.");
+                return 1;
+            };
+        } else if arg == "--json" {
+            let Some(_) = iter.next() else {
+                eprintln!("PDAL: kernels.translate: Missing value for option '--json'.");
+                return 1;
+            };
+            return -1;
         } else if arg.starts_with("--") {
             match parse_cli_stage_option(arg) {
                 Some(option) => stage_options.push(option),
@@ -656,7 +682,51 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     if !apply_cli_stage_options(&mut stages, &stage_options) {
         return -1;
     }
-    execute_kernel_pipeline("translate", serde_json::Value::Array(stages))
+    execute_translate_pipeline(stages, metadata_file, serialization_file)
+}
+
+fn execute_translate_pipeline(
+    stages: Vec<serde_json::Value>,
+    metadata_file: Option<String>,
+    serialization_file: Option<String>,
+) -> i32 {
+    let pipeline_json = serde_json::Value::Array(stages);
+    if let Some(path) = serialization_file {
+        if let Err(err) = std::fs::write(&path, pipeline_json.to_string()) {
+            eprintln!(
+                "PDAL: kernels.translate: Unable to write pipeline serialization '{path}': {err}"
+            );
+            return 1;
+        }
+        return 0;
+    }
+
+    let mut pipeline = match pipeline_from_json(&pipeline_json.to_string()) {
+        Ok(pipeline) => pipeline,
+        Err(err) => {
+            eprintln!("PDAL: kernels.translate: {err}");
+            return 1;
+        }
+    };
+
+    match pipeline.execute_with_result(Vec::new()) {
+        Ok(result) => {
+            if let Some(path) = metadata_file {
+                let handle = crate::pipeline_abi::PipelineHandle { pipeline };
+                let summary =
+                    crate::pipeline_abi::pipeline_result_to_json_for_kernel(result, &handle);
+                if let Err(err) = std::fs::write(&path, summary) {
+                    eprintln!("PDAL: kernels.translate: Unable to write metadata '{path}': {err}");
+                    return 1;
+                }
+            }
+            0
+        }
+        Err(err) => {
+            eprintln!("PDAL: kernels.translate: {err}");
+            1
+        }
+    }
 }
 
 fn expand_translate_option_files(options: Vec<CliStageOption>) -> Result<Vec<CliStageOption>, i32> {
