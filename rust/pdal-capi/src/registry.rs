@@ -58,6 +58,7 @@ use pdal_filters::nndistance::{NNDistanceFilter, NNDistanceMode};
 use pdal_filters::normal::NormalFilter;
 use pdal_filters::optimal_neighborhood::OptimalNeighborhoodFilter;
 use pdal_filters::outlier::OutlierFilter;
+use pdal_filters::overlay::OverlayFilter;
 use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
@@ -165,6 +166,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.normal",
     "filters.optimalneighborhood",
     "filters.outlier",
+    "filters.overlay",
     "filters.planefit",
     "filters.pmf",
     "filters.projpipeline",
@@ -710,6 +712,40 @@ pub fn create_filter(
             get_f64(options, "multiplier", 2.0)?,
             get_u64(options, "class", 7)? as u8,
         )))),
+        "filters.overlay" => {
+            // The Rust OverlayFilter reads polygons from layer 0 of the OGR
+            // datasource with the given attribute column. The OGR SQL `query`,
+            // explicit `layer`/`lyr_name`, and spatial `bounds` options need
+            // OGR query/layer plumbing the registry path does not drive; error
+            // explicitly on them. `threads` is accepted but ignored (the Rust
+            // filter runs single-threaded).
+            let dimension = options.get_str("dimension", "");
+            if dimension.trim().is_empty() {
+                return Err(StageError(
+                    "filters.overlay: missing 'dimension' option.".to_string(),
+                ));
+            }
+            let datasource = options.get_str("datasource", "");
+            if datasource.trim().is_empty() {
+                return Err(StageError(
+                    "filters.overlay: missing 'datasource' option.".to_string(),
+                ));
+            }
+            for opt in ["query", "layer", "lyr_name", "bounds"] {
+                if !options.get_str(opt, "").trim().is_empty() {
+                    return Err(StageError(format!(
+                        "filters.overlay: the '{opt}' option is not supported in \
+                         the Rust pipeline registry (uses layer 0, no OGR query/\
+                         spatial filter)."
+                    )));
+                }
+            }
+            Ok(Box::new(FilterWrapper::new(OverlayFilter::new(
+                &dimension,
+                &datasource,
+                &options.get_str("column", ""),
+            ))))
+        }
         "filters.planefit" => Ok(Box::new(FilterWrapper::new(PlaneFitFilter::new(get_u64(
             options, "knn", 8,
         )?

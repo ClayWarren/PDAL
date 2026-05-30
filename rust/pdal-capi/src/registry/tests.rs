@@ -338,6 +338,57 @@ fn pipeline_json_runs_colorization_against_raster() {
 }
 
 #[test]
+fn pipeline_json_runs_overlay_from_shapefile() {
+    // filters.overlay assigns the shapefile 'cls' attribute (values 2/5/6) to
+    // Classification for points inside each polygon. Assert the overlay
+    // actually reclassifies points by comparing the count of points with a
+    // shapefile class before and after the filter.
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let las = repo.join("test/data/autzen/autzen-dd.las");
+    let shp = repo.join("test/data/autzen/attributes.shp");
+
+    // Baseline classifications straight from the reader.
+    let mut ro = Options::new();
+    ro.add("filename", las.display());
+    let mut reader = create_reader("readers.las", &ro).unwrap();
+    let base = reader.read().unwrap();
+    let total = base[0].len();
+    assert!(total > 0);
+    let base_cls: Vec<f64> = (0..total)
+        .map(|idx| base[0].get_f64(idx, &DimId::Classification))
+        .collect();
+
+    let json = format!(
+        r#"[
+                {{"filename":"{}"}},
+                {{"type":"filters.overlay", "dimension":"Classification", "datasource":"{}", "column":"cls"}}
+            ]"#,
+        escape_json_path(&las),
+        escape_json_path(&shp)
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), total, "overlay should preserve point count");
+
+    // At least one point must be reclassified by a polygon, and every changed
+    // value must come from the shapefile 'cls' set {2, 5, 6}.
+    let mut changed = 0u64;
+    for idx in 0..views[0].len() {
+        let cls = views[0].get_f64(idx, &DimId::Classification);
+        if cls != base_cls[idx as usize] {
+            changed += 1;
+            assert!(
+                matches!(cls as u32, 2 | 5 | 6),
+                "reassigned class {cls} not in shapefile cls set"
+            );
+        }
+    }
+    assert!(changed > 0, "overlay should reclassify some points");
+}
+
+#[test]
 fn sort_rejects_unknown_order() {
     let mut options = Options::new();
     options.add("dimensions", "X").add("order", "sideways");
@@ -504,6 +555,10 @@ fn default_filter_options(name: &str) -> Options {
         }
         "filters.colorization" => {
             options.add("raster", "dummy.tif");
+        }
+        "filters.overlay" => {
+            options.add("dimension", "Classification");
+            options.add("datasource", "dummy.shp");
         }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
