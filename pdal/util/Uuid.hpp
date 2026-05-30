@@ -57,7 +57,6 @@
 #include <cstdint>
 #include <cstring>
 #include <iomanip>
-#include <random>
 #include <sstream>
 #include <string>
 
@@ -66,15 +65,8 @@
 #include "Extractor.hpp"
 #include "Inserter.hpp"
 #include "Utils.hpp"
-
-extern "C"
-{
-    bool pdal_uuid_parse(const char* input, uint8_t* outBytes);
-    char* pdal_uuid_unparse(const uint8_t* bytes);
-    bool pdal_uuid_random(uint8_t* outBytes);
-    bool pdal_uuid_is_null(const uint8_t* bytes);
-    void pdal_string_free(char* ptr);
-}
+#include <pdal/pdal_types.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -97,33 +89,6 @@ struct PDAL_EXPORT uuid
     void clear()
     {
         memset(this, 0, sizeof(struct uuid));
-    }
-
-    void randomize()
-    {
-        static std::random_device rd;
-        static std::mt19937_64 gen(rd());
-        static std::uniform_int_distribution<uint64_t> dist;
-
-        uint64_t r = dist(gen);
-        const char* c = reinterpret_cast<const char*>(&r);
-        memcpy(&time_low, c, sizeof(time_low));
-        c += sizeof(time_low);
-        memcpy(&time_mid, c, sizeof(time_mid));
-        c += sizeof(time_mid);
-        memcpy(&time_hi_and_version, c, sizeof(time_hi_and_version));
-
-        r = dist(gen);
-        c = reinterpret_cast<const char*>(&r);
-        std::memcpy(&clock_seq, c, sizeof(clock_seq));
-        c += sizeof(clock_seq);
-        std::memcpy(node, c, sizeof(node));
-
-        // Set the high nibble to 4 (version 4).
-        time_hi_and_version = (time_hi_and_version & 0x0FFF) | 0x4000;
-
-        // Set the high two bits to 2 (variant for RFC 4122)
-        clock_seq = (clock_seq & 0x3FFF) | 0x8000;
     }
 };
 #pragma pack(pop)
@@ -232,10 +197,9 @@ public:
     RandomUuid()
     {
         uint8_t bytes[16];
-        if (pdal_uuid_random(bytes))
-            unpack(reinterpret_cast<const char*>(bytes));
-        else
-            m_data.randomize();
+        if (!pdal_uuid_random(bytes))
+            throw pdal_error("Unable to create random UUID.");
+        unpack(reinterpret_cast<const char*>(bytes));
     }
 };
 

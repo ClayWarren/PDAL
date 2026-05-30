@@ -67,7 +67,7 @@ Status definitions:
 | Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
 | Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | in progress | `pdal-native::vsi::VsiFile` opens local, URL, and `/vsicurl/` paths through GDAL VSI and now implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) now counts as Rust C ABI-backed. STAC remote JSON traversal and remote LASzip EPT reads consume the same adapter for the mixed-reader C++ test. Broader object-store option parity remains open. |
-| Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. **`apps/` is complete** (0 port-candidate LOC -- `apps/pdal.cpp` is a thin entry-point peer; see the `C++ \`pdal\` app shell` row). The standalone tools have C ABI-backed dispatch shells, and broad `kernels/` command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, `pdal delta`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. Direct exported C++ `DeltaKernel`, `EvalKernel`, `GroundKernel`, `MergeKernel`, `PipelineKernel`, `RandomKernel`, `SortKernel`, `SplitKernel`, and `TileKernel` execution now reaches the same Rust C ABI runner, reducing the remaining kernel implementation backlog while preserving the public C++ classes. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
+| Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. **`apps/` is complete** (0 port-candidate LOC -- `apps/pdal.cpp` is a thin entry-point peer; see the `C++ \`pdal\` app shell` row). The standalone tools have C ABI-backed dispatch shells, and broad `kernels/` command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, `pdal delta`, `pdal tindex`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. Direct exported C++ `DeltaKernel`, `EvalKernel`, `GroundKernel`, `MergeKernel`, `PipelineKernel`, `RandomKernel`, `SortKernel`, `SplitKernel`, `TIndexKernel`, and `TileKernel` execution now reaches the same Rust C ABI runner, reducing the remaining kernel implementation backlog while preserving the public C++ classes. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
 
 ## Root-Level Migration Status
 
@@ -195,13 +195,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 21,703 | 202 |
-| c-abi-backed | 38,764 | 345 |
+| port-candidate | 21,525 | 201 |
+| c-abi-backed | 38,914 | 346 |
 | native-adapter | 1,428 | 10 |
 | holdout | 339 | 4 |
-| total | 62,234 | 561 |
+| total | 62,206 | 561 |
 
-Port-candidate backlog by area: `pdal` 9,332 · `io` 8,010 · `filters` 3,436 ·
+Port-candidate backlog by area: `pdal` 9,154 · `io` 8,010 · `filters` 3,436 ·
 `kernels` 925. `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
