@@ -389,6 +389,31 @@ fn rust_kernel_run_handles_tindex_rich_boundary_options() {
 }
 
 #[test]
+fn rust_kernel_run_handles_tindex_srs_options() {
+    let name = CString::new("tindex").unwrap();
+    let create = CString::new("create").unwrap();
+    let tindex = CString::new("--tindex").unwrap();
+    let output = CString::new("out.geojson").unwrap();
+    let target_srs = CString::new("--t_srs=EPSG:3857").unwrap();
+    let assign_srs = CString::new("--a_srs").unwrap();
+    let assign_value = CString::new("EPSG:26915").unwrap();
+    let file = CString::new("input.las").unwrap();
+    let argv = [
+        create.as_ptr(),
+        tindex.as_ptr(),
+        output.as_ptr(),
+        target_srs.as_ptr(),
+        assign_srs.as_ptr(),
+        assign_value.as_ptr(),
+        file.as_ptr(),
+    ];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
 fn rust_kernel_run_accepts_info_help() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("--help").unwrap();

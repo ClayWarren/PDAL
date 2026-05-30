@@ -47,6 +47,9 @@ struct CreateArgs {
     tindex_file: String,
     files: Vec<String>,
     driver_name: String,
+    target_srs: String,
+    assign_srs: String,
+    override_source_srs: bool,
     path_prefix: Option<String>,
     write_absolute_path: bool,
     layer_name: String,
@@ -145,7 +148,7 @@ fn run_create(args: &[String]) -> i32 {
             "PDAL: kernels.tindex: ESRI Shapefile field 'srs' supports a maximum of 254 characters."
         );
     }
-    let layer = match dataset.open_or_create_layer(&args.layer_name, &first_srs) {
+    let layer = match dataset.open_or_create_layer(&args.layer_name, &args.target_srs) {
         Ok(layer) => layer,
         Err(err) => {
             eprintln!("PDAL: kernels.tindex: Error creating layer: {err}");
@@ -168,6 +171,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
         tindex_file: String::new(),
         files: Vec::new(),
         driver_name: "ESRI Shapefile".to_string(),
+        target_srs: "EPSG:4326".to_string(),
+        assign_srs: "EPSG:4326".to_string(),
+        override_source_srs: false,
         path_prefix: None,
         write_absolute_path: false,
         layer_name: "pdal".to_string(),
@@ -201,6 +207,11 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
             "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
             "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
+            "--t_srs" => parsed.target_srs = next_value(&mut iter, arg)?.clone(),
+            "--a_srs" => {
+                parsed.assign_srs = next_value(&mut iter, arg)?.clone();
+                parsed.override_source_srs = true;
+            }
             "--lco" => apply_layer_creation_option(&mut parsed, next_value(&mut iter, arg)?)?,
             "--log" => {
                 let _ = next_value(&mut iter, "--log")?;
@@ -266,6 +277,13 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             }
             _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
                 parsed.path_prefix = Some(value.to_string());
+            }
+            _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
+                parsed.target_srs = value.to_string();
+            }
+            _ if let Some(value) = arg.strip_prefix("--a_srs=") => {
+                parsed.assign_srs = value.to_string();
+                parsed.override_source_srs = true;
             }
             _ if arg.starts_with("--log=") => {}
             _ if let Some(value) = arg.strip_prefix("--lco=") => {
@@ -463,6 +481,9 @@ fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {
     let mut entries = Vec::new();
     for file in &args.files {
         let mut entry = create_entry(file, args)?;
+        if entry.wkt.is_empty() || args.override_source_srs {
+            entry.wkt.clone_from(&args.assign_srs);
+        }
         if first_srs.is_empty() && !entry.wkt.is_empty() {
             first_srs.clone_from(&entry.wkt);
         } else if !first_srs.is_empty() && !entry.wkt.is_empty() && entry.wkt != first_srs {
