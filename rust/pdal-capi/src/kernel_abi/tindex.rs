@@ -221,6 +221,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
             "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
             "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
+            "--threads" | "--requests" => {
+                let _ = next_value(&mut iter, arg)?;
+            }
             "--t_srs" => parsed.target_srs = next_value(&mut iter, arg)?.clone(),
             "--a_srs" => {
                 parsed.assign_srs = next_value(&mut iter, arg)?.clone();
@@ -289,6 +292,10 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
                     "true" | "1" | "yes" | "on"
                 );
             }
+            _ if arg
+                .strip_prefix("--threads=")
+                .or_else(|| arg.strip_prefix("--requests="))
+                .is_some() => {}
             _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
                 parsed.path_prefix = Some(value.to_string());
             }

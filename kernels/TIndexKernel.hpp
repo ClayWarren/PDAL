@@ -34,54 +34,13 @@
 
 #pragma once
 
-#include <pdal/Filter.hpp>
-#include <pdal/Stage.hpp>
-#include <pdal/Streamable.hpp>
 #include <pdal/SubcommandKernel.hpp>
-#include <pdal/util/FileUtils.hpp>
-
-// Get GDAL's forward decls if available
-// otherwise make our own
-#if __has_include(<gdal_fwd.h>)
-#include <gdal_fwd.h>
-#else
-using OGRDataSourceH = void*;
-using OGRLayerH = void*;
-using OGRFeatureH = void*;
-#endif
 
 namespace pdal
 {
-class Polygon;
-
-namespace gdal
-{
-class SpatialRef;
-}
-
-class StageFactory;
 
 class PDAL_EXPORT TIndexKernel : public SubcommandKernel
 {
-    struct FileInfo
-    {
-        std::string m_filename;
-        std::string m_srs;
-        std::string m_boundary;
-        double m_gridHeight;
-        struct tm m_ctime;
-        struct tm m_mtime;
-        bool m_isRemote = false;
-    };
-
-    struct FieldIndexes
-    {
-        int m_filename;
-        int m_srs;
-        int m_ctime;
-        int m_mtime;
-    };
-
 public:
     std::string getName() const override;
     TIndexKernel();
@@ -93,31 +52,12 @@ private:
     int execute() override;
     StringList subcommands() const override;
 
-    void createFile();
-    void mergeFile();
-    bool openDataset(const std::string& filename);
-    bool createDataset(const std::string& filename);
-    bool openLayer(const std::string& layerName);
-    bool createLayer(const std::string& layerName);
-    FieldIndexes getFields();
-    void getFileInfo(FileInfo& info);
-    bool createFeature(const FieldIndexes& indexes, FileInfo& info);
-    pdal::Polygon prepareGeometry(const FileInfo& fileInfo);
-    void createFields();
-    void setStringField(OGRFeatureH hFeature, int idx, const char* value);
-    void fastBoundary(Stage& reader, FileInfo& fileInfo);
-    std::string makeMultiPolygon(const std::string& wkt);
-
-    bool isFileIndexed(const FieldIndexes& indexes, const FileInfo& fileInfo);
-
     std::string m_idxFilename;
     std::string m_filespec;
-    StringList m_files;
     std::string m_listfile;
     std::string m_layerName;
     std::string m_driverName;
     std::string m_tileIndexColumnName;
-    std::string m_srsColumnName;
     std::string m_wkt;
     StringList m_lcOptions;
     BOX2D m_bounds;
@@ -130,16 +70,12 @@ private:
     uint32_t m_sampleSize;
     std::string m_boundaryExpr;
 
-    OGRDataSourceH m_dataset;
-    OGRLayerH m_layer;
     std::string m_tgtSrsString;
     std::string m_assignSrsString;
     bool m_fastBoundary;
     bool m_usestdin;
     bool m_overrideASrs;
     bool m_skipMultiSrs;
-    std::string m_originalSrs;
-    size_t m_maxFieldSize;
 };
 
 } // namespace pdal
