@@ -697,6 +697,16 @@ extern "C"
                                       double* xs, double* ys, double* zs,
                                       size_t len);
 
+    typedef struct pdal_topocentric_transform pdal_topocentric_transform_t;
+    pdal_topocentric_transform_t* pdal_topocentric_create(double lat0,
+                                                          double lon0,
+                                                          double h0);
+    void pdal_topocentric_destroy(pdal_topocentric_transform_t* handle);
+    bool pdal_topocentric_forward(const pdal_topocentric_transform_t* handle,
+                                  double* x, double* y, double* z);
+    bool pdal_topocentric_reverse(const pdal_topocentric_transform_t* handle,
+                                  double* x, double* y, double* z);
+
     // XML schema
     char* pdal_xml_schema_remap_old_name(const char* name);
 

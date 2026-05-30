@@ -223,6 +223,78 @@ impl SrsTransform {
     }
 }
 
+/// A local-cartesian (topocentric ENU) transform around an anchor lat/lon/h on
+/// the WGS84 ellipsoid, ported from the C++ `filters/private/georeference`
+/// `LocalCartesian`. Forward maps geocentric (ECEF) XYZ to local ENU; reverse
+/// maps local ENU back to ECEF. Implemented directly over PROJ's
+/// `+proj=topocentric` pipeline (3D), since the `proj` crate's high-level
+/// `convert` is 2D only.
+pub struct TopocentricTransform {
+    ctx: *mut proj_sys::pj_ctx,
+    pj: *mut proj_sys::PJconsts,
+}
+
+impl TopocentricTransform {
+    pub fn new(lat0: f64, lon0: f64, h0: f64) -> Result<Self, String> {
+        // Match the C++ definition string byte-for-byte (fixed, 12 digits).
+        let def = format!(
+            "+proj=topocentric +ellps=WGS84 +lon_0={lon0:.12} +lat_0={lat0:.12} +h_0={h0:.12}"
+        );
+        let c_def = CString::new(def).map_err(|_| "topocentric def has NUL".to_string())?;
+        unsafe {
+            let ctx = proj_sys::proj_context_create();
+            if ctx.is_null() {
+                return Err("proj_context_create failed".into());
+            }
+            let pj = proj_sys::proj_create(ctx, c_def.as_ptr());
+            if pj.is_null() {
+                proj_sys::proj_context_destroy(ctx);
+                return Err("proj_create failed for topocentric pipeline".into());
+            }
+            Ok(Self { ctx, pj })
+        }
+    }
+
+    fn trans(&self, dir: proj_sys::PJ_DIRECTION, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+        unsafe {
+            let mut coord = proj_sys::PJ_COORD {
+                xyzt: proj_sys::PJ_XYZT {
+                    x,
+                    y,
+                    z,
+                    t: f64::INFINITY,
+                },
+            };
+            coord = proj_sys::proj_trans(self.pj, dir, coord);
+            let xyzt = coord.xyzt;
+            (xyzt.x, xyzt.y, xyzt.z)
+        }
+    }
+
+    /// ECEF -> local ENU.
+    pub fn forward(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+        self.trans(proj_sys::PJ_DIRECTION_PJ_FWD, x, y, z)
+    }
+
+    /// Local ENU -> ECEF.
+    pub fn reverse(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+        self.trans(proj_sys::PJ_DIRECTION_PJ_INV, x, y, z)
+    }
+}
+
+impl Drop for TopocentricTransform {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.pj.is_null() {
+                proj_sys::proj_destroy(self.pj);
+            }
+            if !self.ctx.is_null() {
+                proj_sys::proj_context_destroy(self.ctx);
+            }
+        }
+    }
+}
+
 pub fn version() -> String {
     unsafe {
         let info = proj_sys::proj_info();
@@ -794,6 +866,29 @@ mod tests {
     #[test]
     fn proj_version_is_available() {
         assert!(!version().is_empty());
+    }
+
+    #[test]
+    fn topocentric_round_trips_and_anchors_at_origin() {
+        // Anchor near Portland, OR.
+        let t = TopocentricTransform::new(45.0, -123.0, 100.0).unwrap();
+        // ECEF coordinates of the anchor itself (computed from WGS84):
+        // forward should map the anchor's ECEF to ~(0,0,0) ENU.
+        // Instead of hardcoding ECEF, verify the forward/reverse round-trip is
+        // an identity for an arbitrary ECEF point, and that reverse(0,0,0)
+        // followed by forward returns the origin.
+        let (ox, oy, oz) = t.reverse(0.0, 0.0, 0.0); // ENU origin -> ECEF anchor
+        let (ex, ey, ez) = t.forward(ox, oy, oz); // back to ENU
+        assert!(ex.abs() < 1e-6, "east {ex}");
+        assert!(ey.abs() < 1e-6, "north {ey}");
+        assert!(ez.abs() < 1e-6, "up {ez}");
+
+        // Round-trip an arbitrary local point.
+        let (rx, ry, rz) = t.reverse(10.0, -20.0, 5.0);
+        let (bx, by, bz) = t.forward(rx, ry, rz);
+        assert!((bx - 10.0).abs() < 1e-6, "east {bx}");
+        assert!((by + 20.0).abs() < 1e-6, "north {by}");
+        assert!((bz - 5.0).abs() < 1e-6, "up {bz}");
     }
 
     #[test]

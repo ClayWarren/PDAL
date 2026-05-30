@@ -33,8 +33,8 @@
  ****************************************************************************/
 
 #include "LocalCartesian.hpp"
-#include <ogr_spatialref.h>
-#include <ostream>
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -43,46 +43,32 @@ namespace georeference
 
 LocalCartesian::LocalCartesian(const double lat0, const double lon0,
                                const double h0)
-    : m_ctx(proj_context_create()), m_ecef2enu(nullptr)
+    : m_handle(nullptr)
 {
     reset(lat0, lon0, h0);
 }
 
 LocalCartesian::~LocalCartesian()
 {
-
-    proj_destroy(m_ecef2enu);
-    proj_context_destroy(m_ctx);
+    pdal_topocentric_destroy(m_handle);
 }
 
 void LocalCartesian::reset(const double lat0, const double lon0,
                            const double h0)
 {
-    if (m_ecef2enu)
-        proj_destroy(m_ecef2enu);
-    std::stringstream ss;
-    ss << std::fixed << std::setprecision(12)
-       << "+proj=topocentric +ellps=WGS84"
-       << " +lon_0=" << lon0 << " +lat_0=" << lat0 << " +h_0=" << h0;
-    m_ecef2enu = proj_create(m_ctx, ss.str().c_str());
+    if (m_handle)
+        pdal_topocentric_destroy(m_handle);
+    m_handle = pdal_topocentric_create(lat0, lon0, h0);
 }
 
 void LocalCartesian::forward(double& x, double& y, double& z) const
 {
-    PJ_COORD c = {{x, y, z, HUGE_VAL}};
-    c = proj_trans(m_ecef2enu, PJ_FWD, c);
-    x = c.v[0];
-    y = c.v[1];
-    z = c.v[2];
+    pdal_topocentric_forward(m_handle, &x, &y, &z);
 }
 
 void LocalCartesian::reverse(double& x, double& y, double& z) const
 {
-    PJ_COORD c = {{x, y, z, HUGE_VAL}};
-    c = proj_trans(m_ecef2enu, PJ_INV, c);
-    x = c.v[0];
-    y = c.v[1];
-    z = c.v[2];
+    pdal_topocentric_reverse(m_handle, &x, &y, &z);
 }
 
 void LocalCartesian::forward(PointRef& point) const

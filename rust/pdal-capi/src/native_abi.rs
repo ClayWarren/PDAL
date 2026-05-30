@@ -910,6 +910,111 @@ pub unsafe extern "C" fn pdal_srs_transform_destroy(handle: *mut pdal_srs_transf
     }
 }
 
+/// Opaque handle wrapping a local-cartesian (topocentric ENU) transform around
+/// an anchor lat/lon/h on WGS84. Backs the C++ `georeference::LocalCartesian`.
+/// Construct with `pdal_topocentric_create`; release with
+/// `pdal_topocentric_destroy`.
+#[allow(non_camel_case_types)]
+pub struct pdal_topocentric_transform_t {
+    inner: srs::TopocentricTransform,
+}
+
+/// Create a topocentric transform anchored at `lat0`/`lon0` (degrees) and `h0`
+/// (metres). Returns `null` on error and sets the last error message.
+///
+/// # Safety
+///
+/// The returned pointer is owned by the caller and must be released with
+/// `pdal_topocentric_destroy`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_topocentric_create(
+    lat0: f64,
+    lon0: f64,
+    h0: f64,
+) -> *mut pdal_topocentric_transform_t {
+    ffi_catch(
+        std::ptr::null_mut(),
+        || match srs::TopocentricTransform::new(lat0, lon0, h0) {
+            Ok(inner) => Box::into_raw(Box::new(pdal_topocentric_transform_t { inner })),
+            Err(err) => {
+                set_last_error(err);
+                std::ptr::null_mut()
+            }
+        },
+    )
+}
+
+/// Free a handle returned by `pdal_topocentric_create`. Safe to pass `null`.
+///
+/// # Safety
+///
+/// `handle` must have come from `pdal_topocentric_create` and not been
+/// destroyed already.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_topocentric_destroy(handle: *mut pdal_topocentric_transform_t) {
+    if !handle.is_null() {
+        drop(Box::from_raw(handle));
+    }
+}
+
+/// Forward transform a single XYZ point in place: geocentric (ECEF) -> local
+/// ENU. Returns false on null handle/pointers.
+///
+/// # Safety
+///
+/// `handle` must come from `pdal_topocentric_create`. `x`/`y`/`z` must be
+/// non-null and valid for read+write.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_topocentric_forward(
+    handle: *const pdal_topocentric_transform_t,
+    x: *mut f64,
+    y: *mut f64,
+    z: *mut f64,
+) -> bool {
+    ffi_catch(false, || {
+        let Some(handle) = handle.as_ref() else {
+            return false;
+        };
+        let (Some(x), Some(y), Some(z)) = (x.as_mut(), y.as_mut(), z.as_mut()) else {
+            return false;
+        };
+        let (nx, ny, nz) = handle.inner.forward(*x, *y, *z);
+        *x = nx;
+        *y = ny;
+        *z = nz;
+        true
+    })
+}
+
+/// Reverse transform a single XYZ point in place: local ENU -> geocentric
+/// (ECEF). Returns false on null handle/pointers.
+///
+/// # Safety
+///
+/// `handle` must come from `pdal_topocentric_create`. `x`/`y`/`z` must be
+/// non-null and valid for read+write.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_topocentric_reverse(
+    handle: *const pdal_topocentric_transform_t,
+    x: *mut f64,
+    y: *mut f64,
+    z: *mut f64,
+) -> bool {
+    ffi_catch(false, || {
+        let Some(handle) = handle.as_ref() else {
+            return false;
+        };
+        let (Some(x), Some(y), Some(z)) = (x.as_mut(), y.as_mut(), z.as_mut()) else {
+            return false;
+        };
+        let (nx, ny, nz) = handle.inner.reverse(*x, *y, *z);
+        *x = nx;
+        *y = ny;
+        *z = nz;
+        true
+    })
+}
+
 /// Transform a single XYZ point in place. Returns false on null handle or
 /// GDAL-reported failure.
 ///

@@ -37,7 +37,11 @@
 #include <pdal/PointRef.hpp>
 
 #include <memory>
-#include <proj.h>
+
+// The topocentric ENU transform is implemented in Rust behind the C ABI
+// (`pdal_topocentric_*`); this C++ class is a thin delegator. Forward-declare
+// the opaque handle so the header stays free of the C ABI / PROJ includes.
+struct pdal_topocentric_transform;
 
 namespace pdal
 {
@@ -45,8 +49,7 @@ namespace georeference
 {
 class LocalCartesian
 {
-    PJ_CONTEXT* m_ctx;
-    PJ* m_ecef2enu;
+    pdal_topocentric_transform* m_handle;
 
 public:
     LocalCartesian(double lat0, double lon0, double h0 = 0.0);
