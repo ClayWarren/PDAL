@@ -266,8 +266,9 @@ add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
 add_dependencies(${PDAL_LIB_NAME} pdal_rust_capi)
 
 target_include_directories(${PDAL_LIB_NAME}
-    PRIVATE
-        ${RUST_CAPI_HEADER_DIR}
+    PUBLIC
+        $<BUILD_INTERFACE:${RUST_CAPI_HEADER_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 #

@@ -22,6 +22,8 @@ extern "C"
     typedef struct pdal_quad_index pdal_quad_index_t;
     typedef struct pdal_deflate_compressor pdal_deflate_compressor_t;
     typedef struct pdal_deflate_decompressor pdal_deflate_decompressor_t;
+    typedef struct pdal_zstd_compressor pdal_zstd_compressor_t;
+    typedef struct pdal_zstd_decompressor pdal_zstd_decompressor_t;
     typedef struct pdal_thread_pool pdal_thread_pool_t;
     typedef struct pdal_stage_extensions pdal_stage_extensions_t;
     typedef struct pdal_artifact_manager pdal_artifact_manager_t;
@@ -103,9 +105,8 @@ extern "C"
     int32_t pdal_ept_addon_write(const pdal_point_view_t* view,
                                  const char* node_id_dim,
                                  const char* point_id_dim,
-                                 const char* source_dim,
-                                 const char* addon_file, int32_t addon_type,
-                                 uint64_t hierarchy_step,
+                                 const char* source_dim, const char* addon_file,
+                                 int32_t addon_type, uint64_t hierarchy_step,
                                  const pdal_ept_root_bounds_t* root_bounds,
                                  const pdal_ept_overlap_t* overlaps,
                                  uint64_t overlap_count);
@@ -197,7 +198,8 @@ extern "C"
     void* pdal_column_storage_dim_slot(pdal_column_storage_t* handle,
                                        uint64_t dim_order, uint64_t dim_size,
                                        uint64_t idx);
-    uint64_t pdal_column_storage_num_points(const pdal_column_storage_t* handle);
+    uint64_t
+    pdal_column_storage_num_points(const pdal_column_storage_t* handle);
     char* pdal_file_utils_getcwd();
     char* pdal_file_utils_to_absolute_path(const char* filename);
     char* pdal_file_utils_to_absolute_path_with_base(const char* filename,
@@ -263,6 +265,22 @@ extern "C"
                                      uint8_t** out_buf, size_t* out_len);
     void pdal_deflate_decompressor_destroy(
         pdal_deflate_decompressor_t* decompressor);
+
+    // Streaming Zstandard compression
+    pdal_zstd_compressor_t* pdal_zstd_compressor_create(int32_t level);
+    bool pdal_zstd_compressor_update(pdal_zstd_compressor_t* compressor,
+                                     const char* buf, size_t len,
+                                     uint8_t** out_buf, size_t* out_len);
+    bool pdal_zstd_compressor_finish(pdal_zstd_compressor_t* compressor,
+                                     uint8_t** out_buf, size_t* out_len);
+    void pdal_zstd_compressor_destroy(pdal_zstd_compressor_t* compressor);
+    pdal_zstd_decompressor_t* pdal_zstd_decompressor_create();
+    bool pdal_zstd_decompressor_update(pdal_zstd_decompressor_t* decompressor,
+                                       const char* buf, size_t len,
+                                       uint8_t** out_buf, size_t* out_len);
+    bool pdal_zstd_decompressor_finish(pdal_zstd_decompressor_t* decompressor,
+                                       uint8_t** out_buf, size_t* out_len);
+    void pdal_zstd_decompressor_destroy(pdal_zstd_decompressor_t* decompressor);
 
     typedef struct
     {
@@ -705,9 +723,8 @@ extern "C"
     bool pdal_gridpnp_inside(const pdal_gridpnp_t* handle, double x, double y);
 
     typedef struct pdal_topocentric_transform pdal_topocentric_transform_t;
-    pdal_topocentric_transform_t* pdal_topocentric_create(double lat0,
-                                                          double lon0,
-                                                          double h0);
+    pdal_topocentric_transform_t*
+    pdal_topocentric_create(double lat0, double lon0, double h0);
     void pdal_topocentric_destroy(pdal_topocentric_transform_t* handle);
     bool pdal_topocentric_forward(const pdal_topocentric_transform_t* handle,
                                   double* x, double* y, double* z);
@@ -872,9 +889,9 @@ extern "C"
                            const int32_t* hexes, uint64_t pair_count,
                            uint64_t precision);
     char* pdal_h3grid_wkt(uint8_t resolution, int32_t dense_limit,
-                          double origin_lat_degrees,
-                          double origin_lng_degrees, const int32_t* hexes,
-                          uint64_t pair_count, uint64_t precision);
+                          double origin_lat_degrees, double origin_lng_degrees,
+                          const int32_t* hexes, uint64_t pair_count,
+                          uint64_t precision);
     pdal_stage_t* pdal_stage_create_faceraster(const pdal_options_t* ops);
     pdal_stage_t* pdal_stage_create_radialdensity(double radius);
     pdal_stage_t* pdal_stage_create_nndistance(uint64_t k, const char* mode);
@@ -904,16 +921,12 @@ extern "C"
         bool negate;
     } pdal_dim_range_t;
 
-    pdal_stage_t* pdal_stage_create_smrf(double cell, double slope,
-                                         bool has_window, double window,
-                                         double scalar, double threshold,
-                                         double cut, uint8_t ground_class,
-                                         uint8_t other_class, bool only_ground,
-                                         const char* const* returns,
-                                         uint64_t count,
-                                         const pdal_dim_range_t* ignore,
-                                         uint64_t ignore_count,
-                                         uint8_t classbits);
+    pdal_stage_t* pdal_stage_create_smrf(
+        double cell, double slope, bool has_window, double window,
+        double scalar, double threshold, double cut, uint8_t ground_class,
+        uint8_t other_class, bool only_ground, const char* const* returns,
+        uint64_t count, const pdal_dim_range_t* ignore, uint64_t ignore_count,
+        uint8_t classbits);
     pdal_stage_t* pdal_stage_create_pmf(
         double cell_size, bool exponential, double initial_distance,
         double max_distance, double max_window_size, double slope,
@@ -987,12 +1000,10 @@ extern "C"
     void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
     uint64_t* pdal_delaunay_triangulate(const pdal_point_view_t* view,
                                         uint64_t* out_len);
-    uint64_t* pdal_greedyprojection_triangulate(const pdal_point_view_t* view,
-                                                double mu, double search_radius,
-                                                uint64_t nnn, double min_angle,
-                                                double max_angle, double eps_angle,
-                                                bool consistent,
-                                                uint64_t* out_len);
+    uint64_t* pdal_greedyprojection_triangulate(
+        const pdal_point_view_t* view, double mu, double search_radius,
+        uint64_t nnn, double min_angle, double max_angle, double eps_angle,
+        bool consistent, uint64_t* out_len);
     pdal_point_view_t* pdal_icp_register(
         const pdal_point_view_t* fixed, const pdal_point_view_t* moving,
         int32_t max_iters, int32_t max_similar, double rotation_threshold,

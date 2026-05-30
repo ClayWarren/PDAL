@@ -23,7 +23,7 @@ pub struct DeflateDecompressorHandle {
 ///
 /// An empty vector yields a NULL pointer with `*out_len = 0`. Any non-NULL
 /// pointer must be released with `pdal_u8_array_free`.
-unsafe fn emit_bytes(bytes: Vec<u8>, out_buf: *mut *mut u8, out_len: *mut usize) {
+pub(crate) unsafe fn emit_bytes(bytes: Vec<u8>, out_buf: *mut *mut u8, out_len: *mut usize) {
     if !out_len.is_null() {
         *out_len = bytes.len();
     }

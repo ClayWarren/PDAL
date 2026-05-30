@@ -51,6 +51,7 @@ mod uuid_abi;
 mod vsi_abi;
 mod writer_abi;
 mod xml_schema_abi;
+mod zstd_abi;
 
 pub use artifact_abi::*;
 pub use column_storage_abi::*;
@@ -96,6 +97,7 @@ pub use uuid_abi::*;
 pub use vsi_abi::*;
 pub use writer_abi::*;
 pub use xml_schema_abi::*;
+pub use zstd_abi::*;
 
 #[cfg(test)]
 mod tests;
