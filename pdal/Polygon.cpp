@@ -42,14 +42,15 @@
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
-#include "../filters/private/pnp/GridPnp.hpp"
-
 namespace pdal
 {
 
+// PrivateData previously cached GridPnp point-in-polygon grids, but
+// Polygon::covers/contains now evaluate through the Rust GEOS C ABI
+// (pdal_geometry_wkt_covers_point/contains_point), so the grids were built and
+// never read. The struct is kept (empty) to preserve the m_pd pimpl shape.
 struct Polygon::PrivateData
 {
-    std::vector<GridPnp> m_grids;
 };
 
 Polygon::Polygon()
@@ -74,6 +75,11 @@ void Polygon::PrivateDataDeleter::operator()(PrivateData* pd)
     delete pd;
 }
 
+// Retained as an exported (PDAL_EXPORT) API symbol. It formerly populated a
+// GridPnp point-in-polygon cache, but covers()/contains() now evaluate through
+// the Rust GEOS C ABI, so there is nothing to precompute.
+void Polygon::initGrids() const {}
+
 void Polygon::init()
 {
     m_pd.reset(new PrivateData());
@@ -96,11 +102,6 @@ void Polygon::init()
     }
 }
 
-void Polygon::initGrids() const
-{
-    for (const Polygon& p : polygons())
-        m_pd->m_grids.emplace_back(p.exteriorRing(), p.interiorRings());
-}
 
 Polygon::Polygon(const std::string& wkt_or_json, SpatialReference ref)
     : Geometry(wkt_or_json, ref), m_pd(new PrivateData)
@@ -145,10 +146,7 @@ Polygon& Polygon::operator=(const Polygon& src)
     return *this;
 }
 
-void Polygon::modified()
-{
-    m_pd->m_grids.clear();
-}
+void Polygon::modified() {}
 
 void Polygon::clear()
 {
