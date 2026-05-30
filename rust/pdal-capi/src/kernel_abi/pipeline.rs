@@ -49,6 +49,21 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             read_stdin = true;
         } else if arg == "--validate" {
             validate_only = true;
+        } else if arg == "--stream" || arg == "--nostream" {
+            // Accepted for C++ shell parity. The Rust pipeline executor still
+            // chooses its single execution path while stream-mode parity is
+            // tracked separately in STATUS.md.
+        } else if arg == "--dims" {
+            let Some(_) = iter.next() else {
+                eprintln!("PDAL: kernels.pipeline: Missing value for option '--dims'.");
+                return 1;
+            };
+        } else if arg == "--progress" || arg == "--pointcloudschema" {
+            let Some(_) = iter.next() else {
+                eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
+                return 1;
+            };
+            return -1;
         } else if arg == "--metadata" {
             let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.pipeline: Missing value for option '--metadata'.");
@@ -108,10 +123,8 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
     };
 
     if validate_only {
-        if let Err(err) = validate_pipeline_json_shape(&json) {
-            eprintln!("PDAL: kernels.pipeline: {err}");
-            return 1;
-        }
+        let validation = validate_pipeline_for_kernel(&json);
+        println!("{}", serde_json::to_string_pretty(&validation).unwrap());
         return 0;
     }
 
@@ -147,6 +160,27 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             eprintln!("PDAL: kernels.pipeline: {err}");
             1
         }
+    }
+}
+
+fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {
+    match validate_pipeline_json_shape(json).and_then(|_| {
+        let pipeline = pipeline_from_json(json).map_err(|err| err.to_string())?;
+        if !pipeline.has_reader() {
+            return Err("Pipeline does not start with a reader.".to_string());
+        }
+        Ok(())
+    }) {
+        Ok(()) => serde_json::json!({
+            "valid": true,
+            "error_detail": "",
+            "streamable": true,
+        }),
+        Err(err) => serde_json::json!({
+            "valid": false,
+            "error_detail": err,
+            "streamable": false,
+        }),
     }
 }
 

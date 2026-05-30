@@ -430,6 +430,10 @@ impl Pipeline {
         self.nodes.is_empty()
     }
 
+    pub fn has_reader(&self) -> bool {
+        self.nodes.iter().any(|node| node.kind == StageKind::Reader)
+    }
+
     pub fn stage(&self, idx: usize) -> Option<&StageNode> {
         self.nodes.get(idx)
     }

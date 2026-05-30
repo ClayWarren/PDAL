@@ -35,9 +35,6 @@
 #pragma once
 
 #include <pdal/Kernel.hpp>
-#include <pdal/PipelineManager.hpp>
-#include <pdal/PipelineWriter.hpp>
-#include <pdal/util/FileUtils.hpp>
 
 namespace pdal
 {
@@ -60,7 +57,6 @@ private:
     bool m_validate;
     std::string m_PointCloudSchemaOutput;
     std::string m_progressFile;
-    int m_progressFd;
     bool m_usestdin;
     bool m_stream;
     bool m_noStream;

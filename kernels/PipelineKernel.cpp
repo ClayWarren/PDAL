@@ -36,12 +36,10 @@
 
 #include "PipelineKernel.hpp"
 
-#ifdef PDAL_HAVE_LIBXML2
-#include <pdal/XMLSchema.hpp>
-#endif
+#include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <nlohmann/json.hpp>
-#include <pdal/PDALUtils.hpp>
+#include <sstream>
+#include <vector>
 
 namespace pdal
 {
@@ -56,7 +54,7 @@ std::string PipelineKernel::getName() const
     return s_info.name;
 }
 
-PipelineKernel::PipelineKernel() : m_validate(false), m_progressFd(-1) {}
+PipelineKernel::PipelineKernel() : m_validate(false) {}
 
 void PipelineKernel::validateSwitches(ProgramArgs& args)
 {
@@ -109,75 +107,57 @@ void PipelineKernel::addSwitches(ProgramArgs& args)
 
 int PipelineKernel::execute()
 {
-    if (!Utils::fileExists(m_inputFile))
-        throw pdal_error("file not found: " + m_inputFile);
-    if (m_progressFile.size())
-    {
-        m_progressFd = Utils::openProgress(m_progressFile);
-        m_manager.setProgressFd(m_progressFd);
-    }
-
+    StringList args;
+    if (m_usestdin)
+        args.push_back("--stdin");
+    else
+        args.push_back(m_inputFile);
     if (m_validate)
+        args.push_back("--validate");
+    if (m_pipelineFile.size())
     {
-        NL::json root;
-        // Validate the options of the pipeline we were
-        // given, and once we succeed, we're done
-        try
-        {
-            m_manager.readPipeline(m_inputFile);
-            if (!m_manager.hasReader())
-                throw pdal_error("Pipeline does not start with a reader.");
-            m_manager.prepare();
-            root["valid"] = true;
-            root["error_detail"] = "";
-            root["streamable"] = m_manager.pipelineStreamable();
-        }
-        catch (pdal::pdal_error const& e)
-        {
-            root["valid"] = false;
-            root["error_detail"] = e.what();
-            root["streamable"] = false;
-        }
-        Utils::closeProgress(m_progressFd);
-        std::cout << root.dump(4) << "\n";
-        return 0;
+        args.push_back("--pipeline-serialization");
+        args.push_back(m_pipelineFile);
     }
-
-    m_manager.readPipeline(m_inputFile);
-    if (!m_manager.hasReader())
-        throw pdal_error("Pipeline does not start with a reader.");
-    m_manager.pointTable().layout()->setAllowedDims(m_dimNames);
-    if (m_manager.execute(m_mode).m_mode == ExecMode::None)
-        throw pdal_error("Couldn't run pipeline in requested execution mode.");
-
     if (m_metadataFile.size())
     {
-        std::ostream* out = Utils::createFile(m_metadataFile, false);
-        if (!out)
-            throw pdal_error("Can't open file '" + m_metadataFile +
-                             "' for metadata output.");
-        Utils::toJSON(m_manager.getMetadata(), *out);
-        Utils::closeFile(out);
+        args.push_back("--metadata");
+        args.push_back(m_metadataFile);
     }
-    if (m_pipelineFile.size())
-        PipelineWriter::writePipeline(m_manager.getStage(), m_pipelineFile);
-
-    if (m_PointCloudSchemaOutput.size() > 0)
+    if (m_stream)
+        args.push_back("--stream");
+    if (m_noStream)
+        args.push_back("--nostream");
+    if (m_dimNames.size())
     {
-#ifdef PDAL_HAVE_LIBXML2
-        XMLSchema schema(m_manager.pointTable().layout());
-
-        std::ostream* out = Utils::createFile(m_PointCloudSchemaOutput);
-        std::string xml(schema.xml());
-        out->write(xml.c_str(), xml.size());
-        Utils::closeFile(out);
-#else
-        std::cerr << "libxml2 support not available, no schema is produced"
-                  << std::endl;
-#endif
+        std::ostringstream dims;
+        for (size_t i = 0; i < m_dimNames.size(); ++i)
+        {
+            if (i)
+                dims << ',';
+            dims << m_dimNames[i];
+        }
+        args.push_back("--dims");
+        args.push_back(dims.str());
     }
-    Utils::closeProgress(m_progressFd);
-    return 0;
+    if (m_progressFile.size())
+    {
+        args.push_back("--progress");
+        args.push_back(m_progressFile);
+    }
+    if (m_PointCloudSchemaOutput.size())
+    {
+        args.push_back("--pointcloudschema");
+        args.push_back(m_PointCloudSchemaOutput);
+    }
+
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
+
+    return pdal_rust_kernel_run("pipeline", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal
