@@ -201,8 +201,12 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 | holdout | 339 | 4 |
 | total | 63,123 | 551 |
 
-Port-candidate backlog by area: `pdal` 9,332 · `io` 7,979 · `filters` 4,465 ·
-`kernels` 2,313 · `tools` 62. (A dead-code sweep removed the orphaned C++
+Port-candidate backlog by area: `pdal` 9,332 · `io` 8,336 · `filters` 4,465 ·
+`kernels` 3,169. `apps` and `tools` are now at 0 (apps is a thin entry-point
+peer; the only `tools` entry the audit had been counting was the in-tree
+GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
+implementation — the audit now excludes files including `pdal_test_main.hpp`).
+(A dead-code sweep removed the orphaned C++
 delaunator, CSF, miniball, straighten, mongoexpression, and DisjointSet
 implementations once their filters routed through Rust, plus the genuinely-dead
 non-exported `io/PcdHeader.cpp`, `io/FbiHeader.cpp` dumper, and the non-exported

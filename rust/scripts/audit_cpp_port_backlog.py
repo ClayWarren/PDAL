@@ -79,6 +79,20 @@ HOLDOUTS = {
 }
 
 
+# GoogleTest harness header included by every in-tree C++ test. Files that
+# include it are behavioral-contract tests, not portable implementation, and
+# must be excluded from the backlog even when they live under a mainline area
+# (e.g. `tools/nitfwrap/NitfWrapTest.cpp`) rather than under `test/`.
+TEST_MARKER = "pdal_test_main.hpp"
+
+
+def is_in_tree_test(path: str) -> bool:
+    try:
+        return TEST_MARKER in Path(path).read_text(errors="replace")
+    except OSError:
+        return False
+
+
 def list_source_files(areas: list[str]) -> list[str]:
     out = subprocess.run(
         ["git", "ls-files", *areas],
@@ -88,7 +102,7 @@ def list_source_files(areas: list[str]) -> list[str]:
     )
     files = []
     for path in out.stdout.splitlines():
-        if path.endswith(SOURCE_EXTS):
+        if path.endswith(SOURCE_EXTS) and not is_in_tree_test(path):
             files.append(path)
     return sorted(files)
 
