@@ -43,6 +43,11 @@ struct HexBinState {
     point_count: u64,
     dense_hex_count: u64,
     dense_point_count: u64,
+    /// `sample_size` to report in metadata. When the edge length is estimated
+    /// and the input has fewer points than the requested sample size, hexer
+    /// runs out of sample points and reports the actual count instead, matching
+    /// `HexBinFilter`/`BaseGrid::computeHexSize`.
+    effective_sample_size: u64,
 }
 
 impl HexBinFilter {
@@ -203,6 +208,12 @@ impl Filter for HexBinFilter {
             ]
         };
 
+        let effective_sample_size = if self.edge_length.is_none() && xy.len() < self.sample_size {
+            xy.len() as u64
+        } else {
+            self.sample_size as u64
+        };
+
         self.state = Some(HexBinState {
             height: grid.height(),
             width: grid.width(),
@@ -211,6 +222,7 @@ impl Filter for HexBinFilter {
             point_count: xy.len() as u64,
             dense_hex_count,
             dense_point_count,
+            effective_sample_size,
         });
 
         // hexbin is a pass-through filter: it writes side files and computes
@@ -221,7 +233,12 @@ impl Filter for HexBinFilter {
     fn metadata(&self) -> MetadataNode {
         let mut node = MetadataNode::new("filters.hexbin");
         node.add_value("threshold", MetadataValue::U64(self.threshold as u64));
-        node.add_value("sample_size", MetadataValue::U64(self.sample_size as u64));
+        let sample_size = self
+            .state
+            .as_ref()
+            .map(|s| s.effective_sample_size)
+            .unwrap_or(self.sample_size as u64);
+        node.add_value("sample_size", MetadataValue::U64(sample_size));
         node.add_value(
             "edge_length",
             MetadataValue::F64(self.edge_length.unwrap_or(0.0)),
