@@ -34,8 +34,9 @@
 
 #include "MergeKernel.hpp"
 
-#include <filters/MergeFilter.hpp>
-#include <pdal/StageFactory.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
@@ -65,20 +66,22 @@ void MergeKernel::validateSwitches(ProgramArgs& args)
 
 int MergeKernel::execute()
 {
-    MergeFilter filter;
-
-    for (size_t i = 0; i < m_files.size(); ++i)
+    StringList args;
+    if (!m_driverOverride.empty())
     {
-        Stage& reader = makeReader(m_files[i], m_driverOverride);
-        filter.setInput(reader);
+        args.push_back("--driver");
+        args.push_back(m_driverOverride);
     }
+    args.insert(args.end(), m_files.begin(), m_files.end());
+    args.push_back(m_outputFile);
 
-    Stage& writer = makeWriter(m_outputFile, filter, "");
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    ColumnPointTable table;
-    writer.prepare(table);
-    writer.execute(table);
-    return 0;
+    return pdal_rust_kernel_run("merge", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

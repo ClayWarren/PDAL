@@ -34,7 +34,9 @@
 
 #include "SortKernel.hpp"
 
-#include <pdal/Stage.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
@@ -66,21 +68,26 @@ void SortKernel::addSwitches(ProgramArgs& args)
 
 int SortKernel::execute()
 {
-    Stage& readerStage = makeReader(m_inputFile, m_driverOverride);
-    Stage& sortStage = makeFilter("filters.mortonorder", readerStage);
-
-    Options writerOptions;
+    StringList args;
+    if (!m_driverOverride.empty())
+    {
+        args.push_back("--driver");
+        args.push_back(m_driverOverride);
+    }
+    args.push_back(m_inputFile);
+    args.push_back(m_outputFile);
     if (m_bCompress)
-        writerOptions.add("compression", true);
+        args.push_back("--writers.las.compression=true");
     if (m_bForwardMetadata)
-        writerOptions.add("forward_metadata", true);
-    Stage& writer = makeWriter(m_outputFile, sortStage, "", writerOptions);
+        args.push_back("--writers.las.forward_metadata=true");
 
-    ColumnPointTable table;
-    writer.prepare(table);
-    writer.execute(table);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    return 0;
+    return pdal_rust_kernel_run("sort", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

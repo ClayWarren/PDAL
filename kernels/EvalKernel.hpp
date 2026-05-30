@@ -182,7 +182,6 @@ public:
 private:
     void addSwitches(ProgramArgs& args) override;
     void validateSwitches(ProgramArgs& args) override;
-    PointViewPtr loadSet(const std::string& filename, PointTableRef table);
 
     std::string m_predictedFile;
     std::string m_truthFile;
@@ -190,8 +189,6 @@ private:
 
     std::string m_predictedDimName;
     std::string m_truthDimName;
-    Dimension::Id m_predictedDimId;
-    Dimension::Id m_truthDimId;
 };
 
 } // namespace pdal

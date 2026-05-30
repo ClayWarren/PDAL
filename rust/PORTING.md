@@ -144,6 +144,8 @@ Current active milestone:
 2. Work down the compatibility-wrapper surface: where a C++ test now routes
    through Rust, replace any remaining meaningful C++ implementation behind the
    wrapper or record why it is an intentional holdout.
+   Exported C++ classes may remain as public API/ABI shells, but their behavior
+   should delegate to the Rust C ABI once the Rust implementation is ready.
 3. Keep hardening the Rust-backed local I/O and command surface that already
    exists: regression coverage, option parity, metadata/bounds behavior, and
    error/output shape.

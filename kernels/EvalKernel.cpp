@@ -34,10 +34,9 @@
 
 #include "EvalKernel.hpp"
 
-#include <pdal/KDIndex.hpp>
-#include <pdal/PDALUtils.hpp>
-#include <pdal/pdal_config.hpp>
-#include <pdal/util/ProgramArgs.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
@@ -79,106 +78,33 @@ void EvalKernel::validateSwitches(ProgramArgs& args)
             "Must specify comma-separated list of labels to evaluate.");
 }
 
-PointViewPtr EvalKernel::loadSet(const std::string& filename,
-                                 PointTableRef table)
-{
-    Stage& reader = makeReader(filename, "");
-    reader.prepare(table);
-    PointViewSet viewSet = reader.execute(table);
-    assert(viewSet.size() == 1);
-    return *viewSet.begin();
-}
-
 int EvalKernel::execute()
 {
-    ColumnPointTable predictedTable;
-    PointViewPtr predictedView = loadSet(m_predictedFile, predictedTable);
-    PointLayoutPtr predictedLayout(predictedTable.layout());
-    m_predictedDimId = predictedLayout->findDim(m_predictedDimName);
-    if (m_predictedDimId == Dimension::Id::Unknown)
-        throw pdal_error("Predicted dimension '" + m_predictedDimName +
-                         "' does not exist.");
+    StringList args;
+    args.push_back(m_predictedFile);
+    args.push_back(m_truthFile);
 
-    ColumnPointTable truthTable;
-    PointViewPtr truthView = loadSet(m_truthFile, truthTable);
-    PointLayoutPtr truthLayout(truthTable.layout());
-    m_truthDimId = truthLayout->findDim(m_truthDimName);
-    if (m_truthDimId == Dimension::Id::Unknown)
-        throw pdal_error("Truth dimension '" + m_truthDimName +
-                         "' does not exist.");
-
-    assert(predictedView->size() == truthView->size());
-
-    KD3Index& kdi = truthView->build3dIndex();
-
-    int dim = m_labelStrList.size();
-
-    std::vector<int> labelList;
-    for (auto const& label : m_labelStrList)
-        labelList.push_back(std::stoi(label));
-    std::sort(labelList.begin(), labelList.end());
-
-    LabelStats ls(dim);
-
-    for (PointRef p : *predictedView)
+    std::string labels;
+    for (size_t i = 0; i < m_labelStrList.size(); ++i)
     {
-        // It would be nice if we could expect that the points are aligned in
-        // both the predicted and truth views, but this often cannot be
-        // guaranteed, so rather than using the same PointId, we search for the
-        // nearest neighbor.
-        PointId qid = kdi.neighbor(p);
-        PointRef q = truthView->point(qid);
-
-        // TODO (chambbj): We should perhaps look at the distance to the
-        // nearest point and reject or otherwise report distances greater than
-        // 0.0, indicating some sort of mismatch between files.
-
-        int pc = p.getFieldAs<int>(m_predictedDimId);
-        int qc = q.getFieldAs<int>(m_truthDimId);
-
-        auto it = std::find(labelList.begin(), labelList.end(), qc);
-        size_t qci;
-        if (it != labelList.end())
-            qci = std::distance(labelList.begin(), it);
-        else
-            qci = dim;
-
-        it = std::find(labelList.begin(), labelList.end(), pc);
-        size_t pci;
-        if (it != labelList.end())
-            pci = std::distance(labelList.begin(), it);
-        else
-            pci = dim;
-
-        ls.insert(qci, pci);
+        if (i)
+            labels += ",";
+        labels += m_labelStrList[i];
     }
+    args.push_back("--labels");
+    args.push_back(labels);
+    args.push_back("--prediction_dim");
+    args.push_back(m_predictedDimName);
+    args.push_back("--truth_dim");
+    args.push_back(m_truthDimName);
 
-    MetadataNode root;
-    for (int label = 0; label < dim; ++label)
-    {
-        MetadataNode elem = root.addList("labels");
-        elem.add("label", m_labelStrList[label]);
-        elem.add("support", ls.getSupport(label));
-        elem.add("intersection_over_union", ls.getIntersectionOverUnion(label),
-                 "", 3);
-        elem.add("f1_score", ls.getF1Score(label), "", 3);
-        elem.add("sensitivity", ls.getSensitivity(label), "", 3);
-        elem.add("specificity", ls.getSpecificity(label), "", 3);
-        elem.add("precision", ls.getPrecision(label), "", 3);
-        elem.add("accuracy", ls.getAccuracy(label), "", 3);
-    }
-    root.add("mean_intersection_over_union", ls.getMeanIntersectionOverUnion(),
-             "", 3);
-    root.add("predicted_file", m_predictedFile);
-    root.add("truth_file", m_truthFile);
-    root.add("overall_accuracy", ls.getOverallAccuracy(), "", 3);
-    root.add("f1_score", ls.getF1Score(), "", 3);
-    root.add("confusion_matrix", ls.prettyPrintConfusionMatrix());
-    root.add("pdal_version", Config::fullVersionString());
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    Utils::toJSON(root, std::cout);
-
-    return 0;
+    return pdal_rust_kernel_run("eval", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

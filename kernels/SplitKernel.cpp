@@ -34,9 +34,11 @@
 
 #include "SplitKernel.hpp"
 
-#include <io/BufferReader.hpp>
-#include <pdal/StageFactory.hpp>
 #include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <cmath>
+#include <vector>
 
 namespace pdal
 {
@@ -73,54 +75,44 @@ void SplitKernel::validateSwitches(ProgramArgs& args)
         m_outputFile += m_inputFile;
 }
 
-namespace
-{
-std::string makeFilename(const std::string& s, int i)
-{
-    std::string out = s;
-    auto pos = out.find_last_of('.');
-    if (pos == out.npos)
-        pos = out.length();
-    out.insert(pos, std::string("_") + std::to_string(i));
-    return out;
-}
-} // namespace
-
 int SplitKernel::execute()
 {
-    Stage& reader = makeReader(m_inputFile, m_driverOverride);
-
-    Options filterOpts;
-    std::string driver = (m_length ? "filters.splitter" : "filters.chipper");
+    StringList args;
+    if (!m_driverOverride.empty())
+    {
+        args.push_back("--driver");
+        args.push_back(m_driverOverride);
+    }
+    args.push_back(m_inputFile);
+    args.push_back(m_outputFile);
     if (m_length)
     {
-        filterOpts.add("length", m_length);
-        filterOpts.add("origin_x", m_xOrigin);
-        filterOpts.add("origin_y", m_yOrigin);
+        args.push_back("--length");
+        args.push_back(std::to_string(m_length));
+        if (!std::isnan(m_xOrigin))
+        {
+            args.push_back("--origin_x");
+            args.push_back(std::to_string(m_xOrigin));
+        }
+        if (!std::isnan(m_yOrigin))
+        {
+            args.push_back("--origin_y");
+            args.push_back(std::to_string(m_yOrigin));
+        }
     }
     else
     {
-        filterOpts.add("capacity", m_capacity);
+        args.push_back("--capacity");
+        args.push_back(std::to_string(m_capacity));
     }
-    Stage& f = makeFilter(driver, reader, filterOpts);
 
-    ColumnPointTable table;
-    f.prepare(table);
-    PointViewSet pvSet = f.execute(table);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    int filenum = 1;
-    for (auto& pvp : pvSet)
-    {
-        BufferReader reader;
-        reader.addView(pvp);
-
-        std::string filename = makeFilename(m_outputFile, filenum++);
-        Stage& writer = makeWriter(filename, reader, "");
-
-        writer.prepare(table);
-        writer.execute(table);
-    }
-    return 0;
+    return pdal_rust_kernel_run("split", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

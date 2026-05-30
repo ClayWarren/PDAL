@@ -49,7 +49,9 @@ cargo llvm-cov \
     --no-report \
     -- "${test_args[@]}"
 
-# Pass 2: Run ignored tests and report combined metrics
+# Pass 2: Run ignored tests and report combined metrics. Ignored tests include
+# installed-PDAL and network parity checks, so failures here must not make the
+# local Rust coverage gate depend on external runtime state.
 exec cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \
@@ -59,4 +61,3 @@ exec cargo llvm-cov \
     --ignore-run-fail \
     "${cov_args[@]}" \
     -- "${test_args[@]}" --ignored
-

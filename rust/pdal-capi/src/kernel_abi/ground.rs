@@ -91,42 +91,42 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
             || arg == "--developer-debug=false"
         {
             // Accepted and ignored.
-        } else if arg.starts_with("--max_window_size") {
+        } else if option_matches(arg, "--max_window_size") {
             max_window_size = match value_for!("--max_window_size").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("max_window_size"),
             };
-        } else if arg.starts_with("--slope") {
+        } else if option_matches(arg, "--slope") {
             slope = match value_for!("--slope").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("slope"),
             };
-        } else if arg.starts_with("--cell_size") {
+        } else if option_matches(arg, "--cell_size") {
             cell_size = match value_for!("--cell_size").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("cell_size"),
             };
-        } else if arg.starts_with("--scalar") {
+        } else if option_matches(arg, "--scalar") {
             scalar = match value_for!("--scalar").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("scalar"),
             };
-        } else if arg.starts_with("--threshold") {
+        } else if option_matches(arg, "--threshold") {
             threshold = match value_for!("--threshold").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("threshold"),
             };
-        } else if arg.starts_with("--cut") {
+        } else if option_matches(arg, "--cut") {
             cut = match value_for!("--cut").parse() {
                 Ok(v) => v,
                 Err(_) => return invalid_value("cut"),
             };
-        } else if arg.starts_with("--max_distance") {
+        } else if option_matches(arg, "--max_distance") {
             // Declared by the C++ kernel but unused; accept and ignore.
             let _ = value_for!("--max_distance");
-        } else if arg.starts_with("--initial_distance") {
+        } else if option_matches(arg, "--initial_distance") {
             let _ = value_for!("--initial_distance");
-        } else if arg.starts_with("--returns") {
+        } else if option_matches(arg, "--returns") {
             // Replaces the default set; accepts comma-separated or repeated.
             let value = value_for!("--returns");
             let parsed: Vec<String> = value
@@ -139,7 +139,7 @@ pub(super) unsafe fn run_ground_kernel(argc: i32, argv: *const *const c_char) ->
                 returns_set = true;
             }
             returns.extend(parsed);
-        } else if arg.starts_with("--ignore") {
+        } else if option_matches(arg, "--ignore") {
             ignore.push(value_for!("--ignore"));
         } else if arg == "--reset" || arg == "--reset=true" {
             reset = true;
@@ -231,6 +231,13 @@ fn invalid_value(name: &str) -> i32 {
     1
 }
 
+fn option_matches(arg: &str, name: &str) -> bool {
+    arg == name
+        || arg
+            .strip_prefix(name)
+            .is_some_and(|rest| rest.starts_with('='))
+}
+
 /// Split an `--option=value` argument into its value, or `None` for the
 /// space-separated `--option value` form.
 fn split_value(arg: &str) -> Option<String> {
@@ -287,5 +294,23 @@ fn execute_ground_pipeline(value: serde_json::Value) -> i32 {
             eprintln!("PDAL: kernels.ground: {err}");
             1
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::option_matches;
+
+    #[test]
+    fn option_matches_exact_or_equals_forms_only() {
+        assert!(option_matches("--slope", "--slope"));
+        assert!(option_matches("--slope=0.2", "--slope"));
+
+        assert!(!option_matches("--slope_bad=0.2", "--slope"));
+        assert!(!option_matches("--thresholded=1.0", "--threshold"));
+        assert!(!option_matches(
+            "--ignoreme=Classification[7:7]",
+            "--ignore"
+        ));
     }
 }

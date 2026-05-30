@@ -34,7 +34,10 @@
 
 #include "RandomKernel.hpp"
 
-#include <pdal/Stage.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <sstream>
+#include <vector>
 
 namespace pdal
 {
@@ -79,33 +82,39 @@ void RandomKernel::addSwitches(ProgramArgs& args)
 
 int RandomKernel::execute()
 {
-    Options readerOptions;
-
-    if (!m_bounds.empty())
-        readerOptions.add("bounds", m_bounds);
-
-    std::string distribution(Utils::tolower(m_distribution));
-    if (distribution == "uniform")
-        readerOptions.add("mode", "uniform");
-    else if (distribution == "normal")
-        readerOptions.add("mode", "normal");
-    else if (distribution == "random")
-        readerOptions.add("mode", "random");
-    else
-        throw pdal_error("invalid distribution: " + m_distribution);
-    readerOptions.add("count", m_numPointsToWrite);
-    Stage& reader = makeReader("", "readers.faux", readerOptions);
-
-    Options writerOptions;
+    StringList args;
+    args.push_back(m_outputFile);
     if (m_bCompress)
-        writerOptions.add("compression", true);
-    Stage& writer = makeWriter(m_outputFile, reader, "", writerOptions);
+        args.push_back("--compress");
+    args.push_back("--count");
+    args.push_back(std::to_string(m_numPointsToWrite));
+    if (!m_bounds.empty())
+    {
+        std::ostringstream out;
+        out << m_bounds;
+        args.push_back("--bounds");
+        args.push_back(out.str());
+    }
+    args.push_back("--distribution");
+    args.push_back(m_distribution);
+    if (!m_means.empty())
+    {
+        args.push_back("--mean");
+        args.push_back(m_means);
+    }
+    if (!m_stdevs.empty())
+    {
+        args.push_back("--stdev");
+        args.push_back(m_stdevs);
+    }
 
-    ColumnPointTable table;
-    writer.prepare(table);
-    writer.execute(table);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    return 0;
+    return pdal_rust_kernel_run("random", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal
