@@ -44,6 +44,11 @@
 #include <pdal/util/FileUtils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
+#include <fstream>
+#include <sstream>
+
+#include <nlohmann/json.hpp>
+
 #include "Support.hpp"
 #include "filters/HexBinFilter.hpp"
 
@@ -104,6 +109,84 @@ TEST(HexbinFilterTest, HexbinFilterTest_test_1)
     printChildren(out, m);
     out.close();
     FileUtils::deleteFile(filename);
+}
+
+namespace
+{
+nlohmann::json readJsonFile(const std::string& path)
+{
+    std::ifstream in(path);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    return nlohmann::json::parse(ss.str());
+}
+} // namespace
+
+// Gates the OGR density/boundary file-output path (kernels/private/density/
+// OGR.cpp). Setting 'boundary' forces the C++ grid path, which writes both the
+// per-hexagon density tessellation and the hull boundary through OGR. We write
+// GeoJSON (human-readable) and assert the feature/field/geometry shape so the
+// behavior is locked before the hexagon source is ported off hexer::BaseGrid.
+TEST(HexbinFilterTest, ogr_density_boundary_output)
+{
+    StageFactory f;
+
+    Options options;
+    options.add("filename", Support::datapath("las/hextest.las"));
+
+    Stage* reader(f.createStage("readers.las"));
+    ASSERT_TRUE(reader);
+    reader->setOptions(options);
+
+    std::string densityFile = Support::temppath("hexbin_density.json");
+    std::string boundaryFile = Support::temppath("hexbin_boundary.json");
+    FileUtils::deleteFile(densityFile);
+    FileUtils::deleteFile(boundaryFile);
+
+    Stage* hexbin(f.createStage("filters.hexbin"));
+    ASSERT_TRUE(hexbin);
+
+    Options hexOptions;
+    hexOptions.add("threshold", 1);
+    hexOptions.add("edge_length", 0.666666666);
+    hexOptions.add("density", densityFile);
+    hexOptions.add("boundary", boundaryFile);
+    hexOptions.add("ogrdriver", "GeoJSON");
+    hexbin->setOptions(hexOptions);
+    hexbin->setInput(*reader);
+
+    PointTable table;
+    hexbin->prepare(table);
+    hexbin->execute(table);
+
+    // Density: one Polygon feature per dense hexagon, with ID + COUNT fields and
+    // a closed 7-vertex hexagonal ring (6 corners + repeated first vertex).
+    nlohmann::json density = readJsonFile(densityFile);
+    EXPECT_EQ(density["type"], "FeatureCollection");
+    const auto& dfeatures = density["features"];
+    ASSERT_TRUE(dfeatures.is_array());
+    EXPECT_GT(dfeatures.size(), 0u);
+    for (const auto& feature : dfeatures)
+    {
+        EXPECT_EQ(feature["geometry"]["type"], "Polygon");
+        ASSERT_TRUE(feature["properties"].contains("ID"));
+        ASSERT_TRUE(feature["properties"].contains("COUNT"));
+        EXPECT_GE(feature["properties"]["COUNT"].get<int>(), 1);
+        const auto& ring = feature["geometry"]["coordinates"][0];
+        EXPECT_EQ(ring.size(), 7u);
+    }
+
+    // Boundary: a single MultiPolygon feature with ID == 0.
+    nlohmann::json boundary = readJsonFile(boundaryFile);
+    EXPECT_EQ(boundary["type"], "FeatureCollection");
+    const auto& bfeatures = boundary["features"];
+    ASSERT_TRUE(bfeatures.is_array());
+    ASSERT_EQ(bfeatures.size(), 1u);
+    EXPECT_EQ(bfeatures[0]["geometry"]["type"], "MultiPolygon");
+    EXPECT_EQ(bfeatures[0]["properties"]["ID"].get<int>(), 0);
+
+    FileUtils::deleteFile(densityFile);
+    FileUtils::deleteFile(boundaryFile);
 }
 
 // testing sample size for calculating grid size

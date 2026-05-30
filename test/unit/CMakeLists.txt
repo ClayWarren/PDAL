@@ -502,6 +502,7 @@ PDAL_ADD_TEST(pdal_filters_transformation_test FILES
         filters/HexbinFilterTest.cpp
     INCLUDES
         ${PDAL_VENDOR_DIR}/h3/include
+        ${NLOHMANN_INCLUDE_DIR}
     LINK_WITH
         ${PDAL_H3_LIB_NAME}
 )
