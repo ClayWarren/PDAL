@@ -17,6 +17,7 @@ use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
+use pdal_filters::colorization::{parse_band_spec, ColorizationFilter};
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
 use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::csf::CsfFilter;
@@ -124,6 +125,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.assign",
     "filters.chipper",
     "filters.cluster",
+    "filters.colorization",
     "filters.covariancefeatures",
     "filters.crop",
     "filters.csf",
@@ -276,6 +278,21 @@ pub fn create_filter(
             get_f64(options, "tolerance", 1.0)?,
             get_bool(options, "is3d", true)?,
         )))),
+        "filters.colorization" => {
+            // C++ ColorizationFilter parses the `dimensions` list into
+            // name:band:scale specs (defaulting to Red/Green/Blue) before
+            // sampling the raster; replicate that parse here.
+            let raster = options.get_str("raster", "");
+            if raster.trim().is_empty() {
+                return Err(StageError(
+                    "filters.colorization: missing 'raster' option.".to_string(),
+                ));
+            }
+            let bands = parse_band_spec(&options.get_str("dimensions", "")).map_err(StageError)?;
+            Ok(Box::new(FilterWrapper::new(ColorizationFilter::new(
+                &raster, bands,
+            ))))
+        }
         "filters.covariancefeatures" => {
             Ok(Box::new(FilterWrapper::new(CovarianceFeaturesFilter::new(
                 get_u64(options, "knn", 10)? as usize,

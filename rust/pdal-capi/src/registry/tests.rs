@@ -312,6 +312,32 @@ fn registry_hag_dem_filter_computes_height_above_raster() {
 }
 
 #[test]
+fn pipeline_json_runs_colorization_against_raster() {
+    // Mirrors the C++ ColorizationFilterTest.test1: colorize autzen points from
+    // autzen.jpg with "Red, Green,Blue::255" and check point 0 == 210/205/47175
+    // (Blue raw 185 scaled by 255).
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let las = repo.join("test/data/autzen/autzen-point-format-3.las");
+    let raster = repo.join("test/data/autzen/autzen.jpg");
+
+    let json = format!(
+        r#"[
+                {{"filename":"{}"}},
+                {{"type":"filters.colorization", "raster":"{}", "dimensions":"Red, Green,Blue::255  "}}
+            ]"#,
+        escape_json_path(&las),
+        escape_json_path(&raster)
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Red), 210.0);
+    assert_eq!(views[0].get_f64(0, &DimId::Green), 205.0);
+    assert_eq!(views[0].get_f64(0, &DimId::Blue), 47175.0);
+}
+
+#[test]
 fn sort_rejects_unknown_order() {
     let mut options = Options::new();
     options.add("dimensions", "X").add("order", "sideways");
@@ -474,6 +500,9 @@ fn default_filter_options(name: &str) -> Options {
             options.add("limits", "Z[0:100]");
         }
         "filters.hag_dem" => {
+            options.add("raster", "dummy.tif");
+        }
+        "filters.colorization" => {
             options.add("raster", "dummy.tif");
         }
         "filters.straighten" => {
