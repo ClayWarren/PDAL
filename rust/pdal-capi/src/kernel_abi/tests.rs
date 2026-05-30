@@ -414,6 +414,33 @@ fn rust_kernel_run_handles_tindex_srs_options() {
 }
 
 #[test]
+fn rust_kernel_run_handles_tindex_merge_polygon_options() {
+    let name = CString::new("tindex").unwrap();
+    let merge = CString::new("merge").unwrap();
+    let tindex = CString::new("--tindex").unwrap();
+    let index = CString::new("missing.geojson").unwrap();
+    let filespec = CString::new("--filespec").unwrap();
+    let output = CString::new("out.las").unwrap();
+    let polygon = CString::new("--polygon").unwrap();
+    let wkt = CString::new("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))").unwrap();
+    let target_srs = CString::new("--t_srs=EPSG:3857").unwrap();
+    let argv = [
+        merge.as_ptr(),
+        tindex.as_ptr(),
+        index.as_ptr(),
+        filespec.as_ptr(),
+        output.as_ptr(),
+        polygon.as_ptr(),
+        wkt.as_ptr(),
+        target_srs.as_ptr(),
+    ];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
 fn rust_kernel_run_accepts_info_help() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("--help").unwrap();

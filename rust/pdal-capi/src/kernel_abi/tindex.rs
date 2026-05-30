@@ -76,6 +76,12 @@ struct Entry {
     boundary_wkt: Option<String>,
 }
 
+struct MergeClip {
+    bounds: Bounds2D,
+    stage_key: &'static str,
+    stage_value: String,
+}
+
 pub(super) unsafe fn run_tindex_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
@@ -861,7 +867,7 @@ fn print_geojson_tindex(args: &CreateArgs, entries: Vec<Entry>) {
 }
 
 fn run_merge(args: &[String]) -> i32 {
-    let (index_file, output_file, location_field, bounds) = match parse_merge_args(args) {
+    let (index_file, output_file, location_field, clip) = match parse_merge_args(args) {
         Ok(parsed) => parsed,
         Err(ParseResult::Error(message)) => {
             eprintln!("PDAL: kernels.tindex: {message}");
@@ -897,12 +903,12 @@ fn run_merge(args: &[String]) -> i32 {
     let mut tags = Vec::new();
     let mut file_count = 0;
     for (index, feature) in features.iter().enumerate() {
-        if let Some(bounds) = &bounds {
+        if let Some(clip) = &clip {
             let Some(feature_bounds) = feature_bounds_2d(feature) else {
                 eprintln!("PDAL: kernels.tindex: Feature has invalid geometry.");
                 return 1;
             };
-            if !feature_bounds.overlaps(bounds) {
+            if !feature_bounds.overlaps(&clip.bounds) {
                 continue;
             }
         }
@@ -918,9 +924,20 @@ fn run_merge(args: &[String]) -> i32 {
         stages.push(serde_json::json!({
             "type": reader,
             "filename": location,
-            "tag": tag,
+            "tag": tag.clone(),
         }));
-        tags.push(tag);
+        if let Some(clip) = &clip {
+            let crop_tag = format!("tindex_crop_{index}");
+            stages.push(serde_json::json!({
+                "type": "filters.crop",
+                (clip.stage_key): clip.stage_value,
+                "inputs": [tag],
+                "tag": crop_tag,
+            }));
+            tags.push(crop_tag);
+        } else {
+            tags.push(tag);
+        }
         file_count += 1;
     }
     println!("Merge filecount: {file_count}");
@@ -944,11 +961,11 @@ fn run_merge(args: &[String]) -> i32 {
 
 fn parse_merge_args(
     args: &[String],
-) -> Result<(String, String, String, Option<Bounds2D>), ParseResult> {
+) -> Result<(String, String, String, Option<MergeClip>), ParseResult> {
     let mut tindex_file = None;
     let mut output_file = None;
     let mut location_field = "location".to_string();
-    let mut bounds = None;
+    let mut clip = None;
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -958,7 +975,14 @@ fn parse_merge_args(
             "--tindex_name" => location_field = next_value(&mut iter, "--tindex_name")?.clone(),
             "--bounds" => {
                 let value = next_value(&mut iter, "--bounds")?;
-                bounds = Some(parse_merge_bounds(value)?);
+                clip = Some(parse_merge_bounds(value)?);
+            }
+            "--polygon" => {
+                let value = next_value(&mut iter, "--polygon")?;
+                clip = Some(parse_merge_polygon(value)?);
+            }
+            "--t_srs" => {
+                let _ = next_value(&mut iter, "--t_srs")?;
             }
             "--log" => {
                 let _ = next_value(&mut iter, "--log")?;
@@ -967,8 +991,12 @@ fn parse_merge_args(
                 let _ = next_value(&mut iter, arg)?;
             }
             _ if let Some(value) = arg.strip_prefix("--bounds=") => {
-                bounds = Some(parse_merge_bounds(value)?);
+                clip = Some(parse_merge_bounds(value)?);
             }
+            _ if let Some(value) = arg.strip_prefix("--polygon=") => {
+                clip = Some(parse_merge_polygon(value)?);
+            }
+            _ if arg.starts_with("--t_srs=") => {}
             _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--") => {
                 return Err(ParseResult::Unsupported);
@@ -989,13 +1017,36 @@ fn parse_merge_args(
             "merge requires --filespec <output>".to_string(),
         ));
     };
-    Ok((tindex_file, output_file, location_field, bounds))
+    Ok((tindex_file, output_file, location_field, clip))
 }
 
-fn parse_merge_bounds(value: &str) -> Result<Bounds2D, ParseResult> {
-    parse_bounds2d(value, 0)
+fn parse_merge_bounds(value: &str) -> Result<MergeClip, ParseResult> {
+    let bounds = parse_bounds2d(value, 0)
         .map(|parsed| parsed.bounds)
-        .map_err(|err| ParseResult::Error(format!("Invalid bounds: {err}")))
+        .map_err(|err| ParseResult::Error(format!("Invalid bounds: {err}")))?;
+    Ok(MergeClip {
+        bounds,
+        stage_key: "bounds",
+        stage_value: value.to_string(),
+    })
+}
+
+fn parse_merge_polygon(value: &str) -> Result<MergeClip, ParseResult> {
+    let geometry = Geometry::from_wkt(value)
+        .map_err(|err| ParseResult::Error(format!("Invalid polygon: {err}")))?;
+    let (minx, maxx, miny, maxy, _, _) = geometry
+        .bounds()
+        .map_err(|err| ParseResult::Error(format!("Invalid polygon bounds: {err}")))?;
+    Ok(MergeClip {
+        bounds: Bounds2D {
+            minx,
+            maxx,
+            miny,
+            maxy,
+        },
+        stage_key: "polygon",
+        stage_value: value.to_string(),
+    })
 }
 
 fn feature_bounds_2d(feature: &serde_json::Value) -> Option<Bounds2D> {
