@@ -36,6 +36,7 @@ use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
 use pdal_filters::hag_delaunay::HagDelaunayFilter;
+use pdal_filters::hag_dem::HagDemFilter;
 use pdal_filters::hagnn::HagNnFilter;
 use pdal_filters::head::HeadFilter;
 use pdal_filters::hexbin::HexBinFilter;
@@ -141,6 +142,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.gpstimeconvert",
     "filters.groupby",
     "filters.hag_delaunay",
+    "filters.hag_dem",
     "filters.hag_nn",
     "filters.head",
     "filters.hexbin",
@@ -487,6 +489,26 @@ pub fn create_filter(
             get_bool(options, "allow_extrapolation", true)?,
             get_u64(options, "class", 2)? as u8,
         )))),
+        "filters.hag_dem" => {
+            // C++ HagDemFilter clamp defaults are numeric_limits<double>::min()
+            // (smallest positive, f64::MIN_POSITIVE) and ::max() (f64::MAX); the
+            // ground class defaults to 2.
+            let raster = options.get_str("raster", "");
+            if raster.trim().is_empty() {
+                return Err(StageError(
+                    "filters.hag_dem: missing 'raster' option.".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(HagDemFilter::new(
+                &raster,
+                get_u64(options, "band", 1)? as i32,
+                get_bool(options, "zero_ground", true)?,
+                get_f64(options, "min_clamp", f64::MIN_POSITIVE)?,
+                get_f64(options, "max_clamp", f64::MAX)?,
+                get_f64(options, "nodata_hag", 0.0)?,
+                get_u64(options, "class", 2)? as u8,
+            ))))
+        }
         "filters.hag_nn" => Ok(Box::new(FilterWrapper::new(HagNnFilter::new(
             get_u64(options, "count", 1)? as usize,
             get_f64(options, "max_distance", 0.0)?,

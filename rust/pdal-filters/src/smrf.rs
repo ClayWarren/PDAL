@@ -167,12 +167,19 @@ impl SmrfFilter {
         // Prefer a georeferenced raster, but a debug dump must not fail the whole
         // SMRF run when the view's SRS can't be set (e.g. the LAS 32767
         // "no CRS" sentinel) — fall back to writing without a projection.
-        let mut raster =
-            match Raster::create_float64(&path, "GTiff", cols as i32, rows as i32, 1, gt, srs_wkt) {
-                Ok(raster) => raster,
-                Err(_) => Raster::create_float64(&path, "GTiff", cols as i32, rows as i32, 1, gt, "")
-                    .map_err(StageError)?,
-            };
+        let mut raster = match Raster::create_float64(
+            &path,
+            "GTiff",
+            cols as i32,
+            rows as i32,
+            1,
+            gt,
+            srs_wkt,
+        ) {
+            Ok(raster) => raster,
+            Err(_) => Raster::create_float64(&path, "GTiff", cols as i32, rows as i32, 1, gt, "")
+                .map_err(StageError)?,
+        };
         let mut buf = vec![0.0f64; rows * cols];
         for i in 0..rows {
             for j in 0..cols {

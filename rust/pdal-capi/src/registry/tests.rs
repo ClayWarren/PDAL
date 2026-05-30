@@ -270,6 +270,48 @@ fn registry_dem_filter_keeps_points_within_raster_limits() {
 }
 
 #[test]
+fn registry_hag_dem_filter_computes_height_above_raster() {
+    // Mirrors the C++ HAGFilterTest.dem: a ground-classified point gets HAG 0,
+    // an unclassified point at Z=200 over the float32.tif DEM (value 107) gets
+    // HAG 93. Also confirms the output dimension is prepared by the registry.
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let raster = repo.join("test/data/gdal/float32.tif");
+
+    let mut options = Options::new();
+    options.add("raster", raster.display());
+    let mut filter = create_filter("filters.hag_dem", &options).unwrap();
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    layout.register(DimId::Classification, DimType::U8);
+    let mut view = PointView::new(Rc::new(layout));
+    for class in [2.0, 1.0] {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, 440750.0);
+        view.set_f64(idx, &DimId::Y, 3751290.0);
+        view.set_f64(idx, &DimId::Z, 200.0);
+        view.set_f64(idx, &DimId::Classification, class);
+    }
+
+    // The pipeline prepares output dimensions before running a filter; the
+    // registry-built wrapper must declare HeightAboveGround for that to work.
+    let output_dims = filter.output_dimensions();
+    assert!(
+        output_dims.contains(&(DimId::HeightAboveGround, DimType::F64)),
+        "registry wrapper should declare the HeightAboveGround output dimension"
+    );
+    let view = view.with_dimensions(&output_dims);
+
+    let views = filter.run(&[view]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 2);
+    assert_eq!(views[0].get_f64(0, &DimId::HeightAboveGround), 0.0);
+    assert_eq!(views[0].get_f64(1, &DimId::HeightAboveGround), 93.0);
+}
+
+#[test]
 fn sort_rejects_unknown_order() {
     let mut options = Options::new();
     options.add("dimensions", "X").add("order", "sideways");
@@ -430,6 +472,9 @@ fn default_filter_options(name: &str) -> Options {
         "filters.dem" => {
             options.add("raster", "dummy.tif");
             options.add("limits", "Z[0:100]");
+        }
+        "filters.hag_dem" => {
+            options.add("raster", "dummy.tif");
         }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");

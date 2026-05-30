@@ -1,7 +1,7 @@
 //! `filters.hag_dem` -- compute height above ground using a DEM raster.
 
 use pdal_core::gdal::{self, Raster};
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
 pub struct HagDemFilter {
@@ -53,6 +53,10 @@ impl Filter for HagDemFilter {
 
     fn name(&self) -> &str {
         "filters.hag_dem"
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        vec![(DimId::HeightAboveGround, DimType::F64)]
     }
 
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
