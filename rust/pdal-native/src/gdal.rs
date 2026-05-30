@@ -449,16 +449,45 @@ impl VectorPointWriter {
         )
     }
 
+    /// Create a polygon-geometry writer with the layer named like the C++
+    /// `density::OGR` writer (`wkbMultiPolygon` layer geometry, so it can hold
+    /// both per-hexagon `wkbPolygon` density features and a `wkbMultiPolygon`
+    /// boundary feature). `layer_name` mirrors the C++ `lyr_name`/`layerName`.
+    pub fn create_polygon(
+        path: &str,
+        driver_name: &str,
+        srs_wkt: &str,
+        layer_name: &str,
+    ) -> Result<Self, String> {
+        Self::create_with_geometry_named(
+            path,
+            driver_name,
+            srs_wkt,
+            layer_name,
+            gdal_sys::OGRwkbGeometryType::wkbMultiPolygon,
+        )
+    }
+
     fn create_with_geometry(
         path: &str,
         driver_name: &str,
         srs_wkt: &str,
         geometry_type: gdal_sys::OGRwkbGeometryType::Type,
     ) -> Result<Self, String> {
+        Self::create_with_geometry_named(path, driver_name, srs_wkt, "points", geometry_type)
+    }
+
+    fn create_with_geometry_named(
+        path: &str,
+        driver_name: &str,
+        srs_wkt: &str,
+        layer_name: &str,
+        geometry_type: gdal_sys::OGRwkbGeometryType::Type,
+    ) -> Result<Self, String> {
         register_drivers();
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let driver_c = CString::new(driver_name).map_err(|e| e.to_string())?;
-        let layer_c = CString::new("points").map_err(|e| e.to_string())?;
+        let layer_c = CString::new(layer_name).map_err(|e| e.to_string())?;
         unsafe {
             let driver = gdal_sys::OGRGetDriverByName(driver_c.as_ptr());
             if driver.is_null() {
@@ -625,6 +654,106 @@ impl VectorPointWriter {
             if result != gdal_sys::OGRErr::OGRERR_NONE {
                 return Err("Can't create OGR feature".to_string());
             }
+        }
+        Ok(())
+    }
+
+    /// Write one `wkbPolygon` feature from a single exterior ring, mirroring the
+    /// C++ `collectHexagon` density path. The ring is closed automatically if
+    /// the caller's last vertex does not repeat the first.
+    pub fn write_polygon(
+        &self,
+        ring: &[(f64, f64)],
+        fields: &[VectorFieldValue],
+    ) -> Result<(), String> {
+        unsafe {
+            let polygon = gdal_sys::OGR_G_CreateGeometry(gdal_sys::OGRwkbGeometryType::wkbPolygon);
+            if polygon.is_null() {
+                return Err("Can't create OGR polygon geometry".to_string());
+            }
+            let linear_ring =
+                gdal_sys::OGR_G_CreateGeometry(gdal_sys::OGRwkbGeometryType::wkbLinearRing);
+            if linear_ring.is_null() {
+                gdal_sys::OGR_G_DestroyGeometry(polygon);
+                return Err("Can't create OGR linear ring geometry".to_string());
+            }
+            for (x, y) in ring {
+                gdal_sys::OGR_G_AddPoint_2D(linear_ring, *x, *y);
+            }
+            // Close the ring if the caller did not already repeat the first point.
+            if let (Some(first), Some(last)) = (ring.first(), ring.last()) {
+                if first != last {
+                    gdal_sys::OGR_G_AddPoint_2D(linear_ring, first.0, first.1);
+                }
+            }
+            if gdal_sys::OGR_G_AddGeometryDirectly(polygon, linear_ring)
+                != gdal_sys::OGRErr::OGRERR_NONE
+            {
+                gdal_sys::OGR_G_DestroyGeometry(linear_ring);
+                gdal_sys::OGR_G_DestroyGeometry(polygon);
+                return Err("Can't add ring to OGR polygon".to_string());
+            }
+            self.write_geometry_feature(polygon, fields)
+        }
+    }
+
+    /// Write one feature whose geometry is parsed from a WKT string (used for
+    /// the boundary `MULTIPOLYGON`, which already comes from the hex grid as
+    /// WKT). Mirrors the C++ `writeBoundary` single-feature output.
+    pub fn write_geometry_wkt(&self, wkt: &str, fields: &[VectorFieldValue]) -> Result<(), String> {
+        let wkt_c = CString::new(wkt).map_err(|e| e.to_string())?;
+        unsafe {
+            let mut wkt_ptr = wkt_c.as_ptr() as *mut std::os::raw::c_char;
+            let mut geom: gdal_sys::OGRGeometryH = std::ptr::null_mut();
+            if gdal_sys::OGR_G_CreateFromWkt(&mut wkt_ptr, std::ptr::null_mut(), &mut geom)
+                != gdal_sys::OGRErr::OGRERR_NONE
+                || geom.is_null()
+            {
+                return Err(format!("Can't parse OGR geometry from WKT: {wkt}"));
+            }
+            self.write_geometry_feature(geom, fields)
+        }
+    }
+
+    /// Attach `geometry` (taken by ownership) to a new feature with `fields` and
+    /// append it to the layer. On any error the geometry/feature are destroyed.
+    unsafe fn write_geometry_feature(
+        &self,
+        geometry: gdal_sys::OGRGeometryH,
+        fields: &[VectorFieldValue],
+    ) -> Result<(), String> {
+        let defn = gdal_sys::OGR_L_GetLayerDefn(self.layer);
+        if defn.is_null() {
+            gdal_sys::OGR_G_DestroyGeometry(geometry);
+            return Err("Can't get OGR layer definition".to_string());
+        }
+        let feature = gdal_sys::OGR_F_Create(defn);
+        if feature.is_null() {
+            gdal_sys::OGR_G_DestroyGeometry(geometry);
+            return Err("Can't create OGR feature".to_string());
+        }
+        for (idx, value) in fields.iter().enumerate() {
+            match value {
+                VectorFieldValue::Integer(value) => {
+                    gdal_sys::OGR_F_SetFieldInteger(feature, idx as i32, *value);
+                }
+                VectorFieldValue::Integer64(value) => {
+                    gdal_sys::OGR_F_SetFieldInteger64(feature, idx as i32, *value);
+                }
+                VectorFieldValue::Real(value) => {
+                    gdal_sys::OGR_F_SetFieldDouble(feature, idx as i32, *value);
+                }
+            }
+        }
+        if gdal_sys::OGR_F_SetGeometryDirectly(feature, geometry) != gdal_sys::OGRErr::OGRERR_NONE {
+            gdal_sys::OGR_G_DestroyGeometry(geometry);
+            gdal_sys::OGR_F_Destroy(feature);
+            return Err("Can't set OGR feature geometry".to_string());
+        }
+        let result = gdal_sys::OGR_L_CreateFeature(self.layer, feature);
+        gdal_sys::OGR_F_Destroy(feature);
+        if result != gdal_sys::OGRErr::OGRERR_NONE {
+            return Err("Can't create OGR feature".to_string());
         }
         Ok(())
     }
@@ -1172,6 +1301,93 @@ mod tests {
         // Feature column not found
         assert!(vector.get_features(0, "nonexistent").is_err());
         assert!(vector.get_features(99, "name").is_err());
+    }
+
+    fn temp_geojson(name: &str) -> PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("pdal-native-{name}-{}.json", std::process::id()));
+        let _ = fs::remove_file(&path);
+        path
+    }
+
+    #[test]
+    fn test_polygon_writer_density_and_boundary() {
+        register_drivers();
+
+        // Density layer: one Polygon feature per hexagon with ID + COUNT, like
+        // the C++ density::OGR::writeDensity path.
+        let density = temp_geojson("polygon-density");
+        {
+            let writer = VectorPointWriter::create_polygon(
+                density.to_str().unwrap(),
+                "GeoJSON",
+                "",
+                "hexbins",
+            )
+            .unwrap();
+            writer
+                .create_field("ID", VectorFieldType::Integer64)
+                .unwrap();
+            writer
+                .create_field("COUNT", VectorFieldType::Integer)
+                .unwrap();
+            // A 6-vertex hexagon; write_polygon should close the ring for us.
+            let hexagon = [
+                (0.0, 1.0),
+                (0.87, 0.5),
+                (0.87, -0.5),
+                (0.0, -1.0),
+                (-0.87, -0.5),
+                (-0.87, 0.5),
+            ];
+            writer
+                .write_polygon(
+                    &hexagon,
+                    &[
+                        VectorFieldValue::Integer64(42),
+                        VectorFieldValue::Integer(7),
+                    ],
+                )
+                .unwrap();
+        }
+        let vector = Vector::open(density.to_str().unwrap()).unwrap();
+        let features = vector.get_features(0, "ID").unwrap();
+        assert_eq!(features.len(), 1);
+        assert!(features[0].0.contains("POLYGON"));
+        assert_eq!(features[0].1, 42);
+        drop(vector);
+        let _ = fs::remove_file(&density);
+
+        // Boundary layer: a single MultiPolygon feature written from WKT, like
+        // the C++ writeBoundary path (the hull comes from the grid as WKT).
+        let boundary = temp_geojson("polygon-boundary");
+        {
+            let writer = VectorPointWriter::create_polygon(
+                boundary.to_str().unwrap(),
+                "GeoJSON",
+                "",
+                "hexbins",
+            )
+            .unwrap();
+            writer
+                .create_field("ID", VectorFieldType::Integer64)
+                .unwrap();
+            writer
+                .write_geometry_wkt(
+                    "MULTIPOLYGON (((0 0, 4 0, 4 4, 0 4, 0 0)))",
+                    &[VectorFieldValue::Integer64(0)],
+                )
+                .unwrap();
+            // Invalid WKT must surface an error, not silently drop the feature.
+            assert!(writer.write_geometry_wkt("NOT WKT", &[]).is_err());
+        }
+        let vector = Vector::open(boundary.to_str().unwrap()).unwrap();
+        let features = vector.get_features(0, "ID").unwrap();
+        assert_eq!(features.len(), 1);
+        assert!(features[0].0.contains("MULTIPOLYGON") || features[0].0.contains("POLYGON"));
+        assert_eq!(features[0].1, 0);
+        drop(vector);
+        let _ = fs::remove_file(&boundary);
     }
 
     #[test]
