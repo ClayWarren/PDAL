@@ -19,29 +19,44 @@ if [[ -n "${CONDA_PREFIX:-}" ]]; then
     export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
 
-args=("$@")
-if (($# == 0)); then
-    args=(--summary-only)
-fi
+cov_args=()
+test_args=()
+seen_dash_dash=false
 
-has_test_args=false
-for arg in "${args[@]}"; do
+for arg in "$@"; do
     if [[ "$arg" == "--" ]]; then
-        has_test_args=true
-        break
+        seen_dash_dash=true
+        continue
+    fi
+    if [[ "$seen_dash_dash" == true ]]; then
+        test_args+=("$arg")
+    else
+        cov_args+=("$arg")
     fi
 done
 
-if [[ "$has_test_args" == false ]]; then
-    args+=(-- --test-threads=1)
-else
-    args+=(--test-threads=1)
+if ((${#cov_args[@]} == 0)); then
+    cov_args=(--summary-only)
 fi
+test_args+=(--test-threads=1)
 
+# Pass 1: Run standard tests
+cargo llvm-cov \
+    --manifest-path rust/Cargo.toml \
+    --workspace \
+    --all-targets \
+    --exclude-from-report pdal-capi \
+    --no-report \
+    -- "${test_args[@]}"
+
+# Pass 2: Run ignored tests and report combined metrics
 exec cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \
     --all-targets \
     --exclude-from-report pdal-capi \
-    "${args[@]}"
+    --no-clean \
+    --ignore-run-fail \
+    "${cov_args[@]}" \
+    -- "${test_args[@]}" --ignored
 
