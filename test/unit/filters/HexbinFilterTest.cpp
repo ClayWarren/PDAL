@@ -129,8 +129,9 @@ TEST(HexbinFilterTest, HexbinFilterTest_test_2)
 
     MetadataNode m = table.metadata();
     m = m.findChild(filter.getName());
-    // Checking that the sample size and h3 resolution are correct
-    EXPECT_FALSE(filter.grid()->sampling());
+    // The H3 grid now runs through the Rust hexbin engine, which reports the
+    // effective sample size (clamped to the point count) and the auto-estimated
+    // H3 resolution via metadata rather than a C++ grid object.
     EXPECT_EQ(m.findChild("sample_size").value<int>(), 10);
     EXPECT_EQ(m.findChild("h3_resolution").value<int>(), 13);
 

@@ -55,13 +55,21 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
             None
         };
         let density = options.get_str("density", "");
-        let filter = HexBinFilter::with_options(
+        let mut filter = HexBinFilter::with_options(
             edge,
             options.get_u64("threshold", 15) as u32,
             options.get_u64("sample_size", 5000) as usize,
             (!density.is_empty()).then_some(density),
             options.get_bool("output_tesselation", false),
         );
+        // H3 grid mode: `h3_resolution` is only forwarded when explicitly set
+        // (>= 0); its absence means auto-estimate the resolution from a sample.
+        if options.get_bool("h3_grid", false) {
+            let resolution = options
+                .has("h3_resolution")
+                .then(|| options.get_u64("h3_resolution", 0) as u8);
+            filter.set_h3(resolution);
+        }
         Box::into_raw(Box::new(StageWrapper {
             filter: Box::new(filter),
         }))

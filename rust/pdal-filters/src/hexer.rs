@@ -557,6 +557,41 @@ impl H3Grid {
         }
     }
 
+    /// The H3 resolution this grid bins at (derived from the origin cell).
+    pub fn resolution(&self) -> Resolution {
+        self.origin.resolution()
+    }
+
+    /// Bin a point given in degrees (lng = x, lat = y) into its H3 cell,
+    /// mirroring `hexer::H3Grid::addXY` + `BaseGrid::addPoint`. The origin cell
+    /// fixes the local IJ frame and the resolution, so this must be called only
+    /// after the grid is constructed at the chosen resolution.
+    pub fn add_lat_lng(&mut self, lat_deg: f64, lng_deg: f64) -> Result<(), String> {
+        let cell = LatLng::new(lat_deg, lng_deg)
+            .map_err(|err| format!("Invalid lat/lng ({lat_deg}, {lng_deg}): {err}"))?
+            .to_cell(self.resolution());
+        let h = self.h3_to_ij(cell)?;
+        let count = {
+            let entry = self.counts.entry(h).or_insert(0);
+            *entry += 1;
+            *entry
+        };
+        if count == self.dense_limit {
+            let above = self.edge_hex(h, 0);
+            let below = self.edge_hex(h, 3);
+            if !self.is_dense(above) {
+                self.possible_roots.insert(h);
+            }
+            self.possible_roots.remove(&below);
+        }
+        Ok(())
+    }
+
+    /// All binned hexagons and their point counts (local IJ keys).
+    pub fn counts(&self) -> &HashMap<HexId, i32> {
+        &self.counts
+    }
+
     pub fn find_shapes(&mut self) -> Result<(), String> {
         if self.possible_roots.is_empty() {
             return Err("No areas of sufficient density - no shapes. \
@@ -749,12 +784,30 @@ impl H3Grid {
             .map_err(|err| format!("Can't convert IJ ({}, {}) to H3Index: {err}", ij.i, ij.j))
     }
 
-    #[allow(dead_code)]
     fn h3_to_ij(&self, cell: CellIndex) -> Result<HexId, String> {
         cell.to_local_ij(self.origin)
             .map(|ij| HexId::new(ij.coord.i, ij.coord.j))
             .map_err(|err| format!("Can't convert H3 index to IJ: {err}"))
     }
+}
+
+/// Pick an H3 resolution from an estimated hexagon height **in radians**,
+/// mirroring `hexer::H3Grid::processHeight`. The caller must convert the
+/// degree-space sample height to radians first (H3Grid::addXY stores radian
+/// coordinates before `computeHexSize`). Resolutions 1-7 are skipped, so the
+/// table entry index is offset by 8; the largest matching entry wins.
+pub fn h3_resolution_from_height(height_rad: f64) -> Result<u8, String> {
+    const RES_HEIGHTS: [f64; 7] = [2.0, 2.62e-4, 6.28e-5, 2.09e-5, 8.73e-6, 3.32e-6, 1.4e-6];
+    let mut res: i32 = -1;
+    for (i, &h) in RES_HEIGHTS.iter().take(6).enumerate() {
+        if height_rad < h {
+            res = i as i32 + 8;
+        }
+    }
+    if res < 0 {
+        return Err("unable to calculate H3 grid size!".to_string());
+    }
+    Ok(res as u8)
 }
 
 /// Format a point with the same trimmed-trailing-zero behavior as

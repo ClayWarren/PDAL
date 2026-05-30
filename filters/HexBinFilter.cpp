@@ -119,11 +119,16 @@ void HexBin::addArgs(ProgramArgs& args)
 
 bool HexBin::useRustPath() const
 {
-    // The Rust hexbin engine handles both an explicit edge_length and the
-    // sample-based auto edge_length estimate, so the only standard-grid cases
-    // still on the C++ path are an OGR boundary-file output (no Rust writer
-    // yet) and H3 grids.
-    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1;
+    // An OGR boundary-file output has no Rust writer yet, so it stays on the
+    // C++ path. The Rust engine handles standard grids (explicit or sample-
+    // estimated edge_length, plus the GeoJSON density file) and H3 grids
+    // (fixed or auto resolution). H3 density-file output still needs the C++
+    // OGR writer, so route H3 to Rust only when no density file is requested.
+    if (!m_boundaryOutput.empty())
+        return false;
+    if (m_isH3)
+        return m_DensityOutput.empty();
+    return true;
 }
 
 PointViewSet HexBin::run(PointViewPtr view)
@@ -142,6 +147,13 @@ PointViewSet HexBin::run(PointViewPtr view)
                              m_outputTesselation ? "true" : "false");
         if (!m_DensityOutput.empty())
             pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
+        if (m_isH3)
+        {
+            pdal_options_add_str(ops, "h3_grid", "true");
+            // Forward an explicit resolution only; -1 means auto-estimate.
+            if (m_h3Res != -1)
+                pdal_options_add_u64(ops, "h3_resolution", m_h3Res);
+        }
 
         m_rustStage = pdal_stage_create_hexbin(ops);
         pdal_options_destroy(ops);

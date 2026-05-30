@@ -547,13 +547,21 @@ pub fn create_filter(
                 None
             };
             let density = options.get_str("density", "");
-            Ok(Box::new(FilterWrapper::new(HexBinFilter::with_options(
+            let mut filter = HexBinFilter::with_options(
                 edge,
                 get_u64(options, "threshold", 15)? as u32,
                 get_u64(options, "sample_size", 5000)? as usize,
                 (!density.is_empty()).then_some(density),
                 get_bool(options, "output_tesselation", false)?,
-            ))))
+            );
+            if get_bool(options, "h3_grid", false)? {
+                let resolution = options
+                    .has("h3_resolution")
+                    .then(|| get_u64(options, "h3_resolution", 0).map(|r| r as u8))
+                    .transpose()?;
+                filter.set_h3(resolution);
+            }
+            Ok(Box::new(FilterWrapper::new(filter)))
         }
         "filters.iqr" => Ok(Box::new(FilterWrapper::new(IqrFilter::new(
             get_f64(options, "multiplier", 1.5)?,
