@@ -559,6 +559,16 @@ fn metrics_c_abi_reports_distances_and_eval_errors() {
         assert_eq!(delta["Y"]["mean"], 0.0);
         assert_eq!(delta["Z"]["mean"], 0.0);
 
+        let detail: serde_json::Value = serde_json::from_str(&take_string(pdal_delta_ex(
+            path.as_ptr(),
+            path.as_ptr(),
+            true,
+            false,
+        )))
+        .unwrap();
+        assert_eq!(detail["delta"][0]["i"], 0);
+        assert_eq!(detail["delta"][0]["X"], 0.0);
+
         assert_eq!(
             pdal_hausdorff(
                 std::ptr::null(),

@@ -233,7 +233,7 @@ fn ground_kernel_basic_and_extract_option_mapping() {
     assert_eq!(basic.len(), 1065);
     // --extract keeps only the ground (Classification 2) subset: fewer points,
     // and every surviving point is classified ground.
-    assert!(extract.len() > 0 && extract.len() < basic.len());
+    assert!(!extract.is_empty() && extract.len() < basic.len());
     for i in 0..extract.len() {
         assert_eq!(extract.get_f64(i, &DimId::Classification), 2.0);
     }

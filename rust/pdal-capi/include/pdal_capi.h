@@ -1282,6 +1282,8 @@ extern "C"
                        double* hausdorff, double* modified_hausdorff);
     int pdal_chamfer(const char* path_a, const char* path_b, double* chamfer);
     char* pdal_delta(const char* path_a, const char* path_b);
+    char* pdal_delta_ex(const char* path_a, const char* path_b, bool detail,
+                        bool all_dims);
     char* pdal_eval(const char* predicted_path, const char* truth_path,
                     const char* labels, const char* predicted_dim,
                     const char* truth_dim);

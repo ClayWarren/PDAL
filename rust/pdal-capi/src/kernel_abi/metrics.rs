@@ -1,5 +1,5 @@
 use crate::error::pdal_string_free;
-use crate::metrics_abi::{pdal_chamfer, pdal_delta, pdal_eval, pdal_hausdorff};
+use crate::metrics_abi::{pdal_chamfer, pdal_delta_ex, pdal_eval, pdal_hausdorff};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -92,11 +92,25 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
         return 0;
     }
 
-    let (c_source, c_candidate, _, _) = match c_metric_paths("delta", &args) {
-        Ok(paths) => paths,
-        Err(code) => return code,
+    let (detail, all_dims, paths) = match parse_delta_args(&args) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("Error: {message}");
+            return 1;
+        }
     };
-    let json = pdal_delta(c_source.as_ptr(), c_candidate.as_ptr());
+    let (source, candidate) = paths;
+    let (c_source, c_candidate) = match (
+        CString::new(source.as_str()),
+        CString::new(candidate.as_str()),
+    ) {
+        (Ok(c_source), Ok(c_candidate)) => (c_source, c_candidate),
+        _ => {
+            eprintln!("Error: a filename contains an interior NUL byte");
+            return 1;
+        }
+    };
+    let json = pdal_delta_ex(c_source.as_ptr(), c_candidate.as_ptr(), detail, all_dims);
     if json.is_null() {
         print_last_error();
         return 1;
@@ -104,6 +118,47 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
     println!("{}", CStr::from_ptr(json).to_string_lossy());
     pdal_string_free(json);
     0
+}
+
+fn parse_delta_args(args: &[String]) -> Result<(bool, bool, (String, String)), String> {
+    let mut source = None;
+    let mut candidate = None;
+    let mut detail = false;
+    let mut all_dims = false;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--detail" => detail = true,
+            "--alldims" => all_dims = true,
+            "--source" => {
+                let Some(value) = iter.next() else {
+                    return Err("--source requires a filename".to_string());
+                };
+                source = Some(value.clone());
+            }
+            "--candidate" => {
+                let Some(value) = iter.next() else {
+                    return Err("--candidate requires a filename".to_string());
+                };
+                candidate = Some(value.clone());
+            }
+            _ if let Some(value) = arg.strip_prefix("--source=") => {
+                source = Some(value.to_string());
+            }
+            _ if let Some(value) = arg.strip_prefix("--candidate=") => {
+                candidate = Some(value.to_string());
+            }
+            _ if arg.starts_with("--") => return Err(format!("unknown delta option '{arg}'")),
+            _ if source.is_none() => source = Some(arg.clone()),
+            _ if candidate.is_none() => candidate = Some(arg.clone()),
+            _ => return Err("delta expects exactly two filenames".to_string()),
+        }
+    }
+
+    match (source, candidate) {
+        (Some(source), Some(candidate)) => Ok((detail, all_dims, (source, candidate))),
+        _ => Err("delta expects exactly two filenames".to_string()),
+    }
 }
 
 pub(super) unsafe fn run_eval_kernel(argc: i32, argv: *const *const c_char) -> i32 {

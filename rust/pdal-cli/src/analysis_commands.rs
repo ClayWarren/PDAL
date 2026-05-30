@@ -3,6 +3,60 @@ use std::ffi::CString;
 use std::io::Read;
 use std::path::Path;
 
+struct DeltaArgs {
+    source: String,
+    candidate: String,
+    detail: bool,
+    all_dims: bool,
+}
+
+fn parse_delta_args(args: &[String]) -> Result<DeltaArgs, String> {
+    let mut source = None;
+    let mut candidate = None;
+    let mut detail = false;
+    let mut all_dims = false;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--detail" => detail = true,
+            "--alldims" => all_dims = true,
+            "--source" => {
+                let Some(value) = iter.next() else {
+                    return Err("--source requires a filename".to_string());
+                };
+                source = Some(value.clone());
+            }
+            "--candidate" => {
+                let Some(value) = iter.next() else {
+                    return Err("--candidate requires a filename".to_string());
+                };
+                candidate = Some(value.clone());
+            }
+            _ if let Some(value) = arg.strip_prefix("--source=") => {
+                source = Some(value.to_string());
+            }
+            _ if let Some(value) = arg.strip_prefix("--candidate=") => {
+                candidate = Some(value.to_string());
+            }
+            _ if arg.starts_with("--") => return Err(format!("unknown delta option '{arg}'")),
+            _ if source.is_none() => source = Some(arg.clone()),
+            _ if candidate.is_none() => candidate = Some(arg.clone()),
+            _ => return Err("delta expects exactly two filenames".to_string()),
+        }
+    }
+
+    let (Some(source), Some(candidate)) = (source, candidate) else {
+        return Err("delta expects exactly two filenames".to_string());
+    };
+
+    Ok(DeltaArgs {
+        source,
+        candidate,
+        detail,
+        all_dims,
+    })
+}
+
 fn parse_source_candidate_args<'a>(
     command: &str,
     args: &'a [String],
@@ -470,21 +524,24 @@ impl App {
     pub(super) fn run_delta(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
-            println!("  pdal delta <source> <candidate>");
+            println!("  pdal delta <source> <candidate> [--detail] [--alldims]");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
                 0
             };
         }
-        let (source, candidate) = match parse_source_candidate_args("delta", &self.command_args) {
-            Ok(paths) => paths,
+        let args = match parse_delta_args(&self.command_args) {
+            Ok(args) => args,
             Err(message) => {
                 eprintln!("Error: {message}");
                 return 1;
             }
         };
-        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
+        let (c_source, c_candidate) = match (
+            CString::new(args.source.as_str()),
+            CString::new(args.candidate.as_str()),
+        ) {
             (Ok(source), Ok(candidate)) => (source, candidate),
             _ => {
                 eprintln!("Error: a filename contains an interior NUL byte");
@@ -492,7 +549,14 @@ impl App {
             }
         };
 
-        let json_ptr = unsafe { pdal_capi::pdal_delta(c_source.as_ptr(), c_candidate.as_ptr()) };
+        let json_ptr = unsafe {
+            pdal_capi::pdal_delta_ex(
+                c_source.as_ptr(),
+                c_candidate.as_ptr(),
+                args.detail,
+                args.all_dims,
+            )
+        };
         if json_ptr.is_null() {
             self.output_last_error();
             return 1;

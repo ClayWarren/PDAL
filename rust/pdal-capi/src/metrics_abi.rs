@@ -165,9 +165,28 @@ pub unsafe extern "C" fn pdal_chamfer(
 /// `path_a` and `path_b` must be valid NUL-terminated C strings.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char) -> *mut c_char {
+    pdal_delta_ex(path_a, path_b, false, false)
+}
+
+/// Extended delta report with C++ `DeltaKernel` option parity.
+///
+/// `detail` selects per-point deltas instead of min/mean/max summaries.
+/// `all_dims` includes every dimension common to both layouts; otherwise only
+/// `X`, `Y`, and `Z` are reported.
+///
+/// # Safety
+///
+/// `path_a` and `path_b` must be valid NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_delta_ex(
+    path_a: *const c_char,
+    path_b: *const c_char,
+    detail: bool,
+    all_dims: bool,
+) -> *mut c_char {
     clear_last_error();
     if path_a.is_null() || path_b.is_null() {
-        set_last_error("null argument to pdal_delta");
+        set_last_error("null argument to pdal_delta_ex");
         return std::ptr::null_mut();
     }
     let path_a = CStr::from_ptr(path_a).to_string_lossy().into_owned();
@@ -192,16 +211,61 @@ pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char
         return std::ptr::null_mut();
     }
 
-    let stats = pdal_core::metrics::delta_summary(&source, &candidate);
-    let dim_json = |stat: &pdal_core::metrics::DeltaStat| serde_json::json!({ "min": stat.min, "mean": stat.mean, "max": stat.max });
-    let report = serde_json::json!({
-        "source": path_a,
-        "candidate": path_b,
-        "X": dim_json(&stats[0]),
-        "Y": dim_json(&stats[1]),
-        "Z": dim_json(&stats[2]),
-    });
+    let dims = delta_dimensions(&source, &candidate, all_dims);
+    let report = if detail {
+        let mut root = serde_json::Map::new();
+        for detail in pdal_core::metrics::delta_details_for_dims(&source, &candidate, &dims) {
+            let mut item = serde_json::Map::new();
+            item.insert("i".to_string(), serde_json::json!(detail.index));
+            for (name, value) in detail.values {
+                item.insert(name, serde_json::json!(value));
+            }
+            root.entry("delta".to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .expect("delta array")
+                .push(serde_json::Value::Object(item));
+        }
+        serde_json::Value::Object(root)
+    } else {
+        let stats = pdal_core::metrics::delta_summary_for_dims(&source, &candidate, &dims);
+        let mut root = serde_json::Map::new();
+        root.insert("source".to_string(), serde_json::json!(path_a));
+        root.insert("candidate".to_string(), serde_json::json!(path_b));
+        for stat in stats {
+            root.insert(
+                stat.dimension,
+                serde_json::json!({ "min": stat.min, "mean": stat.mean, "max": stat.max }),
+            );
+        }
+        serde_json::Value::Object(root)
+    };
     string_to_c_ptr(report.to_string())
+}
+
+fn delta_dimensions(
+    source: &PointView,
+    candidate: &PointView,
+    all_dims: bool,
+) -> Vec<(String, DimId)> {
+    if !all_dims {
+        return vec![
+            ("X".to_string(), DimId::X),
+            ("Y".to_string(), DimId::Y),
+            ("Z".to_string(), DimId::Z),
+        ];
+    }
+
+    let mut dims = Vec::new();
+    for idx in 0..source.layout().dim_count() {
+        let Some((dim, _)) = source.layout().dim_at(idx) else {
+            continue;
+        };
+        if candidate.layout().dim(dim).is_some() {
+            dims.push((dim.name().to_string(), dim.clone()));
+        }
+    }
+    dims
 }
 
 /// Evaluate predicted classification labels against truth labels.

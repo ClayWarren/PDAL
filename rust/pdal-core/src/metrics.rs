@@ -99,10 +99,16 @@ pub fn chamfer_distance(a: &PointView, b: &PointView) -> f64 {
 
 /// Min/mean/max of the signed delta of one dimension.
 pub struct DeltaStat {
-    pub dimension: &'static str,
+    pub dimension: String,
     pub min: f64,
     pub mean: f64,
     pub max: f64,
+}
+
+/// Per-source-point deltas to the nearest candidate point.
+pub struct DeltaDetail {
+    pub index: PointId,
+    pub values: Vec<(String, f64)>,
 }
 
 /// Per-dimension `X`/`Y`/`Z` delta statistics (PDAL's `delta` kernel).
@@ -111,17 +117,38 @@ pub struct DeltaStat {
 /// signed difference `source - candidate` is accumulated per dimension. Both
 /// views must be non-empty.
 pub fn delta_summary(source: &PointView, candidate: &PointView) -> [DeltaStat; 3] {
-    let dims = [DimId::X, DimId::Y, DimId::Z];
-    let names = ["X", "Y", "Z"];
-    let mut min = [f64::MAX; 3];
-    let mut max = [f64::MIN; 3];
-    let mut mean = [0.0f64; 3];
+    let stats = delta_summary_for_dims(
+        source,
+        candidate,
+        &[
+            ("X".to_string(), DimId::X),
+            ("Y".to_string(), DimId::Y),
+            ("Z".to_string(), DimId::Z),
+        ],
+    );
+    std::array::from_fn(|idx| DeltaStat {
+        dimension: stats[idx].dimension.clone(),
+        min: stats[idx].min,
+        mean: stats[idx].mean,
+        max: stats[idx].max,
+    })
+}
+
+/// Per-dimension delta statistics for the requested dimensions.
+pub fn delta_summary_for_dims(
+    source: &PointView,
+    candidate: &PointView,
+    dims: &[(String, DimId)],
+) -> Vec<DeltaStat> {
+    let mut min = vec![f64::MAX; dims.len()];
+    let mut max = vec![f64::MIN; dims.len()];
+    let mut mean = vec![0.0f64; dims.len()];
 
     for (source_id, &(cand_id, _)) in nearest_neighbors(source, candidate).iter().enumerate() {
         let count = source_id as f64 + 1.0;
-        for d in 0..3 {
-            let sv = source.get_f64(source_id as PointId, &dims[d]);
-            let cv = candidate.get_f64(cand_id, &dims[d]);
+        for (d, (_, dim)) in dims.iter().enumerate() {
+            let sv = source.get_f64(source_id as PointId, dim);
+            let cv = candidate.get_f64(cand_id, dim);
             let delta = sv - cv;
             if delta < min[d] {
                 min[d] = delta;
@@ -129,17 +156,42 @@ pub fn delta_summary(source: &PointView, candidate: &PointView) -> [DeltaStat; 3
             if delta > max[d] {
                 max[d] = delta;
             }
-            // Welford running mean of the signed deltas.
             mean[d] += (delta - mean[d]) / count;
         }
     }
 
-    std::array::from_fn(|d| DeltaStat {
-        dimension: names[d],
-        min: min[d],
-        mean: mean[d],
-        max: max[d],
-    })
+    dims.iter()
+        .enumerate()
+        .map(|(d, (name, _))| DeltaStat {
+            dimension: name.clone(),
+            min: min[d],
+            mean: mean[d],
+            max: max[d],
+        })
+        .collect()
+}
+
+/// Point-level deltas for the requested dimensions.
+pub fn delta_details_for_dims(
+    source: &PointView,
+    candidate: &PointView,
+    dims: &[(String, DimId)],
+) -> Vec<DeltaDetail> {
+    nearest_neighbors(source, candidate)
+        .iter()
+        .enumerate()
+        .map(|(source_id, &(cand_id, _))| DeltaDetail {
+            index: source_id as PointId,
+            values: dims
+                .iter()
+                .map(|(name, dim)| {
+                    let sv = source.get_f64(source_id as PointId, dim);
+                    let cv = candidate.get_f64(cand_id, dim);
+                    (name.clone(), sv - cv)
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 /// Classification metrics for a single label (PDAL's `LabelStats`).
@@ -337,6 +389,53 @@ mod tests {
             (stats[2].min, stats[2].mean, stats[2].max),
             (-1.0, 1.0, 3.0)
         );
+    }
+
+    #[test]
+    fn delta_supports_custom_dims_and_detail_output() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::U16);
+        let layout = Rc::new(layout);
+        let mut source = PointView::new(layout.clone());
+        let p0 = source.add_point();
+        source.set_f64(p0, &DimId::X, 0.0);
+        source.set_f64(p0, &DimId::Y, 0.0);
+        source.set_f64(p0, &DimId::Z, 0.0);
+        source.set_f64(p0, &DimId::Intensity, 8.0);
+        let p1 = source.add_point();
+        source.set_f64(p1, &DimId::X, 10.0);
+        source.set_f64(p1, &DimId::Y, 0.0);
+        source.set_f64(p1, &DimId::Z, 0.0);
+        source.set_f64(p1, &DimId::Intensity, 2.0);
+
+        let mut candidate = PointView::new(layout);
+        let q0 = candidate.add_point();
+        candidate.set_f64(q0, &DimId::X, 0.0);
+        candidate.set_f64(q0, &DimId::Y, 0.0);
+        candidate.set_f64(q0, &DimId::Z, 0.0);
+        candidate.set_f64(q0, &DimId::Intensity, 3.0);
+        let q1 = candidate.add_point();
+        candidate.set_f64(q1, &DimId::X, 10.0);
+        candidate.set_f64(q1, &DimId::Y, 0.0);
+        candidate.set_f64(q1, &DimId::Z, 0.0);
+        candidate.set_f64(q1, &DimId::Intensity, 5.0);
+
+        let dims = vec![("Intensity".to_string(), DimId::Intensity)];
+        let stats = delta_summary_for_dims(&source, &candidate, &dims);
+        assert_eq!(stats[0].dimension, "Intensity");
+        assert_eq!(
+            (stats[0].min, stats[0].mean, stats[0].max),
+            (-3.0, 1.0, 5.0)
+        );
+
+        let details = delta_details_for_dims(&source, &candidate, &dims);
+        assert_eq!(details[0].index, 0);
+        assert_eq!(details[0].values[0], ("Intensity".to_string(), 5.0));
+        assert_eq!(details[1].index, 1);
+        assert_eq!(details[1].values[0], ("Intensity".to_string(), -3.0));
     }
 
     /// Build a cloud whose points carry an extra `Classification` label.

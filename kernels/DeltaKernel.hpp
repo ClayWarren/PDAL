@@ -34,33 +34,10 @@
 
 #pragma once
 
-#include <map>
-
-#include <pdal/KDIndex.hpp>
 #include <pdal/Kernel.hpp>
-#include <pdal/PointView.hpp>
 
 namespace pdal
 {
-
-struct DimIndex
-{
-    std::string m_name;
-    Dimension::Id m_srcId;
-    Dimension::Id m_candId;
-    double m_min;
-    double m_max;
-    double m_avg;
-    point_count_t m_cnt;
-
-    DimIndex()
-        : m_srcId(Dimension::Id::Unknown), m_candId(Dimension::Id::Unknown),
-          m_min((std::numeric_limits<double>::max)()),
-          m_max((std::numeric_limits<double>::lowest)()), m_avg(0.0), m_cnt(0)
-    {
-    }
-};
-typedef std::map<std::string, DimIndex> DimIndexMap;
 
 class PDAL_EXPORT DeltaKernel : public Kernel
 {
@@ -71,12 +48,6 @@ public:
 
 private:
     void addSwitches(ProgramArgs& args) override;
-    PointViewPtr loadSet(const std::string& filename, PointTableRef table);
-    MetadataNode dump(PointViewPtr& srcView, PointViewPtr& candView,
-                      KD3Index& index, DimIndexMap& dims);
-    MetadataNode dumpDetail(PointViewPtr& srcView, PointViewPtr& candView,
-                            KD3Index& index, DimIndexMap& dims);
-    void accumulate(DimIndex& d, double v);
 
     std::string m_sourceFile;
     std::string m_candidateFile;

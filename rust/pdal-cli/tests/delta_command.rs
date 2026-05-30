@@ -81,6 +81,47 @@ fn delta_supports_named_source_and_candidate() {
 }
 
 #[test]
+fn delta_supports_detail_output() {
+    let file = data_path("test/data/ply/simple_text.ply");
+    let result = run_delta(&["--detail", file.to_str().unwrap(), file.to_str().unwrap()]);
+    assert!(
+        result.status.success(),
+        "pdal-rs delta --detail failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let first = json["delta"].as_array().unwrap().first().unwrap();
+    assert_eq!(first["i"], 0);
+    assert_eq!(first["X"], 0.0);
+    assert_eq!(first["Y"], 0.0);
+    assert_eq!(first["Z"], 0.0);
+}
+
+#[test]
+fn delta_supports_all_dimensions() {
+    let file = data_path("test/data/ply/text_extradim.ply");
+    let result = run_delta(&["--alldims", file.to_str().unwrap(), file.to_str().unwrap()]);
+    assert!(
+        result.status.success(),
+        "pdal-rs delta --alldims failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let object = json.as_object().unwrap();
+    let has_extra_dim = object
+        .keys()
+        .any(|key| !matches!(key.as_str(), "source" | "candidate" | "X" | "Y" | "Z"));
+    assert!(
+        has_extra_dim,
+        "expected --alldims to include an extra dimension"
+    );
+}
+
+#[test]
 fn delta_without_two_files_fails() {
     let file = data_path("test/data/ply/simple_text.ply");
     let result = run_delta(&[file.to_str().unwrap()]);
