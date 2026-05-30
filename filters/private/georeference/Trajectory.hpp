@@ -34,14 +34,14 @@
 
 #pragma once
 #include <nlohmann/json.hpp>
-#include <pdal/PointTable.hpp>
-#include <pdal/PointView.hpp>
 #include <pdal/pdal_types.hpp>
 
-#include <list>
-#include <map>
 #include <string>
-#include <utility>
+
+// Trajectory loading + interpolation is implemented in Rust behind the C ABI
+// (`pdal_trajectory_*`); this C++ class is a thin delegator. Forward-declare
+// the opaque handle so the header stays free of the C ABI include.
+struct pdal_trajectory;
 
 namespace pdal
 {
@@ -50,12 +50,11 @@ namespace georeference
 struct TrajPoint;
 class Trajectory
 {
-    pdal::PointViewPtr m_pointView;
-    pdal::PointTable m_table;
-    pdal::PointViewSet m_set;
+    pdal_trajectory* m_handle;
 
 public:
     Trajectory(const std::string& trajFile, const NL::json& opts);
+    ~Trajectory();
 
     bool getTrajPoint(double time, TrajPoint& trajPoint) const;
 };

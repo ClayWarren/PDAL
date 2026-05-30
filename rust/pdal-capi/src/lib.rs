@@ -44,6 +44,7 @@ mod stats_abi;
 mod thread_pool_abi;
 mod tile_abi;
 mod tool_abi;
+mod trajectory_abi;
 mod utils_abi;
 mod uuid_abi;
 mod vsi_abi;

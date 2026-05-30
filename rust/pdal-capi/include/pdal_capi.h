@@ -707,6 +707,15 @@ extern "C"
     bool pdal_topocentric_reverse(const pdal_topocentric_transform_t* handle,
                                   double* x, double* y, double* z);
 
+    typedef struct pdal_trajectory pdal_trajectory_t;
+    pdal_trajectory_t* pdal_trajectory_create(const char* filename,
+                                              const char* options_json);
+    void pdal_trajectory_destroy(pdal_trajectory_t* handle);
+    bool pdal_trajectory_get_point(const pdal_trajectory_t* handle, double time,
+                                   double* roll, double* pitch, double* azimuth,
+                                   double* wander_angle, double* x, double* y,
+                                   double* z, double* out_time);
+
     // XML schema
     char* pdal_xml_schema_remap_old_name(const char* name);
 

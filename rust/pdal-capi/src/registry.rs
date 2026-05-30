@@ -1407,7 +1407,9 @@ fn stage_name(
     }
 }
 
-fn options_from_object(object: &serde_json::Map<String, Value>) -> Result<Options, StageError> {
+pub(crate) fn options_from_object(
+    object: &serde_json::Map<String, Value>,
+) -> Result<Options, StageError> {
     let mut options = Options::new();
     for (key, value) in object {
         if matches!(key.as_str(), "type" | "tag" | "inputs") {

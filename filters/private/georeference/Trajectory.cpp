@@ -33,116 +33,44 @@
  ****************************************************************************/
 
 #include "Trajectory.hpp"
-#include "Utils.hpp"
-#include <algorithm>
-#include <cmath>
-#include <filesystem>
-#include <pdal/Options.hpp>
+
 #include <pdal/pdal_types.hpp>
 
-#include <pdal/Reader.hpp>
-#include <pdal/StageFactory.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
 namespace georeference
 {
-using DimId = Dimension::Id;
 
 Trajectory::Trajectory(const std::string& filename, const NL::json& opts)
+    : m_handle(nullptr)
 {
-    std::string driver("");
-    if (opts.contains("type"))
-        driver = opts.at("type").get<std::string>();
-    if (driver.empty())
-        driver = StageFactory::inferReaderDriver(filename);
-    if (driver.empty())
-        throw pdal_error("Cannot determine reader for input file: " + filename);
-
-    Options readerOptions;
-    readerOptions.add("filename", filename);
-    for (auto& arg : opts.items())
+    // Forward the optional `trajectory_options` object (driver `type` plus
+    // reader options) to the Rust loader as JSON text.
+    std::string optionsJson = opts.is_null() ? std::string("{}") : opts.dump();
+    m_handle = pdal_trajectory_create(filename.c_str(), optionsJson.c_str());
+    if (!m_handle)
     {
-        if (arg.key() == "type")
-            continue;
-
-        NL::detail::value_t type = opts.at(arg.key()).type();
-        switch (type)
-        {
-        case NL::detail::value_t::string:
-        {
-            std::string val = arg.value().get<std::string>();
-            readerOptions.add(arg.key(), arg.value().get<std::string>());
-            break;
-        }
-        case NL::detail::value_t::number_float:
-        {
-            readerOptions.add(arg.key(), arg.value().get<float>());
-            break;
-        }
-        case NL::detail::value_t::number_integer:
-        {
-            readerOptions.add(arg.key(), arg.value().get<int>());
-            break;
-        }
-        case NL::detail::value_t::boolean:
-        {
-            readerOptions.add(arg.key(), arg.value().get<bool>());
-            break;
-        }
-        default:
-        {
-            readerOptions.add(arg.key(), arg.value().dump());
-            break;
-        }
-        }
+        const char* err = pdal_last_error();
+        throw pdal_error(err && *err
+                             ? std::string(err)
+                             : ("Cannot load trajectory: " + filename));
     }
+}
 
-    std::unique_ptr<StageFactory> factory(new StageFactory);
-    Stage* reader = factory->createStage(driver);
-    reader->setOptions(readerOptions);
-    reader->prepare(m_table);
-    m_set = reader->execute(m_table);
-    m_pointView = *(m_set.begin());
+Trajectory::~Trajectory()
+{
+    pdal_trajectory_destroy(m_handle);
 }
 
 bool Trajectory::getTrajPoint(double time, TrajPoint& output) const
 {
-    PointViewIter upper = std::lower_bound(
-        m_pointView->begin(), m_pointView->end(), time,
-        [](const PointRef pt, double time)
-        { return pt.getFieldAs<double>(DimId::GpsTime) < time; });
-    if (upper != m_pointView->begin() && upper != m_pointView->end())
-    {
-        PointRef p1 = *(upper - 1);
-        PointRef p2 = *upper;
-        const double t1 = p1.getFieldAs<double>(DimId::GpsTime);
-        const double t2 = p2.getFieldAs<double>(DimId::GpsTime);
-        const double frac = (time - t1) / (t2 - t1);
-
-        output.roll = Utils::getAngle(p1.getFieldAs<double>(DimId::Roll),
-                                      p2.getFieldAs<double>(DimId::Roll), frac);
-        output.pitch =
-            Utils::getAngle(p1.getFieldAs<double>(DimId::Pitch),
-                            p2.getFieldAs<double>(DimId::Pitch), frac);
-        output.azimuth =
-            Utils::getAngle(p1.getFieldAs<double>(DimId::Azimuth),
-                            p2.getFieldAs<double>(DimId::Azimuth), frac);
-        output.wanderAngle =
-            Utils::getAngle(p1.getFieldAs<double>(DimId::WanderAngle),
-                            p2.getFieldAs<double>(DimId::WanderAngle), frac);
-        output.x = Utils::getAngle(p1.getFieldAs<double>(DimId::X),
-                                   p2.getFieldAs<double>(DimId::X), frac);
-        output.y = Utils::getAngle(p1.getFieldAs<double>(DimId::Y),
-                                   p2.getFieldAs<double>(DimId::Y), frac);
-        output.z = Utils::getValue(p1.getFieldAs<double>(DimId::Z),
-                                   p2.getFieldAs<double>(DimId::Z), frac);
-        output.time =
-            Utils::getValue(p1.getFieldAs<double>(DimId::GpsTime),
-                            p2.getFieldAs<double>(DimId::GpsTime), frac);
-        return true;
-    }
-    return false;
+    return pdal_trajectory_get_point(m_handle, time, &output.roll,
+                                     &output.pitch, &output.azimuth,
+                                     &output.wanderAngle, &output.x, &output.y,
+                                     &output.z, &output.time);
 }
+
 } // namespace georeference
 } // namespace pdal
