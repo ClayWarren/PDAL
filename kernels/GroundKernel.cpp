@@ -35,16 +35,11 @@
 
 #include "GroundKernel.hpp"
 
-#include <pdal/Options.hpp>
-#include <pdal/PointTable.hpp>
-#include <pdal/PointView.hpp>
-#include <pdal/Stage.hpp>
-#include <pdal/StageFactory.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "../filters/private/DimRange.hpp"
 
-#include <memory>
-#include <string>
+#include <sstream>
 #include <vector>
 
 namespace pdal
@@ -110,51 +105,51 @@ void GroundKernel::addSwitches(ProgramArgs& args)
 
 int GroundKernel::execute()
 {
-    ColumnPointTable table;
-
-    Options assignOptions;
-    assignOptions.add("assignment", "Classification[:]=0");
-
-    Options outlierOptions;
-
-    Options groundOptions;
-    groundOptions.add("window", m_args->maxWindowSize);
-    groundOptions.add("threshold", m_args->threshold);
-    groundOptions.add("slope", m_args->slope);
-    groundOptions.add("cell", m_args->cellSize);
-    groundOptions.add("cut", m_args->cut);
-    groundOptions.add("scalar", m_args->scalar);
-    for (auto& s : m_args->returns)
-        groundOptions.add("returns", s);
-    for (DimRange& r : m_args->ignored)
-        groundOptions.add("ignore", r);
-
-    Options rangeOptions;
-    rangeOptions.add("limits", "Classification[2:2]");
-
-    Stage& readerStage(makeReader(m_args->inputFile, ""));
-
-    Stage* assignStage = &readerStage;
+    StringList args;
+    args.push_back(m_args->inputFile);
+    args.push_back(m_args->outputFile);
+    args.push_back("--max_window_size");
+    args.push_back(std::to_string(m_args->maxWindowSize));
+    args.push_back("--slope");
+    args.push_back(std::to_string(m_args->slope));
+    args.push_back("--max_distance");
+    args.push_back(std::to_string(m_args->maxDistance));
+    args.push_back("--initial_distance");
+    args.push_back(std::to_string(m_args->initialDistance));
+    args.push_back("--cell_size");
+    args.push_back(std::to_string(m_args->cellSize));
+    args.push_back("--scalar");
+    args.push_back(std::to_string(m_args->scalar));
+    args.push_back("--threshold");
+    args.push_back(std::to_string(m_args->threshold));
+    args.push_back("--cut");
+    args.push_back(std::to_string(m_args->cut));
+    for (const std::string& value : m_args->returns)
+    {
+        args.push_back("--returns");
+        args.push_back(value);
+    }
+    for (const DimRange& range : m_args->ignored)
+    {
+        std::ostringstream out;
+        out << range;
+        args.push_back("--ignore");
+        args.push_back(out.str());
+    }
     if (m_args->reset)
-        assignStage = &makeFilter("filters.assign", readerStage, assignOptions);
-
-    Stage* outlierStage = assignStage;
+        args.push_back("--reset");
     if (m_args->denoise)
-        outlierStage =
-            &makeFilter("filters.outlier", *assignStage, outlierOptions);
-
-    Stage& groundStage =
-        makeFilter("filters.smrf", *outlierStage, groundOptions);
-
-    Stage* rangeStage = &groundStage;
+        args.push_back("--denoise");
     if (m_args->extract)
-        rangeStage = &makeFilter("filters.range", groundStage, rangeOptions);
+        args.push_back("--extract");
 
-    Stage& writer(makeWriter(m_args->outputFile, *rangeStage, ""));
-    writer.prepare(table);
-    writer.execute(table);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    return 0;
+    return pdal_rust_kernel_run("ground", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal
