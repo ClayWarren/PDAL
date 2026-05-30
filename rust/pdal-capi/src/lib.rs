@@ -19,6 +19,7 @@ mod filter_grid_abi;
 mod filter_icp_abi;
 mod filter_mesh_abi;
 mod filter_runtime;
+mod gridpnp_abi;
 mod info_abi;
 mod io_abi;
 mod kernel_abi;

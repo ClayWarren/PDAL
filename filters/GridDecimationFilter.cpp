@@ -41,7 +41,6 @@
 #include <pdal/private/gdal/GDALUtils.hpp>
 
 #include "private/Point.hpp"
-#include "private/pnp/GridPnp.hpp"
 
 #include <cstdarg>
 #include <sstream>

@@ -697,6 +697,13 @@ extern "C"
                                       double* xs, double* ys, double* zs,
                                       size_t len);
 
+    typedef struct pdal_gridpnp pdal_gridpnp_t;
+    pdal_gridpnp_t* pdal_gridpnp_create(const double* coords,
+                                        const size_t* ring_sizes,
+                                        size_t ring_count);
+    void pdal_gridpnp_destroy(pdal_gridpnp_t* handle);
+    bool pdal_gridpnp_inside(const pdal_gridpnp_t* handle, double x, double y);
+
     typedef struct pdal_topocentric_transform pdal_topocentric_transform_t;
     pdal_topocentric_transform_t* pdal_topocentric_create(double lat0,
                                                           double lon0,
