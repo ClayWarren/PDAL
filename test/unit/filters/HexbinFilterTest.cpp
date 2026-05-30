@@ -149,7 +149,9 @@ TEST(HexbinFilterTest, HexbinFilterTest_test_2)
     MetadataNode m2 = table2.metadata();
     m2 = m2.findChild(filter2.getName());
 
-    EXPECT_FALSE(filter2.grid()->sampling());
+    // The non-H3 standard grid now runs through the Rust hexbin engine, which
+    // reports the effective sample size (clamped to the point count) and the
+    // estimated edge length via metadata rather than a C++ grid object.
     EXPECT_EQ(m2.findChild("sample_size").value<int>(), 10);
     EXPECT_FLOAT_EQ(m2.findChild("estimated_edge").value<float>(), 1e-05);
 }

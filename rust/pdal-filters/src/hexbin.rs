@@ -188,9 +188,12 @@ impl Filter for HexBinFilter {
         // Trace the boundary. If there's no dense region, hexer returns an
         // error and we leave hex_boundary unset so the C++ wrapper can emit
         // `MULTIPOLYGON EMPTY` (matching the failure path).
+        // Fixed precision-8 matches C++ HexGrid::toWKT (OStringStreamClassicLocale
+        // + std::fixed). HexBinFilter re-parses hex_boundary_raw and smooths it
+        // through GEOS, so byte-identical raw WKT yields a byte-identical boundary.
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
             grid.find_parent_paths();
-            Some(grid.to_wkt(8))
+            Some(grid.to_wkt_fixed(8))
         } else {
             None
         };

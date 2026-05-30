@@ -119,8 +119,11 @@ void HexBin::addArgs(ProgramArgs& args)
 
 bool HexBin::useRustPath() const
 {
-    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1 &&
-           m_edgeLength > 0.0;
+    // The Rust hexbin engine handles both an explicit edge_length and the
+    // sample-based auto edge_length estimate, so the only standard-grid cases
+    // still on the C++ path are an OGR boundary-file output (no Rust writer
+    // yet) and H3 grids.
+    return !m_isH3 && m_boundaryOutput.empty() && m_h3Res == -1;
 }
 
 PointViewSet HexBin::run(PointViewPtr view)
@@ -294,15 +297,6 @@ void HexBin::done(PointTableRef table)
             rust_metadata::addChildrenTo(m_metadata, rustMetadata);
             pdal_metadata_node_destroy(rustMetadata);
         }
-
-        m_metadata.add("threshold", m_density,
-                       "Minimum number of points inside a hexagon to be "
-                       "considered full");
-        m_metadata.add(
-            "sample_size", m_sampleSize,
-            "Number of samples used for "
-            "estimating hexagon edge size. Only used if 'edge_length' or "
-            "'h3_resolution' is not set.");
 
         MetadataNode rawNode = m_metadata.findChild("hex_boundary_raw");
         std::string rawWkt = rawNode.valid() ? rawNode.value() : std::string();

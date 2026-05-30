@@ -456,50 +456,62 @@ impl HexGrid {
     /// Format the boundary as `MULTIPOLYGON (...)` with the given numeric
     /// precision, matching the C++ classic-locale stream output.
     pub fn to_wkt(&self, precision: usize) -> String {
+        self.format_wkt(precision, false)
+    }
+
+    /// Like [`to_wkt`], but with `std::fixed`-style precision (exactly
+    /// `precision` decimals). Used for `hex_boundary_raw`, which `HexBinFilter`
+    /// re-parses and smooths through GEOS — it must match the C++
+    /// `HexGrid::toWKT` fixed output so the simplified boundary is identical.
+    pub fn to_wkt_fixed(&self, precision: usize) -> String {
+        self.format_wkt(precision, true)
+    }
+
+    fn format_wkt(&self, precision: usize, fixed: bool) -> String {
         let mut out = String::from("MULTIPOLYGON (");
         for (i, &root) in self.roots.iter().enumerate() {
             if i > 0 {
                 out.push(',');
             }
-            self.write_path_polygon(root, precision, &mut out);
+            self.write_path_polygon(root, precision, fixed, &mut out);
         }
         out.push(')');
         out
     }
 
-    fn write_path_polygon(&self, idx: usize, precision: usize, out: &mut String) {
-        let islands = self.write_polygon(idx, precision, out);
+    fn write_path_polygon(&self, idx: usize, precision: usize, fixed: bool, out: &mut String) {
+        let islands = self.write_polygon(idx, precision, fixed, out);
         let mut pending = islands;
         while !pending.is_empty() {
             let next = std::mem::take(&mut pending);
             for sub in next {
                 out.push_str(", ");
-                pending.extend(self.write_polygon(sub, precision, out));
+                pending.extend(self.write_polygon(sub, precision, fixed, out));
             }
         }
     }
 
-    fn write_polygon(&self, idx: usize, precision: usize, out: &mut String) -> Vec<usize> {
+    fn write_polygon(&self, idx: usize, precision: usize, fixed: bool, out: &mut String) -> Vec<usize> {
         let mut islands = Vec::new();
         out.push('(');
-        self.write_ring(idx, precision, out);
+        self.write_ring(idx, precision, fixed, out);
         for &child in &self.paths[idx].children {
             out.push_str(", ");
-            self.write_ring(child, precision, out);
+            self.write_ring(child, precision, fixed, out);
             islands.extend(self.paths[child].children.iter().copied());
         }
         out.push(')');
         islands
     }
 
-    fn write_ring(&self, idx: usize, precision: usize, out: &mut String) {
+    fn write_ring(&self, idx: usize, precision: usize, fixed: bool, out: &mut String) {
         let pts = &self.paths[idx].points;
         debug_assert!(pts.len() > 2);
         out.push('(');
-        write_point(out, pts[0], precision);
+        write_point(out, pts[0], precision, fixed);
         for pt in &pts[1..] {
             out.push_str(", ");
-            write_point(out, *pt, precision);
+            write_point(out, *pt, precision, fixed);
         }
         out.push(')');
     }
@@ -687,10 +699,10 @@ impl H3Grid {
         let pts = &self.paths[idx].points;
         debug_assert!(pts.len() > 2);
         out.push('(');
-        write_point(out, pts[0], precision);
+        write_point(out, pts[0], precision, false);
         for pt in &pts[1..] {
             out.push_str(", ");
-            write_point(out, *pt, precision);
+            write_point(out, *pt, precision, false);
         }
         out.push(')');
     }
@@ -748,17 +760,26 @@ impl H3Grid {
 /// Format a point with the same trimmed-trailing-zero behavior as
 /// `Utils::OStringStreamClassicLocale` after `std::ios_base::fixed` + the
 /// precision setting (e.g. `4.90748 0.5`, not `4.907480 0.500000`).
-fn write_point(out: &mut String, p: Point, precision: usize) {
-    write_double(out, p.x, precision);
+fn write_point(out: &mut String, p: Point, precision: usize, fixed: bool) {
+    write_double(out, p.x, precision, fixed);
     out.push(' ');
-    write_double(out, p.y, precision);
+    write_double(out, p.y, precision, fixed);
 }
 
-fn write_double(out: &mut String, v: f64, precision: usize) {
-    // Mirror C++ default ostream behavior: `precision` is the number of
-    // significant digits, and trailing zeros after the decimal point are
-    // removed. We stay inside the %f-style branch because every coordinate
-    // produced by HexGrid has |v| < 1e6 and we never set `std::fixed`.
+fn write_double(out: &mut String, v: f64, precision: usize, fixed: bool) {
+    // `fixed` mirrors `Utils::OStringStreamClassicLocale` with
+    // `std::ios_base::fixed`: exactly `precision` digits after the decimal
+    // point, trailing zeros kept. This is what `HexBinFilter` feeds to
+    // `pdal::Polygon::simplify`, so the Rust `hex_boundary_raw` must use it to
+    // match the C++ smoothed boundary byte-for-byte.
+    if fixed {
+        let _ = write!(out, "{:.*}", precision, v);
+        return;
+    }
+    // Default ostream behavior: `precision` is the number of significant
+    // digits, and trailing zeros after the decimal point are removed. Every
+    // coordinate produced by HexGrid has |v| < 1e6, so we stay in the %f-style
+    // branch.
     if v == 0.0 {
         out.push('0');
         return;
