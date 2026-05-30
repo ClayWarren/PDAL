@@ -82,6 +82,14 @@ struct MergeClip {
     stage_value: String,
 }
 
+struct MergeArgs {
+    tindex_file: String,
+    output_file: String,
+    location_field: String,
+    target_srs: String,
+    clip: Option<MergeClip>,
+}
+
 pub(super) unsafe fn run_tindex_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
@@ -867,7 +875,7 @@ fn print_geojson_tindex(args: &CreateArgs, entries: Vec<Entry>) {
 }
 
 fn run_merge(args: &[String]) -> i32 {
-    let (index_file, output_file, location_field, clip) = match parse_merge_args(args) {
+    let args = match parse_merge_args(args) {
         Ok(parsed) => parsed,
         Err(ParseResult::Error(message)) => {
             eprintln!("PDAL: kernels.tindex: {message}");
@@ -876,17 +884,23 @@ fn run_merge(args: &[String]) -> i32 {
         Err(ParseResult::Unsupported) => return -1,
     };
 
-    let index_json = match std::fs::read_to_string(&index_file) {
+    let index_json = match std::fs::read_to_string(&args.tindex_file) {
         Ok(json) => json,
         Err(err) => {
-            eprintln!("PDAL: kernels.tindex: Unable to read tindex '{index_file}': {err}");
+            eprintln!(
+                "PDAL: kernels.tindex: Unable to read tindex '{}': {err}",
+                args.tindex_file
+            );
             return 1;
         }
     };
     let index: serde_json::Value = match serde_json::from_str(&index_json) {
         Ok(index) => index,
         Err(err) => {
-            eprintln!("PDAL: kernels.tindex: Unable to parse GeoJSON tindex '{index_file}': {err}");
+            eprintln!(
+                "PDAL: kernels.tindex: Unable to parse GeoJSON tindex '{}': {err}",
+                args.tindex_file
+            );
             return 1;
         }
     };
@@ -903,7 +917,7 @@ fn run_merge(args: &[String]) -> i32 {
     let mut tags = Vec::new();
     let mut file_count = 0;
     for (index, feature) in features.iter().enumerate() {
-        if let Some(clip) = &clip {
+        if let Some(clip) = &args.clip {
             let Some(feature_bounds) = feature_bounds_2d(feature) else {
                 eprintln!("PDAL: kernels.tindex: Feature has invalid geometry.");
                 return 1;
@@ -912,8 +926,11 @@ fn run_merge(args: &[String]) -> i32 {
                 continue;
             }
         }
-        let Some(location) = feature["properties"][&location_field].as_str() else {
-            eprintln!("PDAL: kernels.tindex: Feature is missing '{location_field}'.");
+        let Some(location) = feature["properties"][&args.location_field].as_str() else {
+            eprintln!(
+                "PDAL: kernels.tindex: Feature is missing '{}'.",
+                args.location_field
+            );
             return 1;
         };
         let Some(reader) = infer_reader_driver(location) else {
@@ -926,17 +943,30 @@ fn run_merge(args: &[String]) -> i32 {
             "filename": location,
             "tag": tag.clone(),
         }));
-        if let Some(clip) = &clip {
+        let mut input_tag = tag;
+        let feature_srs = feature["properties"]["srs"].as_str().unwrap_or("");
+        if !feature_srs.is_empty() && feature_srs != args.target_srs {
+            let reprojection_tag = format!("tindex_reprojection_{index}");
+            stages.push(serde_json::json!({
+                "type": "filters.reprojection",
+                "in_srs": feature_srs,
+                "out_srs": &args.target_srs,
+                "inputs": [input_tag],
+                "tag": reprojection_tag,
+            }));
+            input_tag = reprojection_tag;
+        }
+        if let Some(clip) = &args.clip {
             let crop_tag = format!("tindex_crop_{index}");
             stages.push(serde_json::json!({
                 "type": "filters.crop",
                 (clip.stage_key): clip.stage_value,
-                "inputs": [tag],
+                "inputs": [input_tag],
                 "tag": crop_tag,
             }));
             tags.push(crop_tag);
         } else {
-            tags.push(tag);
+            tags.push(input_tag);
         }
         file_count += 1;
     }
@@ -951,20 +981,22 @@ fn run_merge(args: &[String]) -> i32 {
             "inputs": tags,
         }));
     }
-    let Some(writer) = infer_writer_driver(&output_file) else {
-        eprintln!("PDAL: kernels.tindex: Unable to infer writer driver for '{output_file}'.");
+    let Some(writer) = infer_writer_driver(&args.output_file) else {
+        eprintln!(
+            "PDAL: kernels.tindex: Unable to infer writer driver for '{}'.",
+            args.output_file
+        );
         return 1;
     };
-    stages.push(serde_json::json!({ "type": writer, "filename": output_file }));
+    stages.push(serde_json::json!({ "type": writer, "filename": args.output_file }));
     execute_pipeline(serde_json::Value::Array(stages))
 }
 
-fn parse_merge_args(
-    args: &[String],
-) -> Result<(String, String, String, Option<MergeClip>), ParseResult> {
+fn parse_merge_args(args: &[String]) -> Result<MergeArgs, ParseResult> {
     let mut tindex_file = None;
     let mut output_file = None;
     let mut location_field = "location".to_string();
+    let mut target_srs = "EPSG:4326".to_string();
     let mut clip = None;
 
     let mut iter = args.iter();
@@ -982,7 +1014,7 @@ fn parse_merge_args(
                 clip = Some(parse_merge_polygon(value)?);
             }
             "--t_srs" => {
-                let _ = next_value(&mut iter, "--t_srs")?;
+                target_srs = next_value(&mut iter, "--t_srs")?.clone();
             }
             "--log" => {
                 let _ = next_value(&mut iter, "--log")?;
@@ -996,7 +1028,9 @@ fn parse_merge_args(
             _ if let Some(value) = arg.strip_prefix("--polygon=") => {
                 clip = Some(parse_merge_polygon(value)?);
             }
-            _ if arg.starts_with("--t_srs=") => {}
+            _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
+                target_srs = value.to_string();
+            }
             _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--") => {
                 return Err(ParseResult::Unsupported);
@@ -1017,7 +1051,13 @@ fn parse_merge_args(
             "merge requires --filespec <output>".to_string(),
         ));
     };
-    Ok((tindex_file, output_file, location_field, clip))
+    Ok(MergeArgs {
+        tindex_file,
+        output_file,
+        location_field,
+        target_srs,
+        clip,
+    })
 }
 
 fn parse_merge_bounds(value: &str) -> Result<MergeClip, ParseResult> {
