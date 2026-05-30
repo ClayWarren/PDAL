@@ -316,4 +316,156 @@ mod tests {
             }
         }
     }
+
+    /// Build an `nx`-by-`ny` surface grid. `jitter` perturbs the X/Y of interior
+    /// points with a deterministic xorshift so the advancing front has to stitch
+    /// irregular fronts (driving connect_point / case_next2f / case_next2s).
+    /// `curve` lifts each point in Z to exercise the projection-plane and
+    /// visibility math; normals point up, which is enough to reach those paths.
+    fn grid_view(nx: usize, ny: usize, jitter: f64, curve: f64) -> PointView {
+        let mut layout = PointLayout::new();
+        for d in [
+            DimId::X,
+            DimId::Y,
+            DimId::Z,
+            DimId::NormalX,
+            DimId::NormalY,
+            DimId::NormalZ,
+        ] {
+            layout.register(d, DimType::F64);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        let mut seed = 0x2545_f491_4f6c_dd1d_u64;
+        let mut rng = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64 - 0.5
+        };
+        for gy in 0..ny {
+            for gx in 0..nx {
+                let id = view.add_point();
+                let interior = gx > 0 && gy > 0 && gx + 1 < nx && gy + 1 < ny;
+                let jx = if interior { jitter * rng() } else { 0.0 };
+                let jy = if interior { jitter * rng() } else { 0.0 };
+                let x = gx as f64 + jx;
+                let y = gy as f64 + jy;
+                view.set_f64(id, &DimId::X, x);
+                view.set_f64(id, &DimId::Y, y);
+                view.set_f64(id, &DimId::Z, curve * (x * x + y * y));
+                view.set_f64(id, &DimId::NormalX, 0.0);
+                view.set_f64(id, &DimId::NormalY, 0.0);
+                view.set_f64(id, &DimId::NormalZ, 1.0);
+            }
+        }
+        view
+    }
+
+    fn dense_params() -> GreedyProjectionParams {
+        GreedyProjectionParams {
+            mu: 2.5,
+            search_radius: 3.0,
+            nnn: 16,
+            ..GreedyProjectionParams::default()
+        }
+    }
+
+    fn assert_valid_triangles(view: &PointView, triangles: &[[PointId; 3]]) {
+        let n = view.len();
+        for tri in triangles {
+            assert!(tri[0] != tri[1] && tri[1] != tri[2] && tri[0] != tri[2]);
+            for &idx in tri {
+                assert!(idx < n, "triangle index out of bounds");
+            }
+        }
+    }
+
+    #[test]
+    fn dense_planar_grid_triangulates_interior() {
+        let view = grid_view(12, 12, 0.0, 0.0);
+        let triangles = run(&view, dense_params());
+        assert!(
+            triangles.len() > 100,
+            "expected a substantial mesh, got {}",
+            triangles.len()
+        );
+        assert_valid_triangles(&view, &triangles);
+    }
+
+    #[test]
+    fn jittered_grid_exercises_front_stitching() {
+        let view = grid_view(14, 10, 0.45, 0.0);
+        let triangles = run(&view, dense_params());
+        assert!(!triangles.is_empty());
+        assert_valid_triangles(&view, &triangles);
+    }
+
+    #[test]
+    fn curved_grid_exercises_projection_and_visibility() {
+        let view = grid_view(11, 11, 0.25, 0.05);
+        let triangles = run(&view, dense_params());
+        assert!(!triangles.is_empty());
+        assert_valid_triangles(&view, &triangles);
+    }
+
+    #[test]
+    fn tight_radius_leaves_far_points_unconnected() {
+        let mut layout = PointLayout::new();
+        for d in [
+            DimId::X,
+            DimId::Y,
+            DimId::Z,
+            DimId::NormalX,
+            DimId::NormalY,
+            DimId::NormalZ,
+        ] {
+            layout.register(d, DimType::F64);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        let add = |view: &mut PointView, x: f64, y: f64| {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, x);
+            view.set_f64(id, &DimId::Y, y);
+            view.set_f64(id, &DimId::Z, 0.0);
+            view.set_f64(id, &DimId::NormalX, 0.0);
+            view.set_f64(id, &DimId::NormalY, 0.0);
+            view.set_f64(id, &DimId::NormalZ, 1.0);
+        };
+        for gy in 0..3 {
+            for gx in 0..3 {
+                add(&mut view, gx as f64, gy as f64);
+                add(&mut view, gx as f64 + 50.0, gy as f64);
+            }
+        }
+        let params = GreedyProjectionParams {
+            mu: 2.0,
+            search_radius: 1.8,
+            nnn: 8,
+            ..GreedyProjectionParams::default()
+        };
+        let triangles = run(&view, params);
+        assert_valid_triangles(&view, &triangles);
+    }
+
+    #[test]
+    fn fewer_than_three_points_yields_no_triangles() {
+        let mut layout = PointLayout::new();
+        for d in [
+            DimId::X,
+            DimId::Y,
+            DimId::Z,
+            DimId::NormalX,
+            DimId::NormalY,
+            DimId::NormalZ,
+        ] {
+            layout.register(d, DimType::F64);
+        }
+        let mut view = PointView::new(Rc::new(layout));
+        for i in 0..2 {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, i as f64);
+            view.set_f64(id, &DimId::NormalZ, 1.0);
+        }
+        assert!(run(&view, dense_params()).is_empty());
+    }
 }
