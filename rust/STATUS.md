@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 20,396 | 186 |
-| c-abi-backed | 39,289 | 352 |
+| port-candidate | 19,773 | 183 |
+| c-abi-backed | 39,827 | 355 |
 | native-adapter | 2,188 | 19 |
 | holdout | 339 | 4 |
-| total | 62,212 | 561 |
+| total | 62,127 | 561 |
 
-Port-candidate backlog by area: `pdal` 8,025 · `io` 8,010 · `filters` 3,436 ·
+Port-candidate backlog by area: `io` 8,010 · `pdal` 7,402 · `filters` 3,436 ·
 `kernels` 925. `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not

@@ -56,6 +56,8 @@ C_ABI_HEADER_MARKERS = ("pdal_capi.h", "RustViewConverter.hpp")
 KNOWN_BRIDGE_FILES = {
     "filters/private/RustMetadata.hpp",
     "filters/private/RustPipeline.hpp",
+    "pdal/KDIndex.cpp",
+    "pdal/KDIndex.hpp",
 }
 
 # C++ bindings over external native libraries. Their Rust home is `pdal-native`

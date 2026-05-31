@@ -11,8 +11,8 @@
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
- *       the documentation and/or other materials provided
- *       with the distribution.
+ *       the documentation and/or other materials provided with the
+ *       distribution.
  *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
  *       names of its contributors may be used to endorse or promote
  *       products derived from this software without specific prior
@@ -34,417 +34,270 @@
 
 #pragma once
 
-#include <nanoflann/nanoflann.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {
+namespace
+{
 
-class KD2Impl
+inline void appendIds(const std::vector<pdal_spatial_result_t>& results,
+                      PointIdList& output)
+{
+    output.reserve(results.size());
+    for (const pdal_spatial_result_t& result : results)
+        output.push_back(result.id);
+}
+
+inline void copyKnnResults(const std::vector<pdal_spatial_result_t>& results,
+                           PointIdList* indices, std::vector<double>* sqrDists)
+{
+    if (!indices || !sqrDists)
+        return;
+
+    const size_t count =
+        (std::min)({results.size(), indices->size(), sqrDists->size()});
+    for (size_t i = 0; i < count; ++i)
+    {
+        (*indices)[i] = results[i].id;
+        (*sqrDists)[i] = results[i].sqr_dist;
+    }
+}
+
+inline std::vector<pdal_spatial_result_t>
+knn(pdal_point_view_t* view, const std::vector<const char*>& dims,
+    const std::vector<double>& query, point_count_t k, size_t stride)
+{
+    if (!view || dims.empty() || query.empty() || k == 0)
+        return {};
+
+    std::vector<pdal_spatial_result_t> results(k);
+    uint64_t written = pdal_point_view_knn(
+        view, dims.data(), query.data(), dims.size(), k,
+        (std::max)(stride, size_t(1)), results.data(), results.size());
+    results.resize(written);
+    return results;
+}
+
+inline std::vector<pdal_spatial_result_t>
+radius(pdal_point_view_t* view, const std::vector<const char*>& dims,
+       const std::vector<double>& query, double r)
+{
+    if (!view || dims.empty() || query.empty())
+        return {};
+
+    uint64_t len = 0;
+    pdal_spatial_result_t* raw = pdal_point_view_radius(
+        view, dims.data(), query.data(), dims.size(), r, &len);
+    if (!raw)
+        return {};
+
+    std::vector<pdal_spatial_result_t> results(raw, raw + len);
+    pdal_spatial_results_free(raw, len);
+    return results;
+}
+
+inline std::vector<const char*>
+dimensionNames(const PointLayout& layout, const Dimension::IdList& dims,
+               std::vector<std::string>& storage)
+{
+    storage.clear();
+    storage.reserve(dims.size());
+    std::vector<const char*> names;
+    names.reserve(dims.size());
+    for (Dimension::Id dim : dims)
+    {
+        storage.push_back(layout.dimName(dim));
+        names.push_back(storage.back().c_str());
+    }
+    return names;
+}
+
+} // unnamed namespace
+
+class KDBaseImpl
 {
 public:
-    using RadiusResults = std::vector<std::pair<size_t, double>>;
-
-    KD2Impl(const PointView& buf)
-        : m_buf(buf),
-          m_index(2, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
+    explicit KDBaseImpl(const PointView& buf) : m_buf(buf), m_rustView(nullptr)
     {
     }
 
-    std::size_t kdtree_get_point_count() const
+    ~KDBaseImpl()
     {
-        return m_buf.size();
-    }
-
-    double kdtree_get_pt(const PointId idx, int dim) const
-    {
-        using namespace Dimension;
-        std::array<Id, 2> ids{Id::X, Id::Y};
-        return m_buf.getFieldAs<double>(ids[dim], idx);
-    }
-
-    double kdtree_distance(const double* p1, const PointId p2_idx,
-                           size_t /*numDims*/) const
-    {
-        double d0 = p1[0] - m_buf.getFieldAs<double>(Dimension::Id::X, p2_idx);
-        double d1 = p1[1] - m_buf.getFieldAs<double>(Dimension::Id::Y, p2_idx);
-
-        return (d0 * d0 + d1 * d1);
-    }
-
-    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
-    {
-        if (m_buf.empty())
-            bb = {};
-        else
-        {
-            BOX2D bounds;
-            m_buf.calculateBounds(bounds);
-
-            bb = {{bounds.minx, bounds.maxx}, {bounds.miny, bounds.maxy}};
-        }
-        return true;
+        pdal_point_view_destroy(m_rustView);
     }
 
     void build()
     {
-        m_index.buildIndex();
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = rust_view_converter::toRust(const_cast<PointView&>(m_buf));
+    }
+
+protected:
+    pdal_point_view_t* view() const
+    {
+        if (!m_rustView)
+            const_cast<KDBaseImpl*>(this)->build();
+        return m_rustView;
+    }
+
+private:
+    const PointView& m_buf;
+    pdal_point_view_t* m_rustView;
+};
+
+class KD2Impl : public KDBaseImpl
+{
+public:
+    using RadiusResults = std::vector<std::pair<size_t, double>>;
+
+    explicit KD2Impl(const PointView& buf) : KDBaseImpl(buf) {}
+
+    void build()
+    {
+        KDBaseImpl::build();
     }
 
     PointIdList neighbors(double x, double y, point_count_t k) const
     {
-        k = (std::min)(m_buf.size(), k);
-        PointIdList output(k);
-        std::vector<double> out_dist_sqr(k);
-        nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k);
-
-        resultSet.init(&output[0], &out_dist_sqr[0]);
-
-        std::array<double, 2> pt{x, y};
-        m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams(10));
+        PointIdList output;
+        appendIds(knn(view(), {"X", "Y"}, {x, y}, k, 1), output);
         return output;
     }
 
     void knnSearch(double x, double y, point_count_t k, PointIdList* indices,
-                   std::vector<double>* sqr_dists) const
+                   std::vector<double>* sqrDists) const
     {
-        k = (std::min)(m_buf.size(), k);
-        nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k);
-
-        resultSet.init(&indices->front(), &sqr_dists->front());
-
-        std::array<double, 2> pt{x, y};
-        m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams(10));
+        copyKnnResults(knn(view(), {"X", "Y"}, {x, y}, k, 1), indices,
+                       sqrDists);
     }
 
     PointIdList radius(double x, double y, double r) const
     {
         PointIdList output;
-        std::vector<std::pair<std::size_t, double>> ret_matches;
-        nanoflann::SearchParams params;
-        params.sorted = true;
-
-        std::array<double, 2> pt{x, y};
-
-        // Our distance metric is square distance, so we use the square of
-        // the radius.
-        const std::size_t count =
-            m_index.radiusSearch(&pt[0], r * r, ret_matches, params);
-
-        for (std::size_t i = 0; i < count; ++i)
-            output.push_back(ret_matches[i].first);
+        appendIds(radiusResults(x, y, r), output);
         return output;
     }
 
-    void radius(double x, double y, double r, RadiusResults& ret_matches) const
+    void radius(double x, double y, double r, RadiusResults& results) const
     {
-        nanoflann::SearchParams params;
-
-        std::array<double, 2> pt{x, y};
-
-        // Our distance metric is square distance, so we use the square of
-        // the radius.
-        m_index.radiusSearch(&pt[0], r * r, ret_matches, params);
+        results.clear();
+        for (const pdal_spatial_result_t& result : radiusResults(x, y, r))
+            results.push_back({result.id, result.sqr_dist});
     }
 
 private:
-    const PointView& m_buf;
-
-    typedef nanoflann::KDTreeSingleIndexAdaptor<
-        nanoflann::L2_Simple_Adaptor<double, KD2Impl, double>, KD2Impl, -1,
-        std::size_t>
-        KDTree;
-
-    KDTree m_index;
+    std::vector<pdal_spatial_result_t> radiusResults(double x, double y,
+                                                     double r) const
+    {
+        return pdal::radius(view(), {"X", "Y"}, {x, y}, r);
+    }
 };
 
-class KD3Impl
+class KD3Impl : public KDBaseImpl
 {
 public:
     using RadiusResults = std::vector<std::pair<size_t, double>>;
 
-    KD3Impl(const PointView& buf)
-        : m_buf(buf),
-          m_index(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(100))
-    {
-    }
-
-    std::size_t kdtree_get_point_count() const
-    {
-        return m_buf.size();
-    }
-
-    double kdtree_get_pt(const PointId idx, int dim) const
-    {
-        if (idx >= m_buf.size())
-            return 0.0;
-
-        using namespace Dimension;
-        std::array<Id, 3> ids{Id::X, Id::Y, Id::Z};
-        if ((size_t)dim >= ids.size())
-            throw pdal_error("kdtree_get_pt: Request for invalid dimension "
-                             "from nanoflann");
-
-        return m_buf.getFieldAs<double>(ids[dim], idx);
-    }
-
-    double kdtree_distance(const double* p1, const PointId p2_idx,
-                           size_t /*numDims*/) const
-    {
-        double d0 = p1[0] - m_buf.getFieldAs<double>(Dimension::Id::X, p2_idx);
-        double d1 = p1[1] - m_buf.getFieldAs<double>(Dimension::Id::Y, p2_idx);
-        double d2 = p1[2] - m_buf.getFieldAs<double>(Dimension::Id::Z, p2_idx);
-
-        return (d0 * d0 + d1 * d1 + d2 * d2);
-    }
-
-    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
-    {
-        if (m_buf.empty())
-            bb = {};
-        else
-        {
-            BOX3D bounds;
-            m_buf.calculateBounds(bounds);
-            bb = {{bounds.minx, bounds.maxx},
-                  {bounds.miny, bounds.maxy},
-                  {bounds.minz, bounds.maxz}};
-        }
-        return true;
-    }
+    explicit KD3Impl(const PointView& buf) : KDBaseImpl(buf) {}
 
     void build()
     {
-        m_index.buildIndex();
+        KDBaseImpl::build();
     }
 
     PointIdList neighbors(double x, double y, double z, point_count_t k,
                           size_t stride) const
     {
-        // Account for input buffer size smaller than requested number of
-        // neighbors, then determine the number of neighbors to extract based
-        // on the desired stride.
-        k = (std::min)(m_buf.size(), k);
-        point_count_t k2 = stride * k;
-
-        // Prepare output indices and squared distances.
-        PointIdList output(k2);
-        std::vector<double> out_dist_sqr(k2);
-
-        // Set the query point.
-        std::vector<double> pt{x, y, z};
-
-        // Extract k*stride neighbors, then return only k, selecting every nth
-        // neighbor at the given stride.
-        nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k2);
-        resultSet.init(&output[0], &out_dist_sqr[0]);
-        m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams());
-
-        // Perform the downsampling if a stride is provided.
-        if (stride > 1)
-        {
-            for (size_t i = 1; i < k; ++i)
-                output[i] = output[i * stride];
-            output.resize(k);
-        }
+        PointIdList output;
+        appendIds(knn(view(), {"X", "Y", "Z"}, {x, y, z}, k, stride), output);
         return output;
     }
 
     void knnSearch(double x, double y, double z, point_count_t k,
-                   PointIdList* indices, std::vector<double>* sqr_dists) const
+                   PointIdList* indices, std::vector<double>* sqrDists) const
     {
-        k = (std::min)(m_buf.size(), k);
-        nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k);
-
-        resultSet.init(&indices->front(), &sqr_dists->front());
-
-        std::vector<double> pt;
-        pt.push_back(x);
-        pt.push_back(y);
-        pt.push_back(z);
-        m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams(10));
+        copyKnnResults(knn(view(), {"X", "Y", "Z"}, {x, y, z}, k, 1), indices,
+                       sqrDists);
     }
 
     PointIdList radius(double x, double y, double z, double r) const
     {
         PointIdList output;
-        std::vector<std::pair<std::size_t, double>> ret_matches;
-        nanoflann::SearchParams params;
-        params.sorted = true;
-
-        std::vector<double> pt{x, y, z};
-
-        // Our distance metric is square distance, so we use the square of
-        // the radius.
-        const std::size_t count =
-            m_index.radiusSearch(&pt[0], r * r, ret_matches, params);
-
-        for (std::size_t i = 0; i < count; ++i)
-            output.push_back(ret_matches[i].first);
+        appendIds(radiusResults(x, y, z, r), output);
         return output;
     }
 
     void radius(double x, double y, double z, double r,
-                RadiusResults& ret_matches) const
+                RadiusResults& results) const
     {
-        nanoflann::SearchParams params;
-
-        std::vector<double> pt{x, y, z};
-
-        // Our distance metric is square distance, so we use the square of
-        // the radius.
-        m_index.radiusSearch(&pt[0], r * r, ret_matches, params);
+        results.clear();
+        for (const pdal_spatial_result_t& result : radiusResults(x, y, z, r))
+            results.push_back({result.id, result.sqr_dist});
     }
 
 private:
-    const PointView& m_buf;
-
-    typedef nanoflann::KDTreeSingleIndexAdaptor<
-        nanoflann::L2_Simple_Adaptor<double, KD3Impl, double>, KD3Impl, -1,
-        std::size_t>
-        KDTree;
-
-    KDTree m_index;
+    std::vector<pdal_spatial_result_t> radiusResults(double x, double y,
+                                                     double z, double r) const
+    {
+        return pdal::radius(view(), {"X", "Y", "Z"}, {x, y, z}, r);
+    }
 };
 
-class KDFlexImpl
+class KDFlexImpl : public KDBaseImpl
 {
 public:
     KDFlexImpl(const PointView& buf, const Dimension::IdList& dims)
-        : m_buf(buf), m_dims(dims),
-          m_index(m_dims.size(), *this,
-                  nanoflann::KDTreeSingleIndexAdaptorParams(100))
+        : KDBaseImpl(buf), m_buf(buf), m_dims(dims)
     {
-    }
-
-    std::size_t kdtree_get_point_count() const
-    {
-        return m_buf.size();
     }
 
     void build()
     {
-        m_index.buildIndex();
+        KDBaseImpl::build();
     }
 
     PointIdList neighbors(PointRef& point, point_count_t k, size_t stride) const
     {
-        // Account for input buffer size smaller than requested number of
-        // neighbors, then determine the number of neighbors to extract based
-        // on the desired stride.
-        k = (std::min)(m_buf.size(), k);
-        point_count_t k2 = stride * k;
-
-        // Prepare output indices and squared distances.
-        PointIdList output(k2);
-        std::vector<double> out_dist_sqr(k2);
-
-        // Set the query point.
-        std::vector<double> pt;
-        for (auto const& dim : m_dims)
-        {
-            double val = point.getFieldAs<double>(dim);
-            pt.push_back(val);
-        }
-
-        // Extract k*stride neighbors, then return only k, selecting every nth
-        // neighbor at the given stride.
-        nanoflann::KNNResultSet<double, PointId, point_count_t> resultSet(k2);
-        resultSet.init(&output[0], &out_dist_sqr[0]);
-        m_index.findNeighbors(resultSet, &pt[0], nanoflann::SearchParams());
-
-        // Perform the downsampling if a stride is provided.
-        if (stride > 1)
-        {
-            for (size_t i = 1; i < k; ++i)
-                output[i] = output[i * stride];
-            output.resize(k);
-        }
+        std::vector<std::string> nameStorage;
+        std::vector<const char*> names =
+            dimensionNames(*m_buf.layout(), m_dims, nameStorage);
+        PointIdList output;
+        appendIds(knn(view(), names, query(point), k, stride), output);
         return output;
     }
 
     PointIdList radius(PointId idx, double r) const
     {
+        std::vector<std::string> nameStorage;
+        std::vector<const char*> names =
+            dimensionNames(*m_buf.layout(), m_dims, nameStorage);
         PointIdList output;
-        std::vector<std::pair<std::size_t, double>> ret_matches;
-        nanoflann::SearchParams params;
-        params.sorted = true;
-
-        std::vector<double> pt;
-        for (auto const& dim : m_dims)
-        {
-            double val = m_buf.getFieldAs<double>(dim, idx);
-            pt.push_back(val);
-        }
-
-        // Our distance metric is square distance, so we use the square of
-        // the radius.
-        const std::size_t count =
-            m_index.radiusSearch(pt.data(), r * r, ret_matches, params);
-
-        for (std::size_t i = 0; i < count; ++i)
-            output.push_back(ret_matches[i].first);
+        appendIds(pdal::radius(view(), names, query(idx), r), output);
         return output;
     }
 
-    inline double kdtree_get_pt(const PointId idx, int dim) const
-    {
-        if (idx >= m_buf.size())
-            return 0.0;
-
-        return m_buf.getFieldAs<double>(m_dims[dim], idx);
-    }
-
-    inline double kdtree_distance(const double* p1, const PointId idx,
-                                  size_t /*numDims*/) const
-    {
-        double result(0.0);
-        for (size_t i = 0; i < m_dims.size(); ++i)
-        {
-            double d = p1[i] - m_buf.getFieldAs<double>(m_dims[i], idx);
-            result += d * d;
-        }
-
-        return result;
-    }
-
-    template <class BBOX> bool kdtree_get_bbox(BBOX& bb) const
-    {
-        if (m_buf.empty())
-            bb = {};
-        else
-        {
-            for (size_t j = 0; j < m_dims.size(); ++j)
-            {
-                double val = m_buf.getFieldAs<double>(m_dims[j], 0);
-                bb[j].low = val;
-                bb[j].high = val;
-            }
-
-            for (PointId i = 1; i < m_buf.size(); ++i)
-            {
-                for (size_t j = 0; j < m_dims.size(); ++j)
-                {
-                    double val = m_buf.getFieldAs<double>(m_dims[j], i);
-                    if (val < bb[j].low)
-                        bb[j].low = val;
-                    if (val > bb[j].high)
-                        bb[j].high = val;
-                }
-            }
-        }
-        return true;
-    }
-
 private:
+    std::vector<double> query(PointRef& point) const
+    {
+        std::vector<double> values;
+        values.reserve(m_dims.size());
+        for (Dimension::Id dim : m_dims)
+            values.push_back(point.getFieldAs<double>(dim));
+        return values;
+    }
+
+    std::vector<double> query(PointId idx) const
+    {
+        std::vector<double> values;
+        values.reserve(m_dims.size());
+        for (Dimension::Id dim : m_dims)
+            values.push_back(m_buf.getFieldAs<double>(dim, idx));
+        return values;
+    }
+
     const PointView& m_buf;
     const Dimension::IdList& m_dims;
-
-    typedef nanoflann::KDTreeSingleIndexAdaptor<
-        nanoflann::L2_Simple_Adaptor<double, KDFlexImpl, double>, KDFlexImpl,
-        -1, std::size_t>
-        KDTree;
-
-    KDTree m_index;
 };
 
 } // namespace pdal
