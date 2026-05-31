@@ -1524,6 +1524,7 @@ extern "C"
     void pdal_ept_reader_preview_destroy(pdal_ept_reader_preview_t* handle);
     bool pdal_ept_validate_origin(const char* filename, const char* origin);
     bool pdal_ept_validate_bounds(const char* filename, const char* bounds);
+    bool pdal_ept_srs_wkt_from_info(const char* info_json, char** out_wkt);
     char* pdal_stac_preview_json(const pdal_options_t* ops);
 
     pdal_writer_t* pdal_writer_create_ogr(const pdal_options_t* ops);

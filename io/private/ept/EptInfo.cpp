@@ -39,6 +39,8 @@
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
 
+#include <pdal_capi.h>
+
 namespace pdal
 {
 namespace ept
@@ -79,63 +81,17 @@ void EptInfo::initialize()
     m_span = m_info.at("span").get<uint64_t>();
     m_version = m_info.at("version").get<std::string>();
 
-    auto iSrs = m_info.find("srs");
-    if (iSrs != m_info.end() && iSrs->size())
+    // The SRS user-input string is built from the info's `srs` object by Rust
+    // (wkt, or authority + horizontal [+ vertical]) so the rules and error
+    // messages live in one place behind the C ABI.
+    const std::string infoStr = m_info.dump();
+    char* srsWkt = nullptr;
+    if (!pdal_ept_srs_wkt_from_info(infoStr.c_str(), &srsWkt))
+        throw pdal_error(pdal_last_error());
+    if (srsWkt)
     {
-        std::string wkt;
-        auto iWkt = iSrs->find("wkt");
-        auto iAuthority = iSrs->find("authority");
-        auto iHorizontal = iSrs->find("horizontal");
-        auto iVertical = iSrs->find("vertical");
-
-        if (iWkt != iSrs->end())
-        {
-            if (!iWkt->is_string())
-                throw pdal_error("srs.wkt must be specified as a string. "
-                                 "Found '" +
-                                 iWkt->dump() + "'.");
-            wkt = iWkt->get<std::string>();
-        }
-        else
-        {
-            if (iAuthority == iSrs->end() || iHorizontal == iSrs->end())
-                throw pdal_error(
-                    "srs must be defined with at least one of "
-                    "wkt or both authority and horizontal specifications.");
-            if (!iAuthority->is_string())
-                throw pdal_error("srs.authority must be specified as a "
-                                 "string.  Found '" +
-                                 iAuthority->dump() + "'.");
-            wkt = iAuthority->get<std::string>();
-
-            std::string horiz;
-            if (iHorizontal->is_number_unsigned())
-                horiz = std::to_string(iHorizontal->get<uint64_t>());
-            else if (iHorizontal->is_string())
-                horiz = iHorizontal->get<std::string>();
-            else
-                throw pdal_error("srs.horizontal must be specified as a "
-                                 "non-negative integer or equivalent string. "
-                                 "Found '" +
-                                 iHorizontal->dump() + "'.");
-            wkt += ":" + horiz;
-
-            if (iVertical != iSrs->end())
-            {
-                std::string vert;
-                if (iVertical->is_number_unsigned())
-                    vert = std::to_string(iVertical->get<uint64_t>());
-                else if (iVertical->is_string())
-                    vert = iVertical->get<std::string>();
-                else
-                    throw pdal_error(
-                        "srs.vertical must be specified as a "
-                        "non-negative integer or equivalent string. "
-                        "Found '" +
-                        iVertical->dump() + "'.");
-                wkt += "+" + vert;
-            }
-        }
+        std::string wkt(srsWkt);
+        pdal_string_free(srsWkt);
         m_srs.set(wkt);
         if (!m_srs.valid())
             throw pdal_error("Invalid/unknown srs.wkt specification.");

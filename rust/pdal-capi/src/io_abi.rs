@@ -1298,6 +1298,52 @@ pub unsafe extern "C" fn pdal_ept_validate_bounds(
     }
 }
 
+/// Build the SRS WKT/user-input string from an EPT info JSON document,
+/// matching the C++ `EptInfo::initialize()` rules.
+///
+/// On success returns `true`. When the info has a usable `srs`, `*out_wkt` is
+/// set to a newly-allocated string (free with `pdal_string_free`); when no
+/// `srs` is present `*out_wkt` is set to null. On a parse or validation error,
+/// returns `false`, sets the last error, and leaves `*out_wkt` null.
+///
+/// # Safety
+/// `info_json` must be a valid null-terminated C string and `out_wkt` a valid
+/// pointer to a `char*`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_srs_wkt_from_info(
+    info_json: *const c_char,
+    out_wkt: *mut *mut c_char,
+) -> bool {
+    let Some(out_wkt) = out_wkt.as_mut() else {
+        set_last_error("Missing EPT srs output pointer.");
+        return false;
+    };
+    *out_wkt = std::ptr::null_mut();
+    if info_json.is_null() {
+        set_last_error("Missing EPT info JSON.");
+        return false;
+    }
+    let info_json = CStr::from_ptr(info_json).to_string_lossy().into_owned();
+    let info: serde_json::Value = match serde_json::from_str(&info_json) {
+        Ok(value) => value,
+        Err(_) => {
+            set_last_error("Unable to parse EPT info as JSON.");
+            return false;
+        }
+    };
+    match pdal_io::ept::ept_srs_wkt(&info) {
+        Ok(Some(wkt)) => {
+            *out_wkt = string_to_c_ptr(wkt);
+            true
+        }
+        Ok(None) => true,
+        Err(err) => {
+            set_last_error(err.0);
+            false
+        }
+    }
+}
+
 /// Return local STAC preview metadata as JSON.
 ///
 /// # Safety

@@ -719,3 +719,77 @@ fn reader_errors_on_bounds_too_short() {
     let err = reader.read().err().unwrap();
     assert!(err.0.contains("bounds must contain six coordinates"));
 }
+
+#[test]
+fn srs_wkt_uses_explicit_wkt() {
+    let info = serde_json::json!({ "srs": { "wkt": "EPSG:26915 wkt text" } });
+    assert_eq!(
+        ept_srs_wkt(&info).unwrap(),
+        Some("EPSG:26915 wkt text".to_string())
+    );
+}
+
+#[test]
+fn srs_wkt_builds_from_authority_and_horizontal() {
+    let info = serde_json::json!({
+        "srs": { "authority": "EPSG", "horizontal": 26915 }
+    });
+    assert_eq!(ept_srs_wkt(&info).unwrap(), Some("EPSG:26915".to_string()));
+
+    // Horizontal may also be given as a string.
+    let info = serde_json::json!({
+        "srs": { "authority": "EPSG", "horizontal": "26915" }
+    });
+    assert_eq!(ept_srs_wkt(&info).unwrap(), Some("EPSG:26915".to_string()));
+}
+
+#[test]
+fn srs_wkt_appends_vertical() {
+    let info = serde_json::json!({
+        "srs": { "authority": "EPSG", "horizontal": 26915, "vertical": 5703 }
+    });
+    assert_eq!(
+        ept_srs_wkt(&info).unwrap(),
+        Some("EPSG:26915+5703".to_string())
+    );
+}
+
+#[test]
+fn srs_wkt_absent_or_empty_is_none() {
+    assert_eq!(ept_srs_wkt(&serde_json::json!({})).unwrap(), None);
+    assert_eq!(
+        ept_srs_wkt(&serde_json::json!({ "srs": {} })).unwrap(),
+        None
+    );
+    assert_eq!(
+        ept_srs_wkt(&serde_json::json!({ "srs": null })).unwrap(),
+        None
+    );
+}
+
+#[test]
+fn srs_wkt_validation_errors_match_cpp() {
+    let err = ept_srs_wkt(&serde_json::json!({ "srs": { "wkt": 5 } }))
+        .err()
+        .unwrap();
+    assert!(err.0.contains("srs.wkt must be specified as a string"));
+
+    let err = ept_srs_wkt(&serde_json::json!({ "srs": { "authority": "EPSG" } }))
+        .err()
+        .unwrap();
+    assert!(err.0.contains("at least one of"));
+
+    let err = ept_srs_wkt(&serde_json::json!({
+        "srs": { "authority": "EPSG", "horizontal": -1 }
+    }))
+    .err()
+    .unwrap();
+    assert!(err.0.contains("srs.horizontal must be specified"));
+
+    let err = ept_srs_wkt(&serde_json::json!({
+        "srs": { "authority": "EPSG", "horizontal": 26915, "vertical": 1.5 }
+    }))
+    .err()
+    .unwrap();
+    assert!(err.0.contains("srs.vertical must be specified"));
+}

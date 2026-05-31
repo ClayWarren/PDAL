@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 1,459 | 10 |
-| c-abi-backed | 44,874 | 394 |
+| port-candidate | 1,204 | 8 |
+| c-abi-backed | 45,084 | 396 |
 | native-adapter | 5,718 | 55 |
 | holdout | 6,282 | 62 |
-| total | 58,333 | 521 |
+| total | 58,288 | 521 |
 
-Port-candidate backlog by area: `pdal` 1,017 · `io` 442. `filters`,
+Port-candidate backlog by area: `pdal` 1,017 · `io` 187. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -265,6 +265,11 @@ holdouts; the remaining `pdal/` backlog is now concentrated in
 C++ compatibility surface. Rust owns an independent pipeline graph/executor
 through `pdal_pipeline_*`; the remaining C++ classes expose mutable `Stage*`
 manager APIs and exact C++ JSON parser behavior for existing SDK callers.
+The private EPT `EptInfo` SRS user-input building (wkt, or authority +
+horizontal [+ vertical]) now routes through the Rust `pdal_ept_srs_wkt_from_info`
+C ABI (`pdal-io::ept::ept_srs_wkt`), with the C++ rules and error messages
+preserved in one place; only `io/private/ept/TileContents` remains as `io`
+port-candidate backlog.
 Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
