@@ -227,6 +227,23 @@ pub unsafe extern "C" fn pdal_las_vlr_header_write(
     true
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_vlr_text(data: *const u8, data_len: u64) -> *mut c_char {
+    if data.is_null() && data_len != 0 {
+        return string_to_c_ptr(String::new());
+    }
+    let data = if data_len == 0 {
+        &[]
+    } else {
+        std::slice::from_raw_parts(data, data_len as usize)
+    };
+    let end = data
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(data.len());
+    string_to_c_ptr(String::from_utf8_lossy(&data[..end]).into_owned())
+}
+
 fn fixed_c_string<const N: usize>(bytes: &[u8]) -> [c_char; N] {
     let mut out = [0 as c_char; N];
     let copy_len = bytes.len().min(N.saturating_sub(1));

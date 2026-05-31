@@ -509,6 +509,7 @@ extern "C"
     bool pdal_las_vlr_header_write(const pdal_las_vlr_header_t* header,
                                    bool evlr, uint8_t* out_data,
                                    uint64_t out_len);
+    char* pdal_las_vlr_text(const uint8_t* data, uint64_t data_len);
 
     pdal_las_tile_t* pdal_las_tile_create(uint32_t chunk, uint64_t size);
     void pdal_las_tile_destroy(pdal_las_tile_t* tile);

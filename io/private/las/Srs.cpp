@@ -36,6 +36,8 @@
 #include "Geotiff.hpp"
 #include "Utils.hpp"
 
+#include <pdal_capi.h>
+
 namespace pdal
 {
 namespace las
@@ -157,18 +159,10 @@ void Srs::extractWkt(const Vlr* vlr)
     if (!vlr || vlr->empty())
         return;
 
-    // There is supposed to be a NULL byte at the end of the data,
-    // but sometimes there isn't because some people don't follow the
-    // rules.  If there is a NULL byte, don't stick it in the
-    // wkt string.
-    size_t len = vlr->dataSize();
-    const char* c = vlr->data() + len - 1;
-    if (*c == 0)
-        len--;
-    std::string wkt(vlr->data(), len);
-    // Strip any excess NULL bytes from the WKT.
-    wkt.erase(std::find(wkt.begin(), wkt.end(), '\0'), wkt.end());
-
+    char* raw = pdal_las_vlr_text(reinterpret_cast<const uint8_t*>(vlr->data()),
+                                  vlr->dataSize());
+    std::string wkt(raw ? raw : "");
+    pdal_string_free(raw);
     m_srs = SpatialReference(wkt);
 }
 

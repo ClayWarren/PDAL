@@ -143,6 +143,25 @@ fn las_vlr_header_abi_roundtrips_vlr_and_evlr_headers() {
     }
 }
 
+#[test]
+fn las_vlr_text_abi_truncates_at_first_nul() {
+    unsafe {
+        let bytes = b"PROJCS[\"example\"]\0ignored";
+        let text = pdal_las_vlr_text(bytes.as_ptr(), bytes.len() as u64);
+        assert!(!text.is_null());
+        assert_eq!(
+            std::ffi::CStr::from_ptr(text).to_str().unwrap(),
+            "PROJCS[\"example\"]"
+        );
+        pdal_string_free(text);
+
+        let empty = pdal_las_vlr_text(std::ptr::null(), 0);
+        assert!(!empty.is_null());
+        assert_eq!(std::ffi::CStr::from_ptr(empty).to_str().unwrap(), "");
+        pdal_string_free(empty);
+    }
+}
+
 fn write_c_chars<const N: usize>(dst: &mut [i8; N], value: &str) {
     for (out, byte) in dst.iter_mut().zip(value.bytes()) {
         *out = byte as i8;
