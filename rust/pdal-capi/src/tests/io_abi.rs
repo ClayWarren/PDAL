@@ -75,6 +75,90 @@ fn las_header_abi_matches_supported_formats_and_legacy_counts() {
 }
 
 #[test]
+fn las_vlr_header_abi_roundtrips_vlr_and_evlr_headers() {
+    unsafe {
+        let mut header = pdal_las_vlr_header_t {
+            record_sig: 0,
+            user_id: [0; 17],
+            record_id: 42,
+            data_size: 123,
+            description: [0; 33],
+        };
+        write_c_chars(&mut header.user_id, "PDAL");
+        write_c_chars(&mut header.description, "metadata");
+
+        let mut bytes = vec![0_u8; 54];
+        assert!(pdal_las_vlr_header_write(
+            &header,
+            false,
+            bytes.as_mut_ptr(),
+            bytes.len() as u64
+        ));
+        let mut parsed = pdal_las_vlr_header_t {
+            record_sig: 0,
+            user_id: [0; 17],
+            record_id: 0,
+            data_size: 0,
+            description: [0; 33],
+        };
+        assert!(pdal_las_vlr_header_parse(
+            bytes.as_ptr(),
+            bytes.len() as u64,
+            false,
+            &mut parsed
+        ));
+        assert_eq!(parsed.record_id, 42);
+        assert_eq!(parsed.data_size, 123);
+        assert_eq!(read_c_chars(&parsed.user_id), "PDAL");
+        assert_eq!(read_c_chars(&parsed.description), "metadata");
+
+        header.data_size = u64::from(u16::MAX) + 1;
+        assert!(!pdal_las_vlr_header_write(
+            &header,
+            false,
+            bytes.as_mut_ptr(),
+            bytes.len() as u64
+        ));
+
+        let mut evlr_bytes = vec![0_u8; 60];
+        assert!(pdal_las_vlr_header_write(
+            &header,
+            true,
+            evlr_bytes.as_mut_ptr(),
+            evlr_bytes.len() as u64
+        ));
+        assert!(pdal_las_vlr_header_parse(
+            evlr_bytes.as_ptr(),
+            evlr_bytes.len() as u64,
+            true,
+            &mut parsed
+        ));
+        assert_eq!(parsed.data_size, u64::from(u16::MAX) + 1);
+        assert!(!pdal_las_vlr_header_parse(
+            evlr_bytes.as_ptr(),
+            10,
+            true,
+            &mut parsed
+        ));
+    }
+}
+
+fn write_c_chars<const N: usize>(dst: &mut [i8; N], value: &str) {
+    for (out, byte) in dst.iter_mut().zip(value.bytes()) {
+        *out = byte as i8;
+    }
+}
+
+fn read_c_chars<const N: usize>(src: &[i8; N]) -> String {
+    let bytes: Vec<u8> = src
+        .iter()
+        .take_while(|&&ch| ch != 0)
+        .map(|&ch| ch as u8)
+        .collect();
+    String::from_utf8(bytes).unwrap()
+}
+
+#[test]
 fn las_tile_abi_owns_buffer_and_advances_cursor() {
     unsafe {
         let tile = pdal_las_tile_create(7, 6);

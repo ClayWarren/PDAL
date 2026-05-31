@@ -150,6 +150,105 @@ fn should_mirror_las_legacy_count(point_count: u64, version_minor: u8, point_for
     point_count <= u64::from(u32::MAX) && !(version_minor >= 4 && point_format >= 6)
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct pdal_las_vlr_header_t {
+    pub record_sig: u16,
+    pub user_id: [c_char; 17],
+    pub record_id: u16,
+    pub data_size: u64,
+    pub description: [c_char; 33],
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_vlr_header_parse(
+    data: *const u8,
+    data_len: u64,
+    evlr: bool,
+    out_header: *mut pdal_las_vlr_header_t,
+) -> bool {
+    let Some(out_header) = out_header.as_mut() else {
+        return false;
+    };
+    let header_len: usize = if evlr { 60 } else { 54 };
+    if data.is_null() || data_len < header_len as u64 {
+        return false;
+    }
+    let data = std::slice::from_raw_parts(data, data_len as usize);
+    let record_sig = u16::from_le_bytes([data[0], data[1]]);
+    let user_id = fixed_c_string::<17>(&data[2..18]);
+    let record_id = u16::from_le_bytes([data[18], data[19]]);
+    let data_size = if evlr {
+        u64::from_le_bytes(data[20..28].try_into().expect("slice length checked"))
+    } else {
+        u16::from_le_bytes([data[20], data[21]]) as u64
+    };
+    let description_offset = if evlr { 28 } else { 22 };
+    let description = fixed_c_string::<33>(&data[description_offset..description_offset + 32]);
+    *out_header = pdal_las_vlr_header_t {
+        record_sig,
+        user_id,
+        record_id,
+        data_size,
+        description,
+    };
+    true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_vlr_header_write(
+    header: *const pdal_las_vlr_header_t,
+    evlr: bool,
+    out_data: *mut u8,
+    out_len: u64,
+) -> bool {
+    let Some(header) = header.as_ref() else {
+        return false;
+    };
+    let header_len: usize = if evlr { 60 } else { 54 };
+    if out_data.is_null() || out_len < header_len as u64 {
+        return false;
+    }
+    if !evlr && header.data_size > u64::from(u16::MAX) {
+        return false;
+    }
+    let out = std::slice::from_raw_parts_mut(out_data, out_len as usize);
+    out[..header_len].fill(0);
+    out[0..2].copy_from_slice(&header.record_sig.to_le_bytes());
+    write_fixed_c_string(&header.user_id, &mut out[2..18]);
+    out[18..20].copy_from_slice(&header.record_id.to_le_bytes());
+    if evlr {
+        out[20..28].copy_from_slice(&header.data_size.to_le_bytes());
+        write_fixed_c_string(&header.description, &mut out[28..60]);
+    } else {
+        out[20..22].copy_from_slice(&(header.data_size as u16).to_le_bytes());
+        write_fixed_c_string(&header.description, &mut out[22..54]);
+    }
+    true
+}
+
+fn fixed_c_string<const N: usize>(bytes: &[u8]) -> [c_char; N] {
+    let mut out = [0 as c_char; N];
+    let copy_len = bytes.len().min(N.saturating_sub(1));
+    for (dst, src) in out.iter_mut().zip(bytes.iter()).take(copy_len) {
+        if *src == 0 {
+            break;
+        }
+        *dst = *src as c_char;
+    }
+    out
+}
+
+fn write_fixed_c_string(src: &[c_char], dst: &mut [u8]) {
+    for (out, ch) in dst.iter_mut().zip(src.iter()) {
+        let byte = *ch as u8;
+        if byte == 0 {
+            break;
+        }
+        *out = byte;
+    }
+}
+
 pub struct LasTileHandle {
     chunk: u32,
     data: Vec<u8>,

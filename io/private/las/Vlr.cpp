@@ -39,6 +39,8 @@
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Inserter.hpp>
 
+#include <cstdio>
+
 namespace pdal
 {
 namespace las
@@ -105,18 +107,15 @@ const Vlr* findVlr(const std::string& userId, uint16_t recordId,
 
 void Vlr::fillHeader(const char* buf)
 {
-    LeExtractor in(buf, Vlr::HeaderSize);
-    uint16_t dataLen;
-
-    in >> recordSig;
-    in.get(userId, 16);
-    // Trim all characters after a NULL
-    userId = userId.data();
-    in >> recordId >> dataLen;
-    in.get(description, 32);
-    // Trim all characters after a NULL
-    description = description.data();
-    promisedDataSize = dataLen;
+    pdal_las_vlr_header_t header;
+    if (!pdal_las_vlr_header_parse(reinterpret_cast<const uint8_t*>(buf),
+                                   Vlr::HeaderSize, false, &header))
+        throw pdal_error("Invalid LAS VLR header.");
+    recordSig = header.record_sig;
+    userId = header.user_id;
+    recordId = header.record_id;
+    promisedDataSize = header.data_size;
+    description = header.description;
 }
 
 std::vector<char> Vlr::headerData() const
@@ -124,39 +123,46 @@ std::vector<char> Vlr::headerData() const
     std::vector<char> buf(HeaderSize);
 
     assert(dataVec.size() <= (std::numeric_limits<uint16_t>::max)());
-    LeInserter out(buf.data(), HeaderSize);
-    out << recordSig;
-    out.put(userId, 16);
-    out << recordId << (uint16_t)(dataVec.size());
-    out.put(description, 32);
-
+    pdal_las_vlr_header_t header{};
+    header.record_sig = recordSig;
+    std::snprintf(header.user_id, sizeof(header.user_id), "%s", userId.c_str());
+    header.record_id = recordId;
+    header.data_size = dataVec.size();
+    std::snprintf(header.description, sizeof(header.description), "%s",
+                  description.c_str());
+    if (!pdal_las_vlr_header_write(
+            &header, false, reinterpret_cast<uint8_t*>(buf.data()), buf.size()))
+        throw pdal_error("Unable to write LAS VLR header.");
     return buf;
 }
 
 void Evlr::fillHeader(const char* buf)
 {
-    LeExtractor in(buf, Evlr::HeaderSize);
-
-    in >> recordSig;
-    in.get(userId, 16);
-    // Trim all characters after a NULL
-    userId = userId.data();
-    in >> recordId >> promisedDataSize;
-    in.get(description, 32);
-    // Trim all characters after a NULL
-    description = description.data();
+    pdal_las_vlr_header_t header;
+    if (!pdal_las_vlr_header_parse(reinterpret_cast<const uint8_t*>(buf),
+                                   Evlr::HeaderSize, true, &header))
+        throw pdal_error("Invalid LAS EVLR header.");
+    recordSig = header.record_sig;
+    userId = header.user_id;
+    recordId = header.record_id;
+    promisedDataSize = header.data_size;
+    description = header.description;
 }
 
 std::vector<char> Evlr::headerData() const
 {
     std::vector<char> buf(HeaderSize);
 
-    LeInserter out(buf.data(), HeaderSize);
-    out << recordSig;
-    out.put(userId, 16);
-    out << recordId << (uint64_t)dataVec.size();
-    out.put(description, 32);
-
+    pdal_las_vlr_header_t header{};
+    header.record_sig = recordSig;
+    std::snprintf(header.user_id, sizeof(header.user_id), "%s", userId.c_str());
+    header.record_id = recordId;
+    header.data_size = dataVec.size();
+    std::snprintf(header.description, sizeof(header.description), "%s",
+                  description.c_str());
+    if (!pdal_las_vlr_header_write(
+            &header, true, reinterpret_cast<uint8_t*>(buf.data()), buf.size()))
+        throw pdal_error("Unable to write LAS EVLR header.");
     return buf;
 }
 

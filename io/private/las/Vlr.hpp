@@ -40,6 +40,7 @@
 
 #include <pdal/Metadata.hpp>
 #include <pdal/SpatialReference.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
