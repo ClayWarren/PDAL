@@ -87,6 +87,29 @@ fn csf_classify_rejects_negative_rigidness() {
 }
 
 #[test]
+fn assign_statements_apply_to_selected_view_points() {
+    unsafe {
+        let view = xyz_view(&[(0.0, 0.0, 1.0), (1.0, 0.0, 2.0), (2.0, 0.0, 3.0)]);
+        let statement = cstring("Classification = Z + 10 WHERE Z >= 2");
+        let statements = [statement.as_ptr()];
+        let selected = [0_u64, 1, 2];
+
+        assert!(pdal_point_view_apply_assign_statements(
+            view,
+            statements.as_ptr(),
+            statements.len() as u64,
+            selected.as_ptr(),
+            selected.len() as u64
+        ));
+        assert_eq!(get(view, 0, "Classification"), 0.0);
+        assert_eq!(get(view, 1, "Classification"), 12.0);
+        assert_eq!(get(view, 2, "Classification"), 13.0);
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
 fn option_backed_filter_stages_construct_and_run_through_c_abi() {
     unsafe {
         let view = xyz_view(&[(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]);
@@ -770,6 +793,13 @@ fn test_filter_abi_nulls_and_errors() {
             layout
         ));
         pdal_point_layout_destroy(layout);
+        assert!(!pdal_point_view_apply_assign_statements(
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0
+        ));
         pdal_stage_ferry_point(std::ptr::null_mut(), std::ptr::null_mut(), 0);
         assert!(pdal_stage_create_randomize(std::ptr::null()).is_null());
 

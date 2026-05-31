@@ -14,8 +14,6 @@
 #include <pdal/PointRef.hpp>
 #include <pdal/Polygon.hpp>
 
-#include "private/expr/AssignStatement.hpp"
-
 namespace pdal
 {
 
@@ -33,7 +31,7 @@ private:
     {
         std::string m_methodKeep; // type of output (min, max)
         double m_edgeLength;      // lenght of grid
-        std::vector<expr::AssignStatement> m_statements;
+        StringList m_statements;
     };
 
     std::unique_ptr<GridArgs> m_args;

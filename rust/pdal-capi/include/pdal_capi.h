@@ -855,6 +855,11 @@ extern "C"
     bool pdal_stage_validate_assign_statement(const char* statement);
     bool pdal_stage_validate_assign_statement_with_layout(
         const char* statement, const pdal_point_layout_t* layout);
+    bool pdal_point_view_apply_assign_statements(pdal_point_view_t* view,
+                                                 const char* const* statements,
+                                                 uint64_t statement_count,
+                                                 const uint64_t* indices,
+                                                 uint64_t index_count);
     void pdal_stage_ferry_point(pdal_stage_t* stage, pdal_point_view_t* view,
                                 uint64_t idx);
 

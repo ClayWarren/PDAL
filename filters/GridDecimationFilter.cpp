@@ -43,14 +43,18 @@
 #include "private/Point.hpp"
 
 #include <cstdarg>
-#include <sstream>
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal_capi.h>
+#include <sstream>
 
-extern "C" {
-    uint64_t* pdal_grid_decimation_get_kept_indices(const pdal_point_view_t* view, double resolution, const char* output_type, uint64_t* out_len);
+extern "C"
+{
+    uint64_t* pdal_grid_decimation_get_kept_indices(
+        const pdal_point_view_t* view, double resolution,
+        const char* output_type, uint64_t* out_len);
     void pdal_free_u64_array(uint64_t* ptr, uint64_t len);
-    char* pdal_grid_decimation_validate(double resolution, const char* output_type);
+    char* pdal_grid_decimation_validate(double resolution,
+                                        const char* output_type);
 }
 
 namespace pdal
@@ -90,15 +94,21 @@ void GridDecimationFilter::prepared(PointTableRef table)
 {
     PointLayoutPtr layout(table.layout());
 
-    for (expr::AssignStatement& expr : m_args->m_statements)
+    pdal_point_layout_t* rustLayout = rust_view_converter::toRustLayout(layout);
+    for (const std::string& statement : m_args->m_statements)
     {
-        auto status = expr.prepare(layout);
-        if (!status)
-            throwError(status.what());
+        if (!pdal_stage_validate_assign_statement_with_layout(statement.c_str(),
+                                                              rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError(
+                "Invalid gridDecimation value expression.");
+        }
     }
+    pdal_point_layout_destroy(rustLayout);
 
-    if (char* error = pdal_grid_decimation_validate(m_args->m_edgeLength,
-                                                    m_args->m_methodKeep.c_str()))
+    if (char* error = pdal_grid_decimation_validate(
+            m_args->m_edgeLength, m_args->m_methodKeep.c_str()))
     {
         std::string message(error);
         pdal_string_free(error);
@@ -108,8 +118,8 @@ void GridDecimationFilter::prepared(PointTableRef table)
 
 void GridDecimationFilter::ready(PointTableRef table)
 {
-    if (char* error = pdal_grid_decimation_validate(m_args->m_edgeLength,
-                                                    m_args->m_methodKeep.c_str()))
+    if (char* error = pdal_grid_decimation_validate(
+            m_args->m_edgeLength, m_args->m_methodKeep.c_str()))
     {
         std::string message(error);
         pdal_string_free(error);
@@ -122,9 +132,7 @@ void GridDecimationFilter::processOne(BOX2D bounds, PointRef& point,
 {
 }
 
-void GridDecimationFilter::createGrid(BOX2D bounds)
-{
-}
+void GridDecimationFilter::createGrid(BOX2D bounds) {}
 
 PointViewSet GridDecimationFilter::run(PointViewPtr view)
 {
@@ -132,30 +140,32 @@ PointViewSet GridDecimationFilter::run(PointViewPtr view)
 
     uint64_t kept_len = 0;
     pdal_point_view_t* rust_in = rust_view_converter::toRust(view);
-    uint64_t* kept_indices = pdal_grid_decimation_get_kept_indices(rust_in, m_args->m_edgeLength, m_args->m_methodKeep.c_str(), &kept_len);
+    uint64_t* kept_indices = pdal_grid_decimation_get_kept_indices(
+        rust_in, m_args->m_edgeLength, m_args->m_methodKeep.c_str(), &kept_len);
 
-    std::set<PointId> keepPoint;
+    if (!m_args->m_statements.empty() && kept_indices)
+    {
+        std::vector<const char*> statementPtrs;
+        statementPtrs.reserve(m_args->m_statements.size());
+        for (const std::string& statement : m_args->m_statements)
+            statementPtrs.push_back(statement.c_str());
+
+        if (!pdal_point_view_apply_assign_statements(
+                rust_in, statementPtrs.data(), statementPtrs.size(),
+                kept_indices, kept_len))
+        {
+            if (kept_indices)
+                pdal_free_u64_array(kept_indices, kept_len);
+            pdal_point_view_destroy(rust_in);
+            rust_view_converter::throwLastError(
+                "Rust gridDecimation assignment failed.");
+        }
+        rust_view_converter::fromRust(rust_in, *view);
+    }
+
     if (kept_indices)
-    {
-        for (uint64_t i = 0; i < kept_len; ++i)
-        {
-            keepPoint.insert(kept_indices[i]);
-        }
         pdal_free_u64_array(kept_indices, kept_len);
-    }
     pdal_point_view_destroy(rust_in);
-
-    for (PointId i = 0; i < view->size(); ++i)
-    {
-        if (keepPoint.find(view->point(i).pointId()) != keepPoint.end())
-        {
-            PointRef point = view->point(i);
-            for (expr::AssignStatement& expr : m_args->m_statements)
-                if (expr.conditionalExpr().eval(point))
-                    point.setField(expr.identExpr().eval(),
-                                   expr.valueExpr().eval(point));
-        }
-    }
 
     viewSet.insert(view);
     return viewSet;

@@ -173,6 +173,74 @@ pub unsafe extern "C" fn pdal_stage_validate_assign_statement_with_layout(
     }
 }
 
+/// Apply assign filter value expressions to selected points in a view.
+///
+/// # Safety
+///
+/// `view` must be a valid point view pointer. `statements` must be valid for
+/// `statement_count` entries. `indices` must be null with a zero count, or
+/// valid for `index_count` entries.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_apply_assign_statements(
+    view: *mut PointView,
+    statements: *const *const std::os::raw::c_char,
+    statement_count: u64,
+    indices: *const u64,
+    index_count: u64,
+) -> bool {
+    let Some(view) = view.as_mut() else {
+        set_last_error("null point view");
+        return false;
+    };
+    let Ok(statement_strings) = c_string_array(statements, statement_count) else {
+        set_last_error("invalid assign statements");
+        return false;
+    };
+    let mut statements = Vec::new();
+    for statement in statement_strings {
+        let mut statement = match pdal_core::expr::AssignStatement::parse(&statement) {
+            Ok(statement) => statement,
+            Err(err) => {
+                set_last_error(&err);
+                return false;
+            }
+        };
+        if let Err(err) = statement.prepare(view.layout().as_ref()) {
+            set_last_error(&err);
+            return false;
+        }
+        statements.push(statement);
+    }
+
+    let selected: Vec<u64> = if indices.is_null() {
+        if index_count != 0 {
+            set_last_error("null selected point indices");
+            return false;
+        }
+        (0..view.len()).collect()
+    } else {
+        std::slice::from_raw_parts(indices, index_count as usize).to_vec()
+    };
+
+    for idx in selected {
+        if idx >= view.len() {
+            set_last_error("selected point index out of range");
+            return false;
+        }
+        for statement in &statements {
+            if !statement.condition().eval(view, idx) {
+                continue;
+            }
+            let Some(dim) = statement.ident().dim() else {
+                set_last_error("invalid assignment target");
+                return false;
+            };
+            view.set_f64(idx, &dim, statement.value().eval(view, idx));
+        }
+    }
+    true
+}
+
 /// Copy values between dimensions on a specific point in a PointView.
 ///
 /// # Safety
