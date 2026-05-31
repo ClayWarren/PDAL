@@ -36,133 +36,28 @@
 
 #include "arbiter/arbiter.hpp"
 
-#include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
-#include <pdal/util/IStream.hpp>
-#include <pdal/util/OStream.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
-
-namespace
-{
-
-arbiter::http::Headers getRangeHeader(int start, int end = 0)
-{
-    arbiter::http::Headers h;
-    h["Range"] = "bytes=" + std::to_string(start) + "-" +
-                 (end ? std::to_string(end - 1) : "");
-    return h;
-}
-
-} // namespace
 
 PointlessLas getPointlessLasFile(const std::string& path)
 {
     assert(Utils::isRemote(path));
 
-    const uint64_t maxHeaderSize(375);
-
-    const uint64_t minorVersionPos(25);
-    const uint64_t headerSizePos(94);
-    const uint64_t pointOffsetPos(96);
-    const uint64_t legacyPointCountPos(107);
-    const uint64_t evlrOffsetPos(235);
-    const uint64_t evlrNumberPos(evlrOffsetPos + 8);
-    const uint64_t pointCountPos(247);
-
-    std::string fileSignature;
-    uint8_t minorVersion(0);
-    uint16_t headerSize(0);
-    uint32_t pointOffset(0);
-    uint64_t evlrOffset(0);
-    uint32_t evlrNumber(0);
-    uint32_t legacyPointCount(0);
-    uint64_t pointCount(0);
-
-    arbiter::Arbiter a;
-
-    std::string header(a.get(path, getRangeHeader(0, maxHeaderSize)));
-
-    std::stringstream headerStream(
-        header, std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-
-    pdal::ILeStream is(&headerStream);
-    pdal::OLeStream os(&headerStream);
-
-    is.seek(0);
-    is.get(fileSignature, 4);
-
-    if (fileSignature != "LASF")
+    pdal_pointless_las_result_t* result =
+        pdal_pointless_las_create(path.c_str());
+    if (!result)
     {
-        throw std::runtime_error(
-            "Invalid file signature for .las or .laz file: must be LASF");
+        const char* err = pdal_last_error();
+        throw pdal_error(err ? err : "Unable to create pointless LAS file.");
     }
 
-    is.seek(minorVersionPos);
-    is >> minorVersion;
+    uint64_t pointCount = result->point_count;
+    std::string localPath(result->filename ? result->filename : "");
+    pdal_pointless_las_destroy(result);
 
-    is.seek(headerSizePos);
-    is >> headerSize;
-
-    is.seek(pointOffsetPos);
-    is >> pointOffset;
-
-    is.seek(legacyPointCountPos);
-    is >> legacyPointCount;
-    pointCount = legacyPointCount;
-
-    // Set the legacy point count to 0 since we are removing the point data.
-    os.seek(legacyPointCountPos);
-    os << (uint32_t)0;
-
-    if (minorVersion >= 4)
-    {
-        is.seek(evlrOffsetPos);
-        is >> evlrOffset;
-
-        is.seek(evlrNumberPos);
-        is >> evlrNumber;
-
-        is.seek(pointCountPos);
-        is >> pointCount;
-
-        // Modify the header such that the EVLRs come directly after the VLRs -
-        // removing the point data itself.
-        os.seek(evlrOffsetPos);
-        os << pointOffset;
-
-        // Set the 1.4 point count to 0 since we are removing the point data.
-        os.seek(pointCountPos);
-        os << (uint64_t)0;
-    }
-
-    // Extract the modified header, VLRs, and append the EVLRs.
-    header = headerStream.str();
-    std::vector<char> data(header.data(), header.data() + headerSize);
-
-    const bool hasVlrs = headerSize < pointOffset;
-    if (hasVlrs)
-    {
-        const auto vlrs =
-            a.getBinary(path, getRangeHeader(headerSize, pointOffset));
-        data.insert(data.end(), vlrs.begin(), vlrs.end());
-    }
-
-    const bool hasEvlrs = evlrNumber && evlrOffset;
-    if (hasEvlrs)
-    {
-        const auto evlrs = a.getBinary(path, getRangeHeader((int)evlrOffset));
-        data.insert(data.end(), evlrs.begin(), evlrs.end());
-    }
-
-    const std::string extension(arbiter::getExtension(path));
-    const std::string basename(std::to_string(arbiter::randomNumber()) +
-                               (extension.size() ? "." + extension : ""));
-
-    const std::string localPath =
-        arbiter::join(arbiter::getTempPath(), basename);
-    a.put(localPath, data);
     return PointlessLas{pointCount, std::make_unique<arbiter::LocalHandle>(
                                         localPath, /*isRemote=*/false)};
 }

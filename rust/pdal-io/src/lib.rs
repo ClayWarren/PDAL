@@ -30,6 +30,7 @@ pub mod ogr_writer;
 pub mod optech;
 pub mod pcd;
 pub mod ply;
+pub mod pointless_las;
 pub mod pts;
 pub mod ptx;
 pub mod qfit;

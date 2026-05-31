@@ -9,6 +9,40 @@ fn cstring(value: &str) -> CString {
     CString::new(value).unwrap()
 }
 
+fn tiny_las_header(point_count: u32) -> Vec<u8> {
+    let mut header = vec![0; 227];
+    header[0..4].copy_from_slice(b"LASF");
+    header[25] = 2;
+    header[94..96].copy_from_slice(&(227u16).to_le_bytes());
+    header[96..100].copy_from_slice(&(227u32).to_le_bytes());
+    header[107..111].copy_from_slice(&point_count.to_le_bytes());
+    header
+}
+
+#[test]
+fn pointless_las_capi_returns_temp_header_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("input.las");
+    let mut data = tiny_las_header(7);
+    data.extend([1, 2, 3]);
+    std::fs::write(&input, data).unwrap();
+
+    unsafe {
+        let input = cstring(input.to_str().unwrap());
+        let result = pdal_pointless_las_create(input.as_ptr());
+        assert!(!result.is_null());
+        assert_eq!((*result).point_count, 7);
+        let filename = CStr::from_ptr((*result).filename)
+            .to_string_lossy()
+            .into_owned();
+        let output = std::fs::read(&filename).unwrap();
+        assert_eq!(output.len(), 227);
+        assert_eq!(u32::from_le_bytes(output[107..111].try_into().unwrap()), 0);
+        pdal_pointless_las_destroy(result);
+        let _ = std::fs::remove_file(filename);
+    }
+}
+
 #[test]
 #[allow(clippy::cognitive_complexity)]
 fn reader_and_writer_ctors_handle_null_options_path() {

@@ -116,6 +116,14 @@ extern "C"
     // Driver inference
     char* pdal_infer_reader_driver(const char* filename);
     char* pdal_infer_writer_driver(const char* filename);
+    typedef struct pdal_pointless_las_result
+    {
+        uint64_t point_count;
+        char* filename;
+    } pdal_pointless_las_result_t;
+    pdal_pointless_las_result_t* pdal_pointless_las_create(
+        const char* filename);
+    void pdal_pointless_las_destroy(pdal_pointless_las_result_t* result);
     char* pdal_rust_stage_list_json();
     pdal_stage_extensions_t* pdal_stage_extensions_create();
     void pdal_stage_extensions_set(pdal_stage_extensions_t* extensions,

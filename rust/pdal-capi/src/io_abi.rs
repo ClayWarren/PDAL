@@ -6,6 +6,55 @@ use std::ffi::{c_char, CStr};
 use std::path::Path;
 use std::rc::Rc;
 
+#[repr(C)]
+pub struct PointlessLasResult {
+    pub point_count: u64,
+    pub filename: *mut c_char,
+}
+
+/// Create a local pointless LAS copy from a remote/local LAS path.
+///
+/// # Safety
+/// `filename` must be null or a valid NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pointless_las_create(
+    filename: *const c_char,
+) -> *mut PointlessLasResult {
+    let filename = if filename.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(filename).to_str() {
+            Ok(value) => value,
+            Err(err) => {
+                set_last_error(err.to_string());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+    match pdal_io::pointless_las::create(filename) {
+        Ok(result) => Box::into_raw(Box::new(PointlessLasResult {
+            point_count: result.point_count,
+            filename: string_to_c_ptr(result.path.display().to_string()),
+        })),
+        Err(err) => {
+            set_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Destroy a result returned by `pdal_pointless_las_create`.
+///
+/// # Safety
+/// `result` must be null or a pointer returned by `pdal_pointless_las_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pointless_las_destroy(result: *mut PointlessLasResult) {
+    if !result.is_null() {
+        let result = Box::from_raw(result);
+        crate::error::pdal_string_free(result.filename);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Reader C ABI
 // ---------------------------------------------------------------------------
