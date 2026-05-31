@@ -889,6 +889,24 @@ fn test_filter_abi_nulls_and_errors() {
             "Missing colorinterp layout."
         );
         assert!(pdal_colorinterp_pipeline_streamable(0.0, 0.0));
+        let ramp_name = cstring("pestel_shades");
+        let mut ramp_data = std::ptr::null();
+        let mut ramp_len = 0;
+        assert!(pdal_colorinterp_default_ramp(
+            ramp_name.as_ptr(),
+            &mut ramp_data,
+            &mut ramp_len
+        ));
+        assert!(!ramp_data.is_null());
+        assert!(ramp_len > 8);
+        let ramp_bytes = std::slice::from_raw_parts(ramp_data, ramp_len as usize);
+        assert_eq!(&ramp_bytes[..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
+        let missing_ramp = cstring("not_a_ramp");
+        assert!(!pdal_colorinterp_default_ramp(
+            missing_ramp.as_ptr(),
+            &mut ramp_data,
+            &mut ramp_len
+        ));
         assert!(pdal_stage_create_colorization(std::ptr::null(), std::ptr::null(), 0).is_null());
         assert!(pdal_stage_create_hag_dem(std::ptr::null(), 0, false, 0.0, 0.0, 0.0, 0).is_null());
 

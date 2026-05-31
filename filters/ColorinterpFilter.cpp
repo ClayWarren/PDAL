@@ -35,28 +35,21 @@
 #include "ColorinterpFilter.hpp"
 
 #include <pdal/PointView.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
 #include <pdal/private/gdal/Raster.hpp>
-#include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <pdal/util/Utils.hpp>
 #include <pdal_capi.h>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
+#include <cstdint>
+#include <vector>
 
 #include <cpl_vsi.h>
 
-#include "ColorInterpRamps.hpp"
-#include <pdal/private/RustViewConverter.hpp>
-
 namespace pdal
 {
-
-static std::vector<std::string> ramps = {
-    "awesome_green", "black_orange",  "blue_hue",   "blue_red",
-    "heat_map",      "pestel_shades", "blue_orange"};
 
 static StaticPluginInfo const s_info{
     "filters.colorinterp", "Assigns RGB colors based on a dimension and a ramp",
@@ -75,45 +68,19 @@ ColorinterpFilter::~ColorinterpFilter()
         pdal_stage_destroy(m_rustStage);
 }
 
-// The VSIFILE* that VSIFileFromMemBuffer creates in this
-// macro is never cleaned up. We're opening seven PNGs in the
-// ColorInterpRamps-ramps.hpp header. We always open them so they're available.
-//
-// GDAL forces to keep track of the return value, and its being ignored here,
-// To avoid the warning message:
-// warning: ignoring return value of 'VSILFILE* VSIFileFromMemBuffer(....)'
-//          declared with attribute warn_unused_result [-Wunused-result]
-// Using a tmp variable
-#define GETRAMP(name)                                                          \
-    if (pdal::Utils::iequals(#name, rampFilename))                             \
-    {                                                                          \
-        unsigned char* location(name);                                         \
-        int size(0);                                                           \
-        location = name;                                                       \
-        size = sizeof(name);                                                   \
-        rampFilename = "/vsimem/" + std::string(#name) + ".png";               \
-        auto tmp(VSIFileFromMemBuffer(rampFilename.c_str(), location, size,    \
-                                      false));                                 \
-    }
-//
-
 std::shared_ptr<gdal::Raster> openRamp(std::string& rampFilename)
 {
-    // If the user selected a default ramp name, it will be opened by
-    // one of these macros if it matches. Otherwise, we just open with the
-    // GDALOpen'able the user gave us
-
-    // GETRAMP will set rampFilename to the /vsimem filename it
-    // used to actually open the file, and from then on it can be treated
-    // like any other GDAL datasource.
-
-    GETRAMP(awesome_green);
-    GETRAMP(black_orange);
-    GETRAMP(blue_hue);
-    GETRAMP(blue_red);
-    GETRAMP(heat_map);
-    GETRAMP(pestel_shades);
-    GETRAMP(blue_orange);
+    const uint8_t* data = nullptr;
+    uint64_t size = 0;
+    if (pdal_colorinterp_default_ramp(rampFilename.c_str(), &data, &size))
+    {
+        rampFilename = "/vsimem/" + rampFilename + ".png";
+        auto tmp = VSIFileFromMemBuffer(
+            rampFilename.c_str(),
+            const_cast<GByte*>(reinterpret_cast<const GByte*>(data)),
+            static_cast<vsi_l_offset>(size), false);
+        (void)tmp;
+    }
 
     std::shared_ptr<gdal::Raster> output(
         new gdal::Raster(rampFilename.c_str()));

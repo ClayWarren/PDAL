@@ -1226,6 +1226,9 @@ extern "C"
                                              const char* dim_name, double min,
                                              double max);
     bool pdal_colorinterp_pipeline_streamable(double min, double max);
+    bool pdal_colorinterp_default_ramp(const char* name,
+                                       const uint8_t** out_data,
+                                       uint64_t* out_len);
     pdal_stage_t* pdal_stage_create_colorization(const char* raster_path,
                                                  const pdal_band_info_t* bands,
                                                  uint64_t count);

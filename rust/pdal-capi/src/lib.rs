@@ -6,6 +6,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod artifact_abi;
+mod color_ramps_abi;
 mod column_storage_abi;
 mod config_abi;
 mod deflate_abi;
@@ -55,6 +56,7 @@ mod xml_schema_abi;
 mod zstd_abi;
 
 pub use artifact_abi::*;
+pub use color_ramps_abi::*;
 pub use column_storage_abi::*;
 pub use config_abi::*;
 pub use deflate_abi::*;
