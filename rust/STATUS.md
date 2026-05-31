@@ -185,8 +185,8 @@ The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
   over a Rust-backed implementation are not counted as backlog.
 - `native-adapter`: C++ bindings over an external native library or platform
   API whose Rust home is `pdal-native`/FFI (e.g. `pdal/private/gdal/`, GDAL
-  VSI, lazperf compatibility, dynamic library loading, and backtrace adapters),
-  not a from-scratch port.
+  VSI, GDAL grid/density OGR adapters, lazperf compatibility, dynamic library
+  loading, and backtrace adapters), not a from-scratch port.
 - `holdout`: a documented intentional C++ holdout (libgeotiff GeoKey encoding,
   the `StreamCallback` callback ABI). Keep this list small and cited in the
   script.
@@ -197,14 +197,14 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 16,340 | 152 |
-| c-abi-backed | 41,019 | 364 |
-| native-adapter | 2,188 | 19 |
+| port-candidate | 14,845 | 146 |
+| c-abi-backed | 41,769 | 366 |
+| native-adapter | 2,921 | 23 |
 | holdout | 339 | 4 |
-| total | 59,886 | 539 |
+| total | 59,874 | 539 |
 
-Port-candidate backlog by area: `io` 7,997 · `pdal` 6,881 · `filters` 1,000 ·
-`kernels` 462. `apps` and `tools` are now at 0 (apps is a thin entry-point
+Port-candidate backlog by area: `io` 7,461 · `pdal` 6,119 · `filters` 1,000 ·
+`kernels` 265. `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
@@ -350,7 +350,7 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is about `16,340` code LOC for the main first-party
+C++ tests and vendor, is about `14,845` code LOC for the main first-party
 surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). That is
 still a ceiling, not a precise backlog: mixed files count as wrapper when they
 include the C ABI even if they still contain legacy implementation, and

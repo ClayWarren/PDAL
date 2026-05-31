@@ -68,6 +68,10 @@ NATIVE_ADAPTER_PREFIXES = (
 )
 
 NATIVE_ADAPTER_FILES = {
+    "io/private/GDALGrid.cpp",
+    "io/private/GDALGrid.hpp",
+    "kernels/private/density/OGR.cpp",
+    "kernels/private/density/OGR.hpp",
     "pdal/DynamicLibrary.cpp",
     "pdal/private/DynamicLibrary.hpp",
     "pdal/compression/LazPerfVlrCompression.cpp",

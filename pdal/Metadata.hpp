@@ -36,6 +36,8 @@
 
 #include <pdal/pdal_internal.hpp>
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal/util/Uuid.hpp>
@@ -46,20 +48,6 @@
 #include <stdint.h>
 #include <type_traits>
 #include <vector>
-
-extern "C"
-{
-    char* pdal_metadata_json_value(const char* typeName, const char* value);
-    bool pdal_metadata_value_as_bool(const char* typeName, const char* value,
-                                     bool* outValue);
-    bool pdal_metadata_value_as_f64(const char* typeName, const char* value,
-                                    double* outValue);
-    bool pdal_metadata_value_as_i64(const char* typeName, const char* value,
-                                    int64_t* outValue);
-    bool pdal_metadata_value_as_u64(const char* typeName, const char* value,
-                                    uint64_t* outValue);
-    void pdal_string_free(char* ptr);
-}
 
 namespace pdal
 {
