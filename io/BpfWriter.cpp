@@ -343,10 +343,9 @@ void BpfWriter::writeRustView()
     int coordId = m_coordId.m_val;
     if (m_coordId.m_auto && !coordId)
     {
-        BpfHeader header;
-        header.setLog(log());
-        if (header.trySetSpatialReference(m_curSrs))
-            coordId = header.m_coordId;
+        int32_t zone = 0;
+        if (pdal_srs_get_utm_zone(m_curSrs.getWKT().c_str(), &zone) && zone)
+            coordId = zone;
     }
     addOption(options, "coord_id", Utils::toString(coordId));
 

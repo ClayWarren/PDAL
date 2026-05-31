@@ -171,7 +171,6 @@ struct BpfHeader
     PDAL_EXPORT bool read(ILeStream& stream);
     bool readV3(ILeStream& stream);
     bool readV1(ILeStream& stream);
-    bool trySetSpatialReference(const pdal::SpatialReference&);
     PDAL_EXPORT bool readDimensions(ILeStream& stream,
                                     std::vector<BpfDimension>& dims,
                                     bool fixNames);
