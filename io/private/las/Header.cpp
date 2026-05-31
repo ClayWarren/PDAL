@@ -14,27 +14,7 @@ namespace las
 
 int baseCount(int format)
 {
-    // LAZ screws with the high bits of the format, so we mask down to the low
-    // four bits.
-    switch (format & Header::FormatMask)
-    {
-    case 0:
-        return 20;
-    case 1:
-        return 28;
-    case 2:
-        return 26;
-    case 3:
-        return 34;
-    case 6:
-        return 30;
-    case 7:
-        return 36;
-    case 8:
-        return 38;
-    default:
-        return 0;
-    }
+    return pdal_las_base_count(format);
 }
 
 void Header::fill(const char* buf, size_t bufsize)
@@ -153,22 +133,16 @@ StringList Header::validate(uint64_t fileSize) const
 void Header::setPointCount(uint64_t pointCount)
 {
     ePointCount = pointCount;
-    bool condition = (ePointCount <= (std::numeric_limits<uint32_t>::max)()) &&
-                     !((versionMinor >= 4) && (pointFormat() >= 6));
-    legacyPointCount = condition ? (uint32_t)ePointCount : 0;
+    legacyPointCount =
+        pdal_las_legacy_point_count(pointCount, versionMinor, pointFormat());
 }
 
 void Header::setPointsByReturn(int returnNum, uint64_t pointCount)
 {
     ePointsByReturn[returnNum] = pointCount;
     if (returnNum < LegacyReturnCount)
-    {
-        bool condition =
-            (pointCount <= (std::numeric_limits<uint32_t>::max)()) &&
-            !((versionMinor >= 4) && (pointFormat() >= 6));
-
-        legacyPointsByReturn[returnNum] = condition ? (uint32_t)pointCount : 0;
-    }
+        legacyPointsByReturn[returnNum] = pdal_las_legacy_points_by_return(
+            pointCount, returnNum, versionMinor, pointFormat());
 }
 
 } // namespace las

@@ -43,6 +43,7 @@
 #include <pdal/PointRef.hpp>
 #include <pdal/Scaling.hpp>
 #include <pdal/pdal_config.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -92,19 +93,7 @@ inline std::ostream& operator<<(std::ostream& out, const Compression& c)
 
 inline bool pointFormatSupported(int format)
 {
-    switch (format)
-    {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 6:
-    case 7:
-    case 8:
-        return true;
-    default:
-        return false;
-    }
+    return pdal_las_point_format_supported(format);
 }
 
 // Metadata

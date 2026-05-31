@@ -97,6 +97,59 @@ pub unsafe extern "C" fn pdal_las_summary_bounds(
     }
 }
 
+#[no_mangle]
+pub extern "C" fn pdal_las_base_count(format: i32) -> i32 {
+    match format & 0x0f {
+        0 => 20,
+        1 => 28,
+        2 => 26,
+        3 => 34,
+        6 => 30,
+        7 => 36,
+        8 => 38,
+        _ => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_las_point_format_supported(format: i32) -> bool {
+    matches!(format, 0 | 1 | 2 | 3 | 6 | 7 | 8)
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_las_legacy_point_count(
+    point_count: u64,
+    version_minor: u8,
+    point_format: i32,
+) -> u32 {
+    if should_mirror_las_legacy_count(point_count, version_minor, point_format) {
+        point_count as u32
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_las_legacy_points_by_return(
+    point_count: u64,
+    return_num: i32,
+    version_minor: u8,
+    point_format: i32,
+) -> u32 {
+    if return_num < 0
+        || return_num >= 5
+        || !should_mirror_las_legacy_count(point_count, version_minor, point_format)
+    {
+        0
+    } else {
+        point_count as u32
+    }
+}
+
+fn should_mirror_las_legacy_count(point_count: u64, version_minor: u8, point_format: i32) -> bool {
+    point_count <= u64::from(u32::MAX) && !(version_minor >= 4 && point_format >= 6)
+}
+
 pub struct LasTileHandle {
     chunk: u32,
     data: Vec<u8>,

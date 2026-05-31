@@ -484,6 +484,16 @@ extern "C"
     void pdal_las_summary_bounds(const pdal_las_summary_t* summary,
                                  pdal_bounds3d_t* out_bounds);
 
+    int32_t pdal_las_base_count(int32_t format);
+    bool pdal_las_point_format_supported(int32_t format);
+    uint32_t pdal_las_legacy_point_count(uint64_t point_count,
+                                         uint8_t version_minor,
+                                         int32_t point_format);
+    uint32_t pdal_las_legacy_points_by_return(uint64_t point_count,
+                                              int32_t return_num,
+                                              uint8_t version_minor,
+                                              int32_t point_format);
+
     pdal_las_tile_t* pdal_las_tile_create(uint32_t chunk, uint64_t size);
     void pdal_las_tile_destroy(pdal_las_tile_t* tile);
     const char* pdal_las_tile_data_const(const pdal_las_tile_t* tile);

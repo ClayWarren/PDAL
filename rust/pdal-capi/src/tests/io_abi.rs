@@ -46,6 +46,35 @@ fn las_summary_abi_tracks_bounds_total_and_return_counts() {
 }
 
 #[test]
+fn las_header_abi_matches_supported_formats_and_legacy_counts() {
+    assert_eq!(pdal_las_base_count(0), 20);
+    assert_eq!(pdal_las_base_count(1), 28);
+    assert_eq!(pdal_las_base_count(2), 26);
+    assert_eq!(pdal_las_base_count(3), 34);
+    assert_eq!(pdal_las_base_count(6), 30);
+    assert_eq!(pdal_las_base_count(7), 36);
+    assert_eq!(pdal_las_base_count(8), 38);
+    assert_eq!(pdal_las_base_count(0x86), 30);
+    assert_eq!(pdal_las_base_count(5), 0);
+
+    for format in [0, 1, 2, 3, 6, 7, 8] {
+        assert!(pdal_las_point_format_supported(format));
+    }
+    assert!(!pdal_las_point_format_supported(4));
+    assert!(!pdal_las_point_format_supported(9));
+
+    assert_eq!(pdal_las_legacy_point_count(123, 2, 3), 123);
+    assert_eq!(pdal_las_legacy_point_count(123, 4, 6), 0);
+    assert_eq!(
+        pdal_las_legacy_point_count(u64::from(u32::MAX) + 1, 2, 3),
+        0
+    );
+    assert_eq!(pdal_las_legacy_points_by_return(42, 2, 2, 3), 42);
+    assert_eq!(pdal_las_legacy_points_by_return(42, 5, 2, 3), 0);
+    assert_eq!(pdal_las_legacy_points_by_return(42, 0, 4, 6), 0);
+}
+
+#[test]
 fn las_tile_abi_owns_buffer_and_advances_cursor() {
     unsafe {
         let tile = pdal_las_tile_create(7, 6);
