@@ -130,6 +130,12 @@ HOLDOUTS = {
     "pdal/util/OStream.hpp": "C++ public std::ostream/endian stream compatibility surface",
     "io/OptechRotationMatrix.hpp": "empty public compatibility include",
     "io/point_types.hpp": "PCL point type compatibility header",
+    "io/BpfHeader.cpp": "exported BPF header compatibility API surface",
+    "io/BpfHeader.hpp": "exported BPF header compatibility API surface",
+    "io/LasHeader.cpp": "exported deprecated LAS header compatibility API surface",
+    "io/LasHeader.hpp": "exported deprecated LAS header compatibility API surface",
+    "io/LasVLR.cpp": "exported deprecated LAS VLR compatibility API surface",
+    "io/LasVLR.hpp": "exported deprecated LAS VLR compatibility API surface",
     # C++ compatibility argument-binding API used by exported C++ shells. The
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
