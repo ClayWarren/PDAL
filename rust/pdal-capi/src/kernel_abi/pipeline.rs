@@ -262,6 +262,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
     let mut mode = InfoMode::Stats {
         dimensions: None,
         enumerate: None,
+        breakout: None,
     };
     let mut pc_type = "lidar".to_string();
     let mut serialization_file = None;
@@ -273,6 +274,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             mode = InfoMode::Stats {
                 dimensions: None,
                 enumerate: None,
+                breakout: None,
             };
         } else if arg == "--schema" {
             mode = InfoMode::Schema;
@@ -324,16 +326,24 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             };
             mode = InfoMode::Stats {
                 dimensions: Some(parse_dimension_list(value)),
-                enumerate: match mode {
+                enumerate: match mode.clone() {
                     InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
+                breakout: match mode.clone() {
+                    InfoMode::Stats { breakout, .. } => breakout,
                     _ => None,
                 },
             };
         } else if let Some(value) = arg.strip_prefix("--dimensions=") {
             mode = InfoMode::Stats {
                 dimensions: Some(parse_dimension_list(value)),
-                enumerate: match mode {
+                enumerate: match mode.clone() {
                     InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
+                breakout: match mode.clone() {
+                    InfoMode::Stats { breakout, .. } => breakout,
                     _ => None,
                 },
             };
@@ -343,19 +353,55 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 return 1;
             };
             mode = InfoMode::Stats {
-                dimensions: match mode {
+                dimensions: match mode.clone() {
                     InfoMode::Stats { dimensions, .. } => dimensions,
                     _ => None,
                 },
                 enumerate: Some(parse_dimension_list(value)),
+                breakout: match mode.clone() {
+                    InfoMode::Stats { breakout, .. } => breakout,
+                    _ => None,
+                },
             };
         } else if let Some(value) = arg.strip_prefix("--enumerate=") {
             mode = InfoMode::Stats {
-                dimensions: match mode {
+                dimensions: match mode.clone() {
                     InfoMode::Stats { dimensions, .. } => dimensions,
                     _ => None,
                 },
                 enumerate: Some(parse_dimension_list(value)),
+                breakout: match mode.clone() {
+                    InfoMode::Stats { breakout, .. } => breakout,
+                    _ => None,
+                },
+            };
+        } else if arg == "--breakout" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--breakout'.");
+                return 1;
+            };
+            mode = InfoMode::Stats {
+                dimensions: match mode.clone() {
+                    InfoMode::Stats { dimensions, .. } => dimensions,
+                    _ => None,
+                },
+                enumerate: match mode.clone() {
+                    InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
+                breakout: Some(DimId::from_name(value)),
+            };
+        } else if let Some(value) = arg.strip_prefix("--breakout=") {
+            mode = InfoMode::Stats {
+                dimensions: match mode.clone() {
+                    InfoMode::Stats { dimensions, .. } => dimensions,
+                    _ => None,
+                },
+                enumerate: match mode.clone() {
+                    InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
+                breakout: Some(DimId::from_name(value)),
             };
         } else if arg == "--pc_type" {
             let Some(value) = iter.next() else {
@@ -474,11 +520,13 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
     }
 }
 
+#[derive(Clone)]
 enum InfoMode {
     Summary,
     Stats {
         dimensions: Option<Vec<DimId>>,
         enumerate: Option<Vec<DimId>>,
+        breakout: Option<DimId>,
     },
     Schema,
     Metadata,
@@ -526,7 +574,13 @@ fn info_report(
         InfoMode::Stats {
             dimensions,
             enumerate,
-        } => stats_report(views, dimensions.as_deref(), enumerate.as_deref()),
+            breakout,
+        } => stats_report(
+            views,
+            dimensions.as_deref(),
+            enumerate.as_deref(),
+            breakout.as_ref(),
+        ),
         InfoMode::Schema => schema_report(views),
         InfoMode::Metadata => metadata_report(metadata),
         InfoMode::All => {
@@ -535,7 +589,7 @@ fn info_report(
             output.push_str(&schema_body(views, 2));
             output.push_str(",\n");
             output.push_str("  \"stats\":\n");
-            output.push_str(&stats_body(views, 2, None, None));
+            output.push_str(&stats_body(views, 2, None, None, None));
             output.push_str(",\n");
             output.push_str("  \"metadata\": ");
             let metadata_json = crate::metadata_abi::metadata_node_to_json_flat(metadata);
@@ -862,10 +916,11 @@ fn stats_report(
     views: &[PointView],
     dimensions: Option<&[DimId]>,
     enumerate: Option<&[DimId]>,
+    breakout: Option<&DimId>,
 ) -> String {
     format!(
         "{{\n  \"stats\":\n{}\n}}\n",
-        stats_body(views, 2, dimensions, enumerate)
+        stats_body(views, 2, dimensions, enumerate, breakout)
     )
 }
 
@@ -874,13 +929,19 @@ fn stats_body(
     indent: usize,
     dimensions: Option<&[DimId]>,
     enumerate: Option<&[DimId]>,
+    breakout: Option<&DimId>,
 ) -> String {
     let pad = " ".repeat(indent);
     let list_pad = " ".repeat(indent + 2);
     let item_pad = " ".repeat(indent + 4);
     let value_pad = " ".repeat(indent + 6);
     let stats = dimension_stats(views, dimensions, enumerate);
-    let mut output = format!("{pad}{{\n{list_pad}\"statistic\":\n{list_pad}[\n");
+    let mut output = format!("{pad}{{\n");
+    if let Some(dim) = breakout {
+        output.push_str(&breakout_body(dim, list_pad.as_str(), item_pad.as_str()));
+        output.push_str(",\n");
+    }
+    output.push_str(&format!("{list_pad}\"statistic\":\n{list_pad}[\n"));
     for (idx, stat) in stats.iter().enumerate() {
         if idx > 0 {
             output.push_str(",\n");
@@ -997,6 +1058,30 @@ fn unique_sorted_values(values: &[f64]) -> Vec<f64> {
     unique.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     unique.dedup_by(|a, b| a == b);
     unique
+}
+
+fn breakout_body(dim: &DimId, list_pad: &str, item_pad: &str) -> String {
+    let value_pad = format!("{item_pad}  ");
+    let expressions = [
+        "(Withheld==1)",
+        "(Keypoint==1)",
+        "(Overlap==1)",
+        "(Synthetic==1)",
+    ];
+    let mut output = format!(
+        "{list_pad}\"breakout\":\n{list_pad}{{\n{item_pad}\"dimension\": \"{}\",\n{item_pad}\"statistic\":\n{item_pad}[\n",
+        dim.name()
+    );
+    for (idx, expression) in expressions.iter().enumerate() {
+        if idx > 0 {
+            output.push_str(",\n");
+        }
+        output.push_str(&format!(
+            "{value_pad}{{\n{value_pad}  \"expression\": \"{expression}\",\n{value_pad}  \"position\": {idx}\n{value_pad}}}"
+        ));
+    }
+    output.push_str(&format!("\n{item_pad}]\n{list_pad}}}"));
+    output
 }
 
 fn dim_type_name(ty: DimType) -> &'static str {

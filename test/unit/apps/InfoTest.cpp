@@ -170,6 +170,11 @@ TEST(Info, stats)
     SCOPED_TRACE("stats");
     test("", r);
     test("--stats --enumerate Classification", R"foo("values")foo");
+    test("--stats --breakout Classification", R"foo(
+    "breakout":
+    {
+      "dimension": "Classification",
+)foo");
 
     // 10-Jan-20 - Broken by a change to proj which converts meters to ft, I
     // think.
