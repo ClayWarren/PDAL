@@ -243,9 +243,15 @@ impl LasReader {
     /// assumes uniform chunk sizes. We side-step it by streaming the LAZ
     /// points sequentially and dropping records outside the kept ranges.
     pub fn read_ranges(&mut self, ranges: &[(u64, u64)]) -> Result<PointView, StageError> {
-        let path = Path::new(&self.filename);
-        let mut reader = las::Reader::from_path(path)
-            .map_err(|e| StageError(format!("Failed to open LAS/LAZ file: {}", e)))?;
+        let mut reader = if is_vsi_path(&self.filename) {
+            let data = read_vsi_file(&self.filename)?;
+            las::Reader::new(Cursor::new(data))
+                .map_err(|e| StageError(format!("Failed to open LAS/LAZ VSI data: {}", e)))?
+        } else {
+            let path = Path::new(&self.filename);
+            las::Reader::from_path(path)
+                .map_err(|e| StageError(format!("Failed to open LAS/LAZ file: {}", e)))?
+        };
         let header = reader.header();
         let point_format = header.point_format().to_u8().unwrap_or(3);
         self.add_metadata(header);

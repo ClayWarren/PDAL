@@ -173,8 +173,23 @@ pub fn read_chunk_locators(path: &std::path::Path) -> Result<Vec<ChunkLocator>, 
     use std::fs::File;
     use std::io::BufReader;
 
-    // Read offset_to_point_data directly from the LAS header (u32 at byte 96).
     let mut file = File::open(path).map_err(|e| format!("COPC: open chunk table failed: {e}"))?;
+    let file2 = File::open(path).map_err(|e| format!("COPC: open for laz vlr failed: {e}"))?;
+    read_chunk_locators_from(&mut file, BufReader::new(file2))
+}
+
+/// Read the LAZ chunk table from seekable byte streams. `file` is used for
+/// direct header/chunk-table seeks; `las_source` is a fresh stream for the LAS
+/// crate to parse the LAZ VLR from the header.
+pub fn read_chunk_locators_from<R, S>(
+    mut file: &mut R,
+    las_source: S,
+) -> Result<Vec<ChunkLocator>, String>
+where
+    R: Read + Seek,
+    S: Read + Seek + Send + Sync + 'static,
+{
+    // Read offset_to_point_data directly from the LAS header (u32 at byte 96).
     file.seek(SeekFrom::Start(96))
         .map_err(|e| format!("COPC: seek header offset_to_point_data failed: {e}"))?;
     let offset_to_point_data = u64::from(
@@ -182,10 +197,8 @@ pub fn read_chunk_locators(path: &std::path::Path) -> Result<Vec<ChunkLocator>, 
             .map_err(|e| format!("COPC: read offset_to_point_data failed: {e}"))?,
     );
 
-    // Use a fresh BufReader so las can parse VLRs without consuming our handle.
-    let file2 = File::open(path).map_err(|e| format!("COPC: open for laz vlr failed: {e}"))?;
-    let buffered = BufReader::new(file2);
-    let reader = las::Reader::new(buffered)
+    // Use a fresh stream so las can parse VLRs without consuming our handle.
+    let reader = las::Reader::new(las_source)
         .map_err(|e| format!("COPC: open las reader for laz vlr failed: {e}"))?;
     let laz_vlr = reader
         .header()
