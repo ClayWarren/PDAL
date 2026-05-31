@@ -38,6 +38,10 @@
 #include "private/density/OGR.hpp"
 
 #include <pdal/util/FileUtils.hpp>
+#include <pdal/util/Utils.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
 
 namespace pdal
 {
@@ -93,29 +97,73 @@ void DensityKernel::outputDensity(pdal::SpatialReference const& reference)
 
 int DensityKernel::execute()
 {
-    if (m_inputFile == "STDIN" ||
-        (FileUtils::extension(m_inputFile) == ".xml" ||
-         FileUtils::extension(m_inputFile) == ".json"))
+    if (!Utils::iequals(m_driverName, "GeoJSON") || !m_layerName.empty() ||
+        m_isH3)
     {
-        m_manager.readPipeline(m_inputFile);
+        if (m_inputFile == "STDIN" ||
+            (FileUtils::extension(m_inputFile) == ".xml" ||
+             FileUtils::extension(m_inputFile) == ".json"))
+        {
+            m_manager.readPipeline(m_inputFile);
+        }
+        else
+        {
+            m_manager.makeReader(m_inputFile, "");
+        }
+        Options options;
+        options.add("sample_size", m_sampleSize);
+        options.add("threshold", m_density);
+        options.add("edge_length", m_edgeLength);
+        options.add("hole_cull_area_tolerance", m_cullArea);
+        options.add("smooth", m_doSmooth);
+        options.add("h3_grid", m_isH3);
+        options.add("h3_resolution", m_h3Res);
+        m_hexbinStage = &(m_manager.makeFilter("filters.hexbin",
+                                               *m_manager.getStage(), options));
+        m_manager.execute();
+        outputDensity(m_manager.pointTable().anySpatialReference());
+        return 0;
     }
-    else
+
+    StringList args;
+    args.push_back(m_inputFile);
+    args.push_back(m_outputFile);
+    if (!m_driverName.empty())
     {
-        m_manager.makeReader(m_inputFile, "");
+        args.push_back("--ogrdriver");
+        args.push_back(m_driverName);
     }
-    Options options;
-    options.add("sample_size", m_sampleSize);
-    options.add("threshold", m_density);
-    options.add("edge_length", m_edgeLength);
-    options.add("hole_cull_area_tolerance", m_cullArea);
-    options.add("smooth", m_doSmooth);
-    options.add("h3_grid", m_isH3);
-    options.add("h3_resolution", m_h3Res);
-    m_hexbinStage = &(
-        m_manager.makeFilter("filters.hexbin", *m_manager.getStage(), options));
-    m_manager.execute();
-    outputDensity(m_manager.pointTable().anySpatialReference());
-    return 0;
+    if (m_edgeLength != 0.0)
+    {
+        args.push_back("--edge_length");
+        args.push_back(std::to_string(m_edgeLength));
+    }
+    args.push_back("--threshold");
+    args.push_back(std::to_string(m_density));
+    args.push_back("--filters.hexbin.sample_size=" +
+                   std::to_string(m_sampleSize));
+    args.push_back("--filters.hexbin.smooth=" +
+                   std::string(m_doSmooth ? "true" : "false"));
+    if (m_cullArea != 0.0)
+    {
+        args.push_back("--filters.hexbin.hole_cull_area_tolerance=" +
+                       std::to_string(m_cullArea));
+    }
+    if (m_isH3)
+    {
+        args.push_back("--filters.hexbin.h3_grid=true");
+        if (m_h3Res != -1)
+            args.push_back("--filters.hexbin.h3_resolution=" +
+                           std::to_string(m_h3Res));
+    }
+
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
+
+    return pdal_rust_kernel_run("density", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal
