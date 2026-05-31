@@ -391,8 +391,8 @@ void InfoKernel::dump(MetadataNode& root)
 
 bool InfoKernel::canRunRust() const
 {
-    if (m_usestdin || m_showAll || !m_breakoutDimension.empty() ||
-        !m_enumerate.empty() || (m_pcType != "lidar" && !m_stac))
+    if (m_usestdin || !m_breakoutDimension.empty() || !m_enumerate.empty() ||
+        (m_pcType != "lidar" && !m_stac))
         return false;
 
     if (!m_queryPoint.empty() && !isTwoDimensionalQuery(m_queryPoint))
@@ -410,7 +410,9 @@ int InfoKernel::runRust() const
         args.push_back(m_driverOverride);
     }
 
-    if (m_showSummary)
+    if (m_showAll)
+        args.push_back("--all");
+    else if (m_showSummary)
         args.push_back("--summary");
     else if (m_showSchema)
         args.push_back("--schema");
