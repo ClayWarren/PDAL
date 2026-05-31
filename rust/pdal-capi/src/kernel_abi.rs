@@ -649,6 +649,7 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let mut stage_options = Vec::new();
     let mut metadata_file = None;
     let mut serialization_file = None;
+    let mut filter_json = None;
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -701,11 +702,13 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
                 return 1;
             };
         } else if arg == "--json" {
-            let Some(_) = iter.next() else {
+            let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.translate: Missing value for option '--json'.");
                 return 1;
             };
-            return -1;
+            filter_json = Some(value.clone());
+        } else if let Some(value) = arg.strip_prefix("--json=") {
+            filter_json = Some(value.to_string());
         } else if arg.starts_with("--") {
             match parse_cli_stage_option(arg) {
                 Some(option) => stage_options.push(option),
@@ -728,6 +731,10 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         eprintln!("PDAL: kernels.translate: Missing value for positional argument 'output'.");
         return 1;
     };
+    if filter_json.is_some() && !filters.is_empty() {
+        eprintln!("PDAL: kernels.translate: Cannot set both --filter options and --json options");
+        return 1;
+    }
     let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
     else {
         eprintln!("PDAL: kernels.translate: Unable to infer reader driver for '{input}'.");
@@ -739,17 +746,28 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         return 1;
     };
 
-    let mut stages = Vec::new();
-    stages.push(serde_json::json!({ "type": reader, "filename": input }));
-    for filter in filters {
-        let stage_type = if filter.contains('.') {
-            filter
-        } else {
-            format!("filters.{filter}")
-        };
-        stages.push(serde_json::json!({ "type": stage_type }));
-    }
-    stages.push(serde_json::json!({ "type": writer, "filename": output }));
+    let mut stages = if let Some(json) = filter_json {
+        match translate_json_stages(&json, &input, &output, &reader, &writer) {
+            Ok(stages) => stages,
+            Err(message) => {
+                eprintln!("PDAL: kernels.translate: {message}");
+                return 1;
+            }
+        }
+    } else {
+        let mut stages = Vec::new();
+        stages.push(serde_json::json!({ "type": reader, "filename": input }));
+        for filter in filters {
+            let stage_type = if filter.contains('.') {
+                filter
+            } else {
+                format!("filters.{filter}")
+            };
+            stages.push(serde_json::json!({ "type": stage_type }));
+        }
+        stages.push(serde_json::json!({ "type": writer, "filename": output }));
+        stages
+    };
 
     let stage_options = match expand_translate_option_files(stage_options) {
         Ok(options) => options,
@@ -761,11 +779,99 @@ unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     execute_translate_pipeline(stages, metadata_file, serialization_file)
 }
 
+fn translate_json_stages(
+    json_arg: &str,
+    input: &str,
+    output: &str,
+    reader: &str,
+    writer: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    let json = fs::read_to_string(json_arg).unwrap_or_else(|_| json_arg.to_string());
+    let value: serde_json::Value =
+        serde_json::from_str(&json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+    let stages = if let Some(array) = value.as_array() {
+        array.clone()
+    } else if let Some(array) = value.get("pipeline").and_then(serde_json::Value::as_array) {
+        array.clone()
+    } else {
+        return Err("Pipeline JSON object must contain a 'pipeline' array.".to_string());
+    };
+
+    let mut rewritten = Vec::new();
+    let mut replaced_reader = false;
+    let mut replaced_writer = false;
+    for (position, stage) in stages.iter().enumerate() {
+        if !replaced_reader && is_reader_stage(stage, position, stages.len()) {
+            rewritten.push(replacement_stage(stage, reader, input));
+            replaced_reader = true;
+        } else if !replaced_writer && is_writer_stage(stage, position, stages.len()) {
+            rewritten.push(replacement_stage(stage, writer, output));
+            replaced_writer = true;
+        } else {
+            rewritten.push(stage.clone());
+        }
+    }
+
+    if !replaced_reader {
+        rewritten.insert(0, serde_json::json!({ "type": reader, "filename": input }));
+    }
+    if !replaced_writer {
+        rewritten.push(serde_json::json!({ "type": writer, "filename": output }));
+    }
+
+    Ok(rewritten)
+}
+
+fn replacement_stage(
+    original: &serde_json::Value,
+    driver: &str,
+    filename: &str,
+) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    object.insert(
+        "type".to_string(),
+        serde_json::Value::String(driver.to_string()),
+    );
+    object.insert(
+        "filename".to_string(),
+        serde_json::Value::String(filename.to_string()),
+    );
+    if let Some(tag) = original.get("tag").cloned() {
+        object.insert("tag".to_string(), tag);
+    }
+    serde_json::Value::Object(object)
+}
+
+fn is_reader_stage(stage: &serde_json::Value, position: usize, len: usize) -> bool {
+    if let Some(driver) = stage.get("type").and_then(serde_json::Value::as_str) {
+        return driver.starts_with("readers.");
+    }
+    let has_filename = stage.as_str().is_some()
+        || stage
+            .get("filename")
+            .and_then(serde_json::Value::as_str)
+            .is_some();
+    has_filename && position == 0 && len > 1
+}
+
+fn is_writer_stage(stage: &serde_json::Value, position: usize, len: usize) -> bool {
+    if let Some(driver) = stage.get("type").and_then(serde_json::Value::as_str) {
+        return driver.starts_with("writers.");
+    }
+    let has_filename = stage.as_str().is_some()
+        || stage
+            .get("filename")
+            .and_then(serde_json::Value::as_str)
+            .is_some();
+    has_filename && position + 1 == len
+}
+
 fn execute_translate_pipeline(
     stages: Vec<serde_json::Value>,
     metadata_file: Option<String>,
     serialization_file: Option<String>,
 ) -> i32 {
+    let stage_types = translate_stage_types(&stages);
     let pipeline_json = serde_json::Value::Array(stages);
     if let Some(path) = serialization_file {
         if let Err(err) = std::fs::write(&path, pipeline_json.to_string()) {
@@ -789,8 +895,18 @@ fn execute_translate_pipeline(
         Ok(result) => {
             if let Some(path) = metadata_file {
                 let handle = crate::pipeline_abi::PipelineHandle { pipeline };
+                let mut summary = serde_json::from_str::<serde_json::Value>(
+                    &crate::pipeline_abi::pipeline_result_to_json_for_kernel(result, &handle),
+                )
+                .unwrap_or_else(|_| serde_json::json!({}));
+                summary["stages"] = serde_json::Value::Array(
+                    stage_types
+                        .into_iter()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                );
                 let summary =
-                    crate::pipeline_abi::pipeline_result_to_json_for_kernel(result, &handle);
+                    serde_json::to_string_pretty(&summary).unwrap_or_else(|_| "{}".to_string());
                 if let Err(err) = std::fs::write(&path, summary) {
                     eprintln!("PDAL: kernels.translate: Unable to write metadata '{path}': {err}");
                     return 1;
@@ -803,6 +919,18 @@ fn execute_translate_pipeline(
             1
         }
     }
+}
+
+fn translate_stage_types(stages: &[serde_json::Value]) -> Vec<String> {
+    stages
+        .iter()
+        .filter_map(|stage| {
+            stage
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect()
 }
 
 fn expand_translate_option_files(options: Vec<CliStageOption>) -> Result<Vec<CliStageOption>, i32> {

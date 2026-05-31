@@ -318,6 +318,42 @@ fn rust_kernel_run_reports_translate_missing_input() {
 }
 
 #[test]
+fn translate_json_replaces_pipeline_reader_and_writer() {
+    let json = r#"{
+        "pipeline": [
+            { "type": "readers.las", "filename": "old-input.las" },
+            { "type": "filters.range", "limits": "Z[0:100]" },
+            { "type": "writers.las", "filename": "old-output.las" }
+        ]
+    }"#;
+
+    let stages = translate_json_stages(
+        json,
+        "new-input.las",
+        "new-output.las",
+        "readers.las",
+        "writers.las",
+    )
+    .unwrap();
+
+    assert_eq!(stages[0]["filename"], "new-input.las");
+    assert_eq!(stages[1]["type"], "filters.range");
+    assert_eq!(stages[2]["filename"], "new-output.las");
+}
+
+#[test]
+fn translate_json_wraps_filter_only_pipeline() {
+    let json = r#"{"pipeline":[{"type":"filters.stats"}]}"#;
+
+    let stages =
+        translate_json_stages(json, "in.las", "out.las", "readers.las", "writers.las").unwrap();
+
+    assert_eq!(stages[0]["type"], "readers.las");
+    assert_eq!(stages[1]["type"], "filters.stats");
+    assert_eq!(stages[2]["type"], "writers.las");
+}
+
+#[test]
 fn translate_option_file_expands_command_options() {
     let options = vec![CliStageOption {
         stage: "filters.range".to_string(),
