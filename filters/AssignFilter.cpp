@@ -35,7 +35,6 @@
 
 #include "AssignFilter.hpp"
 #include "private/DimRange.hpp"
-#include "private/expr/AssignStatement.hpp"
 #include <pdal/StageFactory.hpp>
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
@@ -62,7 +61,6 @@ struct AssignArgs
     std::vector<AssignRange> m_assignments;
     DimRange m_condition;
     std::vector<std::string> m_valueStrings;
-    std::vector<expr::AssignStatement> m_statements;
 };
 
 void AssignRange::parse(const std::string& r)
@@ -149,30 +147,34 @@ void AssignFilter::prepared(PointTableRef table)
                        r.m_name + "'.");
     }
 
-    m_args->m_statements.clear();
+    pdal_point_layout_t* rustLayout = rust_view_converter::toRustLayout(layout);
     for (const std::string& value : m_args->m_valueStrings)
     {
-        if (!pdal_stage_validate_assign_statement(value.c_str()))
-            rust_view_converter::throwLastError("Rust C ABI call failed.");
+        std::string target = rust_view_converter::takeString(
+            pdal_assign_statement_target_dim(value.c_str()));
+        if (target.empty())
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError(
+                "Invalid assign value expression.");
+        }
 
-        expr::AssignStatement stmt;
-        Utils::StatusWithReason status = Utils::fromString(value, stmt);
-        if (!status)
-            throwError(status.what());
-        m_args->m_statements.push_back(std::move(stmt));
+        if (layout->findDim(target) == Dimension::Id::Unknown)
+        {
+            layout->registerOrAssignDim(target, Dimension::Type::Double);
+            pdal_point_layout_destroy(rustLayout);
+            rustLayout = rust_view_converter::toRustLayout(layout);
+        }
+
+        if (!pdal_stage_validate_assign_statement_with_layout(value.c_str(),
+                                                              rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError(
+                "Invalid assign value expression.");
+        }
     }
-
-    for (expr::AssignStatement& expr : m_args->m_statements)
-    {
-        expr::IdentExpression& ident = expr.identExpr();
-        if (!expr.prepare(layout) && ident.eval() == Dimension::Id::Unknown)
-            layout->registerOrAssignDim(ident.name(), Dimension::Type::Double);
-
-        // Try to prepare again after potentially adding a dimension.
-        auto status = expr.prepare(layout);
-        if (!status)
-            throwError(status.what());
-    }
+    pdal_point_layout_destroy(rustLayout);
 }
 
 bool AssignFilter::processOne(PointRef& point)
@@ -186,10 +188,24 @@ bool AssignFilter::processOne(PointRef& point)
         if (r.valuePasses(point.getFieldAs<double>(r.m_id)))
             point.setField(r.m_id, r.m_value);
 
-    for (expr::AssignStatement& expr : m_args->m_statements)
-        if (expr.conditionalExpr().eval(point))
-            point.setField(expr.identExpr().eval(),
-                           expr.valueExpr().eval(point));
+    if (!m_args->m_valueStrings.empty())
+    {
+        pdal_point_view_t* rustPoint =
+            rust_view_converter::toRustPoint(point, point.layout());
+        std::vector<const char*> valuePtrs;
+        valuePtrs.reserve(m_args->m_valueStrings.size());
+        for (const std::string& value : m_args->m_valueStrings)
+            valuePtrs.push_back(value.c_str());
+        if (!pdal_point_view_apply_assign_statements(
+                rustPoint, valuePtrs.data(), valuePtrs.size(), nullptr, 0))
+        {
+            pdal_point_view_destroy(rustPoint);
+            rust_view_converter::throwLastError(
+                "Rust assign value expression failed.");
+        }
+        rust_view_converter::fromRustPoint(rustPoint, 0, point);
+        pdal_point_view_destroy(rustPoint);
+    }
 
     return true;
 }
@@ -231,13 +247,22 @@ void AssignFilter::filter(PointView& view)
         pdal_stage_destroy(stage);
     }
 
-    for (PointId id = 0; id < view.size(); ++id)
+    if (!m_args->m_valueStrings.empty())
     {
-        PointRef point(view, id);
-        for (expr::AssignStatement& expr : m_args->m_statements)
-            if (expr.conditionalExpr().eval(point))
-                point.setField(expr.identExpr().eval(),
-                               expr.valueExpr().eval(point));
+        pdal_point_view_t* rustView = rust_view_converter::toRust(view);
+        std::vector<const char*> valuePtrs;
+        valuePtrs.reserve(m_args->m_valueStrings.size());
+        for (const std::string& value : m_args->m_valueStrings)
+            valuePtrs.push_back(value.c_str());
+        if (!pdal_point_view_apply_assign_statements(
+                rustView, valuePtrs.data(), valuePtrs.size(), nullptr, 0))
+        {
+            pdal_point_view_destroy(rustView);
+            rust_view_converter::throwLastError(
+                "Rust assign value expression failed.");
+        }
+        rust_view_converter::fromRust(rustView, view);
+        pdal_point_view_destroy(rustView);
     }
 }
 

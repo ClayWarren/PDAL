@@ -2,7 +2,8 @@ use super::*;
 use crate::stage_abi::StageWrapper;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
-use std::os::raw::c_int;
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_int};
 
 fn cstring(value: &str) -> CString {
     CString::new(value).unwrap()
@@ -56,6 +57,13 @@ unsafe fn get(view: *mut PointView, idx: u64, dim: &str) -> f64 {
     pdal_point_view_get_f64(view, idx, dim.as_ptr())
 }
 
+unsafe fn take_c_string(ptr: *mut c_char) -> String {
+    assert!(!ptr.is_null());
+    let value = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+    pdal_string_free(ptr);
+    value
+}
+
 unsafe fn destroy_stage(stage: *mut StageWrapper) {
     assert!(!stage.is_null());
     pdal_stage_destroy(stage);
@@ -93,6 +101,8 @@ fn assign_statements_apply_to_selected_view_points() {
         let statement = cstring("Classification = Z + 10 WHERE Z >= 2");
         let statements = [statement.as_ptr()];
         let selected = [0_u64, 1, 2];
+        let target = pdal_assign_statement_target_dim(statement.as_ptr());
+        assert_eq!(take_c_string(target), "Classification");
 
         assert!(pdal_point_view_apply_assign_statements(
             view,

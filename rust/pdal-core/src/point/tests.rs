@@ -502,6 +502,15 @@ fn dim_id_name_covers_all_variants() {
 }
 
 #[test]
+fn dim_id_from_name_accepts_common_case_variants() {
+    assert_eq!(DimId::from_name("intensity"), DimId::Intensity);
+    assert_eq!(DimId::from_name("classification"), DimId::Classification);
+    assert_eq!(DimId::from_name("gpstime"), DimId::GpsTime);
+    assert_eq!(DimId::from_name("userdata"), DimId::UserData);
+    assert_eq!(DimId::from_name("red"), DimId::Red);
+}
+
+#[test]
 fn pdal_dimension_interpretation_name_covers_each_type() {
     assert_eq!(pdal_dimension_interpretation_name(0x000), "unknown");
     assert_eq!(pdal_dimension_interpretation_name(0x101), "int8_t");

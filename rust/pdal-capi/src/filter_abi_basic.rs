@@ -173,6 +173,30 @@ pub unsafe extern "C" fn pdal_stage_validate_assign_statement_with_layout(
     }
 }
 
+/// Return the target dimension name for an assign filter value expression.
+///
+/// # Safety
+///
+/// `statement` must be null or a valid NUL-terminated C string. The returned
+/// string must be freed with `pdal_string_free`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_assign_statement_target_dim(
+    statement: *const std::os::raw::c_char,
+) -> *mut std::os::raw::c_char {
+    if statement.is_null() {
+        set_last_error("null assign statement");
+        return std::ptr::null_mut();
+    }
+    let statement = CStr::from_ptr(statement).to_string_lossy();
+    match pdal_core::expr::AssignStatement::parse(&statement) {
+        Ok(statement) => string_to_c_ptr(statement.ident().name().to_string()),
+        Err(err) => {
+            set_last_error(&err);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Apply assign filter value expressions to selected points in a view.
 ///
 /// # Safety
