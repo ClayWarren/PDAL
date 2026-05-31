@@ -196,13 +196,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 10,524 | 92 |
-| c-abi-backed | 41,837 | 371 |
+| port-candidate | 8,992 | 84 |
+| c-abi-backed | 41,891 | 373 |
 | native-adapter | 4,515 | 42 |
-| holdout | 1,449 | 16 |
+| holdout | 2,927 | 22 |
 | total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 5,671 · `pdal` 4,853. `filters`,
+Port-candidate backlog by area: `io` 5,671 · `pdal` 3,321. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -233,7 +233,14 @@ implementation to port. Small
 format helper headers that only serve Rust-backed C++ reader/writer wrappers
 (`PcdHeader`, `FbiHeader`, `SbetCommon`, `OptechCommon`, `HeaderVal`) count
 with their Rust-backed owners rather than as standalone portable
-implementation. Rerun the audit after each change.
+implementation. The compression base and gzip headers count with the
+Rust-backed deflate implementation: `DeflateCompression.cpp` owns the exported
+`GzipDecompressor` methods, routes zlib-format deflate through Rust, and keeps
+only the gzip auto-detect zlib fallback in C++. Public C++ typedef, exception,
+log-level, `std::istream`/`std::ostream`, endian extractor, endian inserter, and
+null ostream headers are compatibility holdouts: Rust owns equivalent domain
+logic where needed, but these exported C++ APIs must remain until the C++ SDK
+itself goes away. Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so

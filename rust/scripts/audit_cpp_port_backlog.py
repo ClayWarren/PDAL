@@ -61,6 +61,8 @@ KNOWN_BRIDGE_FILES = {
     "io/SbetCommon.hpp",
     "filters/private/RustMetadata.hpp",
     "filters/private/RustPipeline.hpp",
+    "pdal/compression/Compression.hpp",
+    "pdal/compression/GzipCompression.hpp",
     "pdal/KDIndex.cpp",
     "pdal/KDIndex.hpp",
 }
@@ -114,8 +116,14 @@ HOLDOUTS = {
     "pdal/pdal.hpp": "C++ umbrella include compatibility surface",
     "pdal/pdal_export.hpp": "C++ symbol export macro compatibility surface",
     "pdal/pdal_internal.hpp": "C++ internal compatibility include",
+    "pdal/pdal_types.hpp": "C++ public typedef/exception/log-level compatibility surface",
     "pdal/util/pdal_util_export.hpp": "C++ utility symbol export macro compatibility surface",
     "pdal/util/pdal_util_internal.hpp": "C++ utility platform macro compatibility surface",
+    "pdal/util/Extractor.hpp": "C++ public endian buffer extractor compatibility surface",
+    "pdal/util/Inserter.hpp": "C++ public endian buffer inserter compatibility surface",
+    "pdal/util/IStream.hpp": "C++ public std::istream/endian stream compatibility surface",
+    "pdal/util/NullOStream.hpp": "C++ public logging ostream compatibility surface",
+    "pdal/util/OStream.hpp": "C++ public std::ostream/endian stream compatibility surface",
     "io/OptechRotationMatrix.hpp": "empty public compatibility include",
     "io/point_types.hpp": "PCL point type compatibility header",
     # C++ compatibility argument-binding API used by exported C++ shells. The
