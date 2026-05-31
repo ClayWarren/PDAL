@@ -668,12 +668,7 @@ QuickInfo StacReader::inspect()
     {
     }
 
-    const bool hasDataAsset =
-        std::find(m_p->m_args->assetNames.begin(),
-                  m_p->m_args->assetNames.end(),
-                  "data") != m_p->m_args->assetNames.end();
-    const bool rustCatalogPreview =
-        stacType == "Catalog" && m_p->m_args->items.empty() && hasDataAsset;
+    const bool rustCatalogPreview = stacType == "Catalog";
     const bool rustFeatureCollectionPreview =
         stacType == "FeatureCollection" && m_p->m_args->catalogs.empty();
     const bool rustFeaturePreview = stacType == "Feature";

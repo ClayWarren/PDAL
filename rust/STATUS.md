@@ -198,10 +198,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 13,905 | 145 |
-| c-abi-backed | 41,769 | 366 |
+| c-abi-backed | 41,765 | 366 |
 | native-adapter | 2,921 | 23 |
 | holdout | 1,279 | 5 |
-| total | 59,874 | 539 |
+| total | 59,870 | 539 |
 
 Port-candidate backlog by area: `io` 7,461 · `pdal` 5,179 · `filters` 1,000 ·
 `kernels` 265. `apps` and `tools` are now at 0 (apps is a thin entry-point
@@ -711,7 +711,8 @@ Known mixed binaries:
   `schema_validate_test`, and `multiple_readers_test` count. Local and remote
   STAC
   Feature/Collection traversal, direct asset reads, collection-id filtering,
-  local Catalog preview metadata (`item_ids` and total `pc:count`), local
+  local and remote Catalog preview metadata (`item_ids`, `catalog_ids`,
+  `collection_ids`, and total `pc:count`) including item-id pruning, local
   FeatureCollection item-id regex preview metadata, and single-item
   date/bounds/GeoJSON OGR-boundary preview pruning, schema-flag structural
   validation for local fixture shapes, property filtering, and per-reader args

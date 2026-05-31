@@ -272,14 +272,8 @@ fn collect_item_assets(
             .ok_or_else(|| StageError(format!("STAC asset '{name}' is missing an href.")))?;
         let location = resolve_stac_link(base, href);
         let driver = driver_for_asset(asset, &location)?;
-        if context
-            .asset_names
-            .iter()
-            .any(|requested| requested == name)
-        {
-            context.assets.push(StacAsset { location, driver });
-            return Ok(());
-        }
+        context.assets.push(StacAsset { location, driver });
+        return Ok(());
     }
     Ok(())
 }
