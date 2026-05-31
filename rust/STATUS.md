@@ -197,28 +197,29 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 19,546 | 182 |
-| c-abi-backed | 40,072 | 356 |
+| port-candidate | 16,340 | 152 |
+| c-abi-backed | 41,019 | 364 |
 | native-adapter | 2,188 | 19 |
 | holdout | 339 | 4 |
-| total | 62,145 | 561 |
+| total | 59,886 | 539 |
 
-Port-candidate backlog by area: `io` 7,997 · `pdal` 7,188 · `filters` 3,436 ·
-`kernels` 925. `apps` and `tools` are now at 0 (apps is a thin entry-point
+Port-candidate backlog by area: `io` 7,997 · `pdal` 6,881 · `filters` 1,000 ·
+`kernels` 462. `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
 (The latest kernel sweeps moved direct C++ `DeltaKernel`/`EvalKernel`/
 `GroundKernel`/`MergeKernel`/`PipelineKernel`/`RandomKernel`/`SortKernel`/
-`SplitKernel`/`TIndexKernel`/`TileKernel`/`TranslateKernel` execution through
+`SplitKernel`/`TIndexKernel`/`TileKernel`/`TranslateKernel`, and supported
+`InfoKernel` modes execute through
 `pdal_rust_kernel_run`, reducing kernel port-candidate backlog while retaining
 the exported classes as compatibility shells.)
 (A dead-code sweep removed the orphaned C++
 delaunator, CSF, miniball, straighten, mongoexpression, and DisjointSet
 implementations once their filters routed through Rust, plus the genuinely-dead
 non-exported `io/PcdHeader.cpp`, `io/FbiHeader.cpp` dumper, and the non-exported
-BPF header (de)serialization helpers; rerun the audit after each change — the
-totals above are a stale snapshot. **API-parity note:** removing dead code is
+BPF header (de)serialization helpers; rerun the audit after each change.
+**API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
 exported classes/methods must be preserved (hollowed to delegate to Rust, not
@@ -349,15 +350,14 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is about `47,134` code LOC for the main first-party
-surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools/`) after
-subtracting the current file-level wrapper/adapter estimate. That is still a
-ceiling, not a precise backlog: mixed files count as wrapper when they include
-the C ABI even if they still contain legacy implementation, and intentional C++
-holdouts have not all been subtracted. Optional `plugins/` add another deferred
-ceiling of about `36,476` code LOC; plugin work should stay separate from the
-mainline implementation-replacement checkpoint until the plugin ABI/support
-decision is made.
+C++ tests and vendor, is about `16,340` code LOC for the main first-party
+surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). That is
+still a ceiling, not a precise backlog: mixed files count as wrapper when they
+include the C ABI even if they still contain legacy implementation, and
+intentional C++ holdouts have not all been subtracted. Optional `plugins/` add
+another deferred ceiling of about `36,476` code LOC; plugin work should stay
+separate from the mainline implementation-replacement checkpoint until the
+plugin ABI/support decision is made.
 
 Using the same simple nonblank/noncomment line counter, the current first-party
 C++ implementation ceilings by area are approximately:

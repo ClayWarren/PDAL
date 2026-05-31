@@ -35,10 +35,13 @@
 #include "InfoKernel.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <ctime>
+#include <vector>
 
 #include <pdal/pdal_config.hpp>
 #include <pdal/pdal_features.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "arbiter/arbiter.hpp"
 #include "private/stac/StacInfo.hpp"
@@ -57,6 +60,28 @@ static StaticPluginInfo const s_info{"kernels.info", "Info Kernel",
                                      "https://pdal.org/apps/info.html"};
 
 CREATE_STATIC_KERNEL(InfoKernel, s_info)
+
+namespace
+{
+
+bool isSinglePointId(const std::string& value)
+{
+    return !value.empty() &&
+           std::all_of(value.begin(), value.end(),
+                       [](unsigned char c) { return std::isdigit(c) != 0; });
+}
+
+bool isTwoDimensionalQuery(const std::string& value)
+{
+    StringList parts = Utils::split2(value, '/');
+    if (parts.empty() || parts.size() > 2)
+        return false;
+
+    StringList coords = Utils::split2(parts[0], ',');
+    return coords.size() == 2;
+}
+
+} // namespace
 
 std::string InfoKernel::getName() const
 {
@@ -371,8 +396,84 @@ void InfoKernel::dump(MetadataNode& root)
     }
 }
 
+bool InfoKernel::canRunRust() const
+{
+    if (m_usestdin || m_showAll || m_boundary || !m_breakoutDimension.empty() ||
+        !m_enumerate.empty() || m_pcType != "lidar")
+        return false;
+
+    if (!m_pointIndexes.empty() && !isSinglePointId(m_pointIndexes))
+        return false;
+
+    if (!m_queryPoint.empty() && !isTwoDimensionalQuery(m_queryPoint))
+        return false;
+
+    return true;
+}
+
+int InfoKernel::runRust() const
+{
+    StringList args;
+    if (!m_driverOverride.empty())
+    {
+        args.push_back("--driver");
+        args.push_back(m_driverOverride);
+    }
+
+    if (m_showSummary)
+        args.push_back("--summary");
+    else if (m_showSchema)
+        args.push_back("--schema");
+    else if (m_showMetadata)
+        args.push_back("--metadata");
+    else if (m_stac)
+        args.push_back("--stac");
+    else if (!m_pointIndexes.empty())
+    {
+        args.push_back("--point");
+        args.push_back(m_pointIndexes);
+    }
+    else if (!m_queryPoint.empty())
+    {
+        args.push_back("--query");
+        args.push_back(m_queryPoint);
+    }
+    else
+    {
+        args.push_back("--stats");
+        if (!m_dimensions.empty())
+        {
+            args.push_back("--dimensions");
+            args.push_back(m_dimensions);
+        }
+    }
+
+    if (!m_pipelineFile.empty())
+    {
+        args.push_back("--pipeline-serialization");
+        args.push_back(m_pipelineFile);
+    }
+
+    args.push_back(m_inputFile);
+
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
+
+    return pdal_rust_kernel_run("info", static_cast<int>(argv.size()),
+                                argv.data());
+}
+
 int InfoKernel::execute()
 {
+    if (canRunRust())
+    {
+        int status = runRust();
+        if (status != -1)
+            return status;
+    }
+
     std::string filename = (m_usestdin ? std::string("STDIN") : m_inputFile);
     MetadataNode root = run(filename);
     Utils::toJSON(root, std::cout);

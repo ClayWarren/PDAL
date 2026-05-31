@@ -82,6 +82,8 @@ private:
     void makeReader(const std::string& filename);
     void makePipeline();
     void dump(MetadataNode& root);
+    bool canRunRust() const;
+    int runRust() const;
 
     std::string m_inputFile;
     bool m_showStats;
