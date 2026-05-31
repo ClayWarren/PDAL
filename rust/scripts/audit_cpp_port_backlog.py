@@ -65,6 +65,18 @@ NATIVE_ADAPTER_PREFIXES = (
     "pdal/private/gdal/",
 )
 
+NATIVE_ADAPTER_FILES = {
+    "pdal/DynamicLibrary.cpp",
+    "pdal/private/DynamicLibrary.hpp",
+    "pdal/compression/LazPerfVlrCompression.cpp",
+    "pdal/compression/LazPerfVlrCompression.hpp",
+    "pdal/util/VSIIO.cpp",
+    "pdal/util/VSIIO.hpp",
+    "pdal/util/private/BacktraceExecinfo.cpp",
+    "pdal/util/private/BacktraceNone.cpp",
+    "pdal/util/private/BacktraceUnwind.cpp",
+}
+
 # Documented intentional C++ holdouts. Keep this list small and cited; prefer
 # moving a file out of here once its port lands rather than letting it grow.
 HOLDOUTS = {
@@ -125,6 +137,8 @@ def classify_own(path: str) -> str:
     """Classify a file from its own path and content."""
     if path in HOLDOUTS:
         return "holdout"
+    if path in NATIVE_ADAPTER_FILES:
+        return "native-adapter"
     if any(path.startswith(prefix) for prefix in NATIVE_ADAPTER_PREFIXES):
         return "native-adapter"
     if is_c_abi_backed(path):

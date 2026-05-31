@@ -183,8 +183,10 @@ The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
 - `c-abi-backed`: includes the Rust C ABI header (or is a known Rust bridge
   header). A header inherits its sibling `.cpp`'s category, so interface headers
   over a Rust-backed implementation are not counted as backlog.
-- `native-adapter`: C++ bindings over an external native library whose Rust home
-  is `pdal-native`/FFI (e.g. `pdal/private/gdal/`), not a from-scratch port.
+- `native-adapter`: C++ bindings over an external native library or platform
+  API whose Rust home is `pdal-native`/FFI (e.g. `pdal/private/gdal/`, GDAL
+  VSI, lazperf compatibility, dynamic library loading, and backtrace adapters),
+  not a from-scratch port.
 - `holdout`: a documented intentional C++ holdout (libgeotiff GeoKey encoding,
   the `StreamCallback` callback ABI). Keep this list small and cited in the
   script.
@@ -195,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 21,156 | 195 |
+| port-candidate | 20,396 | 186 |
 | c-abi-backed | 39,289 | 352 |
-| native-adapter | 1,428 | 10 |
+| native-adapter | 2,188 | 19 |
 | holdout | 339 | 4 |
 | total | 62,212 | 561 |
 
-Port-candidate backlog by area: `pdal` 8,785 · `io` 8,010 · `filters` 3,436 ·
+Port-candidate backlog by area: `pdal` 8,025 · `io` 8,010 · `filters` 3,436 ·
 `kernels` 925. `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
