@@ -416,9 +416,7 @@ void StacReader::Private::printErrors(Catalog& c)
 
 bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
-    Args& args = *m_args;
-    return !Utils::isRemote(filename) && args.catalogs.empty() &&
-           rustStacTypeSupported(filename);
+    return !Utils::isRemote(filename) && rustStacTypeSupported(filename);
 }
 
 std::string listStr(std::string key, std::vector<RegEx> ids)
@@ -595,6 +593,8 @@ void StacReader::initialize()
             addOption(options, "asset_names", assetName);
         for (const RegEx& item : m_p->m_args->items)
             addOption(options, "items", item.m_str);
+        for (const RegEx& catalog : m_p->m_args->catalogs)
+            addOption(options, "catalogs", catalog.m_str);
         for (const RegEx& collection : m_p->m_args->collections)
             addOption(options, "collections", collection.m_str);
         for (const NL::json& date : m_p->m_args->dates)
@@ -697,6 +697,8 @@ QuickInfo StacReader::inspect()
             addOption(options, "asset_names", assetName);
         for (const RegEx& item : m_p->m_args->items)
             addOption(options, "items", item.m_str);
+        for (const RegEx& catalog : m_p->m_args->catalogs)
+            addOption(options, "catalogs", catalog.m_str);
         for (const NL::json& date : m_p->m_args->dates)
             addOption(options, "date_ranges", date.dump());
         if (!m_p->m_args->bounds.empty())

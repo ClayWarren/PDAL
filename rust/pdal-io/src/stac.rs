@@ -23,6 +23,7 @@ pub struct StacReader {
     filename: String,
     asset_names: Vec<String>,
     items: Vec<String>,
+    catalogs: Vec<String>,
     date_ranges: Vec<String>,
     bounds: String,
     ogr: String,
@@ -45,6 +46,7 @@ impl StacReader {
             filename: options.get_str("filename", ""),
             asset_names: asset_names(options),
             items: option_values(options, "items"),
+            catalogs: comma_values(options, "catalogs"),
             date_ranges: option_values(options, "date_ranges"),
             bounds: options.get_str("bounds", ""),
             ogr: options.get_str("ogr", ""),
@@ -69,6 +71,7 @@ impl StacReader {
             point_count: 0,
         };
         let item_filters = compile_regexes(&self.items, "items")?;
+        let catalog_filters = compile_regexes(&self.catalogs, "catalogs")?;
         let date_ranges = parse_date_ranges(&self.date_ranges)?;
         let bounds = if self.ogr.trim().is_empty() {
             parse_bounds(&self.bounds)?
@@ -78,15 +81,20 @@ impl StacReader {
         let mut context = StacPreviewContext {
             asset_names: &self.asset_names,
             item_filters: &item_filters,
+            catalog_filters: &catalog_filters,
             date_ranges: &date_ranges,
             bounds: bounds.as_ref(),
             validate_schema: self.validate_schema,
             visited: &mut visited,
             preview: &mut preview,
+            root: true,
         };
         collect_preview(&self.filename, &mut context)?;
         if preview.item_ids.is_empty()
-            && (!item_filters.is_empty() || !date_ranges.is_empty() || bounds.is_some())
+            && (!item_filters.is_empty()
+                || !catalog_filters.is_empty()
+                || !date_ranges.is_empty()
+                || bounds.is_some())
         {
             return Err(StageError(
                 "Reader list is empty after filtering.".to_string(),
@@ -111,6 +119,7 @@ impl Reader for StacReader {
         let mut visited = BTreeSet::new();
         let mut assets = Vec::new();
         let collections = compile_regexes(&self.collections, "collections")?;
+        let catalogs = compile_regexes(&self.catalogs, "catalogs")?;
         let item_filters = compile_regexes(&self.items, "items")?;
         let property_filters = parse_property_filters(&self.properties)?;
         let reader_args = parse_reader_args(&self.reader_args)?;
@@ -125,16 +134,19 @@ impl Reader for StacReader {
             item_filters: &item_filters,
             date_ranges: &date_ranges,
             bounds: bounds.as_ref(),
+            catalogs: &catalogs,
             collections: &collections,
             property_filters: &property_filters,
             validate_schema: self.validate_schema,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&self.filename, &mut context)?;
 
         if assets.is_empty()
-            && (!self.collections.is_empty()
+            && (!self.catalogs.is_empty()
+                || !self.collections.is_empty()
                 || !item_filters.is_empty()
                 || !property_filters.is_empty()
                 || !date_ranges.is_empty()
@@ -228,7 +240,13 @@ fn collect_assets(location: &str, context: &mut StacAssetContext<'_>) -> Result<
     }
     match json["type"].as_str() {
         Some("Feature") => collect_item_assets(&json, &base, context),
-        Some("Catalog") | Some("Collection") => collect_linked_items(&json, &base, context),
+        Some("Catalog") => {
+            if !context.root && !catalog_matches(&json, context.catalogs) {
+                return Ok(());
+            }
+            collect_linked_items(&json, &base, context)
+        }
+        Some("Collection") => collect_linked_items(&json, &base, context),
         Some("FeatureCollection") => {
             let features = json["features"].as_array().ok_or_else(|| {
                 StageError(format!(
@@ -254,11 +272,13 @@ struct StacAssetContext<'a> {
     item_filters: &'a [Regex],
     date_ranges: &'a [DateRange],
     bounds: Option<&'a Bounds2D>,
+    catalogs: &'a [Regex],
     collections: &'a [Regex],
     property_filters: &'a [PropertyFilter],
     validate_schema: bool,
     visited: &'a mut BTreeSet<String>,
     assets: &'a mut Vec<StacAsset>,
+    root: bool,
 }
 
 fn collect_item_assets(
@@ -318,7 +338,10 @@ fn collect_linked_items(
         let Some(href) = link["href"].as_str() else {
             continue;
         };
+        let root = context.root;
+        context.root = false;
         collect_assets(&resolve_stac_link(base, href), context)?;
+        context.root = root;
     }
     Ok(())
 }
@@ -326,11 +349,13 @@ fn collect_linked_items(
 struct StacPreviewContext<'a> {
     asset_names: &'a [String],
     item_filters: &'a [Regex],
+    catalog_filters: &'a [Regex],
     date_ranges: &'a [DateRange],
     bounds: Option<&'a Bounds2D>,
     validate_schema: bool,
     visited: &'a mut BTreeSet<String>,
     preview: &'a mut StacPreview,
+    root: bool,
 }
 
 fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Result<(), StageError> {
@@ -360,6 +385,12 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
             Ok(())
         }
         Some("Catalog") | Some("Collection") | Some("FeatureCollection") => {
+            if json["type"].as_str() == Some("Catalog")
+                && !context.root
+                && !catalog_matches(&json, context.catalog_filters)
+            {
+                return Ok(());
+            }
             if let Some(id) = json["id"].as_str() {
                 match json["type"].as_str() {
                     Some("Catalog") => context.preview.catalog_ids.push(id.to_string()),
@@ -388,11 +419,15 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
                     let Some(href) = link["href"].as_str() else {
                         continue;
                     };
+                    let root = context.root;
+                    context.root = false;
                     if is_remote(href) {
                         collect_preview(href, context)?;
+                        context.root = root;
                         continue;
                     }
                     collect_preview(&resolve_stac_link(&base, href), context)?;
+                    context.root = root;
                 }
             }
             Ok(())
@@ -650,6 +685,16 @@ fn collection_matches(item: &Value, collections: &[Regex]) -> bool {
         return false;
     };
     collections.iter().any(|regex| regex.is_match(collection))
+}
+
+fn catalog_matches(catalog: &Value, catalogs: &[Regex]) -> bool {
+    if catalogs.is_empty() {
+        return true;
+    }
+    let Some(id) = catalog["id"].as_str() else {
+        return false;
+    };
+    catalogs.iter().any(|regex| regex.is_match(id))
 }
 
 fn compile_regexes(values: &[String], label: &str) -> Result<Vec<Regex>, StageError> {
@@ -1226,11 +1271,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &[],
             bounds: None,
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert_eq!(assets.len(), 1);
@@ -1268,11 +1315,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &accepted,
             bounds: None,
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert_eq!(assets.len(), 1);
@@ -1284,11 +1333,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &rejected,
             bounds: None,
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert!(assets.is_empty());
@@ -1318,11 +1369,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &[],
             bounds: Some(&accepted),
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert_eq!(assets.len(), 1);
@@ -1334,11 +1387,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &[],
             bounds: Some(&rejected),
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert!(assets.is_empty());
@@ -1382,11 +1437,13 @@ mod tests {
             item_filters: &[],
             date_ranges: &[],
             bounds: None,
+            catalogs: &[],
             collections: &[],
             property_filters: &[],
             validate_schema: false,
             visited: &mut visited,
             assets: &mut assets,
+            root: true,
         };
         collect_assets(
             &temp.path().join("catalog.json").to_string_lossy(),
@@ -1397,6 +1454,71 @@ mod tests {
         assert_eq!(assets.len(), 1);
         assert_eq!(assets[0].driver, "readers.las");
         assert!(assets[0].location.ends_with("x.laz"));
+    }
+
+    #[test]
+    fn catalog_filter_selects_matching_nested_catalog() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        std::fs::copy(&source, temp.path().join("accepted.ply")).unwrap();
+        std::fs::copy(&source, temp.path().join("rejected.ply")).unwrap();
+        std::fs::write(
+            temp.path().join("catalog.json"),
+            br#"{
+  "type": "Catalog",
+  "id": "root",
+  "links": [
+    {"rel": "catalog", "href": "accepted.json"},
+    {"rel": "catalog", "href": "rejected.json"}
+  ]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("accepted.json"),
+            br#"{
+  "type": "Catalog",
+  "id": "keep-me",
+  "links": [{"rel": "item", "href": "accepted-item.json"}]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("rejected.json"),
+            br#"{
+  "type": "Catalog",
+  "id": "drop-me",
+  "links": [{"rel": "item", "href": "rejected-item.json"}]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("accepted-item.json"),
+            br#"{"type":"Feature","assets":{"data":{"href":"accepted.ply"}}}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("rejected-item.json"),
+            br#"{"type":"Feature","assets":{"data":{"href":"rejected.ply"}}}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add(
+            "filename",
+            temp.path()
+                .join("catalog.json")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        options.add("catalogs", "keep-.*");
+        let mut reader = StacReader::new(&options);
+
+        let views = reader.read().unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 3);
     }
 
     #[test]
