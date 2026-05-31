@@ -97,8 +97,7 @@ void DensityKernel::outputDensity(pdal::SpatialReference const& reference)
 
 int DensityKernel::execute()
 {
-    if (!Utils::iequals(m_driverName, "GeoJSON") || !m_layerName.empty() ||
-        m_isH3)
+    if (!Utils::iequals(m_driverName, "GeoJSON") || !m_layerName.empty())
     {
         if (m_inputFile == "STDIN" ||
             (FileUtils::extension(m_inputFile) == ".xml" ||

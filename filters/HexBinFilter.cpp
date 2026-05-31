@@ -122,8 +122,6 @@ bool HexBin::useRustPath() const
 {
     if (!m_boundaryOutput.empty() && !Utils::iequals(m_driver, "GeoJSON"))
         return false;
-    if (m_isH3)
-        return m_DensityOutput.empty();
     return true;
 }
 

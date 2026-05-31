@@ -650,6 +650,16 @@ impl H3Grid {
         &self.counts
     }
 
+    /// Vertices for a local-IJ H3 cell, walking edges 0..6 and closing with
+    /// edge 0. The returned coordinates are longitude/latitude degrees.
+    pub fn hex_vertices(&self, hex: HexId) -> Result<[Point; 7], String> {
+        let mut out = [Point::new(0.0, 0.0); 7];
+        for edge in 0..=6 {
+            out[edge as usize] = self.find_point(Segment::new(hex, edge % 6))?;
+        }
+        Ok(out)
+    }
+
     pub fn find_shapes(&mut self) -> Result<(), String> {
         if self.possible_roots.is_empty() {
             return Err("No areas of sufficient density - no shapes. \

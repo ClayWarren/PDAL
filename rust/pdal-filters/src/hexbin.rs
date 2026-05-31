@@ -12,8 +12,6 @@
 //!   apply `pdal::Polygon::simplify` to produce the user-facing `boundary`
 //!   metadata using the existing GEOS path;
 //! - a GeoJSON density tessellation when `density` output is requested.
-//!
-//! H3 grids stay in C++ for now.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -217,6 +215,15 @@ impl HexBinFilter {
             grid.add_lat_lng(lat, lng).map_err(StageError)?;
         }
 
+        if let Some(path) = &self.density_output {
+            let geojson = density_geojson_h3(&grid, self.threshold)?;
+            fs::write(path, geojson).map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to write density output '{path}': {err}"
+                ))
+            })?;
+        }
+
         // H3 grids are not smoothed (HexBinFilter forbids smoothing options for
         // H3), so the boundary precision only feeds GEOS WKT reformatting.
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
@@ -301,6 +308,38 @@ fn density_geojson(grid: &HexGrid, dense_limit: u32) -> String {
     }
     out.push_str("\n  ]\n}\n");
     out
+}
+
+fn density_geojson_h3(grid: &H3Grid, dense_limit: u32) -> Result<String, StageError> {
+    let mut dense: Vec<(&HexId, &i32)> = grid
+        .counts()
+        .iter()
+        .filter(|(_, &count)| count as u32 >= dense_limit)
+        .collect();
+    dense.sort_by_key(|(hex, _)| **hex);
+
+    let mut out = String::from("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [");
+    for (idx, (hex, count)) in dense.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        out.push_str("\n    {\"type\": \"Feature\", \"properties\": {\"ID\": ");
+        let _ = write!(out, "{}", HexGrid::hex_id_u64(**hex));
+        let _ = write!(out, ", \"COUNT\": {count}}}, \"geometry\": ");
+        out.push_str("{\"type\": \"Polygon\", \"coordinates\": [[");
+        let verts = grid
+            .hex_vertices(**hex)
+            .map_err(|err| StageError(format!("filters.hexbin: {err}")))?;
+        for (vi, v) in verts.iter().enumerate() {
+            if vi > 0 {
+                out.push_str(", ");
+            }
+            let _ = write!(out, "[{}, {}]", v.x, v.y);
+        }
+        out.push_str("]]}}");
+    }
+    out.push_str("\n  ]\n}\n");
+    Ok(out)
 }
 
 fn format_hex_offsets(offsets: &[(f64, f64); 6]) -> String {
@@ -476,6 +515,25 @@ mod tests {
         // Standard-grid metadata must not appear for an H3 grid.
         assert!(m.find_child("estimated_edge").is_none());
         assert!(m.find_child("hex_offsets").is_none());
+    }
+
+    #[test]
+    fn h3_density_output_writes_geojson_features() {
+        let view = geo_view(30);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("h3-density.geojson");
+        let mut f = HexBinFilter::new(None, 1, 5000, Some(path.display().to_string()));
+        f.set_h3(Some(10));
+
+        f.run_one(&view).unwrap();
+
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(json["type"], "FeatureCollection");
+        let features = json["features"].as_array().unwrap();
+        assert!(!features.is_empty());
+        assert!(features[0]["properties"]["COUNT"].as_i64().unwrap() > 0);
+        assert_eq!(features[0]["geometry"]["type"], "Polygon");
     }
 
     #[test]

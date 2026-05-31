@@ -198,10 +198,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 13,905 | 145 |
-| c-abi-backed | 41,765 | 366 |
+| c-abi-backed | 41,762 | 366 |
 | native-adapter | 2,921 | 23 |
 | holdout | 1,279 | 5 |
-| total | 59,870 | 539 |
+| total | 59,867 | 539 |
 
 Port-candidate backlog by area: `io` 7,461 · `pdal` 5,179 · `filters` 1,000 ·
 `kernels` 265. `apps` and `tools` are now at 0 (apps is a thin entry-point
@@ -559,7 +559,9 @@ Known mixed binaries:
 - `pdal_filters_hexbin_test`: `HexbinFilterTest_test_1`,
   `HexbinFilterTest_test_2`, `HexGrid_issue_2507`, `H3Grid_issue_2507`, and
   `issue_4899` count. Hexbin stage execution and the native/H3 hex-grid
-  boundary generators route through the Rust C ABI.
+  boundary generators route through the Rust C ABI. GeoJSON density file output
+  now routes through Rust for both standard and H3 grids; non-GeoJSON OGR
+  output remains a documented C++/GDAL fallback.
 - `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry
   distance calculation routes through the Rust C ABI.
 - `pdal_filters_faceraster_test`: all 2 tests count; mesh rasterization and
