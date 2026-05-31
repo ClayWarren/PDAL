@@ -34,9 +34,6 @@
 
 #include "DensityKernel.hpp"
 
-#include "../filters/HexBinFilter.hpp"
-#include "private/density/OGR.hpp"
-
 #include <pdal/util/FileUtils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
@@ -82,34 +79,11 @@ void DensityKernel::addSwitches(ProgramArgs& args)
              m_h3Res, -1);
 }
 
-void DensityKernel::outputDensity(pdal::SpatialReference const& reference)
-{
-    HexBin* hexbin = dynamic_cast<HexBin*>(m_hexbinStage);
-    if (!hexbin)
-        throw pdal::pdal_error("unable to fetch filters.hexbin stage!");
-
-    hexer::BaseGrid* grid = hexbin->grid();
-
-    OGR writer(m_outputFile, reference.getWKT(), m_driverName, m_layerName);
-    writer.writeDensity(*grid);
-}
-
 int DensityKernel::execute()
 {
-    if (m_inputFile == "STDIN" ||
-        (FileUtils::extension(m_inputFile) == ".xml" ||
-         FileUtils::extension(m_inputFile) == ".json"))
+    if (FileUtils::extension(m_inputFile) == ".xml")
     {
-        if (m_inputFile == "STDIN" ||
-            (FileUtils::extension(m_inputFile) == ".xml" ||
-             FileUtils::extension(m_inputFile) == ".json"))
-        {
-            m_manager.readPipeline(m_inputFile);
-        }
-        else
-        {
-            m_manager.makeReader(m_inputFile, "");
-        }
+        m_manager.readPipeline(m_inputFile);
         Options options;
         options.add("sample_size", m_sampleSize);
         options.add("threshold", m_density);
@@ -118,10 +92,11 @@ int DensityKernel::execute()
         options.add("smooth", m_doSmooth);
         options.add("h3_grid", m_isH3);
         options.add("h3_resolution", m_h3Res);
-        m_hexbinStage = &(m_manager.makeFilter("filters.hexbin",
-                                               *m_manager.getStage(), options));
+        options.add("density", m_outputFile);
+        options.add("ogrdriver", m_driverName);
+        options.add("lyr_name", m_layerName);
+        m_manager.makeFilter("filters.hexbin", *m_manager.getStage(), options);
         m_manager.execute();
-        outputDensity(m_manager.pointTable().anySpatialReference());
         return 0;
     }
 

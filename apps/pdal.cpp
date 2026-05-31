@@ -394,14 +394,41 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
             }
             if (!found)
             {
-                char* raw = pdal_app_unknown_command_message(m_command.c_str());
-                std::string msg = raw ? raw : "";
-                if (raw)
-                    pdal_string_free(raw);
+                std::string msg = takeCapiString(
+                    pdal_app_unknown_command_message(m_command.c_str()));
                 log->get(LogLevel::Error) << msg << '\n' << '\n';
             }
         }
         return ret;
+    }
+
+    if (m_showVersion)
+    {
+        outputVersion();
+        return 0;
+    }
+    else if (m_showDrivers)
+    {
+        outputDrivers();
+        return 0;
+    }
+    else if (m_showCommands)
+    {
+        outputCommands("");
+        return 0;
+    }
+    else if (m_showOptions.size())
+    {
+        if (m_showOptions == "all")
+            outputOptions();
+        else
+            outputOptions(m_showOptions, m_out);
+        return 0;
+    }
+    else if (m_help)
+    {
+        outputHelp(args);
+        return 0;
     }
 
     // If we get here, all arguments should be consumed, if not, it's
@@ -412,20 +439,7 @@ int App::execute(StringList& cmdArgs, LogPtr& log)
         return 1;
     }
 
-    if (m_showVersion)
-        outputVersion();
-    else if (m_showDrivers)
-        outputDrivers();
-    else if (m_showCommands)
-        outputCommands("");
-    else if (m_showOptions.size())
-    {
-        if (m_showOptions == "all")
-            outputOptions();
-        else
-            outputOptions(m_showOptions, m_out);
-    }
-    else
+    if (!m_help)
         outputHelp(args);
     return 0;
 }

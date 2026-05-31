@@ -19,6 +19,10 @@ target_link_libraries(lasdump PRIVATE
     ${COREFOUNDATION_FRAMEWORK}
 )
 
+if (LIBLZMA_FOUND)
+    target_link_libraries(lasdump PRIVATE LibLZMA::LibLZMA)
+endif()
+
 target_include_directories(lasdump PRIVATE
     ${RUST_CAPI_HEADER_DIR}
     ${PROJECT_BINARY_DIR}/include

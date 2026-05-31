@@ -47,7 +47,6 @@ public:
     int execute() override;
 
 private:
-    Stage* m_hexbinStage;
     std::string m_inputFile;
     std::string m_outputFile;
     std::string m_driverName;
@@ -61,7 +60,6 @@ private:
     int m_h3Res;
 
     void addSwitches(ProgramArgs& args) override;
-    void outputDensity(pdal::SpatialReference const& ref);
 };
 
 } // namespace pdal

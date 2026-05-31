@@ -7,6 +7,7 @@ use pdal_core::options::Options;
 use pdal_kernels::{FauxPluginKernel, Kernel, KernelArgs};
 use std::ffi::{CStr, CString};
 use std::fs;
+use std::io::Read;
 use std::os::raw::c_char;
 
 mod ground;
@@ -207,13 +208,39 @@ unsafe fn run_density_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         eprintln!("PDAL: kernels.density: Missing value for positional argument 'output'.");
         return 1;
     };
+
+    hexbin_stage["density"] = serde_json::json!(output);
+
+    if input == "STDIN" || input == "-" {
+        let mut json = String::new();
+        if let Err(err) = std::io::stdin().read_to_string(&mut json) {
+            eprintln!("PDAL: kernels.density: Unable to read pipeline from stdin: {err}");
+            return 1;
+        }
+        return execute_density_pipeline_json(&json, hexbin_stage);
+    }
+
+    if input.ends_with(".json") {
+        let json = match fs::read_to_string(&input) {
+            Ok(json) => json,
+            Err(err) => {
+                eprintln!("PDAL: kernels.density: Unable to read pipeline '{input}': {err}");
+                return 1;
+            }
+        };
+        return execute_density_pipeline_json(&json, hexbin_stage);
+    }
+
+    if input.ends_with(".xml") {
+        return -1;
+    }
+
     let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
     else {
         eprintln!("PDAL: kernels.density: Unable to infer reader driver for '{input}'.");
         return 1;
     };
 
-    hexbin_stage["density"] = serde_json::json!(output);
     execute_kernel_pipeline(
         "density",
         serde_json::json!([
@@ -221,6 +248,42 @@ unsafe fn run_density_kernel(argc: i32, argv: *const *const c_char) -> i32 {
             hexbin_stage,
         ]),
     )
+}
+
+fn execute_density_pipeline_json(json: &str, hexbin_stage: serde_json::Value) -> i32 {
+    let value = match append_stage_to_pipeline_json(json, hexbin_stage) {
+        Ok(value) => value,
+        Err(err) => {
+            eprintln!("PDAL: kernels.density: {err}");
+            return 1;
+        }
+    };
+    execute_kernel_pipeline("density", value)
+}
+
+fn append_stage_to_pipeline_json(
+    json: &str,
+    stage: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let mut value: serde_json::Value =
+        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+    match &mut value {
+        serde_json::Value::Array(stages) => {
+            stages.push(stage);
+            Ok(value)
+        }
+        serde_json::Value::Object(object) => {
+            let Some(pipeline) = object.get_mut("pipeline") else {
+                return Err("Pipeline JSON object is missing a 'pipeline' array.".to_string());
+            };
+            let Some(stages) = pipeline.as_array_mut() else {
+                return Err("Pipeline JSON object has a non-array 'pipeline' member.".to_string());
+            };
+            stages.push(stage);
+            Ok(value)
+        }
+        _ => Err("Pipeline JSON must be an array or object.".to_string()),
+    }
 }
 
 unsafe fn argv_to_vec(argc: i32, argv: *const *const c_char) -> Result<Vec<String>, i32> {
