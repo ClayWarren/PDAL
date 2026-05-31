@@ -196,13 +196,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 11,239 | 112 |
+| port-candidate | 11,093 | 108 |
 | c-abi-backed | 41,438 | 366 |
-| native-adapter | 4,369 | 38 |
+| native-adapter | 4,515 | 42 |
 | holdout | 1,279 | 5 |
 | total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 6,090 · `pdal` 5,149. `filters`,
+Port-candidate backlog by area: `io` 6,090 · `pdal` 5,003. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -223,7 +223,9 @@ paths both routed through the Rust hexbin stage and `kernels.tindex` preserved
 the historic exact-boundary numeric behavior. The last `filters/` remainder,
 `filters/private/Point`, is intentionally counted as a native adapter because
 it is an exported OGR-backed compatibility helper for C++ option parsing, not
-portable filter algorithm logic. Rerun the audit after each change.
+portable filter algorithm logic. Platform backtrace/endian helpers are likewise
+counted as native adapters, not domain-port backlog. Rerun the audit after each
+change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
@@ -357,7 +359,7 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is `11,239` code LOC for the main first-party
+C++ tests and vendor, is `11,093` code LOC for the main first-party
 surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). That is
 still a ceiling, not a precise backlog: mixed files count as wrapper when they
 include the C ABI even if they still contain legacy implementation, and
