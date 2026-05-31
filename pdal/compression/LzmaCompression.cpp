@@ -28,87 +28,73 @@
  * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
  * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
 #include "LzmaCompression.hpp"
 
-#include <lzma.h>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
 
-class Lzma
+namespace
 {
-protected:
-    Lzma(BlockCb cb) : m_cb(cb)
-    {
-        m_strm = LZMA_STREAM_INIT;
-    }
 
-    ~Lzma()
-    {
-        lzma_end(&m_strm);
-    }
+compression_error lastCompressionError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    return compression_error(message && message[0] ? message : fallback);
+}
 
-    void run(const char* buf, size_t bufsize, lzma_action mode)
-    {
-        m_strm.avail_in = bufsize;
-        m_strm.next_in =
-            reinterpret_cast<unsigned char*>(const_cast<char*>(buf));
-        int ret = LZMA_OK;
-        do
-        {
-            m_strm.avail_out = CHUNKSIZE;
-            m_strm.next_out = m_tmpbuf;
-            ret = lzma_code(&m_strm, mode);
-            size_t written = CHUNKSIZE - m_strm.avail_out;
-            if (written)
-                m_cb(reinterpret_cast<char*>(m_tmpbuf), written);
-        } while (ret == LZMA_OK);
-        if (ret == LZMA_STREAM_END)
-            return;
+void emitRustBytes(const BlockCb& cb, uint8_t* buf, size_t len)
+{
+    if (!buf)
+        return;
+    cb(reinterpret_cast<char*>(buf), len);
+    pdal_u8_array_free(buf, len);
+}
 
-        switch (ret)
-        {
-        case LZMA_MEM_ERROR:
-            throw compression_error("Memory allocation failure.");
-        case LZMA_DATA_ERROR:
-            throw compression_error("LZMA data error.");
-        case LZMA_OPTIONS_ERROR:
-            throw compression_error("Unsupported option.");
-        case LZMA_UNSUPPORTED_CHECK:
-            throw compression_error("Unsupported integrity check.");
-        }
-    }
+} // unnamed namespace
 
-protected:
-    lzma_stream m_strm;
-
-private:
-    unsigned char m_tmpbuf[CHUNKSIZE];
-    BlockCb m_cb;
-};
-
-class LzmaCompressorImpl : public Lzma
+class LzmaCompressorImpl
 {
 public:
-    LzmaCompressorImpl(BlockCb cb) : Lzma(cb)
+    LzmaCompressorImpl(BlockCb cb) : m_cb(cb)
     {
-        if (lzma_easy_encoder(&m_strm, 2, LZMA_CHECK_CRC64) != LZMA_OK)
-            throw compression_error("Can't create compressor");
+        m_compressor = pdal_lzma_compressor_create();
+        if (!m_compressor)
+            throw lastCompressionError("Could not create lzma compressor.");
+    }
+
+    ~LzmaCompressorImpl()
+    {
+        if (m_compressor)
+            pdal_lzma_compressor_destroy(m_compressor);
     }
 
     void compress(const char* buf, size_t bufsize)
     {
-        run(buf, bufsize, LZMA_RUN);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_lzma_compressor_update(m_compressor, buf, bufsize, &out,
+                                         &outlen))
+            throw lastCompressionError("Rust lzma compressor update failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
 
     void done()
     {
-        run(nullptr, 0, LZMA_FINISH);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_lzma_compressor_finish(m_compressor, &out, &outlen))
+            throw lastCompressionError("Rust lzma compressor finish failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
+
+private:
+    BlockCb m_cb;
+    pdal_lzma_compressor_t* m_compressor = nullptr;
 };
 
 LzmaCompressor::LzmaCompressor(BlockCb cb) : m_impl(new LzmaCompressorImpl(cb))
@@ -127,25 +113,44 @@ void LzmaCompressor::done()
     m_impl->done();
 }
 
-class LzmaDecompressorImpl : public Lzma
+class LzmaDecompressorImpl
 {
 public:
-    LzmaDecompressorImpl(BlockCb cb) : Lzma(cb)
+    LzmaDecompressorImpl(BlockCb cb) : m_cb(cb)
     {
-        if (lzma_auto_decoder(&m_strm, (std::numeric_limits<uint32_t>::max)(),
-                              LZMA_TELL_UNSUPPORTED_CHECK))
-            throw compression_error("Can't create decompressor");
+        m_decompressor = pdal_lzma_decompressor_create();
+        if (!m_decompressor)
+            throw lastCompressionError("Could not create lzma decompressor.");
+    }
+
+    ~LzmaDecompressorImpl()
+    {
+        if (m_decompressor)
+            pdal_lzma_decompressor_destroy(m_decompressor);
     }
 
     void decompress(const char* buf, size_t bufsize)
     {
-        run(buf, bufsize, LZMA_RUN);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_lzma_decompressor_update(m_decompressor, buf, bufsize, &out,
+                                           &outlen))
+            throw lastCompressionError("Rust lzma decompressor update failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
 
     void done()
     {
-        run(nullptr, 0, LZMA_FINISH);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_lzma_decompressor_finish(m_decompressor, &out, &outlen))
+            throw lastCompressionError("Rust lzma decompressor finish failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
+
+private:
+    BlockCb m_cb;
+    pdal_lzma_decompressor_t* m_decompressor = nullptr;
 };
 
 LzmaDecompressor::LzmaDecompressor(BlockCb cb)

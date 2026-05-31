@@ -22,6 +22,8 @@ extern "C"
     typedef struct pdal_quad_index pdal_quad_index_t;
     typedef struct pdal_deflate_compressor pdal_deflate_compressor_t;
     typedef struct pdal_deflate_decompressor pdal_deflate_decompressor_t;
+    typedef struct pdal_lzma_compressor pdal_lzma_compressor_t;
+    typedef struct pdal_lzma_decompressor pdal_lzma_decompressor_t;
     typedef struct pdal_zstd_compressor pdal_zstd_compressor_t;
     typedef struct pdal_zstd_decompressor pdal_zstd_decompressor_t;
     typedef struct pdal_thread_pool pdal_thread_pool_t;
@@ -265,6 +267,22 @@ extern "C"
                                      uint8_t** out_buf, size_t* out_len);
     void pdal_deflate_decompressor_destroy(
         pdal_deflate_decompressor_t* decompressor);
+
+    // Streaming LZMA compression
+    pdal_lzma_compressor_t* pdal_lzma_compressor_create();
+    bool pdal_lzma_compressor_update(pdal_lzma_compressor_t* compressor,
+                                     const char* buf, size_t len,
+                                     uint8_t** out_buf, size_t* out_len);
+    bool pdal_lzma_compressor_finish(pdal_lzma_compressor_t* compressor,
+                                     uint8_t** out_buf, size_t* out_len);
+    void pdal_lzma_compressor_destroy(pdal_lzma_compressor_t* compressor);
+    pdal_lzma_decompressor_t* pdal_lzma_decompressor_create();
+    bool pdal_lzma_decompressor_update(pdal_lzma_decompressor_t* decompressor,
+                                       const char* buf, size_t len,
+                                       uint8_t** out_buf, size_t* out_len);
+    bool pdal_lzma_decompressor_finish(pdal_lzma_decompressor_t* decompressor,
+                                       uint8_t** out_buf, size_t* out_len);
+    void pdal_lzma_decompressor_destroy(pdal_lzma_decompressor_t* decompressor);
 
     // Streaming Zstandard compression
     pdal_zstd_compressor_t* pdal_zstd_compressor_create(int32_t level);
