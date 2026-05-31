@@ -34,6 +34,8 @@
 
 #include "Summary.hpp"
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
 namespace las
@@ -41,45 +43,51 @@ namespace las
 
 Summary::Summary()
 {
-    clear();
+    m_summary = pdal_las_summary_create();
+}
+
+Summary::~Summary()
+{
+    pdal_las_summary_destroy(m_summary);
 }
 
 void Summary::clear()
 {
-    m_totalNumPoints = 0;
-    m_returnCounts.fill(0);
-    m_bounds.clear();
+    pdal_las_summary_clear(m_summary);
 }
 
 void Summary::addPoint(double x, double y, double z, int returnNumber)
 {
-    ++m_totalNumPoints;
-    m_bounds.grow(x, y, z);
+    pdal_las_summary_add_point(m_summary, x, y, z, returnNumber);
+}
 
-    // Returns numbers are indexed from one, but the array indexes from 0.
-    if (returnNumber >= 1 && returnNumber <= (int)m_returnCounts.size())
-        m_returnCounts[returnNumber - 1]++;
+point_count_t Summary::getTotalNumPoints() const
+{
+    return pdal_las_summary_total_num_points(m_summary);
 }
 
 BOX3D Summary::getBounds() const
 {
-    return m_bounds;
+    pdal_bounds3d_t bounds;
+    pdal_las_summary_bounds(m_summary, &bounds);
+    return BOX3D(bounds.minx, bounds.miny, bounds.minz, bounds.maxx,
+                 bounds.maxy, bounds.maxz);
 }
 
 point_count_t Summary::getReturnCount(int returnNumber) const
 {
-    return m_returnCounts[returnNumber];
+    return pdal_las_summary_return_count(m_summary, returnNumber);
 }
 
 void Summary::dump(std::ostream& str) const
 {
-    str << m_bounds;
+    str << getBounds();
     str << "Number of returns:";
-    for (size_t i = 0; i < m_returnCounts.size(); ++i)
-        str << " " << m_returnCounts[i];
+    for (int i = 0; i < las::Header::ReturnCount; ++i)
+        str << " " << getReturnCount(i);
     str << "\n";
 
-    str << "Total number of points: " << m_totalNumPoints << "\n";
+    str << "Total number of points: " << getTotalNumPoints() << "\n";
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Summary& data)

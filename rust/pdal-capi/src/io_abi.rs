@@ -1,10 +1,101 @@
 use crate::error::{clear_last_error, set_last_error, string_to_c_ptr};
+use crate::point_abi::pdal_bounds3d_t;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use std::ffi::{c_char, CStr};
 use std::path::Path;
 use std::rc::Rc;
+
+pub struct LasSummaryHandle {
+    summary: pdal_io::las_summary::LasSummary,
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_las_summary_create() -> *mut LasSummaryHandle {
+    Box::into_raw(Box::new(LasSummaryHandle {
+        summary: pdal_io::las_summary::LasSummary::default(),
+    }))
+}
+
+/// # Safety
+/// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_destroy(summary: *mut LasSummaryHandle) {
+    if !summary.is_null() {
+        drop(Box::from_raw(summary));
+    }
+}
+
+/// # Safety
+/// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_clear(summary: *mut LasSummaryHandle) {
+    if let Some(summary) = summary.as_mut() {
+        summary.summary.clear();
+    }
+}
+
+/// # Safety
+/// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_add_point(
+    summary: *mut LasSummaryHandle,
+    x: f64,
+    y: f64,
+    z: f64,
+    return_number: i32,
+) {
+    if let Some(summary) = summary.as_mut() {
+        summary.summary.add_point(x, y, z, return_number);
+    }
+}
+
+/// # Safety
+/// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_total_num_points(
+    summary: *const LasSummaryHandle,
+) -> u64 {
+    summary
+        .as_ref()
+        .map(|summary| summary.summary.total_num_points())
+        .unwrap_or(0)
+}
+
+/// # Safety
+/// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_return_count(
+    summary: *const LasSummaryHandle,
+    return_number: u64,
+) -> u64 {
+    let Some(summary) = summary.as_ref() else {
+        return 0;
+    };
+    summary.summary.return_count(return_number as usize)
+}
+
+/// # Safety
+/// `summary` must be a pointer returned by `pdal_las_summary_create` and
+/// `out_bounds` must point to writable memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_summary_bounds(
+    summary: *const LasSummaryHandle,
+    out_bounds: *mut pdal_bounds3d_t,
+) {
+    if let (Some(summary), Some(out_bounds)) = (summary.as_ref(), out_bounds.as_mut()) {
+        let bounds = summary.summary.bounds();
+        *out_bounds = pdal_bounds3d_t {
+            minx: bounds.minx,
+            maxx: bounds.maxx,
+            miny: bounds.miny,
+            maxy: bounds.maxy,
+            minz: bounds.minz,
+            maxz: bounds.maxz,
+        };
+    }
+}
 
 #[repr(C)]
 pub struct PointlessLasResult {

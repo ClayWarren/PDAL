@@ -2,6 +2,50 @@ use super::*;
 use std::ffi::c_void;
 
 #[test]
+fn las_summary_abi_tracks_bounds_total_and_return_counts() {
+    unsafe {
+        let summary = pdal_las_summary_create();
+        assert!(!summary.is_null());
+
+        pdal_las_summary_add_point(summary, 10.0, 20.0, 30.0, 1);
+        pdal_las_summary_add_point(summary, -5.0, 40.0, 15.0, 3);
+        pdal_las_summary_add_point(summary, 100.0, -2.0, 0.5, 16);
+
+        assert_eq!(pdal_las_summary_total_num_points(summary), 3);
+        assert_eq!(pdal_las_summary_return_count(summary, 0), 1);
+        assert_eq!(pdal_las_summary_return_count(summary, 2), 1);
+        assert_eq!(pdal_las_summary_return_count(summary, 15), 0);
+
+        let mut bounds = pdal_bounds3d_t {
+            minx: 0.0,
+            maxx: 0.0,
+            miny: 0.0,
+            maxy: 0.0,
+            minz: 0.0,
+            maxz: 0.0,
+        };
+        pdal_las_summary_bounds(summary, &mut bounds);
+        assert_eq!(bounds.minx, -5.0);
+        assert_eq!(bounds.maxx, 100.0);
+        assert_eq!(bounds.miny, -2.0);
+        assert_eq!(bounds.maxy, 40.0);
+        assert_eq!(bounds.minz, 0.5);
+        assert_eq!(bounds.maxz, 30.0);
+
+        pdal_las_summary_clear(summary);
+        assert_eq!(pdal_las_summary_total_num_points(summary), 0);
+        assert_eq!(pdal_las_summary_return_count(summary, 0), 0);
+
+        pdal_las_summary_destroy(summary);
+        pdal_las_summary_destroy(std::ptr::null_mut());
+        pdal_las_summary_clear(std::ptr::null_mut());
+        pdal_las_summary_add_point(std::ptr::null_mut(), 1.0, 2.0, 3.0, 1);
+        assert_eq!(pdal_las_summary_total_num_points(std::ptr::null()), 0);
+        assert_eq!(pdal_las_summary_return_count(std::ptr::null(), 0), 0);
+    }
+}
+
+#[test]
 fn reader_and_writer_constructors_cover_supported_driver_handles() {
     unsafe {
         let options = pdal_options_create();

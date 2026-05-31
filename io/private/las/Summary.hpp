@@ -34,10 +34,11 @@
 
 #pragma once
 
-#include <array>
 #include <ostream>
 
 #include "Header.hpp"
+
+typedef struct pdal_las_summary pdal_las_summary_t;
 
 namespace pdal
 {
@@ -48,23 +49,19 @@ class Summary
 {
 public:
     Summary();
+    ~Summary();
     Summary& operator=(const Summary&) = delete;
     Summary(const Summary&) = delete;
 
     void clear();
     void addPoint(double x, double y, double z, int returnNumber);
-    point_count_t getTotalNumPoints() const
-    {
-        return m_totalNumPoints;
-    }
+    point_count_t getTotalNumPoints() const;
     BOX3D getBounds() const;
     point_count_t getReturnCount(int returnNumber) const;
     void dump(std::ostream&) const;
 
 private:
-    BOX3D m_bounds;
-    std::array<point_count_t, las::Header::ReturnCount> m_returnCounts;
-    point_count_t m_totalNumPoints;
+    pdal_las_summary_t* m_summary;
 };
 
 std::ostream& operator<<(std::ostream& ostr, const Summary&);

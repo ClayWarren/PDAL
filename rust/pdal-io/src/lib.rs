@@ -19,6 +19,7 @@ pub mod gltf;
 pub mod ilvis2;
 pub mod ilvis2_metadata;
 pub mod las;
+pub mod las_summary;
 pub mod las_writer;
 pub mod lasdump;
 pub mod nitf_reader;

@@ -30,6 +30,7 @@ extern "C"
     typedef struct pdal_stage_extensions pdal_stage_extensions_t;
     typedef struct pdal_artifact_manager pdal_artifact_manager_t;
     typedef struct pdal_column_storage pdal_column_storage_t;
+    typedef struct pdal_las_summary pdal_las_summary_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -210,6 +211,7 @@ extern "C"
                                        uint64_t idx);
     uint64_t
     pdal_column_storage_num_points(const pdal_column_storage_t* handle);
+
     char* pdal_file_utils_getcwd();
     char* pdal_file_utils_to_absolute_path(const char* filename);
     char* pdal_file_utils_to_absolute_path_with_base(const char* filename,
@@ -469,6 +471,17 @@ extern "C"
     bool pdal_bounds3d_empty(const pdal_bounds3d_t* bounds);
     void pdal_bounds3d_grow_point(pdal_bounds3d_t* bounds, double x, double y,
                                   double z);
+    pdal_las_summary_t* pdal_las_summary_create();
+    void pdal_las_summary_destroy(pdal_las_summary_t* summary);
+    void pdal_las_summary_clear(pdal_las_summary_t* summary);
+    void pdal_las_summary_add_point(pdal_las_summary_t* summary, double x,
+                                    double y, double z, int32_t return_number);
+    uint64_t
+    pdal_las_summary_total_num_points(const pdal_las_summary_t* summary);
+    uint64_t pdal_las_summary_return_count(const pdal_las_summary_t* summary,
+                                           uint64_t return_number);
+    void pdal_las_summary_bounds(const pdal_las_summary_t* summary,
+                                 pdal_bounds3d_t* out_bounds);
     void pdal_bounds3d_grow_bounds(pdal_bounds3d_t* bounds,
                                    const pdal_bounds3d_t* other);
     void pdal_bounds3d_grow_distance(pdal_bounds3d_t* bounds, double distance);

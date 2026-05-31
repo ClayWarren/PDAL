@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 5,054 | 42 |
-| c-abi-backed | 41,943 | 374 |
+| port-candidate | 4,977 | 40 |
+| c-abi-backed | 42,023 | 376 |
 | native-adapter | 5,529 | 52 |
 | holdout | 5,799 | 53 |
-| total | 58,325 | 521 |
+| total | 58,328 | 521 |
 
-Port-candidate backlog by area: `io` 3,604 · `pdal` 1,450. `filters`,
+Port-candidate backlog by area: `io` 3,527 · `pdal` 1,450. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -248,7 +248,9 @@ milestone. The COPC writer private `Common.hpp` option/header shell counts with
 the Rust-backed `CopcWriter` wrapper rather than as standalone algorithmic
 backlog. Exported deprecated `LasHeader`/`LasVLR` and exported `BpfHeader`
 classes are compatibility holdouts; their private parser/data helpers remain
-backlog unless they route through Rust or are proved dead. Obvious exported C++
+backlog unless they route through Rust or are proved dead. The private LAS
+summary counter/bounds helper now routes through Rust behind its C++ compatibility
+class. Obvious exported C++
 SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
 dimension/mesh/quick-info/artifact helpers, subcommand shells, and
 `Utils::Random` with its `std::mt19937&` API) are likewise compatibility
