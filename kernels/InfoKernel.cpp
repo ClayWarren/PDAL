@@ -44,7 +44,6 @@
 #include <rust/pdal-capi/include/pdal_capi.h>
 
 #include "arbiter/arbiter.hpp"
-#include "private/stac/StacInfo.hpp"
 #include <filters/InfoFilter.hpp>
 #include <pdal/KDIndex.hpp>
 #include <pdal/PDALUtils.hpp>
@@ -359,31 +358,10 @@ void InfoKernel::dump(MetadataNode& root)
         else
             root.add(m_hexbinStage->getMetadata().clone("boundary"));
     }
-
-    // STAC stage.
-    if (m_stac)
-    {
-        MetadataNode statsMeta;
-        if (!m_showStats)
-            statsMeta = m_stacStage->getMetadata();
-        else
-            statsMeta = root.findChild("stats");
-
-        MetadataNode readerMeta;
-        if (!m_showMetadata)
-            readerMeta = m_reader->getMetadata().clone("metadata");
-        else
-            readerMeta = root.findChild("metadata");
-
-        addStacMetadata(root, statsMeta, readerMeta, infoMeta, m_pcType);
-    }
 }
 
 bool InfoKernel::canRunRust() const
 {
-    if (m_pcType != "lidar" && !m_stac)
-        return false;
-
     return true;
 }
 
