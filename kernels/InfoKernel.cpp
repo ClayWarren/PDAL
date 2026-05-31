@@ -64,16 +64,6 @@ CREATE_STATIC_KERNEL(InfoKernel, s_info)
 namespace
 {
 
-bool isTwoDimensionalQuery(const std::string& value)
-{
-    StringList parts = Utils::split2(value, '/');
-    if (parts.empty() || parts.size() > 2)
-        return false;
-
-    StringList coords = Utils::split2(parts[0], ',');
-    return coords.size() == 2;
-}
-
 } // namespace
 
 std::string InfoKernel::getName() const
@@ -393,9 +383,6 @@ bool InfoKernel::canRunRust() const
 {
     if (m_usestdin || !m_breakoutDimension.empty() || !m_enumerate.empty() ||
         (m_pcType != "lidar" && !m_stac))
-        return false;
-
-    if (!m_queryPoint.empty() && !isTwoDimensionalQuery(m_queryPoint))
         return false;
 
     return true;

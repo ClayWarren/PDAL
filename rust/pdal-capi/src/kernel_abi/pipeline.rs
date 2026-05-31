@@ -462,6 +462,7 @@ impl InfoMode {
 struct QueryRequest {
     x: f64,
     y: f64,
+    z: Option<f64>,
     count: usize,
 }
 
@@ -670,8 +671,13 @@ fn query_report(views: &[PointView], query: QueryRequest) -> String {
         for local_id in 0..view.len() {
             let dx = view.get_f64(local_id, &DimId::X) - query.x;
             let dy = view.get_f64(local_id, &DimId::Y) - query.y;
+            let dz = query
+                .z
+                .filter(|_| view.layout().dim(&DimId::Z).is_some())
+                .map(|z| view.get_f64(local_id, &DimId::Z) - z)
+                .unwrap_or(0.0);
             points.push((
-                dx.mul_add(dx, dy * dy),
+                dx.mul_add(dx, dy.mul_add(dy, dz * dz)),
                 view.source_index(local_id),
                 view,
                 local_id,
@@ -770,10 +776,14 @@ fn parse_point_spec(value: &str) -> Option<Vec<PointId>> {
 
 fn parse_query(value: &str) -> Option<QueryRequest> {
     let (coords, count) = value.split_once('/')?;
-    let (x, y) = coords.split_once(',')?;
+    let parts: Vec<&str> = coords.split(',').collect();
+    if !(2..=3).contains(&parts.len()) {
+        return None;
+    }
     Some(QueryRequest {
-        x: x.parse().ok()?,
-        y: y.parse().ok()?,
+        x: parts[0].parse().ok()?,
+        y: parts[1].parse().ok()?,
+        z: parts.get(2).map(|z| z.parse()).transpose().ok()?,
         count: count.parse().ok()?,
     })
 }
