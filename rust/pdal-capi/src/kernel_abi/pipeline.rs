@@ -454,7 +454,7 @@ enum InfoMode {
 
 impl InfoMode {
     fn needs_boundary(&self) -> bool {
-        matches!(self, Self::Boundary)
+        matches!(self, Self::All | Self::Boundary)
     }
 }
 
@@ -501,6 +501,20 @@ fn info_report(
             output.push_str(
                 &serde_json::to_string_pretty(&metadata_json).unwrap_or_else(|_| "{}".into()),
             );
+            output.push_str(",\n");
+            output.push_str("  \"boundary\": ");
+            output.push_str(&boundary_value(metadata).to_string());
+            output.push_str(",\n");
+            output.push_str("  \"stac\": ");
+            let stac_json = serde_json::from_str::<serde_json::Value>(&stac_report(
+                views, metadata, filename, pc_type,
+            ))
+            .ok()
+            .and_then(|value| value.get("stac").cloned())
+            .unwrap_or_else(|| serde_json::json!({}));
+            output.push_str(
+                &serde_json::to_string_pretty(&stac_json).unwrap_or_else(|_| "{}".into()),
+            );
             output.push_str("\n}\n");
             output
         }
@@ -513,6 +527,13 @@ fn info_report(
 }
 
 fn boundary_report(metadata: &MetadataNode) -> String {
+    let value = serde_json::json!({
+        "boundary": boundary_value(metadata),
+    });
+    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+}
+
+fn boundary_value(metadata: &MetadataNode) -> serde_json::Value {
     let hexbin = metadata.find_child("stage_1");
     let boundary = hexbin
         .and_then(|stage| stage.find_child("hex_boundary_raw"))
@@ -540,13 +561,10 @@ fn boundary_report(metadata: &MetadataNode) -> String {
         .and_then(|geometry| geometry.to_gdal_geojson(8))
         .unwrap_or_else(|_| "{}".to_string());
 
-    let value = serde_json::json!({
-        "boundary": {
-            "boundary": boundary,
-            "boundary_json": boundary_json,
-        }
-    });
-    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+    serde_json::json!({
+        "boundary": boundary,
+        "boundary_json": boundary_json,
+    })
 }
 
 fn metadata_report(metadata: &MetadataNode) -> String {
