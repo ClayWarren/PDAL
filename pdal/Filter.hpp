@@ -62,7 +62,7 @@ private:
     void l_initialize(PointTableRef table) final;
     void l_addArgs(ProgramArgs& args) final;
     void l_prepared(PointTableRef table) final;
-    const expr::ConditionalExpression* whereExpr() const override;
+    const std::string* whereExpression() const override;
     WhereMergeMode mergeMode() const override;
     PointViewSet run(PointViewPtr view) override;
     virtual void filter(PointView& /*view*/) {}

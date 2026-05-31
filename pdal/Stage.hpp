@@ -58,11 +58,6 @@ class StageRunner;
 class StageWrapper;
 class Streamable;
 
-namespace expr
-{
-class ConditionalExpression;
-}
-
 /**
   A stage performs the actual processing in PDAL.  Stages may read data,
   modify or filter read data, create metadata or write processed data.
@@ -410,7 +405,7 @@ private:
     Stage& operator=(const Stage&) = delete;
     Stage(const Stage&) = delete;
 
-    virtual const expr::ConditionalExpression* whereExpr() const = 0;
+    virtual const std::string* whereExpression() const = 0;
     virtual WhereMergeMode mergeMode() const = 0;
     void setupLog();
     void handleOptions();

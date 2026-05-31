@@ -46,11 +46,6 @@ namespace pdal
 
 class UserCallback;
 
-namespace expr
-{
-class ConditionalExpression;
-}
-
 /**
   A Writer is a terminal stage for a PDAL pipeline.  It usually writes output
   to a file, but this isn't a requirement.  The class provides support for
@@ -97,7 +92,7 @@ private:
     void l_initialize(PointTableRef table) override;
     void l_prepared(PointTableRef table) final;
 
-    const expr::ConditionalExpression* whereExpr() const override;
+    const std::string* whereExpression() const override;
     WhereMergeMode mergeMode() const override;
     /**
       Write the point in a PointView.  This is a simplification of the

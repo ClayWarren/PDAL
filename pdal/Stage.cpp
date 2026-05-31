@@ -32,7 +32,6 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include "../filters/private/expr/ConditionalExpression.hpp"
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/SpatialReference.hpp>
@@ -59,14 +58,14 @@ Stage::~Stage() {}
 void Stage::splitView(const PointViewPtr& view, PointViewPtr& keep,
                       PointViewPtr& skip)
 {
-    const expr::ConditionalExpression* where = whereExpr();
+    const std::string* where = whereExpression();
     if (where)
     {
         pdal_point_view_t* rustView = rust_view_converter::toRust(view);
         pdal_point_view_t* rustKeep = nullptr;
         pdal_point_view_t* rustSkip = nullptr;
-        if (!pdal_point_view_split_where(rustView, where->print().c_str(),
-                                         &rustKeep, &rustSkip))
+        if (!pdal_point_view_split_where(rustView, where->c_str(), &rustKeep,
+                                         &rustSkip))
         {
             pdal_point_view_destroy(rustView);
             rust_view_converter::throwLastError("Rust where split failed.");

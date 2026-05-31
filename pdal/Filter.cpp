@@ -33,14 +33,14 @@
  ****************************************************************************/
 
 #include "Filter.hpp"
-#include "../filters/private/expr/ConditionalExpression.hpp"
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {
 
 struct Filter::Args
 {
-    expr::ConditionalExpression m_where;
+    std::string m_where;
     Arg* m_whereArg;
     Filter::WhereMergeMode m_whereMerge;
     Arg* m_whereMergeArg;
@@ -85,17 +85,26 @@ void Filter::l_addArgs(ProgramArgs& args)
 void Filter::l_prepared(PointTableRef table)
 {
     Stage::l_prepared(table);
-    auto status = m_args->m_where.prepare(table.layout());
-    if (!status)
-        throwError("Invalid 'where': " + status.what());
+    if (m_args->m_whereArg->set())
+    {
+        pdal_point_layout_t* rustLayout =
+            rust_view_converter::toRustLayout(table.layout());
+        if (!pdal_expression_validate_with_layout(m_args->m_where.c_str(),
+                                                  rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError("Invalid 'where'.");
+        }
+        pdal_point_layout_destroy(rustLayout);
+    }
     if (m_args->m_whereMergeArg->set() && !m_args->m_whereArg->set())
         throwError("Can't set 'where_merge' options without also setting "
                    "'where' option.");
 }
 
-const expr::ConditionalExpression* Filter::whereExpr() const
+const std::string* Filter::whereExpression() const
 {
-    if (!m_args->m_where.valid())
+    if (!m_args->m_whereArg->set())
         return nullptr;
     return &(m_args->m_where);
 }

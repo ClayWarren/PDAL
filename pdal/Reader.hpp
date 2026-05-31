@@ -45,11 +45,6 @@ namespace pdal
 
 class Reader;
 
-namespace expr
-{
-class ConditionalExpression;
-}
-
 class PDAL_EXPORT Reader : public virtual Stage
 {
 public:
@@ -96,7 +91,7 @@ private:
     void l_prepared(PointTableRef table) final;
 
     void assignParsedOptions() final;
-    const expr::ConditionalExpression* whereExpr() const override;
+    const std::string* whereExpression() const override;
     WhereMergeMode mergeMode() const override;
     virtual point_count_t read(PointViewPtr /*view*/, point_count_t /*num*/)
     {

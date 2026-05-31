@@ -34,10 +34,10 @@
 
 #include <iterator>
 
-#include "../filters/private/expr/ConditionalExpression.hpp"
 #include <pdal/Filter.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
+#include <pdal/private/RustViewConverter.hpp>
 
 namespace pdal
 {
@@ -250,14 +250,28 @@ void Streamable::execute(StreamPointTable& table,
             }
             s->startLogging();
 
-            const expr::ConditionalExpression* where = s->whereExpr();
+            const std::string* where = s->whereExpression();
             for (PointId idx = 0; idx < pointLimit; idx++)
             {
                 point.setPointId(idx);
                 if (table.skip(idx))
                     continue;
-                if (where && !where->eval(point))
-                    continue;
+                if (where)
+                {
+                    pdal_point_view_t* rustPoint =
+                        rust_view_converter::toRustPoint(point, point.layout());
+                    uint64_t evalsCount = 0;
+                    uint8_t* evals = pdal_point_view_expression_mask(
+                        rustPoint, where->c_str(), &evalsCount);
+                    pdal_point_view_destroy(rustPoint);
+                    if (!evals)
+                        rust_view_converter::throwLastError(
+                            "Rust where evaluation failed.");
+                    bool passes = evalsCount == 1 && evals[0] != 0;
+                    pdal_u8_array_free(evals, evalsCount);
+                    if (!passes)
+                        continue;
+                }
                 if (!s->processOne(point))
                     table.setSkip(idx);
             }

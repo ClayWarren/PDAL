@@ -39,7 +39,6 @@
 
 #include <rust/pdal-capi/include/pdal_capi.h>
 
-#include "../filters/private/expr/ConditionalExpression.hpp"
 #include <pdal/util/ProgramArgs.hpp>
 
 #pragma warning(disable : 4127) // conditional expression is constant
@@ -49,7 +48,7 @@ namespace pdal
 
 struct Writer::Args
 {
-    expr::ConditionalExpression where;
+    std::string where;
     Arg* whereArg;
     Stage::WhereMergeMode whereMerge;
     Arg* whereMergeArg;
@@ -60,9 +59,9 @@ Writer::Writer() : m_args(new Args) {}
 
 Writer::~Writer() {}
 
-const expr::ConditionalExpression* Writer::whereExpr() const
+const std::string* Writer::whereExpression() const
 {
-    if (!m_args->where.valid())
+    if (!m_args->whereArg->set())
         return nullptr;
     return &(m_args->where);
 }
@@ -104,9 +103,18 @@ void Writer::l_addArgs(ProgramArgs& args)
 void Writer::l_prepared(PointTableRef table)
 {
     Stage::l_prepared(table);
-    auto status = m_args->where.prepare(table.layout());
-    if (!status)
-        throwError("Invalid 'where': " + status.what());
+    if (m_args->whereArg->set())
+    {
+        pdal_point_layout_t* rustLayout =
+            rust_view_converter::toRustLayout(table.layout());
+        if (!pdal_expression_validate_with_layout(m_args->where.c_str(),
+                                                  rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError("Invalid 'where'.");
+        }
+        pdal_point_layout_destroy(rustLayout);
+    }
     if (m_args->whereMergeArg->set() && !m_args->whereArg->set())
         throwError("Can't set 'where_merge' options without also setting "
                    "'where' option.");

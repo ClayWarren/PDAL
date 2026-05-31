@@ -38,7 +38,7 @@
 namespace pdal
 {
 
-const expr::ConditionalExpression* Reader::whereExpr() const
+const std::string* Reader::whereExpression() const
 {
     return nullptr;
 }
