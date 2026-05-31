@@ -30,7 +30,7 @@ Status definitions:
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
-| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; most now route meaningful behavior through the Rust C ABI, with `filters.dem` joining the Rust-backed set. Some wrappers still retain C++ validation, setup, or intentional holdouts; registry exposure is not the same as full pipeline parity. |
+| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; the portable filter implementation backlog is now at 0 port-candidate LOC. Remaining C++ under `filters/` is wrapper/compatibility surface plus the exported `filters/private/Point` OGR geometry adapter used by C++ option parsing (`filters.crop` centers and `filters.normal` viewpoint). Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | prototype | A narrow prepare/layout hook exists for registry-visible derived-dimension filters such as `NNDistance`, `RadialDensity`, `Eigenvalue*`, `ClusterID`, `HeightAboveGround`, `Coplanar`, `PlaneFit`, `Reciprocity`, and custom `filters.zsmooth` dimensions. More complex layout mutation remains open. |
 | Pure/local I/O harness | in progress | `readers.faux` and `writers.null` support in-memory pipeline testing. |
 | Text I/O | done | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, and installed-PDAL regression coverage exists for scoped workflows. |
@@ -196,13 +196,14 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 12,742 | 128 |
+| port-candidate | 12,615 | 125 |
 | c-abi-backed | 41,610 | 368 |
-| native-adapter | 2,724 | 21 |
+| native-adapter | 2,821 | 23 |
 | holdout | 1,279 | 5 |
-| total | 58,355 | 522 |
+| total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 7,466 · `pdal` 5,179 · `filters` 97. `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
+Port-candidate backlog by area: `io` 7,466 · `pdal` 5,149. `filters`,
+`kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
@@ -219,7 +220,10 @@ non-exported `io/PcdHeader.cpp`, `io/FbiHeader.cpp` dumper, and the non-exported
 BPF header (de)serialization helpers. A later sweep removed the private C++
 hexer grid/density OGR subsystem after `filters.hexbin` standard and streaming
 paths both routed through the Rust hexbin stage and `kernels.tindex` preserved
-the historic exact-boundary numeric behavior. Rerun the audit after each change.
+the historic exact-boundary numeric behavior. The last `filters/` remainder,
+`filters/private/Point`, is intentionally counted as a native adapter because
+it is an exported OGR-backed compatibility helper for C++ option parsing, not
+portable filter algorithm logic. Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
@@ -353,7 +357,7 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is about `13,905` code LOC for the main first-party
+C++ tests and vendor, is `12,615` code LOC for the main first-party
 surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). That is
 still a ceiling, not a precise backlog: mixed files count as wrapper when they
 include the C ABI even if they still contain legacy implementation, and

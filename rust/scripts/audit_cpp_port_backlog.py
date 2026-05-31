@@ -68,6 +68,8 @@ NATIVE_ADAPTER_PREFIXES = (
 )
 
 NATIVE_ADAPTER_FILES = {
+    "filters/private/Point.cpp",
+    "filters/private/Point.hpp",
     "io/private/GDALGrid.cpp",
     "io/private/GDALGrid.hpp",
     "kernels/private/density/OGR.cpp",
@@ -109,6 +111,8 @@ TEST_MARKER = "pdal_test_main.hpp"
 
 
 def is_in_tree_test(path: str) -> bool:
+    if path == "pdal/pdal_test_main.hpp":
+        return True
     try:
         return TEST_MARKER in Path(path).read_text(errors="replace")
     except OSError:
