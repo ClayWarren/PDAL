@@ -274,6 +274,8 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             mode = InfoMode::Metadata;
         } else if arg == "--all" {
             mode = InfoMode::All;
+        } else if arg == "--boundary" {
+            mode = InfoMode::Boundary;
         } else if arg == "--stac" {
             mode = InfoMode::Stac;
         } else if arg == "-p" || arg == "--point" {
@@ -394,7 +396,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         }
     }
 
-    let mut pipeline = match info_pipeline(&driver, &filename) {
+    let mut pipeline = match info_pipeline(&driver, &filename, mode.needs_boundary()) {
         Ok(pipeline) => pipeline,
         Err(err) => {
             eprintln!("PDAL: kernels.info: {err}");
@@ -418,6 +420,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         | InfoMode::Schema
         | InfoMode::Metadata
         | InfoMode::All
+        | InfoMode::Boundary
         | InfoMode::Stac
         | InfoMode::Point(_)
         | InfoMode::Query(_) => match pipeline.execute(Vec::new()) {
@@ -443,9 +446,16 @@ enum InfoMode {
     Schema,
     Metadata,
     All,
+    Boundary,
     Stac,
     Point(PointId),
     Query(QueryRequest),
+}
+
+impl InfoMode {
+    fn needs_boundary(&self) -> bool {
+        matches!(self, Self::Boundary)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -455,9 +465,16 @@ struct QueryRequest {
     count: usize,
 }
 
-fn info_pipeline(driver: &str, filename: &str) -> Result<pdal_core::pipeline::Pipeline, String> {
-    pipeline_from_json(&serde_json::json!([{ "type": driver, "filename": filename }]).to_string())
-        .map_err(|err| err.to_string())
+fn info_pipeline(
+    driver: &str,
+    filename: &str,
+    include_boundary: bool,
+) -> Result<pdal_core::pipeline::Pipeline, String> {
+    let mut stages = vec![serde_json::json!({ "type": driver, "filename": filename })];
+    if include_boundary {
+        stages.push(serde_json::json!({ "type": "filters.hexbin" }));
+    }
+    pipeline_from_json(&serde_json::Value::Array(stages).to_string()).map_err(|err| err.to_string())
 }
 
 fn info_report(
@@ -488,10 +505,48 @@ fn info_report(
             output
         }
         InfoMode::Stac => stac_report(views, metadata, filename, pc_type),
+        InfoMode::Boundary => boundary_report(metadata),
         InfoMode::Point(point_id) => point_report(views, point_id),
         InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
     }
+}
+
+fn boundary_report(metadata: &MetadataNode) -> String {
+    let hexbin = metadata.find_child("stage_1");
+    let boundary = hexbin
+        .and_then(|stage| stage.find_child("hex_boundary_raw"))
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_string)
+        .unwrap_or_else(|| "MULTIPOLYGON EMPTY".to_string());
+    let estimated_edge = hexbin
+        .and_then(|stage| stage.find_child("estimated_edge"))
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_f64)
+        .unwrap_or(0.0);
+    let geometry = pdal_native::geometry::Geometry::from_wkt(&boundary).and_then(|geometry| {
+        if estimated_edge > 0.0 && boundary != "MULTIPOLYGON EMPTY" {
+            geometry.simplify(1.1 * estimated_edge / 2.0, true)
+        } else {
+            Ok(geometry)
+        }
+    });
+    let boundary = geometry
+        .as_ref()
+        .ok()
+        .and_then(|geometry| geometry.to_wkt_precision(8).ok())
+        .unwrap_or(boundary);
+    let boundary_json = geometry
+        .and_then(|geometry| geometry.to_gdal_geojson(8))
+        .unwrap_or_else(|_| "{}".to_string());
+
+    let value = serde_json::json!({
+        "boundary": {
+            "boundary": boundary,
+            "boundary_json": boundary_json,
+        }
+    });
+    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
 }
 
 fn metadata_report(metadata: &MetadataNode) -> String {

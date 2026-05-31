@@ -200,6 +200,14 @@ TEST(Info, schema)
     test("--schema", r);
 }
 
+TEST(Info, boundary)
+{
+    std::string r = R"foo("boundary": ")foo";
+
+    SCOPED_TRACE("boundary");
+    test("--boundary", r);
+}
+
 TEST(Info, all)
 {
     std::string r = R"foo(

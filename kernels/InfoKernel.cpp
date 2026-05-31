@@ -398,7 +398,7 @@ void InfoKernel::dump(MetadataNode& root)
 
 bool InfoKernel::canRunRust() const
 {
-    if (m_usestdin || m_showAll || m_boundary || !m_breakoutDimension.empty() ||
+    if (m_usestdin || m_showAll || !m_breakoutDimension.empty() ||
         !m_enumerate.empty() || (m_pcType != "lidar" && !m_stac))
         return false;
 
@@ -435,6 +435,8 @@ int InfoKernel::runRust() const
             args.push_back(m_pcType);
         }
     }
+    else if (m_boundary)
+        args.push_back("--boundary");
     else if (!m_pointIndexes.empty())
     {
         args.push_back("--point");
