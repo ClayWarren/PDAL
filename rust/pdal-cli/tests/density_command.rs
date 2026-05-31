@@ -2,6 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use pdal_native::gdal::Vector;
+
 fn data_path(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -107,6 +109,37 @@ fn density_supports_driver_path_and_native_options() {
         serde_json::from_str(&fs::read_to_string(&output).unwrap()).unwrap();
     assert_eq!(geojson["type"], "FeatureCollection");
     assert!(!feature_counts(&geojson).is_empty());
+}
+
+#[test]
+fn density_writes_non_geojson_output_through_native_vector_writer() {
+    let input = data_path("test/data/las/interesting.las");
+    let temp = make_temp_dir("pdal-rs-density-gpkg");
+    let output = temp.join("density.gpkg");
+
+    let result = run_density(&[
+        input.to_str().unwrap(),
+        output.to_str().unwrap(),
+        "--ogrdriver",
+        "GPKG",
+        "--lyr_name",
+        "custom_hexbins",
+        "--edge_length=25",
+        "--threshold=2",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs density failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let vector = Vector::open(output.to_str().unwrap()).unwrap();
+    let features = vector.get_features(0, "COUNT").unwrap();
+    assert!(!features.is_empty());
+    assert!(features
+        .iter()
+        .all(|(wkt, count)| wkt.contains("POLYGON") && *count >= 2));
 }
 
 #[test]

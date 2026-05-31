@@ -120,8 +120,6 @@ void HexBin::addArgs(ProgramArgs& args)
 
 bool HexBin::useRustPath() const
 {
-    if (!m_boundaryOutput.empty() && !Utils::iequals(m_driver, "GeoJSON"))
-        return false;
     return true;
 }
 
@@ -143,6 +141,8 @@ PointViewSet HexBin::run(PointViewPtr view)
             pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
         if (!m_boundaryOutput.empty())
             pdal_options_add_str(ops, "boundary", m_boundaryOutput.c_str());
+        pdal_options_add_str(ops, "ogrdriver", m_driver.c_str());
+        pdal_options_add_str(ops, "lyr_name", "hexbins");
         if (m_isH3)
         {
             pdal_options_add_str(ops, "h3_grid", "true");

@@ -40,7 +40,7 @@ Status definitions:
 | PLY I/O | in progress | C++ reader/writer unit-test shapes pass through the Rust-backed path, including ASCII/binary reads, ASCII/binary writes, mesh faces, precision/dim typing, and `#` flex filenames. Broader installed-PDAL and uncommon PLY fixture coverage can still grow. |
 | OBJ reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path, including deterministic Wavefront OBJ ASCII data, mesh faces, and VTN de-duplication. |
 | GLTF writer | in progress | Existing C++ writer unit-test shapes pass through the Rust-backed path for deterministic local GLB output from mesh-backed views. |
-| OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims`, `multicount`, and the GeoJSON `WRITE_BBOX`/`COORDINATE_PRECISION` creation options used by the C++ tests. Plain Shapefile and GeoPackage point output, attribute fields, Shapefile MultiPoint grouping, and Shapefile measured point output now go through a Rust native GDAL/OGR adapter. The C++ `OGRWriter` delegates those GeoJSON, Shapefile, and GeoPackage cases to the Rust C ABI and routes multicount/attr_dims option validation, missing-attr_dims-dimension errors, and the RFC7946 unsupported-SRS error through Rust. All pre-port `pdal_io_ogr_writer_test` cases route through Rust. Native OGR creation options beyond the covered subset and transactions are deferred. The `pdal-native` `VectorPointWriter` also gained polygon support (`create_polygon`, `write_polygon`, `write_geometry_wkt`) for the hexbin density/boundary file-output keystone (decoupling `kernels/private/density/OGR.cpp` from `hexer::BaseGrid`); the filter-side wiring through it is not done yet. |
+| OGR writer | in progress | GeoJSON point and MultiPoint FeatureCollection output is covered, including `attr_dims`, `multicount`, and the GeoJSON `WRITE_BBOX`/`COORDINATE_PRECISION` creation options used by the C++ tests. Plain Shapefile and GeoPackage point output, attribute fields, Shapefile MultiPoint grouping, and Shapefile measured point output now go through a Rust native GDAL/OGR adapter. The C++ `OGRWriter` delegates those GeoJSON, Shapefile, and GeoPackage cases to the Rust C ABI and routes multicount/attr_dims option validation, missing-attr_dims-dimension errors, and the RFC7946 unsupported-SRS error through Rust. All pre-port `pdal_io_ogr_writer_test` cases route through Rust. Native OGR creation options beyond the covered subset and transactions are deferred. The `pdal-native` `VectorPointWriter` also supports polygon layers (`create_polygon`, `write_polygon`, `write_geometry_wkt`), and `filters.hexbin`/`kernels.density` use it for non-GeoJSON density/boundary output. |
 | QFIT reader | in progress | Existing C++ reader unit-test shapes pass through the Rust-backed path for deterministic NASA ATM QFIT binary fixtures. |
 | SBET/SMRMSG I/O | in progress | Existing C++ SBET reader/writer and SMRMSG reader unit-test shapes pass through the Rust-backed path for deterministic local trajectory fixtures. |
 | LAS/LAZ I/O | in progress | `las`/`laz` crate path supports standard dimensions, V1.0-1.4 point formats, Extra Bytes (VLR and user `extra_dims`), `start`/`count`/`nosrs`/`srs_vlr_order` reader options, WKT/PROJJSON/GeoTIFF SRS extraction via `las-crs`, compression/decompression, full-file GDAL VSI URL reads, and core writer header options. Direct Rust C ABI reader/writer constructors are covered, and the C++ `LasReader`/`LasWriter` wrappers now route local read/write through Rust. Keep parity tests honest before broad claims. |
@@ -198,10 +198,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 13,905 | 145 |
-| c-abi-backed | 41,762 | 366 |
+| c-abi-backed | 41,769 | 366 |
 | native-adapter | 2,921 | 23 |
 | holdout | 1,279 | 5 |
-| total | 59,867 | 539 |
+| total | 59,874 | 539 |
 
 Port-candidate backlog by area: `io` 7,461 · `pdal` 5,179 · `filters` 1,000 ·
 `kernels` 265. `apps` and `tools` are now at 0 (apps is a thin entry-point
@@ -560,8 +560,8 @@ Known mixed binaries:
   `HexbinFilterTest_test_2`, `HexGrid_issue_2507`, `H3Grid_issue_2507`, and
   `issue_4899` count. Hexbin stage execution and the native/H3 hex-grid
   boundary generators route through the Rust C ABI. GeoJSON density file output
-  now routes through Rust for both standard and H3 grids; non-GeoJSON OGR
-  output remains a documented C++/GDAL fallback.
+  routes through Rust for both standard and H3 grids; non-GeoJSON density and
+  boundary output now route through the Rust native GDAL/OGR polygon writer.
 - `pdal_filters_geomdistance_test`: only `test_polygon` counts; geometry
   distance calculation routes through the Rust C ABI.
 - `pdal_filters_faceraster_test`: all 2 tests count; mesh rasterization and

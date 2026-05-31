@@ -154,10 +154,23 @@ unsafe fn run_density_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         } else if let Some(value) = arg.strip_prefix("--driver=") {
             reader_override = Some(value.to_string());
         } else if arg == "--ogrdriver" || arg == "-f" {
-            if iter.next().is_none() {
+            let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
                 return 1;
-            }
+            };
+            hexbin_stage["ogrdriver"] = serde_json::json!(value);
+        } else if let Some(value) = arg.strip_prefix("--ogrdriver=") {
+            hexbin_stage["ogrdriver"] = serde_json::json!(value);
+        } else if let Some(value) = arg.strip_prefix("-f=") {
+            hexbin_stage["ogrdriver"] = serde_json::json!(value);
+        } else if arg == "--lyr_name" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.density: Missing value for option '--lyr_name'.");
+                return 1;
+            };
+            hexbin_stage["lyr_name"] = serde_json::json!(value);
+        } else if let Some(value) = arg.strip_prefix("--lyr_name=") {
+            hexbin_stage["lyr_name"] = serde_json::json!(value);
         } else if arg == "--edge_length" || arg == "--threshold" {
             let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");

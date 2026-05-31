@@ -383,6 +383,8 @@ pub fn create_filter(
             };
             let density = options.get_str("density", "");
             let boundary = options.get_str("boundary", "");
+            let driver = options.get_str("ogrdriver", "GeoJSON");
+            let layer_name = options.get_str("lyr_name", "hexbins");
             let mut filter = HexBinFilter::with_options(
                 edge,
                 get_u64(options, "threshold", 15)? as u32,
@@ -391,6 +393,8 @@ pub fn create_filter(
                 (!boundary.is_empty()).then_some(boundary),
                 get_bool(options, "output_tesselation", false)?,
             );
+            filter.set_output_driver(driver);
+            filter.set_layer_name(layer_name);
             if get_bool(options, "h3_grid", false)? {
                 let resolution = options
                     .has("h3_resolution")

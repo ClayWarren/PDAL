@@ -38,7 +38,6 @@
 #include "private/density/OGR.hpp"
 
 #include <pdal/util/FileUtils.hpp>
-#include <pdal/util/Utils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
 #include <vector>
@@ -97,7 +96,9 @@ void DensityKernel::outputDensity(pdal::SpatialReference const& reference)
 
 int DensityKernel::execute()
 {
-    if (!Utils::iequals(m_driverName, "GeoJSON") || !m_layerName.empty())
+    if (m_inputFile == "STDIN" ||
+        (FileUtils::extension(m_inputFile) == ".xml" ||
+         FileUtils::extension(m_inputFile) == ".json"))
     {
         if (m_inputFile == "STDIN" ||
             (FileUtils::extension(m_inputFile) == ".xml" ||
@@ -131,6 +132,11 @@ int DensityKernel::execute()
     {
         args.push_back("--ogrdriver");
         args.push_back(m_driverName);
+    }
+    if (!m_layerName.empty())
+    {
+        args.push_back("--lyr_name");
+        args.push_back(m_layerName);
     }
     if (m_edgeLength != 0.0)
     {

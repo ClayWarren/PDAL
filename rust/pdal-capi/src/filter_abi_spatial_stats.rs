@@ -56,6 +56,8 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
         };
         let density = options.get_str("density", "");
         let boundary = options.get_str("boundary", "");
+        let driver = options.get_str("ogrdriver", "GeoJSON");
+        let layer_name = options.get_str("lyr_name", "hexbins");
         let mut filter = HexBinFilter::with_options(
             edge,
             options.get_u64("threshold", 15) as u32,
@@ -64,6 +66,8 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
             (!boundary.is_empty()).then_some(boundary),
             options.get_bool("output_tesselation", false),
         );
+        filter.set_output_driver(driver);
+        filter.set_layer_name(layer_name);
         // H3 grid mode: `h3_resolution` is only forwarded when explicitly set
         // (>= 0); its absence means auto-estimate the resolution from a sample.
         if options.get_bool("h3_grid", false) {

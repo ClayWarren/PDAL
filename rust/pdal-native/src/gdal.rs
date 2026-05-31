@@ -769,6 +769,7 @@ impl Drop for VectorPointWriter {
 
 impl Vector {
     pub fn open(path: &str) -> Result<Self, String> {
+        register_drivers();
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         unsafe {
             let ds = gdal_sys::OGROpen(path_c.as_ptr(), 0, std::ptr::null_mut());
@@ -780,6 +781,7 @@ impl Vector {
     }
 
     pub fn create(path: &str, driver_name: &str) -> Result<Self, String> {
+        register_drivers();
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let driver_c = CString::new(driver_name).map_err(|e| e.to_string())?;
         unsafe {

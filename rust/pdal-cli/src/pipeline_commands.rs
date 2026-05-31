@@ -694,7 +694,7 @@ impl App {
     pub(super) fn run_density(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
-            println!("  pdal density <input> <output.geojson> [--<stage>.<key>=<value> ...]");
+            println!("  pdal density <input> <output> [--<stage>.<key>=<value> ...]");
             return if self.command_args.is_empty() && !self.help {
                 1
             } else {
@@ -729,10 +729,37 @@ impl App {
             } else if let Some(driver) = arg.strip_prefix("--driver=") {
                 driver_override = Some(driver);
             } else if arg == "--ogrdriver" || arg == "-f" {
-                let Some(_) = args.next() else {
+                let Some(value) = args.next() else {
                     eprintln!("Error: {arg} requires an OGR driver name");
                     return 1;
                 };
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "ogrdriver".to_string(),
+                    value: value.clone(),
+                });
+            } else if let Some(value) = arg.strip_prefix("--ogrdriver=") {
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "ogrdriver".to_string(),
+                    value: value.to_string(),
+                });
+            } else if arg == "--lyr_name" {
+                let Some(value) = args.next() else {
+                    eprintln!("Error: {arg} requires a layer name");
+                    return 1;
+                };
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "lyr_name".to_string(),
+                    value: value.clone(),
+                });
+            } else if let Some(value) = arg.strip_prefix("--lyr_name=") {
+                stage_options.push(StageOption {
+                    stage: "filters.hexbin".to_string(),
+                    key: "lyr_name".to_string(),
+                    value: value.to_string(),
+                });
             } else if arg == "--edge_length" || arg == "--threshold" {
                 let Some(value) = args.next() else {
                     eprintln!("Error: {arg} requires a value");
@@ -793,9 +820,9 @@ impl App {
         };
 
         // reader -> filters.hexbin: the hexbin filter tessellates the X/Y
-        // domain and writes the dense-cell density grid as GeoJSON. The
-        // density output is a vector file, so no point-cloud writer is added;
-        // `--filters.hexbin.*` options override the hexbin defaults.
+        // domain and writes the dense-cell density grid as a vector file, so
+        // no point-cloud writer is added; `--filters.hexbin.*` options
+        // override the hexbin defaults.
         let mut stages: Vec<serde_json::Value> = vec![
             serde_json::json!({ "type": reader, "filename": input }),
             serde_json::json!({ "type": "filters.hexbin", "density": output }),

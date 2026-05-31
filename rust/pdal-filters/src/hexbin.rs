@@ -19,6 +19,7 @@ use std::fs;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::point::{DimId, PointId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
+use pdal_native::gdal::{VectorFieldType, VectorFieldValue, VectorPointWriter};
 
 use std::f64::consts::PI;
 
@@ -31,6 +32,8 @@ pub struct HexBinFilter {
     sample_size: usize,
     density_output: Option<String>,
     boundary_output: Option<String>,
+    driver_name: String,
+    layer_name: String,
     output_tesselation: bool,
     /// H3 mode. `None` = standard hexagonal grid. `Some(None)` = H3 with the
     /// resolution auto-estimated from a sample. `Some(Some(res))` = H3 at a
@@ -91,10 +94,25 @@ impl HexBinFilter {
             sample_size,
             density_output,
             boundary_output,
+            driver_name: "GeoJSON".to_string(),
+            layer_name: "hexbins".to_string(),
             output_tesselation,
             h3: None,
             state: None,
         }
+    }
+
+    pub fn set_output_driver(&mut self, driver_name: impl Into<String>) {
+        self.driver_name = driver_name.into();
+    }
+
+    pub fn set_layer_name(&mut self, layer_name: impl Into<String>) {
+        let layer_name = layer_name.into();
+        self.layer_name = if layer_name.is_empty() {
+            "hexbins".to_string()
+        } else {
+            layer_name
+        };
     }
 
     /// Enable H3 grid mode. `resolution` is `None` for auto-estimation or
@@ -131,14 +149,8 @@ impl HexBinFilter {
             grid.add_xy(x, y);
         }
 
-        // Density output (GeoJSON) is independent of boundary tracing.
         if let Some(path) = &self.density_output {
-            let geojson = density_geojson(&grid, self.threshold);
-            fs::write(path, geojson).map_err(|err| {
-                StageError(format!(
-                    "filters.hexbin: unable to write density output '{path}': {err}"
-                ))
-            })?;
+            self.write_density_standard(path, &grid)?;
         }
 
         // Trace the boundary. If there's no dense region, hexer returns an
@@ -150,11 +162,7 @@ impl HexBinFilter {
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
             grid.find_parent_paths();
             if let Some(path) = &self.boundary_output {
-                fs::write(path, grid.boundary_geojson()).map_err(|err| {
-                    StageError(format!(
-                        "filters.hexbin: unable to write boundary output '{path}': {err}"
-                    ))
-                })?;
+                self.write_boundary(path, &grid.boundary_geojson(), &grid.to_wkt_fixed(8))?;
             }
             Some(grid.to_wkt_fixed(8))
         } else {
@@ -216,12 +224,7 @@ impl HexBinFilter {
         }
 
         if let Some(path) = &self.density_output {
-            let geojson = density_geojson_h3(&grid, self.threshold)?;
-            fs::write(path, geojson).map_err(|err| {
-                StageError(format!(
-                    "filters.hexbin: unable to write density output '{path}': {err}"
-                ))
-            })?;
+            self.write_density_h3(path, &grid)?;
         }
 
         // H3 grids are not smoothed (HexBinFilter forbids smoothing options for
@@ -229,11 +232,7 @@ impl HexBinFilter {
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
             grid.find_parent_paths();
             if let Some(path) = &self.boundary_output {
-                fs::write(path, grid.boundary_geojson()).map_err(|err| {
-                    StageError(format!(
-                        "filters.hexbin: unable to write boundary output '{path}': {err}"
-                    ))
-                })?;
+                self.write_boundary(path, &grid.boundary_geojson(), &grid.to_wkt(8))?;
             }
             Some(grid.to_wkt(8))
         } else {
@@ -252,6 +251,126 @@ impl HexBinFilter {
             effective_sample_size: self.effective_sample_size(xy.len(), estimated),
             h3_resolution: Some(res),
         })
+    }
+
+    fn writes_geojson(&self) -> bool {
+        self.driver_name.eq_ignore_ascii_case("GeoJSON")
+    }
+
+    fn create_polygon_writer(&self, path: &str) -> Result<VectorPointWriter, StageError> {
+        let writer =
+            VectorPointWriter::create_polygon(path, &self.driver_name, "", &self.layer_name)
+                .map_err(|err| {
+                    StageError(format!(
+                        "filters.hexbin: unable to create OGR output '{path}': {err}"
+                    ))
+                })?;
+        writer
+            .create_field("ID", VectorFieldType::Integer64)
+            .map_err(|err| {
+                StageError(format!("filters.hexbin: unable to create ID field: {err}"))
+            })?;
+        writer
+            .create_field("COUNT", VectorFieldType::Integer)
+            .map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to create COUNT field: {err}"
+                ))
+            })?;
+        Ok(writer)
+    }
+
+    fn write_density_standard(&self, path: &str, grid: &HexGrid) -> Result<(), StageError> {
+        if self.writes_geojson() {
+            fs::write(path, density_geojson(grid, self.threshold)).map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to write density output '{path}': {err}"
+                ))
+            })?;
+            return Ok(());
+        }
+
+        let writer = self.create_polygon_writer(path)?;
+        for (hex, count) in dense_hexes(grid.counts(), self.threshold) {
+            let ring: Vec<_> = grid.hex_vertices(*hex).iter().map(|p| (p.x, p.y)).collect();
+            writer
+                .write_polygon(
+                    &ring,
+                    &[
+                        VectorFieldValue::Integer64(HexGrid::hex_id_u64(*hex) as i64),
+                        VectorFieldValue::Integer(*count),
+                    ],
+                )
+                .map_err(|err| {
+                    StageError(format!(
+                        "filters.hexbin: unable to write density feature: {err}"
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn write_density_h3(&self, path: &str, grid: &H3Grid) -> Result<(), StageError> {
+        if self.writes_geojson() {
+            fs::write(path, density_geojson_h3(grid, self.threshold)?).map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to write density output '{path}': {err}"
+                ))
+            })?;
+            return Ok(());
+        }
+
+        let writer = self.create_polygon_writer(path)?;
+        for (hex, count) in dense_hexes(grid.counts(), self.threshold) {
+            let ring: Vec<_> = grid
+                .hex_vertices(*hex)
+                .map_err(|err| StageError(format!("filters.hexbin: {err}")))?
+                .iter()
+                .map(|p| (p.x, p.y))
+                .collect();
+            writer
+                .write_polygon(
+                    &ring,
+                    &[
+                        VectorFieldValue::Integer64(HexGrid::hex_id_u64(*hex) as i64),
+                        VectorFieldValue::Integer(*count),
+                    ],
+                )
+                .map_err(|err| {
+                    StageError(format!(
+                        "filters.hexbin: unable to write density feature: {err}"
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    fn write_boundary(
+        &self,
+        path: &str,
+        geojson: &str,
+        boundary_wkt: &str,
+    ) -> Result<(), StageError> {
+        if self.writes_geojson() {
+            fs::write(path, geojson).map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to write boundary output '{path}': {err}"
+                ))
+            })?;
+            return Ok(());
+        }
+
+        let writer = self.create_polygon_writer(path)?;
+        writer
+            .write_geometry_wkt(
+                boundary_wkt,
+                &[VectorFieldValue::Integer64(0), VectorFieldValue::Integer(0)],
+            )
+            .map_err(|err| {
+                StageError(format!(
+                    "filters.hexbin: unable to write boundary feature: {err}"
+                ))
+            })
     }
 }
 
@@ -281,15 +400,8 @@ fn compute_hex_size(
 /// Serialize the dense hexagons as a GeoJSON `FeatureCollection`, matching
 /// the C++ OGR density writer's per-cell `ID`/`COUNT` schema.
 fn density_geojson(grid: &HexGrid, dense_limit: u32) -> String {
-    let mut dense: Vec<(&HexId, &i32)> = grid
-        .counts()
-        .iter()
-        .filter(|(_, &count)| count as u32 >= dense_limit)
-        .collect();
-    dense.sort_by_key(|(hex, _)| **hex);
-
     let mut out = String::from("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [");
-    for (idx, (hex, count)) in dense.iter().enumerate() {
+    for (idx, (hex, count)) in dense_hexes(grid.counts(), dense_limit).iter().enumerate() {
         if idx > 0 {
             out.push(',');
         }
@@ -311,15 +423,8 @@ fn density_geojson(grid: &HexGrid, dense_limit: u32) -> String {
 }
 
 fn density_geojson_h3(grid: &H3Grid, dense_limit: u32) -> Result<String, StageError> {
-    let mut dense: Vec<(&HexId, &i32)> = grid
-        .counts()
-        .iter()
-        .filter(|(_, &count)| count as u32 >= dense_limit)
-        .collect();
-    dense.sort_by_key(|(hex, _)| **hex);
-
     let mut out = String::from("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [");
-    for (idx, (hex, count)) in dense.iter().enumerate() {
+    for (idx, (hex, count)) in dense_hexes(grid.counts(), dense_limit).iter().enumerate() {
         if idx > 0 {
             out.push(',');
         }
@@ -340,6 +445,18 @@ fn density_geojson_h3(grid: &H3Grid, dense_limit: u32) -> Result<String, StageEr
     }
     out.push_str("\n  ]\n}\n");
     Ok(out)
+}
+
+fn dense_hexes(
+    counts: &std::collections::HashMap<HexId, i32>,
+    dense_limit: u32,
+) -> Vec<(&HexId, &i32)> {
+    let mut dense: Vec<_> = counts
+        .iter()
+        .filter(|(_, &count)| count as u32 >= dense_limit)
+        .collect();
+    dense.sort_by_key(|(hex, _)| **hex);
+    dense
 }
 
 fn format_hex_offsets(offsets: &[(f64, f64); 6]) -> String {
@@ -458,6 +575,7 @@ impl Streamable for HexBinFilter {
 mod tests {
     use super::*;
     use pdal_core::point::{DimType, PointLayout};
+    use pdal_native::gdal::Vector;
     use std::rc::Rc;
 
     fn flat_view(n: usize) -> PointView {
@@ -630,5 +748,50 @@ mod tests {
         assert_eq!(features.len(), 1);
         assert_eq!(features[0]["properties"]["ID"], 0);
         assert_eq!(features[0]["geometry"]["type"], "MultiPolygon");
+    }
+
+    #[test]
+    fn non_geojson_density_and_boundary_use_native_polygon_writer() {
+        let view = flat_view(50);
+        let dir = tempfile::tempdir().unwrap();
+        let density = dir.path().join("density.gpkg");
+        let boundary = dir.path().join("boundary.gpkg");
+
+        let mut density_filter = HexBinFilter::with_options(
+            Some(1.0),
+            1,
+            10,
+            Some(density.display().to_string()),
+            None,
+            false,
+        );
+        density_filter.set_output_driver("GPKG");
+        density_filter.run_one(&view).unwrap();
+
+        let density_vector = Vector::open(density.to_str().unwrap()).unwrap();
+        let density_features = density_vector.get_features(0, "COUNT").unwrap();
+        assert!(!density_features.is_empty());
+        assert!(density_features
+            .iter()
+            .all(|(wkt, count)| wkt.contains("POLYGON") && *count >= 1));
+        drop(density_vector);
+
+        let mut boundary_filter = HexBinFilter::with_options(
+            Some(1.0),
+            1,
+            10,
+            None,
+            Some(boundary.display().to_string()),
+            false,
+        );
+        boundary_filter.set_output_driver("GPKG");
+        boundary_filter.set_layer_name("custom_hexbins");
+        boundary_filter.run_one(&view).unwrap();
+
+        let boundary_vector = Vector::open(boundary.to_str().unwrap()).unwrap();
+        let boundary_features = boundary_vector.get_features(0, "ID").unwrap();
+        assert_eq!(boundary_features.len(), 1);
+        assert!(boundary_features[0].0.contains("MULTIPOLYGON"));
+        assert_eq!(boundary_features[0].1, 0);
     }
 }

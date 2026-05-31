@@ -1053,6 +1053,7 @@ dependencies = [
  "h3o",
  "pdal-core",
  "pdal-io",
+ "pdal-native",
  "rstar 0.12.2",
  "serde_json",
  "tempfile",
