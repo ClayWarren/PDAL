@@ -34,10 +34,9 @@
 
 #include "HausdorffKernel.hpp"
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/pdal_config.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <pdal_capi.h>
+#include <vector>
 
 namespace pdal
 {
@@ -64,28 +63,17 @@ void HausdorffKernel::addSwitches(ProgramArgs& args)
 
 int HausdorffKernel::execute()
 {
-    // The Hausdorff and modified-Hausdorff distances are computed by the Rust
-    // metrics engine (pdal-core::metrics::hausdorff_pair) via the C ABI, which
-    // loads both clouds through the Rust readers.
-    double hausdorff = 0.0;
-    double modified = 0.0;
-    if (pdal_hausdorff(m_sourceFile.c_str(), m_candidateFile.c_str(),
-                       &hausdorff, &modified) != 0)
-    {
-        const char* message = pdal_last_error();
-        throw pdal_error(message ? message
-                                 : "Rust hausdorff computation failed.");
-    }
+    StringList args;
+    args.push_back(m_sourceFile);
+    args.push_back(m_candidateFile);
 
-    MetadataNode root;
-    root.add("filenames", m_sourceFile);
-    root.add("filenames", m_candidateFile);
-    root.add("hausdorff", hausdorff);
-    root.add("modified_hausdorff", modified);
-    root.add("pdal_version", Config::fullVersionString());
-    Utils::toJSON(root, std::cout);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    return 0;
+    return pdal_rust_kernel_run("hausdorff", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal

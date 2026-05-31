@@ -34,10 +34,9 @@
 
 #include "ChamferKernel.hpp"
 
-#include <pdal/PDALUtils.hpp>
-#include <pdal/pdal_config.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
-#include <pdal_capi.h>
+#include <vector>
 
 namespace pdal
 {
@@ -64,25 +63,17 @@ void ChamferKernel::addSwitches(ProgramArgs& args)
 
 int ChamferKernel::execute()
 {
-    // The Chamfer distance is computed by the Rust metrics engine
-    // (pdal-core::metrics::chamfer_distance) via the C ABI, which loads both
-    // clouds through the Rust readers.
-    double chamfer = 0.0;
-    if (pdal_chamfer(m_sourceFile.c_str(), m_candidateFile.c_str(), &chamfer) !=
-        0)
-    {
-        const char* message = pdal_last_error();
-        throw pdal_error(message ? message : "Rust chamfer computation failed.");
-    }
+    StringList args;
+    args.push_back(m_sourceFile);
+    args.push_back(m_candidateFile);
 
-    MetadataNode root;
-    root.add("filenames", m_sourceFile);
-    root.add("filenames", m_candidateFile);
-    root.add("chamfer", chamfer);
-    root.add("pdal_version", Config::fullVersionString());
-    Utils::toJSON(root, std::cout);
+    std::vector<const char*> argv;
+    argv.reserve(args.size());
+    for (const std::string& arg : args)
+        argv.push_back(arg.c_str());
 
-    return 0;
+    return pdal_rust_kernel_run("chamfer", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 } // namespace pdal
