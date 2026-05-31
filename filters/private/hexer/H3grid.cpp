@@ -5,7 +5,6 @@
 
 #include "BaseGrid.hpp"
 #include "H3grid.hpp"
-#include "Processor.hpp"
 
 namespace hexer
 {
