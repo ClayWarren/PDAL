@@ -34,6 +34,8 @@
 
 #include "Entry.hpp"
 
+#include <pdal_capi.h>
+
 namespace pdal
 {
 namespace copc
@@ -41,13 +43,21 @@ namespace copc
 
 Hierarchy::Hierarchy(const std::vector<char>& data)
 {
-    LeExtractor in(data.data(), data.size());
-    while (in)
+    pdal_copc_entry_t* entries = nullptr;
+    uint64_t count = 0;
+    if (!pdal_copc_hierarchy_parse(
+            reinterpret_cast<const uint8_t*>(data.data()), data.size(),
+            &entries, &count))
+        return;
+
+    for (uint64_t i = 0; i < count; ++i)
     {
-        Entry e;
-        in >> e.m_key >> e.m_offset >> e.m_byteSize >> e.m_pointCount;
+        const pdal_copc_entry_t& in = entries[i];
+        Entry e(Key(in.d, in.x, in.y, in.z), in.offset, in.byte_size,
+                in.point_count);
         m_entries.insert(e);
     }
+    pdal_copc_entries_free(entries, count);
 }
 
 point_count_t Hierarchy::pointCount() const

@@ -40,6 +40,7 @@
 
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/Extractor.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -66,23 +67,13 @@ public:
     bool fill(const std::string& s)
     {
         d = -1;
-        const StringList tokens(Utils::split(s, '-'));
-        if (tokens.size() != 4)
+        pdal_copc_key_t key;
+        if (!pdal_copc_key_parse(s.c_str(), &key))
             return false;
-
-        size_t cnt;
-        d = std::stoi(tokens[0], &cnt);
-        if (cnt != tokens[0].size())
-            return false;
-        x = std::stoi(tokens[1], &cnt);
-        if (cnt != tokens[1].size())
-            return false;
-        y = std::stoi(tokens[2], &cnt);
-        if (cnt != tokens[2].size())
-            return false;
-        z = std::stoi(tokens[3], &cnt);
-        if (cnt != tokens[3].size())
-            return false;
+        d = key.d;
+        x = key.x;
+        y = key.y;
+        z = key.z;
         return true;
     }
 
@@ -98,34 +89,32 @@ public:
 
     operator std::string() const
     {
-        return std::to_string(d) + '-' + std::to_string(x) + '-' +
-               std::to_string(y) + '-' + std::to_string(z);
+        pdal_copc_key_t key{d, x, y, z};
+        char* raw = pdal_copc_key_to_string(&key);
+        std::string out(raw ? raw : "");
+        pdal_string_free(raw);
+        return out;
     }
 
     Key child(int32_t dir) const
     {
-        return Key(d + 1, (x << 1) | (dir & 0x1), (y << 1) | ((dir >> 1) & 0x1),
-                   (z << 1) | ((dir >> 2) & 0x1));
+        pdal_copc_key_t key{d, x, y, z};
+        pdal_copc_key_t child;
+        if (!pdal_copc_key_child(&key, dir, &child))
+            return Key::invalid();
+        return Key(child.d, child.x, child.y, child.z);
     }
 
     BOX3D bounds(const BOX3D& root) const
     {
-        BOX3D cellBounds;
-
-        int width = pow(2, d);
-        double cellWidth = (root.maxx - root.minx) / width;
-        // The test in each of these is to avoid unnecessary rounding errors
-        // when we know the actual value.
-        cellBounds.minx = (x == 0 ? root.minx : root.minx + (cellWidth * x));
-        cellBounds.maxx =
-            (x == (width - 1) ? root.maxx : root.minx + (cellWidth * (x + 1)));
-        cellBounds.miny = (y == 0 ? root.miny : root.miny + (cellWidth * y));
-        cellBounds.maxy =
-            (y == (width - 1) ? root.maxy : root.miny + (cellWidth * (y + 1)));
-        cellBounds.minz = (z == 0 ? root.minz : root.minz + (cellWidth * z));
-        cellBounds.maxz =
-            (z == (width - 1) ? root.maxz : root.minz + (cellWidth * (z + 1)));
-        return cellBounds;
+        pdal_copc_key_t key{d, x, y, z};
+        pdal_copc_bounds3d_t in{root.minx, root.maxx, root.miny,
+                                root.maxy, root.minz, root.maxz};
+        pdal_copc_bounds3d_t out;
+        if (!pdal_copc_key_bounds(&key, &in, &out))
+            return BOX3D();
+        return BOX3D(out.minx, out.miny, out.minz, out.maxx, out.maxy,
+                     out.maxz);
     }
 
     static Key invalid()
@@ -135,7 +124,6 @@ public:
         return badkey;
     }
 
-private:
     Key(int d, int x, int y, int z) : d(d), x(x), y(y), z(z) {}
 };
 
@@ -192,11 +180,8 @@ template <> struct hash<pdal::copc::Key>
 {
     std::size_t operator()(pdal::copc::Key const& k) const noexcept
     {
-        std::hash<uint64_t> h;
-
-        uint64_t k1 = ((uint64_t)k.d << 32) | k.x;
-        uint64_t k2 = ((uint64_t)k.y << 32) | k.z;
-        return h(k1) ^ (h(k2) << 1);
+        pdal_copc_key_t key{k.d, k.x, k.y, k.z};
+        return pdal_copc_key_hash(&key);
     }
 };
 } // namespace std

@@ -133,6 +133,103 @@ fn copc_info_abi_decodes_little_endian_payload() {
 }
 
 #[test]
+fn copc_hierarchy_abi_decodes_entries() {
+    let mut data = Vec::new();
+    for (level, x, y, z, offset, byte_size, point_count) in [
+        (0_i32, 0_i32, 0_i32, 0_i32, 128_u64, 256_i32, -1_i32),
+        (1_i32, 1_i32, 0_i32, 1_i32, 1024_u64, 512_i32, 42_i32),
+    ] {
+        data.extend_from_slice(&level.to_le_bytes());
+        data.extend_from_slice(&x.to_le_bytes());
+        data.extend_from_slice(&y.to_le_bytes());
+        data.extend_from_slice(&z.to_le_bytes());
+        data.extend_from_slice(&offset.to_le_bytes());
+        data.extend_from_slice(&byte_size.to_le_bytes());
+        data.extend_from_slice(&point_count.to_le_bytes());
+    }
+
+    unsafe {
+        let mut entries = std::ptr::null_mut();
+        let mut count = 0;
+        assert!(pdal_copc_hierarchy_parse(
+            data.as_ptr(),
+            data.len() as u64,
+            &mut entries,
+            &mut count
+        ));
+        assert_eq!(count, 2);
+        assert_eq!((*entries).d, 0);
+        assert_eq!((*entries.add(1)).x, 1);
+        assert_eq!((*entries.add(1)).z, 1);
+        assert_eq!((*entries.add(1)).offset, 1024);
+        assert_eq!((*entries.add(1)).byte_size, 512);
+        assert_eq!((*entries.add(1)).point_count, 42);
+        pdal_copc_entries_free(entries, count);
+        pdal_copc_entries_free(std::ptr::null_mut(), 0);
+
+        assert!(!pdal_copc_hierarchy_parse(
+            data.as_ptr(),
+            data.len() as u64 - 1,
+            &mut entries,
+            &mut count
+        ));
+        assert!(!pdal_copc_hierarchy_parse(
+            data.as_ptr(),
+            data.len() as u64,
+            std::ptr::null_mut(),
+            &mut count
+        ));
+    }
+}
+
+#[test]
+fn copc_key_abi_parses_children_bounds_and_hashes() {
+    unsafe {
+        let value = CString::new("2-3-1-0").unwrap();
+        let mut key = pdal_copc_key_t {
+            d: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+        };
+
+        assert!(pdal_copc_key_parse(value.as_ptr(), &mut key));
+        assert_eq!((key.d, key.x, key.y, key.z), (2, 3, 1, 0));
+
+        let s = pdal_copc_key_to_string(&key);
+        assert_eq!(CStr::from_ptr(s).to_str().unwrap(), "2-3-1-0");
+        pdal_string_free(s);
+
+        let mut child = key;
+        assert!(pdal_copc_key_child(&key, 5, &mut child));
+        assert_eq!((child.d, child.x, child.y, child.z), (3, 7, 2, 1));
+
+        let root = pdal_copc_bounds3d_t {
+            minx: 0.0,
+            maxx: 8.0,
+            miny: 10.0,
+            maxy: 18.0,
+            minz: 20.0,
+            maxz: 28.0,
+        };
+        let mut bounds = root;
+        assert!(pdal_copc_key_bounds(&key, &root, &mut bounds));
+        assert_eq!(bounds.minx, 6.0);
+        assert_eq!(bounds.maxx, 8.0);
+        assert_eq!(bounds.miny, 12.0);
+        assert_eq!(bounds.maxy, 14.0);
+        assert_eq!(bounds.minz, 20.0);
+        assert_eq!(bounds.maxz, 22.0);
+
+        assert_ne!(pdal_copc_key_hash(&key), pdal_copc_key_hash(&child));
+        let bad = CString::new("2-3-1").unwrap();
+        assert!(!pdal_copc_key_parse(bad.as_ptr(), &mut key));
+        assert!(!pdal_copc_key_child(&key, 0, std::ptr::null_mut()));
+        assert!(!pdal_copc_key_bounds(&key, std::ptr::null(), &mut bounds));
+    }
+}
+
+#[test]
 fn ept_key_abi_parses_strings_and_bisects_bounds() {
     unsafe {
         let value = CString::new("2-3-4-5").unwrap();

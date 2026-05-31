@@ -123,8 +123,8 @@ extern "C"
         uint64_t point_count;
         char* filename;
     } pdal_pointless_las_result_t;
-    pdal_pointless_las_result_t* pdal_pointless_las_create(
-        const char* filename);
+    pdal_pointless_las_result_t*
+    pdal_pointless_las_create(const char* filename);
     void pdal_pointless_las_destroy(pdal_pointless_las_result_t* result);
     char* pdal_rust_stage_list_json();
     pdal_stage_extensions_t* pdal_stage_extensions_create();
@@ -509,6 +509,49 @@ extern "C"
 
     bool pdal_copc_info_parse(const uint8_t* data, uint64_t data_len,
                               pdal_copc_info_t* out_info);
+
+    typedef struct
+    {
+        int32_t d;
+        int32_t x;
+        int32_t y;
+        int32_t z;
+        uint64_t offset;
+        int32_t byte_size;
+        int32_t point_count;
+    } pdal_copc_entry_t;
+
+    bool pdal_copc_hierarchy_parse(const uint8_t* data, uint64_t data_len,
+                                   pdal_copc_entry_t** out_entries,
+                                   uint64_t* out_count);
+    void pdal_copc_entries_free(pdal_copc_entry_t* entries, uint64_t count);
+
+    typedef struct
+    {
+        int32_t d;
+        int32_t x;
+        int32_t y;
+        int32_t z;
+    } pdal_copc_key_t;
+
+    typedef struct
+    {
+        double minx;
+        double maxx;
+        double miny;
+        double maxy;
+        double minz;
+        double maxz;
+    } pdal_copc_bounds3d_t;
+
+    bool pdal_copc_key_parse(const char* value, pdal_copc_key_t* out_key);
+    char* pdal_copc_key_to_string(const pdal_copc_key_t* key);
+    bool pdal_copc_key_child(const pdal_copc_key_t* key, int32_t direction,
+                             pdal_copc_key_t* out_key);
+    bool pdal_copc_key_bounds(const pdal_copc_key_t* key,
+                              const pdal_copc_bounds3d_t* root,
+                              pdal_copc_bounds3d_t* out_bounds);
+    uint64_t pdal_copc_key_hash(const pdal_copc_key_t* key);
 
     typedef struct
     {

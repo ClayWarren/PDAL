@@ -231,7 +231,6 @@ fn read_hierarchy_page<R: Read + Seek + ?Sized>(
     offset: u64,
     byte_size: u64,
 ) -> Result<Vec<HierarchyEntry>, String> {
-    let entries = (byte_size as usize) / HIERARCHY_ENTRY_SIZE;
     let mut buf = vec![0u8; byte_size as usize];
     reader
         .seek(SeekFrom::Start(offset))
@@ -239,9 +238,19 @@ fn read_hierarchy_page<R: Read + Seek + ?Sized>(
     reader
         .read_exact(&mut buf)
         .map_err(|e| format!("COPC: read hierarchy page failed: {e}"))?;
+    parse_hierarchy_page(&buf)
+}
 
+pub fn parse_hierarchy_page(data: &[u8]) -> Result<Vec<HierarchyEntry>, String> {
+    if !data.len().is_multiple_of(HIERARCHY_ENTRY_SIZE) {
+        return Err(format!(
+            "COPC: hierarchy page size {} is not a multiple of {HIERARCHY_ENTRY_SIZE}",
+            data.len()
+        ));
+    }
+    let entries = data.len() / HIERARCHY_ENTRY_SIZE;
     let mut out = Vec::with_capacity(entries);
-    let mut cursor = std::io::Cursor::new(&buf[..]);
+    let mut cursor = std::io::Cursor::new(data);
     for _ in 0..entries {
         let level = cursor
             .read_i32::<LittleEndian>()
