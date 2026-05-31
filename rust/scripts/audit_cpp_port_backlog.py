@@ -54,6 +54,11 @@ SOURCE_EXTS = (".cpp", ".hpp", ".h", ".cc", ".cxx")
 # through Rust -- a pure wrapper or a mixed file that still hides some C++.
 C_ABI_HEADER_MARKERS = ("pdal_capi.h", "RustViewConverter.hpp")
 KNOWN_BRIDGE_FILES = {
+    "io/FbiHeader.hpp",
+    "io/HeaderVal.hpp",
+    "io/OptechCommon.hpp",
+    "io/PcdHeader.hpp",
+    "io/SbetCommon.hpp",
     "filters/private/RustMetadata.hpp",
     "filters/private/RustPipeline.hpp",
     "pdal/KDIndex.cpp",
@@ -100,6 +105,17 @@ NATIVE_ADAPTER_FILES = {
 # Documented intentional C++ holdouts. Keep this list small and cited; prefer
 # moving a file out of here once its port lands rather than letting it grow.
 HOLDOUTS = {
+    # Permanent C++ public compatibility shims. These are not portable PDAL
+    # implementation and should not be ported behind the Rust C ABI.
+    "pdal/JsonFwd.hpp": "deprecated public nlohmann forward-declaration shim",
+    "pdal/PluginHelper.hpp": "C++ plugin registration macro compatibility surface",
+    "pdal/PluginInfo.hpp": "C++ plugin metadata compatibility surface",
+    "pdal/PointContainer.hpp": "intentional compile-time error compatibility header",
+    "pdal/pdal.hpp": "C++ umbrella include compatibility surface",
+    "pdal/pdal_export.hpp": "C++ symbol export macro compatibility surface",
+    "pdal/pdal_internal.hpp": "C++ internal compatibility include",
+    "pdal/util/pdal_util_export.hpp": "C++ utility symbol export macro compatibility surface",
+    "pdal/util/pdal_util_internal.hpp": "C++ utility platform macro compatibility surface",
     # C++ compatibility argument-binding API used by exported C++ shells. The
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
