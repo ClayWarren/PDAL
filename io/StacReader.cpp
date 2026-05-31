@@ -111,7 +111,8 @@ bool rustStacTypeSupported(const std::string& filename)
         NL::json stacJson =
             NL::json::parse(FileUtils::readFileIntoString(filename));
         std::string stacType = Utils::jsonValue<std::string>(stacJson, "type");
-        return stacType == "Feature" || stacType == "Collection";
+        return stacType == "Feature" || stacType == "Collection" ||
+               stacType == "FeatureCollection";
     }
     catch (...)
     {
