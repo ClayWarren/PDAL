@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 6,925 | 67 |
+| port-candidate | 5,054 | 42 |
 | c-abi-backed | 41,943 | 374 |
 | native-adapter | 5,529 | 52 |
-| holdout | 3,928 | 28 |
+| holdout | 5,799 | 53 |
 | total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 3,604 · `pdal` 3,321. `filters`,
+Port-candidate backlog by area: `io` 3,604 · `pdal` 1,450. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -248,8 +248,13 @@ milestone. The COPC writer private `Common.hpp` option/header shell counts with
 the Rust-backed `CopcWriter` wrapper rather than as standalone algorithmic
 backlog. Exported deprecated `LasHeader`/`LasVLR` and exported `BpfHeader`
 classes are compatibility holdouts; their private parser/data helpers remain
-backlog unless they route through Rust or are proved dead. Rerun the audit after
-each change.
+backlog unless they route through Rust or are proved dead. Obvious exported C++
+SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
+dimension/mesh/quick-info/artifact helpers, subcommand shells, and
+`Utils::Random` with its `std::mt19937&` API) are likewise compatibility
+holdouts; the remaining `pdal/` backlog is now concentrated in
+`PipelineManager`, JSON pipeline parsing support, and raster data ownership.
+Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
