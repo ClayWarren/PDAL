@@ -418,7 +418,6 @@ bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
     Args& args = *m_args;
     return !Utils::isRemote(filename) && args.catalogs.empty() &&
-           args.dates.empty() && args.bounds.empty() && !args.ogr.size() &&
            rustStacTypeSupported(filename);
 }
 
@@ -598,6 +597,20 @@ void StacReader::initialize()
             addOption(options, "items", item.m_str);
         for (const RegEx& collection : m_p->m_args->collections)
             addOption(options, "collections", collection.m_str);
+        for (const NL::json& date : m_p->m_args->dates)
+            addOption(options, "date_ranges", date.dump());
+        if (!m_p->m_args->bounds.empty())
+        {
+            std::stringstream bounds;
+            bounds << m_p->m_args->bounds;
+            addOption(options, "bounds", bounds.str());
+        }
+        if (m_p->m_args->ogr.size())
+        {
+            std::stringstream ogr;
+            ogr << m_p->m_args->ogr;
+            addOption(options, "ogr", ogr.str());
+        }
         if (!m_p->m_args->properties.empty())
             addOption(options, "properties", m_p->m_args->properties.dump());
         if (!m_p->m_args->rawReaderArgs.empty())

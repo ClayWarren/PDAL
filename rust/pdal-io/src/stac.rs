@@ -1,9 +1,9 @@
 //! `readers.stac` -- local STAC asset reader.
 //!
 //! This is a narrow local-file slice: STAC Item assets and local
-//! Catalog/Collection/FeatureCollection traversal. Remote assets, schema
-//! validation, EPT/COPC-specific behavior, and STAC filtering stay with the
-//! later vendor/remote I/O milestone.
+//! Catalog/Collection/FeatureCollection traversal. Remote asset breadth,
+//! full schema validation, and EPT/COPC-specific behavior stay with the later
+//! vendor/remote I/O milestone.
 
 use crate::tindex::{append_view, read_point_location, resolve_location};
 use chrono::{DateTime, FixedOffset};
@@ -114,9 +114,17 @@ impl Reader for StacReader {
         let item_filters = compile_regexes(&self.items, "items")?;
         let property_filters = parse_property_filters(&self.properties)?;
         let reader_args = parse_reader_args(&self.reader_args)?;
+        let date_ranges = parse_date_ranges(&self.date_ranges)?;
+        let bounds = if self.ogr.trim().is_empty() {
+            parse_bounds(&self.bounds)?
+        } else {
+            parse_ogr_bounds(&self.ogr)?
+        };
         let mut context = StacAssetContext {
             asset_names: &self.asset_names,
             item_filters: &item_filters,
+            date_ranges: &date_ranges,
+            bounds: bounds.as_ref(),
             collections: &collections,
             property_filters: &property_filters,
             validate_schema: self.validate_schema,
@@ -125,7 +133,13 @@ impl Reader for StacReader {
         };
         collect_assets(&self.filename, &mut context)?;
 
-        if assets.is_empty() && !self.collections.is_empty() {
+        if assets.is_empty()
+            && (!self.collections.is_empty()
+                || !item_filters.is_empty()
+                || !property_filters.is_empty()
+                || !date_ranges.is_empty()
+                || bounds.is_some())
+        {
             return Err(StageError(
                 "Reader list is empty after filtering.".to_string(),
             ));
@@ -238,6 +252,8 @@ fn collect_assets(location: &str, context: &mut StacAssetContext<'_>) -> Result<
 struct StacAssetContext<'a> {
     asset_names: &'a [String],
     item_filters: &'a [Regex],
+    date_ranges: &'a [DateRange],
+    bounds: Option<&'a Bounds2D>,
     collections: &'a [Regex],
     property_filters: &'a [PropertyFilter],
     validate_schema: bool,
@@ -252,6 +268,14 @@ fn collect_item_assets(
 ) -> Result<(), StageError> {
     if !item_matches_id_filters(item, context.item_filters) {
         return Ok(());
+    }
+    if !context.date_ranges.is_empty() && !item_matches_dates(item, context.date_ranges) {
+        return Ok(());
+    }
+    if let Some(bounds) = context.bounds {
+        if !item_matches_bounds(item, bounds) {
+            return Ok(());
+        }
     }
     if !collection_matches(item, context.collections) {
         return Ok(());
@@ -1200,6 +1224,8 @@ mod tests {
         let mut context = StacAssetContext {
             asset_names: &asset_names,
             item_filters: &[],
+            date_ranges: &[],
+            bounds: None,
             collections: &[],
             property_filters: &[],
             validate_schema: false,
@@ -1210,6 +1236,112 @@ mod tests {
         assert_eq!(assets.len(), 1);
         assert_eq!(assets[0].driver, "readers.copc");
         assert_eq!(assets[0].location, "http://example.com/x.copc.laz");
+    }
+
+    #[test]
+    fn collect_assets_applies_date_ranges() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{
+  "type": "Feature",
+  "id": "dated",
+  "properties": {"datetime": "2022-11-15T00:00:00Z"},
+  "assets": {"data": {"href": "x.laz", "type": "application/vnd.laszip"}}
+}"#,
+        )
+        .unwrap();
+        let asset_names = [String::from("data")];
+        let accepted = parse_date_ranges(&[String::from(
+            r#"["2022-11-01T00:00:00Z","2022-11-20T00:00:00Z"]"#,
+        )])
+        .unwrap();
+        let rejected = parse_date_ranges(&[String::from(
+            r#"["2022-12-01T00:00:00Z","2022-12-20T00:00:00Z"]"#,
+        )])
+        .unwrap();
+
+        let mut visited = BTreeSet::new();
+        let mut assets = Vec::new();
+        let mut context = StacAssetContext {
+            asset_names: &asset_names,
+            item_filters: &[],
+            date_ranges: &accepted,
+            bounds: None,
+            collections: &[],
+            property_filters: &[],
+            validate_schema: false,
+            visited: &mut visited,
+            assets: &mut assets,
+        };
+        collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
+        assert_eq!(assets.len(), 1);
+
+        let mut visited = BTreeSet::new();
+        let mut assets = Vec::new();
+        let mut context = StacAssetContext {
+            asset_names: &asset_names,
+            item_filters: &[],
+            date_ranges: &rejected,
+            bounds: None,
+            collections: &[],
+            property_filters: &[],
+            validate_schema: false,
+            visited: &mut visited,
+            assets: &mut assets,
+        };
+        collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
+        assert!(assets.is_empty());
+    }
+
+    #[test]
+    fn collect_assets_applies_bounds_filter() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            temp.path(),
+            br#"{
+  "type": "Feature",
+  "id": "bounded",
+  "bbox": [-79.0, 38.0, -74.0, 39.0],
+  "assets": {"data": {"href": "x.laz", "type": "application/vnd.laszip"}}
+}"#,
+        )
+        .unwrap();
+        let asset_names = [String::from("data")];
+        let accepted = parse_bounds("([-80,-73],[37,40])").unwrap().unwrap();
+        let rejected = parse_bounds("([50,51],[-10,0])").unwrap().unwrap();
+
+        let mut visited = BTreeSet::new();
+        let mut assets = Vec::new();
+        let mut context = StacAssetContext {
+            asset_names: &asset_names,
+            item_filters: &[],
+            date_ranges: &[],
+            bounds: Some(&accepted),
+            collections: &[],
+            property_filters: &[],
+            validate_schema: false,
+            visited: &mut visited,
+            assets: &mut assets,
+        };
+        collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
+        assert_eq!(assets.len(), 1);
+
+        let mut visited = BTreeSet::new();
+        let mut assets = Vec::new();
+        let mut context = StacAssetContext {
+            asset_names: &asset_names,
+            item_filters: &[],
+            date_ranges: &[],
+            bounds: Some(&rejected),
+            collections: &[],
+            property_filters: &[],
+            validate_schema: false,
+            visited: &mut visited,
+            assets: &mut assets,
+        };
+        collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
+        assert!(assets.is_empty());
     }
 
     #[test]
