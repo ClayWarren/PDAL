@@ -64,12 +64,20 @@ KNOWN_BRIDGE_FILES = {
 # or explicit FFI (see rust/VENDOR.md), not a from-scratch Rust reimplementation,
 # so they are tracked apart from the pure-Rust backlog.
 NATIVE_ADAPTER_PREFIXES = (
+    "io/private/connector/",
+    "io/private/esri/",
     "pdal/private/gdal/",
 )
 
 NATIVE_ADAPTER_FILES = {
     "filters/private/Point.cpp",
     "filters/private/Point.hpp",
+    "io/EsriReader.cpp",
+    "io/EsriReader.hpp",
+    "io/I3SReader.cpp",
+    "io/I3SReader.hpp",
+    "io/SlpkReader.cpp",
+    "io/SlpkReader.hpp",
     "io/private/GDALGrid.cpp",
     "io/private/GDALGrid.hpp",
     "kernels/private/density/OGR.cpp",

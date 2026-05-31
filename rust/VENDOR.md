@@ -41,13 +41,13 @@ copy vendor source just to reduce the apparent amount of remaining work.
 
 | Vendor path | Current C++ role | Rust-port stance |
 | --- | --- | --- |
-| `vendor/arbiter` | Remote/local file access support | Do not port early. I/O should first prove deterministic local readers/writers. Later choose a Rust async/object-store stack or keep C++/FFI for remote access. |
+| `vendor/arbiter` | Remote/local file access support | Adapter-bound. C++ `io/private/connector` remains the Arbiter compatibility adapter while Rust remote reads use GDAL VSI for the covered paths. Do not broaden Arbiter work until a concrete I/O parity case needs it. |
 | `vendor/eigen` | Linear algebra for geometry, statistics, registration, and filters | Do not vendor Eigen into Rust. Existing Rust filter ports currently use small local math where parity needs are narrow. If broader linear algebra is needed, prefer a Rust crate such as `nalgebra` after a concrete filter/core requirement. |
 | `vendor/gtest` | C++ test framework | No Rust-port role. Existing C++ tests remain the behavioral contract. Rust uses Cargo tests. |
 | `vendor/h3` | H3 indexing support | Already replaced on the Rust side by the `h3o` crate. Do not bind to the vendored C H3 library unless parity requires behavior `h3o` cannot provide. |
 | `vendor/kazhdan` | Poisson reconstruction private algorithm | Defer. For Poisson-related stages, make a stage-level decision: port the algorithm, bind the C++ implementation through FFI, or leave the stage in C++. Do not begin with a broad Kazhdan rewrite. |
 | `vendor/lazperf` | LAS/LAZ compression and LAS point stream helpers | Already replaced for the current Rust LAS/LAZ path by the `las` crate with its `laz` feature. Do not port or bind lazperf unless parity testing proves the Rust replacement cannot match required PDAL behavior. |
-| `vendor/lepcc` | Esri LEPCC compression support | Defer until the relevant I/O path is selected. Likely FFI or leave C++ unless a mature Rust alternative exists. |
+| `vendor/lepcc` | Esri LEPCC compression support | Adapter-bound for the ESRI/I3S/SLPK reader family. Decide FFI, Rust replacement, or retained C++ when those readers become the active I/O milestone; do not treat LEPCC code as generic portable backlog. |
 | `vendor/nanoflann` | KD-tree nearest-neighbor support | Do not port directly. Rust spatial filters already use a shared `pdal-core::spatial` API that can swap internals later. If performance requires it, choose a Rust spatial index crate behind that API. |
 | `vendor/nlohmann` | JSON support in C++ code | No direct Rust-port role. Rust code should use `serde_json` where JSON is part of the contract. |
 | `vendor/schema-validator` | JSON schema validation for pipeline/config surfaces | Defer until Rust owns pipeline JSON validation. Prefer a Rust JSON-schema crate or explicit compatibility adapter after parity tests identify the required draft/features. |
