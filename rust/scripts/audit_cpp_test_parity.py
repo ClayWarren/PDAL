@@ -114,6 +114,7 @@ COVERED: dict[str, object] = {
     "pdal_georeference_test": ALL,
     "pdal_charbuf_test": ALL,
     "pdal_deflate_test": ALL,
+    "pdal_zstd_test": ALL,
     "pdal_io_vsi_test": ALL,
     "pdal_i3s_obb_test": ALL,
     "pdal_math_utils_test": ALL,
@@ -233,6 +234,7 @@ COVERED: dict[str, object] = {
     "pdal_filters_geomdistance_test": {"create", "test_polygon"},
     "pdal_filters_hexbin_test": {
         "HexbinFilterTest_test_1",
+        "ogr_density_boundary_output",
         "HexbinFilterTest_test_2",
         "HexGrid_issue_2507",
         "H3Grid_issue_2507",

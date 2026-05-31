@@ -149,9 +149,8 @@ The first target was the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-**This milestone is complete.** `819 / 819` baseline C++ GoogleTest cases
-(`100.00%`) and `956 / 956` currently built cases (`100.00%`, with
-`--include-added-tests`) are confirmed Rust C ABI-backed by
+**This milestone is complete.** `820 / 820` baseline C++ GoogleTest cases
+(`100.00%`) are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
 port, so newly added guard tests do not move the headline denominator. Keep this
@@ -255,9 +254,11 @@ deliberately conservative. Drive the number down by porting the ranked
 `port-candidate` files (or by reclassifying one with a cited holdout/backed
 entry when that is the honest answer).
 
-The branch-wide health metric, including guard tests added before and during
-the port, is `955 / 955` currently built C++ GoogleTest cases, or `100.00%`;
-compute that with `--include-added-tests`.
+The branch-wide visibility metric, including guard tests added before and during
+the port, is `958 / 1056` currently built C++ GoogleTest cases, or `90.72%`;
+compute that with `--include-added-tests`. That number is informational because
+many added guard tests intentionally still exercise C++ compatibility seams or
+non-port holdouts; do not use it as the headline parity denominator.
 
 When the NITF plugin is built (`-DBUILD_PLUGIN_NITF=ON`), `pdal_io_nitf_reader_test`
 and `pdal_io_nitf_writer_test` (6 tests total) route through the Rust C ABI
