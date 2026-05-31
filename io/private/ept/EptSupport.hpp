@@ -36,19 +36,26 @@
 
 #include <nlohmann/json.hpp>
 #include <pdal/util/Bounds.hpp>
+#include <pdal_capi.h>
 
 namespace pdal
 {
 
 inline BOX3D toBox3d(const NL::json& b)
 {
-    if (!b.is_array() || b.size() != 6)
+    pdal_bounds3d_t bounds;
+    uint64_t pos = 0;
+    char* err =
+        pdal_bounds3d_parse(b.dump().c_str(), 0, &bounds, nullptr, &pos);
+    if (err)
     {
-        throw pdal_error("Invalid bounds specification: " + b.dump());
+        std::string message(err);
+        pdal_string_free(err);
+        throw pdal_error("Invalid bounds specification: " + b.dump() + ": " +
+                         message);
     }
-
-    return BOX3D(b[0].get<double>(), b[1].get<double>(), b[2].get<double>(),
-                 b[3].get<double>(), b[4].get<double>(), b[5].get<double>());
+    return BOX3D(bounds.minx, bounds.miny, bounds.minz, bounds.maxx,
+                 bounds.maxy, bounds.maxz);
 }
 
 } // namespace pdal
