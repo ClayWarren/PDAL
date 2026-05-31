@@ -94,6 +94,12 @@ NATIVE_ADAPTER_FILES = {
     "io/private/GDALGrid.hpp",
     "io/private/copc/Tile.cpp",
     "io/private/copc/Tile.hpp",
+    # Arbiter/Connector-backed EPT per-tile fetch. Local supported EPT reads
+    # route through the Rust reader in EptReader::ready(); TileContents only
+    # runs on the remote (or 2D-bounds-with-SRS) Connector fallback, the same
+    # shape as the io/private/stac native-adapter files.
+    "io/private/ept/TileContents.cpp",
+    "io/private/ept/TileContents.hpp",
     "io/private/las/ChunkInfo.hpp",
     "kernels/private/density/OGR.cpp",
     "kernels/private/density/OGR.hpp",

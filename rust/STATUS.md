@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 1,204 | 8 |
+| port-candidate | 1,017 | 6 |
 | c-abi-backed | 45,084 | 396 |
-| native-adapter | 5,718 | 55 |
+| native-adapter | 5,905 | 57 |
 | holdout | 6,282 | 62 |
 | total | 58,288 | 521 |
 
-Port-candidate backlog by area: `pdal` 1,017 · `io` 187. `filters`,
+Port-candidate backlog by area: `pdal` 1,017. `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -268,8 +268,17 @@ manager APIs and exact C++ JSON parser behavior for existing SDK callers.
 The private EPT `EptInfo` SRS user-input building (wkt, or authority +
 horizontal [+ vertical]) now routes through the Rust `pdal_ept_srs_wkt_from_info`
 C ABI (`pdal-io::ept::ept_srs_wkt`), with the C++ rules and error messages
-preserved in one place; only `io/private/ept/TileContents` remains as `io`
-port-candidate backlog.
+preserved in one place. With that, the `io` port-candidate backlog is 0:
+`io/private/ept/TileContents.{cpp,hpp}` is reclassified as a native adapter,
+matching the `io/private/stac` precedent. Its entire read path goes through the
+Arbiter-backed `connector::Connector` (`m_connector`), and the C++ `EptReader`
+only reaches it on the remote (or 2D-bounds-with-SRS) fallback —
+`EptReader::ready()` routes every local, non-2D-bounds-SRS read through the Rust
+`pdal_reader_create_ept` path. **Documented parity gap (not a silent loss):** a
+*local* EPT read with a 2D query bounds that carries an SRS still falls back to
+the C++ `TileContents`/`Connector` path because the Rust EPT reader does not yet
+reproject a 2D bounds; closing that gap (reproject 2D query bounds to the EPT
+SRS in `pdal-io::ept`) would make `TileContents` purely the remote adapter.
 Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
