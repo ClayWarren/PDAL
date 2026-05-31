@@ -116,6 +116,8 @@ HOLDOUTS = {
     "pdal/pdal_internal.hpp": "C++ internal compatibility include",
     "pdal/util/pdal_util_export.hpp": "C++ utility symbol export macro compatibility surface",
     "pdal/util/pdal_util_internal.hpp": "C++ utility platform macro compatibility surface",
+    "io/OptechRotationMatrix.hpp": "empty public compatibility include",
+    "io/point_types.hpp": "PCL point type compatibility header",
     # C++ compatibility argument-binding API used by exported C++ shells. The
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
