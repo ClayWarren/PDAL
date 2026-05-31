@@ -38,14 +38,9 @@
 #include <pdal_capi.h>
 
 #include "private/RustMetadata.hpp"
-#include "private/hexer/H3grid.hpp"
-#include "private/hexer/HexGrid.hpp"
 
-#include "../kernels/private/density/OGR.hpp"
 #include <pdal/Polygon.hpp>
 #include <pdal/util/Utils.hpp>
-
-using namespace hexer;
 
 namespace pdal
 {
@@ -73,7 +68,7 @@ std::string HexBin::getName() const
 
 hexer::BaseGrid* HexBin::grid() const
 {
-    return m_grid.get();
+    return nullptr;
 }
 
 void HexBin::addArgs(ProgramArgs& args)
@@ -123,50 +118,47 @@ bool HexBin::useRustPath() const
     return true;
 }
 
+pdal_stage* HexBin::createRustStage()
+{
+    pdal_options_t* ops = pdal_options_create();
+    if (m_edgeLength > 0)
+        pdal_options_add_f64(ops, "edge_length", m_edgeLength);
+    pdal_options_add_u64(ops, "threshold", m_density);
+    pdal_options_add_u64(ops, "sample_size", m_sampleSize);
+    pdal_options_add_str(ops, "output_tesselation",
+                         m_outputTesselation ? "true" : "false");
+    if (!m_DensityOutput.empty())
+        pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
+    if (!m_boundaryOutput.empty())
+        pdal_options_add_str(ops, "boundary", m_boundaryOutput.c_str());
+    pdal_options_add_str(ops, "ogrdriver", m_driver.c_str());
+    pdal_options_add_str(ops, "lyr_name", "hexbins");
+    if (m_isH3)
+    {
+        pdal_options_add_str(ops, "h3_grid", "true");
+        if (m_h3Res != -1)
+            pdal_options_add_u64(ops, "h3_resolution", m_h3Res);
+    }
+
+    pdal_stage* stage = pdal_stage_create_hexbin(ops);
+    pdal_options_destroy(ops);
+    if (!stage)
+        throwError("Failed to create Rust hexbin stage.");
+    return stage;
+}
+
 PointViewSet HexBin::run(PointViewPtr view)
 {
     if (useRustPath() && !view->empty())
     {
         if (m_rustStage)
             pdal_stage_destroy(m_rustStage);
-
-        pdal_options_t* ops = pdal_options_create();
-        if (m_edgeLength > 0)
-            pdal_options_add_f64(ops, "edge_length", m_edgeLength);
-        pdal_options_add_u64(ops, "threshold", m_density);
-        pdal_options_add_u64(ops, "sample_size", m_sampleSize);
-        pdal_options_add_str(ops, "output_tesselation",
-                             m_outputTesselation ? "true" : "false");
-        if (!m_DensityOutput.empty())
-            pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
-        if (!m_boundaryOutput.empty())
-            pdal_options_add_str(ops, "boundary", m_boundaryOutput.c_str());
-        pdal_options_add_str(ops, "ogrdriver", m_driver.c_str());
-        pdal_options_add_str(ops, "lyr_name", "hexbins");
-        if (m_isH3)
-        {
-            pdal_options_add_str(ops, "h3_grid", "true");
-            // Forward an explicit resolution only; -1 means auto-estimate.
-            if (m_h3Res != -1)
-                pdal_options_add_u64(ops, "h3_resolution", m_h3Res);
-        }
-
-        m_rustStage = pdal_stage_create_hexbin(ops);
-        pdal_options_destroy(ops);
-        if (!m_rustStage)
-            throwError("Failed to create Rust hexbin stage.");
-
+        m_rustStage = createRustStage();
         m_usedRust = true;
         rust_view_converter::runInPlace(m_rustStage, *view);
-        PointViewSet viewSet;
-        viewSet.insert(view);
-        return viewSet;
     }
 
-    m_usedRust = false;
     PointViewSet viewSet;
-    if (!view->empty())
-        filter(*view);
     viewSet.insert(view);
     return viewSet;
 }
@@ -206,44 +198,15 @@ void HexBin::initialize()
 void HexBin::ready(PointTableRef table)
 {
     m_count = 0;
-    if (m_isH3)
-    {
-        if (m_h3Res == -1)
-        {
-            m_grid.reset(new H3Grid(m_density));
-            m_grid->setSampleSize(m_sampleSize);
-        }
-        else
-            m_grid.reset(new H3Grid(m_h3Res, m_density));
-    }
-    else
-    {
-        if (m_edgeLength == 0.0)
-        {
-            m_grid.reset(new HexGrid(m_density));
-            m_grid->setSampleSize(m_sampleSize);
-        }
-        else
-            m_grid.reset(new HexGrid(m_edgeLength * sqrt(3), m_density));
-    }
-}
-
-void HexBin::filter(PointView& view)
-{
-    PointRef p(view, 0);
-
-    for (PointId idx = 0; idx < view.size(); ++idx)
-    {
-        p.setPointId(idx);
-        processOne(p);
-    }
+    m_streamView.reset(new PointView(table, m_srs));
 }
 
 bool HexBin::processOne(PointRef& point)
 {
-    double x = point.getFieldAs<double>(Dimension::Id::X);
-    double y = point.getFieldAs<double>(Dimension::Id::Y);
-    m_grid->addXY(x, y);
+    PointId idx = m_streamView->size();
+    m_streamView->point(idx);
+    for (Dimension::Id dim : point.layout()->dims())
+        m_streamView->setField(dim, idx, point.getFieldAs<double>(dim));
     m_count++;
     return true;
 }
@@ -251,235 +214,61 @@ bool HexBin::processOne(PointRef& point)
 void HexBin::spatialReferenceChanged(const SpatialReference& srs)
 {
     m_srs = srs;
-    if (!m_grid->checkSRS(m_srs))
-    {
-        std::ostringstream oss;
-        oss << "Cannot find H3 hexbin locations with spatial reference: ("
-            << m_srs.getProj4() << ")! Input must be EPSG:4326";
-        throwError(oss.str());
-    }
 }
 
-bool HexBin::createGrid()
+void HexBin::addRustMetadata(PointTableRef table)
 {
-    try
+    pdal_metadata_node_t* rustMetadata = pdal_stage_metadata(m_rustStage);
+    if (rustMetadata)
     {
-        if (m_grid->sampling())
-        {
-            // If we ran out of points while sampling, process the points in the
-            // sample buffer: in stream mode, we can't check this until we've
-            // gone through all the points
-            if (m_sampleSize > m_count)
-            {
-                m_grid->flushSamples();
-                // Setting this so it gets written to metadata correctly
-                m_sampleSize = m_count;
-            }
-            else
-                throwError(
-                    "Sampling for hexbin auto-edge length calculation failed!");
-        }
-
-        m_grid->findShapes();
-        m_grid->findParentPaths();
-    }
-    catch (hexer::hexer_error& e)
-    {
-        m_metadata.add(
-            "error", e.what(),
-            "Hexer threw an error and was unable to compute a boundary");
-        m_metadata.add("boundary", "MULTIPOLYGON EMPTY",
-                       "Empty polygon -- unable to compute boundary");
-        return false;
-    }
-    return true;
-}
-
-void HexBin::done(PointTableRef table)
-{
-    if (m_usedRust)
-    {
-        pdal_metadata_node_t* rustMetadata = pdal_stage_metadata(m_rustStage);
-        if (rustMetadata)
-        {
-            rust_metadata::addChildrenTo(m_metadata, rustMetadata);
-            pdal_metadata_node_destroy(rustMetadata);
-        }
-
-        MetadataNode rawNode = m_metadata.findChild("hex_boundary_raw");
-        std::string rawWkt = rawNode.valid() ? rawNode.value() : std::string();
-        MetadataNode heightNode = m_metadata.findChild("estimated_edge");
-        double gridHeight =
-            heightNode.valid() ? heightNode.value<double>() : 0.0;
-
-        pdal::Polygon p(
-            rawWkt.empty() ? std::string("MULTIPOLYGON EMPTY") : rawWkt, m_srs);
-        if (m_doSmooth && gridHeight > 0.0 && !rawWkt.empty() &&
-            rawWkt != "MULTIPOLYGON EMPTY")
-        {
-            double tolerance = 1.1 * gridHeight / 2.0;
-            double cull =
-                m_cullArg->set() ? m_cullArea : (6 * tolerance * tolerance);
-            p.simplify(tolerance, cull, m_preserve_topology);
-        }
-
-        m_metadata.add("boundary", p.wkt(m_precision),
-                       "Approximated MULTIPOLYGON of domain");
-        m_metadata.addWithType("boundary_json", p.json(), "json",
-                               "Approximated MULTIPOLYGON of domain");
-
-        if (m_rustStage)
-        {
-            pdal_stage_destroy(m_rustStage);
-            m_rustStage = nullptr;
-        }
-        m_usedRust = false;
-        return;
+        rust_metadata::addChildrenTo(m_metadata, rustMetadata);
+        pdal_metadata_node_destroy(rustMetadata);
     }
 
-    if (!createGrid())
-        return;
+    MetadataNode rawNode = m_metadata.findChild("hex_boundary_raw");
+    std::string rawWkt = rawNode.valid() ? rawNode.value() : std::string();
+    MetadataNode heightNode = m_metadata.findChild("estimated_edge");
+    double gridHeight = heightNode.valid() ? heightNode.value<double>() : 0.0;
 
-    m_metadata.add(
-        "threshold", m_grid->denseLimit(),
-        "Minimum number of points inside a hexagon to be considered full");
-    m_metadata.add(
-        "sample_size", m_sampleSize,
-        "Number of samples used for "
-        "estimating hexagon edge size. Only used if 'edge_length' or "
-        "'h3_resolution' is not set.");
-
-    Utils::OStringStreamClassicLocale polygon;
-    polygon.setf(std::ios_base::fixed, std::ios_base::floatfield);
-    polygon.precision(m_precision);
-    m_grid->toWKT(polygon);
-
-    if (m_outputTesselation)
+    pdal::Polygon p(rawWkt.empty() ? std::string("MULTIPOLYGON EMPTY") : rawWkt,
+                    m_srs);
+    if (m_doSmooth && gridHeight > 0.0 && !rawWkt.empty() &&
+        rawWkt != "MULTIPOLYGON EMPTY")
     {
-        m_metadata.add("hex_boundary", polygon.str(),
-                       "Boundary MULTIPOLYGON of domain");
-    }
-
-    // density and boundary writing with OGR does not support polygon smoothing
-    if (m_DensityOutput.size())
-    {
-        OGR writer(m_DensityOutput, m_srs.getWKT(), m_driver, "hexbins");
-        writer.writeDensity(*m_grid);
-    }
-    if (m_boundaryOutput.size())
-    {
-        OGR writer(m_boundaryOutput, m_srs.getWKT(), m_driver, "hexbins");
-        writer.writeBoundary(*m_grid);
-    }
-
-    pdal::Polygon p(polygon.str(), m_srs);
-
-    // If the SRS was geographic, use relevant
-    // UTM for area and density computation
-    Polygon density_p(p);
-    if (m_srs.isGeographic())
-    {
-        // Compute a UTM polygon
-        BOX3D box = p.bounds();
-        int zone = SpatialReference::calculateZone(box.minx, box.miny);
-        if (!density_p.transform(SpatialReference::wgs84FromZone(zone)))
-            density_p = Polygon();
-    }
-
-    double area = density_p.area();
-    double density = m_count / area;
-    if (std::isinf(density))
-    {
-        density = -1.0;
-        area = -1.0;
-    }
-
-    m_metadata.add("density", density,
-                   "Number of points per square unit (total area)");
-    m_metadata.add("area", area, "Area in square units of tessellated polygon");
-    m_metadata.add("avg_pt_spacing", std::sqrt(1 / density),
-                   "Avg point spacing (x/y units)");
-
-    int n(0);
-    point_count_t totalCount(0);
-    for (auto& [coord, count] : m_grid->getHexes())
-    {
-        if (m_grid->isDense(coord))
-        {
-            totalCount += count;
-            n++;
-        }
-    }
-
-    // what's the purpose of this? rename it?
-    double hexArea(((3 * SQRT_3) / 2.0) *
-                   (m_grid->height() * m_grid->height()));
-    double avg_density = (n * hexArea) / totalCount;
-    m_metadata.add("avg_pt_per_sq_unit", avg_density,
-                   "Area / point count "
-                   "(ignore contrary metadata item name. This is '(n * "
-                   "hexArea) / totalCount')");
-
-    if (!m_isH3)
-    {
-        /***
-        We want to make these bumps on edges go away, which means that
-        we want to elimnate both B and C.  If we take a line from A -> C,
-        we need the tolerance to eliminate B.  After that we're left with
-        the triangle ACD and we want to eliminate C.  The perpendicular
-        distance from AD to C is the hexagon height / 2, so we set the
-        tolerance a little larger than that.  This is larger than the
-        perpendicular distance needed to eliminate B in ABC, so should
-        serve for both cases.
-
-           B ______  C
-            /      \
-         A /        \ D
-
-        ***/
-        if (m_doSmooth)
-        {
-            double tolerance = 1.1 * m_grid->height() / 2;
-            double cull =
-                m_cullArg->set() ? m_cullArea : (6 * tolerance * tolerance);
-            p.simplify(tolerance, cull, m_preserve_topology);
-        }
-
-        Utils::OStringStreamClassicLocale offsets;
-        offsets << "MULTIPOINT (";
-        for (int i = 0; i < 6; ++i)
-        {
-            hexer::Point p = m_grid->offset(i);
-            offsets << p.m_x << " " << p.m_y;
-            if (i != 5)
-                offsets << ", ";
-        }
-        offsets << ")";
-
-        m_metadata.add(
-            "edge_length", m_edgeLength,
-            "The edge length of the "
-            "hexagon to use in situations where you do not want to estimate "
-            "based on a sample");
-        m_metadata.add("estimated_edge", m_grid->height(),
-                       "Estimated computed edge distance");
-        m_metadata.add("hex_offsets", offsets.str(),
-                       "Offset of hex corners from "
-                       "hex centers.");
-    }
-    else
-    {
-        m_metadata.add(
-            "h3_resolution", m_grid->getRes(),
-            "The H3 resolution level "
-            "of the grid. See https://h3geo.org/docs/core-library/restable "
-            "for more information");
+        double tolerance = 1.1 * gridHeight / 2.0;
+        double cull =
+            m_cullArg->set() ? m_cullArea : (6 * tolerance * tolerance);
+        p.simplify(tolerance, cull, m_preserve_topology);
     }
 
     m_metadata.add("boundary", p.wkt(m_precision),
                    "Approximated MULTIPOLYGON of domain");
     m_metadata.addWithType("boundary_json", p.json(), "json",
                            "Approximated MULTIPOLYGON of domain");
+}
+
+void HexBin::done(PointTableRef table)
+{
+    if (!m_usedRust && m_streamView && !m_streamView->empty())
+    {
+        if (m_rustStage)
+            pdal_stage_destroy(m_rustStage);
+        m_rustStage = createRustStage();
+        m_usedRust = true;
+        rust_view_converter::runInPlace(m_rustStage, *m_streamView);
+    }
+
+    if (m_usedRust)
+    {
+        addRustMetadata(table);
+        if (m_rustStage)
+        {
+            pdal_stage_destroy(m_rustStage);
+            m_rustStage = nullptr;
+        }
+        m_usedRust = false;
+    }
+    m_streamView.reset();
 }
 
 } // namespace pdal

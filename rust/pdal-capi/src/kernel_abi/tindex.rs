@@ -5,7 +5,7 @@ use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::expr::ConditionalExpression;
 use pdal_core::gdal::{LayerHandle, Vector};
 use pdal_core::point::DimId;
-use pdal_filters::hexer::{HexGrid, SQRT_3};
+use pdal_filters::hexer::HexGrid;
 use pdal_native::geometry::Geometry;
 use std::ffi::CStr;
 use std::io::Read;
@@ -582,7 +582,7 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
     };
 
     let mut grid = if opts.edge_length > 0.0 {
-        HexGrid::with_height(opts.edge_length * SQRT_3, opts.density)
+        HexGrid::with_height(opts.edge_length * 3.0_f64.sqrt(), opts.density)
     } else {
         // Auto-edge-length sampling isn't ported yet; fall back to a small
         // edge derived from the leading-point spacing so we still produce a

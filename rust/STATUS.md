@@ -196,13 +196,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 13,609 | 140 |
-| c-abi-backed | 41,776 | 368 |
-| native-adapter | 2,921 | 23 |
+| port-candidate | 12,742 | 128 |
+| c-abi-backed | 41,610 | 368 |
+| native-adapter | 2,724 | 21 |
 | holdout | 1,279 | 5 |
-| total | 59,585 | 536 |
+| total | 58,355 | 522 |
 
-Port-candidate backlog by area: `io` 7,466 · `pdal` 5,179 · `filters` 964. `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
+Port-candidate backlog by area: `io` 7,466 · `pdal` 5,179 · `filters` 97. `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
@@ -216,7 +216,10 @@ the exported classes as compatibility shells.)
 delaunator, CSF, miniball, straighten, mongoexpression, and DisjointSet
 implementations once their filters routed through Rust, plus the genuinely-dead
 non-exported `io/PcdHeader.cpp`, `io/FbiHeader.cpp` dumper, and the non-exported
-BPF header (de)serialization helpers; rerun the audit after each change.
+BPF header (de)serialization helpers. A later sweep removed the private C++
+hexer grid/density OGR subsystem after `filters.hexbin` standard and streaming
+paths both routed through the Rust hexbin stage and `kernels.tindex` preserved
+the historic exact-boundary numeric behavior. Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so
@@ -847,6 +850,11 @@ algorithm decision.
 - Now Rust C ABI-backed: `CS`; the C++ wrapper keeps return filtering,
   ignore-range segmentation, debug-directory validation, and class assignment
   plumbing around the Rust cloth classifier.
+- Now Rust C ABI-backed: `HexBin`, including the standard `run` path,
+  streaming execution (accumulated into a compatibility view before the Rust
+  stage runs), density/boundary side-file output, and the exact-boundary path
+  used by `kernels.tindex`. The private C++ `hexer` grid and old density OGR
+  helper have been removed; the exported `HexBin` shell remains.
 - `SMR` (`filters.smrf`): the Rust filter performs the `ignore` DimRange and
   `synthetic|keypoint|withheld` `classbits` pre-segmentation itself (matching the
   C++ `ignoreDimRanges`/`ignoreClassBits`). Both the Rust pipeline registry path

@@ -44,7 +44,7 @@ typedef struct pdal_stage pdal_stage_t;
 namespace hexer
 {
 class BaseGrid;
-};
+}
 
 namespace pdal
 {
@@ -62,7 +62,7 @@ public:
     hexer::BaseGrid* grid() const;
 
 private:
-    std::unique_ptr<hexer::BaseGrid> m_grid;
+    PointViewPtr m_streamView;
     uint32_t m_precision;
     uint32_t m_sampleSize;
     double m_cullArea;
@@ -83,16 +83,16 @@ private:
     pdal_stage* m_rustStage;
     bool m_usedRust;
 
+    pdal_stage* createRustStage();
+    void addRustMetadata(PointTableRef table);
     void addArgs(ProgramArgs& args) override;
     bool useRustPath() const;
     PointViewSet run(PointViewPtr view) override;
     void initialize() override;
     void ready(PointTableRef table) override;
-    void filter(PointView& view) override;
     bool processOne(PointRef& point) override;
     void spatialReferenceChanged(const SpatialReference& srs) override;
     void done(PointTableRef table) override;
-    bool createGrid();
 };
 
 } // namespace pdal
