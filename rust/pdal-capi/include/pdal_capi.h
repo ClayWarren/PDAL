@@ -431,6 +431,15 @@ extern "C"
         double maxz;
     } pdal_bounds3d_t;
 
+    typedef struct
+    {
+        bool is_3d;
+        pdal_bounds2d_t bounds2d;
+        pdal_bounds3d_t bounds3d;
+        char* srs;
+        uint64_t pos;
+    } pdal_srs_bounds_parse_result_t;
+
     void pdal_bounds2d_clear(pdal_bounds2d_t* bounds);
     bool pdal_bounds2d_empty(const pdal_bounds2d_t* bounds);
     void pdal_bounds2d_grow_point(pdal_bounds2d_t* bounds, double x, double y);
@@ -466,6 +475,8 @@ extern "C"
     char* pdal_bounds3d_parse(const char* input, uint64_t pos,
                               pdal_bounds3d_t* out_bounds, char** out_wkt,
                               uint64_t* out_pos);
+    char* pdal_srs_bounds_parse(const char* input, uint64_t pos,
+                                pdal_srs_bounds_parse_result_t* out_result);
     bool pdal_bounds2d_equal(const pdal_bounds2d_t* left,
                              const pdal_bounds2d_t* right);
     bool pdal_bounds3d_equal(const pdal_bounds3d_t* left,

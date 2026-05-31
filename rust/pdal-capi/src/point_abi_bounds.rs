@@ -27,6 +27,16 @@ pub struct pdal_bounds3d_t {
     pub maxz: f64,
 }
 
+#[repr(C)]
+#[derive(Debug)]
+pub struct pdal_srs_bounds_parse_result_t {
+    pub is_3d: bool,
+    pub bounds2d: pdal_bounds2d_t,
+    pub bounds3d: pdal_bounds3d_t,
+    pub srs: *mut c_char,
+    pub pos: u64,
+}
+
 impl From<pdal_bounds2d_t> for Bounds2D {
     fn from(value: pdal_bounds2d_t) -> Self {
         Bounds2D {
@@ -320,6 +330,26 @@ pub unsafe extern "C" fn pdal_bounds3d_parse(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn pdal_srs_bounds_parse(
+    input: *const c_char,
+    pos: u64,
+    out_result: *mut pdal_srs_bounds_parse_result_t,
+) -> *mut c_char {
+    if input.is_null() || out_result.is_null() {
+        return string_to_c_ptr("Invalid null SRS bounds parse argument.".to_string());
+    }
+
+    let input = CStr::from_ptr(input).to_string_lossy();
+    match parse_srs_bounds(&input, pos as usize) {
+        Ok(parsed) => {
+            *out_result = parsed;
+            std::ptr::null_mut()
+        }
+        Err(error) => string_to_c_ptr(error),
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn pdal_bounds2d_equal(
     left: *const pdal_bounds2d_t,
     right: *const pdal_bounds2d_t,
@@ -330,6 +360,81 @@ pub unsafe extern "C" fn pdal_bounds2d_equal(
         }
         _ => false,
     }
+}
+
+fn parse_srs_bounds(input: &str, pos: usize) -> Result<pdal_srs_bounds_parse_result_t, String> {
+    match parse_bounds3d(input, pos) {
+        Ok(parsed) => Ok(finish_srs_bounds_parse(
+            input,
+            parsed.pos,
+            parsed.wkt,
+            true,
+            Bounds2D {
+                minx: parsed.bounds.minx,
+                maxx: parsed.bounds.maxx,
+                miny: parsed.bounds.miny,
+                maxy: parsed.bounds.maxy,
+            },
+            parsed.bounds,
+        )?),
+        Err(_) => {
+            let parsed = parse_bounds2d(input, 0)?;
+            Ok(finish_srs_bounds_parse(
+                input,
+                parsed.pos,
+                parsed.wkt,
+                false,
+                parsed.bounds,
+                Bounds3D {
+                    minx: parsed.bounds.minx,
+                    maxx: parsed.bounds.maxx,
+                    miny: parsed.bounds.miny,
+                    maxy: parsed.bounds.maxy,
+                    minz: Bounds3D::empty().minz,
+                    maxz: Bounds3D::empty().maxz,
+                },
+            )?)
+        }
+    }
+}
+
+fn finish_srs_bounds_parse(
+    input: &str,
+    mut pos: usize,
+    mut srs: String,
+    is_3d: bool,
+    bounds2d: Bounds2D,
+    bounds3d: Bounds3D,
+) -> Result<pdal_srs_bounds_parse_result_t, String> {
+    pos = skip_ascii_whitespace(input, pos);
+    if pos != input.len() {
+        if input.as_bytes().get(pos) != Some(&b'/') {
+            return Err("Invalid character following valid bounds box.".to_string());
+        }
+        pos += 1;
+        pos = skip_ascii_whitespace(input, pos);
+        srs = input[pos..].trim().to_string();
+        pos = input.len();
+    }
+
+    Ok(pdal_srs_bounds_parse_result_t {
+        is_3d,
+        bounds2d: bounds2d.into(),
+        bounds3d: bounds3d.into(),
+        srs: string_to_c_ptr(srs),
+        pos: pos as u64,
+    })
+}
+
+fn skip_ascii_whitespace(input: &str, mut pos: usize) -> usize {
+    while input
+        .as_bytes()
+        .get(pos)
+        .is_some_and(u8::is_ascii_whitespace)
+    {
+        pos += 1;
+    }
+    pos
 }
 
 #[no_mangle]

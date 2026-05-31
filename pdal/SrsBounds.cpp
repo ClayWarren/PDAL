@@ -31,17 +31,8 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <limits>
-
 #include <pdal/SrsBounds.hpp>
-
-namespace
-{
-
-const double LOWEST = (std::numeric_limits<double>::lowest)();
-const double HIGHEST = (std::numeric_limits<double>::max)();
-
-} // namespace
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -75,19 +66,31 @@ SrsBounds::SrsBounds(const BOX2D& box, const SpatialReference& srs)
 
 void SrsBounds::parse(const std::string& s, std::string::size_type& pos)
 {
-    Bounds::parse(s, pos);
-    pos += Utils::extractSpaces(s, pos);
-    m_srs.set(to2d().wkt);
-    if (pos == s.size())
-        return;
+    pdal_srs_bounds_parse_result_t result;
+    char* parseError = pdal_srs_bounds_parse(s.c_str(), pos, &result);
+    if (parseError)
+    {
+        std::string message(parseError);
+        pdal_string_free(parseError);
+        throw Bounds::error(message);
+    }
 
-    if (s[pos++] != '/')
-        throw Bounds::error("Invalid character following valid bounds box.");
-
-    pos += Utils::extractSpaces(s, pos);
-    SpatialReference srs;
-    m_srs.parse(s, pos);
-    pos += Utils::extractSpaces(s, pos);
+    if (result.is_3d)
+    {
+        BOX3D box(result.bounds3d.minx, result.bounds3d.miny,
+                  result.bounds3d.minz, result.bounds3d.maxx,
+                  result.bounds3d.maxy, result.bounds3d.maxz);
+        reset(box);
+    }
+    else
+    {
+        BOX2D box(result.bounds2d.minx, result.bounds2d.miny,
+                  result.bounds2d.maxx, result.bounds2d.maxy);
+        reset(box);
+    }
+    m_srs.set(result.srs ? result.srs : "");
+    pos = result.pos;
+    pdal_string_free(result.srs);
 }
 
 std::ostream& operator<<(std::ostream& out, const SrsBounds& srsBounds)
