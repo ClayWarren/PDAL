@@ -32,11 +32,10 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <iostream>
+#include "BpfHeader.hpp"
 
 #include <pdal/util/IStream.hpp>
-
-#include "BpfHeader.hpp"
+#include <pdal/util/Utils.hpp>
 
 namespace pdal
 {
@@ -64,10 +63,13 @@ std::ostream& operator<<(std::ostream& out, const BpfFormat& format)
     {
     case BpfFormat::PointMajor:
         out << "Point";
+        break;
     case BpfFormat::ByteMajor:
         out << "Byte";
+        break;
     case BpfFormat::DimMajor:
         out << "Dimension";
+        break;
     }
     return out;
 }
@@ -152,7 +154,6 @@ bool BpfHeader::readV1(ILeStream& stream)
     else
         return false;
 
-    // Dimensions should include X, Y, and Z
     m_numDim += 3;
 
     BpfDimension xDim;
@@ -203,8 +204,6 @@ bool BpfHeader::readDimensions(ILeStream& stream, BpfDimensionList& dims,
     if (!BpfDimension::read(stream, dims, staticCnt))
         return false;
 
-    // Verify that we have an X, Y and Z, so that we don't have to worry
-    // about it later.
     bool x = false;
     bool y = false;
     bool z = false;

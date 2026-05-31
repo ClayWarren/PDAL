@@ -34,6 +34,9 @@
 
 #pragma once
 
+#include <cstring>
+#include <iosfwd>
+#include <iostream>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -46,7 +49,6 @@ namespace pdal
 {
 
 class ILeStream;
-class OLeStream;
 
 struct BpfMuellerMatrix
 {

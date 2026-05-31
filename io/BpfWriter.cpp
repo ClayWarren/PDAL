@@ -176,8 +176,7 @@ void BpfWriter::addArgs(ProgramArgs& args)
 {
     args.add("compression", "Output compression", m_compression);
     args.add("header_data", "Base64-encoded header data", m_extraDataSpec);
-    args.add("format", "Output format", m_header.m_pointFormat,
-             BpfFormat::DimMajor);
+    args.add("format", "Output format", m_format, BpfFormat::DimMajor);
     args.add("coord_id", "UTM coordinate ID", m_coordId, {true, 0});
     args.add("bundledfile", "List of files to bundle in output",
              m_bundledFilesSpec);
@@ -196,16 +195,11 @@ void BpfWriter::initialize()
         setFilename(tmpname);
     }
 
-    m_header.m_coordId = m_coordId.m_val;
-    m_header.m_coordType = Utils::toNative(
-        m_header.m_coordId ? BpfCoordType::UTM : BpfCoordType::Cartesian);
 #ifndef PDAL_HAVE_ZLIB
     if (m_compression)
         throwError("Can't write compressed BPF. PDAL wasn't built with "
                    "Zlib support.");
 #endif
-    m_header.m_compression = Utils::toNative(
-        m_compression ? BpfCompression::Zlib : BpfCompression::None);
 
     for (const auto& file : m_bundledFilesSpec)
     {
@@ -330,7 +324,7 @@ void BpfWriter::writeRustView()
     pdal_options_t* options = pdal_options_create();
     addOption(options, "filename", m_curFilename);
     addOption(options, "compression", m_compression);
-    addOption(options, "format", formatName(m_header.m_pointFormat));
+    addOption(options, "format", formatName(m_format));
     addOption(options, "header_data", m_extraDataSpec);
     addOption(options, "output_dims", joinStrings(m_outputDims));
     addOption(options, "scale_x", m_scaling.m_xXform.m_scale.m_val);

@@ -67,7 +67,7 @@ public:
 
 private:
     StringList m_outputDims; ///< List of dimensions to write
-    BpfHeader m_header;
+    BpfFormat m_format;
     BpfDimensionList m_dims;
     std::vector<Dimension::Type> m_dimTypes;
     bool m_compression;
