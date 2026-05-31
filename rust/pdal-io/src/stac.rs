@@ -312,7 +312,7 @@ fn collect_linked_items(
     };
     for link in links {
         let rel = link["rel"].as_str().unwrap_or("");
-        if !matches!(rel, "item" | "child" | "collection" | "next") {
+        if !matches!(rel, "item" | "child" | "catalog" | "collection" | "next") {
             continue;
         }
         let Some(href) = link["href"].as_str() else {
@@ -1342,6 +1342,61 @@ mod tests {
         };
         collect_assets(&temp.path().to_string_lossy(), &mut context).unwrap();
         assert!(assets.is_empty());
+    }
+
+    #[test]
+    fn collect_assets_follows_catalog_links() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            temp.path().join("catalog.json"),
+            br#"{
+  "type": "Catalog",
+  "id": "root",
+  "links": [{"rel": "catalog", "href": "child.json"}]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("child.json"),
+            br#"{
+  "type": "Catalog",
+  "id": "child",
+  "links": [{"rel": "item", "href": "item.json"}]
+}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("item.json"),
+            br#"{
+  "type": "Feature",
+  "assets": {"data": {"href": "x.laz", "type": "application/vnd.laszip"}}
+}"#,
+        )
+        .unwrap();
+
+        let mut visited = BTreeSet::new();
+        let mut assets = Vec::new();
+        let asset_names = [String::from("data")];
+        let mut context = StacAssetContext {
+            asset_names: &asset_names,
+            item_filters: &[],
+            date_ranges: &[],
+            bounds: None,
+            collections: &[],
+            property_filters: &[],
+            validate_schema: false,
+            visited: &mut visited,
+            assets: &mut assets,
+        };
+        collect_assets(
+            &temp.path().join("catalog.json").to_string_lossy(),
+            &mut context,
+        )
+        .unwrap();
+
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0].driver, "readers.las");
+        assert!(assets[0].location.ends_with("x.laz"));
     }
 
     #[test]
