@@ -98,6 +98,93 @@ pub unsafe extern "C" fn pdal_las_summary_bounds(
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct pdal_copc_info_t {
+    pub center_x: f64,
+    pub center_y: f64,
+    pub center_z: f64,
+    pub halfsize: f64,
+    pub spacing: f64,
+    pub root_hier_offset: u64,
+    pub root_hier_size: u64,
+    pub gpstime_minimum: f64,
+    pub gpstime_maximum: f64,
+    pub reserved: [f64; 11],
+}
+
+/// # Safety
+/// `data` must point to `data_len` readable bytes and `out_info` must point to
+/// writable memory.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_copc_info_parse(
+    data: *const u8,
+    data_len: u64,
+    out_info: *mut pdal_copc_info_t,
+) -> bool {
+    let Some(out_info) = out_info.as_mut() else {
+        return false;
+    };
+    if data.is_null() {
+        return false;
+    }
+    let data = std::slice::from_raw_parts(data, data_len as usize);
+    match parse_copc_info(data) {
+        Some(info) => {
+            *out_info = info;
+            true
+        }
+        None => false,
+    }
+}
+
+fn parse_copc_info(data: &[u8]) -> Option<pdal_copc_info_t> {
+    const COPC_INFO_BYTES: usize = 160;
+    if data.len() < COPC_INFO_BYTES {
+        return None;
+    }
+
+    let mut offset = 0;
+    let center_x = read_f64_le(data, &mut offset)?;
+    let center_y = read_f64_le(data, &mut offset)?;
+    let center_z = read_f64_le(data, &mut offset)?;
+    let halfsize = read_f64_le(data, &mut offset)?;
+    let spacing = read_f64_le(data, &mut offset)?;
+    let root_hier_offset = read_u64_le(data, &mut offset)?;
+    let root_hier_size = read_u64_le(data, &mut offset)?;
+    let gpstime_minimum = read_f64_le(data, &mut offset)?;
+    let gpstime_maximum = read_f64_le(data, &mut offset)?;
+    let mut reserved = [0.0; 11];
+    for value in &mut reserved {
+        *value = read_f64_le(data, &mut offset)?;
+    }
+
+    Some(pdal_copc_info_t {
+        center_x,
+        center_y,
+        center_z,
+        halfsize,
+        spacing,
+        root_hier_offset,
+        root_hier_size,
+        gpstime_minimum,
+        gpstime_maximum,
+        reserved,
+    })
+}
+
+fn read_f64_le(data: &[u8], offset: &mut usize) -> Option<f64> {
+    let bytes: [u8; 8] = data.get(*offset..*offset + 8)?.try_into().ok()?;
+    *offset += 8;
+    Some(f64::from_le_bytes(bytes))
+}
+
+fn read_u64_le(data: &[u8], offset: &mut usize) -> Option<u64> {
+    let bytes: [u8; 8] = data.get(*offset..*offset + 8)?.try_into().ok()?;
+    *offset += 8;
+    Some(u64::from_le_bytes(bytes))
+}
+
+#[repr(C)]
 pub struct PointlessLasResult {
     pub point_count: u64,
     pub filename: *mut c_char,

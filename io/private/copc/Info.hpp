@@ -34,7 +34,8 @@
 
 #pragma once
 
-#include <pdal/util/Extractor.hpp>
+#include <pdal/pdal_types.hpp>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -57,13 +58,22 @@ public:
 
     void fill(const char* buf, size_t bufsize)
     {
-        LeExtractor s(buf, bufsize);
+        pdal_copc_info_t info;
+        if (!pdal_copc_info_parse(reinterpret_cast<const uint8_t*>(buf),
+                                  bufsize, &info))
+            throw pdal_error("Invalid COPC info payload.");
 
-        s >> center_x >> center_y >> center_z >> halfsize >> spacing;
-        s >> root_hier_offset >> root_hier_size;
-        s >> gpstime_minimum >> gpstime_maximum;
+        center_x = info.center_x;
+        center_y = info.center_y;
+        center_z = info.center_z;
+        halfsize = info.halfsize;
+        spacing = info.spacing;
+        root_hier_offset = info.root_hier_offset;
+        root_hier_size = info.root_hier_size;
+        gpstime_minimum = info.gpstime_minimum;
+        gpstime_maximum = info.gpstime_maximum;
         for (int i = 0; i < 11; ++i)
-            s >> reserved[i];
+            reserved[i] = info.reserved[i];
     }
 };
 

@@ -482,6 +482,23 @@ extern "C"
                                            uint64_t return_number);
     void pdal_las_summary_bounds(const pdal_las_summary_t* summary,
                                  pdal_bounds3d_t* out_bounds);
+
+    typedef struct
+    {
+        double center_x;
+        double center_y;
+        double center_z;
+        double halfsize;
+        double spacing;
+        uint64_t root_hier_offset;
+        uint64_t root_hier_size;
+        double gpstime_minimum;
+        double gpstime_maximum;
+        double reserved[11];
+    } pdal_copc_info_t;
+
+    bool pdal_copc_info_parse(const uint8_t* data, uint64_t data_len,
+                              pdal_copc_info_t* out_info);
     void pdal_bounds3d_grow_bounds(pdal_bounds3d_t* bounds,
                                    const pdal_bounds3d_t* other);
     void pdal_bounds3d_grow_distance(pdal_bounds3d_t* bounds, double distance);

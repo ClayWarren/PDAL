@@ -46,6 +46,65 @@ fn las_summary_abi_tracks_bounds_total_and_return_counts() {
 }
 
 #[test]
+fn copc_info_abi_decodes_little_endian_payload() {
+    let mut data = Vec::new();
+    for value in [1.0, 2.0, 3.0, 4.0, 5.0] {
+        data.extend_from_slice(&f64::to_le_bytes(value));
+    }
+    data.extend_from_slice(&1234_u64.to_le_bytes());
+    data.extend_from_slice(&5678_u64.to_le_bytes());
+    data.extend_from_slice(&10.0_f64.to_le_bytes());
+    data.extend_from_slice(&20.0_f64.to_le_bytes());
+    for value in 0..11 {
+        data.extend_from_slice(&f64::to_le_bytes(value as f64 + 100.0));
+    }
+
+    unsafe {
+        let mut info = pdal_copc_info_t {
+            center_x: 0.0,
+            center_y: 0.0,
+            center_z: 0.0,
+            halfsize: 0.0,
+            spacing: 0.0,
+            root_hier_offset: 0,
+            root_hier_size: 0,
+            gpstime_minimum: 0.0,
+            gpstime_maximum: 0.0,
+            reserved: [0.0; 11],
+        };
+
+        assert!(pdal_copc_info_parse(
+            data.as_ptr(),
+            data.len() as u64,
+            &mut info
+        ));
+        assert_eq!(info.center_x, 1.0);
+        assert_eq!(info.center_y, 2.0);
+        assert_eq!(info.center_z, 3.0);
+        assert_eq!(info.halfsize, 4.0);
+        assert_eq!(info.spacing, 5.0);
+        assert_eq!(info.root_hier_offset, 1234);
+        assert_eq!(info.root_hier_size, 5678);
+        assert_eq!(info.gpstime_minimum, 10.0);
+        assert_eq!(info.gpstime_maximum, 20.0);
+        assert_eq!(info.reserved[0], 100.0);
+        assert_eq!(info.reserved[10], 110.0);
+
+        assert!(!pdal_copc_info_parse(data.as_ptr(), 8, &mut info));
+        assert!(!pdal_copc_info_parse(
+            std::ptr::null(),
+            data.len() as u64,
+            &mut info
+        ));
+        assert!(!pdal_copc_info_parse(
+            data.as_ptr(),
+            data.len() as u64,
+            std::ptr::null_mut()
+        ));
+    }
+}
+
+#[test]
 fn reader_and_writer_constructors_cover_supported_driver_handles() {
     unsafe {
         let options = pdal_options_create();
