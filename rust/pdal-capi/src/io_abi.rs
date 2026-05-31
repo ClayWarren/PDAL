@@ -185,6 +185,125 @@ fn read_u64_le(data: &[u8], offset: &mut usize) -> Option<u64> {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct pdal_ept_key_t {
+    pub d: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+    pub bounds: pdal_bounds3d_t,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_key_parse(
+    value: *const c_char,
+    out_key: *mut pdal_ept_key_t,
+) -> bool {
+    let (Some(value), Some(out_key)) = (cstr_to_str(value), out_key.as_mut()) else {
+        return false;
+    };
+    let Some(key) = parse_ept_key(value) else {
+        return false;
+    };
+    *out_key = key;
+    true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_key_to_string(key: *const pdal_ept_key_t) -> *mut c_char {
+    let Some(key) = key.as_ref() else {
+        return string_to_c_ptr(String::new());
+    };
+    string_to_c_ptr(format!("{}-{}-{}-{}", key.d, key.x, key.y, key.z))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_key_bisect(
+    key: *const pdal_ept_key_t,
+    direction: u64,
+    out_key: *mut pdal_ept_key_t,
+) -> bool {
+    let (Some(key), Some(out_key)) = (key.as_ref(), out_key.as_mut()) else {
+        return false;
+    };
+    *out_key = bisect_ept_key(*key, direction);
+    true
+}
+
+fn parse_ept_key(value: &str) -> Option<pdal_ept_key_t> {
+    let mut parts = value.split('-');
+    let d = parts.next()?.parse().ok()?;
+    let x = parts.next()?.parse().ok()?;
+    let y = parts.next()?.parse().ok()?;
+    let z = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(pdal_ept_key_t {
+        d,
+        x,
+        y,
+        z,
+        bounds: empty_abi_bounds3d(),
+    })
+}
+
+fn bisect_ept_key(mut key: pdal_ept_key_t, direction: u64) -> pdal_ept_key_t {
+    key.d += 1;
+    step_ept_key_axis(
+        &mut key.x,
+        &mut key.bounds.minx,
+        &mut key.bounds.maxx,
+        direction,
+        0,
+    );
+    step_ept_key_axis(
+        &mut key.y,
+        &mut key.bounds.miny,
+        &mut key.bounds.maxy,
+        direction,
+        1,
+    );
+    step_ept_key_axis(
+        &mut key.z,
+        &mut key.bounds.minz,
+        &mut key.bounds.maxz,
+        direction,
+        2,
+    );
+    key
+}
+
+fn step_ept_key_axis(id: &mut u32, min: &mut f64, max: &mut f64, direction: u64, axis: u8) {
+    *id *= 2;
+    let mid = *min + ((*max - *min) / 2.0);
+    if (direction & (1_u64 << axis)) != 0 {
+        *min = mid;
+        *id += 1;
+    } else {
+        *max = mid;
+    }
+}
+
+fn empty_abi_bounds3d() -> pdal_bounds3d_t {
+    pdal_bounds3d_t {
+        minx: f64::MAX,
+        maxx: f64::MIN,
+        miny: f64::MAX,
+        maxy: f64::MIN,
+        minz: f64::MAX,
+        maxz: f64::MIN,
+    }
+}
+
+unsafe fn cstr_to_str<'a>(value: *const c_char) -> Option<&'a str> {
+    if value.is_null() {
+        return None;
+    }
+    CStr::from_ptr(value).to_str().ok()
+}
+
+#[repr(C)]
 pub struct PointlessLasResult {
     pub point_count: u64,
     pub filename: *mut c_char,

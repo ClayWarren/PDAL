@@ -36,6 +36,8 @@
 
 #include <functional> // for hash
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
 namespace ept
@@ -50,13 +52,10 @@ public:
 
     Key(const std::string& s)
     {
-        const StringList tokens(Utils::split(s, '-'));
-        if (tokens.size() != 4)
+        pdal_ept_key_t key;
+        if (!pdal_ept_key_parse(s.c_str(), &key))
             throw pdal_error("Invalid EPT KEY: " + s);
-        d = std::stoi(tokens[0]);
-        x = std::stoi(tokens[1]);
-        y = std::stoi(tokens[2]);
-        z = std::stoi(tokens[3]);
+        fromAbi(key);
     }
 
     BOX3D b;
@@ -68,8 +67,11 @@ public:
 
     std::string toString() const
     {
-        return std::to_string(d) + '-' + std::to_string(x) + '-' +
-               std::to_string(y) + '-' + std::to_string(z);
+        pdal_ept_key_t key = toAbi();
+        char* raw = pdal_ept_key_to_string(&key);
+        std::string out(raw ? raw : "");
+        pdal_string_free(raw);
+        return out;
     }
 
     double& operator[](uint64_t i)
@@ -110,31 +112,33 @@ public:
 
     Key bisect(uint64_t direction) const
     {
-        Key key(*this);
-        ++key.d;
-
-        auto step(
-            [&key, direction](uint8_t i)
-            {
-                key.idAt(i) *= 2;
-
-                const double mid(key[i] + (key[i + 3] - key[i]) / 2.0);
-                const bool positive(direction & (((uint64_t)1) << i));
-                if (positive)
-                {
-                    key[i] = mid;
-                    ++key.idAt(i);
-                }
-                else
-                {
-                    key[i + 3] = mid;
-                }
-            });
-
-        for (uint8_t i(0); i < 3; ++i)
-            step(i);
-
+        pdal_ept_key_t out;
+        pdal_ept_key_t in = toAbi();
+        if (!pdal_ept_key_bisect(&in, direction, &out))
+            throw pdal_error("Unable to bisect EPT key.");
+        Key key;
+        key.fromAbi(out);
         return key;
+    }
+
+private:
+    pdal_ept_key_t toAbi() const
+    {
+        return {d, x, y, z, {b.minx, b.maxx, b.miny, b.maxy, b.minz, b.maxz}};
+    }
+
+    void fromAbi(const pdal_ept_key_t& key)
+    {
+        d = key.d;
+        x = key.x;
+        y = key.y;
+        z = key.z;
+        b.minx = key.bounds.minx;
+        b.maxx = key.bounds.maxx;
+        b.miny = key.bounds.miny;
+        b.maxy = key.bounds.maxy;
+        b.minz = key.bounds.minz;
+        b.maxz = key.bounds.maxz;
     }
 };
 

@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 4,946 | 39 |
-| c-abi-backed | 42,064 | 377 |
+| port-candidate | 4,820 | 38 |
+| c-abi-backed | 42,195 | 378 |
 | native-adapter | 5,529 | 52 |
 | holdout | 5,799 | 53 |
-| total | 58,338 | 521 |
+| total | 58,343 | 521 |
 
-Port-candidate backlog by area: `io` 3,496 · `pdal` 1,450. `filters`,
+Port-candidate backlog by area: `io` 3,370 · `pdal` 1,450. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -251,7 +251,9 @@ classes are compatibility holdouts; their private parser/data helpers remain
 backlog unless they route through Rust or are proved dead. The private LAS
 summary counter/bounds helper now routes through Rust behind its C++ compatibility
 class. The private COPC info payload decoder also routes through Rust while
-preserving the C++ `copc::Info` struct for callers. Obvious exported C++
+preserving the C++ `copc::Info` struct for callers. EPT key parsing,
+stringification, and bisection math now route through Rust while preserving the
+exported C++ value type fields and operators. Obvious exported C++
 SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
 dimension/mesh/quick-info/artifact helpers, subcommand shells, and
 `Utils::Random` with its `std::mt19937&` API) are likewise compatibility

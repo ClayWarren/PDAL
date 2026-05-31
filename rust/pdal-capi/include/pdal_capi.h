@@ -499,6 +499,20 @@ extern "C"
 
     bool pdal_copc_info_parse(const uint8_t* data, uint64_t data_len,
                               pdal_copc_info_t* out_info);
+
+    typedef struct
+    {
+        uint32_t d;
+        uint32_t x;
+        uint32_t y;
+        uint32_t z;
+        pdal_bounds3d_t bounds;
+    } pdal_ept_key_t;
+
+    bool pdal_ept_key_parse(const char* value, pdal_ept_key_t* out_key);
+    char* pdal_ept_key_to_string(const pdal_ept_key_t* key);
+    bool pdal_ept_key_bisect(const pdal_ept_key_t* key, uint64_t direction,
+                             pdal_ept_key_t* out_key);
     void pdal_bounds3d_grow_bounds(pdal_bounds3d_t* bounds,
                                    const pdal_bounds3d_t* other);
     void pdal_bounds3d_grow_distance(pdal_bounds3d_t* bounds, double distance);

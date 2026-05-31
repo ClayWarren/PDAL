@@ -105,6 +105,57 @@ fn copc_info_abi_decodes_little_endian_payload() {
 }
 
 #[test]
+fn ept_key_abi_parses_strings_and_bisects_bounds() {
+    unsafe {
+        let value = CString::new("2-3-4-5").unwrap();
+        let mut key = pdal_ept_key_t {
+            d: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            bounds: pdal_bounds3d_t {
+                minx: 0.0,
+                maxx: 8.0,
+                miny: 0.0,
+                maxy: 8.0,
+                minz: 0.0,
+                maxz: 8.0,
+            },
+        };
+
+        assert!(pdal_ept_key_parse(value.as_ptr(), &mut key));
+        assert_eq!((key.d, key.x, key.y, key.z), (2, 3, 4, 5));
+
+        let s = pdal_ept_key_to_string(&key);
+        assert_eq!(CStr::from_ptr(s).to_str().unwrap(), "2-3-4-5");
+        pdal_string_free(s);
+
+        key.bounds = pdal_bounds3d_t {
+            minx: 0.0,
+            maxx: 8.0,
+            miny: 0.0,
+            maxy: 8.0,
+            minz: 0.0,
+            maxz: 8.0,
+        };
+        let mut child = key;
+        assert!(pdal_ept_key_bisect(&key, 5, &mut child));
+        assert_eq!((child.d, child.x, child.y, child.z), (3, 7, 8, 11));
+        assert_eq!(child.bounds.minx, 4.0);
+        assert_eq!(child.bounds.maxx, 8.0);
+        assert_eq!(child.bounds.miny, 0.0);
+        assert_eq!(child.bounds.maxy, 4.0);
+        assert_eq!(child.bounds.minz, 4.0);
+        assert_eq!(child.bounds.maxz, 8.0);
+
+        let bad = CString::new("1-2-3").unwrap();
+        assert!(!pdal_ept_key_parse(bad.as_ptr(), &mut key));
+        assert!(!pdal_ept_key_parse(std::ptr::null(), &mut key));
+        assert!(!pdal_ept_key_bisect(&key, 0, std::ptr::null_mut()));
+    }
+}
+
+#[test]
 fn reader_and_writer_constructors_cover_supported_driver_handles() {
     unsafe {
         let options = pdal_options_create();
