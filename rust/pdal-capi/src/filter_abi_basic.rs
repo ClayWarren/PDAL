@@ -137,6 +137,42 @@ pub unsafe extern "C" fn pdal_stage_validate_assign_statement(
     }
 }
 
+/// Validate an assign filter value expression against a point layout.
+///
+/// # Safety
+///
+/// `statement` must be null or a valid NUL-terminated C string. `layout` must
+/// be a valid point layout pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_validate_assign_statement_with_layout(
+    statement: *const std::os::raw::c_char,
+    layout: *const PointLayout,
+) -> bool {
+    if statement.is_null() {
+        set_last_error("null assign statement");
+        return false;
+    }
+    let Some(layout) = layout.as_ref() else {
+        set_last_error("null point layout");
+        return false;
+    };
+    let statement = CStr::from_ptr(statement).to_string_lossy();
+    let mut statement = match pdal_core::expr::AssignStatement::parse(&statement) {
+        Ok(statement) => statement,
+        Err(err) => {
+            set_last_error(&err);
+            return false;
+        }
+    };
+    match statement.prepare(layout) {
+        Ok(()) => true,
+        Err(err) => {
+            set_last_error(&err);
+            false
+        }
+    }
+}
+
 /// Copy values between dimensions on a specific point in a PointView.
 ///
 /// # Safety

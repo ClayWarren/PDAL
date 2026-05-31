@@ -751,6 +751,25 @@ fn test_filter_abi_nulls_and_errors() {
         assert!(pdal_stage_create_ferry(std::ptr::null(), std::ptr::null(), 0).is_null());
         assert!(pdal_stage_create_ferry_specs(std::ptr::null(), 0).is_null());
         assert!(!pdal_stage_validate_assign_statement(std::ptr::null()));
+        assert!(!pdal_stage_validate_assign_statement_with_layout(
+            std::ptr::null(),
+            std::ptr::null()
+        ));
+        let statement = cstring("Classification = Z + 10 WHERE Z == 5");
+        assert!(!pdal_stage_validate_assign_statement_with_layout(
+            statement.as_ptr(),
+            std::ptr::null()
+        ));
+        let layout = pdal_point_layout_create();
+        for dim in ["Classification", "Z"] {
+            let name = cstring(dim);
+            pdal_point_layout_register_dim(layout, name.as_ptr(), 9);
+        }
+        assert!(pdal_stage_validate_assign_statement_with_layout(
+            statement.as_ptr(),
+            layout
+        ));
+        pdal_point_layout_destroy(layout);
         pdal_stage_ferry_point(std::ptr::null_mut(), std::ptr::null_mut(), 0);
         assert!(pdal_stage_create_randomize(std::ptr::null()).is_null());
 

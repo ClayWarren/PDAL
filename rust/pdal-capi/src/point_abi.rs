@@ -922,6 +922,80 @@ pub unsafe extern "C" fn pdal_point_view_split_where(
     true
 }
 
+/// Validate a conditional expression against a point layout.
+///
+/// # Safety
+///
+/// `expression` must be a valid, NUL-terminated C string. `layout` must be a
+/// valid point layout pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_expression_validate_with_layout(
+    expression: *const c_char,
+    layout: *const PointLayout,
+) -> bool {
+    if expression.is_null() {
+        set_last_error("null expression");
+        return false;
+    }
+    let Some(layout) = layout.as_ref() else {
+        set_last_error("null point layout");
+        return false;
+    };
+    let expression = CStr::from_ptr(expression).to_string_lossy();
+    let mut expr = match ConditionalExpression::parse(&expression) {
+        Ok(expr) => expr,
+        Err(err) => {
+            set_last_error(format!("Invalid expression: {err}"));
+            return false;
+        }
+    };
+    if let Err(err) = expr.prepare(layout) {
+        set_last_error(format!("Invalid expression: {err}"));
+        return false;
+    }
+    true
+}
+
+/// Evaluate a conditional expression for every point in a view.
+///
+/// # Safety
+///
+/// `view` must be valid, `expression` must be a valid NUL-terminated C string,
+/// and `out_len` must be a valid output pointer. The returned pointer must be
+/// freed with `pdal_u8_array_free`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_expression_mask(
+    view: *const PointView,
+    expression: *const c_char,
+    out_len: *mut u64,
+) -> *mut u8 {
+    if view.is_null() || expression.is_null() || out_len.is_null() {
+        set_last_error("null argument to pdal_point_view_expression_mask");
+        return std::ptr::null_mut();
+    }
+    let input = &*view;
+    let expression = CStr::from_ptr(expression).to_string_lossy();
+    let mut expr = match ConditionalExpression::parse(&expression) {
+        Ok(expr) => expr,
+        Err(err) => {
+            set_last_error(format!("Invalid expression: {err}"));
+            return std::ptr::null_mut();
+        }
+    };
+    if let Err(err) = expr.prepare(input.layout().as_ref()) {
+        set_last_error(format!("Invalid expression: {err}"));
+        return std::ptr::null_mut();
+    }
+
+    let mut mask: Vec<u8> = (0..input.len())
+        .map(|idx| u8::from(expr.eval(input, idx)))
+        .collect();
+    *out_len = mask.len() as u64;
+    let ptr = mask.as_mut_ptr();
+    std::mem::forget(mask);
+    ptr
+}
+
 unsafe fn nullable_cstr(value: *const c_char) -> String {
     if value.is_null() {
         String::new()

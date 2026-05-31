@@ -686,6 +686,11 @@ fn point_view_split_where_partitions_points_through_c_abi() {
         let layout = pdal_point_layout_create();
         let x = CString::new("X").unwrap();
         pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        let expression = CString::new("X < 3").unwrap();
+        assert!(pdal_expression_validate_with_layout(
+            expression.as_ptr(),
+            layout
+        ));
         let view = pdal_point_view_create(layout);
 
         for value in [0.0, 1.0, 2.0, 3.0, 4.0] {
@@ -693,7 +698,6 @@ fn point_view_split_where_partitions_points_through_c_abi() {
             pdal_point_view_set_f64(view, point, x.as_ptr(), value);
         }
 
-        let expression = CString::new("X < 3").unwrap();
         let mut keep = std::ptr::null_mut();
         let mut skip = std::ptr::null_mut();
         assert!(pdal_point_view_split_where(
@@ -711,6 +715,16 @@ fn point_view_split_where_partitions_points_through_c_abi() {
         assert_eq!(pdal_point_view_get_f64(skip, 1, x.as_ptr()), 4.0);
         assert_eq!(pdal_point_view_source_index(keep, 2), 2);
         assert_eq!(pdal_point_view_source_index(skip, 0), 3);
+
+        let mut mask_len = 0;
+        let mask = pdal_point_view_expression_mask(view, expression.as_ptr(), &mut mask_len);
+        assert!(!mask.is_null());
+        assert_eq!(mask_len, 5);
+        assert_eq!(
+            std::slice::from_raw_parts(mask, mask_len as usize),
+            &[1, 1, 1, 0, 0]
+        );
+        pdal_u8_array_free(mask, mask_len);
 
         pdal_point_view_destroy(keep);
         pdal_point_view_destroy(skip);

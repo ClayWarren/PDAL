@@ -122,15 +122,20 @@ inline void verifyRustDims(pdal_point_view_t* rustView, PointLayoutPtr layout)
     }
 }
 
+inline pdal_point_layout_t* toRustLayout(PointLayoutPtr layout)
+{
+    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
+    for (auto dim : layout->dims())
+    {
+        pdal_point_layout_register_dim(rustLayout, layout->dimName(dim).c_str(),
+                                       typeId(layout->dimType(dim)));
+    }
+    return rustLayout;
+}
+
 inline pdal_point_view_t* toRust(PointView& inView)
 {
-    pdal_point_layout_t* layout = pdal_point_layout_create();
-    for (auto dim : inView.layout()->dims())
-    {
-        pdal_point_layout_register_dim(layout,
-                                       inView.layout()->dimName(dim).c_str(),
-                                       typeId(inView.layout()->dimType(dim)));
-    }
+    pdal_point_layout_t* layout = toRustLayout(inView.layout());
     pdal_point_view_t* rust_in_view = pdal_point_view_create(layout);
     setSpatialReference(rust_in_view, inView.spatialReference());
     for (PointId idx = 0; idx < inView.size(); ++idx)
@@ -182,12 +187,7 @@ inline pdal_point_view_t* toRust(PointViewPtr inView)
 // data-dependent filter can be streamed through pdal_stage_process_one_at.
 inline pdal_point_view_t* toRustPoint(PointRef& point, PointLayoutPtr layout)
 {
-    pdal_point_layout_t* rustLayout = pdal_point_layout_create();
-    for (auto dim : layout->dims())
-    {
-        pdal_point_layout_register_dim(rustLayout, layout->dimName(dim).c_str(),
-                                       typeId(layout->dimType(dim)));
-    }
+    pdal_point_layout_t* rustLayout = toRustLayout(layout);
     pdal_point_view_t* rustView = pdal_point_view_create(rustLayout);
     pdal_point_view_add_point(rustView);
     for (auto dim : layout->dims())

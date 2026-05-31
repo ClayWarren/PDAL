@@ -29,16 +29,6 @@ pdal_range_limit_t toRustLimit(const DimRange& r)
     return limit;
 }
 
-std::string toAssignmentExpression(expr::AssignStatement& expr)
-{
-    std::string out =
-        expr.identExpr().name() + " = " + expr.valueExpr().print();
-    std::string condition = expr.conditionalExpr().print();
-    if (!condition.empty())
-        out += " WHERE " + condition;
-    return out;
-}
-
 } // unnamed namespace
 
 static PluginInfo const s_info = PluginInfo(
@@ -135,14 +125,19 @@ void RadiusAssignFilter::prepared(PointTableRef table)
     this->preparedDomain(m_srcDomain, layout);
     this->preparedDomain(m_referenceDomain, layout);
 
-    for (expr::AssignStatement& expr : m_updateExpr)
+    pdal_point_layout_t* rustLayout = rust_view_converter::toRustLayout(layout);
+    for (const std::string& expr : m_updateExpr)
     {
-        auto status = expr.prepare(layout);
-        if (!status)
-            throwError("Invalid assignment expression in 'update_expression' "
-                       "option: " +
-                       status.what());
+        if (!pdal_stage_validate_assign_statement_with_layout(expr.c_str(),
+                                                              rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError(
+                "Invalid assignment expression in 'update_expression' "
+                "option.");
+        }
     }
+    pdal_point_layout_destroy(rustLayout);
 }
 
 void RadiusAssignFilter::filter(PointView& view)
@@ -155,13 +150,9 @@ void RadiusAssignFilter::filter(PointView& view)
     for (const DimRange& r : m_referenceDomain)
         referenceLimits.push_back(toRustLimit(r));
 
-    std::vector<std::string> assignmentExpressions;
-    for (expr::AssignStatement& expr : m_updateExpr)
-        assignmentExpressions.push_back(toAssignmentExpression(expr));
-
     std::vector<const char*> assignmentPtrs;
-    assignmentPtrs.reserve(assignmentExpressions.size());
-    for (const std::string& expression : assignmentExpressions)
+    assignmentPtrs.reserve(m_updateExpr.size());
+    for (const std::string& expression : m_updateExpr)
         assignmentPtrs.push_back(expression.c_str());
 
     pdal_point_view_t* rustView = rust_view_converter::toRust(view);

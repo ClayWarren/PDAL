@@ -33,7 +33,6 @@
  ****************************************************************************/
 
 #include "DividerFilter.hpp"
-#include "./private/expr/ConditionalExpression.hpp"
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal_capi.h>
 
@@ -49,7 +48,7 @@ namespace pdal
 
 struct DividerFilter::Args
 {
-    expr::ConditionalExpression m_splitExpression;
+    std::string m_splitExpression;
     Mode m_mode = DividerFilter::Mode::Partition;
     SizeMode m_sizeMode = SizeMode::Count;
     point_count_t m_size = 1;
@@ -137,7 +136,7 @@ void DividerFilter::prepared(PointTableRef table)
 {
     if (m_args->m_mode == Mode::Expression)
     {
-        if (!m_args->m_splitExpression.valid())
+        if (m_args->m_splitExpression.empty())
         {
             std::stringstream oss;
             oss << "The expression '" << m_args->m_splitExpression
@@ -145,9 +144,15 @@ void DividerFilter::prepared(PointTableRef table)
             throwError(oss.str());
         }
 
-        auto status = m_args->m_splitExpression.prepare(table.layout());
-        if (!status)
-            throwError(status.what());
+        pdal_point_layout_t* rustLayout =
+            rust_view_converter::toRustLayout(table.layout());
+        if (!pdal_expression_validate_with_layout(
+                m_args->m_splitExpression.c_str(), rustLayout))
+        {
+            pdal_point_layout_destroy(rustLayout);
+            rust_view_converter::throwLastError("Invalid divider expression.");
+        }
+        pdal_point_layout_destroy(rustLayout);
     }
 
     int32_t mode_val = 0;
@@ -220,11 +225,22 @@ PointViewSet DividerFilter::run(PointViewPtr inView)
     std::vector<uint8_t> evals;
     if (m_args->m_mode == Mode::Expression)
     {
-        evals.reserve(inView->size());
-        for (PointRef point : *inView)
+        pdal_point_view_t* rustView = rust_view_converter::toRust(inView);
+        uint64_t evalsCount = 0;
+        uint8_t* rustEvals = pdal_point_view_expression_mask(
+            rustView, m_args->m_splitExpression.c_str(), &evalsCount);
+        pdal_point_view_destroy(rustView);
+        if (!rustEvals)
+            rust_view_converter::throwLastError(
+                "Rust divider expression evaluation failed.");
+        if (evalsCount != inView->size())
         {
-            evals.push_back(m_args->m_splitExpression.eval(point) ? 1 : 0);
+            pdal_u8_array_free(rustEvals, evalsCount);
+            throwError("Rust divider expression evaluation returned the wrong "
+                       "number of results.");
         }
+        evals.assign(rustEvals, rustEvals + evalsCount);
+        pdal_u8_array_free(rustEvals, evalsCount);
     }
 
     pdal_stage_t* stage = pdal_stage_create_divider(

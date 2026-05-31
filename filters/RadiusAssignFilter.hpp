@@ -1,6 +1,5 @@
 #pragma once
 
-#include "private/expr/AssignStatement.hpp"
 #include <pdal/Filter.hpp>
 
 extern "C" int32_t RadiusAssignFilter_ExitFunc();
@@ -40,7 +39,7 @@ private:
     StringList m_srcDomainSpec;
     std::vector<DimRange> m_srcDomain;
     double m_radius;
-    std::vector<expr::AssignStatement> m_updateExpr;
+    StringList m_updateExpr;
     bool m_search3d;
     double m_max2dAbove;
     double m_max2dBelow;

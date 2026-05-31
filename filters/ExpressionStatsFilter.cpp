@@ -34,7 +34,6 @@
 
 #include "ExpressionStatsFilter.hpp"
 
-#include "./private/expr/ConditionalExpression.hpp"
 #include "private/RustMetadata.hpp"
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/ProgramArgs.hpp>
@@ -65,7 +64,7 @@ std::string ExpressionStatsFilter::getName() const
 
 struct ExpressionStatsFilter::Args
 {
-    std::vector<expr::ConditionalExpression> m_expressions;
+    StringList m_expressions;
     std::string m_dimName;
     Arg* m_whereArg;
 };
@@ -93,14 +92,9 @@ void ExpressionStatsFilter::addArgs(ProgramArgs& args)
 
 void ExpressionStatsFilter::initialize()
 {
-    std::vector<std::string> expressionStrings;
-    expressionStrings.reserve(m_args->m_expressions.size());
-    for (const auto& expression : m_args->m_expressions)
-        expressionStrings.push_back(expression.print());
-
     std::vector<const char*> exprs;
-    exprs.reserve(expressionStrings.size());
-    for (const auto& s : expressionStrings)
+    exprs.reserve(m_args->m_expressions.size());
+    for (const auto& s : m_args->m_expressions)
         exprs.push_back(s.c_str());
 
     if (m_rust_stage)

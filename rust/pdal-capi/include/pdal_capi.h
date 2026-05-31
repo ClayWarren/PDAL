@@ -597,6 +597,12 @@ extern "C"
                                      const char* expression,
                                      pdal_point_view_t** out_keep,
                                      pdal_point_view_t** out_skip);
+    bool
+    pdal_expression_validate_with_layout(const char* expression,
+                                         const pdal_point_layout_t* layout);
+    uint8_t* pdal_point_view_expression_mask(const pdal_point_view_t* view,
+                                             const char* expression,
+                                             uint64_t* out_len);
     void pdal_point_view_destroy(pdal_point_view_t* view);
 
     // QuadIndex
@@ -847,6 +853,8 @@ extern "C"
     pdal_stage_t* pdal_stage_create_ferry_specs(const char* const* specs,
                                                 uint64_t count);
     bool pdal_stage_validate_assign_statement(const char* statement);
+    bool pdal_stage_validate_assign_statement_with_layout(
+        const char* statement, const pdal_point_layout_t* layout);
     void pdal_stage_ferry_point(pdal_stage_t* stage, pdal_point_view_t* view,
                                 uint64_t idx);
 
