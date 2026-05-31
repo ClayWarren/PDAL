@@ -34,16 +34,15 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <vector>
 
 #include <pdal/util/Utils.hpp>
-
-extern "C"
-{
-    char* pdal_dimension_fix_name(const char* name);
-    void pdal_string_free(char* ptr);
-}
+#ifndef PDAL_UTILS_NO_RUST_CAPI
+#include <rust/pdal-capi/include/pdal_capi.h>
+#endif
 
 namespace pdal
 {
@@ -117,6 +116,7 @@ static const int PROPRIETARY = 512;
 /// \return  String representation of dimension type.
 inline std::string interpretationName(Type dimtype)
 {
+#ifdef PDAL_UTILS_NO_RUST_CAPI
     switch (dimtype)
     {
     case Type::None:
@@ -143,6 +143,12 @@ inline std::string interpretationName(Type dimtype)
         return "double";
     }
     return "unknown";
+#else
+    char* name = pdal_dimension_interpretation_name(Utils::toNative(dimtype));
+    std::string output(name ? name : "unknown");
+    pdal_string_free(name);
+    return output;
+#endif
 }
 
 /// Get the type corresponding to a type name.
@@ -150,6 +156,7 @@ inline std::string interpretationName(Type dimtype)
 /// \return  Corresponding type enumeration value.
 inline Type type(std::string s)
 {
+#ifdef PDAL_UTILS_NO_RUST_CAPI
     s = Utils::tolower(s);
 
     if (s == "int8_t" || s == "int8" || s == "char")
@@ -173,10 +180,14 @@ inline Type type(std::string s)
     if (s == "double" || s == "float64")
         return Type::Double;
     return Type::None;
+#else
+    return static_cast<Type>(pdal_dimension_type_from_name(s.c_str()));
+#endif
 }
 
 inline Type type(const std::string& baseType, size_t size)
 {
+#ifdef PDAL_UTILS_NO_RUST_CAPI
     BaseType base = fromName(baseType);
     if (base == BaseType::None)
         return Type::None;
@@ -186,6 +197,10 @@ inline Type type(const std::string& baseType, size_t size)
         return Type::None;
 
     return static_cast<Type>((size_t)(base) | size);
+#else
+    return static_cast<Type>(
+        pdal_dimension_type_from_base_and_size(baseType.c_str(), size));
+#endif
 }
 
 template <typename T> Type type();
@@ -256,10 +271,26 @@ inline std::size_t extractName(const std::string& s, std::string::size_type p)
 
 inline std::string fixName(std::string name)
 {
+#ifdef PDAL_UTILS_NO_RUST_CAPI
+    if (name.empty())
+        return name;
+    if (!std::isalpha(static_cast<unsigned char>(name.front())))
+        name.front() = '_';
+    auto fixChar = [](char c)
+    {
+        unsigned char uc = static_cast<unsigned char>(c);
+        return (std::isalpha(uc) || std::isdigit(uc) || c == '_' || c == ' ')
+                   ? c
+                   : '_';
+    };
+    std::transform(name.begin(), name.end(), name.begin(), fixChar);
+    return name;
+#else
     char* fixed = pdal_dimension_fix_name(name.c_str());
     std::string output(fixed ? fixed : "");
     pdal_string_free(fixed);
     return output;
+#endif
 }
 
 inline bool nameValid(std::string name)
