@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 4,775 | 37 |
+| port-candidate | 4,633 | 32 |
 | c-abi-backed | 42,242 | 379 |
 | native-adapter | 5,529 | 52 |
-| holdout | 5,799 | 53 |
+| holdout | 5,941 | 58 |
 | total | 58,345 | 521 |
 
-Port-candidate backlog by area: `io` 3,325 · `pdal` 1,450. `filters`,
+Port-candidate backlog by area: `io` 3,183 · `pdal` 1,450. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -255,7 +255,8 @@ preserving the C++ `copc::Info` struct for callers. EPT key parsing,
 stringification, and bisection math now route through Rust while preserving the
 exported C++ value type fields and operators. The private LAS tile byte buffer
 and cursor now route through Rust behind the C++ `las::Tile` shell. Obvious
-exported C++
+exported C++ `BufferReader`, private C++ EPT artifact/table/layout adapters
+(`Artifact`, `FixedPointLayout`, `VectorPointTable`), and exported C++
 SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
 dimension/mesh/quick-info/artifact helpers, subcommand shells, and
 `Utils::Random` with its `std::mt19937&` API) are likewise compatibility

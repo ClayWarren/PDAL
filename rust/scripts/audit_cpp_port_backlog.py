@@ -157,10 +157,15 @@ HOLDOUTS = {
     "io/point_types.hpp": "PCL point type compatibility header",
     "io/BpfHeader.cpp": "exported BPF header compatibility API surface",
     "io/BpfHeader.hpp": "exported BPF header compatibility API surface",
+    "io/BufferReader.hpp": "exported C++ in-memory reader compatibility shell",
     "io/LasHeader.cpp": "exported deprecated LAS header compatibility API surface",
     "io/LasHeader.hpp": "exported deprecated LAS header compatibility API surface",
     "io/LasVLR.cpp": "exported deprecated LAS VLR compatibility API surface",
     "io/LasVLR.hpp": "exported deprecated LAS VLR compatibility API surface",
+    "io/private/ept/Artifact.hpp": "C++ EPT artifact compatibility shell",
+    "io/private/ept/FixedPointLayout.cpp": "C++ PointLayout ordering compatibility adapter",
+    "io/private/ept/FixedPointLayout.hpp": "C++ PointLayout ordering compatibility adapter",
+    "io/private/ept/VectorPointTable.hpp": "C++ PointTable view compatibility adapter",
     # C++ compatibility argument-binding API used by exported C++ shells. The
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
