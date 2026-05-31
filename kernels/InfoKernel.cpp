@@ -64,13 +64,6 @@ CREATE_STATIC_KERNEL(InfoKernel, s_info)
 namespace
 {
 
-bool isSinglePointId(const std::string& value)
-{
-    return !value.empty() &&
-           std::all_of(value.begin(), value.end(),
-                       [](unsigned char c) { return std::isdigit(c) != 0; });
-}
-
 bool isTwoDimensionalQuery(const std::string& value)
 {
     StringList parts = Utils::split2(value, '/');
@@ -400,9 +393,6 @@ bool InfoKernel::canRunRust() const
 {
     if (m_usestdin || m_showAll || !m_breakoutDimension.empty() ||
         !m_enumerate.empty() || (m_pcType != "lidar" && !m_stac))
-        return false;
-
-    if (!m_pointIndexes.empty() && !isSinglePointId(m_pointIndexes))
         return false;
 
     if (!m_queryPoint.empty() && !isTwoDimensionalQuery(m_queryPoint))

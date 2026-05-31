@@ -283,20 +283,20 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
                 eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
                 return 1;
             };
-            let Some(point_id) = parse_point_id(value) else {
+            let Some(point_ids) = parse_point_spec(value) else {
                 return -1;
             };
-            mode = InfoMode::Point(point_id);
+            mode = InfoMode::Points(point_ids);
         } else if let Some(value) = arg.strip_prefix("-p=") {
-            let Some(point_id) = parse_point_id(value) else {
+            let Some(point_ids) = parse_point_spec(value) else {
                 return -1;
             };
-            mode = InfoMode::Point(point_id);
+            mode = InfoMode::Points(point_ids);
         } else if let Some(value) = arg.strip_prefix("--point=") {
-            let Some(point_id) = parse_point_id(value) else {
+            let Some(point_ids) = parse_point_spec(value) else {
                 return -1;
             };
-            mode = InfoMode::Point(point_id);
+            mode = InfoMode::Points(point_ids);
         } else if arg == "--query" {
             let Some(value) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '--query'.");
@@ -422,7 +422,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         | InfoMode::All
         | InfoMode::Boundary
         | InfoMode::Stac
-        | InfoMode::Point(_)
+        | InfoMode::Points(_)
         | InfoMode::Query(_) => match pipeline.execute(Vec::new()) {
             Ok(views) => {
                 let metadata = pipeline.metadata();
@@ -448,7 +448,7 @@ enum InfoMode {
     All,
     Boundary,
     Stac,
-    Point(PointId),
+    Points(Vec<PointId>),
     Query(QueryRequest),
 }
 
@@ -520,7 +520,7 @@ fn info_report(
         }
         InfoMode::Stac => stac_report(views, metadata, filename, pc_type),
         InfoMode::Boundary => boundary_report(metadata),
-        InfoMode::Point(point_id) => point_report(views, point_id),
+        InfoMode::Points(point_ids) => point_report(views, &point_ids),
         InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
     }
@@ -633,14 +633,29 @@ fn stac_encoding(filename: &str) -> String {
         .unwrap_or_else(|| "?".to_string())
 }
 
-fn point_report(views: &[PointView], point_id: PointId) -> String {
+fn point_report(views: &[PointView], point_ids: &[PointId]) -> String {
     let mut output = String::from("{\n  \"points\":\n  {\n");
-    if let Some((view, local_id)) = locate_point(views, point_id) {
+    if point_ids.len() == 1 {
         output.push_str("    \"point\":\n");
-        output.push_str(&point_json(view, local_id, 4));
-        output.push('\n');
+        if let Some((view, local_id)) = locate_point(views, point_ids[0]) {
+            output.push_str(&point_json(view, local_id, 4));
+            output.push('\n');
+        } else {
+            output.push_str("    null\n");
+        }
     } else {
-        output.push_str("    \"point\": null\n");
+        output.push_str("    \"point\":\n    [\n");
+        let mut emitted = 0;
+        for point_id in point_ids {
+            if let Some((view, local_id)) = locate_point(views, *point_id) {
+                if emitted > 0 {
+                    output.push_str(",\n");
+                }
+                output.push_str(&point_json(view, local_id, 6));
+                emitted += 1;
+            }
+        }
+        output.push_str("\n    ]\n");
     }
     output.push_str("  },\n  \"reader\": \"readers.las\"\n}\n");
     output
@@ -732,8 +747,25 @@ fn point_field_names(view: &PointView) -> Vec<String> {
     names
 }
 
-fn parse_point_id(value: &str) -> Option<PointId> {
-    value.parse::<PointId>().ok()
+fn parse_point_spec(value: &str) -> Option<Vec<PointId>> {
+    let mut ids = Vec::new();
+    for part in value
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if let Some((start, end)) = part.split_once('-') {
+            let start = start.parse::<PointId>().ok()?;
+            let end = end.parse::<PointId>().ok()?;
+            if end < start {
+                return None;
+            }
+            ids.extend(start..=end);
+        } else {
+            ids.push(part.parse::<PointId>().ok()?);
+        }
+    }
+    (!ids.is_empty()).then_some(ids)
 }
 
 fn parse_query(value: &str) -> Option<QueryRequest> {

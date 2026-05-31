@@ -98,6 +98,14 @@ TEST(Info, point)
 
     SCOPED_TRACE("point");
     test("-p 5", r);
+
+    SCOPED_TRACE("point-range");
+    test("-p 5-6", R"foo(
+        "PointId": 5,
+)foo");
+    test("-p 5-6", R"foo(
+        "PointId": 6,
+)foo");
 }
 
 TEST(Info, query)
