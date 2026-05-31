@@ -467,6 +467,20 @@ impl HexGrid {
         self.format_wkt(precision, true)
     }
 
+    pub fn boundary_geojson(&self) -> String {
+        let mut out = String::from(
+            "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\"type\": \"Feature\", \"properties\": {\"ID\": 0}, \"geometry\": {\"type\": \"MultiPolygon\", \"coordinates\": [",
+        );
+        for (i, &root) in self.roots.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            self.write_path_geojson(root, &mut out);
+        }
+        out.push_str("]}}\n  ]\n}\n");
+        out
+    }
+
     fn format_wkt(&self, precision: usize, fixed: bool) -> String {
         let mut out = String::from("MULTIPOLYGON (");
         for (i, &root) in self.roots.iter().enumerate() {
@@ -491,6 +505,18 @@ impl HexGrid {
         }
     }
 
+    fn write_path_geojson(&self, idx: usize, out: &mut String) {
+        let islands = self.write_polygon_geojson(idx, out);
+        let mut pending = islands;
+        while !pending.is_empty() {
+            let next = std::mem::take(&mut pending);
+            for sub in next {
+                out.push_str(", ");
+                pending.extend(self.write_polygon_geojson(sub, out));
+            }
+        }
+    }
+
     fn write_polygon(
         &self,
         idx: usize,
@@ -510,6 +536,19 @@ impl HexGrid {
         islands
     }
 
+    fn write_polygon_geojson(&self, idx: usize, out: &mut String) -> Vec<usize> {
+        let mut islands = Vec::new();
+        out.push('[');
+        self.write_ring_geojson(idx, out);
+        for &child in &self.paths[idx].children {
+            out.push_str(", ");
+            self.write_ring_geojson(child, out);
+            islands.extend(self.paths[child].children.iter().copied());
+        }
+        out.push(']');
+        islands
+    }
+
     fn write_ring(&self, idx: usize, precision: usize, fixed: bool, out: &mut String) {
         let pts = &self.paths[idx].points;
         debug_assert!(pts.len() > 2);
@@ -520,6 +559,19 @@ impl HexGrid {
             write_point(out, *pt, precision, fixed);
         }
         out.push(')');
+    }
+
+    fn write_ring_geojson(&self, idx: usize, out: &mut String) {
+        let pts = &self.paths[idx].points;
+        debug_assert!(pts.len() > 2);
+        out.push('[');
+        for (i, pt) in pts.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            let _ = write!(out, "[{}, {}]", pt.x, pt.y);
+        }
+        out.push(']');
     }
 
     #[cfg(test)]
@@ -648,6 +700,20 @@ impl H3Grid {
         out
     }
 
+    pub fn boundary_geojson(&self) -> String {
+        let mut out = String::from(
+            "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\"type\": \"Feature\", \"properties\": {\"ID\": 0}, \"geometry\": {\"type\": \"MultiPolygon\", \"coordinates\": [",
+        );
+        for (i, &root) in self.roots.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            self.write_path_geojson(root, &mut out);
+        }
+        out.push_str("]}}\n  ]\n}\n");
+        out
+    }
+
     fn is_dense(&self, h: HexId) -> bool {
         self.counts.get(&h).copied().unwrap_or(0) >= self.dense_limit
     }
@@ -723,6 +789,18 @@ impl H3Grid {
         }
     }
 
+    fn write_path_geojson(&self, idx: usize, out: &mut String) {
+        let islands = self.write_polygon_geojson(idx, out);
+        let mut pending = islands;
+        while !pending.is_empty() {
+            let next = std::mem::take(&mut pending);
+            for sub in next {
+                out.push_str(", ");
+                pending.extend(self.write_polygon_geojson(sub, out));
+            }
+        }
+    }
+
     fn write_polygon(&self, idx: usize, precision: usize, out: &mut String) -> Vec<usize> {
         let mut islands = Vec::new();
         out.push('(');
@@ -736,6 +814,19 @@ impl H3Grid {
         islands
     }
 
+    fn write_polygon_geojson(&self, idx: usize, out: &mut String) -> Vec<usize> {
+        let mut islands = Vec::new();
+        out.push('[');
+        self.write_ring_geojson(idx, out);
+        for &child in &self.paths[idx].children {
+            out.push_str(", ");
+            self.write_ring_geojson(child, out);
+            islands.extend(self.paths[child].children.iter().copied());
+        }
+        out.push(']');
+        islands
+    }
+
     fn write_ring(&self, idx: usize, precision: usize, out: &mut String) {
         let pts = &self.paths[idx].points;
         debug_assert!(pts.len() > 2);
@@ -746,6 +837,19 @@ impl H3Grid {
             write_point(out, *pt, precision, false);
         }
         out.push(')');
+    }
+
+    fn write_ring_geojson(&self, idx: usize, out: &mut String) {
+        let pts = &self.paths[idx].points;
+        debug_assert!(pts.len() > 2);
+        out.push('[');
+        for (i, pt) in pts.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            let _ = write!(out, "[{}, {}]", pt.x, pt.y);
+        }
+        out.push(']');
     }
 
     fn next_segment(&self, s: Segment) -> Segment {

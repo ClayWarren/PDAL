@@ -32,6 +32,7 @@ pub struct HexBinFilter {
     threshold: u32,
     sample_size: usize,
     density_output: Option<String>,
+    boundary_output: Option<String>,
     output_tesselation: bool,
     /// H3 mode. `None` = standard hexagonal grid. `Some(None)` = H3 with the
     /// resolution auto-estimated from a sample. `Some(Some(res))` = H3 at a
@@ -68,7 +69,14 @@ impl HexBinFilter {
         sample_size: usize,
         density_output: Option<String>,
     ) -> Self {
-        Self::with_options(edge_length, threshold, sample_size, density_output, false)
+        Self::with_options(
+            edge_length,
+            threshold,
+            sample_size,
+            density_output,
+            None,
+            false,
+        )
     }
 
     pub fn with_options(
@@ -76,6 +84,7 @@ impl HexBinFilter {
         threshold: u32,
         sample_size: usize,
         density_output: Option<String>,
+        boundary_output: Option<String>,
         output_tesselation: bool,
     ) -> Self {
         Self {
@@ -83,6 +92,7 @@ impl HexBinFilter {
             threshold,
             sample_size,
             density_output,
+            boundary_output,
             output_tesselation,
             h3: None,
             state: None,
@@ -141,6 +151,13 @@ impl HexBinFilter {
         // through GEOS, so byte-identical raw WKT yields a byte-identical boundary.
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
             grid.find_parent_paths();
+            if let Some(path) = &self.boundary_output {
+                fs::write(path, grid.boundary_geojson()).map_err(|err| {
+                    StageError(format!(
+                        "filters.hexbin: unable to write boundary output '{path}': {err}"
+                    ))
+                })?;
+            }
             Some(grid.to_wkt_fixed(8))
         } else {
             None
@@ -204,6 +221,13 @@ impl HexBinFilter {
         // H3), so the boundary precision only feeds GEOS WKT reformatting.
         let hex_boundary_wkt = if grid.find_shapes().is_ok() {
             grid.find_parent_paths();
+            if let Some(path) = &self.boundary_output {
+                fs::write(path, grid.boundary_geojson()).map_err(|err| {
+                    StageError(format!(
+                        "filters.hexbin: unable to write boundary output '{path}': {err}"
+                    ))
+                })?;
+            }
             Some(grid.to_wkt(8))
         } else {
             None
@@ -519,9 +543,34 @@ mod tests {
     #[test]
     fn output_tesselation_emits_hex_boundary() {
         let view = flat_view(50);
-        let mut f = HexBinFilter::with_options(Some(1.0), 1, 10, None, true);
+        let mut f = HexBinFilter::with_options(Some(1.0), 1, 10, None, None, true);
         f.run_one(&view).unwrap();
         let m = f.metadata();
         assert!(m.find_child("hex_boundary").is_some());
+    }
+
+    #[test]
+    fn boundary_output_writes_geojson_multipolygon() {
+        let view = flat_view(50);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("boundary.geojson");
+        let mut f = HexBinFilter::with_options(
+            Some(1.0),
+            1,
+            10,
+            None,
+            Some(path.display().to_string()),
+            false,
+        );
+
+        f.run_one(&view).unwrap();
+
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(json["type"], "FeatureCollection");
+        let features = json["features"].as_array().unwrap();
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0]["properties"]["ID"], 0);
+        assert_eq!(features[0]["geometry"]["type"], "MultiPolygon");
     }
 }

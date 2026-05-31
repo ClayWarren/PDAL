@@ -35,7 +35,6 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <filters/CropFilter.hpp>
-#include <filters/private/hexer/HexGrid.hpp>
 #include <io/LasReader.hpp>
 
 #include <pdal/PointView.hpp>
@@ -122,11 +121,9 @@ nlohmann::json readJsonFile(const std::string& path)
 }
 } // namespace
 
-// Gates the OGR density/boundary file-output path (kernels/private/density/
-// OGR.cpp). Setting 'boundary' forces the C++ grid path, which writes both the
-// per-hexagon density tessellation and the hull boundary through OGR. We write
-// GeoJSON (human-readable) and assert the feature/field/geometry shape so the
-// behavior is locked before the hexagon source is ported off hexer::BaseGrid.
+// Gates the Rust-backed GeoJSON density/boundary file-output path. We assert
+// the feature/field/geometry shape rather than exact coordinates so the test
+// stays focused on the C ABI output contract.
 TEST(HexbinFilterTest, ogr_density_boundary_output)
 {
     StageFactory f;
@@ -159,8 +156,8 @@ TEST(HexbinFilterTest, ogr_density_boundary_output)
     hexbin->prepare(table);
     hexbin->execute(table);
 
-    // Density: one Polygon feature per dense hexagon, with ID + COUNT fields and
-    // a closed 7-vertex hexagonal ring (6 corners + repeated first vertex).
+    // Density: one Polygon feature per dense hexagon, with ID + COUNT fields
+    // and a closed 7-vertex hexagonal ring (6 corners + repeated first vertex).
     nlohmann::json density = readJsonFile(densityFile);
     EXPECT_EQ(density["type"], "FeatureCollection");
     const auto& dfeatures = density["features"];

@@ -43,6 +43,7 @@
 
 #include "../kernels/private/density/OGR.hpp"
 #include <pdal/Polygon.hpp>
+#include <pdal/util/Utils.hpp>
 
 using namespace hexer;
 
@@ -119,12 +120,7 @@ void HexBin::addArgs(ProgramArgs& args)
 
 bool HexBin::useRustPath() const
 {
-    // An OGR boundary-file output has no Rust writer yet, so it stays on the
-    // C++ path. The Rust engine handles standard grids (explicit or sample-
-    // estimated edge_length, plus the GeoJSON density file) and H3 grids
-    // (fixed or auto resolution). H3 density-file output still needs the C++
-    // OGR writer, so route H3 to Rust only when no density file is requested.
-    if (!m_boundaryOutput.empty())
+    if (!m_boundaryOutput.empty() && !Utils::iequals(m_driver, "GeoJSON"))
         return false;
     if (m_isH3)
         return m_DensityOutput.empty();
@@ -147,6 +143,8 @@ PointViewSet HexBin::run(PointViewPtr view)
                              m_outputTesselation ? "true" : "false");
         if (!m_DensityOutput.empty())
             pdal_options_add_str(ops, "density", m_DensityOutput.c_str());
+        if (!m_boundaryOutput.empty())
+            pdal_options_add_str(ops, "boundary", m_boundaryOutput.c_str());
         if (m_isH3)
         {
             pdal_options_add_str(ops, "h3_grid", "true");

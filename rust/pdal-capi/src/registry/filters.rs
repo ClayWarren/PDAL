@@ -382,11 +382,13 @@ pub fn create_filter(
                 None
             };
             let density = options.get_str("density", "");
+            let boundary = options.get_str("boundary", "");
             let mut filter = HexBinFilter::with_options(
                 edge,
                 get_u64(options, "threshold", 15)? as u32,
                 get_u64(options, "sample_size", 5000)? as usize,
                 (!density.is_empty()).then_some(density),
+                (!boundary.is_empty()).then_some(boundary),
                 get_bool(options, "output_tesselation", false)?,
             );
             if get_bool(options, "h3_grid", false)? {
