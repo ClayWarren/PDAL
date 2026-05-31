@@ -230,6 +230,12 @@ TEST(Info, stac)
     SCOPED_TRACE("stac");
     test("--stac", r);
 
+    std::string pcType = R"foo(
+      "pc:type": "sonar"
+)foo";
+    SCOPED_TRACE("stac_pc_type");
+    test("--stac --pc_type sonar", pcType);
+
     // anything other than message and status is a success
     std::string validation = R"foo(
   "stac":

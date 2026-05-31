@@ -399,7 +399,7 @@ void InfoKernel::dump(MetadataNode& root)
 bool InfoKernel::canRunRust() const
 {
     if (m_usestdin || m_showAll || m_boundary || !m_breakoutDimension.empty() ||
-        !m_enumerate.empty() || m_pcType != "lidar")
+        !m_enumerate.empty() || (m_pcType != "lidar" && !m_stac))
         return false;
 
     if (!m_pointIndexes.empty() && !isSinglePointId(m_pointIndexes))
@@ -427,7 +427,14 @@ int InfoKernel::runRust() const
     else if (m_showMetadata)
         args.push_back("--metadata");
     else if (m_stac)
+    {
         args.push_back("--stac");
+        if (m_pcType != "lidar")
+        {
+            args.push_back("--pc_type");
+            args.push_back(m_pcType);
+        }
+    }
     else if (!m_pointIndexes.empty())
     {
         args.push_back("--point");

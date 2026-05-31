@@ -260,6 +260,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
     let mut filename = None;
     let mut driver_override = None;
     let mut mode = InfoMode::Stats { dimensions: None };
+    let mut pc_type = "lidar".to_string();
     let mut serialization_file = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -320,6 +321,14 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             mode = InfoMode::Stats {
                 dimensions: Some(parse_dimension_list(value)),
             };
+        } else if arg == "--pc_type" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--pc_type'.");
+                return 1;
+            };
+            pc_type = value.clone();
+        } else if let Some(value) = arg.strip_prefix("--pc_type=") {
+            pc_type = value.to_string();
         } else if arg == "--pipeline-serialization" {
             let Some(path) = iter.next() else {
                 eprintln!(
@@ -414,7 +423,10 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         | InfoMode::Query(_) => match pipeline.execute(Vec::new()) {
             Ok(views) => {
                 let metadata = pipeline.metadata();
-                println!("{}", info_report(mode, &views, &metadata, &filename));
+                println!(
+                    "{}",
+                    info_report(mode, &views, &metadata, &filename, &pc_type)
+                );
                 0
             }
             Err(err) => {
@@ -453,6 +465,7 @@ fn info_report(
     views: &[PointView],
     metadata: &MetadataNode,
     filename: &str,
+    pc_type: &str,
 ) -> String {
     match mode {
         InfoMode::Stats { dimensions } => stats_report(views, dimensions.as_deref()),
@@ -474,7 +487,7 @@ fn info_report(
             output.push_str("\n}\n");
             output
         }
-        InfoMode::Stac => stac_report(views, metadata, filename),
+        InfoMode::Stac => stac_report(views, metadata, filename, pc_type),
         InfoMode::Point(point_id) => point_report(views, point_id),
         InfoMode::Query(query) => query_report(views, query),
         InfoMode::Summary => String::new(),
@@ -497,7 +510,12 @@ fn parse_dimension_list(value: &str) -> Vec<DimId> {
         .collect()
 }
 
-fn stac_report(views: &[PointView], metadata: &MetadataNode, filename: &str) -> String {
+fn stac_report(
+    views: &[PointView],
+    metadata: &MetadataNode,
+    filename: &str,
+    pc_type: &str,
+) -> String {
     if views
         .first()
         .is_none_or(|view| view.spatial_reference().is_empty())
@@ -506,10 +524,11 @@ fn stac_report(views: &[PointView], metadata: &MetadataNode, filename: &str) -> 
     }
 
     format!(
-        "{{\n  \"stac\":\n  {{\n    \"properties\":\n    {{\n      \"datetime\": \"{}\",\n      \"pc:count\": {},\n      \"pc:encoding\": \"{}\",\n      \"pc:type\": \"lidar\"\n    }}\n  }}\n}}\n",
+        "{{\n  \"stac\":\n  {{\n    \"properties\":\n    {{\n      \"datetime\": \"{}\",\n      \"pc:count\": {},\n      \"pc:encoding\": \"{}\",\n      \"pc:type\": \"{}\"\n    }}\n  }}\n}}\n",
         stac_datetime(metadata),
         views.iter().map(PointView::len).sum::<u64>(),
-        stac_encoding(filename)
+        stac_encoding(filename),
+        pc_type
     )
 }
 
@@ -834,6 +853,9 @@ fn _assert_result_abi_shape(_: pdal_pipeline_result_t) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pdal_core::point::PointLayout;
+    use pdal_core::srs::SpatialReference;
+    use std::rc::Rc;
 
     #[test]
     fn applies_cli_stage_options_to_object_pipeline() {
@@ -880,5 +902,18 @@ mod tests {
         let json = r#"[{"type":"readers.faux"}, 7]"#;
 
         assert!(validate_pipeline_json_shape(json).is_err());
+    }
+
+    #[test]
+    fn stac_report_uses_requested_pointcloud_type() {
+        let layout = Rc::new(PointLayout::new());
+        let mut view = PointView::new(layout);
+        view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
+        view.add_point();
+
+        let report = stac_report(&[view], &MetadataNode::new("root"), "sample.las", "sonar");
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert_eq!(json["stac"]["properties"]["pc:type"], "sonar");
     }
 }
