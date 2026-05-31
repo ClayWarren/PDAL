@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 7,978 | 74 |
-| c-abi-backed | 41,891 | 373 |
+| port-candidate | 7,926 | 73 |
+| c-abi-backed | 41,943 | 374 |
 | native-adapter | 5,529 | 52 |
 | holdout | 2,927 | 22 |
 | total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 4,657 · `pdal` 3,321. `filters`,
+Port-candidate backlog by area: `io` 4,605 · `pdal` 3,321. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -244,7 +244,9 @@ logic where needed, but these exported C++ APIs must remain until the C++ SDK
 itself goes away. The private STAC C++ traversal files are counted as native/
 remote adapter work: local supported STAC paths route through Rust, while those
 files preserve Arbiter/remote/schema fallback behavior for the later remote I/O
-milestone. Rerun the audit after each change.
+milestone. The COPC writer private `Common.hpp` option/header shell counts with
+the Rust-backed `CopcWriter` wrapper rather than as standalone algorithmic
+backlog. Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so

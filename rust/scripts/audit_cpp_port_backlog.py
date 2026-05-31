@@ -61,6 +61,7 @@ KNOWN_BRIDGE_FILES = {
     "io/OptechCommon.hpp",
     "io/PcdHeader.hpp",
     "io/SbetCommon.hpp",
+    "io/private/copcwriter/Common.hpp",
     "filters/private/RustMetadata.hpp",
     "filters/private/RustPipeline.hpp",
     "pdal/compression/Compression.hpp",
