@@ -381,7 +381,7 @@ void InfoKernel::dump(MetadataNode& root)
 
 bool InfoKernel::canRunRust() const
 {
-    if (m_usestdin || !m_breakoutDimension.empty() || !m_enumerate.empty() ||
+    if (m_usestdin || !m_breakoutDimension.empty() ||
         (m_pcType != "lidar" && !m_stac))
         return false;
 
@@ -433,6 +433,11 @@ int InfoKernel::runRust() const
         {
             args.push_back("--dimensions");
             args.push_back(m_dimensions);
+        }
+        if (!m_enumerate.empty())
+        {
+            args.push_back("--enumerate");
+            args.push_back(m_enumerate);
         }
     }
 

@@ -259,7 +259,10 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
 
     let mut filename = None;
     let mut driver_override = None;
-    let mut mode = InfoMode::Stats { dimensions: None };
+    let mut mode = InfoMode::Stats {
+        dimensions: None,
+        enumerate: None,
+    };
     let mut pc_type = "lidar".to_string();
     let mut serialization_file = None;
     let mut iter = args.iter();
@@ -267,7 +270,10 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         if arg == "--summary" {
             mode = InfoMode::Summary;
         } else if arg == "--stats" {
-            mode = InfoMode::Stats { dimensions: None };
+            mode = InfoMode::Stats {
+                dimensions: None,
+                enumerate: None,
+            };
         } else if arg == "--schema" {
             mode = InfoMode::Schema;
         } else if arg == "--metadata" {
@@ -318,10 +324,38 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             };
             mode = InfoMode::Stats {
                 dimensions: Some(parse_dimension_list(value)),
+                enumerate: match mode {
+                    InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
             };
         } else if let Some(value) = arg.strip_prefix("--dimensions=") {
             mode = InfoMode::Stats {
                 dimensions: Some(parse_dimension_list(value)),
+                enumerate: match mode {
+                    InfoMode::Stats { enumerate, .. } => enumerate,
+                    _ => None,
+                },
+            };
+        } else if arg == "--enumerate" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.info: Missing value for option '--enumerate'.");
+                return 1;
+            };
+            mode = InfoMode::Stats {
+                dimensions: match mode {
+                    InfoMode::Stats { dimensions, .. } => dimensions,
+                    _ => None,
+                },
+                enumerate: Some(parse_dimension_list(value)),
+            };
+        } else if let Some(value) = arg.strip_prefix("--enumerate=") {
+            mode = InfoMode::Stats {
+                dimensions: match mode {
+                    InfoMode::Stats { dimensions, .. } => dimensions,
+                    _ => None,
+                },
+                enumerate: Some(parse_dimension_list(value)),
             };
         } else if arg == "--pc_type" {
             let Some(value) = iter.next() else {
@@ -442,7 +476,10 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
 
 enum InfoMode {
     Summary,
-    Stats { dimensions: Option<Vec<DimId>> },
+    Stats {
+        dimensions: Option<Vec<DimId>>,
+        enumerate: Option<Vec<DimId>>,
+    },
     Schema,
     Metadata,
     All,
@@ -486,7 +523,10 @@ fn info_report(
     pc_type: &str,
 ) -> String {
     match mode {
-        InfoMode::Stats { dimensions } => stats_report(views, dimensions.as_deref()),
+        InfoMode::Stats {
+            dimensions,
+            enumerate,
+        } => stats_report(views, dimensions.as_deref(), enumerate.as_deref()),
         InfoMode::Schema => schema_report(views),
         InfoMode::Metadata => metadata_report(metadata),
         InfoMode::All => {
@@ -495,7 +535,7 @@ fn info_report(
             output.push_str(&schema_body(views, 2));
             output.push_str(",\n");
             output.push_str("  \"stats\":\n");
-            output.push_str(&stats_body(views, 2, None));
+            output.push_str(&stats_body(views, 2, None, None));
             output.push_str(",\n");
             output.push_str("  \"metadata\": ");
             let metadata_json = crate::metadata_abi::metadata_node_to_json_flat(metadata);
@@ -818,33 +858,55 @@ fn schema_body(views: &[PointView], indent: usize) -> String {
     output
 }
 
-fn stats_report(views: &[PointView], dimensions: Option<&[DimId]>) -> String {
+fn stats_report(
+    views: &[PointView],
+    dimensions: Option<&[DimId]>,
+    enumerate: Option<&[DimId]>,
+) -> String {
     format!(
         "{{\n  \"stats\":\n{}\n}}\n",
-        stats_body(views, 2, dimensions)
+        stats_body(views, 2, dimensions, enumerate)
     )
 }
 
-fn stats_body(views: &[PointView], indent: usize, dimensions: Option<&[DimId]>) -> String {
+fn stats_body(
+    views: &[PointView],
+    indent: usize,
+    dimensions: Option<&[DimId]>,
+    enumerate: Option<&[DimId]>,
+) -> String {
     let pad = " ".repeat(indent);
     let list_pad = " ".repeat(indent + 2);
     let item_pad = " ".repeat(indent + 4);
     let value_pad = " ".repeat(indent + 6);
-    let stats = dimension_stats(views, dimensions);
+    let stats = dimension_stats(views, dimensions, enumerate);
     let mut output = format!("{pad}{{\n{list_pad}\"statistic\":\n{list_pad}[\n");
     for (idx, stat) in stats.iter().enumerate() {
         if idx > 0 {
             output.push_str(",\n");
         }
         output.push_str(&format!(
-            "{item_pad}{{\n{value_pad}\"average\": {},\n{value_pad}\"count\": {},\n{value_pad}\"maximum\": {},\n{value_pad}\"minimum\": {},\n{value_pad}\"name\": \"{}\",\n{value_pad}\"position\": {},\n{value_pad}\"stddev\": {},\n{value_pad}\"variance\": {}\n{item_pad}}}",
+            "{item_pad}{{\n{value_pad}\"average\": {},\n{value_pad}\"count\": {},\n{value_pad}\"maximum\": {},\n{value_pad}\"minimum\": {},\n{value_pad}\"name\": \"{}\",\n{value_pad}\"position\": {},\n{value_pad}\"stddev\": {}",
             format_number(stat.average),
             stat.count,
             format_number(stat.maximum),
             format_number(stat.minimum),
             stat.name,
             idx,
-            format_number(stat.stddev),
+            format_number(stat.stddev)
+        ));
+        if let Some(values) = &stat.values {
+            output.push_str(&format!(",\n{value_pad}\"values\":\n{value_pad}[\n"));
+            for (value_idx, value) in values.iter().enumerate() {
+                if value_idx > 0 {
+                    output.push_str(",\n");
+                }
+                output.push_str(&format!("{value_pad}  {}", format_number(*value)));
+            }
+            output.push_str(&format!("\n{value_pad}]"));
+        }
+        output.push_str(&format!(
+            ",\n{value_pad}\"variance\": {}\n{item_pad}}}",
             format_number(stat.variance)
         ));
     }
@@ -860,9 +922,14 @@ struct InfoDimensionStats {
     average: f64,
     variance: f64,
     stddev: f64,
+    values: Option<Vec<f64>>,
 }
 
-fn dimension_stats(views: &[PointView], dimensions: Option<&[DimId]>) -> Vec<InfoDimensionStats> {
+fn dimension_stats(
+    views: &[PointView],
+    dimensions: Option<&[DimId]>,
+    enumerate: Option<&[DimId]>,
+) -> Vec<InfoDimensionStats> {
     let Some(first) = views.first() else {
         return Vec::new();
     };
@@ -917,9 +984,19 @@ fn dimension_stats(views: &[PointView], dimensions: Option<&[DimId]>) -> Vec<Inf
             average,
             variance,
             stddev: variance.sqrt(),
+            values: enumerate
+                .is_some_and(|dims| dims.contains(dim))
+                .then(|| unique_sorted_values(&values)),
         });
     }
     output
+}
+
+fn unique_sorted_values(values: &[f64]) -> Vec<f64> {
+    let mut unique = values.to_vec();
+    unique.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    unique.dedup_by(|a, b| a == b);
+    unique
 }
 
 fn dim_type_name(ty: DimType) -> &'static str {
