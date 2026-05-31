@@ -644,6 +644,16 @@ extern "C"
         double edge_length;
     } pdal_raster_limits_t;
 
+    bool pdal_raster_limits_valid(pdal_raster_limits_t limits);
+    int32_t pdal_raster_limits_x_cell(pdal_raster_limits_t limits, double x,
+                                      bool* out_ok);
+    int32_t pdal_raster_limits_y_cell(pdal_raster_limits_t limits, double y,
+                                      bool* out_ok);
+    double pdal_raster_limits_x_cell_pos(pdal_raster_limits_t limits,
+                                         uint64_t x);
+    double pdal_raster_limits_y_cell_pos(pdal_raster_limits_t limits,
+                                         uint64_t y);
+
     pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
     uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
     void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx,

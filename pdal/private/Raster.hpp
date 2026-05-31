@@ -34,10 +34,13 @@
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
+
+#include <pdal_capi.h>
 
 namespace pdal
 {
@@ -71,7 +74,7 @@ public:
 
     bool valid() const
     {
-        return width > 0;
+        return pdal_raster_limits_valid(cAbi());
     }
 
     int checkArgs() const
@@ -100,6 +103,14 @@ private:
     Arg* m_yOriginArg;
     Arg* m_widthArg;
     Arg* m_heightArg;
+
+    pdal_raster_limits_t cAbi() const
+    {
+        return {xOrigin, yOrigin, width > 0 ? static_cast<uint64_t>(width) : 0,
+                height > 0 ? static_cast<uint64_t>(height) : 0, edgeLength};
+    }
+
+    template <typename T> friend class Raster;
 };
 
 inline bool operator==(const RasterLimits& l, const RasterLimits& r)
@@ -179,32 +190,22 @@ public:
 
     int xCell(double x, bool& ok) const
     {
-        double cell = std::floor((x - m_limits.xOrigin) / m_limits.edgeLength);
-        // We check cell + 1 for validity because we make a raster with width
-        // one larger than the limit.
-        ok = (cell >= std::numeric_limits<int>::lowest() &&
-              cell + 1 <= (std::numeric_limits<int>::max)());
-        return static_cast<int>(cell);
+        return pdal_raster_limits_x_cell(m_limits.cAbi(), x, &ok);
     }
 
     int yCell(double y, bool& ok) const
     {
-        double cell = std::floor((y - m_limits.yOrigin) / m_limits.edgeLength);
-        // We check cell + 1 for validity because we make a raster with height
-        // one larger than the limit.
-        ok = (cell >= std::numeric_limits<int>::lowest() &&
-              cell + 1 <= (std::numeric_limits<int>::max)());
-        return static_cast<int>(cell);
+        return pdal_raster_limits_y_cell(m_limits.cAbi(), y, &ok);
     }
 
     double xCellPos(size_t i) const
     {
-        return m_limits.xOrigin + (i + .5) * edgeLength();
+        return pdal_raster_limits_x_cell_pos(m_limits.cAbi(), i);
     }
 
     double yCellPos(size_t j) const
     {
-        return m_limits.yOrigin + (j + .5) * edgeLength();
+        return pdal_raster_limits_y_cell_pos(m_limits.cAbi(), j);
     }
 
     const T* data() const

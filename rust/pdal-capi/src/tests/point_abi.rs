@@ -681,6 +681,32 @@ fn point_view_raster_roundtrips_through_c_abi() {
 }
 
 #[test]
+fn raster_limits_coordinate_math_routes_through_c_abi() {
+    unsafe {
+        let limits = pdal_raster_limits_t {
+            x_origin: 10.0,
+            y_origin: 20.0,
+            width: 2,
+            height: 3,
+            edge_length: 0.5,
+        };
+
+        assert!(pdal_raster_limits_valid(limits));
+        assert_eq!(pdal_raster_limits_x_cell_pos(limits, 1), 10.75);
+        assert_eq!(pdal_raster_limits_y_cell_pos(limits, 2), 21.25);
+
+        let mut ok = false;
+        assert_eq!(pdal_raster_limits_x_cell(limits, 10.75, &mut ok), 1);
+        assert!(ok);
+        assert_eq!(pdal_raster_limits_y_cell(limits, 21.25, &mut ok), 2);
+        assert!(ok);
+
+        let invalid = pdal_raster_limits_t { width: 0, ..limits };
+        assert!(!pdal_raster_limits_valid(invalid));
+    }
+}
+
+#[test]
 fn point_view_split_where_partitions_points_through_c_abi() {
     unsafe {
         let layout = pdal_point_layout_create();
