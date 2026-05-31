@@ -266,6 +266,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
     };
     let mut pc_type = "lidar".to_string();
     let mut serialization_file = None;
+    let mut read_stdin = false;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         if arg == "--summary" {
@@ -429,6 +430,8 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             driver_override = Some(driver.clone());
         } else if let Some(driver) = arg.strip_prefix("--driver=") {
             driver_override = Some(driver.to_string());
+        } else if arg == "--stdin" || arg == "-s" {
+            read_stdin = true;
         } else if arg == "--input" || arg == "-i" {
             let Some(input) = iter.next() else {
                 eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
@@ -444,6 +447,20 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             eprintln!("PDAL: kernels.info: Expected exactly one input file.");
             return 1;
         }
+    }
+
+    if read_stdin && filename.is_some() {
+        eprintln!("PDAL: kernels.info: Expected either --stdin or an input filename, not both.");
+        return 1;
+    }
+
+    if read_stdin {
+        let mut json = String::new();
+        if let Err(err) = std::io::stdin().read_to_string(&mut json) {
+            eprintln!("PDAL: kernels.info: Unable to read pipeline from stdin: {err}");
+            return 1;
+        }
+        return run_info_pipeline_json(&json, mode, &pc_type, serialization_file);
     }
 
     let Some(filename) = filename else {
@@ -518,6 +535,87 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
             }
         },
     }
+}
+
+fn run_info_pipeline_json(
+    json: &str,
+    mode: InfoMode,
+    pc_type: &str,
+    serialization_file: Option<String>,
+) -> i32 {
+    let json = if mode.needs_boundary() {
+        match append_info_stage_to_pipeline_json(
+            json,
+            serde_json::json!({ "type": "filters.hexbin" }),
+        ) {
+            Ok(json) => json,
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                return 1;
+            }
+        }
+    } else {
+        json.to_string()
+    };
+
+    if let Some(path) = serialization_file {
+        if let Err(err) = std::fs::write(&path, &json) {
+            eprintln!("PDAL: kernels.info: Unable to write pipeline serialization '{path}': {err}");
+            return 1;
+        }
+    }
+
+    let mut pipeline = match pipeline_from_json(&json) {
+        Ok(pipeline) => pipeline,
+        Err(err) => {
+            eprintln!("PDAL: kernels.info: {err}");
+            return 1;
+        }
+    };
+
+    match mode {
+        InfoMode::Summary => match pipeline.execute_with_result(Vec::new()) {
+            Ok(result) => {
+                let handle = PipelineHandle { pipeline };
+                println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
+                0
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                1
+            }
+        },
+        _ => match pipeline.execute(Vec::new()) {
+            Ok(views) => {
+                let metadata = pipeline.metadata();
+                println!("{}", info_report(mode, &views, &metadata, "STDIN", pc_type));
+                0
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                1
+            }
+        },
+    }
+}
+
+fn append_info_stage_to_pipeline_json(
+    json: &str,
+    stage: serde_json::Value,
+) -> Result<String, String> {
+    let mut value: serde_json::Value =
+        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+    if let Some(stages) = value.as_array_mut() {
+        stages.push(stage);
+    } else if let Some(stages) = value
+        .get_mut("pipeline")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        stages.push(stage);
+    } else {
+        return Err("Pipeline JSON object must contain a 'pipeline' array.".to_string());
+    }
+    serde_json::to_string(&value).map_err(|err| err.to_string())
 }
 
 #[derive(Clone)]

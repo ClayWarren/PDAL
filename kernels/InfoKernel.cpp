@@ -381,7 +381,7 @@ void InfoKernel::dump(MetadataNode& root)
 
 bool InfoKernel::canRunRust() const
 {
-    if (m_usestdin || (m_pcType != "lidar" && !m_stac))
+    if (m_pcType != "lidar" && !m_stac)
         return false;
 
     return true;
@@ -451,7 +451,10 @@ int InfoKernel::runRust() const
         args.push_back(m_pipelineFile);
     }
 
-    args.push_back(m_inputFile);
+    if (m_usestdin)
+        args.push_back("--stdin");
+    else
+        args.push_back(m_inputFile);
 
     std::vector<const char*> argv;
     argv.reserve(args.size());

@@ -222,6 +222,20 @@ TEST(Info, boundary)
     test("--boundary", r);
 }
 
+TEST(Info, stdinPipeline)
+{
+    std::string json = "{\"pipeline\":[{\"type\":\"readers.las\","
+                       "\"filename\":\"" +
+                       Support::datapath("las/autzen_trim.las") + "\"}]}";
+    std::string output;
+    std::string cmd =
+        "printf '%s' '" + json + "' | " + appName() + " --stdin --summary 2>&1";
+
+    EXPECT_EQ(Utils::run_shell_command(cmd, output), 0);
+    EXPECT_NE(output.find("\"point_count\":110000"), std::string::npos)
+        << output;
+}
+
 TEST(Info, all)
 {
     std::string r = R"foo(
