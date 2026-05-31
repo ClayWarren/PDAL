@@ -68,6 +68,7 @@ KNOWN_BRIDGE_FILES = {
     "pdal/compression/GzipCompression.hpp",
     "pdal/KDIndex.cpp",
     "pdal/KDIndex.hpp",
+    "pdal/private/FileSpecHelper.hpp",
 }
 
 # C++ bindings over external native libraries. Their Rust home is `pdal-native`
@@ -166,9 +167,13 @@ HOLDOUTS = {
     "io/LasVLR.cpp": "exported deprecated LAS VLR compatibility API surface",
     "io/LasVLR.hpp": "exported deprecated LAS VLR compatibility API surface",
     "io/private/ept/Artifact.hpp": "C++ EPT artifact compatibility shell",
+    "io/private/ept/Addon.cpp": "C++ EPT addon metadata/layout compatibility shell",
+    "io/private/ept/Addon.hpp": "C++ EPT addon metadata/layout compatibility shell",
     "io/private/ept/FixedPointLayout.cpp": "C++ PointLayout ordering compatibility adapter",
     "io/private/ept/FixedPointLayout.hpp": "C++ PointLayout ordering compatibility adapter",
+    "io/private/ept/Overlap.hpp": "C++ EPT addon hierarchy compatibility key",
     "io/private/ept/VectorPointTable.hpp": "C++ PointTable view compatibility adapter",
+    "pdal/util/private/JsonSupport.hpp": "C++ nlohmann/Options JSON compatibility glue",
     # C++ compatibility argument-binding API used by exported C++ shells. The
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
