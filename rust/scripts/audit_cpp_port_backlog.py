@@ -86,6 +86,10 @@ NATIVE_ADAPTER_FILES = {
 # Documented intentional C++ holdouts. Keep this list small and cited; prefer
 # moving a file out of here once its port lands rather than letting it grow.
 HOLDOUTS = {
+    # C++ compatibility argument-binding API used by exported C++ shells. The
+    # Rust CLI/kernel path has its own parser; this remains glue for the legacy
+    # C++ API surface (rust/STATUS.md C++ app shell row).
+    "pdal/util/ProgramArgs.hpp": "C++ compatibility CLI argument-binding glue (rust/STATUS.md)",
     # GeoTIFF GeoKey <-> CRS encoding via libgeotiff. rust/STATUS.md: "GeoTIFF
     # VLR encoding remains C++ libgeotiff-backed."
     "io/private/las/Geotiff.cpp": "libgeotiff GeoKey encoding (rust/VENDOR.md, no Rust replacement chosen)",
