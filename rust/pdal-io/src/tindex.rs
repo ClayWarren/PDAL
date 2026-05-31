@@ -1,9 +1,10 @@
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
-use pdal_core::point::PointView;
+use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// Tile-index reader for GeoJSON indexes produced by `pdal tindex create`.
 pub struct TindexReader {
@@ -115,9 +116,8 @@ pub(crate) fn read_point_location(
         "readers.sbet" => crate::sbet::SbetReader::new(&options).read(),
         "readers.smrmsg" => crate::smrmsg::SmrmsgReader::new(&options).read(),
         "readers.terrasolid" => crate::terrasolid::TerrasolidReader::new(&options).read(),
-        "readers.copc" | "readers.las" | "readers.laz" => {
-            crate::las::LasReader::new(&options).read()
-        }
+        "readers.copc" => crate::copc::CopcReader::new(&options).read(),
+        "readers.las" | "readers.laz" => crate::las::LasReader::new(&options).read(),
         "readers.ept" => crate::ept::EptReader::new(&options).read(),
         "readers.ply" => crate::ply::PlyReader::new(&options).read(),
         _ => Err(StageError(format!(
@@ -132,29 +132,86 @@ pub(crate) fn append_view(
     path: &Path,
 ) -> Result<(), StageError> {
     if merged.is_none() {
-        *merged = Some(view.make_new());
+        *merged = Some(empty_view_like(view, &view_dims(view)));
     }
-    let target = merged.as_mut().unwrap();
-    if target.layout().dim_count() != view.layout().dim_count()
-        || target.layout().point_size() != view.layout().point_size()
-    {
-        return Err(StageError(format!(
-            "'{}' has a layout incompatible with the tile index.",
-            path.display()
-        )));
+
+    let current = merged.take().unwrap();
+    let dims = union_dims(&current, view, path)?;
+    let mut target = if same_dims(&current, &dims) {
+        current
+    } else {
+        normalize_view(&current, &dims)
+    };
+    let source = if same_dims(view, &dims) {
+        view.clone()
+    } else {
+        normalize_view(view, &dims)
+    };
+    for idx in 0..source.len() {
+        target.append_point(&source, idx);
     }
-    for idx in 0..target.layout().dim_count() {
-        if target.layout().dim_at(idx) != view.layout().dim_at(idx) {
-            return Err(StageError(format!(
-                "'{}' has a layout incompatible with the tile index.",
-                path.display()
-            )));
+    *merged = Some(target);
+    Ok(())
+}
+
+fn view_dims(view: &PointView) -> Vec<(DimId, DimType)> {
+    (0..view.layout().dim_count())
+        .filter_map(|idx| view.layout().dim_at(idx))
+        .map(|(dim, ty)| (dim.clone(), ty))
+        .collect()
+}
+
+fn union_dims(
+    target: &PointView,
+    source: &PointView,
+    path: &Path,
+) -> Result<Vec<(DimId, DimType)>, StageError> {
+    let mut dims = view_dims(target);
+    for (dim, ty) in view_dims(source) {
+        match dims.iter().find(|(existing, _)| existing == &dim) {
+            Some((_, existing_ty)) if *existing_ty != ty => {
+                return Err(StageError(format!(
+                    "'{}' has dimension '{}' with incompatible types.",
+                    path.display(),
+                    dim.name()
+                )));
+            }
+            Some(_) => {}
+            None => dims.push((dim, ty)),
         }
     }
+    Ok(dims)
+}
+
+fn same_dims(view: &PointView, dims: &[(DimId, DimType)]) -> bool {
+    view.layout().dim_count() == dims.len()
+        && dims.iter().enumerate().all(|(idx, (dim, ty))| {
+            view.layout()
+                .dim_at(idx)
+                .is_some_and(|(view_dim, view_ty)| view_dim == dim && view_ty == *ty)
+        })
+}
+
+fn normalize_view(view: &PointView, dims: &[(DimId, DimType)]) -> PointView {
+    let mut output = empty_view_like(view, dims);
     for idx in 0..view.len() {
-        target.append_point(view, idx);
+        let out_idx = output.add_point();
+        output.set_source_index(out_idx, view.source_index(idx));
+        for (dim, _) in dims {
+            output.set_f64(out_idx, dim, view.get_f64(idx, dim));
+        }
     }
-    Ok(())
+    output
+}
+
+fn empty_view_like(view: &PointView, dims: &[(DimId, DimType)]) -> PointView {
+    let mut layout = PointLayout::new();
+    for (dim, ty) in dims {
+        layout.register(dim.clone(), *ty);
+    }
+    let mut output = PointView::new(Rc::new(layout));
+    output.set_spatial_reference(view.spatial_reference().clone());
+    output
 }
 
 #[cfg(test)]
@@ -311,6 +368,37 @@ mod tests {
     fn read_point_file_errors_on_unknown_extension() {
         let p = std::path::PathBuf::from("/no/such/file.unknownext");
         assert!(read_point_file(&p).is_err());
+    }
+
+    #[test]
+    fn append_view_expands_to_union_layout() {
+        let mut first_layout = PointLayout::new();
+        first_layout.register(DimId::X, DimType::F64);
+        let mut first = PointView::new(Rc::new(first_layout));
+        let p0 = first.add_point();
+        first.set_f64(p0, &DimId::X, 1.0);
+        first.set_source_index(p0, 42);
+
+        let mut second_layout = PointLayout::new();
+        second_layout.register(DimId::X, DimType::F64);
+        second_layout.register(DimId::Intensity, DimType::U16);
+        let mut second = PointView::new(Rc::new(second_layout));
+        let p1 = second.add_point();
+        second.set_f64(p1, &DimId::X, 2.0);
+        second.set_f64(p1, &DimId::Intensity, 9.0);
+
+        let mut merged = None;
+        append_view(&mut merged, &first, Path::new("first.las")).unwrap();
+        append_view(&mut merged, &second, Path::new("second.las")).unwrap();
+        let merged = merged.unwrap();
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.layout().dim_count(), 2);
+        assert_eq!(merged.get_f64(0, &DimId::X), 1.0);
+        assert_eq!(merged.get_f64(0, &DimId::Intensity), 0.0);
+        assert_eq!(merged.get_f64(1, &DimId::X), 2.0);
+        assert_eq!(merged.get_f64(1, &DimId::Intensity), 9.0);
+        assert_eq!(merged.source_index(0), 42);
     }
 
     #[test]

@@ -935,6 +935,15 @@ impl PointView {
             .unwrap_or(idx)
     }
 
+    /// Set the original source row for point `idx`.
+    pub fn set_source_index(&mut self, idx: PointId, source: PointId) -> bool {
+        let Some(slot) = self.source_indices.get_mut(idx as usize) else {
+            return false;
+        };
+        *slot = source;
+        true
+    }
+
     /// Read a dimension of point `idx` as `f64` (PDAL's `getFieldAs`).
     /// Unregistered dimensions read as `0.0`.
     pub fn get_f64(&self, idx: PointId, dim: &DimId) -> f64 {
