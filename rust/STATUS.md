@@ -261,7 +261,10 @@ SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
 dimension/mesh/quick-info/artifact helpers, subcommand shells, and
 `Utils::Random` with its `std::mt19937&` API) are likewise compatibility
 holdouts; the remaining `pdal/` backlog is now concentrated in
-`PipelineManager`, JSON pipeline parsing support, and raster data ownership.
+`PipelineManager`, `PipelineReaderJSON`, and the deprecated `PipelineExecutor`
+C++ compatibility surface. Rust owns an independent pipeline graph/executor
+through `pdal_pipeline_*`; the remaining C++ classes expose mutable `Stage*`
+manager APIs and exact C++ JSON parser behavior for existing SDK callers.
 Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
@@ -396,14 +399,15 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is `10,524` code LOC for the main first-party
-surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). That is
-still a ceiling, not a precise backlog: mixed files count as wrapper when they
-include the C ABI even if they still contain legacy implementation, and
-intentional C++ holdouts have not all been subtracted. Optional `plugins/` add
-another deferred ceiling of about `36,476` code LOC; plugin work should stay
-separate from the mainline implementation-replacement checkpoint until the
-plugin ABI/support decision is made.
+C++ tests and vendor, is `1,459` code LOC across `10` files in the main
+first-party surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and
+`tools`). That is still a ceiling, not a precise backlog: mixed files count as
+wrapper when they include the C ABI even if they still contain legacy
+implementation, and intentional C++ holdouts have to be cited before they leave
+the actionable list. Optional `plugins/` add another deferred ceiling of about
+`36,476` code LOC; plugin work should stay separate from the mainline
+implementation-replacement checkpoint until the plugin ABI/support decision is
+made.
 
 Using the same simple nonblank/noncomment line counter, the current first-party
 C++ implementation ceilings by area are approximately:
