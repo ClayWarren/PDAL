@@ -34,6 +34,7 @@ mod obb_abi;
 mod ogr_spec_abi;
 mod options;
 mod pipeline_abi;
+mod pipeline_reader_abi;
 mod plugin_abi;
 mod point_abi;
 mod program_args_abi;

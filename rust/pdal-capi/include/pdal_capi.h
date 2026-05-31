@@ -1589,6 +1589,11 @@ extern "C"
     int64_t pdal_pipeline_find_by_tag(const pdal_pipeline_t* pipeline,
                                       const char* tag);
 
+    // Faithful PipelineReaderJSON parse + validation. Returns a newly-allocated
+    // JSON descriptor array (free with pdal_string_free) on success, or null
+    // with pdal_last_error() set on a parse/validation error.
+    char* pdal_pipeline_reader_parse_json(const char* json);
+
     // CLI / Kernel dispatch
     const char* pdal_version_string(void);
     char* pdal_kernel_list_json(void);

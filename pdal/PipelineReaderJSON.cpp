@@ -44,6 +44,8 @@
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
 
+#include <pdal_capi.h>
+
 #include <memory>
 #include <vector>
 
@@ -55,54 +57,122 @@ using TagMap = std::map<std::string, Stage*>;
 namespace
 {
 
-std::string extractType(NL::json& node);
-std::string extractTag(NL::json& node, TagMap& tags);
-FileSpec extractFilename(NL::json& node);
-std::vector<Stage*> extractInputs(NL::json& node, TagMap& tags);
-Options extractOptions(NL::json& node);
 bool extractOption(Options& options, const std::string& name,
                    const NL::json& node);
-void handleInputTag(const std::string& tag, const TagMap& tags,
-                    std::vector<Stage*>& inputs);
 
-void parsePipeline(NL::json& tree, PipelineManager& manager)
+// Build a stage's Options from the Rust-validated `options` object. The
+// `plugin` key is handled here (it loads a plugin and is not stored as an
+// option) because plugin loading owns C++ process state.
+Options optionsFromJson(const NL::json& node)
+{
+    Options options;
+
+    for (auto& it : node.items())
+    {
+        const NL::json& subnode = it.value();
+        const std::string& name = it.key();
+
+        if (name == "plugin")
+        {
+            PluginManager<Stage>::loadPlugin(subnode.get<std::string>());
+
+            // Don't actually put a "plugin" option on
+            // any stage
+            continue;
+        }
+
+        if (subnode.is_array())
+        {
+            for (const NL::json& val : subnode)
+                if (val.is_object())
+                    options.add(name, val);
+                else if (!extractOption(options, name, val))
+                    throw pdal_error("JSON pipeline: Invalid value type for "
+                                     "option list '" +
+                                     name + "'.");
+        }
+        else if (subnode.is_object())
+            options.add(name, subnode);
+        else if (!extractOption(options, name, subnode))
+            throw pdal_error("JSON pipeline: Value of stage option '" + name +
+                             "' cannot be converted.");
+    }
+    return options;
+}
+
+bool extractOption(Options& options, const std::string& name,
+                   const NL::json& node)
+{
+    if (node.is_string())
+        options.add(name, node.get<std::string>());
+    else if (node.is_number_unsigned())
+        options.add(name, node.get<uint64_t>());
+    else if (node.is_number_integer())
+        options.add(name, node.get<int64_t>());
+    else if (node.is_number_float())
+        options.add(name, node.get<double>());
+    else if (node.is_boolean())
+        options.add(name, node.get<bool>());
+    else if (node.is_array())
+        options.add(name, node.get<NL::json::array_t>());
+    else if (node.is_null())
+        options.add(name, "");
+    else
+        return false;
+    return true;
+}
+
+// Build a FileSpec from a descriptor. Bare-string pipeline elements are
+// ingested directly; object stages parse their `filename` node (which may be a
+// string or an object) through FileSpecHelper.
+FileSpec extractFilespec(const NL::json& desc)
+{
+    FileSpec spec;
+
+    if (desc.value("string_node", false))
+    {
+        spec.ingest(desc.at("filename").get<std::string>());
+        return spec;
+    }
+
+    const NL::json& filename = desc.at("filename");
+    if (filename.is_null())
+        return spec;
+
+    NL::json fnode = filename;
+    Utils::StatusWithReason status = FileSpecHelper::parse(spec, fnode);
+    if (!status)
+        throw pdal_error(status.what());
+    return spec;
+}
+
+// Build the C++ Stage* DAG from the Rust-validated descriptor array. Rust owns
+// JSON parsing, comment stripping, root/type/tag/inputs validation, and
+// reader/writer/filter role classification; this loop owns FileSpec/Options
+// construction, glob expansion, stage creation, and input wiring.
+void buildPipeline(const NL::json& descriptors, PipelineManager& manager)
 {
     TagMap tags;
     std::vector<Stage*> inputs;
 
-    size_t last = tree.size() - 1;
-    for (size_t i = 0; i < tree.size(); ++i)
+    for (const NL::json& desc : descriptors)
     {
-        NL::json& node = tree.at(i);
+        const std::string role = desc.at("role").get<std::string>();
+        const std::string type = desc.at("type").get<std::string>();
+        const std::string tag = desc.at("tag").get<std::string>();
 
-        FileSpec spec;
-        std::string tag;
-        std::string type;
+        FileSpec spec = extractFilespec(desc);
+        Options options = optionsFromJson(desc.at("options"));
+
         std::vector<Stage*> specifiedInputs;
-        Options options;
-
-        // strings are assumed to be filenames
-        if (node.is_string())
-        {
-            spec.ingest(node.get<std::string>());
-        }
-        else
-        {
-            type = extractType(node);
-            spec = extractFilename(node);
-            tag = extractTag(node, tags);
-            specifiedInputs = extractInputs(node, tags);
-            if (!specifiedInputs.empty())
-                inputs = specifiedInputs;
-            options = extractOptions(node);
-        }
+        for (const NL::json& name : desc.at("inputs"))
+            specifiedInputs.push_back(tags.at(name.get<std::string>()));
+        if (!specifiedInputs.empty())
+            inputs = specifiedInputs;
 
         Stage* s = nullptr;
 
-        // The type is inferred from a filename as a reader if it's not
-        // the last stage or if there's only one.
-        if ((type.empty() && (i == 0 || i != last)) ||
-            Utils::startsWith(type, "readers."))
+        if (role == "reader")
         {
             StringList files = Utils::glob(spec.u8string());
             if (files.empty())
@@ -113,15 +183,10 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
                 spec.setFilePath(path);
                 ReaderCreationOptions ops{spec, type, nullptr, options, tag};
                 s = &manager.makeReader(ops);
-
-                if (specifiedInputs.size())
-                    throw pdal_error("JSON pipeline: Inputs not permitted for "
-                                     " reader: '" +
-                                     path + "'.");
                 inputs.push_back(s);
             }
         }
-        else if (type.empty() || Utils::startsWith(type, "writers."))
+        else if (role == "writer")
         {
             StageCreationOptions ops{spec.u8string(), type, nullptr, options,
                                      tag};
@@ -164,177 +229,6 @@ void parsePipeline(NL::json& tree, PipelineManager& manager)
     }
 }
 
-std::string extractTag(NL::json& node, TagMap& tags)
-{
-    std::string tag;
-
-    auto it = node.find("tag");
-    if (it != node.end())
-    {
-        NL::json& val = *it;
-        if (!val.is_null())
-        {
-            if (val.is_string())
-            {
-                tag = val.get<std::string>();
-                if (tags.find(tag) != tags.end())
-                    throw pdal_error("JSON pipeline: duplicate tag '" + tag +
-                                     "'.");
-            }
-            else
-                throw pdal_error("JSON pipeline: tag must be "
-                                 "specified as a string.");
-        }
-        node.erase(it);
-        std::string::size_type pos = 0;
-        if (!Stage::parseTagName(tag, pos) || pos != tag.size())
-            throw pdal_error(
-                "JSON pipeline: Invalid tag name '" + tag +
-                "'.  "
-                "Must start with letter.  Remainder can be letters, "
-                "digits or underscores.");
-    }
-    return tag;
-}
-
-FileSpec extractFilename(NL::json& node)
-{
-    FileSpec spec;
-
-    auto it = node.find("filename");
-    if (it == node.end())
-        return spec;
-
-    Utils::StatusWithReason status = FileSpecHelper::parse(spec, *it);
-    if (!status)
-        throw pdal_error(status.what());
-    node.erase(it);
-    return spec;
-}
-
-std::vector<Stage*> extractInputs(NL::json& node, TagMap& tags)
-{
-    std::vector<Stage*> inputs;
-    std::string filename;
-
-    auto it = node.find("inputs");
-    if (it != node.end())
-    {
-        NL::json& val = *it;
-        if (val.is_string())
-            handleInputTag(val.get<std::string>(), tags, inputs);
-        else if (val.is_array())
-        {
-            for (auto& input : val)
-            {
-                if (!input.is_string())
-                    throw pdal_error(
-                        "JSON pipeline: 'inputs' tag must "
-                        " be specified as a string or array of strings.");
-                handleInputTag(input.get<std::string>(), tags, inputs);
-            }
-        }
-        else
-            throw pdal_error("JSON pipeline: 'inputs' tag must "
-                             " be specified as a string or array of strings.");
-        node.erase(it);
-    }
-    return inputs;
-}
-
-Options extractOptions(NL::json& node)
-{
-    Options options;
-
-    for (auto& it : node.items())
-    {
-        NL::json& subnode = it.value();
-        const std::string& name = it.key();
-
-        if (name == "plugin")
-        {
-            PluginManager<Stage>::loadPlugin(subnode.get<std::string>());
-
-            // Don't actually put a "plugin" option on
-            // any stage
-            continue;
-        }
-
-        if (subnode.is_array())
-        {
-            for (const NL::json& val : subnode)
-                if (val.is_object())
-                    options.add(name, val);
-                else if (!extractOption(options, name, val))
-                    throw pdal_error("JSON pipeline: Invalid value type for "
-                                     "option list '" +
-                                     name + "'.");
-        }
-        else if (subnode.is_object())
-            options.add(name, subnode);
-        else if (!extractOption(options, name, subnode))
-            throw pdal_error("JSON pipeline: Value of stage option '" + name +
-                             "' cannot be converted.");
-    }
-    node.clear();
-    return options;
-}
-
-std::string extractType(NL::json& node)
-{
-    std::string type;
-
-    auto it = node.find("type");
-    if (it != node.end())
-    {
-        NL::json& val = *it;
-        if (!val.is_null())
-        {
-            if (val.is_string())
-                type = val.get<std::string>();
-            else
-                throw pdal_error("JSON pipeline: 'type' must be specified as "
-                                 "a string.");
-        }
-        node.erase(it);
-    }
-    return type;
-}
-
-bool extractOption(Options& options, const std::string& name,
-                   const NL::json& node)
-{
-    if (node.is_string())
-        options.add(name, node.get<std::string>());
-    else if (node.is_number_unsigned())
-        options.add(name, node.get<uint64_t>());
-    else if (node.is_number_integer())
-        options.add(name, node.get<int64_t>());
-    else if (node.is_number_float())
-        options.add(name, node.get<double>());
-    else if (node.is_boolean())
-        options.add(name, node.get<bool>());
-    else if (node.is_array())
-        options.add(name, node.get<NL::json::array_t>());
-    else if (node.is_null())
-        options.add(name, "");
-    else
-        return false;
-    return true;
-}
-
-void handleInputTag(const std::string& tag, const TagMap& tags,
-                    std::vector<Stage*>& inputs)
-{
-    auto ii = tags.find(tag);
-    if (ii == tags.end())
-        throw pdal_error("JSON pipeline: Invalid pipeline: "
-                         "undefined stage tag '" +
-                         tag + "'.");
-    else
-        inputs.push_back(ii->second);
-}
-
 } // unnamed namespace
 
 PipelineReaderJSON::PipelineReaderJSON(PipelineManager& manager)
@@ -367,32 +261,28 @@ void PipelineReaderJSON::readPipeline(const std::string& filename)
 
 void PipelineReaderJSON::readPipeline(std::istream& input)
 {
-    NL::json root;
+    std::istreambuf_iterator<char> eos;
+    std::string json(std::istreambuf_iterator<char>(input), eos);
 
+    // Rust owns the parse + validation contract; it returns a flat,
+    // pre-validated descriptor array (or an error message via pdal_last_error).
+    char* out = pdal_pipeline_reader_parse_json(json.c_str());
+    if (!out)
+        throw pdal_error(pdal_last_error());
+
+    NL::json descriptors;
     try
     {
-        root = NL::json::parse(input, /* callback */ nullptr,
-                               /* allow exceptions */ true,
-                               /* ignore_comments */ true);
+        descriptors = NL::json::parse(out);
     }
-    catch (NL::json::parse_error& err)
+    catch (...)
     {
-        // Look for a right bracket -- this indicates the start of the
-        // actual message from the parse error.
-        std::string s(err.what());
-        auto pos = s.find(']');
-        if (pos != std::string::npos)
-            s = s.substr(pos + 1);
-        throw pdal_error("Pipeline:" + s);
+        pdal_string_free(out);
+        throw;
     }
+    pdal_string_free(out);
 
-    auto it = root.find("pipeline");
-    if (root.is_object() && it != root.end())
-        parsePipeline(*it, m_manager);
-    else if (root.is_array())
-        parsePipeline(root, m_manager);
-    else
-        throw pdal_error("Pipeline: root element is not a pipeline.");
+    buildPipeline(descriptors, m_manager);
 }
 
 } // namespace pdal
