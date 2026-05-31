@@ -136,8 +136,7 @@ pub extern "C" fn pdal_las_legacy_points_by_return(
     version_minor: u8,
     point_format: i32,
 ) -> u32 {
-    if return_num < 0
-        || return_num >= 5
+    if !(0..5).contains(&return_num)
         || !should_mirror_las_legacy_count(point_count, version_minor, point_format)
     {
         0

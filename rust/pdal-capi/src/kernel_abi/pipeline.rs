@@ -279,6 +279,10 @@ fn apply_stage_options_to_pipeline_json(
     serde_json::to_string(&value).map_err(|_| ())
 }
 
+// Flat CLI-argument dispatcher for `kernels.info`; the long but linear option
+// table is clearer as one match than split across helpers, matching the
+// `run_ground_kernel` arg-parser convention.
+#[allow(clippy::cognitive_complexity)]
 pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,

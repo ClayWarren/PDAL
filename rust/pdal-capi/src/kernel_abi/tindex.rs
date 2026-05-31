@@ -180,6 +180,37 @@ enum ParseResult {
     Unsupported,
 }
 
+/// Handle the `--key=value` forms of the boundary-shaping create args. Returns
+/// `Ok(true)` when `arg` matched one of them (and was applied), `Ok(false)`
+/// when it is not a boundary `=` option.
+fn try_parse_boundary_eq_arg(parsed: &mut CreateArgs, arg: &str) -> Result<bool, ParseResult> {
+    if let Some(value) = arg.strip_prefix("--threshold=") {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.density = parse_int(value, "--threshold")?;
+    } else if let Some(value) = arg
+        .strip_prefix("--resolution=")
+        .or_else(|| arg.strip_prefix("--edge_length="))
+    {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.edge_length = parse_float(value, "--resolution")?;
+    } else if let Some(value) = arg.strip_prefix("--sample_size=") {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.sample_size = parse_uint(value, "--sample_size")?;
+    } else if let Some(value) = arg.strip_prefix("--simplify=") {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.smooth = parse_bool(value, "--simplify")?;
+    } else if let Some(value) = arg.strip_prefix("--fast_boundary=") {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.fast_boundary = parse_bool(value, "--fast_boundary")?;
+    } else if let Some(value) = arg.strip_prefix("--where=") {
+        parsed.rich_boundary_options = true;
+        parsed.boundary.where_expr = Some(value.to_string());
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
 fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
     let mut parsed = CreateArgs {
         tindex_file: String::new(),
@@ -310,35 +341,9 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if let Some(value) = arg.strip_prefix("--lco=") => {
                 apply_layer_creation_option(&mut parsed, value)?;
             }
-            _ if let Some(value) = arg.strip_prefix("--threshold=") => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.density = parse_int(value, "--threshold")?;
-            }
-            _ if let Some(value) = arg
-                .strip_prefix("--resolution=")
-                .or_else(|| arg.strip_prefix("--edge_length=")) =>
-            {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.edge_length = parse_float(value, "--resolution")?;
-            }
-            _ if let Some(value) = arg.strip_prefix("--sample_size=") => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.sample_size = parse_uint(value, "--sample_size")?;
-            }
-            _ if let Some(value) = arg.strip_prefix("--simplify=") => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.smooth = parse_bool(value, "--simplify")?;
-            }
-            _ if let Some(value) = arg.strip_prefix("--fast_boundary=") => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.fast_boundary = parse_bool(value, "--fast_boundary")?;
-            }
+            _ if try_parse_boundary_eq_arg(&mut parsed, arg)? => {}
             _ if let Some(value) = arg.strip_prefix("--skip_different_srs=") => {
                 parsed.skip_different_srs = parse_bool(value, "--skip_different_srs")?;
-            }
-            _ if let Some(value) = arg.strip_prefix("--where=") => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.where_expr = Some(value.to_string());
             }
             _ if arg.starts_with("--filters.hexbin.smooth") => {
                 return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
