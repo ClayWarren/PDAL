@@ -42,6 +42,8 @@
 #include <pdal/util/FileUtils.hpp>
 #include <rust/pdal-capi/include/pdal_capi.h>
 
+#include <fstream>
+
 using namespace pdal;
 
 TEST(PipelineManagerTest, basic)
@@ -118,6 +120,29 @@ TEST(PipelineManagerTest, OptionOrder)
         EXPECT_GE(d, prev);
         prev = d;
     }
+    FileUtils::deleteFile(Support::temppath("sorted.las"));
+}
+
+TEST(PipelineManagerTest, progress)
+{
+    std::string cmd = Support::binpath(Support::exename("pdal") + " pipeline");
+    std::string file(Support::configuredpath("pipeline/sort2.json"));
+    std::string progress = Support::temppath("pipeline-progress.txt");
+    std::string output;
+
+    {
+        std::ofstream out(progress);
+    }
+
+    int stat = Utils::run_shell_command(
+        cmd + " " + file + " --progress " + progress, output);
+    EXPECT_EQ(stat, 0);
+
+    std::string text = FileUtils::readFileIntoString(progress);
+    EXPECT_NE(text.find("READYPIPELINE:pipeline"), std::string::npos);
+    EXPECT_NE(text.find("DONEPIPELINE:pipeline"), std::string::npos);
+
+    FileUtils::deleteFile(progress);
     FileUtils::deleteFile(Support::temppath("sorted.las"));
 }
 

@@ -8,7 +8,9 @@ use pdal_core::driver::infer_reader_driver;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::point::{DimId, DimType, PointId, PointView};
 use std::ffi::CStr;
+use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::os::raw::c_char;
 use std::path::Path;
 
@@ -34,6 +36,7 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
     let mut read_stdin = false;
     let mut validate_only = false;
     let mut metadata_file = None;
+    let mut progress_file = None;
     let mut serialization_file = None;
     let mut stage_options: Vec<CliStageOption> = Vec::new();
 
@@ -58,7 +61,13 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
                 eprintln!("PDAL: kernels.pipeline: Missing value for option '--dims'.");
                 return 1;
             };
-        } else if arg == "--progress" || arg == "--pointcloudschema" {
+        } else if arg == "--progress" {
+            let Some(value) = iter.next() else {
+                eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
+                return 1;
+            };
+            progress_file = Some(value.clone());
+        } else if arg == "--pointcloudschema" {
             let Some(_) = iter.next() else {
                 eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
                 return 1;
@@ -122,6 +131,11 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
         Err(()) => return -1,
     };
 
+    let mut progress = match open_progress_file(progress_file.as_deref()) {
+        Ok(progress) => progress,
+        Err(()) => return 1,
+    };
+
     if validate_only {
         let validation = validate_pipeline_for_kernel(&json);
         println!("{}", serde_json::to_string_pretty(&validation).unwrap());
@@ -146,6 +160,7 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
     };
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
+            write_progress(&mut progress, "DONEPIPELINE", "pipeline");
             if let Some(path) = metadata_file {
                 let handle = PipelineHandle { pipeline };
                 let summary = pipeline_result_to_json_for_kernel(result, &handle);
@@ -160,6 +175,29 @@ pub(super) unsafe fn run_pipeline_kernel(argc: i32, argv: *const *const c_char) 
             eprintln!("PDAL: kernels.pipeline: {err}");
             1
         }
+    }
+}
+
+fn open_progress_file(path: Option<&str>) -> Result<Option<File>, ()> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    match std::fs::OpenOptions::new().write(true).open(path) {
+        Ok(file) => {
+            let mut progress = Some(file);
+            write_progress(&mut progress, "READYPIPELINE", "pipeline");
+            Ok(progress)
+        }
+        Err(_) => {
+            eprintln!("Can't open progress file '{path}'.");
+            Err(())
+        }
+    }
+}
+
+fn write_progress(file: &mut Option<File>, event: &str, text: &str) {
+    if let Some(file) = file {
+        let _ = writeln!(file, "{event}:{text}");
     }
 }
 
