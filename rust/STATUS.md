@@ -182,10 +182,11 @@ The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
 - `c-abi-backed`: includes the Rust C ABI header (or is a known Rust bridge
   header). A header inherits its sibling `.cpp`'s category, so interface headers
   over a Rust-backed implementation are not counted as backlog.
-- `native-adapter`: C++ bindings over an external native library or platform
-  API whose Rust home is `pdal-native`/FFI (e.g. `pdal/private/gdal/`, GDAL
-  VSI, GDAL grid/density OGR adapters, lazperf compatibility, dynamic library
-  loading, and backtrace adapters), not a from-scratch port.
+- `native-adapter`: C++ bindings over an external native library, platform API,
+  or remote/vendor adapter path whose Rust home is `pdal-native`/FFI or a later
+  remote I/O adapter (e.g. `pdal/private/gdal/`, GDAL VSI, GDAL grid/density OGR
+  adapters, lazperf compatibility, Arbiter-backed STAC traversal, dynamic
+  library loading, and backtrace adapters), not a from-scratch port.
 - `holdout`: a documented intentional C++ holdout (libgeotiff GeoKey encoding,
   the `StreamCallback` callback ABI, and the `ProgramArgs` compatibility glue).
   Keep this list small and cited in the script.
@@ -196,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 8,992 | 84 |
+| port-candidate | 7,978 | 74 |
 | c-abi-backed | 41,891 | 373 |
-| native-adapter | 4,515 | 42 |
+| native-adapter | 5,529 | 52 |
 | holdout | 2,927 | 22 |
 | total | 58,325 | 521 |
 
-Port-candidate backlog by area: `io` 5,671 · `pdal` 3,321. `filters`,
+Port-candidate backlog by area: `io` 4,657 · `pdal` 3,321. `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -240,7 +241,10 @@ only the gzip auto-detect zlib fallback in C++. Public C++ typedef, exception,
 log-level, `std::istream`/`std::ostream`, endian extractor, endian inserter, and
 null ostream headers are compatibility holdouts: Rust owns equivalent domain
 logic where needed, but these exported C++ APIs must remain until the C++ SDK
-itself goes away. Rerun the audit after each change.
+itself goes away. The private STAC C++ traversal files are counted as native/
+remote adapter work: local supported STAC paths route through Rust, while those
+files preserve Arbiter/remote/schema fallback behavior for the later remote I/O
+milestone. Rerun the audit after each change.
 **API-parity note:** removing dead code is
 only legitimate when nothing references it AND it is not part of the exported
 public API. Under `-fvisibility=hidden`, `PDAL_EXPORT` *is* the public ABI, so

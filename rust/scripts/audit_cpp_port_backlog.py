@@ -18,9 +18,11 @@ Each first-party C++ file under the mainline areas (`pdal/`, `filters/`, `io/`,
     `.cpp`/`.hpp` pair is treated as one unit: a `.cpp` that delegates usually
     pulls the ABI in through its own paired header, so the signal propagates
     across the stem in both directions.
-  - native-adapter: a C++ binding over an external native library (GDAL/OGR,
-    libgeotiff, GEOS, PROJ) whose Rust home is `pdal-native`/explicit FFI, not a
-    pure-Rust reimplementation. Tracked separately from the pure-Rust backlog.
+  - native-adapter: a C++ binding over an external native library or remote/
+    vendor adapter path (GDAL/OGR, libgeotiff, GEOS, PROJ, Arbiter-backed STAC)
+    whose Rust home is `pdal-native`/explicit FFI or a later remote I/O adapter,
+    not a pure-Rust reimplementation. Tracked separately from the pure-Rust
+    backlog.
   - holdout: a documented intentional C++ holdout (see HOLDOUTS).
   - port-candidate: pure C++ with no C ABI reference and not otherwise
     categorized. This is the actionable backlog.
@@ -73,6 +75,7 @@ KNOWN_BRIDGE_FILES = {
 NATIVE_ADAPTER_PREFIXES = (
     "io/private/connector/",
     "io/private/esri/",
+    "io/private/stac/",
     "pdal/private/gdal/",
 )
 
