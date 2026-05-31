@@ -97,6 +97,81 @@ pub unsafe extern "C" fn pdal_las_summary_bounds(
     }
 }
 
+pub struct LasTileHandle {
+    chunk: u32,
+    data: Vec<u8>,
+    pos: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_las_tile_create(chunk: u32, size: u64) -> *mut LasTileHandle {
+    let Ok(size) = usize::try_from(size) else {
+        set_last_error("LAS tile size exceeds platform capacity.");
+        return std::ptr::null_mut();
+    };
+    Box::into_raw(Box::new(LasTileHandle {
+        chunk,
+        data: vec![0; size],
+        pos: 0,
+    }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_destroy(tile: *mut LasTileHandle) {
+    if !tile.is_null() {
+        drop(Box::from_raw(tile));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_data_const(tile: *const LasTileHandle) -> *const c_char {
+    tile.as_ref()
+        .map(|tile| tile.data.as_ptr().cast::<c_char>())
+        .unwrap_or(std::ptr::null())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_data(tile: *mut LasTileHandle) -> *mut c_char {
+    tile.as_mut()
+        .map(|tile| tile.data.as_mut_ptr().cast::<c_char>())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_size(tile: *const LasTileHandle) -> u64 {
+    tile.as_ref()
+        .map(|tile| tile.data.len() as u64)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_pos(tile: *const LasTileHandle) -> *const c_char {
+    let Some(tile) = tile.as_ref() else {
+        return std::ptr::null();
+    };
+    if tile.pos >= tile.data.len() {
+        return std::ptr::null();
+    }
+    tile.data[tile.pos..].as_ptr().cast::<c_char>()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_chunk(tile: *const LasTileHandle) -> u32 {
+    tile.as_ref().map(|tile| tile.chunk).unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pdal_las_tile_advance(tile: *mut LasTileHandle, point_size: i32) -> bool {
+    let Some(tile) = tile.as_mut() else {
+        return false;
+    };
+    if point_size < 0 {
+        return false;
+    }
+    tile.pos = tile.pos.saturating_add(point_size as usize);
+    tile.pos < tile.data.len()
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct pdal_copc_info_t {

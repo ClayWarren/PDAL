@@ -31,6 +31,7 @@ extern "C"
     typedef struct pdal_artifact_manager pdal_artifact_manager_t;
     typedef struct pdal_column_storage pdal_column_storage_t;
     typedef struct pdal_las_summary pdal_las_summary_t;
+    typedef struct pdal_las_tile pdal_las_tile_t;
 
     const char* pdal_last_error();
     void pdal_clear_error();
@@ -482,6 +483,15 @@ extern "C"
                                            uint64_t return_number);
     void pdal_las_summary_bounds(const pdal_las_summary_t* summary,
                                  pdal_bounds3d_t* out_bounds);
+
+    pdal_las_tile_t* pdal_las_tile_create(uint32_t chunk, uint64_t size);
+    void pdal_las_tile_destroy(pdal_las_tile_t* tile);
+    const char* pdal_las_tile_data_const(const pdal_las_tile_t* tile);
+    char* pdal_las_tile_data(pdal_las_tile_t* tile);
+    uint64_t pdal_las_tile_size(const pdal_las_tile_t* tile);
+    const char* pdal_las_tile_pos(const pdal_las_tile_t* tile);
+    uint32_t pdal_las_tile_chunk(const pdal_las_tile_t* tile);
+    bool pdal_las_tile_advance(pdal_las_tile_t* tile, int32_t point_size);
 
     typedef struct
     {

@@ -34,6 +34,8 @@
 
 #pragma once
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
 namespace pdal
 {
 namespace las
@@ -43,40 +45,41 @@ class Tile
 {
 public:
     Tile(uint32_t chunk, uint32_t size)
-        : m_chunk(chunk), m_data(size), m_pos(m_data.data())
+        : m_tile(pdal_las_tile_create(chunk, size))
     {
+    }
+    ~Tile()
+    {
+        pdal_las_tile_destroy(m_tile);
     }
 
     const char* data() const
     {
-        return m_data.data();
+        return pdal_las_tile_data_const(m_tile);
     }
     char* data()
     {
-        return m_data.data();
+        return pdal_las_tile_data(m_tile);
     }
     size_t size() const
     {
-        return m_data.size();
+        return pdal_las_tile_size(m_tile);
     }
     const char* pos() const
     {
-        return m_pos;
+        return pdal_las_tile_pos(m_tile);
     }
     uint32_t chunk() const
     {
-        return m_chunk;
+        return pdal_las_tile_chunk(m_tile);
     }
     bool advance(int pointSize)
     {
-        m_pos += pointSize;
-        return m_pos < m_data.data() + m_data.size();
+        return pdal_las_tile_advance(m_tile, pointSize);
     }
 
 private:
-    uint32_t m_chunk;
-    std::vector<char> m_data;
-    char* m_pos;
+    pdal_las_tile_t* m_tile;
 };
 using TilePtr = std::unique_ptr<Tile>;
 

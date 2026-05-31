@@ -46,6 +46,34 @@ fn las_summary_abi_tracks_bounds_total_and_return_counts() {
 }
 
 #[test]
+fn las_tile_abi_owns_buffer_and_advances_cursor() {
+    unsafe {
+        let tile = pdal_las_tile_create(7, 6);
+        assert!(!tile.is_null());
+        assert_eq!(pdal_las_tile_chunk(tile), 7);
+        assert_eq!(pdal_las_tile_size(tile), 6);
+
+        let data = pdal_las_tile_data(tile);
+        assert!(!data.is_null());
+        *data.add(0) = 11;
+        *data.add(5) = 99;
+        assert_eq!(*pdal_las_tile_data_const(tile).add(0), 11);
+        assert_eq!(*pdal_las_tile_pos(tile), 11);
+
+        assert!(pdal_las_tile_advance(tile, 4));
+        assert_eq!(*pdal_las_tile_pos(tile), 0);
+        assert!(!pdal_las_tile_advance(tile, 2));
+        assert!(pdal_las_tile_pos(tile).is_null());
+        assert!(!pdal_las_tile_advance(tile, -1));
+
+        pdal_las_tile_destroy(tile);
+        pdal_las_tile_destroy(std::ptr::null_mut());
+        assert_eq!(pdal_las_tile_size(std::ptr::null()), 0);
+        assert!(pdal_las_tile_data(std::ptr::null_mut()).is_null());
+    }
+}
+
+#[test]
 fn copc_info_abi_decodes_little_endian_payload() {
     let mut data = Vec::new();
     for value in [1.0, 2.0, 3.0, 4.0, 5.0] {
