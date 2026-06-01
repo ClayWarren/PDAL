@@ -21,6 +21,7 @@ pub struct TindexReader {
     dialect: String,
     polygon: String,
     target_srs: String,
+    reader_args: String,
     bounds: String,
 }
 
@@ -36,6 +37,7 @@ impl TindexReader {
             dialect: options.get_str("dialect", "OGRSQL"),
             polygon: options.get_str("polygon", ""),
             target_srs: options.get_str("t_srs", ""),
+            reader_args: options.get_str("reader_args", ""),
             bounds: options.get_str("bounds", ""),
         }
     }
@@ -66,12 +68,15 @@ impl Reader for TindexReader {
             bounds.as_ref(),
             polygon.as_ref(),
         )?;
+        let reader_args = parse_reader_args(&self.reader_args)?;
 
         let mut merged: Option<PointView> = None;
         let base = location_base(&self.filename);
         for feature in features {
             let location = resolve_location_text(&base, &feature.location);
-            let mut views = read_point_location(&location, None, &Options::new())?;
+            let driver = pdal_core::driver::infer_reader_driver(&location);
+            let options = reader_options_for(driver, &reader_args);
+            let mut views = read_point_location(&location, driver, &options)?;
             for mut view in views.drain(..) {
                 apply_feature_srs(&mut view, feature.srs.as_deref());
                 reproject_to_target_srs(&mut view, &self.target_srs)?;
@@ -123,6 +128,11 @@ fn apply_feature_srs(view: &mut PointView, srs: Option<&str>) {
 struct IndexFeature {
     location: String,
     srs: Option<String>,
+}
+
+struct ReaderArgs {
+    driver: String,
+    options: Options,
 }
 
 fn read_index_features(
@@ -255,6 +265,68 @@ fn feature_srs(feature: &serde_json::Value, srs_field: &str) -> Option<String> {
         .as_str()
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
+}
+
+fn parse_reader_args(input: &str) -> Result<Vec<ReaderArgs>, StageError> {
+    if input.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut value: serde_json::Value = serde_json::from_str(input)
+        .map_err(|err| StageError(format!("reader_args must be valid JSON: {err}")))?;
+    if value.is_object() {
+        value = serde_json::Value::Array(vec![value]);
+    }
+    let entries = value
+        .as_array()
+        .ok_or_else(|| StageError("reader_args must be a JSON array.".to_string()))?;
+    let mut out = Vec::new();
+    for entry in entries {
+        let object = entry
+            .as_object()
+            .ok_or_else(|| StageError("reader_args entries must be JSON objects.".to_string()))?;
+        let driver = object
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| StageError("reader_args entry is missing type.".to_string()))?
+            .to_string();
+        let mut options = Options::new();
+        for (key, value) in object {
+            if key == "type" || key == "filename" {
+                continue;
+            }
+            add_json_option(&mut options, key, value);
+        }
+        out.push(ReaderArgs { driver, options });
+    }
+    Ok(out)
+}
+
+fn reader_options_for(driver: Option<&str>, reader_args: &[ReaderArgs]) -> Options {
+    let Some(driver) = driver else {
+        return Options::new();
+    };
+    reader_args
+        .iter()
+        .find(|args| args.driver == driver)
+        .map(|args| args.options.clone())
+        .unwrap_or_default()
+}
+
+fn add_json_option(options: &mut Options, key: &str, value: &serde_json::Value) {
+    match value {
+        serde_json::Value::String(text) => {
+            options.add(key, text);
+        }
+        serde_json::Value::Number(number) => {
+            options.add(key, number.to_string());
+        }
+        serde_json::Value::Bool(value) => {
+            options.add(key, if *value { "true" } else { "false" });
+        }
+        _ => {
+            options.add(key, value.to_string());
+        }
+    };
 }
 
 pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
@@ -953,6 +1025,24 @@ mod tests {
         assert_eq!(features.len(), 1);
         assert_eq!(features[0].location, "simple_text.ply");
         assert_eq!(features[0].srs.as_deref(), Some("EPSG:4326"));
+    }
+
+    #[test]
+    fn reader_args_select_options_by_driver() {
+        let args = parse_reader_args(
+            r#"[{"type":"readers.las","count":2},{"type":"readers.ply","precision":3}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            reader_options_for(Some("readers.las"), &args).get_u64("count", 0),
+            2
+        );
+        assert_eq!(
+            reader_options_for(Some("readers.ply"), &args).get_u64("precision", 0),
+            3
+        );
+        assert_eq!(reader_options_for(Some("readers.text"), &args).len(), 0);
     }
 
     #[test]
