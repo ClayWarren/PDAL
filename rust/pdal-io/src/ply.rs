@@ -368,11 +368,6 @@ fn find_header_end(bytes: &[u8]) -> Option<usize> {
 fn parse_property(words: &[&str], element_name: &str) -> Result<PlyProp, StageError> {
     match words.get(1).copied() {
         Some("list") => {
-            if element_name == "vertex" {
-                return Err(StageError(
-                    "List properties are not supported for the 'vertex' element.".to_string(),
-                ));
-            }
             let count_type = words.get(2).and_then(|w| ply_type(w));
             let list_type = words.get(3).and_then(|w| ply_type(w));
             if count_type.is_none() || list_type.is_none() {

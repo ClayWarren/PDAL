@@ -48,6 +48,35 @@ mod tests {
     }
 
     #[test]
+    fn consumes_vertex_list_properties() {
+        let output = temp_path("vertex-list.ply");
+        fs::write(
+            &output,
+            b"ply
+format ascii 1.0
+element vertex 2
+property float x
+property float y
+property float z
+property list uchar int neighbor_indices
+end_header
+1 2 3 2 0 1
+4 5 6 1 0
+",
+        )
+        .unwrap();
+
+        let view = read_back(&output);
+        assert_eq!(view.len(), 2);
+        assert_eq!(view.get_f64(0, &DimId::X), 1.0);
+        assert_eq!(view.get_f64(0, &DimId::Y), 2.0);
+        assert_eq!(view.get_f64(0, &DimId::Z), 3.0);
+        assert_eq!(view.get_f64(1, &DimId::X), 4.0);
+        assert_eq!(view.get_f64(1, &DimId::Y), 5.0);
+        assert_eq!(view.get_f64(1, &DimId::Z), 6.0);
+    }
+
+    #[test]
     fn reads_ascii_mesh_faces() {
         let view = read_ply("ply/mesh.ply");
         assert_eq!(view.len(), 4);
