@@ -476,8 +476,7 @@ bool TIndexReader::canUseRustReader() const
     if (!m_args->m_wkt.empty() && !m_args->m_filterSRS.empty())
         return false;
 
-    return m_args->m_srsColumnName.empty() && m_args->m_ogr.empty() &&
-           m_args->m_rawReaderArgs.empty();
+    return m_args->m_ogr.empty() && m_args->m_rawReaderArgs.empty();
 }
 
 void TIndexReader::loadRustView()
@@ -493,6 +492,7 @@ void TIndexReader::loadRustView()
     addOption(options, "filename", m_filename);
     addOption(options, "lyr_name", m_args->m_layerName);
     addOption(options, "tindex_name", m_args->m_tileIndexColumnName);
+    addOption(options, "srs_column", m_args->m_srsColumnName);
     addOption(options, "where", m_args->m_attributeFilter);
     addOption(options, "sql", m_args->m_sql);
     addOption(options, "dialect", m_args->m_dialect);

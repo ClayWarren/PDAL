@@ -194,7 +194,8 @@ impl Vector {
         if layer.is_null() {
             return Err("Failed to get layer".to_string());
         }
-        self.get_string_features_from_layer(layer, column, "")
+        self.get_string_pair_features_from_layer(layer, column, "", "")
+            .map(drop_optional_string_column)
     }
 
     pub fn get_string_features_by_layer(
@@ -208,14 +209,17 @@ impl Vector {
             if layer.is_null() {
                 return Err("Failed to get layer".to_string());
             }
-            return self.get_string_features_from_layer(layer, column, attribute_filter);
+            return self
+                .get_string_pair_features_from_layer(layer, column, "", attribute_filter)
+                .map(drop_optional_string_column);
         }
         let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
         let layer = unsafe { gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr()) };
         if layer.is_null() {
             return Err(format!("Failed to get layer '{}'.", layer_name));
         }
-        self.get_string_features_from_layer(layer, column, attribute_filter)
+        self.get_string_pair_features_from_layer(layer, column, "", attribute_filter)
+            .map(drop_optional_string_column)
     }
 
     pub fn get_string_features_by_sql(
@@ -242,19 +246,91 @@ impl Vector {
             if layer.is_null() {
                 return Err(format!("Failed to execute OGR SQL '{}'.", sql));
             }
-            let result = self.get_string_features_from_layer(layer, column, attribute_filter);
+            let result = self
+                .get_string_pair_features_from_layer(layer, column, "", attribute_filter)
+                .map(drop_optional_string_column);
             gdal_sys::OGR_DS_ReleaseResultSet(self.ds, layer);
             result
         }
     }
 
-    fn get_string_features_from_layer(
+    pub fn get_string_pair_features_by_layer(
+        &self,
+        layer_name: &str,
+        first_column: &str,
+        second_column: &str,
+        attribute_filter: &str,
+    ) -> Result<Vec<(String, String, Option<String>)>, String> {
+        if layer_name.is_empty() {
+            let layer = unsafe { gdal_sys::OGR_DS_GetLayer(self.ds, 0) };
+            if layer.is_null() {
+                return Err("Failed to get layer".to_string());
+            }
+            return self.get_string_pair_features_from_layer(
+                layer,
+                first_column,
+                second_column,
+                attribute_filter,
+            );
+        }
+        let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
+        let layer = unsafe { gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr()) };
+        if layer.is_null() {
+            return Err(format!("Failed to get layer '{}'.", layer_name));
+        }
+        self.get_string_pair_features_from_layer(
+            layer,
+            first_column,
+            second_column,
+            attribute_filter,
+        )
+    }
+
+    pub fn get_string_pair_features_by_sql(
+        &self,
+        sql: &str,
+        dialect: &str,
+        first_column: &str,
+        second_column: &str,
+        attribute_filter: &str,
+    ) -> Result<Vec<(String, String, Option<String>)>, String> {
+        let sql_c = CString::new(sql).map_err(|e| e.to_string())?;
+        let dialect_c = CString::new(dialect).map_err(|e| e.to_string())?;
+        let dialect_ptr = if dialect.is_empty() {
+            std::ptr::null()
+        } else {
+            dialect_c.as_ptr()
+        };
+        unsafe {
+            let layer = gdal_sys::OGR_DS_ExecuteSQL(
+                self.ds,
+                sql_c.as_ptr(),
+                std::ptr::null_mut(),
+                dialect_ptr,
+            );
+            if layer.is_null() {
+                return Err(format!("Failed to execute OGR SQL '{}'.", sql));
+            }
+            let result = self.get_string_pair_features_from_layer(
+                layer,
+                first_column,
+                second_column,
+                attribute_filter,
+            );
+            gdal_sys::OGR_DS_ReleaseResultSet(self.ds, layer);
+            result
+        }
+    }
+
+    fn get_string_pair_features_from_layer(
         &self,
         layer: gdal_sys::OGRLayerH,
-        column: &str,
+        first_column: &str,
+        second_column: &str,
         attribute_filter: &str,
-    ) -> Result<Vec<(String, String)>, String> {
-        let column_c = CString::new(column).map_err(|e| e.to_string())?;
+    ) -> Result<Vec<(String, String, Option<String>)>, String> {
+        let first_column_c = CString::new(first_column).map_err(|e| e.to_string())?;
+        let second_column_c = CString::new(second_column).map_err(|e| e.to_string())?;
         let filter_c = CString::new(attribute_filter).map_err(|e| e.to_string())?;
         unsafe {
             let mut result = Vec::new();
@@ -275,11 +351,21 @@ impl Vector {
                     break;
                 }
 
-                let field_idx = gdal_sys::OGR_F_GetFieldIndex(feature, column_c.as_ptr());
+                let field_idx = gdal_sys::OGR_F_GetFieldIndex(feature, first_column_c.as_ptr());
                 if field_idx < 0 {
                     gdal_sys::OGR_F_Destroy(feature);
-                    return Err(format!("No column name '{}' was found.", column));
+                    return Err(format!("No column name '{}' was found.", first_column));
                 }
+                let second_field_idx = if second_column.is_empty() {
+                    -1
+                } else {
+                    let idx = gdal_sys::OGR_F_GetFieldIndex(feature, second_column_c.as_ptr());
+                    if idx < 0 {
+                        gdal_sys::OGR_F_Destroy(feature);
+                        return Err(format!("No column name '{}' was found.", second_column));
+                    }
+                    idx
+                };
 
                 let geom = gdal_sys::OGR_F_GetGeometryRef(feature);
                 if !geom.is_null() {
@@ -297,7 +383,19 @@ impl Vector {
                                 .to_string_lossy()
                                 .into_owned()
                         };
-                        result.push((wkt, value));
+                        let second = if second_field_idx < 0 {
+                            None
+                        } else {
+                            let ptr = gdal_sys::OGR_F_GetFieldAsString(feature, second_field_idx);
+                            if ptr.is_null() {
+                                None
+                            } else {
+                                let value =
+                                    std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned();
+                                (!value.is_empty()).then_some(value)
+                            }
+                        };
+                        result.push((wkt, value, second));
                     }
                 }
                 gdal_sys::OGR_F_Destroy(feature);
@@ -349,4 +447,12 @@ impl Drop for Vector {
             gdal_sys::OGR_DS_Destroy(self.ds);
         }
     }
+}
+
+fn drop_optional_string_column(
+    rows: Vec<(String, String, Option<String>)>,
+) -> Vec<(String, String)> {
+    rows.into_iter()
+        .map(|(wkt, value, _)| (wkt, value))
+        .collect()
 }

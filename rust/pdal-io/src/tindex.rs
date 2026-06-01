@@ -15,6 +15,7 @@ pub struct TindexReader {
     filename: String,
     layer_name: String,
     location_field: String,
+    srs_field: String,
     attribute_filter: String,
     sql: String,
     dialect: String,
@@ -29,6 +30,7 @@ impl TindexReader {
             filename: options.get_str("filename", ""),
             layer_name: options.get_str("lyr_name", ""),
             location_field: options.get_str("tindex_name", "location"),
+            srs_field: options.get_str("srs_column", ""),
             attribute_filter: options.get_str("where", ""),
             sql: options.get_str("sql", ""),
             dialect: options.get_str("dialect", "OGRSQL"),
@@ -57,6 +59,7 @@ impl Reader for TindexReader {
             &self.filename,
             &self.layer_name,
             &self.location_field,
+            &self.srs_field,
             &self.attribute_filter,
             &self.sql,
             &self.dialect,
@@ -70,6 +73,7 @@ impl Reader for TindexReader {
             let location = resolve_location_text(&base, &feature.location);
             let mut views = read_point_location(&location, None, &Options::new())?;
             for mut view in views.drain(..) {
+                apply_feature_srs(&mut view, feature.srs.as_deref());
                 reproject_to_target_srs(&mut view, &self.target_srs)?;
                 append_view(&mut merged, &view, Path::new(&location))?;
             }
@@ -110,14 +114,22 @@ fn reproject_to_target_srs(view: &mut PointView, target_srs: &str) -> Result<(),
     Ok(())
 }
 
+fn apply_feature_srs(view: &mut PointView, srs: Option<&str>) {
+    if let Some(srs) = srs.filter(|value| !value.trim().is_empty()) {
+        view.set_spatial_reference(SpatialReference::new(srs));
+    }
+}
+
 struct IndexFeature {
     location: String,
+    srs: Option<String>,
 }
 
 fn read_index_features(
     filename: &str,
     layer_name: &str,
     location_field: &str,
+    srs_field: &str,
     attribute_filter: &str,
     sql: &str,
     dialect: &str,
@@ -125,24 +137,28 @@ fn read_index_features(
     polygon: Option<&Geometry>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     match source::read_to_string(filename) {
-        Ok(text) => match read_geojson_index_features(&text, location_field, bounds, polygon) {
-            Ok(features) => Ok(features),
-            Err(json_err) => read_ogr_index_features(
-                filename,
-                layer_name,
-                location_field,
-                attribute_filter,
-                sql,
-                dialect,
-                bounds,
-                polygon,
-            )
-            .or(Err(json_err)),
-        },
+        Ok(text) => {
+            match read_geojson_index_features(&text, location_field, srs_field, bounds, polygon) {
+                Ok(features) => Ok(features),
+                Err(json_err) => read_ogr_index_features(
+                    filename,
+                    layer_name,
+                    location_field,
+                    srs_field,
+                    attribute_filter,
+                    sql,
+                    dialect,
+                    bounds,
+                    polygon,
+                )
+                .or(Err(json_err)),
+            }
+        }
         Err(text_err) => read_ogr_index_features(
             filename,
             layer_name,
             location_field,
+            srs_field,
             attribute_filter,
             sql,
             dialect,
@@ -156,6 +172,7 @@ fn read_index_features(
 fn read_geojson_index_features(
     text: &str,
     location_field: &str,
+    srs_field: &str,
     bounds: Option<&Bounds2D>,
     polygon: Option<&Geometry>,
 ) -> Result<Vec<IndexFeature>, StageError> {
@@ -182,6 +199,7 @@ fn read_geojson_index_features(
             })?;
         output.push(IndexFeature {
             location: location.to_string(),
+            srs: feature_srs(feature, srs_field),
         });
     }
     Ok(output)
@@ -191,6 +209,7 @@ fn read_ogr_index_features(
     filename: &str,
     layer_name: &str,
     location_field: &str,
+    srs_field: &str,
     attribute_filter: &str,
     sql: &str,
     dialect: &str,
@@ -200,21 +219,42 @@ fn read_ogr_index_features(
     let vector = pdal_native::gdal::Vector::open(filename).map_err(StageError)?;
     let features = if sql.is_empty() {
         vector
-            .get_string_features_by_layer(layer_name, location_field, attribute_filter)
+            .get_string_pair_features_by_layer(
+                layer_name,
+                location_field,
+                srs_field,
+                attribute_filter,
+            )
             .map_err(StageError)?
     } else {
         vector
-            .get_string_features_by_sql(sql, dialect, location_field, attribute_filter)
+            .get_string_pair_features_by_sql(
+                sql,
+                dialect,
+                location_field,
+                srs_field,
+                attribute_filter,
+            )
             .map_err(StageError)?
     };
     let mut output = Vec::new();
-    for (wkt, location) in features {
+    for (wkt, location, srs) in features {
         if !wkt_matches_bounds(&wkt, bounds, polygon)? {
             continue;
         }
-        output.push(IndexFeature { location });
+        output.push(IndexFeature { location, srs });
     }
     Ok(output)
+}
+
+fn feature_srs(feature: &serde_json::Value, srs_field: &str) -> Option<String> {
+    if srs_field.is_empty() {
+        return None;
+    }
+    feature["properties"][srs_field]
+        .as_str()
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
 }
 
 pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
@@ -897,6 +937,22 @@ mod tests {
         assert!((view.get_f64(point, &DimId::X) - 111_319.49).abs() < 1.0);
         assert!((view.get_f64(point, &DimId::Y) - 111_325.14).abs() < 1.0);
         assert_eq!(view.spatial_reference().wkt(), "EPSG:3857");
+    }
+
+    #[test]
+    fn geojson_features_capture_srs_column() {
+        let text = r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"location":"simple_text.ply","srs":"EPSG:4326"},"geometry":null}
+  ]
+}"#;
+
+        let features = read_geojson_index_features(text, "location", "srs", None, None).unwrap();
+
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0].location, "simple_text.ply");
+        assert_eq!(features[0].srs.as_deref(), Some("EPSG:4326"));
     }
 
     #[test]
