@@ -8,6 +8,8 @@ use pdal_kernels::{word_wrap, FauxPluginKernel, Kernel, KernelArgs};
 mod analysis_commands;
 #[path = "pipeline_commands.rs"]
 mod pipeline_commands;
+#[path = "pipeline_extra_commands.rs"]
+mod pipeline_extra_commands;
 
 fn safe_cstr(ptr: *const std::os::raw::c_char) -> Option<String> {
     if ptr.is_null() {
