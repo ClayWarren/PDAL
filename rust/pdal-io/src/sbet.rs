@@ -77,17 +77,11 @@ impl Reader for SbetReader {
                 "SbetReader requires a filename option.".to_string(),
             ));
         }
-        let file = File::open(Path::new(&self.filename))
-            .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
         let point_size = (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64;
-        let file_size = file
-            .metadata()
-            .map_err(|e| StageError(e.to_string()))?
-            .len();
+        let (mut reader, file_size) = open_sbet_reader(&self.filename)?;
         if file_size == 0 || file_size % point_size != 0 {
             return Err(StageError("Invalid file size.".to_string()));
         }
-        let mut reader = BufReader::new(file);
 
         let mut layout = PointLayout::new();
         for (dim, ty) in Self::file_dimensions() {
@@ -118,6 +112,38 @@ impl Reader for SbetReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.sbet")
+    }
+}
+
+fn open_sbet_reader(filename: &str) -> Result<(BufReader<Box<dyn Read>>, u64), StageError> {
+    if is_sbet_vsi_path(filename) {
+        let vsi_path = sbet_vsi_path(filename);
+        let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
+            .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
+        let len = file.len().map_err(StageError)?;
+        return Ok((BufReader::new(Box::new(file)), len));
+    }
+
+    let file = File::open(Path::new(filename))
+        .map_err(|_| StageError(format!("Couldn't open '{filename}'")))?;
+    let len = file
+        .metadata()
+        .map_err(|e| StageError(e.to_string()))?
+        .len();
+    Ok((BufReader::new(Box::new(file)), len))
+}
+
+fn is_sbet_vsi_path(filename: &str) -> bool {
+    filename.starts_with("/vsi")
+        || filename.starts_with("http://")
+        || filename.starts_with("https://")
+}
+
+fn sbet_vsi_path(filename: &str) -> String {
+    if filename.starts_with("http://") || filename.starts_with("https://") {
+        format!("/vsicurl/{filename}")
+    } else {
+        filename.to_string()
     }
 }
 
@@ -179,5 +205,21 @@ mod tests {
 
         assert!(SbetReader::new(&options).read().is_err());
         assert!(SbetReader::new(&Options::new()).read().is_err());
+    }
+
+    #[test]
+    fn sbet_vsi_path_helpers_cover_remote_and_vsi_forms() {
+        assert!(is_sbet_vsi_path("https://example.com/file.sbet"));
+        assert!(is_sbet_vsi_path("http://example.com/file.sbet"));
+        assert!(is_sbet_vsi_path("/vsicurl/https://example.com/file.sbet"));
+        assert!(!is_sbet_vsi_path("/tmp/file.sbet"));
+        assert_eq!(
+            sbet_vsi_path("https://example.com/file.sbet"),
+            "/vsicurl/https://example.com/file.sbet"
+        );
+        assert_eq!(
+            sbet_vsi_path("/vsicurl/https://example.com/file.sbet"),
+            "/vsicurl/https://example.com/file.sbet"
+        );
     }
 }
