@@ -34,9 +34,6 @@ enum BpfFormat {
     Byte = 2,
 }
 
-trait ReadSeek: Read + Seek {}
-impl<T: Read + Seek> ReadSeek for T {}
-
 #[derive(Clone, Debug)]
 struct BpfDimension {
     offset: f64,
@@ -132,13 +129,14 @@ impl Reader for BpfReader {
             .seek(SeekFrom::Start(header.len as u64))
             .map_err(io_error)?;
         let mut decompressed;
-        let (data_reader, data_start): (&mut dyn ReadSeek, u64) = if header.compression != 0 {
-            let expected_size = header.num_pts * dims.len() * std::mem::size_of::<f32>();
-            decompressed = read_compressed_blocks(&mut reader, expected_size)?;
-            (&mut decompressed, 0)
-        } else {
-            (&mut reader, header.len as u64)
-        };
+        let (data_reader, data_start): (&mut dyn crate::source::ReadSeek, u64) =
+            if header.compression != 0 {
+                let expected_size = header.num_pts * dims.len() * std::mem::size_of::<f32>();
+                decompressed = read_compressed_blocks(&mut reader, expected_size)?;
+                (&mut decompressed, 0)
+            } else {
+                (&mut reader, header.len as u64)
+            };
         let mut layout = PointLayout::new();
         for dim in &dims {
             layout.register(dim.id.clone(), DimType::F32);
@@ -166,31 +164,12 @@ impl Reader for BpfReader {
     }
 }
 
-fn open_bpf_reader(filename: &str) -> Result<BufReader<Box<dyn ReadSeek>>, StageError> {
-    if is_bpf_vsi_path(filename) {
-        let vsi_path = bpf_vsi_path(filename);
-        let file = pdal_native::vsi::VsiFile::open(&vsi_path)
-            .map_err(|err| StageError(format!("Can't open file '{filename}': {err}")))?;
-        return Ok(BufReader::new(Box::new(file)));
-    }
-
-    let file = File::open(Path::new(filename))
-        .map_err(|_| StageError(format!("Can't open file '{filename}'.")))?;
-    Ok(BufReader::new(Box::new(file)))
-}
-
-fn is_bpf_vsi_path(filename: &str) -> bool {
-    filename.starts_with("/vsi")
-        || filename.starts_with("http://")
-        || filename.starts_with("https://")
-}
-
-fn bpf_vsi_path(filename: &str) -> String {
-    if filename.starts_with("http://") || filename.starts_with("https://") {
-        format!("/vsicurl/{filename}")
-    } else {
-        filename.to_string()
-    }
+fn open_bpf_reader(
+    filename: &str,
+) -> Result<BufReader<Box<dyn crate::source::ReadSeek>>, StageError> {
+    let file = crate::source::open_seek(filename)
+        .map_err(|err| StageError(format!("Can't open file '{filename}': {err}")))?;
+    Ok(BufReader::new(file))
 }
 
 pub struct BpfWriter {

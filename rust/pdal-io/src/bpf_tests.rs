@@ -24,22 +24,6 @@ fn read_bpf(path: &str) -> PointView {
 }
 
 #[test]
-fn bpf_vsi_path_helpers_cover_remote_and_vsi_forms() {
-    assert!(is_bpf_vsi_path("https://example.com/file.bpf"));
-    assert!(is_bpf_vsi_path("http://example.com/file.bpf"));
-    assert!(is_bpf_vsi_path("/vsicurl/https://example.com/file.bpf"));
-    assert!(!is_bpf_vsi_path("/tmp/file.bpf"));
-    assert_eq!(
-        bpf_vsi_path("https://example.com/file.bpf"),
-        "/vsicurl/https://example.com/file.bpf"
-    );
-    assert_eq!(
-        bpf_vsi_path("/vsicurl/https://example.com/file.bpf"),
-        "/vsicurl/https://example.com/file.bpf"
-    );
-}
-
-#[test]
 fn reads_uncompressed_dim_major_bpf() {
     let view = read_bpf(&data_path("bpf/autzen-utm-chipped-25-v3.bpf"));
 
