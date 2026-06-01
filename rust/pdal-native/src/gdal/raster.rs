@@ -180,6 +180,46 @@ impl Raster {
         }
     }
 
+    pub fn read_band_window(
+        &self,
+        band_idx: i32,
+        x_offset: usize,
+        y_offset: usize,
+        width: usize,
+        height: usize,
+        buffer: &mut [f64],
+    ) -> Result<(), String> {
+        if buffer.len() != width * height {
+            return Err("GDAL band buffer size does not match raster window.".to_string());
+        }
+        unsafe {
+            let band = GDALGetRasterBand(self.ds, band_idx);
+            if band.is_null() {
+                return Err(format!("Failed to get band {}", band_idx));
+            }
+
+            let res = GDALRasterIO(
+                band,
+                GDALRWFlag::GF_Read,
+                x_offset as i32,
+                y_offset as i32,
+                width as i32,
+                height as i32,
+                buffer.as_mut_ptr() as *mut _,
+                width as i32,
+                height as i32,
+                GDALDataType::GDT_Float64,
+                0,
+                0,
+            );
+
+            if res != CPLErr::CE_None {
+                return Err("GDAL RasterIO failed".to_string());
+            }
+            Ok(())
+        }
+    }
+
     pub fn write_band_f64(
         &mut self,
         band_idx: i32,
