@@ -1,5 +1,6 @@
 use super::*;
 use pdal_core::point::DimensionSummary;
+use pdal_core::spatial::SpatialIndex3d;
 use serde_json::json;
 
 #[no_mangle]
@@ -350,6 +351,32 @@ fn spatial_results(
     query: &[f64],
     max_sqr_dist: f64,
 ) -> Vec<pdal_spatial_result_t> {
+    if dims == [DimId::X, DimId::Y, DimId::Z] && query.len() == 3 {
+        let index = SpatialIndex3d::new(view);
+        if max_sqr_dist.is_infinite() {
+            return index
+                .knn_xyz(query[0], query[1], query[2], view.len() as usize)
+                .into_iter()
+                .map(|(id, sqr_dist)| pdal_spatial_result_t { id, sqr_dist })
+                .collect();
+        }
+        let radius = max_sqr_dist.sqrt();
+        let mut results: Vec<pdal_spatial_result_t> = index
+            .radius_xyz(query[0], query[1], query[2], radius)
+            .into_iter()
+            .map(|id| pdal_spatial_result_t {
+                id,
+                sqr_dist: index.squared_distance(id, query[0], query[1], query[2]),
+            })
+            .collect();
+        results.sort_by(|a, b| {
+            a.sqr_dist
+                .total_cmp(&b.sqr_dist)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        return results;
+    }
+
     let mut results = Vec::new();
     for idx in 0..view.len() {
         let mut sqr_dist = 0.0;

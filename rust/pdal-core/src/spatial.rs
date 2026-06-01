@@ -1,17 +1,28 @@
 use crate::point::{DimId, PointId, PointView};
+use rstar::{PointDistance, RTree, RTreeObject, AABB};
 
 /// 3D neighbor-query API used by spatial filters.
-///
-/// The first backend is intentionally simple: an exact brute-force scan. That
-/// keeps the behavioral contract obvious while the Rust/C ABI slice settles;
-/// a real KD-tree can replace the internals without changing filter code.
 pub struct SpatialIndex3d<'a> {
     view: &'a PointView,
+    tree: RTree<IndexedPoint3d>,
 }
 
 impl<'a> SpatialIndex3d<'a> {
     pub fn new(view: &'a PointView) -> Self {
-        Self { view }
+        let points = (0..view.len())
+            .map(|id| IndexedPoint3d {
+                id,
+                point: [
+                    view.get_f64(id, &DimId::X),
+                    view.get_f64(id, &DimId::Y),
+                    view.get_f64(id, &DimId::Z),
+                ],
+            })
+            .collect();
+        Self {
+            view,
+            tree: RTree::bulk_load(points),
+        }
     }
 
     pub fn radius(&self, idx: PointId, radius: f64) -> Vec<PointId> {
@@ -40,13 +51,13 @@ impl<'a> SpatialIndex3d<'a> {
     }
 
     pub fn radius_xyz(&self, x: f64, y: f64, z: f64, radius: f64) -> Vec<PointId> {
-        let radius_sqr = radius * radius;
-        let mut ids = Vec::new();
-        for idx in 0..self.view.len() {
-            if self.squared_distance(idx, x, y, z) <= radius_sqr {
-                ids.push(idx);
-            }
-        }
+        let query = [x, y, z];
+        let mut ids: Vec<PointId> = self
+            .tree
+            .locate_within_distance(query, radius * radius)
+            .map(|point| point.id)
+            .collect();
+        ids.sort_unstable();
         ids
     }
 
@@ -71,19 +82,51 @@ impl<'a> SpatialIndex3d<'a> {
         let y = self.view.get_f64(idx, &DimId::Y);
         let z = self.view.get_f64(idx, &DimId::Z);
 
-        let mut neighbors = Vec::with_capacity(self.view.len() as usize);
-        for candidate in 0..self.view.len() {
-            neighbors.push((candidate, self.squared_distance(candidate, x, y, z)));
+        self.knn_xyz(x, y, z, k)
+    }
+
+    pub fn knn_xyz(&self, x: f64, y: f64, z: f64, k: usize) -> Vec<(PointId, f64)> {
+        if k == 0 {
+            return Vec::new();
         }
+        let query = [x, y, z];
+        let mut neighbors: Vec<(PointId, f64)> = self
+            .tree
+            .nearest_neighbor_iter(&query)
+            .take(k)
+            .map(|point| (point.id, point.distance_2(&query)))
+            .collect();
         neighbors.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
-        neighbors.truncate(k.min(neighbors.len()));
         neighbors
     }
 
-    fn squared_distance(&self, idx: PointId, x: f64, y: f64, z: f64) -> f64 {
+    pub fn squared_distance(&self, idx: PointId, x: f64, y: f64, z: f64) -> f64 {
         let dx = self.view.get_f64(idx, &DimId::X) - x;
         let dy = self.view.get_f64(idx, &DimId::Y) - y;
         let dz = self.view.get_f64(idx, &DimId::Z) - z;
+        dx * dx + dy * dy + dz * dz
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct IndexedPoint3d {
+    id: PointId,
+    point: [f64; 3],
+}
+
+impl RTreeObject for IndexedPoint3d {
+    type Envelope = AABB<[f64; 3]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        AABB::from_point(self.point)
+    }
+}
+
+impl PointDistance for IndexedPoint3d {
+    fn distance_2(&self, point: &[f64; 3]) -> f64 {
+        let dx = self.point[0] - point[0];
+        let dy = self.point[1] - point[1];
+        let dz = self.point[2] - point[2];
         dx * dx + dy * dy + dz * dz
     }
 }
