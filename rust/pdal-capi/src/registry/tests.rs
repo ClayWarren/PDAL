@@ -312,6 +312,59 @@ fn registry_hag_dem_filter_computes_height_above_raster() {
 }
 
 #[test]
+fn registry_h3_filter_assigns_lossless_index() {
+    // `pdal pipeline` with filters.h3 must construct through the registry,
+    // prepare the uint64 H3 dimension, and store the full 64-bit index. A
+    // resolution-12 index uses low bits an f64 cannot hold, so this also
+    // guards the typed (non-f64) storage path.
+    use pdal_core::srs::SpatialReference;
+
+    let mut options = Options::new();
+    options.add("resolution", 12u64);
+    let mut filter = create_filter("filters.h3", &options).unwrap();
+
+    // The pipeline prepares output dimensions before running a filter; the
+    // registry-built wrapper must declare H3 as U64 for set_u64 to land.
+    let output_dims = filter.output_dimensions();
+    assert!(
+        output_dims.contains(&(DimId::H3, DimType::U64)),
+        "registry wrapper should declare the uint64 H3 output dimension"
+    );
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    let mut view = PointView::new(Rc::new(layout));
+    view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
+    let idx = view.add_point();
+    view.set_f64(idx, &DimId::X, -122.0);
+    view.set_f64(idx, &DimId::Y, 47.0);
+    view.set_f64(idx, &DimId::Z, 0.0);
+    let view = view.with_dimensions(&output_dims);
+
+    let views = filter.run(&[view]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 1);
+    let h3 = views[0].get_u64(0, &DimId::H3);
+    assert!(h3 > (1u64 << 53), "H3 index should be a full 64-bit value");
+    assert_ne!(
+        h3,
+        (h3 as f64) as u64,
+        "the typed path must preserve low bits an f64 would drop"
+    );
+}
+
+#[test]
+fn registry_h3_filter_requires_resolution() {
+    let options = Options::new();
+    match create_filter("filters.h3", &options) {
+        Err(err) => assert!(err.0.contains("resolution"), "got: {}", err.0),
+        Ok(_) => panic!("filters.h3 should require a resolution option"),
+    }
+}
+
+#[test]
 fn registry_assign_filter_supports_value_expressions() {
     let mut options = Options::new();
     options.add("value", "Y = X * 2");
@@ -592,6 +645,9 @@ fn default_filter_options(name: &str) -> Options {
         }
         "filters.straighten" => {
             options.add("polyline", "LINESTRING ZM (0 0 0 0, 10 0 0 0)");
+        }
+        "filters.h3" => {
+            options.add("resolution", 12u64);
         }
         _ => {}
     }

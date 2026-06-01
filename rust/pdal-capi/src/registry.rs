@@ -67,6 +67,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.hag_delaunay",
     "filters.hag_dem",
     "filters.hag_nn",
+    "filters.h3",
     "filters.head",
     "filters.hexbin",
     "filters.iqr",

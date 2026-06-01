@@ -34,6 +34,7 @@ use pdal_filters::ferry::FerryFilter;
 use pdal_filters::geom_distance::GeomDistanceFilter;
 use pdal_filters::gpstimeconvert::GpsTimeConvert;
 use pdal_filters::groupby::GroupByFilter;
+use pdal_filters::h3::H3Filter;
 use pdal_filters::hag_delaunay::HagDelaunayFilter;
 use pdal_filters::hag_dem::HagDemFilter;
 use pdal_filters::hagnn::HagNnFilter;
@@ -373,6 +374,17 @@ pub fn create_filter(
             get_u64(options, "count", 10)?,
             get_bool(options, "invert", false)?,
         )))),
+        "filters.h3" => {
+            // The C++ stage takes `resolution` as a required positional arg.
+            if !options.has("resolution") {
+                return Err(StageError(
+                    "filters.h3 requires a 'resolution' option".to_string(),
+                ));
+            }
+            Ok(Box::new(FilterWrapper::new(H3Filter::new(
+                get_u64(options, "resolution", 0)? as u8,
+            ))))
+        }
         "filters.hexbin" => {
             let edge = if options.has("edge_length") {
                 Some(get_f64(options, "edge_length", 0.0)?)

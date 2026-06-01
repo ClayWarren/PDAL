@@ -3,7 +3,7 @@
 //! Port of `filters/H3Filter.cpp`.
 
 use h3o::{LatLng, Resolution};
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::srs::{SpatialReference, SrsTransform};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -45,6 +45,12 @@ impl Filter for H3Filter {
 
     fn name(&self) -> &str {
         "filters.h3"
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        // The C++ stage registers `Dimension::Id::H3` (uint64); the pipeline
+        // must prepare it as U64 so `set_u64` stores the full index.
+        vec![(DimId::H3, DimType::U64)]
     }
 
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
@@ -89,7 +95,7 @@ impl Streamable for H3Filter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdal_core::point::{DimType, PointLayout};
+    use pdal_core::point::PointLayout;
     use std::rc::Rc;
 
     fn view_with_srs(srs: &str) -> PointView {

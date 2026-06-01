@@ -654,7 +654,12 @@ Known mixed binaries:
   `stream_test_2` was strengthened from a no-assertion smoke into a real parity
   check: it requires resolution-12 indexes whose low bits an `f64` mantissa
   cannot hold, which fails on the old `u64 -> f64` path and passes on the typed
-  path.
+  path. With the typed setter in place, `filters.h3` is now registered in the
+  pipeline registry (`FILTER_DRIVERS` + `create_filter`), with
+  `output_dimensions()` declaring the uint64 `H3` dim; `pdal pipeline` runs
+  `filters.h3` end-to-end (verified against `las/test_utm17.las` producing a
+  well-formed resolution-12 cell). The C ABI registry tests cover the
+  lossless-index path and the required-`resolution` error.
 - `pdal_filters_hexbin_test`: `HexbinFilterTest_test_1`,
   `HexbinFilterTest_test_2`, `HexGrid_issue_2507`, `H3Grid_issue_2507`, and
   `issue_4899` count. Hexbin stage execution and the native/H3 hex-grid
