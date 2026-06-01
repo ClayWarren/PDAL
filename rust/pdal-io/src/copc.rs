@@ -13,6 +13,7 @@ use crate::copc_hierarchy::{
     self, CopcInfo, CopcPreview, LasBounds, QueryBounds as HierarchyBounds,
 };
 use crate::las::LasReader;
+use crate::source;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
 use pdal_core::geometry::Geometry;
 use pdal_core::metadata::MetadataNode;
@@ -202,7 +203,7 @@ impl CopcReader {
             return Ok(Vec::new());
         }
         let spec = parse_ogr_spec_json(&self.ogr).map_err(StageError)?;
-        let text = std::fs::read_to_string(&spec.datasource).map_err(|err| {
+        let text = source::read_to_string(&spec.datasource).map_err(|err| {
             StageError(format!(
                 "Can't open OGR datasource '{}': {err}",
                 spec.datasource

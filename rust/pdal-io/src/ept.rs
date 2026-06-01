@@ -9,6 +9,7 @@
 //! existing parity cases. Broad remote binary/zstandard and spatial-filter
 //! preview remain outside this module's current contract.
 
+use crate::source;
 use crate::tindex::append_view;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
 use pdal_core::geometry::Geometry;
@@ -559,7 +560,7 @@ impl EptReader {
             return Ok(Vec::new());
         }
         let spec = parse_ogr_spec_json(&self.ogr).map_err(StageError)?;
-        let text = std::fs::read_to_string(&spec.datasource).map_err(|err| {
+        let text = source::read_to_string(&spec.datasource).map_err(|err| {
             StageError(format!(
                 "Can't open OGR datasource '{}': {err}",
                 spec.datasource

@@ -1,4 +1,5 @@
 use super::ReaderArgs;
+use crate::source;
 use crate::tindex::resolve_location;
 use chrono::{DateTime, FixedOffset};
 use pdal_core::ogr_spec::parse_ogr_spec_json;
@@ -378,7 +379,7 @@ pub(super) fn parse_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> 
 
 pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> {
     let spec = parse_ogr_spec_json(value).map_err(StageError)?;
-    let text = std::fs::read_to_string(&spec.datasource).map_err(|err| {
+    let text = source::read_to_string(&spec.datasource).map_err(|err| {
         StageError(format!(
             "Can't open OGR datasource '{}': {err}",
             spec.datasource
