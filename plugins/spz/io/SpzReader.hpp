@@ -34,10 +34,8 @@
 
 #pragma once
 
-#include <pdal/Dimension.hpp>
 #include <pdal/Reader.hpp>
-
-#include <load-spz.h>
+#include <rust/pdal-capi/include/pdal_capi.h>
 
 namespace pdal
 {
@@ -45,37 +43,21 @@ namespace pdal
 class PDAL_EXPORT SpzReader : public Reader
 {
 public:
-    SpzReader()
-    {
-        m_converter = spz::coordinateConverter(spz::CoordinateSystem::RUB,
-                                               spz::CoordinateSystem::RUB);
-    }
-
-    std::string getName() const;
+    ~SpzReader() override;
+    std::string getName() const override;
 
 private:
-    point_count_t m_numPoints;
-    point_count_t m_index;
-    bool m_isRemote;
-    // number of spherical harmonics for each color (RGB)
-    int m_numSh;
-    //!! put these in a struct or something?
-    Dimension::IdList m_shDims;
-    Dimension::IdList m_rotDims;
-    Dimension::IdList m_scaleDims;
-    Dimension::IdList m_colorDims;
-    Dimension::Id m_alphaDim;
-    std::unique_ptr<spz::PackedGaussians> m_data;
-    spz::CoordinateConverter m_converter;
+    void addArgs(ProgramArgs& args) override;
+    void initialize() override;
+    void addDimensions(PointLayoutPtr layout) override;
+    void ready(PointTableRef table) override;
+    point_count_t read(PointViewPtr view, point_count_t num) override;
+    void done(PointTableRef table) override;
 
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void addDimensions(PointLayoutPtr layout);
-    virtual void ready(PointTableRef table);
-    virtual point_count_t read(PointViewPtr view, point_count_t num);
-    virtual void done(PointTableRef table);
-
-    void extractHeaderData();
+    pdal_point_view_t* m_rustView = nullptr;
+    Dimension::IdList m_dims;
+    StringList m_dimNames;
+    bool m_copied = false;
 };
 
 } // namespace pdal

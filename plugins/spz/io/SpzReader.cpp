@@ -11,8 +11,8 @@
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
- *       the documentation and/or other materials provided
- *       with the distribution.
+ *       the documentation and/or other materials provided with the
+ *       distribution.
  *     * Neither the name of Hobu, Inc. or Flaxen Geo Consulting nor the
  *       names of its contributors may be used to endorse or promote
  *       products derived from this software without specific prior
@@ -34,10 +34,8 @@
 
 #include "SpzReader.hpp"
 
+#include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
-#include <pdal/util/IStream.hpp>
-
-#include <arbiter/arbiter.hpp>
 
 namespace pdal
 {
@@ -48,6 +46,55 @@ static StaticPluginInfo const s_info{"readers.spz",
                                      {"spz"}};
 
 CREATE_SHARED_STAGE(SpzReader, s_info)
+
+namespace
+{
+
+Dimension::Type cppType(int type)
+{
+    using Dimension::Type;
+    switch (type)
+    {
+    case 0:
+        return Type::Unsigned8;
+    case 1:
+        return Type::Unsigned16;
+    case 2:
+        return Type::Unsigned32;
+    case 3:
+        return Type::Unsigned64;
+    case 4:
+        return Type::Signed8;
+    case 5:
+        return Type::Signed16;
+    case 6:
+        return Type::Signed32;
+    case 7:
+        return Type::Signed64;
+    case 8:
+        return Type::Float;
+    case 9:
+    default:
+        return Type::Double;
+    }
+}
+
+void throwLastRustError(const std::string& fallback)
+{
+    const char* message = pdal_last_error();
+    if (message && message[0])
+        throw pdal_error(message);
+    throw pdal_error(fallback);
+}
+
+} // namespace
+
+SpzReader::~SpzReader()
+{
+    if (m_rustView)
+        pdal_point_view_destroy(m_rustView);
+}
+
 std::string SpzReader::getName() const
 {
     return s_info.name;
@@ -55,130 +102,75 @@ std::string SpzReader::getName() const
 
 void SpzReader::addArgs(ProgramArgs& args) {}
 
-void SpzReader::extractHeaderData()
-{
-    m_numPoints = m_data->numPoints;
-
-    // total number of harmonics / 3
-    constexpr std::array<int, 4> numHarmonics{0, 3, 8, 15};
-    m_numSh = numHarmonics[m_data->shDegree];
-}
-
 void SpzReader::initialize()
 {
-    // copy the file to local if it's remote
-    m_isRemote = Utils::isRemote(m_filename);
-    if (m_isRemote)
+    if (m_rustView)
     {
-        std::string remoteFilename = Utils::tempFilename(m_filename);
-        // swap m_filename to temp file, remoteFilename to original
-        std::swap(remoteFilename, m_filename);
+        pdal_point_view_destroy(m_rustView);
+        m_rustView = nullptr;
+    }
+    m_copied = false;
 
-        arbiter::Arbiter a;
-        a.put(m_filename, a.getBinary(remoteFilename));
+    pdal_options_t* options = pdal_options_create();
+    pdal_options_add_str(options, "filename", m_filename.c_str());
+
+    pdal_reader_t* reader = pdal_reader_create_spz(options);
+    if (!reader)
+    {
+        pdal_options_destroy(options);
+        throwLastRustError("Failed to create Rust SPZ reader.");
     }
 
-    ILeStream stream(m_filename);
-    if (!stream)
-        throwError("Unable to open file '" + m_filename + "'");
-    stream.seek(0, std::ios::end);
-    std::vector<uint8_t> data(stream.position());
-    stream.seek(0, std::ios::beg);
-    stream.get(reinterpret_cast<char*>(data.data()), data.size());
-    stream.close();
-
-    m_data.reset(new spz::PackedGaussians(spz::loadSpzPacked(data)));
-
-    extractHeaderData();
+    m_rustView = pdal_reader_read_first(reader);
+    pdal_reader_destroy(reader);
+    pdal_options_destroy(options);
+    if (!m_rustView)
+        throwLastRustError("Rust SPZ reader failed.");
 }
 
 void SpzReader::addDimensions(PointLayoutPtr layout)
 {
-    using namespace Dimension;
-
-    layout->registerDim(Id::X);
-    layout->registerDim(Id::Y);
-    layout->registerDim(Id::Z);
-
-    // RGB, alpha, scale, rotation, SH dimensions set with PLY naming
-    // conventions
-    m_alphaDim = layout->assignDim("opacity", Type::Float);
-    for (int i = 0; i < 3; ++i)
+    m_dims.clear();
+    m_dimNames.clear();
+    uint64_t dimCount = pdal_point_view_dim_count(m_rustView);
+    for (uint64_t idx = 0; idx < dimCount; ++idx)
     {
-        m_colorDims.push_back(
-            layout->assignDim("f_dc_" + std::to_string(i), Type::Float));
-        m_scaleDims.push_back(
-            layout->assignDim("scale_" + std::to_string(i), Type::Float));
+        char* rawName = pdal_point_view_dim_name(m_rustView, idx);
+        if (!rawName)
+            continue;
+        std::string name(rawName);
+        pdal_string_free(rawName);
+        Dimension::Id id = layout->registerOrAssignDim(
+            name, cppType(pdal_point_view_dim_type(m_rustView, idx)));
+        m_dims.push_back(id);
+        m_dimNames.push_back(name);
     }
-
-    for (int i = 0; i < 4; ++i)
-        m_rotDims.push_back(
-            layout->assignDim("rot_" + std::to_string(i), Type::Float));
-
-    for (int i = 0; i < (m_numSh * 3); ++i)
-        m_shDims.push_back(
-            layout->assignDim("f_rest_" + std::to_string(i), Type::Float));
 }
 
 void SpzReader::ready(PointTableRef table)
 {
-    // We extract this in the writer. Make this nested in an SPZ-specific node?
-    MetadataNode m = table.metadata();
-    m.add("coordinate_orientation", "RUB");
-    m_index = 0;
+    table.metadata().add("coordinate_orientation", "RUB");
 }
 
-point_count_t SpzReader::read(PointViewPtr view, point_count_t count)
+point_count_t SpzReader::read(PointViewPtr view, point_count_t)
 {
-    PointId idx = view->size();
+    if (m_copied)
+        return 0;
 
-    count = (std::min)(m_numPoints - m_index, count);
-    point_count_t numRead = m_index;
-    while (numRead < count)
+    point_count_t count = pdal_point_view_length(m_rustView);
+    for (PointId idx = 0; idx < count; ++idx)
     {
-        spz::UnpackedGaussian unpacked = m_data->unpack(numRead, m_converter);
-
-        view->setField(Dimension::Id::X, idx, unpacked.position[0]);
-        view->setField(Dimension::Id::Y, idx, unpacked.position[1]);
-        view->setField(Dimension::Id::Z, idx, unpacked.position[2]);
-
-        // set RGB
-        for (int i = 0; i < 3; ++i)
-            view->setField(m_colorDims[i], idx, unpacked.color[i]);
-
-        view->setField(m_alphaDim, idx, unpacked.alpha);
-
-        // rotation W - xyzw in unpacked, needs to be stored as wxyz for PLY
-        view->setField(m_rotDims[0], idx, unpacked.rotation[3]);
-        // scale and rotation x/y/z
-        for (int i = 0; i < 3; ++i)
-        {
-            view->setField(m_rotDims[i + 1], idx, unpacked.rotation[i]);
-            view->setField(m_scaleDims[i], idx, unpacked.scale[i]);
-        }
-
-        // Spherical harmonics -- assign from UnpackedGaussian so first 1/3 = R,
-        // second 1/3 = G, etc
-        for (int i = 0; i < m_numSh; ++i)
-        {
-            view->setField(m_shDims[i], idx, unpacked.shR[i]);
-            view->setField(m_shDims[m_numSh + i], idx, unpacked.shG[i]);
-            view->setField(m_shDims[2 * m_numSh + i], idx, unpacked.shB[i]);
-        }
-
-        numRead++;
-        idx++;
+        PointRef point(*view, view->size());
+        for (size_t dimIdx = 0; dimIdx < m_dims.size(); ++dimIdx)
+            point.setField(m_dims[dimIdx],
+                           pdal_point_view_get_f64(m_rustView, idx,
+                                                   m_dimNames[dimIdx].c_str()));
     }
-    m_index += numRead;
 
-    return numRead;
+    m_copied = true;
+    return count;
 }
 
-void SpzReader::done(PointTableRef table)
-{
-    // delete tmp file
-    if (m_isRemote)
-        FileUtils::deleteFile(m_filename);
-}
+void SpzReader::done(PointTableRef) {}
 
 } // namespace pdal

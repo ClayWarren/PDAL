@@ -104,8 +104,9 @@ python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40
 Current plugin snapshot, excluding plugin tests and treating bundled
 `plugins/e57/libE57Format` as native/vendor adapter code rather than PDAL
 implementation to port line-by-line: `12,001` port-candidate LOC across `93`
-files. After closing `plugins/faux`, this is `11,967` port-candidate LOC across
-`91` files. The largest plugin backlogs are `tiledb` (`1,636` LOC), `nitf` (`1,253`
+files. After closing `plugins/faux` and routing `plugins/spz` through the C ABI,
+this is `11,618` port-candidate LOC across `86` files. The largest plugin
+backlogs are `tiledb` (`1,636` LOC), `nitf` (`1,253`
 LOC plus `322` C ABI-backed LOC already), `e57` (`1,249` PDAL-wrapper LOC plus
 `15,679` bundled native/vendor LOC), `arrow` (`1,245` LOC), and `trajectory`
 (`1,096` LOC). This is the next big optional bucket, but it should move
@@ -127,7 +128,7 @@ plugin-by-plugin with explicit native dependency decisions.
 | `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
 | `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
 | `plugins/rxp` | deferred | RIEGL RXP integration waits on proprietary/native dependency availability. |
-| `plugins/spz` | in progress | `readers.spz` and `writers.spz` have a Rust fixture-backed checkpoint through `pdal-io`. Broader plugin packaging remains open. |
+| `plugins/spz` | done | `readers.spz` and `writers.spz` have Rust fixture-backed implementations through `pdal-io`, and the C++ plugin classes are thin C ABI-backed reader/writer shells. Current local CMake has SPZ disabled, so C++ plugin tests are not built in this configuration; Rust SPZ tests and C++ wrapper syntax checks pass. |
 | `plugins/teaser` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
 | `plugins/tiledb` | deferred | TileDB I/O waits on native dependency, array storage, and remote/service I/O policy. |
 | `plugins/trajectory` | deferred | Trajectory filter plugin waits until trajectory/SBET/SMRMSG behavior is more complete. |

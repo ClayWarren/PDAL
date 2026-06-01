@@ -34,7 +34,6 @@
 
 #pragma once
 
-#include <load-spz.h>
 #include <pdal/PointView.hpp>
 #include <pdal/Writer.hpp>
 
@@ -44,35 +43,16 @@ namespace pdal
 class PDAL_EXPORT SpzWriter : public Writer
 {
 public:
-    SpzWriter();
-    std::string getName() const;
+    std::string getName() const override;
 
 private:
-    virtual void addArgs(ProgramArgs& args);
-    virtual void initialize();
-    virtual void prepared(PointTableRef table);
-    virtual void write(const PointViewPtr view);
-    virtual void done(PointTableRef table);
+    void addArgs(ProgramArgs& args) override;
+    void prepared(PointTableRef table) override;
+    void write(const PointViewPtr view) override;
+    void done(PointTableRef table) override;
 
-    void checkDimensions(PointLayoutPtr layout);
-    Dimension::Id tryFindDim(PointLayoutPtr layout, const std::string& dimName);
-
-    // maximum number of spherical harmonics dimensions supported by SPZ
-    static const int MAX_SH = 45;
-
-    bool m_antialiased;
-    int m_shDegree;
-    std::string m_remoteFilename;
-    std::string m_coordTransform;
-    std::unique_ptr<spz::GaussianCloud> m_cloud;
-    // the input point table's coordinate system ('RUB', 'LDF', etc.)
-    spz::CoordinateSystem m_coordinateOrientation;
-    //!! again, maybe keep these grouped together
-    Dimension::IdList m_shDims;
-    Dimension::IdList m_rotDims;
-    Dimension::IdList m_scaleDims;
-    Dimension::IdList m_plyColorDims;
-    Dimension::Id m_plyAlphaDim;
+    bool m_antialiased = false;
+    std::string m_coordinateOrientation;
 };
 
 } // namespace pdal
