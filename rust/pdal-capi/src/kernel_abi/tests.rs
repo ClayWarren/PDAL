@@ -1,3 +1,4 @@
+use super::translate::{expand_translate_option_files, parse_option_file, translate_json_stages};
 use super::*;
 use std::ffi::{CStr, CString};
 
