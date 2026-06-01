@@ -510,6 +510,7 @@ impl App {
 }
 
 /// A `--<stage>.<key>=<value>` command-line stage option.
+#[cfg(test)]
 struct StageOption {
     stage: String,
     key: String,
@@ -659,6 +660,7 @@ fn numbered_output(path: &Path, index: usize) -> PathBuf {
     }
 }
 
+#[cfg(test)]
 fn parse_stage_option_arg(arg: &str) -> Result<StageOption, String> {
     let Some(spec) = arg.strip_prefix("--") else {
         return Err(format!("option '{arg}' must be --<stage>.<key>=<value>"));
@@ -678,6 +680,7 @@ fn parse_stage_option_arg(arg: &str) -> Result<StageOption, String> {
 
 /// Apply `--<stage>.<key>=<value>` options to matching pipeline stages. A bare
 /// filter name (`decimation`) also matches `filters.decimation`.
+#[cfg(test)]
 fn apply_stage_options(
     stages: &mut [serde_json::Value],
     options: &[StageOption],

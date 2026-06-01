@@ -83,6 +83,17 @@ pub(crate) struct TileRequest<'a> {
 }
 
 pub(crate) fn tile_file(request: TileRequest<'_>) -> Result<i32, pdal_core::stage::StageError> {
+    if request.output_template.matches('#').count() != 1 {
+        return Err(pdal_core::stage::StageError(
+            "tile: output template must contain exactly one '#' placeholder".to_string(),
+        ));
+    }
+    if request.length <= 0.0 || !request.length.is_finite() {
+        return Err(pdal_core::stage::StageError(
+            "tile: 'length' must be a positive number".to_string(),
+        ));
+    }
+
     let writer_driver = pdal_core::driver::infer_writer_driver(request.output_template)
         .ok_or_else(|| {
             pdal_core::stage::StageError(format!(
