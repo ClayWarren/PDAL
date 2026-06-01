@@ -1,9 +1,8 @@
 use crate::error::string_to_c_ptr;
 use pdal_core::metadata::{
-    json_scalar_value, scalar_as_bool, scalar_as_f64, scalar_as_i64, scalar_as_u64, MetadataKind,
-    MetadataNode, MetadataValue,
+    json_scalar_value, metadata_node_to_json, scalar_as_bool, scalar_as_f64, scalar_as_i64,
+    scalar_as_u64, MetadataNode, MetadataValue,
 };
-use serde_json::json;
 use std::ffi::c_void;
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -639,7 +638,7 @@ pub unsafe extern "C" fn pdal_metadata_node_to_json(node: *const MetadataNode) -
     let value = node
         .as_ref()
         .map(metadata_node_to_json)
-        .unwrap_or_else(|| json!(null));
+        .unwrap_or_else(|| serde_json::json!(null));
     string_to_c_ptr(serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()))
 }
 
@@ -653,86 +652,6 @@ pub unsafe extern "C" fn pdal_metadata_node_to_json(node: *const MetadataNode) -
 pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
     if !node.is_null() {
         drop(Box::from_raw(node));
-    }
-}
-
-pub(crate) fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
-    let mut object = serde_json::Map::new();
-    object.insert("name".to_string(), json!(node.name()));
-    if node.kind() == MetadataKind::Array {
-        object.insert("kind".to_string(), json!("array"));
-    }
-
-    if let Some(value) = node.value() {
-        object.insert("value".to_string(), metadata_value_to_json(value));
-        object.insert("value_type".to_string(), json!(metadata_value_type(value)));
-    }
-    if let Some(type_name) = node.type_name() {
-        object.insert("type".to_string(), json!(type_name));
-    }
-    if let Some(description) = node.description() {
-        object.insert("description".to_string(), json!(description));
-    }
-    if !node.children().is_empty() {
-        object.insert(
-            "children".to_string(),
-            serde_json::Value::Array(node.children().iter().map(metadata_node_to_json).collect()),
-        );
-    }
-
-    serde_json::Value::Object(object)
-}
-
-pub(crate) fn metadata_node_to_json_flat(node: &MetadataNode) -> serde_json::Value {
-    if node.children().is_empty() {
-        if let Some(value) = node.value() {
-            return metadata_value_to_json(value);
-        }
-    }
-
-    let mut object = serde_json::Map::new();
-    for child in node.children() {
-        let value = metadata_node_to_json_flat(child);
-        if child.kind() == MetadataKind::Array {
-            match object.get_mut(child.name()) {
-                Some(serde_json::Value::Array(values)) => values.push(value),
-                Some(existing) => {
-                    let previous = std::mem::replace(existing, serde_json::Value::Null);
-                    *existing = serde_json::Value::Array(vec![previous, value]);
-                }
-                None => {
-                    object.insert(
-                        child.name().to_string(),
-                        serde_json::Value::Array(vec![value]),
-                    );
-                }
-            }
-        } else {
-            object.insert(child.name().to_string(), value);
-        }
-    }
-    serde_json::Value::Object(object)
-}
-
-fn metadata_value_to_json(value: &MetadataValue) -> serde_json::Value {
-    match value {
-        MetadataValue::String(value) => json!(value),
-        MetadataValue::I64(value) => json!(value),
-        MetadataValue::U64(value) => json!(value),
-        MetadataValue::F64(value) => json!(value),
-        MetadataValue::Bool(value) => json!(value),
-        MetadataValue::Pointer(value) => json!(value),
-    }
-}
-
-fn metadata_value_type(value: &MetadataValue) -> &'static str {
-    match value {
-        MetadataValue::String(_) => "string",
-        MetadataValue::I64(_) => "i64",
-        MetadataValue::U64(_) => "u64",
-        MetadataValue::F64(_) => "f64",
-        MetadataValue::Bool(_) => "bool",
-        MetadataValue::Pointer(_) => "pointer",
     }
 }
 
@@ -760,7 +679,7 @@ mod tests {
         root.add_child(second);
 
         assert_eq!(
-            metadata_node_to_json_flat(&root),
+            pdal_core::metadata::metadata_node_to_json_flat(&root),
             serde_json::json!({"item": [1, 2]})
         );
     }
@@ -773,7 +692,7 @@ mod tests {
         root.add_list_child(child);
 
         assert_eq!(
-            metadata_node_to_json_flat(&root),
+            pdal_core::metadata::metadata_node_to_json_flat(&root),
             serde_json::json!({"item": ["one"]})
         );
     }

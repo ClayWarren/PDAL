@@ -157,6 +157,89 @@ pub fn scalar_as_bool(type_name: &str, value: &str) -> Option<bool> {
     }
 }
 
+pub fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    object.insert("name".to_string(), serde_json::json!(node.name()));
+    if node.kind() == MetadataKind::Array {
+        object.insert("kind".to_string(), serde_json::json!("array"));
+    }
+
+    if let Some(value) = node.value() {
+        object.insert("value".to_string(), metadata_value_to_json(value));
+        object.insert(
+            "value_type".to_string(),
+            serde_json::json!(metadata_value_type(value)),
+        );
+    }
+    if let Some(type_name) = node.type_name() {
+        object.insert("type".to_string(), serde_json::json!(type_name));
+    }
+    if let Some(description) = node.description() {
+        object.insert("description".to_string(), serde_json::json!(description));
+    }
+    if !node.children().is_empty() {
+        object.insert(
+            "children".to_string(),
+            serde_json::Value::Array(node.children().iter().map(metadata_node_to_json).collect()),
+        );
+    }
+
+    serde_json::Value::Object(object)
+}
+
+pub fn metadata_node_to_json_flat(node: &MetadataNode) -> serde_json::Value {
+    if node.children().is_empty() {
+        if let Some(value) = node.value() {
+            return metadata_value_to_json(value);
+        }
+    }
+
+    let mut object = serde_json::Map::new();
+    for child in node.children() {
+        let value = metadata_node_to_json_flat(child);
+        if child.kind() == MetadataKind::Array {
+            match object.get_mut(child.name()) {
+                Some(serde_json::Value::Array(values)) => values.push(value),
+                Some(existing) => {
+                    let previous = std::mem::replace(existing, serde_json::Value::Null);
+                    *existing = serde_json::Value::Array(vec![previous, value]);
+                }
+                None => {
+                    object.insert(
+                        child.name().to_string(),
+                        serde_json::Value::Array(vec![value]),
+                    );
+                }
+            }
+        } else {
+            object.insert(child.name().to_string(), value);
+        }
+    }
+    serde_json::Value::Object(object)
+}
+
+fn metadata_value_to_json(value: &MetadataValue) -> serde_json::Value {
+    match value {
+        MetadataValue::String(value) => serde_json::json!(value),
+        MetadataValue::I64(value) => serde_json::json!(value),
+        MetadataValue::U64(value) => serde_json::json!(value),
+        MetadataValue::F64(value) => serde_json::json!(value),
+        MetadataValue::Bool(value) => serde_json::json!(value),
+        MetadataValue::Pointer(value) => serde_json::json!(value),
+    }
+}
+
+fn metadata_value_type(value: &MetadataValue) -> &'static str {
+    match value {
+        MetadataValue::String(_) => "string",
+        MetadataValue::I64(_) => "i64",
+        MetadataValue::U64(_) => "u64",
+        MetadataValue::F64(_) => "f64",
+        MetadataValue::Bool(_) => "bool",
+        MetadataValue::Pointer(_) => "pointer",
+    }
+}
+
 fn quote_json_string(value: &str) -> String {
     format!("\"{}\"", escape_json(value).replace('"', "\\\""))
 }

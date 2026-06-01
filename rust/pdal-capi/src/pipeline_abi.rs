@@ -592,7 +592,7 @@ fn pipeline_result_to_json(
             .iter()
             .map(dimension_summary_json)
             .collect::<Vec<_>>(),
-        "metadata": metadata.as_ref().map(crate::metadata_abi::metadata_node_to_json_flat),
+        "metadata": metadata.as_ref().map(pdal_core::metadata::metadata_node_to_json_flat),
     })
 }
 

@@ -1,7 +1,7 @@
 use super::argv_to_vec;
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
-use pdal_core::metadata::{MetadataNode, MetadataValue};
+use pdal_core::metadata::{metadata_node_to_json_flat, MetadataNode, MetadataValue};
 use pdal_core::point::PointView;
 use pdal_kernels::{
     build_info_plan, point_report, query_report, schema_body, schema_report, stac_report,
@@ -251,7 +251,7 @@ fn info_report(
             output.push_str(&stats_body(views, 2, None, None, None));
             output.push_str(",\n");
             output.push_str("  \"metadata\": ");
-            let metadata_json = crate::metadata_abi::metadata_node_to_json_flat(metadata);
+            let metadata_json = metadata_node_to_json_flat(metadata);
             output.push_str(
                 &serde_json::to_string_pretty(&metadata_json).unwrap_or_else(|_| "{}".into()),
             );
@@ -323,7 +323,7 @@ fn boundary_value(metadata: &MetadataNode) -> serde_json::Value {
 
 fn metadata_report(metadata: &MetadataNode) -> String {
     let value = serde_json::json!({
-        "metadata": crate::metadata_abi::metadata_node_to_json_flat(metadata),
+        "metadata": metadata_node_to_json_flat(metadata),
     });
     serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
 }
