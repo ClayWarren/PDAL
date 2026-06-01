@@ -6,6 +6,7 @@
 
 mod density;
 mod fauxplugin;
+mod ground;
 mod merge;
 mod metrics;
 mod random;
@@ -19,6 +20,7 @@ mod translate;
 
 pub use density::build_density_pipeline;
 pub use fauxplugin::FauxPluginKernel;
+pub use ground::build_ground_pipeline;
 pub use merge::build_merge_pipeline;
 pub use metrics::{
     build_chamfer_plan, build_delta_plan, build_eval_plan, build_hausdorff_plan, DeltaPlan,
