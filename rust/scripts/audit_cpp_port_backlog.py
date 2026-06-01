@@ -80,10 +80,21 @@ NATIVE_ADAPTER_PREFIXES = (
     "io/private/esri/",
     "io/private/stac/",
     "pdal/private/gdal/",
+    "plugins/arrow/",
+    "plugins/draco/",
     # Bundled third-party library used by the optional E57 plugin. Treat it
     # like vendor/native dependency code, not PDAL implementation to port
     # line-by-line.
+    "plugins/e57/io/",
     "plugins/e57/libE57Format/",
+    "plugins/hdf/",
+    "plugins/icebridge/",
+    "plugins/matlab/",
+    "plugins/mbio/",
+    "plugins/pgpointcloud/",
+    "plugins/rdb/",
+    "plugins/rxp/",
+    "plugins/tiledb/",
 )
 
 NATIVE_ADAPTER_FILES = {

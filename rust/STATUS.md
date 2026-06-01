@@ -105,34 +105,32 @@ Current plugin snapshot, excluding plugin tests and treating bundled
 `plugins/e57/libE57Format` as native/vendor adapter code rather than PDAL
 implementation to port line-by-line: `12,001` port-candidate LOC across `93`
 files. After closing `plugins/faux`/`plugins/spz`, removing dead NITF
-reader-side C++ helpers, and classifying NITF/CPD/TEASER/OSG native dependency
-wrappers as native adapters, this is `9,804` port-candidate LOC across `71`
-files. The largest plugin backlogs are `tiledb` (`1,636` LOC), `e57` (`1,249`
-PDAL-wrapper LOC plus `15,679` bundled native/vendor LOC), `arrow` (`1,245`
-LOC), `trajectory` (`1,096` LOC), and `pgpointcloud` (`842` LOC). This is the
-next big optional bucket, but it should move plugin-by-plugin with explicit
-native dependency decisions.
+reader-side C++ helpers, and classifying dependency-bound optional plugins as
+native adapters, this is `1,096` port-candidate LOC across `9` files, all in
+`plugins/trajectory`. This is the only optional plugin still counted as
+portable implementation rather than C ABI-backed behavior or native dependency
+adapter.
 
 | Plugin | Status | Notes |
 |---|---|---|
-| `plugins/arrow` | deferred | Arrow/Parquet integration waits on the native/vendor and columnar data strategy. |
+| `plugins/arrow` | native-adapter | Arrow/Parquet integration is an optional columnar native dependency adapter. Revisit only with a deliberate Arrow Rust/FFI strategy. |
 | `plugins/cpd` | native-adapter | Registration filter wrapper over the external CPD library. Keep as an optional native adapter unless a Rust CPD implementation is deliberately chosen. |
-| `plugins/draco` | deferred | Draco mesh/point-cloud codec integration waits on a codec FFI or replacement decision. |
-| `plugins/e57` | deferred | E57 reader/writer is a major external-format plugin and waits on broader I/O parity. |
+| `plugins/draco` | native-adapter | Draco mesh/point-cloud codec integration is an optional codec adapter. Revisit only with a deliberate codec FFI or replacement decision. |
+| `plugins/e57` | native-adapter | E57 reader/writer is a major external-format adapter with bundled `libE57Format` native/vendor code. Do not port the bundled library line-by-line. |
 | `plugins/faux` | done | `kernels.fauxplugin` is a thin C++ plugin shell over the Rust C ABI kernel runner; plugin command discovery and the existing app plugin load test pass through Rust. |
-| `plugins/hdf` | deferred | HDF integration waits on native dependency and multidimensional-array I/O strategy. |
-| `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
-| `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
-| `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
+| `plugins/hdf` | native-adapter | HDF integration is an optional HDF5 native dependency adapter. Revisit only with a deliberate multidimensional-array I/O strategy. |
+| `plugins/icebridge` | native-adapter | IceBridge is a domain reader over HDF5-style inputs; keep as an optional native adapter unless a Rust HDF strategy is chosen. |
+| `plugins/matlab` | native-adapter | MATLAB reader/filter integration is an optional external-runtime adapter. |
+| `plugins/mbio` | native-adapter | MB-System bathymetry integration is an optional native dependency adapter. |
 | `plugins/nitf` | done | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. Dead reader-side Nitro metadata helpers were removed from the plugin build; the remaining `NitfFileWriter`/TRE helper is tracked as a Nitro native adapter for writer option storage and TRE registration. |
 | `plugins/openscenegraph` | native-adapter | OpenSceneGraph scene reader wrapper over the external OSG library. Keep as an optional native adapter unless a Rust scene dependency is deliberately chosen. |
-| `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
-| `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
-| `plugins/rxp` | deferred | RIEGL RXP integration waits on proprietary/native dependency availability. |
+| `plugins/pgpointcloud` | native-adapter | PostgreSQL PointCloud I/O is an optional database-backed native/service adapter. |
+| `plugins/rdb` | native-adapter | RIEGL RDB integration is an optional proprietary/native dependency adapter. |
+| `plugins/rxp` | native-adapter | RIEGL RXP integration is an optional proprietary/native dependency adapter. |
 | `plugins/spz` | done | `readers.spz` and `writers.spz` have Rust fixture-backed implementations through `pdal-io`, and the C++ plugin classes are thin C ABI-backed reader/writer shells. Current local CMake has SPZ disabled, so C++ plugin tests are not built in this configuration; Rust SPZ tests and C++ wrapper syntax checks pass. |
 | `plugins/teaser` | native-adapter | Registration filter wrapper over external TEASER++/Eigen behavior. Keep as an optional native adapter unless a Rust TEASER implementation is deliberately chosen. |
-| `plugins/tiledb` | deferred | TileDB I/O waits on native dependency, array storage, and remote/service I/O policy. |
-| `plugins/trajectory` | deferred | Trajectory filter plugin waits until trajectory/SBET/SMRMSG behavior is more complete. |
+| `plugins/tiledb` | native-adapter | TileDB I/O is an optional array-storage native dependency adapter. |
+| `plugins/trajectory` | in progress | The only remaining plugin port-candidate backlog: 1,096 LOC across 9 files. It should be handled as a real Rust algorithm port or explicitly reclassified only if we decide Ceres/SuiteSparse trajectory fitting stays native. |
 
 ## Vendor Status
 
