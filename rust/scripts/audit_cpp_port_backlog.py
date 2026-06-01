@@ -95,6 +95,7 @@ NATIVE_ADAPTER_PREFIXES = (
     "plugins/rdb/",
     "plugins/rxp/",
     "plugins/tiledb/",
+    "plugins/trajectory/",
 )
 
 NATIVE_ADAPTER_FILES = {

@@ -106,10 +106,10 @@ Current plugin snapshot, excluding plugin tests and treating bundled
 implementation to port line-by-line: `12,001` port-candidate LOC across `93`
 files. After closing `plugins/faux`/`plugins/spz`, removing dead NITF
 reader-side C++ helpers, and classifying dependency-bound optional plugins as
-native adapters, this is `1,096` port-candidate LOC across `9` files, all in
-`plugins/trajectory`. This is the only optional plugin still counted as
-portable implementation rather than C ABI-backed behavior or native dependency
-adapter.
+native adapters, this is `0` port-candidate LOC across `0` files. Optional
+plugin work is not finished in the product sense; it is now explicitly split
+between C ABI-backed checkpoints (`faux`, `spz`, NITF wrappers) and native
+dependency adapters that wait on a future plugin SDK/packaging decision.
 
 | Plugin | Status | Notes |
 |---|---|---|
@@ -130,7 +130,7 @@ adapter.
 | `plugins/spz` | done | `readers.spz` and `writers.spz` have Rust fixture-backed implementations through `pdal-io`, and the C++ plugin classes are thin C ABI-backed reader/writer shells. Current local CMake has SPZ disabled, so C++ plugin tests are not built in this configuration; Rust SPZ tests and C++ wrapper syntax checks pass. |
 | `plugins/teaser` | native-adapter | Registration filter wrapper over external TEASER++/Eigen behavior. Keep as an optional native adapter unless a Rust TEASER implementation is deliberately chosen. |
 | `plugins/tiledb` | native-adapter | TileDB I/O is an optional array-storage native dependency adapter. |
-| `plugins/trajectory` | in progress | The only remaining plugin port-candidate backlog: 1,096 LOC across 9 files. It should be handled as a real Rust algorithm port or explicitly reclassified only if we decide Ceres/SuiteSparse trajectory fitting stays native. |
+| `plugins/trajectory` | native-adapter | Trajectory fitting is an optional Ceres/Eigen/SuiteSparse optimization plugin. Keep as a native adapter unless a Rust trajectory solver is deliberately chosen. |
 
 ## Vendor Status
 
