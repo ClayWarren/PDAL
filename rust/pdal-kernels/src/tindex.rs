@@ -1,3 +1,4 @@
+use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use std::io::Read;
 
 pub const INVALID_TINDEX_FILTER_STAGE_MESSAGE: &str = "Argument references invalid/unused stage";
@@ -82,6 +83,21 @@ impl Default for TindexCreateArgs {
 pub enum TindexParseResult {
     Error(String),
     Unsupported,
+}
+
+#[derive(Clone, Debug)]
+pub struct TindexMergeArgs {
+    pub tindex_file: String,
+    pub output_file: String,
+    pub location_field: String,
+    pub target_srs: String,
+    pub clip: Option<TindexMergeClip>,
+}
+
+#[derive(Clone, Debug)]
+pub enum TindexMergeClip {
+    Bounds { bounds: Bounds2D, value: String },
+    Polygon { value: String },
 }
 
 pub fn print_tindex_usage() {
@@ -257,6 +273,93 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
         ));
     }
     Ok(parsed)
+}
+
+pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, TindexParseResult> {
+    let mut tindex_file = None;
+    let mut output_file = None;
+    let mut location_field = "location".to_string();
+    let mut target_srs = "EPSG:4326".to_string();
+    let mut clip = None;
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--tindex" => tindex_file = Some(tindex_next_value(&mut iter, "--tindex")?.clone()),
+            "--filespec" => output_file = Some(tindex_next_value(&mut iter, "--filespec")?.clone()),
+            "--tindex_name" => {
+                location_field = tindex_next_value(&mut iter, "--tindex_name")?.clone()
+            }
+            "--bounds" => {
+                let value = tindex_next_value(&mut iter, "--bounds")?;
+                clip = Some(parse_merge_bounds(value)?);
+            }
+            "--polygon" => {
+                clip = Some(TindexMergeClip::Polygon {
+                    value: tindex_next_value(&mut iter, "--polygon")?.clone(),
+                });
+            }
+            "--t_srs" => {
+                target_srs = tindex_next_value(&mut iter, "--t_srs")?.clone();
+            }
+            "--log" => {
+                let _ = tindex_next_value(&mut iter, "--log")?;
+            }
+            "--lyr_name" | "--ogrdriver" | "-f" => {
+                let _ = tindex_next_value(&mut iter, arg)?;
+            }
+            _ if let Some(value) = arg.strip_prefix("--bounds=") => {
+                clip = Some(parse_merge_bounds(value)?);
+            }
+            _ if let Some(value) = arg.strip_prefix("--polygon=") => {
+                clip = Some(TindexMergeClip::Polygon {
+                    value: value.to_string(),
+                });
+            }
+            _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
+                target_srs = value.to_string();
+            }
+            _ if arg.starts_with("--log=") => {}
+            _ if arg.starts_with("--") => {
+                return Err(TindexParseResult::Unsupported);
+            }
+            _ if tindex_file.is_none() => tindex_file = Some(arg.clone()),
+            _ if output_file.is_none() => output_file = Some(arg.clone()),
+            _ => {
+                return Err(TindexParseResult::Error(
+                    "too many merge arguments".to_string(),
+                ))
+            }
+        }
+    }
+
+    let Some(tindex_file) = tindex_file else {
+        return Err(TindexParseResult::Error(
+            "merge requires --tindex <index>".to_string(),
+        ));
+    };
+    let Some(output_file) = output_file else {
+        return Err(TindexParseResult::Error(
+            "merge requires --filespec <output>".to_string(),
+        ));
+    };
+    Ok(TindexMergeArgs {
+        tindex_file,
+        output_file,
+        location_field,
+        target_srs,
+        clip,
+    })
+}
+
+fn parse_merge_bounds(value: &str) -> Result<TindexMergeClip, TindexParseResult> {
+    let bounds = parse_bounds2d(value, 0)
+        .map(|parsed| parsed.bounds)
+        .map_err(|err| TindexParseResult::Error(format!("Invalid bounds: {err}")))?;
+    Ok(TindexMergeClip::Bounds {
+        bounds,
+        value: value.to_string(),
+    })
 }
 
 fn try_parse_boundary_eq_arg(
@@ -468,5 +571,50 @@ mod tests {
                 "Can't specify more than one source of tindex input files.".to_string()
             )
         );
+    }
+
+    #[test]
+    fn merge_accepts_positionals_and_options() {
+        let parsed = parse_tindex_merge_args(&strings(&[
+            "--tindex",
+            "idx.geojson",
+            "--filespec",
+            "out.las",
+            "--tindex_name",
+            "path",
+            "--t_srs=EPSG:3857",
+            "--bounds=([0,1],[2,3])",
+        ]))
+        .unwrap();
+        assert_eq!(parsed.tindex_file, "idx.geojson");
+        assert_eq!(parsed.output_file, "out.las");
+        assert_eq!(parsed.location_field, "path");
+        assert_eq!(parsed.target_srs, "EPSG:3857");
+        match parsed.clip.unwrap() {
+            TindexMergeClip::Bounds { bounds, value } => {
+                assert_eq!(value, "([0,1],[2,3])");
+                assert_eq!(bounds.minx, 0.0);
+                assert_eq!(bounds.maxx, 1.0);
+                assert_eq!(bounds.miny, 2.0);
+                assert_eq!(bounds.maxy, 3.0);
+            }
+            TindexMergeClip::Polygon { .. } => panic!("expected bounds clip"),
+        }
+    }
+
+    #[test]
+    fn merge_tracks_polygon_without_native_geometry() {
+        let parsed = parse_tindex_merge_args(&strings(&[
+            "idx.geojson",
+            "out.las",
+            "--polygon=POLYGON ((0 0, 1 0, 1 1, 0 0))",
+        ]))
+        .unwrap();
+        match parsed.clip.unwrap() {
+            TindexMergeClip::Polygon { value } => {
+                assert!(value.starts_with("POLYGON"));
+            }
+            TindexMergeClip::Bounds { .. } => panic!("expected polygon clip"),
+        }
     }
 }
