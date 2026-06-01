@@ -41,6 +41,7 @@ pub mod sbet_writer;
 pub mod shift_reader;
 pub mod slpk;
 pub mod smrmsg;
+mod source;
 pub mod spz;
 pub mod stac;
 pub mod terrasolid;

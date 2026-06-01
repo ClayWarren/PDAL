@@ -8,6 +8,7 @@
 //!
 //! ASCII and binary little/big endian storage modes are supported.
 
+use crate::source;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
@@ -173,7 +174,7 @@ impl Reader for PlyReader {
                 "PlyReader requires a filename option.".to_string(),
             ));
         }
-        let bytes = fs::read(Path::new(&self.filename))
+        let bytes = source::read_bytes(&self.filename)
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
         let header_end = find_header_end(&bytes)
             .ok_or_else(|| StageError("'end_header' not found in PLY file.".to_string()))?;

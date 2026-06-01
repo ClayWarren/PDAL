@@ -8,14 +8,13 @@
 //! The reader stores triangulated OBJ faces in the view's mesh, matching the
 //! shape existing C++ tests assert.
 
+use crate::source;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -57,7 +56,7 @@ impl Reader for ObjReader {
                 "ObjReader requires a filename option.".to_string(),
             ));
         }
-        let text = fs::read_to_string(Path::new(&self.filename))
+        let text = source::read_to_string(&self.filename)
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
 
         let mut vertices: Vec<Xyzw> = Vec::new();

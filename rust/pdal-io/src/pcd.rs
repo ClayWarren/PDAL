@@ -1,3 +1,4 @@
+use crate::source;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
@@ -57,7 +58,7 @@ impl Reader for PcdReader {
             ));
         }
 
-        let bytes = fs::read(Path::new(&self.filename))
+        let bytes = source::read_bytes(&self.filename)
             .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
         let header = parse_header(&bytes)?;
 

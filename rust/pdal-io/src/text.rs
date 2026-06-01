@@ -1,11 +1,10 @@
+use crate::source;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
 /// Text reader for simple numeric delimited files.
@@ -171,7 +170,7 @@ impl Reader for TextReader {
             ));
         }
 
-        let text = fs::read_to_string(Path::new(&self.filename))
+        let text = source::read_to_string(&self.filename)
             .map_err(|_| StageError(format!("Unable to open text file '{}'.", self.filename)))?;
         let lines: Vec<&str> = text.lines().collect();
         let header = match &self.header {
@@ -277,6 +276,7 @@ fn skip_ascii_whitespace(bytes: &[u8], pos: &mut usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn data_path(path: &str) -> String {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

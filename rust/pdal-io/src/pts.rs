@@ -13,13 +13,12 @@
 //! dimension set are skipped, and no more than the declared point count is
 //! read.
 
+use crate::source;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
 /// Reader for the Leica PTS ASCII point format.
@@ -47,7 +46,7 @@ impl Reader for PtsReader {
             ));
         }
 
-        let text = fs::read_to_string(Path::new(&self.filename))
+        let text = source::read_to_string(&self.filename)
             .map_err(|_| StageError(format!("Unable to open file '{}'.", self.filename)))?;
         let lines: Vec<&str> = text.lines().collect();
 
@@ -149,7 +148,9 @@ fn split_fields(line: &str) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::io::Write;
+    use std::path::Path;
 
     fn data_path(path: &str) -> String {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
