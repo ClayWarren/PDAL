@@ -980,3 +980,5 @@ fn format_value(value: f64, ty: DimType, precision: Option<usize>) -> String {
 
 #[cfg(test)]
 include!("ply_tests.rs");
+#[cfg(test)]
+include!("ply_stream_tests.rs");

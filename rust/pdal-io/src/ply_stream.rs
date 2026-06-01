@@ -3,11 +3,13 @@ use crate::source;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
+use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
 use std::rc::Rc;
 
 pub(super) struct PlyReaderStreamState {
     reader: BufReader<Box<dyn source::ReadSeek>>,
+    ascii_tokens: VecDeque<String>,
     layout: Rc<PointLayout>,
     vertex: Element,
     format: PlyFormat,
@@ -15,19 +17,18 @@ pub(super) struct PlyReaderStreamState {
 }
 
 pub(super) fn streamable(filename: &str) -> bool {
-    open_binary_vertex_stream(filename)
-        .and_then(|(_reader, elements, format)| {
-            streamable_binary_vertex_element(&elements, format).map(|_| ())
-        })
+    open_vertex_stream(filename)
+        .and_then(|(_reader, elements, _format)| streamable_vertex_element(&elements).map(|_| ()))
         .is_ok()
 }
 
 pub(super) fn stream_init(filename: &str) -> Result<PlyReaderStreamState, StageError> {
-    let (reader, elements, format) = open_binary_vertex_stream(filename)?;
-    let vertex = streamable_binary_vertex_element(&elements, format)?.clone();
+    let (reader, elements, format) = open_vertex_stream(filename)?;
+    let vertex = streamable_vertex_element(&elements)?.clone();
     let layout = layout_for_vertex(&vertex);
     Ok(PlyReaderStreamState {
         reader,
+        ascii_tokens: VecDeque::new(),
         layout,
         remaining: vertex.count,
         vertex,
@@ -47,21 +48,21 @@ pub(super) fn stream_next(
     let target = capacity.max(1).min(state.remaining);
     for _ in 0..target {
         let point = view.add_point();
-        for prop in &state.vertex.props {
+        for prop in state.vertex.props.clone() {
             let PlyProp::Simple { dim, ty } = prop else {
                 return Err(StageError(
                     "PLY streaming does not support list properties.".to_string(),
                 ));
             };
-            let value = read_binary_value(&mut state.reader, state.format, *ty)?;
-            view.set_f64(point, dim, value);
+            let value = read_value(state, ty)?;
+            view.set_f64(point, &dim, value);
         }
         state.remaining -= 1;
     }
     Ok(Some(view))
 }
 
-fn open_binary_vertex_stream(
+fn open_vertex_stream(
     filename: &str,
 ) -> Result<
     (
@@ -100,15 +101,7 @@ fn open_binary_vertex_stream(
     Ok((reader, elements, format))
 }
 
-fn streamable_binary_vertex_element(
-    elements: &[Element],
-    format: PlyFormat,
-) -> Result<&Element, StageError> {
-    if format == PlyFormat::Ascii {
-        return Err(StageError(
-            "PLY streaming is only supported for binary vertex input.".to_string(),
-        ));
-    }
+fn streamable_vertex_element(elements: &[Element]) -> Result<&Element, StageError> {
     let vertex = elements
         .iter()
         .find(|element| element.name == "vertex")
@@ -131,6 +124,55 @@ fn streamable_binary_vertex_element(
         ));
     }
     Ok(vertex)
+}
+
+fn read_value(state: &mut PlyReaderStreamState, ty: DimType) -> Result<f64, StageError> {
+    match state.format {
+        PlyFormat::Ascii => read_ascii_value(state, ty),
+        PlyFormat::BinaryLittleEndian | PlyFormat::BinaryBigEndian => {
+            read_binary_value(&mut state.reader, state.format, ty)
+        }
+    }
+}
+
+fn read_ascii_value(state: &mut PlyReaderStreamState, ty: DimType) -> Result<f64, StageError> {
+    while state.ascii_tokens.is_empty() {
+        let mut line = String::new();
+        let read = state
+            .reader
+            .read_line(&mut line)
+            .map_err(|err| StageError(err.to_string()))?;
+        if read == 0 {
+            return Err(StageError(
+                "Error reading data for the 'vertex' element.".to_string(),
+            ));
+        }
+        state.ascii_tokens.extend(
+            line.split_whitespace()
+                .map(std::string::ToString::to_string),
+        );
+    }
+
+    let token = state.ascii_tokens.pop_front().expect("checked above");
+    parse_ascii_token(&token, ty)
+}
+
+fn parse_ascii_token(token: &str, ty: DimType) -> Result<f64, StageError> {
+    match ty {
+        DimType::I8
+        | DimType::U8
+        | DimType::I16
+        | DimType::U16
+        | DimType::I32
+        | DimType::U32
+        | DimType::F32
+        | DimType::F64 => token
+            .parse::<f64>()
+            .map_err(|_| StageError("Error reading PLY ASCII value.".to_string())),
+        DimType::I64 | DimType::U64 => Err(StageError(
+            "Unsupported ASCII PLY property type.".to_string(),
+        )),
+    }
 }
 
 fn layout_for_vertex(vertex: &Element) -> Rc<PointLayout> {
