@@ -12,13 +12,8 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
 use std::rc::Rc;
-
-trait ReadSeek: Read + Seek {}
-impl<T: Read + Seek> ReadSeek for T {}
 
 pub struct QfitReader {
     filename: String,
@@ -160,31 +155,12 @@ impl Reader for QfitReader {
     }
 }
 
-fn open_qfit_reader(filename: &str) -> Result<BufReader<Box<dyn ReadSeek>>, StageError> {
-    if is_qfit_vsi_path(filename) {
-        let vsi_path = qfit_vsi_path(filename);
-        let file = pdal_native::vsi::VsiFile::open(&vsi_path)
-            .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
-        return Ok(BufReader::new(Box::new(file)));
-    }
-
-    let file = File::open(Path::new(filename))
-        .map_err(|_| StageError(format!("Couldn't open '{filename}'")))?;
-    Ok(BufReader::new(Box::new(file)))
-}
-
-fn is_qfit_vsi_path(filename: &str) -> bool {
-    filename.starts_with("/vsi")
-        || filename.starts_with("http://")
-        || filename.starts_with("https://")
-}
-
-fn qfit_vsi_path(filename: &str) -> String {
-    if filename.starts_with("http://") || filename.starts_with("https://") {
-        format!("/vsicurl/{filename}")
-    } else {
-        filename.to_string()
-    }
+fn open_qfit_reader(
+    filename: &str,
+) -> Result<BufReader<Box<dyn crate::source::ReadSeek>>, StageError> {
+    let file = crate::source::open_seek(filename)
+        .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
+    Ok(BufReader::new(file))
 }
 
 fn read_i32<R: Read>(reader: &mut R, endian: QfitEndian) -> Result<i32, std::io::Error> {
@@ -197,6 +173,7 @@ fn read_i32<R: Read>(reader: &mut R, endian: QfitEndian) -> Result<i32, std::io:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn read_i32_little_endian() {
@@ -210,22 +187,6 @@ mod tests {
         let buf = [0x12, 0x34, 0x56, 0x78];
         let val = read_i32(&mut &buf[..], QfitEndian::Big).unwrap();
         assert_eq!(val, 0x12345678);
-    }
-
-    #[test]
-    fn qfit_vsi_path_helpers_cover_remote_and_vsi_forms() {
-        assert!(is_qfit_vsi_path("https://example.com/file.qi"));
-        assert!(is_qfit_vsi_path("http://example.com/file.qi"));
-        assert!(is_qfit_vsi_path("/vsicurl/https://example.com/file.qi"));
-        assert!(!is_qfit_vsi_path("/tmp/file.qi"));
-        assert_eq!(
-            qfit_vsi_path("https://example.com/file.qi"),
-            "/vsicurl/https://example.com/file.qi"
-        );
-        assert_eq!(
-            qfit_vsi_path("/vsicurl/https://example.com/file.qi"),
-            "/vsicurl/https://example.com/file.qi"
-        );
     }
 
     #[test]

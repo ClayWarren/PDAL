@@ -10,9 +10,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::Path;
 use std::rc::Rc;
 
 pub struct SmrmsgReader {
@@ -87,36 +85,12 @@ impl Reader for SmrmsgReader {
     }
 }
 
-fn open_smrmsg_reader(filename: &str) -> Result<(BufReader<Box<dyn Read>>, u64), StageError> {
-    if is_smrmsg_vsi_path(filename) {
-        let vsi_path = smrmsg_vsi_path(filename);
-        let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
-            .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
-        let len = file.len().map_err(StageError)?;
-        return Ok((BufReader::new(Box::new(file)), len));
-    }
-
-    let file = File::open(Path::new(filename))
-        .map_err(|_| StageError(format!("Couldn't open '{filename}'")))?;
-    let len = file
-        .metadata()
-        .map_err(|e| StageError(e.to_string()))?
-        .len();
-    Ok((BufReader::new(Box::new(file)), len))
-}
-
-fn is_smrmsg_vsi_path(filename: &str) -> bool {
-    filename.starts_with("/vsi")
-        || filename.starts_with("http://")
-        || filename.starts_with("https://")
-}
-
-fn smrmsg_vsi_path(filename: &str) -> String {
-    if filename.starts_with("http://") || filename.starts_with("https://") {
-        format!("/vsicurl/{filename}")
-    } else {
-        filename.to_string()
-    }
+fn open_smrmsg_reader(
+    filename: &str,
+) -> Result<(BufReader<Box<dyn crate::source::ReadSeek>>, u64), StageError> {
+    let (file, len) = crate::source::open_seek_len(filename)
+        .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
+    Ok((BufReader::new(file), len))
 }
 
 #[cfg(test)]
@@ -201,23 +175,5 @@ mod tests {
         assert_eq!(view.get_f64(0, &DimId::GpsTime), 1.0);
         assert_eq!(view.get_f64(0, &DimId::NorthPositionRMS), 0.1);
         assert_eq!(view.get_f64(0, &DimId::HeadingRMS), 0.03);
-    }
-
-    #[test]
-    fn smrmsg_vsi_path_helpers_cover_remote_and_vsi_forms() {
-        assert!(is_smrmsg_vsi_path("https://example.com/file.smrmsg"));
-        assert!(is_smrmsg_vsi_path("http://example.com/file.smrmsg"));
-        assert!(is_smrmsg_vsi_path(
-            "/vsicurl/https://example.com/file.smrmsg"
-        ));
-        assert!(!is_smrmsg_vsi_path("/tmp/file.smrmsg"));
-        assert_eq!(
-            smrmsg_vsi_path("https://example.com/file.smrmsg"),
-            "/vsicurl/https://example.com/file.smrmsg"
-        );
-        assert_eq!(
-            smrmsg_vsi_path("/vsicurl/https://example.com/file.smrmsg"),
-            "/vsicurl/https://example.com/file.smrmsg"
-        );
     }
 }

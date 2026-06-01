@@ -18,6 +18,19 @@ pub fn open_seek(filename: &str) -> Result<Box<dyn ReadSeek>, String> {
         .map_err(|err| err.to_string())
 }
 
+pub fn open_seek_len(filename: &str) -> Result<(Box<dyn ReadSeek>, u64), String> {
+    if is_vsi_path(filename) {
+        let path = vsi_path(filename);
+        let mut file = pdal_native::vsi::VsiFile::open(&path)?;
+        let len = file.len()?;
+        return Ok((Box::new(file), len));
+    }
+
+    let file = fs::File::open(Path::new(filename)).map_err(|err| err.to_string())?;
+    let len = file.metadata().map_err(|err| err.to_string())?.len();
+    Ok((Box::new(file), len))
+}
+
 pub fn read_bytes(filename: &str) -> Result<Vec<u8>, String> {
     if is_vsi_path(filename) {
         let path = vsi_path(filename);
