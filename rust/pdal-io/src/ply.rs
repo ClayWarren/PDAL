@@ -9,6 +9,10 @@
 //! ASCII and binary little/big endian storage modes are supported.
 
 use crate::source;
+#[path = "ply_stream.rs"]
+mod ply_stream;
+use ply_stream::PlyReaderStreamState;
+
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
@@ -48,6 +52,7 @@ impl PlyFormat {
 }
 
 /// One declared property of a PLY element.
+#[derive(Clone)]
 enum PlyProp {
     /// A scalar value: one ASCII token.
     Simple { dim: DimId, ty: DimType },
@@ -60,6 +65,7 @@ enum PlyProp {
 }
 
 /// One declared PLY element (`vertex`, `face`, ...).
+#[derive(Clone)]
 struct Element {
     name: String,
     count: usize,
@@ -153,13 +159,20 @@ fn read_binary_value(
 /// Reader for the Stanford PLY format (ASCII encoding).
 pub struct PlyReader {
     filename: String,
+    stream: Option<PlyReaderStreamState>,
 }
 
 impl PlyReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            stream: None,
         }
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        self.stream = Some(ply_stream::stream_init(&self.filename)?);
+        Ok(())
     }
 }
 
@@ -254,6 +267,24 @@ impl Reader for PlyReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.ply")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        ply_stream::streamable(&self.filename)
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        ply_stream::stream_next(
+            self.stream.as_mut().expect("stream initialized above"),
+            capacity,
+        )
     }
 }
 
