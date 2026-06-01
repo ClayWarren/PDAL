@@ -3,6 +3,7 @@ pub mod assign;
 pub mod chipper;
 pub mod cluster;
 pub mod colorinterp;
+pub mod colorinterp_ramps;
 pub mod colorization;
 pub mod covariancefeatures;
 pub mod crop;

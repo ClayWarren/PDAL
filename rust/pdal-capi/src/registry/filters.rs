@@ -15,6 +15,7 @@ use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::chipper::ChipperFilter;
 use pdal_filters::cluster::ClusterFilter;
+use pdal_filters::colorinterp::ColorinterpFilter;
 use pdal_filters::colorization::{parse_band_spec, ColorizationFilter};
 use pdal_filters::covariancefeatures::{CovarianceFeaturesFilter, Mode as CovarianceMode};
 use pdal_filters::crop::{CropCenter, CropFilter};
@@ -116,6 +117,36 @@ pub fn create_filter(
             get_f64(options, "tolerance", 1.0)?,
             get_bool(options, "is3d", true)?,
         )))),
+        "filters.colorinterp" => {
+            // Min/max default to NaN so the filter computes bounds from the
+            // view (or from `k`/`mad`); the default ramp is the named
+            // `pestel_shades`, resolved from embedded PNG bytes at run time.
+            let min = options
+                .has("minimum")
+                .then(|| get_f64(options, "minimum", f64::NAN))
+                .transpose()?
+                .unwrap_or(f64::NAN);
+            let max = options
+                .has("maximum")
+                .then(|| get_f64(options, "maximum", f64::NAN))
+                .transpose()?
+                .unwrap_or(f64::NAN);
+            Ok(Box::new(FilterWrapper::new(
+                ColorinterpFilter::new(
+                    &options.get_str("dimension", "Z"),
+                    &options.get_str("ramp", "pestel_shades"),
+                    min,
+                    max,
+                    get_bool(options, "clamp", false)?,
+                    get_bool(options, "invert", false)?,
+                )
+                .with_bounds_params(
+                    get_bool(options, "mad", false)?,
+                    get_f64(options, "mad_multiplier", 1.4862)?,
+                    get_f64(options, "k", 0.0)?,
+                ),
+            )))
+        }
         "filters.colorization" => {
             // C++ ColorizationFilter parses the `dimensions` list into
             // name:band:scale specs (defaulting to Red/Green/Blue) before

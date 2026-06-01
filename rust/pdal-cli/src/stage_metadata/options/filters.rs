@@ -34,6 +34,45 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
                 None,
             ),
         ],
+        "filters.colorinterp" => vec![
+            option(
+                "dimension",
+                "Dimension to interpolate colors from.",
+                Some(json!("Z")),
+            ),
+            option("minimum", "Minimum value for scaling (auto if unset).", None),
+            option("maximum", "Maximum value for scaling (auto if unset).", None),
+            option(
+                "clamp",
+                "Clamp values outside [minimum, maximum] to the range.",
+                Some(json!(false)),
+            ),
+            option(
+                "ramp",
+                "Named built-in ramp or GDAL-readable color ramp image.",
+                Some(json!("pestel_shades")),
+            ),
+            option(
+                "invert",
+                "Invert the ramp direction.",
+                Some(json!(false)),
+            ),
+            option(
+                "mad",
+                "Use Median Absolute Deviation with 'k' to compute bounds.",
+                Some(json!(false)),
+            ),
+            option(
+                "mad_multiplier",
+                "MAD threshold multiplier.",
+                Some(json!(1.4862)),
+            ),
+            option(
+                "k",
+                "Number of deviations for the computed minimum/maximum.",
+                Some(json!(0.0)),
+            ),
+        ],
         "filters.colorization" => vec![
             option(
                 "raster",
@@ -443,6 +482,11 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
                 Some(json!(false)),
             ),
         ],
+        "filters.h3" => vec![option(
+            "resolution",
+            "H3 resolution (0-15) for the computed index.",
+            None,
+        )],
         "filters.head" | "filters.tail" => vec![
             option("count", "Number of points to keep.", Some(json!(10))),
             option(

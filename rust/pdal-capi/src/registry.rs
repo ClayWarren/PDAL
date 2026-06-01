@@ -46,6 +46,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.assign",
     "filters.chipper",
     "filters.cluster",
+    "filters.colorinterp",
     "filters.colorization",
     "filters.covariancefeatures",
     "filters.crop",

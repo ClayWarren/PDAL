@@ -629,9 +629,21 @@ Known mixed binaries:
   through the Rust C ABI in batch and streaming paths.
 - `pdal_filters_voxel_downsize_test`: all 6 tests count. Voxel downsizing routes
   through the Rust C ABI in batch and streaming paths.
+- `pdal_filters_colorinterp_test`: `minmax`, `missingz`, `badramp`,
+  `cantstream`, `autorange`, `k`, and
   `mad` count. Color interpolation execution routes through the Rust C ABI.
   Missing-dimension validation and streamability checks remain C++ wrapper
-  behavior.
+  behavior. `filters.colorinterp` is now also registered in the pipeline
+  registry, so `pdal pipeline` runs it: the Rust filter is self-sufficient for
+  the registry path -- it resolves the named built-in ramps (`pestel_shades`
+  etc.) by decoding their embedded PNG bytes (the data moved to
+  `pdal-filters::colorinterp_ramps`, with `pdal_colorinterp_default_ramp`
+  delegating to it and the `png` crate decoding to RGB bands), computes auto
+  `minimum`/`maximum` (plus the `k`/`mad`/`mad_multiplier` modes) when bounds
+  are NaN, and declares Red/Green/Blue (uint16) via `output_dimensions()`. The
+  auto-bounds/k/mad math is gated by Rust unit tests mirroring the C++
+  `autorange`/`k`/`mad` expected values. With this, every first-party filter
+  with a Rust implementation is registry-visible.
 - `pdal_filters_colorization_test`: `test1`, `test2`, `test3`, and `test5`
   count. Color sampling and point updates route through the Rust C ABI. Invalid
   dimension-name validation remains C++ layout behavior.

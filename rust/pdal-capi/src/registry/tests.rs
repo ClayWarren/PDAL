@@ -365,6 +365,52 @@ fn registry_h3_filter_requires_resolution() {
 }
 
 #[test]
+fn registry_colorinterp_filter_uses_named_ramp_and_auto_bounds() {
+    // `pdal pipeline` with filters.colorinterp and no min/max must construct
+    // through the registry, resolve the default `pestel_shades` named ramp
+    // (no file), prepare Red/Green/Blue as uint16, and assign colors.
+    let mut options = Options::new();
+    options.add("ramp", "pestel_shades");
+    let mut filter = create_filter("filters.colorinterp", &options).unwrap();
+
+    let output_dims = filter.output_dimensions();
+    for dim in [DimId::Red, DimId::Green, DimId::Blue] {
+        assert!(
+            output_dims.contains(&(dim.clone(), DimType::U16)),
+            "colorinterp should declare {dim:?} as uint16"
+        );
+    }
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::Z, DimType::F64);
+    let mut view = PointView::new(Rc::new(layout));
+    for z in 0..10 {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::Z, z as f64);
+    }
+    let view = view.with_dimensions(&output_dims);
+
+    let views = filter.run(&[view]).unwrap();
+    assert_eq!(views.len(), 1);
+    let out = &views[0];
+    assert_eq!(out.len(), 10);
+    // Auto bounds span Z [0,9]; the ramp ends differ, so the lowest and
+    // highest points get different colors, and every channel stays in 0..=255.
+    for i in 0..out.len() {
+        for dim in [DimId::Red, DimId::Green, DimId::Blue] {
+            let c = out.get_u64(i, &dim);
+            assert!(c <= 255, "channel {dim:?} out of byte range: {c}");
+        }
+    }
+    let first = out.get_u64(0, &DimId::Red);
+    let last = out.get_u64(9, &DimId::Red);
+    assert_ne!(
+        first, last,
+        "ramp ends should differ across the value range"
+    );
+}
+
+#[test]
 fn registry_assign_filter_supports_value_expressions() {
     let mut options = Options::new();
     options.add("value", "Y = X * 2");
