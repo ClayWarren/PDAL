@@ -187,7 +187,7 @@ where
 }
 
 fn read_tindex_filelist(path: &str) -> Result<Vec<String>, String> {
-    let contents = std::fs::read_to_string(path)
+    let contents = pdal_io::source::read_to_string(path)
         .map_err(|err| format!("unable to read file list '{path}': {err}"))?;
     Ok(nonempty_lines(&contents))
 }
@@ -765,7 +765,7 @@ impl App {
             return 1;
         };
 
-        let index_json = match std::fs::read_to_string(tindex_file) {
+        let index_json = match pdal_io::source::read_to_string(tindex_file) {
             Ok(json) => json,
             Err(err) => {
                 eprintln!("Error: unable to read tindex '{tindex_file}': {err}");

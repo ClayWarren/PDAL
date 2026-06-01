@@ -72,7 +72,7 @@ impl App {
             json
         } else {
             let input = input.unwrap();
-            match std::fs::read_to_string(input) {
+            match pdal_io::source::read_to_string(input) {
                 Ok(json) => json,
                 Err(err) => {
                     eprintln!("Error: unable to read pipeline '{input}': {err}");
