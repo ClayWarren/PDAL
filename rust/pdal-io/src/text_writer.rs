@@ -3,7 +3,8 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
 use pdal_core::point::{DimId, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{BufWriter, Write};
 use std::path::Path;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -32,6 +33,12 @@ pub struct TextWriter {
     quote_header: bool,
     precision: usize,
     point_count: u64,
+    stream: Option<TextStreamState>,
+}
+
+struct TextStreamState {
+    writer: BufWriter<File>,
+    specs: Vec<DimSpec>,
 }
 
 impl TextWriter {
@@ -53,6 +60,7 @@ impl TextWriter {
             quote_header: options.get_bool("quote_header", true),
             precision: options.get_u64("precision", 3) as usize,
             point_count: 0,
+            stream: None,
         }
     }
 
@@ -120,39 +128,48 @@ impl TextWriter {
         let specs = self.dimension_specs(first.layout())?;
         let mut output = String::new();
 
-        if self.write_header {
-            for (idx, spec) in specs.iter().enumerate() {
-                if idx > 0 {
-                    output.push_str(&self.delimiter);
-                }
-                if self.quote_header {
-                    output.push('"');
-                    output.push_str(&spec.name);
-                    output.push('"');
-                } else {
-                    output.push_str(&spec.name);
-                }
-            }
-            output.push_str(&self.newline);
-        }
+        self.append_csv_header(&mut output, &specs);
 
         for view in views {
             for point in 0..view.len() {
                 self.point_count += 1;
-                for (idx, spec) in specs.iter().enumerate() {
-                    if idx > 0 {
-                        output.push_str(&self.delimiter);
-                    }
-                    output.push_str(&format_number(
-                        view.get_f64(point, &spec.id),
-                        spec.precision,
-                    ));
-                }
-                output.push_str(&self.newline);
+                self.append_csv_row(&mut output, view, point, &specs);
             }
         }
 
         Ok(output)
+    }
+
+    fn append_csv_header(&self, output: &mut String, specs: &[DimSpec]) {
+        if !self.write_header {
+            return;
+        }
+        for (idx, spec) in specs.iter().enumerate() {
+            if idx > 0 {
+                output.push_str(&self.delimiter);
+            }
+            if self.quote_header {
+                output.push('"');
+                output.push_str(&spec.name);
+                output.push('"');
+            } else {
+                output.push_str(&spec.name);
+            }
+        }
+        output.push_str(&self.newline);
+    }
+
+    fn append_csv_row(&self, output: &mut String, view: &PointView, point: u64, specs: &[DimSpec]) {
+        for (idx, spec) in specs.iter().enumerate() {
+            if idx > 0 {
+                output.push_str(&self.delimiter);
+            }
+            output.push_str(&format_number(
+                view.get_f64(point, &spec.id),
+                spec.precision,
+            ));
+        }
+        output.push_str(&self.newline);
     }
 
     fn write_geojson(&mut self, views: &[PointView]) -> Result<String, StageError> {
@@ -253,6 +270,59 @@ impl Writer for TextWriter {
         node.add_value("point_count", MetadataValue::U64(self.point_count));
         node
     }
+
+    fn reset(&mut self) {
+        self.stream = None;
+        self.point_count = 0;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty() && self.output_type == OutputType::Csv
+    }
+
+    fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
+        if self.stream.is_none() {
+            let file = File::create(Path::new(&self.filename)).map_err(|_| {
+                StageError(format!("Couldn't open '{}' for output.", self.filename))
+            })?;
+            let specs = self.dimension_specs(chunk.layout())?;
+            let mut header = String::new();
+            self.append_csv_header(&mut header, &specs);
+            let mut writer = BufWriter::new(file);
+            writer
+                .write_all(header.as_bytes())
+                .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+            self.stream = Some(TextStreamState { writer, specs });
+        }
+
+        let mut rows = String::new();
+        let specs = self
+            .stream
+            .as_ref()
+            .expect("stream initialized above")
+            .specs
+            .clone();
+        for point in 0..chunk.len() {
+            self.point_count += 1;
+            self.append_csv_row(&mut rows, chunk, point, &specs);
+        }
+        self.stream
+            .as_mut()
+            .expect("stream initialized above")
+            .writer
+            .write_all(rows.as_bytes())
+            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))
+    }
+
+    fn stream_finish(&mut self) -> Result<(), StageError> {
+        let Some(mut state) = self.stream.take() else {
+            return self.write(&[]);
+        };
+        state
+            .writer
+            .flush()
+            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))
+    }
 }
 
 fn dim_spec_or_default(specs: &[DimSpec], id: DimId, precision: usize) -> DimSpec {
@@ -274,11 +344,13 @@ fn format_number(value: f64, precision: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::faux::FauxReader;
     use crate::text::TextReader;
     use pdal_core::options::Options;
-    use pdal_core::pipeline::{FilterWrapper, Pipeline, Reader};
+    use pdal_core::pipeline::{FilterWrapper, Pipeline, Reader, Writer};
     use pdal_core::point::{DimType, PointLayout, PointView};
     use pdal_filters::decimation::DecimationFilter;
+    use pdal_filters::range::{RangeFilter, RangeLimit};
     use std::rc::Rc;
 
     fn data_path(path: &str) -> String {
@@ -451,6 +523,112 @@ mod tests {
         assert_eq!(lines[0], "X,Y,Z");
         assert_eq!(lines[1], "289814.15,4320978.61,170.76");
         assert_eq!(lines[5], "289818.01,4320980.38,170.61");
+    }
+
+    #[test]
+    fn streaming_csv_matches_materialized_write() {
+        let view = make_precision_view();
+        let mut first = view.clone();
+        first.truncate(2);
+        let mut second = view.make_new();
+        second.append_point(&view, 2);
+
+        let materialized = write_view("stream-materialized.csv", &view, |options| {
+            options
+                .add("order", "X,Y,Z,Intensity")
+                .add("precision", 5)
+                .add("quote_header", false);
+        });
+
+        let path = temp_path("streamed.csv");
+        let mut options = Options::new();
+        options
+            .add("filename", &path)
+            .add("order", "X,Y,Z,Intensity")
+            .add("precision", 5)
+            .add("quote_header", false);
+        let mut writer = TextWriter::new(&options);
+        assert!(writer.streamable());
+        writer.stream_write(&first).unwrap();
+        writer.stream_write(&second).unwrap();
+        writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), materialized);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn streaming_csv_writes_header_for_empty_chunk() {
+        let mut view = make_precision_view();
+        view.truncate(0);
+
+        let path = temp_path("stream-empty.csv");
+        let mut options = Options::new();
+        options
+            .add("filename", &path)
+            .add("order", "X,Y,Z")
+            .add("quote_header", false);
+        let mut writer = TextWriter::new(&options);
+
+        writer.stream_write(&view).unwrap();
+        writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "X,Y,Z,Intensity\n");
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn pipeline_streams_to_csv_writer() {
+        let output = temp_path("stream-pipeline.csv");
+
+        let mut reader_options = Options::new();
+        reader_options
+            .add("count", "12")
+            .add("mode", "ramp")
+            .add("bounds", "([0,11],[0,11],[0,11])");
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 0.0,
+            upper_bound: 5.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("order", "X,Y,Z")
+            .add("quote_header", false)
+            .add("precision", 0);
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.faux",
+            Box::new(FauxReader::new(&reader_options).unwrap()),
+            reader_options,
+        );
+        let filter = pipeline.add_stage(
+            "filters.range",
+            Box::new(FilterWrapper::new(RangeFilter::new(limits))),
+            Options::new(),
+        );
+        let writer = pipeline.add_writer(
+            "writers.text",
+            Box::new(TextWriter::new(&writer_options)),
+            writer_options,
+        );
+        pipeline.add_dependency(filter, reader).unwrap();
+        pipeline.add_dependency(writer, filter).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(6));
+        let written = fs::read_to_string(&output).unwrap();
+        let _ = fs::remove_file(output);
+
+        let lines: Vec<_> = written.lines().collect();
+        assert_eq!(lines[0], "X,Y,Z,OffsetTime");
+        assert_eq!(lines.len(), 7);
+        assert_eq!(lines[1], "0,0,0,0");
+        assert_eq!(lines[6], "5,5,5,5");
     }
 
     #[test]
