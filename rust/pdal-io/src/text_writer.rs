@@ -39,6 +39,7 @@ pub struct TextWriter {
 struct TextStreamState {
     writer: BufWriter<File>,
     specs: Vec<DimSpec>,
+    first_feature: bool,
 }
 
 impl TextWriter {
@@ -179,10 +180,6 @@ impl TextWriter {
             ));
         };
         let specs = self.dimension_specs(first.layout())?;
-        let x_dim = dim_spec_or_default(&specs, DimId::X, self.precision);
-        let y_dim = dim_spec_or_default(&specs, DimId::Y, self.precision);
-        let z_dim = dim_spec_or_default(&specs, DimId::Z, self.precision);
-
         let mut output = String::new();
         if !self.callback.is_empty() {
             output.push_str(&self.callback);
@@ -198,40 +195,7 @@ impl TextWriter {
                     output.push(',');
                 }
                 first_feature = false;
-
-                output.push_str(
-                    "{ \"type\":\"Feature\",\"geometry\": { \"type\": \"Point\", \"coordinates\": [",
-                );
-                output.push_str(&format_number(
-                    view.get_f64(point, &DimId::X),
-                    x_dim.precision,
-                ));
-                output.push(',');
-                output.push_str(&format_number(
-                    view.get_f64(point, &DimId::Y),
-                    y_dim.precision,
-                ));
-                output.push(',');
-                output.push_str(&format_number(
-                    view.get_f64(point, &DimId::Z),
-                    z_dim.precision,
-                ));
-                output.push_str("]},\"properties\": {");
-
-                for (idx, spec) in specs.iter().enumerate() {
-                    if idx > 0 {
-                        output.push(',');
-                    }
-                    output.push('"');
-                    output.push_str(&spec.name);
-                    output.push_str("\":\"");
-                    output.push_str(&format_number(
-                        view.get_f64(point, &spec.id),
-                        spec.precision,
-                    ));
-                    output.push('"');
-                }
-                output.push_str("}}");
+                self.append_geojson_feature(&mut output, view, point, &specs);
             }
         }
 
@@ -240,6 +204,52 @@ impl TextWriter {
             output.push(')');
         }
         Ok(output)
+    }
+
+    fn append_geojson_feature(
+        &self,
+        output: &mut String,
+        view: &PointView,
+        point: u64,
+        specs: &[DimSpec],
+    ) {
+        let x_dim = dim_spec_or_default(specs, DimId::X, self.precision);
+        let y_dim = dim_spec_or_default(specs, DimId::Y, self.precision);
+        let z_dim = dim_spec_or_default(specs, DimId::Z, self.precision);
+
+        output.push_str(
+            "{ \"type\":\"Feature\",\"geometry\": { \"type\": \"Point\", \"coordinates\": [",
+        );
+        output.push_str(&format_number(
+            view.get_f64(point, &DimId::X),
+            x_dim.precision,
+        ));
+        output.push(',');
+        output.push_str(&format_number(
+            view.get_f64(point, &DimId::Y),
+            y_dim.precision,
+        ));
+        output.push(',');
+        output.push_str(&format_number(
+            view.get_f64(point, &DimId::Z),
+            z_dim.precision,
+        ));
+        output.push_str("]},\"properties\": {");
+
+        for (idx, spec) in specs.iter().enumerate() {
+            if idx > 0 {
+                output.push(',');
+            }
+            output.push('"');
+            output.push_str(&spec.name);
+            output.push_str("\":\"");
+            output.push_str(&format_number(
+                view.get_f64(point, &spec.id),
+                spec.precision,
+            ));
+            output.push('"');
+        }
+        output.push_str("}}");
     }
 }
 
@@ -277,7 +287,7 @@ impl Writer for TextWriter {
     }
 
     fn streamable(&self) -> bool {
-        !self.filename.is_empty() && self.output_type == OutputType::Csv
+        !self.filename.is_empty()
     }
 
     fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
@@ -286,13 +296,31 @@ impl Writer for TextWriter {
                 StageError(format!("Couldn't open '{}' for output.", self.filename))
             })?;
             let specs = self.dimension_specs(chunk.layout())?;
-            let mut header = String::new();
-            self.append_csv_header(&mut header, &specs);
+            let header = match self.output_type {
+                OutputType::Csv => {
+                    let mut header = String::new();
+                    self.append_csv_header(&mut header, &specs);
+                    header
+                }
+                OutputType::GeoJson => {
+                    let mut header = String::new();
+                    if !self.callback.is_empty() {
+                        header.push_str(&self.callback);
+                        header.push('(');
+                    }
+                    header.push_str("{ \"type\": \"FeatureCollection\", \"features\": [");
+                    header
+                }
+            };
             let mut writer = BufWriter::new(file);
             writer
                 .write_all(header.as_bytes())
                 .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
-            self.stream = Some(TextStreamState { writer, specs });
+            self.stream = Some(TextStreamState {
+                writer,
+                specs,
+                first_feature: true,
+            });
         }
 
         let mut rows = String::new();
@@ -302,9 +330,29 @@ impl Writer for TextWriter {
             .expect("stream initialized above")
             .specs
             .clone();
-        for point in 0..chunk.len() {
-            self.point_count += 1;
-            self.append_csv_row(&mut rows, chunk, point, &specs);
+        if self.output_type == OutputType::Csv {
+            for point in 0..chunk.len() {
+                self.point_count += 1;
+                self.append_csv_row(&mut rows, chunk, point, &specs);
+            }
+        } else {
+            let mut first_feature = self
+                .stream
+                .as_ref()
+                .expect("stream initialized above")
+                .first_feature;
+            for point in 0..chunk.len() {
+                self.point_count += 1;
+                if !first_feature {
+                    rows.push(',');
+                }
+                first_feature = false;
+                self.append_geojson_feature(&mut rows, chunk, point, &specs);
+            }
+            self.stream
+                .as_mut()
+                .expect("stream initialized above")
+                .first_feature = first_feature;
         }
         self.stream
             .as_mut()
@@ -318,6 +366,18 @@ impl Writer for TextWriter {
         let Some(mut state) = self.stream.take() else {
             return self.write(&[]);
         };
+        if self.output_type == OutputType::GeoJson {
+            state
+                .writer
+                .write_all(b"]}")
+                .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+            if !self.callback.is_empty() {
+                state
+                    .writer
+                    .write_all(b")")
+                    .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+            }
+        }
         state
             .writer
             .flush()
@@ -547,6 +607,38 @@ mod tests {
             .add("order", "X,Y,Z,Intensity")
             .add("precision", 5)
             .add("quote_header", false);
+        let mut writer = TextWriter::new(&options);
+        assert!(writer.streamable());
+        writer.stream_write(&first).unwrap();
+        writer.stream_write(&second).unwrap();
+        writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), materialized);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn streaming_geojson_matches_materialized_write() {
+        let view = make_precision_view();
+        let mut first = view.clone();
+        first.truncate(2);
+        let mut second = view.make_new();
+        second.append_point(&view, 2);
+
+        let materialized = write_view("stream-materialized.geojson", &view, |options| {
+            options
+                .add("format", "geojson")
+                .add("order", "X,Y,Z,Intensity")
+                .add("precision", 5);
+        });
+
+        let path = temp_path("streamed.geojson");
+        let mut options = Options::new();
+        options
+            .add("filename", &path)
+            .add("format", "geojson")
+            .add("order", "X,Y,Z,Intensity")
+            .add("precision", 5);
         let mut writer = TextWriter::new(&options);
         assert!(writer.streamable());
         writer.stream_write(&first).unwrap();
