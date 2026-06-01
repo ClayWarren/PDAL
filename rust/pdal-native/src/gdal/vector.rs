@@ -218,6 +218,36 @@ impl Vector {
         self.get_string_features_from_layer(layer, column, attribute_filter)
     }
 
+    pub fn get_string_features_by_sql(
+        &self,
+        sql: &str,
+        dialect: &str,
+        column: &str,
+        attribute_filter: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        let sql_c = CString::new(sql).map_err(|e| e.to_string())?;
+        let dialect_c = CString::new(dialect).map_err(|e| e.to_string())?;
+        let dialect_ptr = if dialect.is_empty() {
+            std::ptr::null()
+        } else {
+            dialect_c.as_ptr()
+        };
+        unsafe {
+            let layer = gdal_sys::OGR_DS_ExecuteSQL(
+                self.ds,
+                sql_c.as_ptr(),
+                std::ptr::null_mut(),
+                dialect_ptr,
+            );
+            if layer.is_null() {
+                return Err(format!("Failed to execute OGR SQL '{}'.", sql));
+            }
+            let result = self.get_string_features_from_layer(layer, column, attribute_filter);
+            gdal_sys::OGR_DS_ReleaseResultSet(self.ds, layer);
+            result
+        }
+    }
+
     fn get_string_features_from_layer(
         &self,
         layer: gdal_sys::OGRLayerH,

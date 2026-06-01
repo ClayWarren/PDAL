@@ -470,12 +470,13 @@ bool TIndexReader::canUseRustReader() const
 {
     const bool jsonIndex =
         hasSuffix(m_filename, ".json") || hasSuffix(m_filename, ".geojson");
-    if (jsonIndex && !m_args->m_attributeFilter.empty())
+    if (jsonIndex && (!m_args->m_attributeFilter.empty() ||
+                      !m_args->m_sql.empty()))
         return false;
 
     return m_args->m_srsColumnName.empty() && m_args->m_wkt.empty() &&
-           m_args->m_ogr.empty() && m_args->m_sql.empty() &&
-           m_args->m_rawReaderArgs.empty() && m_args->m_tgtSrsString.empty();
+           m_args->m_ogr.empty() && m_args->m_rawReaderArgs.empty() &&
+           m_args->m_tgtSrsString.empty();
 }
 
 void TIndexReader::loadRustView()
@@ -492,6 +493,8 @@ void TIndexReader::loadRustView()
     addOption(options, "lyr_name", m_args->m_layerName);
     addOption(options, "tindex_name", m_args->m_tileIndexColumnName);
     addOption(options, "where", m_args->m_attributeFilter);
+    addOption(options, "sql", m_args->m_sql);
+    addOption(options, "dialect", m_args->m_dialect);
     if (!m_args->m_bounds.empty())
     {
         std::ostringstream bounds;
