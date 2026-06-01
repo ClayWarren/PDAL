@@ -477,7 +477,7 @@ bool TIndexReader::canUseRustReader() const
         m_args->m_tgtSrsString.empty())
         return false;
 
-    return m_args->m_ogr.empty();
+    return true;
 }
 
 void TIndexReader::loadRustView()
@@ -497,7 +497,10 @@ void TIndexReader::loadRustView()
     addOption(options, "where", m_args->m_attributeFilter);
     addOption(options, "sql", m_args->m_sql);
     addOption(options, "dialect", m_args->m_dialect);
-    addOption(options, "polygon", m_args->m_wkt);
+    std::string polygon = m_args->m_wkt;
+    if (m_args->m_ogr.size())
+        polygon = m_args->m_ogr.getPolygons()[0].wkt();
+    addOption(options, "polygon", polygon);
     addOption(options, "filter_srs", m_args->m_filterSRS);
     addOption(options, "t_srs", m_args->m_tgtSrsString);
     if (m_args->m_rawReaderArgs.size())
