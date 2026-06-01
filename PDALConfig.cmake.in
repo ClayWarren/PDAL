@@ -16,6 +16,12 @@ if(TARGET pdalcpp AND NOT TARGET PDAL::PDAL)
   target_link_libraries(PDAL::PDAL INTERFACE pdalcpp)
 endif()
 
+if(TARGET PDAL::PDAL AND NOT TARGET PDAL::CAPI)
+  add_library(PDAL::CAPI INTERFACE IMPORTED)
+  target_include_directories(PDAL::CAPI INTERFACE "${PDAL_CAPI_INCLUDE_DIRS}")
+  target_link_libraries(PDAL::CAPI INTERFACE PDAL::PDAL)
+endif()
+
 #
 # Note: One should be able to just link libpdalcpp.so/dylib/lib.  But
 #   I can't find a way to use @PDAL_LIB_NAME@ because it's not
