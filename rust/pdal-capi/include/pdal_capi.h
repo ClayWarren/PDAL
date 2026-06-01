@@ -1,4 +1,6 @@
 #pragma once
+#ifndef PDAL_RUST_CAPI_H
+#define PDAL_RUST_CAPI_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -1645,4 +1647,6 @@ extern "C"
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
