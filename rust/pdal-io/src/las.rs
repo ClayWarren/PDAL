@@ -43,7 +43,6 @@ struct ConfiguredExtraDim {
     type_name: String,
 }
 
-#[derive(Clone)]
 pub struct LasReader {
     filename: String,
     start: u64,
@@ -55,6 +54,38 @@ pub struct LasReader {
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     srs_vlr_order: Vec<SrsVlrKind>,
     metadata: MetadataNode,
+    /// Streaming state for the chunked `stream_next` path (simple local-file
+    /// reads only); `None` until the first chunk is pulled.
+    stream: Option<LasStreamState>,
+}
+
+impl Clone for LasReader {
+    fn clone(&self) -> Self {
+        Self {
+            filename: self.filename.clone(),
+            start: self.start,
+            count: self.count,
+            nosrs: self.nosrs,
+            ignore_missing_vlrs: self.ignore_missing_vlrs,
+            start_offset: self.start_offset,
+            start_length: self.start_length,
+            configured_extra_dims: self.configured_extra_dims.clone(),
+            srs_vlr_order: self.srs_vlr_order.clone(),
+            metadata: self.metadata.clone(),
+            // A clone is a fresh reader; in-progress streaming state is not shared.
+            stream: None,
+        }
+    }
+}
+
+/// Open reader plus derived layout used by the chunked streaming read path.
+struct LasStreamState {
+    reader: las::Reader,
+    layout: Rc<PointLayout>,
+    point_format: u8,
+    extra_dims: Vec<ExtraDim>,
+    srs: pdal_core::srs::SpatialReference,
+    remaining: u64,
 }
 
 struct ExtraDim {
@@ -81,7 +112,49 @@ impl LasReader {
             configured_extra_dims: configured_extra_dims_from_options(options),
             srs_vlr_order: srs_vlr_order_from_options(options),
             metadata: MetadataNode::new("readers.las"),
+            stream: None,
         }
+    }
+
+    /// Open the file and derive layout/SRS for the streaming read path. Mirrors
+    /// the plain `read_standard_reader` setup so chunked reads produce the same
+    /// points as `read()`.
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        let path = Path::new(&self.filename);
+        let mut reader = las::Reader::from_path(path)
+            .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
+        let header = reader.header();
+        let point_count = header.number_of_points();
+        let point_format = header.point_format().to_u8().unwrap_or(3);
+        if self.start >= point_count && point_count > 0 {
+            return Err(StageError(format!(
+                "LAS start point {} is outside the file's {} points.",
+                self.start, point_count
+            )));
+        }
+        self.add_metadata(header);
+        let (layout, extra_dims) = las_layout(header, &self.configured_extra_dims)?;
+        let layout = Rc::new(layout);
+        let mut probe = PointView::new(Rc::clone(&layout));
+        self.set_spatial_reference(&mut probe, header)?;
+        let srs = probe.spatial_reference().clone();
+        let remaining = self.count.unwrap_or(point_count.saturating_sub(self.start));
+
+        // `header` borrow of `reader` ends here, so we can advance the reader.
+        if self.start > 0 {
+            reader
+                .read_points(self.start)
+                .map_err(|e| StageError(format!("Failed to seek LAS start: {}", e)))?;
+        }
+        self.stream = Some(LasStreamState {
+            reader,
+            layout,
+            point_format,
+            extra_dims,
+            srs,
+            remaining,
+        });
+        Ok(())
     }
 
     fn add_metadata(&mut self, header: &Header) {
@@ -468,6 +541,54 @@ impl Reader for LasReader {
 
     fn metadata(&self) -> MetadataNode {
         self.metadata.clone()
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        // Only the plain local-file standard read path streams; glob, VSI,
+        // NITF-embedded (start_offset), and lenient (ignore_missing_vlrs) reads
+        // fall back to the materializing `read()`.
+        !self.filename.is_empty()
+            && !filename_has_glob(&self.filename)
+            && !is_vsi_path(&self.filename)
+            && self.start_offset == 0
+            && self.start_length == 0
+            && !self.ignore_missing_vlrs
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.remaining == 0 {
+            return Ok(None);
+        }
+        let take = (capacity.max(1) as u64).min(state.remaining);
+        let points = state
+            .reader
+            .read_points(take)
+            .map_err(|e| StageError(format!("Failed to read LAS point: {}", e)))?;
+        if points.is_empty() {
+            state.remaining = 0;
+            return Ok(None);
+        }
+
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        view.set_spatial_reference(state.srs.clone());
+        for point in &points {
+            append_point(&mut view, point, state.point_format, &state.extra_dims)?;
+        }
+
+        let read = points.len() as u64;
+        state.remaining = state.remaining.saturating_sub(read);
+        if read < take {
+            state.remaining = 0; // short read => end of file
+        }
+        Ok(Some(view))
     }
 }
 

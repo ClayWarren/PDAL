@@ -6,6 +6,90 @@ mod tests {
     use pdal_core::point::{DimId, DimType, PointLayout, PointView};
     use std::rc::Rc;
 
+    fn unique_suffix() -> String {
+        format!(
+            "{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        )
+    }
+
+    #[test]
+    fn streaming_write_matches_materialized_write_byte_for_byte() {
+        let src = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/autzen_trim.las"
+        );
+        let mut ropts = Options::new();
+        ropts.add("filename", src);
+
+        // The same points, materialized in one view and produced in chunks.
+        let full = LasReader::new(&ropts).read().unwrap().remove(0);
+        let mut stream_reader = LasReader::new(&ropts);
+        let mut chunks = Vec::new();
+        while let Some(c) = stream_reader.stream_next(30_000).unwrap() {
+            chunks.push(c);
+        }
+        assert!(chunks.len() > 1, "fixture should span multiple chunks");
+
+        let tmp = std::env::temp_dir();
+        let suffix = unique_suffix();
+        let materialized = tmp.join(format!("las-mat-{suffix}.las"));
+        let streamed = tmp.join(format!("las-stream-{suffix}.las"));
+
+        let mut wopts_a = Options::new();
+        wopts_a.add("filename", materialized.display().to_string());
+        LasWriter::new(&wopts_a).write(&[full]).unwrap();
+
+        let mut wopts_b = Options::new();
+        wopts_b.add("filename", streamed.display().to_string());
+        let mut wb = LasWriter::new(&wopts_b);
+        assert!(wb.streamable());
+        for c in &chunks {
+            wb.stream_write(c).unwrap();
+        }
+        wb.stream_finish().unwrap();
+
+        let bytes_a = std::fs::read(&materialized).unwrap();
+        let bytes_b = std::fs::read(&streamed).unwrap();
+        let _ = std::fs::remove_file(&materialized);
+        let _ = std::fs::remove_file(&streamed);
+
+        assert_eq!(bytes_a.len(), bytes_b.len(), "LAS file sizes differ");
+        assert!(
+            bytes_a == bytes_b,
+            "streamed LAS output is not byte-identical to materialized write"
+        );
+    }
+
+    #[test]
+    fn streaming_write_preserves_header_for_empty_chunks() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::U16);
+        let mut chunk = PointView::new(Rc::new(layout));
+        chunk.truncate(0);
+
+        let path = std::env::temp_dir().join(format!("las-stream-empty-{}.las", unique_suffix()));
+        let mut opts = Options::new();
+        opts.add("filename", path.display().to_string());
+        let mut writer = LasWriter::new(&opts);
+
+        writer.stream_write(&chunk).unwrap();
+        writer.stream_finish().unwrap();
+
+        let reader = las::Reader::from_path(&path).unwrap();
+        assert_eq!(reader.header().number_of_points(), 0);
+        assert_eq!(reader.header().point_format().to_u8().unwrap(), 3);
+
+        let _ = std::fs::remove_file(path);
+    }
+
     #[test]
     fn pdal_header_bounds_match_scaled_roundtrip() {
         let transforms = las::Vector {

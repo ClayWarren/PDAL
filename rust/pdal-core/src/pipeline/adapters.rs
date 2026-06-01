@@ -70,7 +70,9 @@ impl StageWrapper for WriterAdapter {
     fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        self.0.reset();
+    }
     fn metadata(&self) -> MetadataNode {
         self.0.metadata()
     }

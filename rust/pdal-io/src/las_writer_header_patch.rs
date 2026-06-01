@@ -64,6 +64,13 @@ fn patch_pdal_header_bounds(
     views: &[PointView],
 ) -> Result<(), StageError> {
     let bounds = pdal_header_bounds(views, transforms);
+    write_header_bounds(path, &bounds)
+}
+
+/// Patch the header min/max bounds fields with pre-computed bounds. Used by the
+/// streaming writer, which accumulates bounds across chunks instead of holding
+/// all views.
+fn write_header_bounds(path: &Path, bounds: &las::Bounds) -> Result<(), StageError> {
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -84,6 +91,27 @@ fn patch_pdal_header_bounds(
     file.write_f64::<LittleEndian>(bounds.min.z)
         .map_err(|e| StageError(e.to_string()))?;
     Ok(())
+}
+
+/// Merge a chunk's quantized header bounds into a running accumulator. Bound
+/// quantization is monotonic, so merging per-chunk quantized bounds equals
+/// quantizing the global bounds.
+fn merge_header_bounds(acc: Option<las::Bounds>, next: las::Bounds) -> las::Bounds {
+    match acc {
+        None => next,
+        Some(acc) => las::Bounds {
+            min: las::Vector {
+                x: acc.min.x.min(next.min.x),
+                y: acc.min.y.min(next.min.y),
+                z: acc.min.z.min(next.min.z),
+            },
+            max: las::Vector {
+                x: acc.max.x.max(next.max.x),
+                y: acc.max.y.max(next.max.y),
+                z: acc.max.z.max(next.max.z),
+            },
+        },
+    }
 }
 
 #[cfg(test)]

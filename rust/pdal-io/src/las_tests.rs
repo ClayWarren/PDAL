@@ -5,6 +5,53 @@ mod tests {
     use std::io::{Seek, SeekFrom, Write};
 
     #[test]
+    fn streaming_chunks_match_full_read() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/autzen_trim.las"
+        );
+        let mut opts = Options::new();
+        opts.add("filename", path);
+
+        let mut full_reader = LasReader::new(&opts);
+        assert!(full_reader.streamable());
+        let full = full_reader.read().expect("full read");
+        let full = &full[0];
+
+        let mut stream_reader = LasReader::new(&opts);
+        let mut chunks: Vec<pdal_core::point::PointView> = Vec::new();
+        while let Some(chunk) = stream_reader.stream_next(30_000).expect("stream chunk") {
+            chunks.push(chunk);
+        }
+
+        let streamed_len: u64 = chunks.iter().map(|c| c.len()).sum();
+        assert_eq!(streamed_len, full.len());
+        assert!(chunks.len() > 1, "fixture should span multiple chunks");
+
+        // Every dimension of every point matches the single-pass read, in order.
+        let layout = full.layout().clone();
+        let mut global = 0u64;
+        for chunk in &chunks {
+            for i in 0..chunk.len() {
+                for d in 0..layout.dim_count() {
+                    let (dim, _) = layout.dim_at(d).unwrap();
+                    assert_eq!(
+                        chunk.get_f64(i, dim),
+                        full.get_f64(global, dim),
+                        "dim {dim:?} at point {global}"
+                    );
+                }
+                global += 1;
+            }
+        }
+        // SRS is carried onto every chunk.
+        assert_eq!(
+            format!("{:?}", chunks[0].spatial_reference()),
+            format!("{:?}", full.spatial_reference())
+        );
+    }
+
+    #[test]
     fn reader_preserves_legacy_synthetic_flag() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),

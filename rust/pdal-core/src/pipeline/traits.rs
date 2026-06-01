@@ -85,6 +85,8 @@ pub trait Writer {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("metadata")
     }
+    /// Reset streaming state before a run. Default no-op.
+    fn reset(&mut self) {}
     /// Whether this writer can consume points chunk by chunk.
     fn streamable(&self) -> bool {
         false

@@ -68,6 +68,29 @@ pub struct LasWriter {
     // write a standard dimension as an additional extra-bytes field). Mirrors
     // the C++ CopcWriter vs LasWriter difference.
     reject_standard_extra_dims: bool,
+    /// Streaming write state (open writer + accumulated bounds). Clones to
+    /// `None` so the `#[derive(Clone)]` for the `#`-templated multi-file path
+    /// stays trivial.
+    stream: StreamSlot,
+}
+
+/// Holds the in-progress streaming writer. Clones to empty so `LasWriter` can
+/// keep deriving `Clone` (a clone is a fresh writer, not a shared file handle).
+#[derive(Default)]
+struct StreamSlot(Option<LasWriterStreamState>);
+
+impl Clone for StreamSlot {
+    fn clone(&self) -> Self {
+        StreamSlot(None)
+    }
+}
+
+/// Open LAS writer plus the running header bounds accumulated across chunks.
+struct LasWriterStreamState {
+    writer: las::Writer<BufWriter<File>>,
+    extra_dims: Vec<ExtraDim>,
+    transforms: las::Vector<Transform>,
+    bounds: Option<las::Bounds>,
 }
 
 #[derive(Clone)]
@@ -155,6 +178,7 @@ impl LasWriter {
             discard_high_return_numbers: options.get_bool("discard_high_return_numbers", false),
             forward_vlrs: forward_vlrs_from_options(options),
             reject_standard_extra_dims: false,
+            stream: StreamSlot(None),
         }
     }
 
@@ -235,28 +259,13 @@ impl LasWriter {
             .is_some_and(|ext| ext.eq_ignore_ascii_case("laz"));
         self.compression || extension_requests_laz
     }
-}
 
-impl Writer for LasWriter {
-    fn name(&self) -> &str {
-        "writers.las"
-    }
-
-    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
-        if self.filename.is_empty() {
-            return Err(StageError(
-                "LasWriter requires a filename option.".to_string(),
-            ));
-        }
-        if self.filename.contains('#') {
-            for (idx, view) in views.iter().enumerate() {
-                let mut writer = self.clone();
-                writer.filename = numbered_filename(&self.filename, idx + 1);
-                writer.write(std::slice::from_ref(view))?;
-            }
-            return Ok(());
-        }
-
+    /// Build the LAS header and resolved extra-dim layout from a representative
+    /// set of views. The header is data-independent (offset is options/default,
+    /// not auto-min), so the streaming path can build it from the first chunk
+    /// and patch the min/max bounds at the end. Shared by `write` and the
+    /// streaming `stream_write` to keep one source of truth for header bytes.
+    fn build_header(&self, views: &[PointView]) -> Result<(Header, Vec<ExtraDim>), StageError> {
         let path = Path::new(&self.filename);
         let should_compress = self.should_compress(path);
         let mut builder = self.initial_builder(views)?;
@@ -296,6 +305,32 @@ impl Writer for LasWriter {
         let header = builder
             .into_header()
             .map_err(|e| StageError(format!("Failed to create LAS header: {}", e)))?;
+        Ok((header, extra_dims))
+    }
+}
+
+impl Writer for LasWriter {
+    fn name(&self) -> &str {
+        "writers.las"
+    }
+
+    fn write(&mut self, views: &[PointView]) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "LasWriter requires a filename option.".to_string(),
+            ));
+        }
+        if self.filename.contains('#') {
+            for (idx, view) in views.iter().enumerate() {
+                let mut writer = self.clone();
+                writer.filename = numbered_filename(&self.filename, idx + 1);
+                writer.write(std::slice::from_ref(view))?;
+            }
+            return Ok(());
+        }
+
+        let path = Path::new(&self.filename);
+        let (header, extra_dims) = self.build_header(views)?;
 
         let file = File::create(path)
             .map(BufWriter::new)
@@ -330,6 +365,80 @@ impl Writer for LasWriter {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("writers.las")
+    }
+
+    fn reset(&mut self) {
+        self.stream = StreamSlot(None);
+    }
+
+    fn streamable(&self) -> bool {
+        // Uncompressed single-file writes only. Compression (laz) and `#`
+        // multi-file templating fall back to the materializing `write`.
+        !self.filename.is_empty()
+            && !self.filename.contains('#')
+            && !self.should_compress(Path::new(&self.filename))
+    }
+
+    fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
+        // Defer creating the file/header until the first chunk so the header is
+        // built from a representative view (matching how `write` derives it
+        // from the full set). Empty chunks still carry layout/SRS, which matters
+        // when a streamable filter drops every point.
+        if self.stream.0.is_none() {
+            let (header, extra_dims) = self.build_header(std::slice::from_ref(chunk))?;
+            let file = File::create(Path::new(&self.filename))
+                .map(BufWriter::new)
+                .map_err(|e| StageError(format!("Failed to create LAS/LAZ file: {}", e)))?;
+            let writer = las::Writer::new(file, header)
+                .map_err(|e| StageError(format!("Failed to create LAS/LAZ writer: {}", e)))?;
+            let transforms = *writer.header().transforms();
+            self.stream.0 = Some(LasWriterStreamState {
+                writer,
+                extra_dims,
+                transforms,
+                bounds: None,
+            });
+        }
+
+        let point_format = self.point_format;
+        let discard = self.discard_high_return_numbers;
+        let minor = self.minor_version.unwrap_or(2);
+        let state = self.stream.0.as_mut().expect("stream initialized above");
+        write_las_points(
+            &mut state.writer,
+            std::slice::from_ref(chunk),
+            &state.extra_dims,
+            point_format,
+            discard,
+            minor,
+        )?;
+        if !chunk.is_empty() {
+            let chunk_bounds = pdal_header_bounds(std::slice::from_ref(chunk), &state.transforms);
+            state.bounds = Some(merge_header_bounds(state.bounds.take(), chunk_bounds));
+        }
+        Ok(())
+    }
+
+    fn stream_finish(&mut self) -> Result<(), StageError> {
+        let Some(mut state) = self.stream.0.take() else {
+            // No chunk ever initialized the writer (all-empty stream): produce
+            // the same empty-file output as the materializing path.
+            return self.write(&[]);
+        };
+        state
+            .writer
+            .close()
+            .map_err(|e| StageError(format!("Failed to close LAS writer: {}", e)))?;
+        let path = Path::new(&self.filename);
+        if let Some(bounds) = state.bounds {
+            write_header_bounds(path, &bounds)?;
+            patch_pdal_legacy_header_counts(
+                path,
+                self.point_format,
+                self.minor_version.unwrap_or(2),
+            )?;
+        }
+        Ok(())
     }
 }
 
