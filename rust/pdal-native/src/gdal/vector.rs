@@ -190,13 +190,37 @@ impl Vector {
         layer_idx: i32,
         column: &str,
     ) -> Result<Vec<(String, String)>, String> {
+        let layer = unsafe { gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx) };
+        if layer.is_null() {
+            return Err("Failed to get layer".to_string());
+        }
+        self.get_string_features_from_layer(layer, column)
+    }
+
+    pub fn get_string_features_by_layer(
+        &self,
+        layer_name: &str,
+        column: &str,
+    ) -> Result<Vec<(String, String)>, String> {
+        if layer_name.is_empty() {
+            return self.get_string_features(0, column);
+        }
+        let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
+        let layer = unsafe { gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr()) };
+        if layer.is_null() {
+            return Err(format!("Failed to get layer '{}'.", layer_name));
+        }
+        self.get_string_features_from_layer(layer, column)
+    }
+
+    fn get_string_features_from_layer(
+        &self,
+        layer: gdal_sys::OGRLayerH,
+        column: &str,
+    ) -> Result<Vec<(String, String)>, String> {
         let column_c = CString::new(column).map_err(|e| e.to_string())?;
         unsafe {
             let mut result = Vec::new();
-            let layer = gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx);
-            if layer.is_null() {
-                return Err("Failed to get layer".to_string());
-            }
             gdal_sys::OGR_L_ResetReading(layer);
 
             loop {
