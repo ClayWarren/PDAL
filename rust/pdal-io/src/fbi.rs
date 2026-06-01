@@ -17,6 +17,9 @@ use std::rc::Rc;
 const HEADER_SIZE: u32 = 1808;
 const SIGNATURE: &[u8; 8] = b"FASTBIN\0";
 
+trait ReadSeek: Read + Seek {}
+impl<T: Read + Seek> ReadSeek for T {}
+
 #[derive(Clone)]
 pub(crate) struct FbiHeader {
     pub(crate) version: u32,
@@ -213,9 +216,7 @@ impl Reader for FbiReader {
                 "FbiReader requires a filename option.".to_string(),
             ));
         }
-        let file = File::open(Path::new(&self.filename))
-            .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
-        let mut reader = BufReader::new(file);
+        let mut reader = open_fbi_reader(&self.filename)?;
         let header = read_header(&mut reader)?;
         let mut layout = PointLayout::new();
         register_dimensions(&mut layout, &header);
@@ -359,6 +360,33 @@ impl Reader for FbiReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.fbi")
+    }
+}
+
+fn open_fbi_reader(filename: &str) -> Result<BufReader<Box<dyn ReadSeek>>, StageError> {
+    if is_fbi_vsi_path(filename) {
+        let vsi_path = fbi_vsi_path(filename);
+        let file = pdal_native::vsi::VsiFile::open(&vsi_path)
+            .map_err(|err| StageError(format!("Couldn't open '{filename}': {err}")))?;
+        return Ok(BufReader::new(Box::new(file)));
+    }
+
+    let file = File::open(Path::new(filename))
+        .map_err(|_| StageError(format!("Couldn't open '{filename}'")))?;
+    Ok(BufReader::new(Box::new(file)))
+}
+
+fn is_fbi_vsi_path(filename: &str) -> bool {
+    filename.starts_with("/vsi")
+        || filename.starts_with("http://")
+        || filename.starts_with("https://")
+}
+
+fn fbi_vsi_path(filename: &str) -> String {
+    if filename.starts_with("http://") || filename.starts_with("https://") {
+        format!("/vsicurl/{filename}")
+    } else {
+        filename.to_string()
     }
 }
 
@@ -812,6 +840,22 @@ mod tests {
         let views = reader.read().expect("read fbi fixture");
         assert!(!views.is_empty());
         assert!(views[0].len() > 0);
+    }
+
+    #[test]
+    fn fbi_vsi_path_helpers_cover_remote_and_vsi_forms() {
+        assert!(is_fbi_vsi_path("https://example.com/file.fbi"));
+        assert!(is_fbi_vsi_path("http://example.com/file.fbi"));
+        assert!(is_fbi_vsi_path("/vsicurl/https://example.com/file.fbi"));
+        assert!(!is_fbi_vsi_path("/tmp/file.fbi"));
+        assert_eq!(
+            fbi_vsi_path("https://example.com/file.fbi"),
+            "/vsicurl/https://example.com/file.fbi"
+        );
+        assert_eq!(
+            fbi_vsi_path("/vsicurl/https://example.com/file.fbi"),
+            "/vsicurl/https://example.com/file.fbi"
+        );
     }
 
     #[test]
