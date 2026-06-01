@@ -15,37 +15,44 @@ set(CPACK_SOURCE_PACKAGE_FILE_NAME
     "${CMAKE_PROJECT_NAME}-${PDAL_VERSION}-src")
 
 set(CPACK_SOURCE_IGNORE_FILES
-"/\\\\.gitattributes;/\\\\.vagrant;/\\\\.DS_Store;/CVS/;/\\\\.git/;\\\\.swp$;~$;\\\\.\\\\#;/\\\\#")
-
-list(APPEND CPACK_SOURCE_IGNORE_FILES "CMakeScripts/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/\\.build/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/\\.claude/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "CMakeCache.txt")
-list(APPEND CPACK_SOURCE_IGNORE_FILES ".xcodeproj")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "build.make")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "_CPack_Packages")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "cmake_install.cmake")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "Testing")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "PDAL.build/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/bin/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/build[^/]*/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/\\.mull-build/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/\\.pixi/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/rust/target/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "Makefile")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "CMakeFiles")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "CTestTestfile.cmake")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/test/data/local/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/test/temp/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/test/unit/TestConfig.hpp$")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/doc/doxygen/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/doc/build/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/doc/presentations/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/doc/_static/logo/dongle/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/cmake/examples/")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "pdal_features.hpp$")
-list(APPEND CPACK_SOURCE_IGNORE_FILES "package.sh")
-list(APPEND CPACK_SOURCE_IGNORE_FILES ".gz2")
-list(APPEND CPACK_SOURCE_IGNORE_FILES ".bz2")
+    "/[.]gitattributes"
+    "/[.]vagrant"
+    "/[.]DS_Store"
+    "/CVS/"
+    "/[.]git/"
+    "[.]swp$"
+    "~$"
+    "[.]#"
+    "/#"
+    "CMakeScripts/"
+    "/[.]build/"
+    "/[.]claude/"
+    "CMakeCache.txt"
+    "[.]xcodeproj"
+    "build.make"
+    "_CPack_Packages"
+    "cmake_install.cmake"
+    "Testing"
+    "PDAL.build/"
+    "/bin/"
+    "/build[^/]*/"
+    "/[.]mull-build/"
+    "/[.]pixi/"
+    "/rust/target/"
+    "Makefile"
+    "CMakeFiles"
+    "CTestTestfile.cmake"
+    "/test/data/local/"
+    "/test/temp/"
+    "/test/unit/TestConfig.hpp$"
+    "/doc/doxygen/"
+    "/doc/build/"
+    "/doc/presentations/"
+    "/doc/_static/logo/dongle/"
+    "/cmake/examples/"
+    "pdal_features.hpp$"
+    "package.sh"
+    "[.]gz2"
+    "[.]bz2")
 
 include(CPack)

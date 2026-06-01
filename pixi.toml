@@ -151,6 +151,7 @@ rust-license-audit = { cmd = "rust/scripts/audit_rust_licenses.py" }
 rust-cpp-port-audit = { cmd = "python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40" }
 rust-cpp-test-parity = { cmd = "python3 rust/scripts/audit_cpp_test_parity.py --build-dir .build", depends-on = ["build"] }
 rust-capi-install-smoke = { cmd = "rust/scripts/check_installed_capi_consumer.sh .build", depends-on = ["build"] }
+rust-source-package-smoke = { cmd = "cd .build && ninja package_source >/dev/null && cd .. && rust/scripts/check_source_package.sh .build", depends-on = ["build"] }
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test", "rust-coverage-check", "rust-license-audit"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }

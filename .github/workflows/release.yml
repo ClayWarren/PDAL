@@ -46,6 +46,7 @@ jobs:
       shell: bash -l {0}
       run: |
          ninja dist
+         ../rust/scripts/check_source_package.sh .
          extensions=".tar.gz .tar.bz2"
          for ext in $extensions
          do
@@ -155,4 +156,3 @@ jobs:
          draft: true
          files: |
           release/PDAL-*
-
