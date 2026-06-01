@@ -30,7 +30,7 @@ fi
 
 
 mamba update --all -y -n base
-mamba install -c conda-forge -y -n base cmake make ninja gdal compilers
+mamba install -c conda-forge -y -n base cmake make ninja gdal compilers rust cargo
 
 git clone https://github.com/PDAL/PDAL.git;
 cd /PDAL;
@@ -97,4 +97,3 @@ docker exec -it $CONTAINERID /docker-package.sh $RELNAME
 command="$DOCKER stop $CONTAINERID"
 echo $command
 $command
-
