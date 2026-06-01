@@ -42,7 +42,7 @@
 #include <pdal/FlexWriter.hpp>
 #include <pdal/pdal_export.hpp>
 #include <pdal/util/OStream.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <vector>
 

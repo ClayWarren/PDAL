@@ -35,7 +35,7 @@
 #include "gtest/gtest.h"
 
 #include "Support.hpp"
-#include "rust/pdal-capi/include/pdal_capi.h"
+#include <pdal_capi.h>
 
 #include <iostream>
 #include <string>

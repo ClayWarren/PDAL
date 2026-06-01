@@ -38,7 +38,7 @@
 #include <pdal/PointView.hpp>
 #include <pdal/Reader.hpp>
 #include <pdal/StageFactory.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 // Get GDAL's forward decls if available
 // otherwise make our own

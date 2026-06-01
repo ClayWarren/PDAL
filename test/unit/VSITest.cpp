@@ -34,7 +34,7 @@
 
 #include "Support.hpp"
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 #include <vendor/nlohmann/nlohmann/json.hpp>
 
 #include <string>

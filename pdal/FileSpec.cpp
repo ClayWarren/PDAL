@@ -39,7 +39,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/private/FileSpecHelper.hpp>
 #include <pdal/util/private/JsonSupport.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

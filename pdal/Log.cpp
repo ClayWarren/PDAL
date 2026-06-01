@@ -34,7 +34,7 @@
 
 #include <pdal/Log.hpp>
 #include <pdal/PDALUtils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <fstream>
 #include <ostream>

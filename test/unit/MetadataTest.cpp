@@ -37,7 +37,7 @@
 #include <pdal/Metadata.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/SpatialReference.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 using namespace pdal;
 

@@ -39,7 +39,7 @@
 #include <pdal/Streamable.hpp>
 #include <pdal/Writer.hpp>
 #include <pdal/util/Bounds.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

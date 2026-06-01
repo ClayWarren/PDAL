@@ -45,7 +45,7 @@
 #include <sstream>
 
 #ifndef PDAL_UTILS_NO_RUST_CAPI
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 #endif
 
 #ifndef _WIN32

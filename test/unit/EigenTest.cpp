@@ -36,7 +36,7 @@
 
 #include <pdal/PointView.hpp>
 #include <pdal/private/MathUtils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <Eigen/Dense>
 

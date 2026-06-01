@@ -47,7 +47,7 @@
 #include <gdal_version.h>
 
 #include <pdal/pdal_features.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <algorithm>
 

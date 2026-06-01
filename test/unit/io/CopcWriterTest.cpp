@@ -41,7 +41,7 @@
 #include <io/LasReader.hpp>
 #include <pdal/util/FileUtils.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "Support.hpp"
 

@@ -56,7 +56,7 @@ namespace fs = std::filesystem;
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Utils.hpp>
 #include <pdal/util/VSIIO.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "pdal_util_internal.hpp"
 

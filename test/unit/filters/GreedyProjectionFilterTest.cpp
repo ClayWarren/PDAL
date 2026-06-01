@@ -36,7 +36,7 @@
 #include <filters/GreedyProjection.hpp>
 #include <io/BufferReader.hpp>
 #include <pdal/PointView.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

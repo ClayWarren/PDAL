@@ -35,7 +35,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <pdal/util/FileUtils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <fstream>
 #include <string>

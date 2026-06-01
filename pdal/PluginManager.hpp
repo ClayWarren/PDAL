@@ -43,7 +43,7 @@
 #include <pdal/PluginInfo.hpp>
 #include <pdal/StageExtensions.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <functional>
 #include <map>

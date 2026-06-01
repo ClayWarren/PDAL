@@ -31,7 +31,7 @@
 #include "SrsTransform.hpp"
 #include <pdal/SpatialReference.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <ogr_spatialref.h>
 

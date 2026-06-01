@@ -37,7 +37,7 @@
 #include <pdal/private/RustViewConverter.hpp>
 #include <pdal/util/Uuid.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <pdal/util/ProgramArgs.hpp>
 

@@ -37,7 +37,7 @@
 #include <pdal/Metadata.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/Stage.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <vector>
 

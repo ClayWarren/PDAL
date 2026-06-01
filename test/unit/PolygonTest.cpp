@@ -39,7 +39,7 @@
 #include <pdal/Polygon.hpp>
 #include <pdal/util/Algorithm.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "Support.hpp"
 

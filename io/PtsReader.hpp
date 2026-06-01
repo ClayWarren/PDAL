@@ -35,7 +35,7 @@
 #pragma once
 
 #include <pdal/Reader.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

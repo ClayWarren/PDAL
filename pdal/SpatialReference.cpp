@@ -36,7 +36,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/SpatialReference.hpp>
 #include <pdal/private/SrsTransform.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <pdal/util/Utils.hpp>
 

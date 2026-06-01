@@ -33,7 +33,7 @@
  ****************************************************************************/
 
 #include <pdal/util/Georeference.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

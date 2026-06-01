@@ -37,7 +37,7 @@
 #include <pdal/pdal_test_main.hpp>
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/ProgramArgs.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 using namespace pdal;
 

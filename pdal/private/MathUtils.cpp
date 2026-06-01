@@ -43,7 +43,7 @@
 #include <pdal/private/gdal/Raster.hpp>
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/Utils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "MathUtils.hpp"
 

@@ -37,7 +37,7 @@
 #include "Support.hpp"
 #include <io/LasReader.hpp>
 #include <pdal/PointTable.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

@@ -35,7 +35,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <nlohmann/json.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "Support.hpp"
 #include <filters/AssignFilter.hpp>

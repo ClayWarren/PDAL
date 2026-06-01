@@ -49,6 +49,12 @@
 
 using namespace pdal;
 
+#if defined(_WIN32)
+#define PDAL_CAPI_EXPORT __declspec(dllexport)
+#else
+#define PDAL_CAPI_EXPORT __attribute__((visibility("default")))
+#endif
+
 static std::once_flag s_pluginsLoaded;
 
 static void ensurePluginsLoaded()
@@ -75,13 +81,13 @@ extern "C"
                              const char* const* argv);
     const char* pdal_rust_kernel_list_json();
 
-    const char* pdal_version_string()
+    PDAL_CAPI_EXPORT const char* pdal_version_string()
     {
         static const std::string version = Config::fullVersionString();
         return version.c_str();
     }
 
-    char* pdal_kernel_list_json()
+    PDAL_CAPI_EXPORT char* pdal_kernel_list_json()
     {
         try
         {
@@ -94,7 +100,7 @@ extern "C"
         }
     }
 
-    char* pdal_stage_list_json()
+    PDAL_CAPI_EXPORT char* pdal_stage_list_json()
     {
         try
         {
@@ -125,7 +131,7 @@ extern "C"
         }
     }
 
-    char* pdal_stage_options_json(const char* stage_name)
+    PDAL_CAPI_EXPORT char* pdal_stage_options_json(const char* stage_name)
     {
         if (!stage_name)
             return nullptr;
@@ -152,7 +158,7 @@ extern "C"
         }
     }
 
-    char* pdal_stage_options_text(const char* stage_name)
+    PDAL_CAPI_EXPORT char* pdal_stage_options_text(const char* stage_name)
     {
         if (!stage_name)
             return nullptr;
@@ -184,9 +190,10 @@ extern "C"
         }
     }
 
-    int pdal_kernel_run(const char* kernel_name, int argc,
-                        const char* const* argv, const char* log_name,
-                        int log_level, bool log_timing)
+    PDAL_CAPI_EXPORT int pdal_kernel_run(const char* kernel_name, int argc,
+                                         const char* const* argv,
+                                         const char* log_name, int log_level,
+                                         bool log_timing)
     {
         if (!kernel_name || (argc > 0 && !argv))
             return 1;
@@ -226,7 +233,7 @@ extern "C"
         }
     }
 
-    void pdal_capi_free(void* ptr)
+    PDAL_CAPI_EXPORT void pdal_capi_free(void* ptr)
     {
         if (ptr)
             free(ptr);

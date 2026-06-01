@@ -34,7 +34,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PipelineWriter.hpp>
 #include <pdal/XMLSchema.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <algorithm>
 #include <cstdlib>

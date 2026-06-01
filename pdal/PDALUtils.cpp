@@ -41,7 +41,7 @@
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/FileUtils.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <utf8.h>
 

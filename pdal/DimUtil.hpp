@@ -41,7 +41,7 @@
 
 #include <pdal/util/Utils.hpp>
 #ifndef PDAL_UTILS_NO_RUST_CAPI
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 #endif
 
 namespace pdal

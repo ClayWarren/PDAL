@@ -38,7 +38,7 @@
 #include <pdal/KDIndex.hpp>
 #include <pdal/PointView.hpp>
 #include <pdal/util/Algorithm.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "private/Raster.hpp"
 

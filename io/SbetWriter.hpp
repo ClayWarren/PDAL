@@ -35,7 +35,7 @@
 #pragma once
 
 #include <pdal/Writer.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "SbetCommon.hpp"
 

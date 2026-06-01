@@ -44,7 +44,7 @@
 #include <pdal/util/ThreadPool.hpp>
 #include <pdal/util/Utils.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "private/connector/Connector.hpp"
 #include "private/ept/Addon.hpp"

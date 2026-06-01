@@ -172,9 +172,10 @@ if (WITH_TESTS)
     enable_testing()
 endif()
 
-# Expose the Rust C ABI include directory and library path to plugins before
+# Expose the Rust C ABI source and include directories to plugins before
 # they are processed. The rest of rust.cmake (which has compile-time side
 # effects we don't want at this point) runs later.
+set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_HEADER_DIR "${ROOT_DIR}/rust/pdal-capi/include")
 
 add_subdirectory(plugins)
@@ -213,6 +214,7 @@ file(GLOB_RECURSE PRIVATE_SRCS
     ${PDAL_SRC_DIR}/private/*.cpp
     ${BACKTRACE_SOURCE})
 list(APPEND SRCS ${BASE_SRCS} ${PRIVATE_SRCS})
+list(APPEND SRCS ${RUST_CAPI_DIR}/pdal-capi/src/pdal_kernel_capi.cpp)
 
 #
 # Remove stuff we don't want to build.
@@ -458,13 +460,6 @@ install(FILES ${DIMENSION_OUTFILE} ${pdal_features_hpp}
 )
 install(FILES ${RUST_CAPI_HEADER_DIR}/pdal_capi.h
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    PERMISSIONS
-        GROUP_EXECUTE WORLD_EXECUTE OWNER_EXECUTE
-        GROUP_READ WORLD_READ OWNER_READ
-        OWNER_WRITE
-)
-install(FILES ${RUST_CAPI_HEADER_DIR}/pdal_capi.h
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rust/pdal-capi/include"
     PERMISSIONS
         GROUP_EXECUTE WORLD_EXECUTE OWNER_EXECUTE
         GROUP_READ WORLD_READ OWNER_READ

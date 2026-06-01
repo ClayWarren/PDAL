@@ -36,7 +36,7 @@
 
 #include <pdal/PointLayout.hpp>
 #include <pdal/util/Algorithm.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 namespace pdal
 {

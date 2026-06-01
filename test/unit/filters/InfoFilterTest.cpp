@@ -36,7 +36,7 @@
 
 #include <filters/InfoFilter.hpp>
 #include <pdal/StageFactory.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <vendor/nlohmann/nlohmann/json.hpp>
 

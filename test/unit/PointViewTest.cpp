@@ -39,7 +39,7 @@
 
 #include <pdal/PDALUtils.hpp>
 #include <pdal/PointView.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "Support.hpp"
 

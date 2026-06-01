@@ -36,7 +36,7 @@
 
 #include <pdal/pdal_internal.hpp>
 
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include <pdal/util/Bounds.hpp>
 #include <pdal/util/Utils.hpp>

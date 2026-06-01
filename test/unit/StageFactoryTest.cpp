@@ -39,7 +39,7 @@
 #include <pdal/StageExtensions.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/util/Algorithm.hpp>
-#include <rust/pdal-capi/include/pdal_capi.h>
+#include <pdal_capi.h>
 
 #include "Support.hpp"
 
