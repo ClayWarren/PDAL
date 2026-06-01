@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::faux::FauxReader;
+    use pdal_core::pipeline::{FilterWrapper, Pipeline};
+    use pdal_filters::range::{RangeFilter, RangeLimit};
 
     fn data_path(path: &str) -> String {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -169,6 +172,127 @@ end_header
         assert_eq!(back.get_f64(0, &DimId::Z), 0.25);
         assert_eq!(back.get_f64(2, &DimId::X), 3.5);
         assert_eq!(back.get_f64(2, &DimId::Y), -4.25);
+    }
+
+    #[test]
+    fn streaming_ascii_writer_matches_materialized_write() {
+        let view = xyz_view(&[
+            (-1.5, 0.0, 0.25),
+            (0.0, 1.0, 2.0),
+            (3.5, -4.25, 5.0),
+            (6.0, 7.0, 8.0),
+        ]);
+        let mut first = view.clone();
+        first.truncate(2);
+        let mut second = view.make_new();
+        for idx in 2..view.len() {
+            second.append_point(&view, idx);
+        }
+
+        let materialized = temp_path("materialized-stream-compare.ply");
+        let streamed = temp_path("streamed-stream-compare.ply");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("precision", 6);
+        let mut stream_options = Options::new();
+        stream_options.add("filename", &streamed).add("precision", 6);
+
+        let mut materialized_writer = PlyWriter::new(&materialized_options).unwrap();
+        materialized_writer
+            .write(&[first.clone(), second.clone()])
+            .unwrap();
+        let mut stream_writer = PlyWriter::new(&stream_options).unwrap();
+        assert!(stream_writer.streamable());
+        stream_writer.stream_write(&first).unwrap();
+        stream_writer.stream_write(&second).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
+    fn streaming_ascii_writer_handles_empty_first_chunk() {
+        let view = xyz_view(&[(-1.5, 0.0, 0.25)]);
+        let empty = view.make_new();
+        let mut nonempty = view.make_new();
+        nonempty.append_point(&view, 0);
+
+        let materialized = temp_path("materialized-empty-first.ply");
+        let streamed = temp_path("streamed-empty-first.ply");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("precision", 6);
+        let mut stream_options = Options::new();
+        stream_options.add("filename", &streamed).add("precision", 6);
+
+        let mut materialized_writer = PlyWriter::new(&materialized_options).unwrap();
+        materialized_writer
+            .write(&[empty.clone(), nonempty.clone()])
+            .unwrap();
+        let mut stream_writer = PlyWriter::new(&stream_options).unwrap();
+        stream_writer.stream_write(&empty).unwrap();
+        stream_writer.stream_write(&nonempty).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let written = fs::read_to_string(&streamed).unwrap();
+        assert!(written.contains("element vertex 1\n"));
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
+    fn pipeline_streams_to_ascii_ply_writer() {
+        let output = temp_path("stream-pipeline.ply");
+
+        let mut reader_options = Options::new();
+        reader_options
+            .add("count", "12")
+            .add("mode", "ramp")
+            .add("bounds", "([0,11],[0,11],[0,11])");
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 0.0,
+            upper_bound: 5.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("dims", "X,Y,Z")
+            .add("precision", 0);
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.faux",
+            Box::new(FauxReader::new(&reader_options).unwrap()),
+            reader_options,
+        );
+        let filter = pipeline.add_stage(
+            "filters.range",
+            Box::new(FilterWrapper::new(RangeFilter::new(limits))),
+            Options::new(),
+        );
+        let writer = pipeline.add_writer(
+            "writers.ply",
+            Box::new(PlyWriter::new(&writer_options).unwrap()),
+            writer_options,
+        );
+        pipeline.add_dependency(filter, reader).unwrap();
+        pipeline.add_dependency(writer, filter).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(6));
+        let written = fs::read_to_string(&output).unwrap();
+        assert!(written.contains("element vertex 6\n"));
+        assert!(written.contains("0 0 0\n"));
+        assert!(written.contains("5 5 5\n"));
+        let _ = fs::remove_file(output);
     }
 
     #[test]
