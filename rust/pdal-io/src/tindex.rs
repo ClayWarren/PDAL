@@ -17,6 +17,7 @@ pub struct TindexReader {
     attribute_filter: String,
     sql: String,
     dialect: String,
+    polygon: String,
     bounds: String,
 }
 
@@ -29,6 +30,7 @@ impl TindexReader {
             attribute_filter: options.get_str("where", ""),
             sql: options.get_str("sql", ""),
             dialect: options.get_str("dialect", "OGRSQL"),
+            polygon: options.get_str("polygon", ""),
             bounds: options.get_str("bounds", ""),
         }
     }
@@ -47,6 +49,7 @@ impl Reader for TindexReader {
         }
 
         let bounds = parse_tindex_bounds(&self.bounds)?;
+        let polygon = parse_tindex_polygon(&self.polygon)?;
         let features = read_index_features(
             &self.filename,
             &self.layer_name,
@@ -55,6 +58,7 @@ impl Reader for TindexReader {
             &self.sql,
             &self.dialect,
             bounds.as_ref(),
+            polygon.as_ref(),
         )?;
 
         let mut merged: Option<PointView> = None;
@@ -90,9 +94,10 @@ fn read_index_features(
     sql: &str,
     dialect: &str,
     bounds: Option<&Bounds2D>,
+    polygon: Option<&Geometry>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     match source::read_to_string(filename) {
-        Ok(text) => match read_geojson_index_features(&text, location_field, bounds) {
+        Ok(text) => match read_geojson_index_features(&text, location_field, bounds, polygon) {
             Ok(features) => Ok(features),
             Err(json_err) => read_ogr_index_features(
                 filename,
@@ -102,6 +107,7 @@ fn read_index_features(
                 sql,
                 dialect,
                 bounds,
+                polygon,
             )
             .or(Err(json_err)),
         },
@@ -113,6 +119,7 @@ fn read_index_features(
             sql,
             dialect,
             bounds,
+            polygon,
         )
         .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
     }
@@ -122,6 +129,7 @@ fn read_geojson_index_features(
     text: &str,
     location_field: &str,
     bounds: Option<&Bounds2D>,
+    polygon: Option<&Geometry>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     let json: serde_json::Value = serde_json::from_str(text).map_err(|err| {
         StageError(format!(
@@ -133,7 +141,7 @@ fn read_geojson_index_features(
     })?;
     let mut output = Vec::new();
     for feature in features {
-        if !feature_matches_bounds(feature, bounds)? {
+        if !feature_matches_bounds(feature, bounds, polygon)? {
             continue;
         }
         let location = feature["properties"][location_field]
@@ -159,6 +167,7 @@ fn read_ogr_index_features(
     sql: &str,
     dialect: &str,
     bounds: Option<&Bounds2D>,
+    polygon: Option<&Geometry>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     let vector = pdal_native::gdal::Vector::open(filename).map_err(StageError)?;
     let features = if sql.is_empty() {
@@ -172,7 +181,7 @@ fn read_ogr_index_features(
     };
     let mut output = Vec::new();
     for (wkt, location) in features {
-        if !wkt_matches_bounds(&wkt, bounds)? {
+        if !wkt_matches_bounds(&wkt, bounds, polygon)? {
             continue;
         }
         output.push(IndexFeature { location });
@@ -214,19 +223,28 @@ fn resolve_location_text(base: &str, location: &str) -> String {
     }
 }
 
-fn wkt_matches_bounds(wkt: &str, bounds: Option<&Bounds2D>) -> Result<bool, StageError> {
-    let Some(bounds) = bounds else {
-        return Ok(true);
-    };
+fn wkt_matches_bounds(
+    wkt: &str,
+    bounds: Option<&Bounds2D>,
+    polygon: Option<&Geometry>,
+) -> Result<bool, StageError> {
     let geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
     let (minx, maxx, miny, maxy, _, _) = geometry.bounds().map_err(StageError)?;
-    Ok(Bounds2D {
+    let feature_bounds = Bounds2D {
         minx,
         maxx,
         miny,
         maxy,
+    };
+    if let Some(bounds) = bounds {
+        if !feature_bounds.overlaps(bounds) {
+            return Ok(false);
+        }
     }
-    .overlaps(bounds))
+    if let Some(polygon) = polygon {
+        return geometry.intersects(polygon).map_err(StageError);
+    }
+    Ok(true)
 }
 
 fn parse_tindex_bounds(bounds: &str) -> Result<Option<Bounds2D>, StageError> {
@@ -238,17 +256,36 @@ fn parse_tindex_bounds(bounds: &str) -> Result<Option<Bounds2D>, StageError> {
         .map_err(StageError)
 }
 
+fn parse_tindex_polygon(polygon: &str) -> Result<Option<Geometry>, StageError> {
+    if polygon.trim().is_empty() {
+        return Ok(None);
+    }
+    Geometry::from_wkt(polygon).map(Some).map_err(StageError)
+}
+
 fn feature_matches_bounds(
     feature: &serde_json::Value,
     bounds: Option<&Bounds2D>,
+    polygon: Option<&Geometry>,
 ) -> Result<bool, StageError> {
-    let Some(bounds) = bounds else {
+    if bounds.is_none() && polygon.is_none() {
         return Ok(true);
-    };
+    }
     let Some(feature_bounds) = geojson_geometry_bounds(&feature["geometry"])? else {
         return Ok(false);
     };
-    Ok(feature_bounds.overlaps(bounds))
+    if let Some(bounds) = bounds {
+        if !feature_bounds.overlaps(bounds) {
+            return Ok(false);
+        }
+    }
+    if let Some(polygon) = polygon {
+        let geometry_text = serde_json::to_string(&feature["geometry"])
+            .map_err(|err| StageError(err.to_string()))?;
+        let geometry = Geometry::from_geojson(&geometry_text).map_err(StageError)?;
+        return geometry.intersects(polygon).map_err(StageError);
+    }
+    Ok(true)
 }
 
 fn geojson_geometry_bounds(geometry: &serde_json::Value) -> Result<Option<Bounds2D>, StageError> {
@@ -711,6 +748,84 @@ mod tests {
 
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].len(), 3);
+    }
+
+    #[test]
+    fn polygon_filter_skips_non_intersecting_features() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        let source_copy = temp.path().join("simple_text.ply");
+        std::fs::copy(&source, &source_copy).unwrap();
+        let index = temp.path().join("index.geojson");
+        std::fs::write(
+            &index,
+            r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    },
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply"},
+      "geometry":{"type":"Polygon","coordinates":[[[50,50],[51,50],[51,51],[50,51],[50,50]]]}
+    }
+  ]
+}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        options.add("polygon", "POLYGON((0 0,2 0,2 2,0 2,0 0))");
+        let mut reader = TindexReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 3);
+    }
+
+    #[test]
+    fn ogr_polygon_filter_skips_non_intersecting_features() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        let source_copy = temp.path().join("simple_text.ply");
+        std::fs::copy(&source, &source_copy).unwrap();
+        let index = temp.path().join("index.gpkg");
+        {
+            let vector = pdal_native::gdal::Vector::create(index.to_str().unwrap(), "GPKG")
+                .expect("GPKG driver is available");
+            let layer = vector.open_or_create_layer("tiles", "").unwrap();
+            unsafe {
+                pdal_native::gdal::Vector::create_string_field(layer, "location").unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+                    &[("location", "simple_text.ply")],
+                )
+                .unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((50 50,51 50,51 51,50 51,50 50))",
+                    &[("location", "simple_text.ply")],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        options.add("lyr_name", "tiles");
+        options.add("polygon", "POLYGON((0 0,2 0,2 2,0 2,0 0))");
+        let mut reader = TindexReader::new(&options);
+
+        assert_eq!(reader.read().unwrap()[0].len(), 3);
     }
 
     #[test]

@@ -66,6 +66,12 @@ impl Geometry {
         false
     }
 
+    pub fn intersects(&self, other: &Self) -> Result<bool, String> {
+        self.geos_geom
+            .intersects(&other.geos_geom)
+            .map_err(|e| e.to_string())
+    }
+
     pub fn area(&self) -> Result<f64, String> {
         self.geos_geom.area().map_err(|e| e.to_string())
     }
