@@ -171,6 +171,13 @@ fn reorder_applies_gather_permutation_in_place() {
         .map(|i| view.get_f64(i, &DimId::X))
         .collect();
     assert_eq!(xs2, vec![3.0, 1.0, 4.0, 0.0, 2.0]);
+
+    // A duplicate source index is also invalid and must not partially reorder.
+    view.reorder(&[0, 0, 2, 3, 4]);
+    let xs3: Vec<f64> = (0..view.len())
+        .map(|i| view.get_f64(i, &DimId::X))
+        .collect();
+    assert_eq!(xs3, vec![3.0, 1.0, 4.0, 0.0, 2.0]);
 }
 
 #[test]

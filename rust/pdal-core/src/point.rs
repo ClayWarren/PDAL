@@ -928,10 +928,10 @@ impl PointView {
 
     /// Reorder points in place so output position `i` holds the point currently
     /// at `order[i]` (a gather permutation, as produced by sorting an index
-    /// vector). `order` must be a permutation of `0..len()`; if its length or
-    /// any value is out of range the view is left unchanged. Done in place with
-    /// only an auxiliary index vector, so callers like `filters.sort` avoid
-    /// allocating a second full copy of the point buffer.
+    /// vector). `order` must be a permutation of `0..len()`; if its length,
+    /// values, or uniqueness are invalid the view is left unchanged. Done in
+    /// place with only auxiliary index vectors, so callers like `filters.sort`
+    /// avoid allocating a second full copy of the point buffer.
     pub fn reorder(&mut self, order: &[PointId]) {
         let n = self.len() as usize;
         if order.len() != n {
@@ -941,11 +941,13 @@ impl PointView {
         // `src`. Applying the inverse permutation with swap cycles realizes the
         // requested gather (each row is moved into place exactly once).
         let mut inverse = vec![0u64; n];
+        let mut seen = vec![false; n];
         for (dst, &src) in order.iter().enumerate() {
             let s = src as usize;
-            if s >= n {
+            if s >= n || seen[s] {
                 return;
             }
+            seen[s] = true;
             inverse[s] = dst as u64;
         }
         for i in 0..n {
