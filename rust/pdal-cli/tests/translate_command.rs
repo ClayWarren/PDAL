@@ -150,6 +150,45 @@ fn translate_enforces_stream_and_overwrite_options() {
 }
 
 #[test]
+fn translate_supports_kernel_runner_options() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-translate-kernel-options");
+    let metadata_output = temp.join("metadata-out.pcd");
+    let serialization_output = temp.join("serialization-out.pcd");
+    let metadata = temp.join("metadata.json");
+    let serialized = temp.join("pipeline.json");
+
+    let result = run_translate(&[
+        input.to_str().unwrap(),
+        metadata_output.to_str().unwrap(),
+        "--metadata",
+        metadata.to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs translate metadata failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let result = run_translate(&[
+        input.to_str().unwrap(),
+        serialization_output.to_str().unwrap(),
+        "--pipeline",
+        serialized.to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs translate pipeline serialization failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert!(metadata.exists());
+    assert!(serialized.exists());
+}
+
+#[test]
 fn translate_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("translate")

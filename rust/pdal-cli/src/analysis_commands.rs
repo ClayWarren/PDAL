@@ -316,6 +316,30 @@ fn add_tindex_features(
 }
 
 impl App {
+    pub(super) fn run_rust_kernel(&self, name: &str) -> i32 {
+        let name = match CString::new(name) {
+            Ok(name) => name,
+            Err(_) => {
+                eprintln!("Error: kernel name contains an interior NUL byte");
+                return 1;
+            }
+        };
+        let args = match self
+            .command_args
+            .iter()
+            .map(|arg| CString::new(arg.as_str()))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(args) => args,
+            Err(_) => {
+                eprintln!("Error: command argument contains an interior NUL byte");
+                return 1;
+            }
+        };
+        let argv: Vec<_> = args.iter().map(|arg| arg.as_ptr()).collect();
+        unsafe { pdal_capi::pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) }
+    }
+
     pub(super) fn run_tile(&self) -> i32 {
         if self.help || self.command_args.is_empty() || self.command_help_requested() {
             println!("Usage:");
