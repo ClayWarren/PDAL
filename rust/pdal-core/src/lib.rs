@@ -13,6 +13,7 @@ pub mod file_spec;
 pub mod gdal;
 pub mod geometry;
 pub mod georeference;
+pub mod info;
 pub mod kernel;
 pub mod log;
 pub mod metadata;
