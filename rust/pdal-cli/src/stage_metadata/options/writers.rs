@@ -195,6 +195,11 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Point dimension to rasterize.",
                 Some(json!("Z")),
             ),
+            option(
+                "data_type",
+                "Raster cell data type.",
+                Some(json!("float64")),
+            ),
             option("nodata", "No-data value.", Some(json!(-9999.0))),
             option(
                 "binmode",
@@ -211,6 +216,14 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
             option("origin_y", "Fixed grid Y origin.", None),
             option("width", "Fixed grid width in cells.", None),
             option("height", "Fixed grid height in cells.", None),
+            option("bounds", "Deprecated fixed grid bounds.", None),
+            option("override_srs", "Spatial reference to apply.", None),
+            option(
+                "default_srs",
+                "Spatial reference to apply when input has none.",
+                None,
+            ),
+            option("metadata", "Comma-separated GDAL metadata items.", None),
         ],
         "writers.raster" => vec![
             filename(),
