@@ -33,6 +33,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     let mut metadata_file = None;
     let mut progress_file = None;
     let mut serialization_file = None;
+    let mut stream_allowed = true;
     let mut stage_options: Vec<CliStageOption> = Vec::new();
 
     let mut iter = args.iter();
@@ -47,10 +48,10 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             read_stdin = true;
         } else if arg == "--validate" {
             validate_only = true;
-        } else if arg == "--stream" || arg == "--nostream" {
-            // Accepted for C++ shell parity. The Rust pipeline executor still
-            // chooses its single execution path while stream-mode parity is
-            // tracked separately in STATUS.md.
+        } else if arg == "--stream" {
+            stream_allowed = true;
+        } else if arg == "--nostream" {
+            stream_allowed = false;
         } else if arg == "--dims" {
             let Some(_) = iter.next() else {
                 eprintln!("PDAL: kernels.pipeline: Missing value for option '--dims'.");
@@ -156,7 +157,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.
-    if metadata_file.is_none() {
+    if stream_allowed && metadata_file.is_none() {
         match pipeline.execute_streaming() {
             Ok(Some(_)) => {
                 write_progress(&mut progress, "DONEPIPELINE", "pipeline");

@@ -111,6 +111,18 @@ fn pipeline_command_streams_eligible_and_falls_back_otherwise() {
             String::from_utf8_lossy(&result.stderr)
         );
     }
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg(&streamable)
+        .arg("--nostream")
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline --nostream failed\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
 }
 
 #[test]
