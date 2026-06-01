@@ -34,9 +34,17 @@ jobs:
       run: |
           pixi run -e dev rust-guard
 
+    - name: Rust C++ port audit
+      run: |
+          pixi run -e dev rust-cpp-port-audit
+
     - name: Build
       run: |
           pixi run -e dev build
+
+    - name: Rust C++ test parity audit
+      run: |
+          pixi run -e dev rust-cpp-test-parity
 
     - name: Test
       run: |
