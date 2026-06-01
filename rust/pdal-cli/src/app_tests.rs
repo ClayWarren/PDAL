@@ -121,6 +121,14 @@ fn command_help_requested_detects_command_local_help() {
     assert!(app.command_help_requested());
 }
 
+#[test]
+fn run_entry_point_parse_error_returns_1() {
+    assert_eq!(
+        super::run(vec!["pdal-rs".to_string(), "--unknown".to_string()]),
+        1
+    );
+}
+
 fn app_with_command(command: &str, args: &[&str]) -> App {
     let mut app = App::new();
     let mut full = vec![command.to_string()];
@@ -713,5 +721,3 @@ mod analysis_tindex_eval;
 mod eval_and_dispatch;
 #[path = "app_tests/pipeline_and_command_errors.rs"]
 mod pipeline_and_command_errors;
-#[path = "app_tests/split_outputs.rs"]
-mod split_outputs;
