@@ -1,30 +1,26 @@
+use crate::stage_options::apply_writer_stage_option;
+use crate::KernelPipelinePlan;
 use pdal_core::driver::infer_writer_driver;
-use pdal_core::kernel::{parse_stage_option, ParseStageResult};
 
-pub enum RandomKernelPlan {
-    Pipeline(serde_json::Value),
-    Return(i32),
-}
-
-pub fn build_random_pipeline(args: &[String]) -> RandomKernelPlan {
+pub fn build_random_pipeline(args: &[String]) -> KernelPipelinePlan {
     if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
         if args.is_empty() {
             eprintln!("PDAL: kernels.random: Missing value for positional argument 'output'.");
-            return RandomKernelPlan::Return(1);
+            return KernelPipelinePlan::Return(1);
         }
         println!("Usage:");
         println!(
             "  pdal random <output> [--count=N] [--bounds=([minx,maxx],[miny,maxy],[minz,maxz])] \
              [--distribution=uniform|normal|random] [--compress]"
         );
-        return RandomKernelPlan::Return(0);
+        return KernelPipelinePlan::Return(0);
     }
 
     let mut parsed = RandomArgs::default();
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
         if let Err(code) = parse_random_arg(arg, &mut iter, &mut parsed) {
-            return RandomKernelPlan::Return(code);
+            return KernelPipelinePlan::Return(code);
         }
     }
 
@@ -34,17 +30,17 @@ pub fn build_random_pipeline(args: &[String]) -> RandomKernelPlan {
         "random" => "random",
         other => {
             eprintln!("PDAL: kernels.random: invalid distribution: {other}");
-            return RandomKernelPlan::Return(1);
+            return KernelPipelinePlan::Return(1);
         }
     };
 
     let Some(output) = parsed.output else {
         eprintln!("PDAL: kernels.random: Missing value for positional argument 'output'.");
-        return RandomKernelPlan::Return(1);
+        return KernelPipelinePlan::Return(1);
     };
     let Some(writer) = infer_writer_driver(&output).map(str::to_string) else {
         eprintln!("PDAL: kernels.random: Unable to infer writer driver for '{output}'.");
-        return RandomKernelPlan::Return(1);
+        return KernelPipelinePlan::Return(1);
     };
 
     let mut reader_stage = serde_json::Map::new();
@@ -74,7 +70,7 @@ pub fn build_random_pipeline(args: &[String]) -> RandomKernelPlan {
     }
     writer_stage.extend(parsed.writer_options);
 
-    RandomKernelPlan::Pipeline(serde_json::json!([
+    KernelPipelinePlan::Pipeline(serde_json::json!([
         serde_json::Value::Object(reader_stage),
         serde_json::Value::Object(writer_stage),
     ]))
@@ -176,30 +172,6 @@ fn split_value(arg: &str) -> Option<String> {
     arg.split_once('=').map(|(_, value)| value.to_string())
 }
 
-fn apply_writer_stage_option(
-    arg: &str,
-    writer_options: &mut serde_json::Map<String, serde_json::Value>,
-) -> bool {
-    let parsed = parse_stage_option(arg, true);
-    if parsed.result != ParseStageResult::Ok || !parsed.stage.starts_with("writers.") {
-        return false;
-    }
-    writer_options.insert(parsed.option, parse_option_value(&parsed.value));
-    true
-}
-
-fn parse_option_value(value: &str) -> serde_json::Value {
-    if let Ok(number) = value.parse::<u64>() {
-        serde_json::json!(number)
-    } else if let Ok(number) = value.parse::<f64>() {
-        serde_json::json!(number)
-    } else if value.eq_ignore_ascii_case("true") || value.eq_ignore_ascii_case("false") {
-        serde_json::json!(value.eq_ignore_ascii_case("true"))
-    } else {
-        serde_json::json!(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,8 +179,8 @@ mod tests {
     fn pipeline(args: &[&str]) -> serde_json::Value {
         let args = args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>();
         match build_random_pipeline(&args) {
-            RandomKernelPlan::Pipeline(value) => value,
-            RandomKernelPlan::Return(code) => panic!("unexpected return: {code}"),
+            KernelPipelinePlan::Pipeline(value) => value,
+            KernelPipelinePlan::Return(code) => panic!("unexpected return: {code}"),
         }
     }
 
@@ -247,13 +219,13 @@ mod tests {
         let bad_distribution = vec!["--distribution=bogus".to_string(), "out.las".to_string()];
         assert!(matches!(
             build_random_pipeline(&bad_distribution),
-            RandomKernelPlan::Return(1)
+            KernelPipelinePlan::Return(1)
         ));
 
         let empty: Vec<String> = Vec::new();
         assert!(matches!(
             build_random_pipeline(&empty),
-            RandomKernelPlan::Return(1)
+            KernelPipelinePlan::Return(1)
         ));
     }
 }

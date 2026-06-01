@@ -5,11 +5,21 @@
 //! contract used by the C ABI kernel runner.
 
 mod fauxplugin;
+mod merge;
 mod random;
 mod registry;
+mod sort;
+mod stage_options;
 mod text;
 
 pub use fauxplugin::FauxPluginKernel;
-pub use random::{build_random_pipeline, RandomKernelPlan};
+pub use merge::build_merge_pipeline;
+pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};
+pub use sort::build_sort_pipeline;
 pub use text::word_wrap;
+
+pub enum KernelPipelinePlan {
+    Pipeline(serde_json::Value),
+    Return(i32),
+}
