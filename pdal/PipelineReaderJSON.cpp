@@ -268,7 +268,10 @@ void PipelineReaderJSON::readPipeline(std::istream& input)
     // pre-validated descriptor array (or an error message via pdal_last_error).
     char* out = pdal_pipeline_reader_parse_json(json.c_str());
     if (!out)
-        throw pdal_error(pdal_last_error());
+    {
+        const char* err = pdal_last_error();
+        throw pdal_error(err ? err : "Failed to parse pipeline JSON.");
+    }
 
     NL::json descriptors;
     try
