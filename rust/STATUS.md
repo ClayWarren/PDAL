@@ -104,13 +104,14 @@ python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40
 Current plugin snapshot, excluding plugin tests and treating bundled
 `plugins/e57/libE57Format` as native/vendor adapter code rather than PDAL
 implementation to port line-by-line: `12,001` port-candidate LOC across `93`
-files. After closing `plugins/faux` and routing `plugins/spz` through the C ABI,
-this is `11,618` port-candidate LOC across `86` files. The largest plugin
-backlogs are `tiledb` (`1,636` LOC), `nitf` (`1,253`
-LOC plus `322` C ABI-backed LOC already), `e57` (`1,249` PDAL-wrapper LOC plus
-`15,679` bundled native/vendor LOC), `arrow` (`1,245` LOC), and `trajectory`
-(`1,096` LOC). This is the next big optional bucket, but it should move
-plugin-by-plugin with explicit native dependency decisions.
+files. After closing `plugins/faux`/`plugins/spz`, removing dead NITF
+reader-side C++ helpers, and classifying the remaining NITF writer TRE wrapper
+as a Nitro native adapter, this is `10,365` port-candidate LOC across `82`
+files. The largest plugin backlogs are `tiledb` (`1,636` LOC), `e57` (`1,249`
+PDAL-wrapper LOC plus `15,679` bundled native/vendor LOC), `arrow` (`1,245`
+LOC), `trajectory` (`1,096` LOC), and `pgpointcloud` (`842` LOC). This is the
+next big optional bucket, but it should move plugin-by-plugin with explicit
+native dependency decisions.
 
 | Plugin | Status | Notes |
 |---|---|---|
@@ -123,7 +124,7 @@ plugin-by-plugin with explicit native dependency decisions.
 | `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
 | `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
 | `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
-| `plugins/nitf` | in progress | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are now thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. The legacy in-tree `NitfFileReader`/`NitfFileWriter` C++ classes still exist as compile-time peers for option storage (`m_nitf.m_fileTitle`, etc.) but no longer do the wrap/unwrap themselves. |
+| `plugins/nitf` | done | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. Dead reader-side Nitro metadata helpers were removed from the plugin build; the remaining `NitfFileWriter`/TRE helper is tracked as a Nitro native adapter for writer option storage and TRE registration. |
 | `plugins/openscenegraph` | deferred | OSG reader/writer waits on 3D scene dependency and mesh I/O strategy. |
 | `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
 | `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |

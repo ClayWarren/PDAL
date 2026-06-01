@@ -23,9 +23,6 @@ include(${PDAL_CMAKE_DIR}/gdal.cmake)
 
 PDAL_ADD_PLUGIN(reader_libname reader nitf
     FILES
-        io/NitfFileReader.cpp
-        io/MetadataReader.cpp
-        io/tre_plugins.cpp
         io/NitfReader.cpp
     INCLUDES
         ${PDAL_VENDOR_DIR}
@@ -49,7 +46,6 @@ PDAL_ADD_PLUGIN(writer_libname writer nitf
     FILES
         io/NitfFileWriter.cpp
         io/NitfWriter.cpp
-        io/MetadataReader.cpp
         io/tre_plugins.cpp
     INCLUDES
         ${RUST_CAPI_HEADER_DIR}
