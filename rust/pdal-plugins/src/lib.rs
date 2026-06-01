@@ -9,5 +9,5 @@
 mod discovery;
 mod info;
 
-pub use discovery::{dynamic_library_extension, plugin_name_from_filename};
+pub use discovery::{dynamic_library_extension, plugin_name_from_filename, valid_plugin_name};
 pub use info::{PluginInfo, PluginKind};

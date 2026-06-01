@@ -1,6 +1,6 @@
 use crate::error::string_to_c_ptr;
 use crate::registry::{FILTER_DRIVERS, READER_DRIVERS, WRITER_DRIVERS};
-use pdal_core::plugin::valid_plugin_name;
+use pdal_plugins::valid_plugin_name;
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;

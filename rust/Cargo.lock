@@ -1011,6 +1011,7 @@ dependencies = [
  "pdal-io",
  "pdal-kernels",
  "pdal-native",
+ "pdal-plugins",
  "serde_json",
  "tempfile",
  "xz2",
