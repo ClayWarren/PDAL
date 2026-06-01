@@ -2,6 +2,7 @@
 //!
 //! Port of `io/LasReader.cpp` using the `las` Rust crate.
 
+use crate::source;
 use byteorder::{LittleEndian, ReadBytesExt};
 use chrono::Datelike;
 use las::point::ScanDirection;
@@ -433,7 +434,7 @@ impl Reader for LasReader {
             )?;
             view
         } else if self.ignore_missing_vlrs {
-            let file = File::open(path)
+            let file = source::open_seek(&self.filename)
                 .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
             let mut read = BufReader::new(file);
             let raw_header = las::raw::Header::read_from(&mut read)
