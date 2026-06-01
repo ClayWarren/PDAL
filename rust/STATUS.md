@@ -165,7 +165,7 @@ The first target was the pre-existing C++ test suite running against Rust
 implementations through the C ABI and C++ wrappers. Rust linkage alone does not
 count.
 
-**This milestone is complete.** `820 / 820` baseline C++ GoogleTest cases
+**This milestone is complete.** `819 / 819` baseline C++ GoogleTest cases
 (`100.00%`) are confirmed Rust C ABI-backed by
 `rust/scripts/audit_cpp_test_parity.py`. The audit defaults to the test set
 from `3df1668e0^`, before both the local C++ guard-test additions and the Rust
@@ -216,10 +216,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 0 | 0 |
-| c-abi-backed | 45,314 | 398 |
+| c-abi-backed | 45,335 | 398 |
 | native-adapter | 5,905 | 57 |
 | holdout | 6,960 | 66 |
-| total | 58,179 | 521 |
+| total | 58,200 | 521 |
 
 Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point

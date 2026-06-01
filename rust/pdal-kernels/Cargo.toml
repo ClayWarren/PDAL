@@ -7,3 +7,4 @@ description = "CLI kernels for the PDAL Rust port."
 
 [dependencies]
 pdal-core = { path = "../pdal-core" }
+serde_json = "1"
