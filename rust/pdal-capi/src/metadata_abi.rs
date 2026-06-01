@@ -692,7 +692,24 @@ pub(crate) fn metadata_node_to_json_flat(node: &MetadataNode) -> serde_json::Val
 
     let mut object = serde_json::Map::new();
     for child in node.children() {
-        object.insert(child.name().to_string(), metadata_node_to_json_flat(child));
+        let value = metadata_node_to_json_flat(child);
+        if child.kind() == MetadataKind::Array {
+            match object.get_mut(child.name()) {
+                Some(serde_json::Value::Array(values)) => values.push(value),
+                Some(existing) => {
+                    let previous = std::mem::replace(existing, serde_json::Value::Null);
+                    *existing = serde_json::Value::Array(vec![previous, value]);
+                }
+                None => {
+                    object.insert(
+                        child.name().to_string(),
+                        serde_json::Value::Array(vec![value]),
+                    );
+                }
+            }
+        } else {
+            object.insert(child.name().to_string(), value);
+        }
     }
     serde_json::Value::Object(object)
 }
@@ -724,5 +741,40 @@ unsafe fn c_string_lossy(ptr: *const c_char) -> String {
         String::new()
     } else {
         CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flat_json_preserves_array_children() {
+        let mut root = MetadataNode::new("root");
+        let mut first = MetadataNode::new("item");
+        first.set_value(MetadataValue::U64(1));
+        root.add_child(first);
+
+        let mut second = MetadataNode::new("item");
+        second.set_value(MetadataValue::U64(2));
+        root.add_child(second);
+
+        assert_eq!(
+            metadata_node_to_json_flat(&root),
+            serde_json::json!({"item": [1, 2]})
+        );
+    }
+
+    #[test]
+    fn flat_json_preserves_explicit_single_array_child() {
+        let mut root = MetadataNode::new("root");
+        let mut child = MetadataNode::new("item");
+        child.set_value(MetadataValue::String("one".to_string()));
+        root.add_list_child(child);
+
+        assert_eq!(
+            metadata_node_to_json_flat(&root),
+            serde_json::json!({"item": ["one"]})
+        );
     }
 }
