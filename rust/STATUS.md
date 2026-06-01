@@ -105,8 +105,8 @@ Current plugin snapshot, excluding plugin tests and treating bundled
 `plugins/e57/libE57Format` as native/vendor adapter code rather than PDAL
 implementation to port line-by-line: `12,001` port-candidate LOC across `93`
 files. After closing `plugins/faux`/`plugins/spz`, removing dead NITF
-reader-side C++ helpers, and classifying the remaining NITF writer TRE wrapper
-as a Nitro native adapter, this is `10,365` port-candidate LOC across `82`
+reader-side C++ helpers, and classifying NITF/CPD/TEASER/OSG native dependency
+wrappers as native adapters, this is `9,804` port-candidate LOC across `71`
 files. The largest plugin backlogs are `tiledb` (`1,636` LOC), `e57` (`1,249`
 PDAL-wrapper LOC plus `15,679` bundled native/vendor LOC), `arrow` (`1,245`
 LOC), `trajectory` (`1,096` LOC), and `pgpointcloud` (`842` LOC). This is the
@@ -116,7 +116,7 @@ native dependency decisions.
 | Plugin | Status | Notes |
 |---|---|---|
 | `plugins/arrow` | deferred | Arrow/Parquet integration waits on the native/vendor and columnar data strategy. |
-| `plugins/cpd` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
+| `plugins/cpd` | native-adapter | Registration filter wrapper over the external CPD library. Keep as an optional native adapter unless a Rust CPD implementation is deliberately chosen. |
 | `plugins/draco` | deferred | Draco mesh/point-cloud codec integration waits on a codec FFI or replacement decision. |
 | `plugins/e57` | deferred | E57 reader/writer is a major external-format plugin and waits on broader I/O parity. |
 | `plugins/faux` | done | `kernels.fauxplugin` is a thin C++ plugin shell over the Rust C ABI kernel runner; plugin command discovery and the existing app plugin load test pass through Rust. |
@@ -125,12 +125,12 @@ native dependency decisions.
 | `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
 | `plugins/mbio` | deferred | MB-System bathymetry integration waits on native dependency strategy. |
 | `plugins/nitf` | done | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. Dead reader-side Nitro metadata helpers were removed from the plugin build; the remaining `NitfFileWriter`/TRE helper is tracked as a Nitro native adapter for writer option storage and TRE registration. |
-| `plugins/openscenegraph` | deferred | OSG reader/writer waits on 3D scene dependency and mesh I/O strategy. |
+| `plugins/openscenegraph` | native-adapter | OpenSceneGraph scene reader wrapper over the external OSG library. Keep as an optional native adapter unless a Rust scene dependency is deliberately chosen. |
 | `plugins/pgpointcloud` | deferred | Database-backed I/O waits on remote/service I/O policy and native dependency choices. |
 | `plugins/rdb` | deferred | RIEGL RDB integration waits on proprietary/native dependency availability. |
 | `plugins/rxp` | deferred | RIEGL RXP integration waits on proprietary/native dependency availability. |
 | `plugins/spz` | done | `readers.spz` and `writers.spz` have Rust fixture-backed implementations through `pdal-io`, and the C++ plugin classes are thin C ABI-backed reader/writer shells. Current local CMake has SPZ disabled, so C++ plugin tests are not built in this configuration; Rust SPZ tests and C++ wrapper syntax checks pass. |
-| `plugins/teaser` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
+| `plugins/teaser` | native-adapter | Registration filter wrapper over external TEASER++/Eigen behavior. Keep as an optional native adapter unless a Rust TEASER implementation is deliberately chosen. |
 | `plugins/tiledb` | deferred | TileDB I/O waits on native dependency, array storage, and remote/service I/O policy. |
 | `plugins/trajectory` | deferred | Trajectory filter plugin waits until trajectory/SBET/SMRMSG behavior is more complete. |
 
