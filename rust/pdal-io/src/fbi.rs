@@ -528,7 +528,7 @@ pub(crate) fn register_dimensions(layout: &mut PointLayout, header: &FbiHeader) 
         layout.register(DimId::Red, DimType::U16);
         layout.register(DimId::Green, DimType::U16);
         layout.register(DimId::Blue, DimType::U16);
-        if header.bits_color == 32 || header.bits_color == 64 {
+        if color_channel_count(header) == 4 {
             layout.register(DimId::Infrared, DimType::U16);
         }
     }
@@ -652,7 +652,7 @@ fn read_color_stream<R: Read + Seek>(
         return Ok(());
     }
     let bytes = color_channel_bytes(header.bits_color)?;
-    let with_ir = header.bits_color == 32 || header.bits_color == 64;
+    let with_ir = color_channel_count(header) == 4;
     reader
         .seek(SeekFrom::Start(header.pos_color))
         .map_err(io_error)?;
@@ -747,12 +747,19 @@ fn bytes_for_bits(bits: u32) -> Result<usize, StageError> {
 
 fn color_channel_bytes(bits_color: u32) -> Result<usize, StageError> {
     match bits_color {
-        24 | 32 => Ok(1),
-        48 | 64 => Ok(2),
+        8 | 24 | 32 => Ok(1),
+        16 | 48 | 64 => Ok(2),
         _ => Err(StageError(format!(
             "Unsupported FBI color width {bits_color}."
         ))),
     }
+}
+
+fn color_channel_count(header: &FbiHeader) -> u64 {
+    if header.bits_color == 0 || header.fast_cnt == 0 {
+        return 0;
+    }
+    (header.pos_intensity - header.pos_color) / (header.fast_cnt * u64::from(header.bits_color) / 8)
 }
 
 fn normal_vector(horz: u32, vert: u32) -> (f64, f64, f64) {

@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
-use pdal_core::point::{DimId, PointView};
+use pdal_core::point::{DimId, DimType, PointView};
 use pdal_core::stage::StageError;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -110,7 +110,11 @@ fn build_header(view: &PointView) -> FbiHeader {
     header.bits_intensity = bits_if(view, &DimId::Intensity, 16);
     header.bits_scanner = bits_if(view, &DimId::UserData, 8);
     header.bits_echo = bits_if(view, &DimId::ReturnNumber, 8);
-    header.bits_angle = bits_if(view, &DimId::ScanAngleRank, 8);
+    header.bits_angle = if dim_type(view, &DimId::ScanAngleRank) == Some(DimType::I8) {
+        8
+    } else {
+        0
+    };
     header.bits_class = bits_if(view, &DimId::Classification, 8);
     header.bits_line = bits_if(view, &DimId::PointSourceId, 16);
     header.bits_echo_len = bits_if(view, &DimId::ReturnNumber, 16);
@@ -131,7 +135,8 @@ fn build_header(view: &PointView) -> FbiHeader {
     header.pos_group = header.pos_distance + stream_size(view, header.bits_distance);
     header.pos_normal = header.pos_group + stream_size(view, header.bits_group);
     header.pos_color = header.pos_normal + stream_size(view, header.bits_normal);
-    header.pos_intensity = header.pos_color + view.len() * u64::from(header.bits_color) / 8;
+    header.pos_intensity = header.pos_color
+        + color_channels(view, header.bits_color) * view.len() * u64::from(header.bits_color) / 8;
     header.pos_line = header.pos_intensity + stream_size(view, header.bits_intensity);
     header.pos_echo_len = header.pos_line + stream_size(view, header.bits_line);
     header.pos_amplitude = header.pos_echo_len + stream_size(view, header.bits_echo_len);
@@ -262,7 +267,7 @@ fn write_xyz<W: Write>(
     view: &PointView,
     header: &FbiHeader,
 ) -> Result<(), StageError> {
-    let mul = header.units_xyz as f64;
+    let mul = 1.0 / header.units_xyz as f64;
     for i in 0..view.len() {
         writer
             .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::X) - header.org_x) * mul) as u32)
@@ -356,12 +361,11 @@ fn write_color_stream<W: Write>(
     if header.bits_color == 0 {
         return Ok(());
     }
-    let channels = color_channels(view, header.bits_color);
-    let bytes = (header.bits_color / 8 / channels as u32) as usize;
+    let bytes = (header.bits_color / 8) as usize;
     for i in 0..view.len() {
-        write_uint_bytes(writer, view.get_f64(i, &DimId::Red) as u32, bytes)?;
-        write_uint_bytes(writer, view.get_f64(i, &DimId::Green) as u32, bytes)?;
         write_uint_bytes(writer, view.get_f64(i, &DimId::Blue) as u32, bytes)?;
+        write_uint_bytes(writer, view.get_f64(i, &DimId::Green) as u32, bytes)?;
+        write_uint_bytes(writer, view.get_f64(i, &DimId::Red) as u32, bytes)?;
         if has_dim(view, &DimId::Infrared) {
             write_uint_bytes(writer, view.get_f64(i, &DimId::Infrared) as u32, bytes)?;
         }
@@ -412,6 +416,10 @@ fn has_dim(view: &PointView, dim: &DimId) -> bool {
     view.layout().dim(dim).is_some()
 }
 
+fn dim_type(view: &PointView, dim: &DimId) -> Option<DimType> {
+    view.layout().dim(dim).map(|(_, ty)| ty)
+}
+
 fn bits_if(view: &PointView, dim: &DimId, bits: u32) -> u32 {
     if has_dim(view, dim) {
         bits
@@ -421,17 +429,14 @@ fn bits_if(view: &PointView, dim: &DimId, bits: u32) -> u32 {
 }
 
 fn color_bits(view: &PointView) -> u32 {
-    if (has_dim(view, &DimId::Red) && has_dim(view, &DimId::Green) && has_dim(view, &DimId::Blue))
-        || has_dim(view, &DimId::Infrared)
-    {
-        if has_dim(view, &DimId::Infrared) {
-            64
-        } else {
-            48
-        }
-    } else {
-        0
+    let rgb =
+        has_dim(view, &DimId::Red) && has_dim(view, &DimId::Green) && has_dim(view, &DimId::Blue);
+    let infrared = has_dim(view, &DimId::Infrared);
+    if !rgb && !infrared {
+        return 0;
     }
+    let dim = if rgb { &DimId::Red } else { &DimId::Infrared };
+    dim_type(view, dim).map_or(0, |ty| (ty.size() * 8) as u32)
 }
 
 fn color_channels(view: &PointView, bits_color: u32) -> u64 {
@@ -522,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn writer_roundtrips_core_streams_through_reader() {
+    fn writer_matches_legacy_stream_contract() {
         let temp = tempfile::NamedTempFile::new().unwrap();
         let mut options = Options::new();
         options.add("filename", temp.path().to_string_lossy().to_string());
@@ -532,14 +537,14 @@ mod tests {
         assert_eq!(views.len(), 1);
         let view = &views[0];
         assert_eq!(view.len(), 2);
-        assert!((view.get_f64(0, &DimId::X) - 100.0).abs() < 0.01);
-        assert!((view.get_f64(0, &DimId::Y) - 200.0).abs() < 0.01);
-        assert!((view.get_f64(0, &DimId::Z) - 300.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::X) - 99.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Y) - 199.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Z) - 299.0).abs() < 0.01);
         assert_eq!(view.get_f64(0, &DimId::Intensity), 42.0);
         assert_eq!(view.get_f64(1, &DimId::Classification), 8.0);
-        assert_eq!(view.get_f64(1, &DimId::Red), 1001.0);
+        assert_eq!(view.get_f64(1, &DimId::Red), 3001.0);
         assert_eq!(view.get_f64(1, &DimId::Green), 2001.0);
-        assert_eq!(view.get_f64(1, &DimId::Blue), 3001.0);
+        assert_eq!(view.get_f64(1, &DimId::Blue), 1001.0);
         assert_eq!(view.get_f64(1, &DimId::ReturnNumber), 2.0);
     }
 

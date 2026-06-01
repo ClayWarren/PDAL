@@ -166,6 +166,28 @@ mod tests {
         header
     }
 
+    fn las_14_header(point_count: u64, evlr_offset: u64, evlr_count: u32) -> Vec<u8> {
+        let mut header = vec![0; MAX_HEADER_SIZE];
+        header[0..4].copy_from_slice(b"LASF");
+        header[MINOR_VERSION_POS as usize] = 4;
+        Cursor::new(&mut header[HEADER_SIZE_POS as usize..])
+            .write_u16::<LittleEndian>(375)
+            .unwrap();
+        Cursor::new(&mut header[POINT_OFFSET_POS as usize..])
+            .write_u32::<LittleEndian>(375)
+            .unwrap();
+        Cursor::new(&mut header[EVLR_OFFSET_POS as usize..])
+            .write_u64::<LittleEndian>(evlr_offset)
+            .unwrap();
+        Cursor::new(&mut header[EVLR_NUMBER_POS as usize..])
+            .write_u32::<LittleEndian>(evlr_count)
+            .unwrap();
+        Cursor::new(&mut header[POINT_COUNT_POS as usize..])
+            .write_u64::<LittleEndian>(point_count)
+            .unwrap();
+        header
+    }
+
     #[test]
     fn local_las_header_is_copied_without_points() {
         let dir = tempfile::tempdir().unwrap();
@@ -191,5 +213,62 @@ mod tests {
         assert!(create(input.to_str().unwrap())
             .unwrap_err()
             .contains("Invalid file signature"));
+    }
+
+    #[test]
+    fn las_14_header_moves_evlrs_and_clears_point_count() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("input.laz");
+        let mut bytes = las_14_header(99, 400, 1);
+        bytes.extend([0; 25]);
+        bytes.extend([7, 8, 9]);
+        std::fs::write(&input, bytes).unwrap();
+
+        let pointless = create(input.to_str().unwrap()).unwrap();
+
+        assert_eq!(pointless.point_count, 99);
+        let output = std::fs::read(&pointless.path).unwrap();
+        assert_eq!(output.len(), 378);
+        assert_eq!(read_u64(&output, EVLR_OFFSET_POS).unwrap(), 375);
+        assert_eq!(read_u64(&output, POINT_COUNT_POS).unwrap(), 0);
+        assert_eq!(&output[375..], &[7, 8, 9]);
+        let _ = std::fs::remove_file(pointless.path);
+    }
+
+    #[test]
+    fn rejects_header_size_and_evlr_offsets_beyond_supported_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("input.las");
+        let mut oversized = las_12_header(1);
+        Cursor::new(&mut oversized[HEADER_SIZE_POS as usize..])
+            .write_u16::<LittleEndian>(MAX_HEADER_SIZE as u16 + 1)
+            .unwrap();
+        oversized.resize(MAX_HEADER_SIZE, 0);
+        std::fs::write(&input, oversized).unwrap();
+        assert!(create(input.to_str().unwrap())
+            .unwrap_err()
+            .contains("exceeds supported maximum"));
+
+        let input = dir.path().join("evlr.laz");
+        std::fs::write(&input, las_14_header(1, 9999, 1)).unwrap();
+        assert!(create(input.to_str().unwrap())
+            .unwrap_err()
+            .contains("beyond end of file"));
+    }
+
+    #[test]
+    fn path_helpers_match_vsi_and_suffix_contract() {
+        assert_eq!(
+            vsi_path("/vsicurl/http://example.test/a.las"),
+            "/vsicurl/http://example.test/a.las"
+        );
+        assert_eq!(
+            vsi_path("https://example.test/a.las"),
+            "/vsicurl/https://example.test/a.las"
+        );
+        assert_eq!(vsi_path("/tmp/a.las"), "/tmp/a.las");
+        assert_eq!(path_suffix("s3://bucket/path/file.laz"), ".laz");
+        assert_eq!(path_suffix("no-extension"), "");
+        assert!(read_u8(&[], 3).unwrap_err().contains("Short LAS header"));
     }
 }

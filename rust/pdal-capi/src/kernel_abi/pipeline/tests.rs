@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel_abi::CliStageOption;
 use command::{apply_stage_options_to_pipeline_json, validate_pipeline_json_shape};
 use pdal_core::point::PointLayout;
 use pdal_core::srs::SpatialReference;
