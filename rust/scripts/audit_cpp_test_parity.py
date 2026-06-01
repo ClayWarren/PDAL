@@ -807,6 +807,7 @@ COVERED: dict[str, object] = {
     "pdal_pipeline_manager_test": {
         "basic",
         "OptionOrder",
+        "progress",
         "InputGlobbing",
         "objects",
         "arrayPipeline",

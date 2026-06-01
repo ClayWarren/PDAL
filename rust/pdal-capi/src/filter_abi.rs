@@ -744,10 +744,7 @@ pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
     }))
 }
 
-/// Create a CSF guard-stage for option validation and empty input behavior.
-///
-/// The full cloth simulation algorithm remains in C++; this Rust stage covers
-/// the pre-processing semantics currently exercised by the C++ CSF unit tests.
+/// Create a CSF stage backed by the Rust cloth-simulation classifier.
 ///
 /// # Safety
 /// `ignored_dims` must be null with a zero count or point to `count`

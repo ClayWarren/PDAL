@@ -160,11 +160,7 @@ pub unsafe extern "C" fn pdal_writer_create_laz(ops: *const Options) -> *mut Wri
     }
 }
 
-/// Create a CopcWriter from options. Currently delegates to the Rust LAS/LAZ
-/// writer with COPC-required defaults forced (LAS 1.4, LAZ compression, point
-/// format 6 if not otherwise set). The resulting file is a LAS 1.4 LAZ that
-/// the existing `LasReader` (Rust-backed) can read; explicit COPC structure
-/// generation is deferred until a real Rust COPC writer lands.
+/// Create a CopcWriter from options.
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
@@ -175,8 +171,6 @@ pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut Wr
         if !opts.has("minor_version") {
             opts.add("minor_version", "4");
         }
-        // Real COPC writer: builds the octree (copc info VLR + hierarchy EVLR +
-        // per-node LAZ chunks) via the ported copcwriter subsystem.
         let writer = Box::new(pdal_io::copcwriter::writer::CopcWriter::new(&opts));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {

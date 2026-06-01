@@ -2,8 +2,7 @@
 //!
 //! Kernels are a late migration phase because they sit above the core,
 //! pipeline, filters, and I/O layers. This crate owns the Rust-native command
-//! contract while most concrete commands still delegate to the existing C++
-//! implementation.
+//! contract used by the C ABI kernel runner.
 
 mod fauxplugin;
 mod registry;
