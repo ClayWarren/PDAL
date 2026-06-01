@@ -16,6 +16,13 @@ use std::rc::Rc;
 pub struct SbetReader {
     filename: String,
     angles_as_degrees: bool,
+    stream: Option<SbetStreamState>,
+}
+
+struct SbetStreamState {
+    reader: BufReader<Box<dyn crate::source::ReadSeek>>,
+    layout: Rc<PointLayout>,
+    remaining: u64,
 }
 
 impl SbetReader {
@@ -23,6 +30,7 @@ impl SbetReader {
         Self {
             filename: options.get_str("filename", ""),
             angles_as_degrees: options.get_bool("angles_as_degrees", true),
+            stream: None,
         }
     }
 
@@ -62,6 +70,59 @@ impl SbetReader {
                 | DimId::ZBodyAngRate
         )
     }
+
+    fn point_size() -> u64 {
+        (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64
+    }
+
+    fn layout() -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        for (dim, ty) in Self::file_dimensions() {
+            layout.register(dim.clone(), *ty);
+        }
+        Rc::new(layout)
+    }
+
+    fn append_record(
+        view: &mut PointView,
+        reader: &mut BufReader<Box<dyn crate::source::ReadSeek>>,
+        angles_as_degrees: bool,
+    ) -> Result<(), StageError> {
+        let id = view.add_point();
+        let mut buf = [0u8; 8];
+        let rad_to_deg = 180.0 / std::f64::consts::PI;
+
+        for (dim, _ty) in Self::file_dimensions() {
+            reader
+                .read_exact(&mut buf)
+                .map_err(|e| StageError(e.to_string()))?;
+            let mut val = (&buf[..]).read_f64::<LittleEndian>().unwrap();
+            if angles_as_degrees && Self::is_angular(dim) {
+                val *= rad_to_deg;
+            }
+            view.set_f64(id, dim, val);
+        }
+        Ok(())
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "SbetReader requires a filename option.".to_string(),
+            ));
+        }
+        let point_size = Self::point_size();
+        let (reader, file_size) = open_sbet_reader(&self.filename)?;
+        if file_size == 0 || file_size % point_size != 0 {
+            return Err(StageError("Invalid file size.".to_string()));
+        }
+        self.stream = Some(SbetStreamState {
+            reader,
+            layout: Self::layout(),
+            remaining: file_size / point_size,
+        });
+        Ok(())
+    }
 }
 
 impl Reader for SbetReader {
@@ -75,34 +136,15 @@ impl Reader for SbetReader {
                 "SbetReader requires a filename option.".to_string(),
             ));
         }
-        let point_size = (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64;
+        let point_size = Self::point_size();
         let (mut reader, file_size) = open_sbet_reader(&self.filename)?;
         if file_size == 0 || file_size % point_size != 0 {
             return Err(StageError("Invalid file size.".to_string()));
         }
 
-        let mut layout = PointLayout::new();
-        for (dim, ty) in Self::file_dimensions() {
-            layout.register(dim.clone(), *ty);
-        }
-
-        let mut view = PointView::new(Rc::new(layout));
-        let dims = Self::file_dimensions();
-        let mut buf = [0u8; 8];
-        let rad_to_deg = 180.0 / std::f64::consts::PI;
-
+        let mut view = PointView::new(Self::layout());
         for _ in 0..(file_size / point_size) {
-            let id = view.add_point();
-            for (dim, _ty) in dims {
-                reader
-                    .read_exact(&mut buf)
-                    .map_err(|e| StageError(e.to_string()))?;
-                let mut val = (&buf[..]).read_f64::<LittleEndian>().unwrap();
-                if self.angles_as_degrees && Self::is_angular(dim) {
-                    val *= rad_to_deg;
-                }
-                view.set_f64(id, dim, val);
-            }
+            Self::append_record(&mut view, &mut reader, self.angles_as_degrees)?;
         }
 
         Ok(vec![view])
@@ -110,6 +152,32 @@ impl Reader for SbetReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.sbet")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.remaining == 0 {
+            return Ok(None);
+        }
+
+        let take = (capacity.max(1) as u64).min(state.remaining);
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        for _ in 0..take {
+            Self::append_record(&mut view, &mut state.reader, self.angles_as_degrees)?;
+        }
+        state.remaining -= take;
+        Ok(Some(view))
     }
 }
 
@@ -170,6 +238,47 @@ mod tests {
         assert_near(view.get_f64(0, &DimId::X), -2.041_654_392_303_94);
         assert_near(view.get_f64(0, &DimId::Roll), -0.02813407149321339);
         assert_near(view.get_f64(0, &DimId::Azimuth), 3.046773230278662);
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("sbet/2-points.sbet"));
+
+        let mut full_reader = SbetReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = SbetReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(1).unwrap().unwrap();
+        let second = stream_reader.stream_next(1).unwrap().unwrap();
+        assert!(stream_reader.stream_next(1).unwrap().is_none());
+
+        assert_eq!(first.len(), 1);
+        assert_eq!(second.len(), 1);
+        assert_near(
+            first.get_f64(0, &DimId::GpsTime),
+            full.get_f64(0, &DimId::GpsTime),
+        );
+        assert_near(
+            first.get_f64(0, &DimId::Azimuth),
+            full.get_f64(0, &DimId::Azimuth),
+        );
+        assert_near(second.get_f64(0, &DimId::Y), full.get_f64(1, &DimId::Y));
+    }
+
+    #[test]
+    fn streaming_honors_radian_option() {
+        let mut options = Options::new();
+        options.add("filename", data_path("sbet/2-points.sbet"));
+        options.add("angles_as_degrees", false);
+
+        let mut stream_reader = SbetReader::new(&options);
+        let first = stream_reader.stream_next(10).unwrap().unwrap();
+
+        assert_eq!(first.len(), 2);
+        assert_near(first.get_f64(0, &DimId::Y), 0.5680211852972264);
+        assert_near(first.get_f64(0, &DimId::Azimuth), 3.046773230278662);
     }
 
     #[test]
