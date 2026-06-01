@@ -5,7 +5,7 @@ use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -105,9 +105,9 @@ impl PcdReader {
         }
 
         let header = parse_header(&header_bytes)?;
-        if header.storage != "ascii" {
+        if header.storage != "ascii" && header.storage != "binary" {
             return Err(StageError(
-                "PCD streaming is only supported for ASCII input.".to_string(),
+                "PCD streaming is only supported for ASCII and binary input.".to_string(),
             ));
         }
         let layout = Self::layout_for(&header);
@@ -186,25 +186,38 @@ impl Reader for PcdReader {
         }
 
         let mut view = PointView::new(Rc::clone(&state.layout));
-        let mut line = String::new();
-        while view.len() < capacity.max(1) as u64 && state.remaining > 0 {
-            line.clear();
-            if state
-                .reader
-                .read_line(&mut line)
-                .map_err(|err| StageError(err.to_string()))?
-                == 0
-            {
-                state.eof = true;
-                break;
+        if state.header.storage == "ascii" {
+            let mut line = String::new();
+            while view.len() < capacity.max(1) as u64 && state.remaining > 0 {
+                line.clear();
+                if state
+                    .reader
+                    .read_line(&mut line)
+                    .map_err(|err| StageError(err.to_string()))?
+                    == 0
+                {
+                    state.eof = true;
+                    break;
+                }
+                if Self::append_ascii_line(
+                    &mut view,
+                    &state.header,
+                    line.trim_end_matches(['\r', '\n']),
+                ) {
+                    state.remaining -= 1;
+                }
             }
-            if Self::append_ascii_line(
-                &mut view,
-                &state.header,
-                line.trim_end_matches(['\r', '\n']),
-            ) {
+        } else if state.header.storage == "binary" {
+            let target = capacity.max(1) as u64;
+            while view.len() < target && state.remaining > 0 {
+                append_binary_point(&mut view, &state.header, &mut state.reader)?;
                 state.remaining -= 1;
             }
+        } else {
+            return Err(StageError(format!(
+                "Unrecognized PCD data storage '{}'.",
+                state.header.storage
+            )));
         }
 
         if view.len() == 0 && (state.eof || state.remaining == 0) {
@@ -653,6 +666,43 @@ fn read_binary_value(bytes: &[u8], offset: &mut usize, field: &Field) -> Result<
             field.size
         ))),
     }
+}
+
+fn read_binary_value_from_reader<R: Read>(
+    reader: &mut R,
+    field: &Field,
+) -> Result<f64, StageError> {
+    let size = usize::try_from(field.size)
+        .map_err(|_| StageError("Unsupported PCD binary field size.".to_string()))?;
+    if size > 8 {
+        return Err(StageError(format!(
+            "Unsupported PCD binary field size {}.",
+            field.size
+        )));
+    }
+    let mut bytes = [0; 8];
+    reader
+        .read_exact(&mut bytes[..size])
+        .map_err(|_| StageError("Unexpected end of binary PCD data.".to_string()))?;
+    let mut offset = 0;
+    read_binary_value(&bytes[..size], &mut offset, field)
+}
+
+fn append_binary_point<R: Read>(
+    view: &mut PointView,
+    header: &Header,
+    reader: &mut R,
+) -> Result<(), StageError> {
+    let point = view.add_point();
+    for field in &header.fields {
+        for count in 0..field.count {
+            let value = read_binary_value_from_reader(reader, field)?;
+            if count == 0 {
+                view.set_f64(point, &field.id, value);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn read_interleaved_binary_points(

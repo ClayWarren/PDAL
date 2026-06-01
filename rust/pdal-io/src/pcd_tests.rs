@@ -130,6 +130,35 @@ mod tests {
     }
 
     #[test]
+    fn streaming_binary_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/autzen-utm.pcd"));
+
+        let mut full_reader = PcdReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = PcdReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(500).unwrap().unwrap();
+        let second = stream_reader.stream_next(500).unwrap().unwrap();
+        let third = stream_reader.stream_next(500).unwrap().unwrap();
+        assert!(stream_reader.stream_next(500).unwrap().is_none());
+
+        assert_eq!(first.len(), 500);
+        assert_eq!(second.len(), 500);
+        assert_eq!(third.len(), 65);
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(
+            second.get_f64(0, &DimId::Y),
+            full.get_f64(500, &DimId::Y)
+        );
+        assert_eq!(
+            third.get_f64(64, &DimId::GpsTime),
+            full.get_f64(1064, &DimId::GpsTime)
+        );
+    }
+
+    #[test]
     fn comma_separated_ascii_rows_are_skipped_like_cpp_reader() {
         let mut options = Options::new();
         options.add("filename", data_path("pcd/utm17_comma.pcd"));
