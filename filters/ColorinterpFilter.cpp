@@ -36,17 +36,10 @@
 
 #include <pdal/PointView.hpp>
 #include <pdal/private/RustViewConverter.hpp>
-#include <pdal/private/gdal/GDALUtils.hpp>
-#include <pdal/private/gdal/Raster.hpp>
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal_capi.h>
 
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <vector>
-
-#include <cpl_vsi.h>
+#include <limits>
 
 namespace pdal
 {
@@ -68,23 +61,18 @@ ColorinterpFilter::~ColorinterpFilter()
         pdal_stage_destroy(m_rustStage);
 }
 
-std::shared_ptr<gdal::Raster> openRamp(std::string& rampFilename)
+// Build the Rust colorinterp stage. The Rust filter owns ramp resolution
+// (including the named built-in ramps decoded from embedded PNGs) and computes
+// the minimum/maximum from the view -- or from k/MAD -- when they are unset.
+pdal_stage_t* ColorinterpFilter::createRustStage()
 {
-    const uint8_t* data = nullptr;
-    uint64_t size = 0;
-    if (pdal_colorinterp_default_ramp(rampFilename.c_str(), &data, &size))
-    {
-        rampFilename = "/vsimem/" + rampFilename + ".png";
-        auto tmp = VSIFileFromMemBuffer(
-            rampFilename.c_str(),
-            const_cast<GByte*>(reinterpret_cast<const GByte*>(data)),
-            static_cast<vsi_l_offset>(size), false);
-        (void)tmp;
-    }
-
-    std::shared_ptr<gdal::Raster> output(
-        new gdal::Raster(rampFilename.c_str()));
-    return output;
+    pdal_stage_t* stage = pdal_stage_create_colorinterp(
+        Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min, m_max,
+        m_clamp, m_invertRamp, m_useMAD, m_madMultiplier, m_stdDevThreshold);
+    if (!stage)
+        rust_view_converter::throwLastError(
+            "Unable to create Rust colorinterp stage.");
+    return stage;
 }
 
 void ColorinterpFilter::addArgs(ProgramArgs& args)
@@ -140,133 +128,13 @@ void ColorinterpFilter::prepared(PointTableRef table)
     }
 
     m_interpDim = layout->findDim(m_interpDimString);
-
-    if (m_rustStage)
-        pdal_stage_destroy(m_rustStage);
-    m_rustStage = pdal_stage_create_colorinterp(
-        Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min, m_max,
-        m_clamp, m_invertRamp);
-    if (!m_rustStage)
-        rust_view_converter::throwLastError(
-            "Unable to create Rust colorinterp stage.");
-    pdal_stage_destroy(m_rustStage);
-    m_rustStage = nullptr;
-}
-
-/**
-  Read the band data into local vectors.
-
-  \param table  Point table.
-*/
-void ColorinterpFilter::ready(PointTableRef table)
-{
-    gdal::registerDrivers();
-
-    m_raster = openRamp(m_colorramp);
-    gdal::GDALError err = m_raster->open();
-    if (err != gdal::GDALError::None && err != gdal::GDALError::NoTransform)
-        throwError(m_raster->errorMsg());
-
-    log()->get(LogLevel::Debug)
-        << getName() << " raster connection: " << m_raster->filename() << '\n';
-
-    m_raster->readBand(m_redBand, 1);
-    m_raster->readBand(m_greenBand, 2);
-    m_raster->readBand(m_blueBand, 3);
 }
 
 void ColorinterpFilter::filter(PointView& view)
 {
-    double median(0.0);
-    double mad(0.0);
-
-    // If the user set a 'k' value, we use that
-    // defaulting to using a computed stddev if we
-    // were not told to use MAD.
-    if (m_stdDevThreshold != 0.0)
-    {
-        std::vector<double> values(view.size());
-
-        stats::Summary summary(Dimension::name(m_interpDim),
-                               stats::Summary::NoEnum, false);
-        for (PointId idx = 0; idx < view.size(); ++idx)
-        {
-            double v = view.getFieldAs<double>(m_interpDim, idx);
-            summary.insert(v);
-            values[idx] = v;
-        }
-
-        auto compute_median = [](std::vector<double> vals)
-        {
-            std::nth_element(vals.begin(), vals.begin() + vals.size() / 2,
-                             vals.end());
-
-            return *(vals.begin() + vals.size() / 2);
-        };
-
-        median = compute_median(values);
-        if (m_useMAD)
-        {
-            std::transform(values.begin(), values.end(), values.begin(),
-                           [median](double v)
-                           { return std::fabs(v - median); });
-            mad = compute_median(values);
-
-            double threshold = mad * m_madMultiplier * m_stdDevThreshold;
-            m_min = median - threshold;
-            m_max = median + threshold;
-
-            log()->get(LogLevel::Debug) << getName() << " mad " << mad << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " median " << median << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " minimum " << m_min << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " maximum " << m_max << '\n';
-        }
-        else
-        {
-            double threshold = (m_stdDevThreshold * summary.sampleStddev());
-            m_min = median - threshold;
-            m_max = median + threshold;
-
-            log()->get(LogLevel::Debug)
-                << getName() << " stddev threshold " << threshold << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " median " << median << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " minimum " << m_min << '\n';
-            log()->get(LogLevel::Debug)
-                << getName() << " maximum " << m_max << '\n';
-        }
-    }
-
-    // If the user didn't set min/max values and hadn't set a stddev, we
-    // compute them.
-    else if (std::isnan(m_min) || std::isnan(m_max))
-    {
-        stats::Summary summary(Dimension::name(m_interpDim),
-                               stats::Summary::NoEnum, false);
-        for (PointId idx = 0; idx < view.size(); ++idx)
-        {
-            double v = view.getFieldAs<double>(m_interpDim, idx);
-            summary.insert(v);
-        }
-
-        if (std::isnan(m_min))
-            m_min = summary.minimum();
-        if (std::isnan(m_max))
-            m_max = summary.maximum();
-    }
-
     if (m_rustStage)
         pdal_stage_destroy(m_rustStage);
-    m_rustStage = pdal_stage_create_colorinterp(
-        Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min, m_max,
-        m_clamp, m_invertRamp);
-    if (!m_rustStage)
-        rust_view_converter::throwLastError(
-            "Unable to create Rust colorinterp stage.");
+    m_rustStage = createRustStage();
     rust_view_converter::runInPlace(m_rustStage, view);
 }
 
@@ -280,14 +148,7 @@ bool ColorinterpFilter::pipelineStreamable() const
 bool ColorinterpFilter::processOne(PointRef& point)
 {
     if (!m_rustStage)
-    {
-        m_rustStage = pdal_stage_create_colorinterp(
-            Dimension::name(m_interpDim).c_str(), m_colorramp.c_str(), m_min,
-            m_max, m_clamp, m_invertRamp);
-        if (!m_rustStage)
-            rust_view_converter::throwLastError(
-                "Unable to create Rust colorinterp stage.");
-    }
+        m_rustStage = createRustStage();
 
     pdal_point_view_t* rustView =
         rust_view_converter::toRustPoint(point, m_layout);

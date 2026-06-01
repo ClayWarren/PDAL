@@ -34,21 +34,13 @@
 
 #pragma once
 
-#include <filters/StatsFilter.hpp>
 #include <pdal/Filter.hpp>
 #include <pdal/Streamable.hpp>
-
-#include <map>
 
 typedef struct pdal_stage pdal_stage_t;
 
 namespace pdal
 {
-
-namespace gdal
-{
-class Raster;
-}
 
 // Interpolates color ramp into Red, Green, and Blue dimensions
 // for a given dimension
@@ -59,9 +51,9 @@ class PDAL_EXPORT ColorinterpFilter : public Filter, public Streamable
 public:
     ColorinterpFilter()
         : m_interpDim(Dimension::Id::Z), m_interpDimString("Z"), m_min(0.0),
-          m_max(0.0), m_clamp(false), m_rampFilename("/vsimem/colorramp.png"),
-          m_invertRamp(false), m_stdDevThreshold(0.0), m_useMAD(false),
-          m_madMultiplier(1.4862), m_rustStage(nullptr)
+          m_max(0.0), m_clamp(false), m_invertRamp(false),
+          m_stdDevThreshold(0.0), m_useMAD(false), m_madMultiplier(1.4862),
+          m_rustStage(nullptr)
     {
     }
     ~ColorinterpFilter() override;
@@ -75,9 +67,10 @@ private:
     void addArgs(ProgramArgs& args) override;
     void filter(PointView& view) override;
     void prepared(PointTableRef table) override;
-    void ready(PointTableRef table) override;
     void addDimensions(PointLayoutPtr layout) override;
     bool processOne(PointRef& point) override;
+
+    pdal_stage_t* createRustStage();
 
     Dimension::Id m_interpDim;
     std::string m_interpDimString;
@@ -85,11 +78,6 @@ private:
     double m_max;
     bool m_clamp;
     std::string m_colorramp;
-    std::shared_ptr<gdal::Raster> m_raster;
-    std::string m_rampFilename;
-    std::vector<uint8_t> m_redBand;
-    std::vector<uint8_t> m_greenBand;
-    std::vector<uint8_t> m_blueBand;
     bool m_invertRamp;
     double m_stdDevThreshold;
     bool m_useMAD;

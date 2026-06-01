@@ -640,10 +640,15 @@ Known mixed binaries:
   `pdal-filters::colorinterp_ramps`, with `pdal_colorinterp_default_ramp`
   delegating to it and the `png` crate decoding to RGB bands), computes auto
   `minimum`/`maximum` (plus the `k`/`mad`/`mad_multiplier` modes) when bounds
-  are NaN, and declares Red/Green/Blue (uint16) via `output_dimensions()`. The
-  auto-bounds/k/mad math is gated by Rust unit tests mirroring the C++
-  `autorange`/`k`/`mad` expected values. With this, every first-party filter
-  with a Rust implementation is registry-visible.
+  are NaN, and declares Red/Green/Blue (uint16) via `output_dimensions()`. With
+  this, every first-party filter with a Rust implementation is registry-visible.
+  The C++ `ColorinterpFilter` now **delegates** ramp resolution and
+  minimum/maximum/k/MAD computation to that Rust filter (the C ABI
+  `pdal_stage_create_colorinterp` gained `mad`/`mad_multiplier`/`k` params), so
+  the `openRamp`/`/vsimem` dance, the GDAL band reads in `ready()`, and the
+  C++ `filter()` stats pass were removed (the file dropped from ~205 to ~108
+  code LOC). The `autorange`/`k`/`mad`/`minmax` cases of
+  `pdal_filters_colorinterp_test` now gate the Rust bounds math directly.
 - `pdal_filters_colorization_test`: `test1`, `test2`, `test3`, and `test5`
   count. Color sampling and point updates route through the Rust C ABI. Invalid
   dimension-name validation remains C++ layout behavior.

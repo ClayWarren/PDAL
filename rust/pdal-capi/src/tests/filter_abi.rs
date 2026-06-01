@@ -235,7 +235,17 @@ fn string_and_array_filter_stages_construct_through_c_abi() {
                 1.0,
             ),
             pdal_stage_create_overlay(class.as_ptr(), datasource.as_ptr(), std::ptr::null()),
-            pdal_stage_create_colorinterp(x.as_ptr(), ramp.as_ptr(), 0.0, 10.0, true, false),
+            pdal_stage_create_colorinterp(
+                x.as_ptr(),
+                ramp.as_ptr(),
+                0.0,
+                10.0,
+                true,
+                false,
+                false,
+                1.4862,
+                0.0,
+            ),
             pdal_stage_create_colorization(raster.as_ptr(), bands.as_ptr(), bands.len() as u64),
             pdal_stage_create_hag_dem(raster.as_ptr(), 1, true, 0.0, 10.0, -9999.0, 2),
             pdal_stage_create_ferry(dims.as_ptr(), [z.as_ptr(), flag.as_ptr()].as_ptr(), 2),
@@ -308,7 +318,10 @@ fn string_and_array_filter_stages_construct_through_c_abi() {
             0.0,
             1.0,
             false,
-            false
+            false,
+            false,
+            1.4862,
+            0.0
         )
         .is_null());
         assert!(pdal_stage_create_colorization(std::ptr::null(), bands.as_ptr(), 1).is_null());
@@ -876,7 +889,10 @@ fn test_filter_abi_nulls_and_errors() {
             0.0,
             0.0,
             false,
-            false
+            false,
+            false,
+            1.4862,
+            0.0
         )
         .is_null());
         assert_eq!(

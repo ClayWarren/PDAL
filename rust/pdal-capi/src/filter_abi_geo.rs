@@ -132,6 +132,9 @@ pub unsafe extern "C" fn pdal_stage_create_colorinterp(
     max: f64,
     clamp: bool,
     invert: bool,
+    mad: bool,
+    mad_multiplier: f64,
+    k: f64,
 ) -> *mut StageWrapper {
     if dim_name.is_null() || ramp.is_null() {
         set_last_error("null argument to pdal_stage_create_colorinterp");
@@ -142,9 +145,10 @@ pub unsafe extern "C" fn pdal_stage_create_colorinterp(
     let ramp = CStr::from_ptr(ramp).to_string_lossy();
 
     Box::into_raw(Box::new(StageWrapper {
-        filter: Box::new(ColorinterpFilter::new(
-            &dim_name, &ramp, min, max, clamp, invert,
-        )),
+        filter: Box::new(
+            ColorinterpFilter::new(&dim_name, &ramp, min, max, clamp, invert)
+                .with_bounds_params(mad, mad_multiplier, k),
+        ),
     }))
 }
 

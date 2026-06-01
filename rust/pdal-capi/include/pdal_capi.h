@@ -1374,7 +1374,8 @@ extern "C"
     pdal_stage_t* pdal_stage_create_colorinterp(const char* dim_name,
                                                 const char* ramp, double min,
                                                 double max, bool clamp,
-                                                bool invert);
+                                                bool invert, bool mad,
+                                                double mad_multiplier, double k);
     char* pdal_colorinterp_validate_prepared(const pdal_point_layout_t* layout,
                                              const char* dim_name, double min,
                                              double max);
