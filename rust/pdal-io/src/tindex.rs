@@ -1,3 +1,4 @@
+use crate::source;
 use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
@@ -36,7 +37,7 @@ impl Reader for TindexReader {
             ));
         }
 
-        let text = std::fs::read_to_string(&self.filename)
+        let text = source::read_to_string(&self.filename)
             .map_err(|err| StageError(format!("Can't open file '{}': {err}", self.filename)))?;
         let json: serde_json::Value = serde_json::from_str(&text).map_err(|err| {
             StageError(format!(
@@ -49,7 +50,7 @@ impl Reader for TindexReader {
         let bounds = parse_tindex_bounds(&self.bounds)?;
 
         let mut merged: Option<PointView> = None;
-        let base = Path::new(&self.filename).parent().unwrap_or(Path::new(""));
+        let base = location_base(&self.filename);
         for feature in features {
             if !feature_matches_bounds(feature, bounds.as_ref())? {
                 continue;
@@ -62,10 +63,10 @@ impl Reader for TindexReader {
                         self.location_field
                     ))
                 })?;
-            let path = resolve_location(base, location);
-            let mut views = read_point_file(&path)?;
+            let location = resolve_location_text(&base, location);
+            let mut views = read_point_location(&location, None, &Options::new())?;
             for view in views.drain(..) {
-                append_view(&mut merged, &view, &path)?;
+                append_view(&mut merged, &view, Path::new(&location))?;
             }
         }
 
@@ -86,6 +87,31 @@ pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
         path.to_path_buf()
     } else {
         base.join(path)
+    }
+}
+
+fn location_base(filename: &str) -> String {
+    if source::is_vsi_path(filename) {
+        return filename
+            .rsplit_once('/')
+            .map(|(base, _)| base.to_string())
+            .unwrap_or_default();
+    }
+
+    Path::new(filename)
+        .parent()
+        .unwrap_or(Path::new(""))
+        .display()
+        .to_string()
+}
+
+fn resolve_location_text(base: &str, location: &str) -> String {
+    if source::is_vsi_path(location) || Path::new(location).is_absolute() {
+        location.to_string()
+    } else if source::is_vsi_path(base) {
+        format!("{}/{}", base.trim_end_matches('/'), location)
+    } else {
+        Path::new(base).join(location).display().to_string()
     }
 }
 
@@ -187,10 +213,6 @@ fn grow_optional_bounds(bounds: &mut Option<Bounds2D>, other: Bounds2D) {
         Some(bounds) => bounds.grow_bounds(&other),
         None => *bounds = Some(other),
     }
-}
-
-pub(crate) fn read_point_file(path: &Path) -> Result<Vec<PointView>, StageError> {
-    read_point_location(&path.to_string_lossy(), None, &Options::new())
 }
 
 pub(crate) fn read_point_location(
@@ -504,6 +526,30 @@ mod tests {
     }
 
     #[test]
+    fn remote_location_helpers_preserve_http_and_vsi_sources() {
+        assert_eq!(
+            location_base("https://example.com/indexes/a.geojson"),
+            "https://example.com/indexes"
+        );
+        assert_eq!(
+            location_base("/vsicurl/https://example.com/indexes/a.geojson"),
+            "/vsicurl/https://example.com/indexes"
+        );
+        assert_eq!(
+            resolve_location_text("https://example.com/indexes", "tile.las"),
+            "https://example.com/indexes/tile.las"
+        );
+        assert_eq!(
+            resolve_location_text("/vsicurl/https://example.com/indexes", "tile.las"),
+            "/vsicurl/https://example.com/indexes/tile.las"
+        );
+        assert_eq!(
+            resolve_location_text("/tmp/indexes", "https://example.com/tile.las"),
+            "https://example.com/tile.las"
+        );
+    }
+
+    #[test]
     fn reader_errors_on_feature_missing_location() {
         let temp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(
@@ -535,8 +581,7 @@ mod tests {
 
     #[test]
     fn read_point_file_errors_on_unknown_extension() {
-        let p = std::path::PathBuf::from("/no/such/file.unknownext");
-        assert!(read_point_file(&p).is_err());
+        assert!(read_point_location("/no/such/file.unknownext", None, &Options::new()).is_err());
     }
 
     #[test]
