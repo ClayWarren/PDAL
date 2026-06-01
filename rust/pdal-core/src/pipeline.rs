@@ -468,6 +468,12 @@ impl Pipeline {
         ))
     }
 
+    /// Return whether this pipeline is eligible for chunked streaming
+    /// execution.
+    pub fn streamable(&self) -> bool {
+        self.streaming_chain().is_some()
+    }
+
     /// Execute the pipeline in chunked streaming mode when it is a fully
     /// streamable linear chain, keeping peak memory bounded by the chunk size
     /// instead of materializing every point. Returns `Ok(Some(point_count))`

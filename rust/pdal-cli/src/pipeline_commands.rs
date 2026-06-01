@@ -115,6 +115,12 @@ impl App {
             return 1;
         }
         if validate_only {
+            let validation = serde_json::json!({
+                "valid": true,
+                "error_detail": "",
+                "streamable": unsafe { pdal_capi::pdal_pipeline_streamable(pipeline) },
+            });
+            println!("{}", serde_json::to_string_pretty(&validation).unwrap());
             unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
             return 0;
         }

@@ -385,6 +385,18 @@ pub unsafe extern "C" fn pdal_pipeline_execute_streaming(pipeline: *mut Pipeline
     }
 }
 
+/// Return whether the pipeline is eligible for chunked streaming execution.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_streamable(pipeline: *const PipelineHandle) -> bool {
+    if pipeline.is_null() {
+        return false;
+    }
+    (*pipeline).pipeline.streamable()
+}
+
 /// Execute the pipeline and return a summary result.
 ///
 /// Returns 0 on success, -1 on error.

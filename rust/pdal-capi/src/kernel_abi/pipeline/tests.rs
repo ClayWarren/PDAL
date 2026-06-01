@@ -1,6 +1,9 @@
 use super::*;
 use crate::kernel_abi::CliStageOption;
-use command::{apply_stage_options_to_pipeline_json, validate_pipeline_json_shape};
+use command::{
+    apply_stage_options_to_pipeline_json, validate_pipeline_for_kernel,
+    validate_pipeline_json_shape,
+};
 use pdal_core::point::PointLayout;
 use pdal_core::srs::SpatialReference;
 use std::rc::Rc;
@@ -50,6 +53,26 @@ fn validate_shape_rejects_non_stage_entries() {
     let json = r#"[{"type":"readers.faux"}, 7]"#;
 
     assert!(validate_pipeline_json_shape(json).is_err());
+}
+
+#[test]
+fn validate_pipeline_reports_actual_streamability() {
+    let streamable = r#"{"pipeline":[
+        {"type":"readers.faux","count":10,"mode":"ramp"},
+        {"type":"filters.range","limits":"X[0:5]"},
+        {"type":"writers.null"}
+    ]}"#;
+    let nonstreamable = r#"{"pipeline":[
+        {"type":"readers.faux","count":10,"mode":"ramp"},
+        {"type":"filters.sort","dimension":"X"},
+        {"type":"writers.null"}
+    ]}"#;
+
+    assert_eq!(validate_pipeline_for_kernel(streamable)["streamable"], true);
+    assert_eq!(
+        validate_pipeline_for_kernel(nonstreamable)["streamable"],
+        false
+    );
 }
 
 #[test]

@@ -1585,6 +1585,8 @@ extern "C"
                                              pdal_point_view_t* input_view);
     int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline,
                                         pdal_point_view_t* input_view);
+    int64_t pdal_pipeline_execute_streaming(pdal_pipeline_t* pipeline);
+    bool pdal_pipeline_streamable(const pdal_pipeline_t* pipeline);
     int64_t pdal_pipeline_execute_result(pdal_pipeline_t* pipeline,
                                          pdal_point_view_t* input_view,
                                          pdal_pipeline_result_t* out_result);

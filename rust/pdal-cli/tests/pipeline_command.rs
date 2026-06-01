@@ -126,6 +126,21 @@ fn pipeline_command_streams_eligible_and_falls_back_otherwise() {
 
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("pipeline")
+        .arg("--validate")
+        .arg(&fallback)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline --validate failed\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let validation: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(validation["valid"], true);
+    assert_eq!(validation["streamable"], false);
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
         .arg(&fallback)
         .arg("--stream")
         .output()
