@@ -10,6 +10,7 @@ mod merge;
 mod random;
 mod registry;
 mod sort;
+mod split;
 mod stage_options;
 mod text;
 
@@ -19,6 +20,7 @@ pub use merge::build_merge_pipeline;
 pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};
 pub use sort::build_sort_pipeline;
+pub use split::{build_split_plan, numbered_split_output, SplitKernelPlan, SplitPlan};
 pub use text::word_wrap;
 
 pub enum KernelPipelinePlan {
