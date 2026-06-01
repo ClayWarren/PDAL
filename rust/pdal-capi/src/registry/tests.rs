@@ -1,4 +1,5 @@
 use super::*;
+use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
@@ -63,6 +64,49 @@ fn unknown_and_unported_drivers_are_rejected() {
     assert!(create_reader("readers.unknown", &options).is_err());
     assert!(create_filter("filters.unknown", &options).is_err());
     assert!(create_writer("writers.unknown", &options).is_err());
+}
+
+#[test]
+fn inferred_but_unported_reader_drivers_fail_cleanly() {
+    let options = Options::new();
+    for (filename, driver) in [
+        ("scene.slpk", "readers.slpk"),
+        ("service.i3s", "readers.i3s"),
+        ("scan.e57", "readers.e57"),
+    ] {
+        assert_eq!(infer_reader_driver(filename), Some(driver));
+        let err = match create_reader(driver, &options) {
+            Ok(_) => panic!("{driver} should not construct yet"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string()
+                .contains("is not available in the Rust port"),
+            "{driver} should report a Rust-port availability error, got {err}"
+        );
+    }
+}
+
+#[test]
+fn inferred_but_unported_writer_drivers_fail_cleanly() {
+    let options = Options::new();
+    for (filename, driver) in [
+        ("out.e57", "writers.e57"),
+        ("out.drc", "writers.draco"),
+        ("out.mat", "writers.matlab"),
+        ("out.parquet", "writers.arrow"),
+    ] {
+        assert_eq!(infer_writer_driver(filename), Some(driver));
+        let err = match create_writer(driver, &options) {
+            Ok(_) => panic!("{driver} should not construct yet"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string()
+                .contains("is not available in the Rust port"),
+            "{driver} should report a Rust-port availability error, got {err}"
+        );
+    }
 }
 
 #[test]
