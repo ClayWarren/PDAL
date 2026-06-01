@@ -519,19 +519,23 @@ pub(super) fn item_matches_bounds(item: &Value, bounds: &Bounds2D) -> bool {
     let Some(bbox) = item["bbox"].as_array() else {
         return false;
     };
-    if bbox.len() < 4 {
-        return false;
-    }
-    let Some(item_minx) = bbox[0].as_f64() else {
-        return false;
-    };
-    let Some(item_miny) = bbox[1].as_f64() else {
+    let Some((minx_idx, miny_idx, maxx_idx, maxy_idx)) = (match bbox.len() {
+        4 => Some((0, 1, 2, 3)),
+        6 => Some((0, 1, 3, 4)),
+        _ => None,
+    }) else {
         return false;
     };
-    let Some(item_maxx) = bbox[2].as_f64() else {
+    let Some(item_minx) = bbox[minx_idx].as_f64() else {
         return false;
     };
-    let Some(item_maxy) = bbox[3].as_f64() else {
+    let Some(item_miny) = bbox[miny_idx].as_f64() else {
+        return false;
+    };
+    let Some(item_maxx) = bbox[maxx_idx].as_f64() else {
+        return false;
+    };
+    let Some(item_maxy) = bbox[maxy_idx].as_f64() else {
         return false;
     };
     item_minx <= bounds.maxx

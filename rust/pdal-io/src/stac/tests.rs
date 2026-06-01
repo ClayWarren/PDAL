@@ -717,6 +717,15 @@ fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
             maxy: 3.0
         }
     ));
+    assert!(item_matches_bounds(
+        &serde_json::json!({"bbox":[0.0, 0.0, -100.0, 2.0, 2.0, 100.0]}),
+        &Bounds2D {
+            minx: 1.0,
+            maxx: 3.0,
+            miny: 1.0,
+            maxy: 3.0
+        }
+    ));
     assert!(!item_matches_bounds(
         &serde_json::json!({"bbox":[0.0]}),
         &bounds
