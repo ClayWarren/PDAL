@@ -34,6 +34,10 @@
 
 #include "FauxPluginKernel.hpp"
 
+#include <rust/pdal-capi/include/pdal_capi.h>
+
+#include <vector>
+
 namespace pdal
 {
 
@@ -49,8 +53,10 @@ std::string FauxPluginKernel::getName() const
 
 int FauxPluginKernel::execute()
 {
-    m_log->get(LogLevel::Info) << "FauxPluginKernel running.\n";
-    return 0;
+    std::string fakeArg = std::to_string(m_fakeArg);
+    std::vector<const char*> argv{fakeArg.c_str()};
+    return pdal_rust_kernel_run("fauxplugin", static_cast<int>(argv.size()),
+                                argv.data());
 }
 
 void FauxPluginKernel::addSwitches(ProgramArgs& args)

@@ -40,6 +40,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 import csv
 import io
 import subprocess
@@ -79,6 +80,10 @@ NATIVE_ADAPTER_PREFIXES = (
     "io/private/esri/",
     "io/private/stac/",
     "pdal/private/gdal/",
+    # Bundled third-party library used by the optional E57 plugin. Treat it
+    # like vendor/native dependency code, not PDAL implementation to port
+    # line-by-line.
+    "plugins/e57/libE57Format/",
 )
 
 NATIVE_ADAPTER_FILES = {
@@ -209,6 +214,8 @@ TEST_MARKER = "pdal_test_main.hpp"
 def is_in_tree_test(path: str) -> bool:
     if path == "pdal/pdal_test_main.hpp":
         return True
+    if path.startswith("plugins/") and "/test/" in path:
+        return True
     try:
         return TEST_MARKER in Path(path).read_text(errors="replace")
     except OSError:
@@ -317,6 +324,11 @@ def area_of(path: str) -> str:
     return path.split("/", 1)[0]
 
 
+def plugin_of(path: str) -> str:
+    parts = path.split("/")
+    return parts[1] if len(parts) > 1 and parts[0] == "plugins" else ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--area", help="Restrict the ranked list to one area (e.g. io)")
@@ -370,6 +382,39 @@ def main() -> int:
     pc = summary.get("port-candidate", {})
     for area in sorted(pc, key=lambda a: pc[a][0], reverse=True):
         print(f"  {area:<10}{pc[area][0]:>8} LOC  ({pc[area][1]} files)")
+
+    if args.include_plugins:
+        plugin_rows: dict[str, dict[str, list[int]]] = defaultdict(
+            lambda: defaultdict(lambda: [0, 0])
+        )
+        for path in files:
+            plugin = plugin_of(path)
+            if not plugin:
+                continue
+            cat = file_category[path]
+            plugin_rows[plugin][cat][0] += loc.get(path, 0)
+            plugin_rows[plugin][cat][1] += 1
+
+        print()
+        print("Plugin backlog by plugin:")
+        print(
+            f"{'plugin':<18}{'port':>11}{'abi':>11}{'native':>11}{'holdout':>11}"
+        )
+        for plugin in sorted(
+            plugin_rows,
+            key=lambda name: plugin_rows[name]["port-candidate"][0],
+            reverse=True,
+        ):
+            row = plugin_rows[plugin]
+
+            def cell(cat: str) -> str:
+                return f"{row[cat][0]}/{row[cat][1]}"
+
+            print(
+                f"{plugin:<18}{cell('port-candidate'):>11}"
+                f"{cell('c-abi-backed'):>11}{cell('native-adapter'):>11}"
+                f"{cell('holdout'):>11}"
+            )
 
     print()
     label = args.show

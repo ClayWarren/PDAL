@@ -95,13 +95,29 @@ Do not start a broad plugin sweep until local core, I/O, and command parity are
 farther along. One-off checkpoints are allowed when they prove a dependency or
 ABI pattern without forcing a plugin SDK decision.
 
+Plugin backlog is now measurable with:
+
+```sh
+python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40
+```
+
+Current plugin snapshot, excluding plugin tests and treating bundled
+`plugins/e57/libE57Format` as native/vendor adapter code rather than PDAL
+implementation to port line-by-line: `12,001` port-candidate LOC across `93`
+files. After closing `plugins/faux`, this is `11,967` port-candidate LOC across
+`91` files. The largest plugin backlogs are `tiledb` (`1,636` LOC), `nitf` (`1,253`
+LOC plus `322` C ABI-backed LOC already), `e57` (`1,249` PDAL-wrapper LOC plus
+`15,679` bundled native/vendor LOC), `arrow` (`1,245` LOC), and `trajectory`
+(`1,096` LOC). This is the next big optional bucket, but it should move
+plugin-by-plugin with explicit native dependency decisions.
+
 | Plugin | Status | Notes |
 |---|---|---|
 | `plugins/arrow` | deferred | Arrow/Parquet integration waits on the native/vendor and columnar data strategy. |
 | `plugins/cpd` | deferred | Registration filter plugin; wait for the broader registration and linear-algebra strategy. |
 | `plugins/draco` | deferred | Draco mesh/point-cloud codec integration waits on a codec FFI or replacement decision. |
 | `plugins/e57` | deferred | E57 reader/writer is a major external-format plugin and waits on broader I/O parity. |
-| `plugins/faux` | prototype | `kernels.fauxplugin` is ported as a compatibility marker to prove plugin command discovery. |
+| `plugins/faux` | done | `kernels.fauxplugin` is a thin C++ plugin shell over the Rust C ABI kernel runner; plugin command discovery and the existing app plugin load test pass through Rust. |
 | `plugins/hdf` | deferred | HDF integration waits on native dependency and multidimensional-array I/O strategy. |
 | `plugins/icebridge` | deferred | Domain reader plugin; wait until core first-party readers are farther along. |
 | `plugins/matlab` | deferred | MATLAB reader/filter integration waits on external-runtime and plugin-loading strategy. |
