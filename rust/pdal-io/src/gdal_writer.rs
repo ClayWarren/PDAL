@@ -30,6 +30,7 @@ pub struct GdalWriter {
     output_type_error: Option<String>,
     dimension: DimId,
     data_type: OutputDataType,
+    data_type_error: Option<String>,
     resolution: f64,
     radius: Option<f64>,
     power: f64,
@@ -37,6 +38,7 @@ pub struct GdalWriter {
     binmode: bool,
     window_size: usize,
     allow_empty: bool,
+    bounds: String,
     fixed_grid: Option<FixedGrid>,
     fixed_grid_arg_count: usize,
     metadata: Vec<(String, String)>,
@@ -71,13 +73,16 @@ impl GdalWriter {
     pub fn new(options: &Options) -> Self {
         let resolution = options.get_f64("resolution", 1.0);
         let (output_types, output_type_error) = output_types(options);
+        let (data_type, data_type_error) =
+            parse_data_type(&options.get_str("data_type", "float64"));
         Self {
             filename: options.get_str("filename", ""),
             driver_name: options.get_str("gdaldriver", "GTiff"),
             output_types,
             output_type_error,
             dimension: DimId::from_name(&options.get_str("dimension", "Z")),
-            data_type: parse_data_type(&options.get_str("data_type", "float64")),
+            data_type,
+            data_type_error,
             resolution,
             radius: options
                 .has("radius")
@@ -87,6 +92,7 @@ impl GdalWriter {
             binmode: options.get_bool("binmode", false),
             window_size: options.get_u64("window_size", 0) as usize,
             allow_empty: options.get_bool("allow_empty", false),
+            bounds: options.get_str("bounds", ""),
             fixed_grid: fixed_grid(options),
             fixed_grid_arg_count: fixed_grid_arg_count(options),
             metadata: parse_metadata(options),
@@ -115,10 +121,18 @@ impl Writer for GdalWriter {
         if let Some(error) = &self.output_type_error {
             return Err(StageError(error.clone()));
         }
+        if let Some(error) = &self.data_type_error {
+            return Err(StageError(error.clone()));
+        }
         if self.fixed_grid_arg_count != 0 && self.fixed_grid_arg_count != 4 {
             return Err(StageError(
                 "Must specify all or none of 'origin_x', 'origin_y', 'width' and 'height'."
                     .to_string(),
+            ));
+        }
+        if !self.bounds.is_empty() && self.fixed_grid_arg_count != 0 {
+            return Err(StageError(
+                "Specify either 'bounds' or 'origin_x'/'origin_y'/'width'/'height' options -- not both".to_string(),
             ));
         }
         if self.output_types.iter().any(is_percentile) && !self.binmode {
@@ -126,6 +140,7 @@ impl Writer for GdalWriter {
                 "Can't output percentiles without 'binmode=true'.".to_string(),
             ));
         }
+        validate_srs_options(&self.override_srs, &self.default_srs)?;
 
         let samples = collect_samples(views, &self.dimension)?;
         if samples.is_empty() && !self.allow_empty {
@@ -134,9 +149,11 @@ impl Writer for GdalWriter {
             ));
         }
 
-        let Some(grid) = self
-            .fixed_grid
-            .or_else(|| grid_from_samples(&samples, self.resolution))
+        let configured_grid = match self.fixed_grid {
+            Some(grid) => Some(grid),
+            None => grid_from_bounds(&self.bounds, self.resolution)?,
+        };
+        let Some(grid) = configured_grid.or_else(|| grid_from_samples(&samples, self.resolution))
         else {
             return Ok(());
         };
@@ -228,10 +245,16 @@ impl Writer for GdalWriter {
     }
 }
 
-fn parse_data_type(value: &str) -> OutputDataType {
+fn parse_data_type(value: &str) -> (OutputDataType, Option<String>) {
     match value.to_ascii_lowercase().as_str() {
-        "int32" | "int32_t" | "signed32" | "int" => OutputDataType::Int32,
-        _ => OutputDataType::Float64,
+        "double" | "float64" => (OutputDataType::Float64, None),
+        "int32" | "int32_t" | "signed32" | "int" => (OutputDataType::Int32, None),
+        _ => (
+            OutputDataType::Float64,
+            Some(format!(
+                "Unsupported GDAL writer data_type '{value}' for the Rust-backed path."
+            )),
+        ),
     }
 }
 
@@ -295,6 +318,22 @@ fn grid_from_samples(samples: &[Sample], resolution: f64) -> Option<FixedGrid> {
         width: ((bounds.maxx - bounds.minx) / resolution).floor() as usize + 1,
         height: ((bounds.maxy - bounds.miny) / resolution).floor() as usize + 1,
     })
+}
+
+fn grid_from_bounds(bounds: &str, resolution: f64) -> Result<Option<FixedGrid>, StageError> {
+    if bounds.is_empty() {
+        return Ok(None);
+    }
+
+    let bounds = pdal_core::bounds::parse_bounds2d(bounds, 0)
+        .map_err(StageError)?
+        .bounds;
+    Ok(Some(FixedGrid {
+        origin_x: bounds.minx,
+        origin_y: bounds.miny,
+        width: ((bounds.maxx - bounds.minx) / resolution).floor() as usize + 1,
+        height: ((bounds.maxy - bounds.miny) / resolution).floor() as usize + 1,
+    }))
 }
 
 fn fixed_grid(options: &Options) -> Option<FixedGrid> {
@@ -607,6 +646,15 @@ fn resolve_srs(views: &[PointView], override_srs: &str, default_srs: &str) -> St
     srs
 }
 
+fn validate_srs_options(override_srs: &str, default_srs: &str) -> Result<(), StageError> {
+    if !override_srs.is_empty() && !default_srs.is_empty() {
+        return Err(StageError(
+            "Can't set both 'override_srs' and 'default_srs'.".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn parse_metadata(options: &Options) -> Vec<(String, String)> {
     let spec = options.get_str("metadata", "");
     if spec.is_empty() {
@@ -647,6 +695,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_conflicting_srs_options() {
+        let err = validate_srs_options("EPSG:4326", "EPSG:2030").unwrap_err();
+        assert!(err.0.contains("override_srs"));
+
+        assert!(validate_srs_options("EPSG:4326", "").is_ok());
+        assert!(validate_srs_options("", "EPSG:2030").is_ok());
+        assert!(validate_srs_options("", "").is_ok());
+    }
+
+    #[test]
     fn parses_output_types_and_percentiles() {
         let mut options = Options::new();
         options.add("output_type", "min,p50,count");
@@ -673,6 +731,33 @@ mod tests {
         let grid = fixed_grid(&options).unwrap();
         assert_eq!(grid.width, 3);
         assert_eq!(grid.height, 4);
+    }
+
+    #[test]
+    fn bounds_option_defines_grid_shape() {
+        let grid = grid_from_bounds("([0, 4.5],[0, 4.5])", 1.0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(grid.origin_x, 0.0);
+        assert_eq!(grid.origin_y, 0.0);
+        assert_eq!(grid.width, 5);
+        assert_eq!(grid.height, 5);
+    }
+
+    #[test]
+    fn writer_rejects_bounds_with_alternate_grid() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        options.add("bounds", "([0, 1],[0, 1])");
+        options.add("origin_x", 0.0);
+        options.add("origin_y", 0.0);
+        options.add("width", 2);
+        options.add("height", 2);
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let err = writer.write(&[view]).unwrap_err();
+        assert!(err.0.contains("Specify either 'bounds'"));
     }
 
     #[test]
@@ -785,12 +870,13 @@ mod tests {
 
     #[test]
     fn parse_data_type_branches() {
-        assert_eq!(parse_data_type("float64"), OutputDataType::Float64);
-        assert_eq!(parse_data_type("int32"), OutputDataType::Int32);
-        assert_eq!(parse_data_type("int32_t"), OutputDataType::Int32);
-        assert_eq!(parse_data_type("signed32"), OutputDataType::Int32);
-        assert_eq!(parse_data_type("int"), OutputDataType::Int32);
-        assert_eq!(parse_data_type("mystery"), OutputDataType::Float64);
+        assert_eq!(parse_data_type("float64").0, OutputDataType::Float64);
+        assert_eq!(parse_data_type("double").0, OutputDataType::Float64);
+        assert_eq!(parse_data_type("int32").0, OutputDataType::Int32);
+        assert_eq!(parse_data_type("int32_t").0, OutputDataType::Int32);
+        assert_eq!(parse_data_type("signed32").0, OutputDataType::Int32);
+        assert_eq!(parse_data_type("int").0, OutputDataType::Int32);
+        assert!(parse_data_type("mystery").1.is_some());
     }
 
     #[test]
@@ -921,6 +1007,18 @@ mod tests {
         let mut writer = GdalWriter::new(&options);
         let view = make_view_with_points();
         assert!(writer.write(&[view]).is_err());
+    }
+
+    #[test]
+    fn writer_propagates_data_type_error() {
+        let mut options = Options::new();
+        options.add("filename", "/tmp/x.tif");
+        options.add("resolution", 1.0);
+        options.add("data_type", "uint8");
+        let mut writer = GdalWriter::new(&options);
+        let view = make_view_with_points();
+        let err = writer.write(&[view]).unwrap_err();
+        assert!(err.0.contains("Unsupported GDAL writer data_type"));
     }
 
     #[test]
