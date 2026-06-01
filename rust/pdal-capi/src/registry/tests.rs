@@ -312,6 +312,36 @@ fn registry_hag_dem_filter_computes_height_above_raster() {
 }
 
 #[test]
+fn registry_assign_filter_supports_value_expressions() {
+    let mut options = Options::new();
+    options.add("value", "Y = X * 2");
+    options.add("value", "Classification = Y WHERE X >= 5");
+    let mut filter = create_filter("filters.assign", &options).unwrap();
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Classification, DimType::U8);
+    let mut view = PointView::new(Rc::new(layout));
+    for x in [1.0, 5.0, 10.0] {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, x);
+        view.set_f64(idx, &DimId::Classification, 1.0);
+    }
+
+    let output_dims = filter.output_dimensions();
+    assert!(output_dims.contains(&(DimId::Y, DimType::F64)));
+    let views = filter.run(&[view.with_dimensions(&output_dims)]).unwrap();
+
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Y), 2.0);
+    assert_eq!(views[0].get_f64(1, &DimId::Y), 10.0);
+    assert_eq!(views[0].get_f64(2, &DimId::Y), 20.0);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 1.0);
+    assert_eq!(views[0].get_f64(1, &DimId::Classification), 10.0);
+    assert_eq!(views[0].get_f64(2, &DimId::Classification), 20.0);
+}
+
+#[test]
 fn pipeline_json_runs_colorization_against_raster() {
     // Mirrors the C++ ColorizationFilterTest.test1: colorize autzen points from
     // autzen.jpg with "Red, Green,Blue::255" and check point 0 == 210/205/47175

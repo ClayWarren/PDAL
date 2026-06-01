@@ -1,3 +1,4 @@
+use pdal_core::expr::expression::AssignStatement;
 use pdal_core::point::{DimId, PointView};
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -23,6 +24,9 @@ pub struct AssignCondition {
 pub struct AssignFilter {
     pub condition: Option<AssignCondition>,
     pub assignments: Vec<AssignRange>,
+    value_assignments: Vec<AssignStatement>,
+    value_targets: Vec<String>,
+    value_assignments_prepared: bool,
 }
 
 impl AssignFilter {
@@ -30,7 +34,38 @@ impl AssignFilter {
         Self {
             condition,
             assignments,
+            value_assignments: Vec::new(),
+            value_targets: Vec::new(),
+            value_assignments_prepared: true,
         }
+    }
+
+    pub fn with_value_expressions(
+        condition: Option<AssignCondition>,
+        assignments: Vec<AssignRange>,
+        expressions: &[String],
+    ) -> Result<Self, StageError> {
+        let mut value_assignments = Vec::new();
+        let mut value_targets = Vec::new();
+        for expression in expressions {
+            let statement = AssignStatement::parse(expression)
+                .map_err(|err| StageError(format!("filters.assign: {err}")))?;
+            let target = statement.ident().name();
+            if target.is_empty() {
+                return Err(StageError(
+                    "filters.assign: assignment target dimension is empty.".to_string(),
+                ));
+            }
+            value_targets.push(target);
+            value_assignments.push(statement);
+        }
+        Ok(Self {
+            condition,
+            assignments,
+            value_assignments,
+            value_targets,
+            value_assignments_prepared: expressions.is_empty(),
+        })
     }
 
     pub fn value_passes(
@@ -52,6 +87,19 @@ impl AssignFilter {
             fail = !fail;
         }
         !fail
+    }
+
+    fn prepare_value_assignments(&mut self, view: &PointView) -> Result<(), StageError> {
+        if self.value_assignments_prepared {
+            return Ok(());
+        }
+        for statement in &mut self.value_assignments {
+            statement
+                .prepare(view.layout().as_ref())
+                .map_err(|err| StageError(format!("filters.assign: {err}")))?;
+        }
+        self.value_assignments_prepared = true;
+        Ok(())
     }
 
     pub fn assign_point(&self, view: &mut PointView, idx: u64) {
@@ -84,6 +132,15 @@ impl AssignFilter {
                 view.set_f64(idx, &dim, r.value);
             }
         }
+
+        for statement in &self.value_assignments {
+            if !statement.condition().eval(view, idx) {
+                continue;
+            }
+            if let Some(dim) = statement.ident().dim() {
+                view.set_f64(idx, &dim, statement.value().eval(view, idx));
+            }
+        }
     }
 }
 
@@ -97,6 +154,7 @@ impl Filter for AssignFilter {
     }
 
     fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+        self.prepare_value_assignments(view)?;
         let size = view.len();
         let mut output = PointView::new(view.layout().clone());
         for i in 0..size {
@@ -107,11 +165,19 @@ impl Filter for AssignFilter {
         Ok(vec![output])
     }
 
+    fn output_dimensions(&self) -> Vec<(DimId, pdal_core::point::DimType)> {
+        self.value_targets
+            .iter()
+            .map(|name| (DimId::from_name(name), pdal_core::point::DimType::F64))
+            .collect()
+    }
+
     fn streamable(&self) -> bool {
-        true
+        self.value_assignments.is_empty()
     }
 
     fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        self.prepare_value_assignments(chunk)?;
         // Same per-point assignment as `run_one`; assign keeps every point.
         for idx in 0..chunk.len() {
             self.assign_point(chunk, idx);
@@ -220,6 +286,43 @@ mod tests {
             );
             assert_eq!(chunk.get_f64(i, &DimId::X), standard.get_f64(i, &DimId::X));
         }
+    }
+
+    #[test]
+    fn value_expressions_assign_in_order_and_prepare_new_dimensions() {
+        let mut filter = AssignFilter::with_value_expressions(
+            None,
+            Vec::new(),
+            &[
+                "Y = X * 2".to_string(),
+                "Classification = Y WHERE X >= 5".to_string(),
+            ],
+        )
+        .unwrap();
+        let input = view(&[1.0, 5.0, 10.0]).with_dimensions(&filter.output_dimensions());
+
+        let output = filter.run_one(&input).unwrap().remove(0);
+
+        assert_eq!(output.get_f64(0, &DimId::Y), 2.0);
+        assert_eq!(output.get_f64(1, &DimId::Y), 10.0);
+        assert_eq!(output.get_f64(2, &DimId::Y), 20.0);
+        assert_eq!(output.get_f64(0, &DimId::Classification), 1.0);
+        assert_eq!(output.get_f64(1, &DimId::Classification), 10.0);
+        assert_eq!(output.get_f64(2, &DimId::Classification), 20.0);
+    }
+
+    #[test]
+    fn value_expression_parse_errors_are_reported() {
+        let err = match AssignFilter::with_value_expressions(
+            None,
+            Vec::new(),
+            &["X = 1 garbage".to_string()],
+        ) {
+            Ok(_) => panic!("expected parse error"),
+            Err(err) => err,
+        };
+
+        assert!(err.0.contains("filters.assign"));
     }
 
     #[test]

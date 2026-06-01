@@ -520,16 +520,6 @@ pub fn create_filter(
             ),
         ))),
         "filters.assign" => {
-            // The expression-based `value` option needs the full assign-statement
-            // parser, which is not yet ported; reject it explicitly rather than
-            // silently ignore it.
-            if !options.values("value").is_empty() {
-                return Err(StageError(
-                    "filters.assign: the expression-based 'value' option is not \
-                     supported in the Rust pipeline registry."
-                        .to_string(),
-                ));
-            }
             let assignments = options
                 .values("assignment")
                 .iter()
@@ -543,15 +533,18 @@ pub fn create_filter(
                 ref c if c.trim().is_empty() => None,
                 c => Some(parse_assign_condition(c.trim()).map_err(StageError)?),
             };
-            if assignments.is_empty() && condition.is_none() {
+            let values = options.values("value").to_vec();
+            if assignments.is_empty() && condition.is_none() && values.is_empty() {
                 return Err(StageError(
                     "filters.assign: no 'assignment' provided.".to_string(),
                 ));
             }
-            Ok(Box::new(FilterWrapper::new(AssignFilter::new(
-                condition,
-                assignments,
-            ))))
+            let filter = if values.is_empty() {
+                AssignFilter::new(condition, assignments)
+            } else {
+                AssignFilter::with_value_expressions(condition, assignments, &values)?
+            };
+            Ok(Box::new(FilterWrapper::new(filter)))
         }
         "filters.outlier" => Ok(Box::new(FilterWrapper::new(OutlierFilter::new(
             options.get_str("method", "statistical"),
