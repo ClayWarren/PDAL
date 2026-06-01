@@ -3,11 +3,10 @@ use crate::pipeline_abi::{
 };
 use crate::registry::pipeline_from_json;
 use chrono::NaiveDate;
-use pdal_core::driver::infer_reader_driver;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::point::{DimId, DimType, PointId, PointView};
+use pdal_kernels::{build_info_plan, InfoKernelPlan, InfoMode, InfoRunPlan, QueryRequest};
 use std::ffi::CStr;
-use std::io::Read;
 use std::os::raw::c_char;
 use std::path::Path;
 
@@ -15,237 +14,31 @@ mod command;
 
 pub(in crate::kernel_abi) use command::run_pipeline_kernel;
 
-// Flat CLI-argument dispatcher for `kernels.info`; the long but linear option
-// table is clearer as one match than split across helpers, matching the
-// `run_ground_kernel` arg-parser convention.
-#[allow(clippy::cognitive_complexity)]
 pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
         Err(code) => return code,
     };
 
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.info: Missing value for positional argument 'input'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal info --summary <file>");
-        return 0;
-    }
-
-    let mut filename = None;
-    let mut driver_override = None;
-    let mut mode = InfoMode::Summary;
-    let mut pc_type = "lidar".to_string();
-    let mut serialization_file = None;
-    let mut read_stdin = false;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--summary" {
-            mode = InfoMode::Summary;
-        } else if arg == "--stats" {
-            mode = InfoMode::Stats {
-                dimensions: None,
-                enumerate: None,
-                breakout: None,
-            };
-        } else if arg == "--schema" {
-            mode = InfoMode::Schema;
-        } else if arg == "--metadata" {
-            mode = InfoMode::Metadata;
-        } else if arg == "--all" {
-            mode = InfoMode::All;
-        } else if arg == "--boundary" {
-            mode = InfoMode::Boundary;
-        } else if arg == "--stac" {
-            mode = InfoMode::Stac;
-        } else if arg == "-p" || arg == "--point" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
-                return 1;
-            };
-            let Some(point_ids) = parse_point_spec(value) else {
-                return -1;
-            };
-            mode = InfoMode::Points(point_ids);
-        } else if let Some(value) = arg.strip_prefix("-p=") {
-            let Some(point_ids) = parse_point_spec(value) else {
-                return -1;
-            };
-            mode = InfoMode::Points(point_ids);
-        } else if let Some(value) = arg.strip_prefix("--point=") {
-            let Some(point_ids) = parse_point_spec(value) else {
-                return -1;
-            };
-            mode = InfoMode::Points(point_ids);
-        } else if arg == "--query" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--query'.");
-                return 1;
-            };
-            let Some(query) = parse_query(value) else {
-                return -1;
-            };
-            mode = InfoMode::Query(query);
-        } else if let Some(value) = arg.strip_prefix("--query=") {
-            let Some(query) = parse_query(value) else {
-                return -1;
-            };
-            mode = InfoMode::Query(query);
-        } else if arg == "--dimensions" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--dimensions'.");
-                return 1;
-            };
-            mode = InfoMode::Stats {
-                dimensions: Some(parse_dimension_list(value)),
-                enumerate: match mode.clone() {
-                    InfoMode::Stats { enumerate, .. } => enumerate,
-                    _ => None,
-                },
-                breakout: match mode.clone() {
-                    InfoMode::Stats { breakout, .. } => breakout,
-                    _ => None,
-                },
-            };
-        } else if let Some(value) = arg.strip_prefix("--dimensions=") {
-            mode = InfoMode::Stats {
-                dimensions: Some(parse_dimension_list(value)),
-                enumerate: match mode.clone() {
-                    InfoMode::Stats { enumerate, .. } => enumerate,
-                    _ => None,
-                },
-                breakout: match mode.clone() {
-                    InfoMode::Stats { breakout, .. } => breakout,
-                    _ => None,
-                },
-            };
-        } else if arg == "--enumerate" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--enumerate'.");
-                return 1;
-            };
-            mode = InfoMode::Stats {
-                dimensions: match mode.clone() {
-                    InfoMode::Stats { dimensions, .. } => dimensions,
-                    _ => None,
-                },
-                enumerate: Some(parse_dimension_list(value)),
-                breakout: match mode.clone() {
-                    InfoMode::Stats { breakout, .. } => breakout,
-                    _ => None,
-                },
-            };
-        } else if let Some(value) = arg.strip_prefix("--enumerate=") {
-            mode = InfoMode::Stats {
-                dimensions: match mode.clone() {
-                    InfoMode::Stats { dimensions, .. } => dimensions,
-                    _ => None,
-                },
-                enumerate: Some(parse_dimension_list(value)),
-                breakout: match mode.clone() {
-                    InfoMode::Stats { breakout, .. } => breakout,
-                    _ => None,
-                },
-            };
-        } else if arg == "--breakout" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--breakout'.");
-                return 1;
-            };
-            mode = InfoMode::Stats {
-                dimensions: match mode.clone() {
-                    InfoMode::Stats { dimensions, .. } => dimensions,
-                    _ => None,
-                },
-                enumerate: match mode.clone() {
-                    InfoMode::Stats { enumerate, .. } => enumerate,
-                    _ => None,
-                },
-                breakout: Some(DimId::from_name(value)),
-            };
-        } else if let Some(value) = arg.strip_prefix("--breakout=") {
-            mode = InfoMode::Stats {
-                dimensions: match mode.clone() {
-                    InfoMode::Stats { dimensions, .. } => dimensions,
-                    _ => None,
-                },
-                enumerate: match mode.clone() {
-                    InfoMode::Stats { enumerate, .. } => enumerate,
-                    _ => None,
-                },
-                breakout: Some(DimId::from_name(value)),
-            };
-        } else if arg == "--pc_type" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--pc_type'.");
-                return 1;
-            };
-            pc_type = value.clone();
-        } else if let Some(value) = arg.strip_prefix("--pc_type=") {
-            pc_type = value.to_string();
-        } else if arg == "--pipeline-serialization" {
-            let Some(path) = iter.next() else {
-                eprintln!(
-                    "PDAL: kernels.info: Missing value for option '--pipeline-serialization'."
-                );
-                return 1;
-            };
-            serialization_file = Some(path.clone());
-        } else if let Some(path) = arg.strip_prefix("--pipeline-serialization=") {
-            serialization_file = Some(path.to_string());
-        } else if arg == "--driver" {
-            let Some(driver) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '--driver'.");
-                return 1;
-            };
-            driver_override = Some(driver.clone());
-        } else if let Some(driver) = arg.strip_prefix("--driver=") {
-            driver_override = Some(driver.to_string());
-        } else if arg == "--stdin" || arg == "-s" {
-            read_stdin = true;
-        } else if arg == "--input" || arg == "-i" {
-            let Some(input) = iter.next() else {
-                eprintln!("PDAL: kernels.info: Missing value for option '{arg}'.");
-                return 1;
-            };
-            if filename.replace(input.clone()).is_some() {
-                eprintln!("PDAL: kernels.info: Expected exactly one input file.");
-                return 1;
-            }
-        } else if arg.starts_with("--") {
-            return -1;
-        } else if filename.replace(arg.clone()).is_some() {
-            eprintln!("PDAL: kernels.info: Expected exactly one input file.");
-            return 1;
-        }
-    }
-
-    if read_stdin && filename.is_some() {
-        eprintln!("PDAL: kernels.info: Expected either --stdin or an input filename, not both.");
-        return 1;
-    }
-
-    if read_stdin {
-        let mut json = String::new();
-        if let Err(err) = std::io::stdin().read_to_string(&mut json) {
-            eprintln!("PDAL: kernels.info: Unable to read pipeline from stdin: {err}");
-            return 1;
-        }
-        return run_info_pipeline_json(&json, mode, &pc_type, serialization_file);
-    }
-
-    let Some(filename) = filename else {
-        eprintln!("PDAL: kernels.info: Missing value for positional argument 'input'.");
-        return 1;
+    let plan = match build_info_plan(&args) {
+        InfoKernelPlan::Run(plan) => plan,
+        InfoKernelPlan::Return(code) => return code,
     };
-    let Some(driver) =
-        driver_override.or_else(|| infer_reader_driver(&filename).map(str::to_string))
-    else {
-        eprintln!("PDAL: kernels.info: Unable to infer reader driver for '{filename}'.");
-        return 1;
+
+    let (filename, driver, mode, pc_type, serialization_file) = match plan {
+        InfoRunPlan::PipelineJson {
+            json,
+            mode,
+            pc_type,
+            serialization_file,
+        } => return run_info_pipeline_json(&json, mode, &pc_type, serialization_file),
+        InfoRunPlan::File {
+            filename,
+            driver,
+            mode,
+            pc_type,
+            serialization_file,
+        } => (filename, driver, mode, pc_type, serialization_file),
     };
 
     if let Some(path) = serialization_file {
@@ -422,37 +215,6 @@ fn append_info_stage_to_pipeline_json(
     serde_json::to_string(&value).map_err(|err| err.to_string())
 }
 
-#[derive(Clone)]
-enum InfoMode {
-    Summary,
-    Stats {
-        dimensions: Option<Vec<DimId>>,
-        enumerate: Option<Vec<DimId>>,
-        breakout: Option<DimId>,
-    },
-    Schema,
-    Metadata,
-    All,
-    Boundary,
-    Stac,
-    Points(Vec<PointId>),
-    Query(QueryRequest),
-}
-
-impl InfoMode {
-    fn needs_boundary(&self) -> bool {
-        matches!(self, Self::All | Self::Boundary)
-    }
-}
-
-#[derive(Clone, Copy)]
-struct QueryRequest {
-    x: f64,
-    y: f64,
-    z: Option<f64>,
-    count: usize,
-}
-
 fn info_pipeline(
     driver: &str,
     filename: &str,
@@ -569,15 +331,6 @@ fn metadata_report(metadata: &MetadataNode) -> String {
         "metadata": crate::metadata_abi::metadata_node_to_json_flat(metadata),
     });
     serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
-}
-
-fn parse_dimension_list(value: &str) -> Vec<DimId> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map(DimId::from_name)
-        .collect()
 }
 
 fn stac_report(
@@ -747,41 +500,6 @@ fn point_field_names(view: &PointView) -> Vec<String> {
     }
     names.sort();
     names
-}
-
-fn parse_point_spec(value: &str) -> Option<Vec<PointId>> {
-    let mut ids = Vec::new();
-    for part in value
-        .split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-    {
-        if let Some((start, end)) = part.split_once('-') {
-            let start = start.parse::<PointId>().ok()?;
-            let end = end.parse::<PointId>().ok()?;
-            if end < start {
-                return None;
-            }
-            ids.extend(start..=end);
-        } else {
-            ids.push(part.parse::<PointId>().ok()?);
-        }
-    }
-    (!ids.is_empty()).then_some(ids)
-}
-
-fn parse_query(value: &str) -> Option<QueryRequest> {
-    let (coords, count) = value.split_once('/')?;
-    let parts: Vec<&str> = coords.split(',').collect();
-    if !(2..=3).contains(&parts.len()) {
-        return None;
-    }
-    Some(QueryRequest {
-        x: parts[0].parse().ok()?,
-        y: parts[1].parse().ok()?,
-        z: parts.get(2).map(|z| z.parse()).transpose().ok()?,
-        count: count.parse().ok()?,
-    })
 }
 
 fn schema_report(views: &[PointView]) -> String {
