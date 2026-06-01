@@ -5,6 +5,7 @@ use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
+use std::io::{BufRead, BufReader};
 use std::rc::Rc;
 
 /// Text reader for simple numeric delimited files.
@@ -14,6 +15,16 @@ pub struct TextReader {
     header: Option<String>,
     skip: usize,
     override_srs: String,
+    stream: Option<TextStreamState>,
+}
+
+struct TextStreamState {
+    reader: BufReader<Box<dyn source::ReadSeek>>,
+    dims: Vec<DimId>,
+    layout: Rc<PointLayout>,
+    separator: char,
+    srs: Option<SpatialReference>,
+    eof: bool,
 }
 
 impl TextReader {
@@ -27,6 +38,7 @@ impl TextReader {
             header: (!header.is_empty()).then_some(header),
             skip: options.get_u64("skip", 0) as usize,
             override_srs: options.get_str("override_srs", ""),
+            stream: None,
         }
     }
 
@@ -156,6 +168,75 @@ impl TextReader {
             self.skip + 1
         }
     }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "TextReader requires a filename option.".to_string(),
+            ));
+        }
+
+        let file = source::open_seek(&self.filename)
+            .map_err(|_| StageError(format!("Unable to open text file '{}'.", self.filename)))?;
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+
+        for _ in 0..self.skip {
+            line.clear();
+            if reader
+                .read_line(&mut line)
+                .map_err(|err| StageError(err.to_string()))?
+                == 0
+            {
+                break;
+            }
+        }
+
+        let header = match &self.header {
+            Some(header) => header.clone(),
+            None => {
+                line.clear();
+                if reader
+                    .read_line(&mut line)
+                    .map_err(|err| StageError(err.to_string()))?
+                    == 0
+                {
+                    return Err(StageError(
+                        "Text file is missing a header line.".to_string(),
+                    ));
+                }
+                let header = trim_line_endings(&line).to_string();
+                if !header.chars().any(|c| c.is_alphabetic()) {
+                    eprintln!(
+                        "(readers.text Warning) readers.text: file '{}' doesn't \
+                         appear to contain a header line.",
+                        self.filename
+                    );
+                }
+                header
+            }
+        };
+        let dims = self.parse_header(&header)?;
+
+        let mut layout = PointLayout::new();
+        for dim in &dims {
+            layout.register(dim.clone(), DimType::F64);
+        }
+        let layout = Rc::new(layout);
+        let srs =
+            (!self.override_srs.is_empty()).then(|| SpatialReference::new(&self.override_srs));
+        let separator = self.separator.unwrap_or(' ');
+
+        self.stream = Some(TextStreamState {
+            reader,
+            dims,
+            layout,
+            separator,
+            srs,
+            eof: false,
+        });
+        Ok(())
+    }
 }
 
 impl Reader for TextReader {
@@ -228,6 +309,68 @@ impl Reader for TextReader {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.text")
     }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.eof {
+            return Ok(None);
+        }
+
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        if let Some(srs) = &state.srs {
+            view.set_spatial_reference(srs.clone());
+        }
+
+        let mut line = String::new();
+        while view.len() < capacity.max(1) as u64 {
+            line.clear();
+            if state
+                .reader
+                .read_line(&mut line)
+                .map_err(|err| StageError(err.to_string()))?
+                == 0
+            {
+                state.eof = true;
+                break;
+            }
+            let line = trim_line_endings(&line);
+            if line.is_empty() {
+                continue;
+            }
+
+            let fields = split_fields(line, state.separator);
+            if fields.len() != state.dims.len() {
+                continue;
+            }
+
+            let point = view.add_point();
+            for (field, dim) in fields.iter().zip(&state.dims) {
+                let value = field.trim().parse::<f64>().unwrap_or(0.0);
+                view.set_f64(point, dim, value);
+            }
+        }
+
+        if view.len() == 0 && state.eof {
+            Ok(None)
+        } else {
+            Ok(Some(view))
+        }
+    }
+}
+
+fn trim_line_endings(line: &str) -> &str {
+    line.trim_end_matches(['\r', '\n'])
 }
 
 fn split_fields(line: &str, separator: char) -> Vec<String> {
@@ -276,6 +419,9 @@ fn skip_ascii_whitespace(bytes: &[u8], pos: &mut usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::text_writer::TextWriter;
+    use pdal_core::pipeline::{FilterWrapper, Pipeline};
+    use pdal_filters::range::{RangeFilter, RangeLimit};
     use std::path::Path;
 
     fn data_path(path: &str) -> String {
@@ -292,6 +438,13 @@ mod tests {
         let mut views = reader.read().unwrap();
         assert_eq!(views.len(), 1);
         views.pop().unwrap()
+    }
+
+    fn temp_path(name: &str) -> String {
+        let path =
+            std::env::temp_dir().join(format!("pdal-rust-text-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        path.display().to_string()
     }
 
     #[test]
@@ -314,6 +467,94 @@ mod tests {
         assert_eq!(view.len(), 10);
         assert_eq!(view.get_f64(0, &DimId::X), 289814.15);
         assert_eq!(view.get_f64(9, &DimId::Y), 4320980.59);
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("text/utm17_1.txt"));
+
+        let mut full_reader = TextReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = TextReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(4).unwrap().unwrap();
+        let second = stream_reader.stream_next(4).unwrap().unwrap();
+        let third = stream_reader.stream_next(4).unwrap().unwrap();
+        assert!(stream_reader.stream_next(4).unwrap().is_none());
+
+        assert_eq!(first.len(), 4);
+        assert_eq!(second.len(), 4);
+        assert_eq!(third.len(), 2);
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(second.get_f64(0, &DimId::X), full.get_f64(4, &DimId::X));
+        assert_eq!(third.get_f64(1, &DimId::Z), full.get_f64(9, &DimId::Z));
+    }
+
+    #[test]
+    fn streaming_honors_override_header_skip_and_srs() {
+        let mut options = Options::new();
+        options
+            .add("filename", data_path("text/crlf_test.txt"))
+            .add("skip", 1)
+            .add("header", "A,B,C,G")
+            .add("override_srs", "EPSG:2029");
+        let mut reader = TextReader::new(&options);
+
+        let first = reader.stream_next(3).unwrap().unwrap();
+        assert_eq!(first.len(), 3);
+        assert_eq!(first.spatial_reference().wkt(), "EPSG:2029");
+        assert_eq!(first.get_f64(0, &DimId::Other("A".to_string())), 289814.15);
+        assert_eq!(first.get_f64(2, &DimId::Other("G".to_string())), 2.0);
+    }
+
+    #[test]
+    fn pipeline_streams_text_reader_to_csv_writer() {
+        let output = temp_path("stream-pipeline.csv");
+        let mut reader_options = Options::new();
+        reader_options.add("filename", data_path("text/utm17_1.txt"));
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 289814.0,
+            upper_bound: 289815.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("order", "X,Y,Z")
+            .add("quote_header", false)
+            .add("precision", 2);
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.text",
+            Box::new(TextReader::new(&reader_options)),
+            reader_options,
+        );
+        let filter = pipeline.add_stage(
+            "filters.range",
+            Box::new(FilterWrapper::new(RangeFilter::new(limits))),
+            Options::new(),
+        );
+        let writer = pipeline.add_writer(
+            "writers.text",
+            Box::new(TextWriter::new(&writer_options)),
+            writer_options,
+        );
+        pipeline.add_dependency(filter, reader).unwrap();
+        pipeline.add_dependency(writer, filter).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(2));
+        let written = std::fs::read_to_string(&output).unwrap();
+        let _ = std::fs::remove_file(output);
+        let lines: Vec<_> = written.lines().collect();
+        assert_eq!(lines[0], "X,Y,Z");
+        assert_eq!(lines.len(), 3);
+        assert!(lines[1].starts_with("289814.15,4320978.61,170.76"));
     }
 
     #[test]
