@@ -197,13 +197,13 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
 
 | category | LOC | files |
 |---|---:|---:|
-| port-candidate | 678 | 4 |
-| c-abi-backed | 45,311 | 398 |
+| port-candidate | 0 | 0 |
+| c-abi-backed | 45,314 | 398 |
 | native-adapter | 5,905 | 57 |
-| holdout | 6,282 | 62 |
-| total | 58,176 | 521 |
+| holdout | 6,960 | 66 |
+| total | 58,179 | 521 |
 
-Port-candidate backlog by area: `pdal` 678. `io`, `filters`,
+Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
@@ -260,13 +260,14 @@ exported C++ `BufferReader`, private C++ EPT artifact/table/layout adapters
 SDK shells under `pdal/` (point/table handles, reader/writer bases, DB bases,
 dimension/mesh/quick-info/artifact helpers, subcommand shells, and
 `Utils::Random` with its `std::mt19937&` API) are likewise compatibility
-holdouts; the remaining `pdal/` backlog is now `PipelineManager` and the
-deprecated `PipelineExecutor` C++ compatibility surface (678 LOC). Rust owns an
-independent pipeline graph/executor through `pdal_pipeline_*`; the remaining C++
-classes expose mutable `Stage*` manager APIs for existing SDK callers and
-execute C++ `Stage*` objects (which cannot route through Rust without unifying
-the stage model). `PipelineReaderJSON`'s JSON parsing/validation now routes
-through the Rust `pdal_pipeline_reader_parse_json` C ABI
+holdouts. `PipelineManager` and the deprecated `PipelineExecutor` are now also
+tracked as intentional C++ SDK compatibility surfaces rather than portable
+implementation backlog: Rust owns an independent pipeline graph/executor through
+`pdal_pipeline_*`, while these exported C++ classes expose mutable `Stage*`,
+`PointTable`, `PointViewSet`, logging, and manager-reference APIs for existing
+SDK callers and execute C++ `Stage*` objects (which cannot route through Rust
+without unifying the stage model). `PipelineReaderJSON`'s JSON
+parsing/validation now routes through the Rust `pdal_pipeline_reader_parse_json` C ABI
 (`pdal-capi::pipeline_reader_abi`): Rust owns JSONC comment stripping,
 root-structure validation, per-stage `type`/`tag`/`inputs` validation, and
 reader/writer/filter classification, returning a pre-validated descriptor array;
@@ -421,15 +422,15 @@ implementation is replaced, and final completion still requires packaging,
 install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
-C++ tests and vendor, is `1,459` code LOC across `10` files in the main
-first-party surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and
-`tools`). That is still a ceiling, not a precise backlog: mixed files count as
-wrapper when they include the C ABI even if they still contain legacy
-implementation, and intentional C++ holdouts have to be cited before they leave
-the actionable list. Optional `plugins/` add another deferred ceiling of about
-`36,476` code LOC; plugin work should stay separate from the mainline
-implementation-replacement checkpoint until the plugin ABI/support decision is
-made.
+C++ tests and vendor, is `0` code LOC across `0` files in the main first-party
+surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). This
+does not mean the port is complete: mixed wrapper files may still contain legacy
+compatibility behavior, native adapters remain intentionally native, and
+documented holdouts remain C++ until the C++ SDK compatibility surface is no
+longer required or a specific replacement design is approved. Optional
+`plugins/` add another deferred ceiling of about `36,476` code LOC; plugin work
+should stay separate from the mainline implementation-replacement checkpoint
+until the plugin ABI/support decision is made.
 
 Using the same simple nonblank/noncomment line counter, the current first-party
 C++ implementation ceilings by area are approximately:

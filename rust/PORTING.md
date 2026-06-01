@@ -86,7 +86,7 @@ roadmap as permission to sweep a directory.
    it weakens C++ validation, bypasses the C ABI, or lacks parity coverage.
 1. Establish pre-port C++ test parity. **Complete for the current build.**
    The audit baseline is the pre-port C++ GoogleTest set, before local guard
-   tests were added. It currently reports `819 / 819` Rust C ABI-backed cases.
+   tests were added. It currently reports `820 / 820` Rust C ABI-backed cases.
    This proves the compatibility wrapper can satisfy the existing tests, but it
    is not the port finish line.
 2. Convert the parity win into real implementation replacement. **Active.**
@@ -139,7 +139,7 @@ roadmap as permission to sweep a directory.
 
 Current active milestone:
 
-1. Treat `819 / 819` as complete checkpoint evidence, not as completion of the
+1. Treat `820 / 820` as complete checkpoint evidence, not as completion of the
    port.
 2. Work down the compatibility-wrapper surface: where a C++ test now routes
    through Rust, replace any remaining meaningful C++ implementation behind the
