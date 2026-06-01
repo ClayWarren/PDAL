@@ -19,6 +19,14 @@ pub struct QfitReader {
     filename: String,
     flip_coordinates: bool,
     scale_z: f64,
+    stream: Option<QfitStreamState>,
+}
+
+struct QfitStreamState {
+    reader: BufReader<Box<dyn crate::source::ReadSeek>>,
+    layout: Rc<PointLayout>,
+    endian: QfitEndian,
+    word_count: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -33,23 +41,13 @@ impl QfitReader {
             filename: options.get_str("filename", ""),
             flip_coordinates: options.get_bool("flip_coordinates", false),
             scale_z: options.get_f64("scale_z", 0.001), // elevation is mm
+            stream: None,
         }
     }
-}
 
-impl Reader for QfitReader {
-    fn name(&self) -> &str {
-        "readers.qfit"
-    }
-
-    fn read(&mut self) -> Result<Vec<PointView>, StageError> {
-        if self.filename.is_empty() {
-            return Err(StageError(
-                "QfitReader requires a filename option.".to_string(),
-            ));
-        }
-        let mut reader = open_qfit_reader(&self.filename)?;
-
+    fn read_header(
+        reader: &mut BufReader<Box<dyn crate::source::ReadSeek>>,
+    ) -> Result<(QfitEndian, usize), StageError> {
         let first_word = reader
             .read_i32::<LittleEndian>()
             .map_err(|_| StageError("Incomplete QFIT header.".to_string()))?;
@@ -70,12 +68,11 @@ impl Reader for QfitReader {
                 record_size
             )));
         }
-        let word_count = (record_size / 4) as usize;
 
         reader
             .seek(SeekFrom::Start(record_size as u64 + 4))
             .map_err(|_| StageError("Failed to seek to QFIT offset record.".to_string()))?;
-        let offset = read_i32(&mut reader, endian)
+        let offset = read_i32(reader, endian)
             .map_err(|_| StageError("Incomplete QFIT offset record.".to_string()))?;
         if offset < 0 {
             return Err(StageError("Invalid negative QFIT data offset.".to_string()));
@@ -85,6 +82,10 @@ impl Reader for QfitReader {
             .seek(SeekFrom::Start(offset as u64))
             .map_err(|_| StageError("Failed to seek to QFIT data segment.".to_string()))?;
 
+        Ok((endian, (record_size / 4) as usize))
+    }
+
+    fn layout(word_count: usize) -> Rc<PointLayout> {
         let mut layout = PointLayout::new();
         layout.register(DimId::OffsetTime, DimType::F64);
         layout.register(DimId::Y, DimType::F64);
@@ -105,53 +106,141 @@ impl Reader for QfitReader {
             layout.register(DimId::PassiveX, DimType::F64);
             layout.register(DimId::PassiveZ, DimType::F64);
         }
-        // GPS time is discarded as per PDAL behavior.
+        Rc::new(layout)
+    }
 
-        let mut view = PointView::new(Rc::new(layout));
+    fn append_record(
+        view: &mut PointView,
+        reader: &mut BufReader<Box<dyn crate::source::ReadSeek>>,
+        endian: QfitEndian,
+        word_count: usize,
+        flip_coordinates: bool,
+        scale_z: f64,
+    ) -> Result<bool, StageError> {
         let mut buf = vec![0i32; word_count];
-
-        loop {
-            for value in &mut buf {
-                match read_i32(&mut reader, endian) {
-                    Ok(v) => *value = v,
-                    Err(_) => return Ok(vec![view]),
-                }
-            }
-            let id = view.add_point();
-
-            let mut x = buf[2] as f64 / 1_000_000.0;
-            if self.flip_coordinates && x > 180.0 {
-                x -= 360.0;
-            }
-
-            view.set_f64(id, &DimId::OffsetTime, buf[0] as f64);
-            view.set_f64(id, &DimId::Y, buf[1] as f64 / 1_000_000.0);
-            view.set_f64(id, &DimId::X, x);
-            view.set_f64(id, &DimId::Z, buf[3] as f64 * self.scale_z);
-            view.set_f64(id, &DimId::StartPulse, buf[4] as f64);
-            view.set_f64(id, &DimId::ReflectedPulse, buf[5] as f64);
-            view.set_f64(id, &DimId::Azimuth, buf[6] as f64 / 1000.0);
-            view.set_f64(id, &DimId::Pitch, buf[7] as f64 / 1000.0);
-            view.set_f64(id, &DimId::Roll, buf[8] as f64 / 1000.0);
-
-            if word_count == 12 {
-                view.set_f64(id, &DimId::Pdop, buf[10] as f64 / 10.0);
-                view.set_f64(id, &DimId::PulseWidth, buf[11] as f64);
-            } else if word_count == 14 {
-                let mut passive_x = buf[11] as f64 / 1_000_000.0;
-                if self.flip_coordinates && passive_x > 180.0 {
-                    passive_x -= 360.0;
-                }
-                view.set_f64(id, &DimId::PassiveSignal, buf[9] as f64);
-                view.set_f64(id, &DimId::PassiveY, buf[10] as f64 / 1_000_000.0);
-                view.set_f64(id, &DimId::PassiveX, passive_x);
-                view.set_f64(id, &DimId::PassiveZ, buf[12] as f64 * self.scale_z);
+        for value in &mut buf {
+            match read_i32(reader, endian) {
+                Ok(v) => *value = v,
+                Err(_) => return Ok(false),
             }
         }
+
+        let id = view.add_point();
+        let mut x = buf[2] as f64 / 1_000_000.0;
+        if flip_coordinates && x > 180.0 {
+            x -= 360.0;
+        }
+
+        view.set_f64(id, &DimId::OffsetTime, buf[0] as f64);
+        view.set_f64(id, &DimId::Y, buf[1] as f64 / 1_000_000.0);
+        view.set_f64(id, &DimId::X, x);
+        view.set_f64(id, &DimId::Z, buf[3] as f64 * scale_z);
+        view.set_f64(id, &DimId::StartPulse, buf[4] as f64);
+        view.set_f64(id, &DimId::ReflectedPulse, buf[5] as f64);
+        view.set_f64(id, &DimId::Azimuth, buf[6] as f64 / 1000.0);
+        view.set_f64(id, &DimId::Pitch, buf[7] as f64 / 1000.0);
+        view.set_f64(id, &DimId::Roll, buf[8] as f64 / 1000.0);
+
+        if word_count == 12 {
+            view.set_f64(id, &DimId::Pdop, buf[10] as f64 / 10.0);
+            view.set_f64(id, &DimId::PulseWidth, buf[11] as f64);
+        } else if word_count == 14 {
+            let mut passive_x = buf[11] as f64 / 1_000_000.0;
+            if flip_coordinates && passive_x > 180.0 {
+                passive_x -= 360.0;
+            }
+            view.set_f64(id, &DimId::PassiveSignal, buf[9] as f64);
+            view.set_f64(id, &DimId::PassiveY, buf[10] as f64 / 1_000_000.0);
+            view.set_f64(id, &DimId::PassiveX, passive_x);
+            view.set_f64(id, &DimId::PassiveZ, buf[12] as f64 * scale_z);
+        }
+
+        Ok(true)
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "QfitReader requires a filename option.".to_string(),
+            ));
+        }
+        let mut reader = open_qfit_reader(&self.filename)?;
+        let (endian, word_count) = Self::read_header(&mut reader)?;
+        self.stream = Some(QfitStreamState {
+            reader,
+            layout: Self::layout(word_count),
+            endian,
+            word_count,
+        });
+        Ok(())
+    }
+}
+
+impl Reader for QfitReader {
+    fn name(&self) -> &str {
+        "readers.qfit"
+    }
+
+    fn read(&mut self) -> Result<Vec<PointView>, StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "QfitReader requires a filename option.".to_string(),
+            ));
+        }
+        let mut reader = open_qfit_reader(&self.filename)?;
+
+        let (endian, word_count) = Self::read_header(&mut reader)?;
+        // GPS time is discarded as per PDAL behavior.
+
+        let mut view = PointView::new(Self::layout(word_count));
+        while Self::append_record(
+            &mut view,
+            &mut reader,
+            endian,
+            word_count,
+            self.flip_coordinates,
+            self.scale_z,
+        )? {}
+        Ok(vec![view])
     }
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.qfit")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        let mut view = PointView::new(Rc::clone(&state.layout));
+
+        for _ in 0..capacity.max(1) {
+            if !Self::append_record(
+                &mut view,
+                &mut state.reader,
+                state.endian,
+                state.word_count,
+                self.flip_coordinates,
+                self.scale_z,
+            )? {
+                break;
+            }
+        }
+
+        if view.len() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(view))
+        }
     }
 }
 
@@ -195,6 +284,7 @@ mod tests {
             filename: String::new(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         match r.read().err() {
             Some(e) => assert!(e.0.contains("requires a filename")),
@@ -208,6 +298,7 @@ mod tests {
             filename: "/nonexistent/qfit-file.qi".to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         match r.read().err() {
             Some(e) => assert!(e.0.contains("Couldn't open")),
@@ -224,6 +315,7 @@ mod tests {
             filename: input.display().to_string(),
             flip_coordinates: true,
             scale_z: 0.001,
+            stream: None,
         };
         let views = r.read().unwrap();
         assert!(!views.is_empty());
@@ -236,6 +328,7 @@ mod tests {
             filename: "dummy".to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         assert_eq!(r.name(), "readers.qfit");
     }
@@ -246,6 +339,7 @@ mod tests {
             filename: "dummy".to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         assert_eq!(r.metadata().name(), "readers.qfit");
     }
@@ -258,6 +352,7 @@ mod tests {
             filename: input.display().to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         let views = r.read().unwrap();
         assert!(!views.is_empty());
@@ -272,9 +367,51 @@ mod tests {
             filename: input.display().to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         let views = r.read().unwrap();
         assert!(!views.is_empty());
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/qfit/10-word.qi");
+        let mut options = Options::new();
+        options.add("filename", input.display().to_string());
+
+        let mut full_reader = QfitReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = QfitReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(2).unwrap().unwrap();
+        let second = stream_reader.stream_next(2).unwrap().unwrap();
+        let mut total = first.len() + second.len();
+        while let Some(chunk) = stream_reader.stream_next(257).unwrap() {
+            total += chunk.len();
+        }
+
+        assert_eq!(total, full.len());
+        assert!(first.layout().dim(&DimId::OffsetTime).is_some());
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(second.get_f64(0, &DimId::Z), full.get_f64(2, &DimId::Z));
+    }
+
+    #[test]
+    fn streaming_honors_fourteen_word_layout_and_flip() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let input = repo.join("test/data/qfit/14-word.qi");
+        let mut options = Options::new();
+        options.add("filename", input.display().to_string());
+        options.add("flip_coordinates", true);
+
+        let mut reader = QfitReader::new(&options);
+        let view = reader.stream_next(10).unwrap().unwrap();
+
+        assert!(view.layout().dim(&DimId::PassiveSignal).is_some());
+        assert!(view.layout().dim(&DimId::PassiveX).is_some());
+        assert!(view.len() > 0);
     }
 
     #[test]
@@ -291,6 +428,7 @@ mod tests {
             filename: path.display().to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         let err = r.read().err().unwrap();
         assert!(err.0.contains("record size"));
@@ -310,6 +448,7 @@ mod tests {
             filename: path.display().to_string(),
             flip_coordinates: false,
             scale_z: 0.001,
+            stream: None,
         };
         let err = r.read().err().unwrap();
         assert!(err.0.contains("Incomplete"));
