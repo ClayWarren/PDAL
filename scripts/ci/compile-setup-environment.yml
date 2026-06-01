@@ -5,5 +5,7 @@ dependencies:
   - compilers
   - ninja
   - cmake
+  - rust
+  - cargo
   - pkg-config
   - make  # [not win]
