@@ -140,7 +140,8 @@ pub(super) fn read_binary_tile(
     schema: &EptSchema,
     srs: &str,
 ) -> Result<PointView, StageError> {
-    let bytes = std::fs::read(path)
+    let location = path.to_string_lossy();
+    let bytes = crate::source::read_bytes(&location)
         .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
     view_from_binary_tile(path, bytes, schema, srs)
 }
@@ -150,7 +151,8 @@ pub(super) fn read_zstandard_tile(
     schema: &EptSchema,
     srs: &str,
 ) -> Result<PointView, StageError> {
-    let bytes = std::fs::read(path)
+    let location = path.to_string_lossy();
+    let bytes = crate::source::read_bytes(&location)
         .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
     let decoded = zstd::stream::decode_all(Cursor::new(bytes)).map_err(|err| {
         StageError(format!(
