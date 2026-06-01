@@ -926,6 +926,65 @@ impl PointView {
         true
     }
 
+    /// Reorder points in place so output position `i` holds the point currently
+    /// at `order[i]` (a gather permutation, as produced by sorting an index
+    /// vector). `order` must be a permutation of `0..len()`; if its length or
+    /// any value is out of range the view is left unchanged. Done in place with
+    /// only an auxiliary index vector, so callers like `filters.sort` avoid
+    /// allocating a second full copy of the point buffer.
+    pub fn reorder(&mut self, order: &[PointId]) {
+        let n = self.len() as usize;
+        if order.len() != n {
+            return;
+        }
+        // `inverse[src]` is the destination slot for the point currently at
+        // `src`. Applying the inverse permutation with swap cycles realizes the
+        // requested gather (each row is moved into place exactly once).
+        let mut inverse = vec![0u64; n];
+        for (dst, &src) in order.iter().enumerate() {
+            let s = src as usize;
+            if s >= n {
+                return;
+            }
+            inverse[s] = dst as u64;
+        }
+        for i in 0..n {
+            while inverse[i] as usize != i {
+                let j = inverse[i] as usize;
+                self.swap_points(i as PointId, j as PointId);
+                inverse.swap(i, j);
+            }
+        }
+    }
+
+    /// Drop mesh and raster attachments. Used by in-place transforms whose
+    /// historical (`make_new`-based) output carried neither, so the in-place
+    /// path stays observably identical.
+    pub fn clear_attachments(&mut self) {
+        self.meshes.clear();
+        self.rasters.clear();
+    }
+
+    /// Copy point row `src` onto row `dst` (data and source index). Used for
+    /// in-place left-compaction by streaming filters: iterate points in order,
+    /// copying each kept row down to the next write slot, then `truncate`.
+    /// Returns false if either index is out of range.
+    pub fn copy_point_within(&mut self, src: PointId, dst: PointId) -> bool {
+        let n = self.len();
+        if src >= n || dst >= n {
+            return false;
+        }
+        if src == dst {
+            return true;
+        }
+        let ps = self.layout.point_size();
+        let s = (src as usize) * ps;
+        let d = (dst as usize) * ps;
+        self.data.copy_within(s..s + ps, d);
+        self.source_indices[dst as usize] = self.source_indices[src as usize];
+        true
+    }
+
     /// Original source row copied into this point. Used by the C++ bridge to
     /// preserve PDAL PointView table IDs when filters return subsets.
     pub fn source_index(&self, idx: PointId) -> PointId {

@@ -133,6 +133,11 @@ pub struct FauxReader {
     stdev_x: f64,
     stdev_y: f64,
     stdev_z: f64,
+    /// Streaming cursor: how many points have been emitted via `stream_next`.
+    stream_cursor: u64,
+    /// Streaming RNG, carried across chunks so the draw sequence matches the
+    /// single-pass `read()`.
+    stream_rng: Option<SimpleRng>,
 }
 
 impl FauxReader {
@@ -173,7 +178,50 @@ impl FauxReader {
             stdev_x: options.get_f64("stdev_x", 1.0),
             stdev_y: options.get_f64("stdev_y", 1.0),
             stdev_z: options.get_f64("stdev_z", 1.0),
+            stream_cursor: 0,
+            stream_rng: None,
         })
+    }
+
+    /// The point layout this reader produces (shared by `read` and streaming).
+    fn build_layout(&self) -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::OffsetTime, DimType::F64);
+        if self.number_of_returns > 0 {
+            layout.register(DimId::ReturnNumber, DimType::U8);
+            layout.register(DimId::NumberOfReturns, DimType::U8);
+        }
+        Rc::new(layout)
+    }
+
+    /// Append global points `start..end` to `view`, using `rng` for the random
+    /// modes. The point at global index `i` is identical whether produced in one
+    /// pass or in chunks, because `generate_point` is a pure function of `i` and
+    /// the (continuously advanced) `rng`.
+    fn fill_points(&self, view: &mut PointView, start: u64, end: u64, rng: &mut SimpleRng) {
+        for i in start..end {
+            let row = view.add_point();
+            let (x, y, z) = self.generate_point(i, rng);
+            view.set_f64(row, &DimId::X, x);
+            view.set_f64(row, &DimId::Y, y);
+            view.set_f64(row, &DimId::Z, z);
+            if self.mode == FauxMode::Invalid {
+                view.set_f64(row, &DimId::OffsetTime, f64::NAN);
+            } else {
+                view.set_f64(row, &DimId::OffsetTime, i as f64);
+            }
+            if self.number_of_returns > 0 {
+                view.set_f64(
+                    row,
+                    &DimId::ReturnNumber,
+                    (i % self.number_of_returns) as f64 + 1.0,
+                );
+                view.set_f64(row, &DimId::NumberOfReturns, self.number_of_returns as f64);
+            }
+        }
     }
 
     fn generate_point(&self, idx: u64, rng: &mut SimpleRng) -> (f64, f64, f64) {
@@ -213,41 +261,9 @@ impl Reader for FauxReader {
     }
 
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
-        let mut layout = PointLayout::new();
-        layout.register(DimId::X, DimType::F64);
-        layout.register(DimId::Y, DimType::F64);
-        layout.register(DimId::Z, DimType::F64);
-        layout.register(DimId::OffsetTime, DimType::F64);
-        if self.number_of_returns > 0 {
-            layout.register(DimId::ReturnNumber, DimType::U8);
-            layout.register(DimId::NumberOfReturns, DimType::U8);
-        }
-        let layout = Rc::new(layout);
-
-        let mut view = PointView::new(layout);
+        let mut view = PointView::new(self.build_layout());
         let mut rng = SimpleRng::new(self.seed);
-
-        for i in 0..self.count {
-            view.add_point();
-            let (x, y, z) = self.generate_point(i, &mut rng);
-            view.set_f64(i, &DimId::X, x);
-            view.set_f64(i, &DimId::Y, y);
-            view.set_f64(i, &DimId::Z, z);
-            if self.mode == FauxMode::Invalid {
-                view.set_f64(i, &DimId::OffsetTime, f64::NAN);
-            } else {
-                view.set_f64(i, &DimId::OffsetTime, i as f64);
-            }
-            if self.number_of_returns > 0 {
-                view.set_f64(
-                    i,
-                    &DimId::ReturnNumber,
-                    (i % self.number_of_returns) as f64 + 1.0,
-                );
-                view.set_f64(i, &DimId::NumberOfReturns, self.number_of_returns as f64);
-            }
-        }
-
+        self.fill_points(&mut view, 0, self.count, &mut rng);
         Ok(vec![view])
     }
 
@@ -256,6 +272,32 @@ impl Reader for FauxReader {
         node.add_value("count", MetadataValue::U64(self.count));
         node.add_value("mode", MetadataValue::String(format!("{:?}", self.mode)));
         node
+    }
+
+    fn reset(&mut self) {
+        self.stream_cursor = 0;
+        self.stream_rng = None;
+    }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream_cursor >= self.count {
+            return Ok(None);
+        }
+        let mut rng = self
+            .stream_rng
+            .take()
+            .unwrap_or_else(|| SimpleRng::new(self.seed));
+        let start = self.stream_cursor;
+        let end = (start + capacity.max(1) as u64).min(self.count);
+        let mut view = PointView::new(self.build_layout());
+        self.fill_points(&mut view, start, end, &mut rng);
+        self.stream_cursor = end;
+        self.stream_rng = Some(rng);
+        Ok(Some(view))
     }
 }
 
@@ -545,6 +587,53 @@ mod tests {
             assert_eq!(view.get_f64(i, &DimId::ReturnNumber), (i % 3) as f64 + 1.0);
             assert_eq!(view.get_f64(i, &DimId::NumberOfReturns), 3.0);
         }
+    }
+
+    #[test]
+    fn streaming_chunks_match_single_pass_read() {
+        // Uniform mode draws from the RNG, so this also proves the streaming
+        // cursor carries RNG state across chunks to reproduce read() exactly.
+        let opts = || {
+            let mut o = Options::new();
+            o.add("count", "25")
+                .add("mode", "uniform")
+                .add("bounds", "([0,100],[0,100],[0,100])")
+                .add("seed", "7")
+                .add("number_of_returns", "3");
+            o
+        };
+
+        let mut full_reader = FauxReader::new(&opts()).unwrap();
+        let full = full_reader.read().unwrap();
+        let full = &full[0];
+
+        let dims = [
+            DimId::X,
+            DimId::Y,
+            DimId::Z,
+            DimId::OffsetTime,
+            DimId::ReturnNumber,
+            DimId::NumberOfReturns,
+        ];
+        let row = |view: &PointView, i: u64| -> Vec<f64> {
+            dims.iter().map(|d| view.get_f64(i, d)).collect()
+        };
+
+        let mut stream_reader = FauxReader::new(&opts()).unwrap();
+        assert!(stream_reader.streamable());
+        let mut streamed: Vec<Vec<f64>> = Vec::new();
+        while let Some(chunk) = stream_reader.stream_next(10).unwrap() {
+            for i in 0..chunk.len() {
+                streamed.push(row(&chunk, i));
+            }
+        }
+
+        assert_eq!(streamed.len() as u64, full.len());
+        for i in 0..full.len() {
+            assert_eq!(streamed[i as usize], row(full, i), "point {i} mismatch");
+        }
+        // Cursor is exhausted; a further pull yields nothing.
+        assert!(stream_reader.stream_next(10).unwrap().is_none());
     }
 
     #[test]

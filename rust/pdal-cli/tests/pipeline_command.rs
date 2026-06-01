@@ -69,6 +69,51 @@ fn pipeline_command_runs_text_pipeline() {
 }
 
 #[test]
+fn pipeline_command_streams_eligible_and_falls_back_otherwise() {
+    let temp = make_temp_dir("pdal-rs-pipeline-streaming");
+
+    // faux -> range -> null is a fully streamable linear chain: the executor
+    // takes the chunked streaming path.
+    let streamable = temp.join("streamable.json");
+    fs::write(
+        &streamable,
+        r#"{"pipeline":[
+            {"type":"readers.faux","count":50000,"mode":"ramp","bounds":"([0,1000],[0,1000],[0,1000])"},
+            {"type":"filters.range","limits":"X[0:500]"},
+            {"type":"writers.null"}
+        ]}"#,
+    )
+    .unwrap();
+
+    // faux -> sort -> null is not streamable (sort needs all points); the
+    // executor must fall back to the materializing path and still succeed.
+    let fallback = temp.join("fallback.json");
+    fs::write(
+        &fallback,
+        r#"{"pipeline":[
+            {"type":"readers.faux","count":50000,"mode":"ramp","bounds":"([0,1000],[0,1000],[0,1000])"},
+            {"type":"filters.sort","dimension":"X"},
+            {"type":"writers.null"}
+        ]}"#,
+    )
+    .unwrap();
+
+    for path in [&streamable, &fallback] {
+        let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+            .arg("pipeline")
+            .arg(path)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "pdal-rs pipeline failed for {}\nstderr:\n{}",
+            path.display(),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+}
+
+#[test]
 fn pipeline_command_accepts_root_pipeline_object() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");

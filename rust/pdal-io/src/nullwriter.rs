@@ -47,6 +47,15 @@ impl Writer for NullWriter {
         node.add_value("point_count", MetadataValue::U64(self.point_count));
         node
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
+        self.point_count += chunk.len();
+        Ok(())
+    }
 }
 
 #[cfg(test)]

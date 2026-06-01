@@ -37,6 +37,43 @@ fn test_sort_ascending() {
 }
 
 #[test]
+fn run_owned_matches_run_output() {
+    // The in-place owned path (used by the pipeline executor) must produce the
+    // same points, order, and source indices as the allocating borrow path.
+    let points = [
+        (3.0, 9.0, 0.0),
+        (1.0, 7.0, 0.0),
+        (2.0, 8.0, 0.0),
+        (2.0, 6.0, 0.0),
+        (0.0, 5.0, 0.0),
+    ];
+    for order in [SortOrder::Asc, SortOrder::Desc] {
+        let view = make_xyz_view(&points);
+
+        let mut borrow_filter =
+            SortFilter::new(vec!["X".to_string()], order, SortAlgorithm::Stable);
+        let borrowed = borrow_filter.run(std::slice::from_ref(&view)).unwrap();
+
+        let mut owned_filter = SortFilter::new(vec!["X".to_string()], order, SortAlgorithm::Stable);
+        let owned = owned_filter.run_owned(vec![view.clone()]).unwrap();
+
+        assert_eq!(extract_xs(&owned[0]), extract_xs(&borrowed[0]));
+        assert_eq!(owned[0].len(), borrowed[0].len());
+        for i in 0..owned[0].len() {
+            assert_eq!(
+                owned[0].source_index(i),
+                borrowed[0].source_index(i),
+                "source index mismatch at {i} for {order:?}"
+            );
+            assert_eq!(
+                owned[0].get_f64(i, &DimId::Y),
+                borrowed[0].get_f64(i, &DimId::Y)
+            );
+        }
+    }
+}
+
+#[test]
 fn test_sort_descending() {
     let view = make_xyz_view(&[(3.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]);
     let mut filter = SortFilter::new(

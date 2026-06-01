@@ -358,6 +358,33 @@ pub unsafe extern "C" fn pdal_pipeline_execute_count(
     }
 }
 
+/// Try to execute the pipeline in chunked streaming mode (bounded peak memory).
+///
+/// Returns the streamed point count (`>= 0`) on success, `-1` on error (message
+/// available via the last-error API), or `-2` when the pipeline is not
+/// streaming-eligible -- in which case the caller should fall back to
+/// `pdal_pipeline_execute`/`_count`/`_result`. Streaming is reader-led, so there
+/// is no input-view parameter.
+///
+/// # Safety
+/// `pipeline` must be a valid pipeline handle.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_pipeline_execute_streaming(pipeline: *mut PipelineHandle) -> i64 {
+    if pipeline.is_null() {
+        return -1;
+    }
+    clear_last_error();
+    let p = &mut (*pipeline).pipeline;
+    match p.execute_streaming() {
+        Ok(Some(count)) => count as i64,
+        Ok(None) => -2,
+        Err(e) => {
+            set_last_error(&e.0);
+            -1
+        }
+    }
+}
+
 /// Execute the pipeline and return a summary result.
 ///
 /// Returns 0 on success, -1 on error.

@@ -134,6 +134,20 @@ impl App {
             return 0;
         }
 
+        // Try chunked streaming first (bounded memory). -2 means the pipeline is
+        // not streaming-eligible, so fall through to the materializing path; the
+        // streaming attempt has no side effects in that case.
+        let streamed = unsafe { pdal_capi::pdal_pipeline_execute_streaming(pipeline) };
+        if streamed >= 0 {
+            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+            return 0;
+        }
+        if streamed == -1 {
+            self.output_last_error();
+            unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+            return 1;
+        }
+
         let mut result = empty_pipeline_result();
         let status = unsafe {
             pdal_capi::pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), &mut result)

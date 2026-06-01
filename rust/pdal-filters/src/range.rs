@@ -207,6 +207,26 @@ impl Filter for RangeFilter {
         Ok(vec![out])
     }
 
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        // Same predicate as `run_one`; left-compact the kept points in place.
+        let n = chunk.len();
+        let mut write = 0u64;
+        for read in 0..n {
+            if self.point_passes(chunk, read) {
+                if write != read {
+                    chunk.copy_point_within(read, write);
+                }
+                write += 1;
+            }
+        }
+        chunk.truncate(write);
+        Ok(())
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -233,6 +253,48 @@ mod tests {
     fn rejects_malformed_limit_strings() {
         assert!(parse_range_limit("Y[4.00e0").is_err());
         assert!(parse_range_limit("Z[4:6]").is_ok());
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        use pdal_core::point::{DimType, PointLayout};
+        use std::rc::Rc;
+
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for x in [0.0, 5.0, 10.0, 15.0, 3.0, 7.0, -1.0] {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, x);
+        }
+
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 0.0,
+            upper_bound: 10.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+
+        let mut std_filter = RangeFilter::new(limits.clone());
+        assert!(std_filter.streamable());
+        let standard = std_filter.run_one(&view).unwrap().remove(0);
+
+        let mut chunk = view.clone();
+        RangeFilter::new(limits).stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), standard.len());
+        assert_eq!(standard.len(), 5); // 0,5,10,3,7 pass; 15 and -1 are dropped
+        assert!(standard.len() < view.len()); // something was actually filtered
+        for i in 0..standard.len() {
+            assert_eq!(
+                chunk.get_f64(i, &DimId::X),
+                standard.get_f64(i, &DimId::X),
+                "point {i}"
+            );
+            assert_eq!(chunk.source_index(i), standard.source_index(i));
+        }
     }
 
     #[test]

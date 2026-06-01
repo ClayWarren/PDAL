@@ -325,6 +325,17 @@ impl Pipeline {
 
         let mut outputs: HashMap<usize, Vec<PointView>> = HashMap::new();
 
+        // How many downstream nodes still need each producer's output. The last
+        // consumer moves the views out of `outputs` instead of cloning, so a
+        // linear pipeline holds one copy of a view at a time rather than keeping
+        // every producer's output alive until the run ends.
+        let mut consumers_remaining: HashMap<usize, usize> = HashMap::new();
+        for node in &self.nodes {
+            for &input_idx in &node.inputs {
+                *consumers_remaining.entry(input_idx).or_insert(0) += 1;
+            }
+        }
+
         for &node_idx in &order {
             let node = &mut self.nodes[node_idx];
 
@@ -334,17 +345,12 @@ impl Pipeline {
                     outputs.insert(node_idx, views);
                 }
                 StageKind::Filter => {
-                    let inputs_for_node: Vec<PointView> = if node.inputs.is_empty() {
-                        input_views.clone()
-                    } else {
-                        let mut merged = Vec::new();
-                        for &input_idx in &node.inputs {
-                            if let Some(views) = outputs.get(&input_idx) {
-                                merged.extend(views.iter().cloned());
-                            }
-                        }
-                        merged
-                    };
+                    let inputs_for_node = take_node_inputs(
+                        &node.inputs,
+                        &mut outputs,
+                        &mut consumers_remaining,
+                        &input_views,
+                    );
 
                     if inputs_for_node.is_empty() {
                         outputs.insert(node_idx, Vec::new());
@@ -357,17 +363,12 @@ impl Pipeline {
                     outputs.insert(node_idx, node_outputs);
                 }
                 StageKind::Writer => {
-                    let inputs_for_node: Vec<PointView> = if node.inputs.is_empty() {
-                        input_views.clone()
-                    } else {
-                        let mut merged = Vec::new();
-                        for &input_idx in &node.inputs {
-                            if let Some(views) = outputs.get(&input_idx) {
-                                merged.extend(views.iter().cloned());
-                            }
-                        }
-                        merged
-                    };
+                    let inputs_for_node = take_node_inputs(
+                        &node.inputs,
+                        &mut outputs,
+                        &mut consumers_remaining,
+                        &input_views,
+                    );
 
                     let writer_inputs = apply_writer_where(node, inputs_for_node)?;
                     self.last_writer_point_count +=
@@ -405,6 +406,102 @@ impl Pipeline {
             bounds_3d: aggregate_bounds_3d(&views),
             dimension_summaries: aggregate_dimension_summaries(&views),
         })
+    }
+
+    /// If this pipeline is a single linear reader -> filters... -> writer chain
+    /// where every stage is streamable and no stage has a `where` clause, return
+    /// `(reader_idx, filter_idxs_in_order, writer_idx)`. Otherwise `None`, and
+    /// the caller should use the materializing [`execute`](Self::execute).
+    fn streaming_chain(&self) -> Option<(usize, Vec<usize>, usize)> {
+        let n = self.nodes.len();
+        if n < 2 {
+            return None;
+        }
+        let order = self.topological_order().ok()?;
+        if order.len() != n {
+            return None;
+        }
+        // Number of downstream consumers of each node; a linear chain has one
+        // for every node except the terminal writer.
+        let mut consumers = vec![0usize; n];
+        for node in &self.nodes {
+            for &input in &node.inputs {
+                if input < n {
+                    consumers[input] += 1;
+                }
+            }
+        }
+        for (pos, &idx) in order.iter().enumerate() {
+            let node = &self.nodes[idx];
+            if !node.stage.streamable() {
+                return None;
+            }
+            if !node.options.get_str("where", "").trim().is_empty() {
+                return None;
+            }
+            let is_last = pos == order.len() - 1;
+            if pos == 0 {
+                if node.kind != StageKind::Reader || !node.inputs.is_empty() {
+                    return None;
+                }
+            } else if node.inputs.len() != 1 || node.inputs[0] != order[pos - 1] {
+                // Each non-reader must take exactly its predecessor as input.
+                return None;
+            }
+            if is_last {
+                if node.kind != StageKind::Writer || consumers[idx] != 0 {
+                    return None;
+                }
+            } else {
+                if consumers[idx] != 1 {
+                    return None; // fan-out is not a linear stream
+                }
+                if pos > 0 && node.kind != StageKind::Filter {
+                    return None;
+                }
+            }
+        }
+        Some((
+            order[0],
+            order[1..order.len() - 1].to_vec(),
+            order[order.len() - 1],
+        ))
+    }
+
+    /// Execute the pipeline in chunked streaming mode when it is a fully
+    /// streamable linear chain, keeping peak memory bounded by the chunk size
+    /// instead of materializing every point. Returns `Ok(Some(point_count))`
+    /// when it streamed, or `Ok(None)` when the pipeline is not streaming-
+    /// eligible (the caller should fall back to [`execute`](Self::execute)).
+    pub fn execute_streaming(&mut self) -> Result<Option<u64>, StageError> {
+        const STREAM_CHUNK_CAPACITY: usize = 10_000;
+
+        let Some((reader, filters, writer)) = self.streaming_chain() else {
+            return Ok(None);
+        };
+
+        for node in &mut self.nodes {
+            node.stage.reset();
+        }
+        self.last_writer_point_count = 0;
+        self.last_writer_view_count = 0;
+
+        let mut total_points = 0u64;
+        while let Some(mut chunk) = self.nodes[reader]
+            .stage
+            .stream_next(STREAM_CHUNK_CAPACITY)?
+        {
+            for &filter in &filters {
+                self.nodes[filter].stage.stream_chunk(&mut chunk)?;
+            }
+            total_points += chunk.len();
+            self.nodes[writer].stage.stream_write(&chunk)?;
+        }
+        self.nodes[writer].stage.stream_finish()?;
+
+        self.last_writer_point_count = total_points;
+        self.last_writer_view_count = 1;
+        Ok(Some(total_points))
     }
 
     /// Aggregate metadata from all stages.
@@ -449,7 +546,7 @@ fn run_stage_with_where(
 ) -> Result<Vec<PointView>, StageError> {
     let where_expr = node.options.get_str("where", "");
     if where_expr.trim().is_empty() {
-        return node.stage.run(&inputs);
+        return node.stage.run_owned(inputs);
     }
     let merge_mode = where_merge_mode(&node.options)?;
     let mut outputs = Vec::new();
@@ -566,6 +663,40 @@ fn aggregate_bounds_2d(views: &[PointView]) -> Option<Bounds2D> {
                 None => bounds,
             })
         })
+}
+
+/// Gather a node's input views. A producer's output is moved into its final
+/// consumer (cloned only for earlier consumers in a multi-consumer/diamond
+/// DAG), and removed from `outputs` once fully consumed, so peak memory tracks
+/// the live working set rather than every stage's output for the whole run.
+/// Leaf outputs are never gathered as input, so they survive for the caller.
+fn take_node_inputs(
+    node_inputs: &[usize],
+    outputs: &mut HashMap<usize, Vec<PointView>>,
+    consumers_remaining: &mut HashMap<usize, usize>,
+    external_inputs: &[PointView],
+) -> Vec<PointView> {
+    if node_inputs.is_empty() {
+        return external_inputs.to_vec();
+    }
+    let mut merged = Vec::new();
+    for &input_idx in node_inputs {
+        let is_last_consumer = match consumers_remaining.get_mut(&input_idx) {
+            Some(count) => {
+                *count = count.saturating_sub(1);
+                *count == 0
+            }
+            None => true,
+        };
+        if is_last_consumer {
+            if let Some(views) = outputs.remove(&input_idx) {
+                merged.extend(views);
+            }
+        } else if let Some(views) = outputs.get(&input_idx) {
+            merged.extend(views.iter().cloned());
+        }
+    }
+    merged
 }
 
 fn prepare_filter_inputs(

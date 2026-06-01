@@ -25,7 +25,9 @@ impl StageWrapper for ReaderAdapter {
     fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
         false
     }
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        self.0.reset();
+    }
     fn metadata(&self) -> MetadataNode {
         self.0.metadata()
     }
@@ -37,6 +39,12 @@ impl StageWrapper for ReaderAdapter {
     }
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
         Vec::new()
+    }
+    fn streamable(&self) -> bool {
+        self.0.streamable()
+    }
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        self.0.stream_next(capacity)
     }
 }
 
@@ -75,6 +83,15 @@ impl StageWrapper for WriterAdapter {
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
         Vec::new()
     }
+    fn streamable(&self) -> bool {
+        self.0.streamable()
+    }
+    fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
+        self.0.stream_write(chunk)
+    }
+    fn stream_finish(&mut self) -> Result<(), StageError> {
+        self.0.stream_finish()
+    }
 }
 
 /// Wrapper that holds a filter and implements `StageWrapper`.
@@ -89,6 +106,9 @@ impl<T: Filter + Streamable> FilterWrapper<T> {
 impl<T: Filter + Streamable> StageWrapper for FilterWrapper<T> {
     fn run(&mut self, inputs: &[PointView]) -> Result<Vec<PointView>, StageError> {
         self.0.run(inputs)
+    }
+    fn run_owned(&mut self, inputs: Vec<PointView>) -> Result<Vec<PointView>, StageError> {
+        self.0.run_owned(inputs)
     }
     fn read(&mut self) -> Result<Vec<PointView>, StageError> {
         Err(StageError("cannot read from a filter".into()))
@@ -113,5 +133,11 @@ impl<T: Filter + Streamable> StageWrapper for FilterWrapper<T> {
     }
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
         self.0.output_dimensions()
+    }
+    fn streamable(&self) -> bool {
+        self.0.streamable()
+    }
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        self.0.stream_chunk(chunk)
     }
 }

@@ -153,6 +153,22 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             return 1;
         }
     };
+    // When no metadata summary is requested, try chunked streaming first
+    // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
+    // eligible -- fall through to the materializing path with no side effects.
+    if metadata_file.is_none() {
+        match pipeline.execute_streaming() {
+            Ok(Some(_)) => {
+                write_progress(&mut progress, "DONEPIPELINE", "pipeline");
+                return 0;
+            }
+            Ok(None) => {}
+            Err(err) => {
+                eprintln!("PDAL: kernels.pipeline: {err}");
+                return 1;
+            }
+        }
+    }
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
             write_progress(&mut progress, "DONEPIPELINE", "pipeline");

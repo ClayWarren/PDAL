@@ -39,6 +39,37 @@ impl Filter for SortFilter {
     }
 
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        let indices = self.sorted_order(input);
+
+        let mut out = input.make_new();
+        for idx in indices {
+            out.append_point(input, idx);
+        }
+
+        Ok(vec![out])
+    }
+
+    fn run_owned(&mut self, inputs: Vec<PointView>) -> Result<Vec<PointView>, StageError> {
+        // In-place equivalent of `run_one`: reorder each view's rows by the same
+        // permutation instead of building a second view, then drop attachments
+        // to match `make_new`'s output (which carried none). This keeps one copy
+        // of the point buffer alive instead of input + output.
+        let mut outputs = Vec::with_capacity(inputs.len());
+        for mut view in inputs {
+            let order = self.sorted_order(&view);
+            view.reorder(&order);
+            view.clear_attachments();
+            outputs.push(view);
+        }
+        Ok(outputs)
+    }
+}
+
+impl SortFilter {
+    /// Compute the gather permutation that sorts `input`: position `i` of the
+    /// result takes the point at the returned index `[i]`. Shared by the
+    /// allocating `run_one` and the in-place `run_owned`.
+    fn sorted_order(&self, input: &PointView) -> Vec<u64> {
         let mut indices: Vec<u64> = (0..input.len()).collect();
 
         for (i, name) in self.dim_names.iter().enumerate() {
@@ -71,12 +102,7 @@ impl Filter for SortFilter {
             }
         }
 
-        let mut out = input.make_new();
-        for idx in indices {
-            out.append_point(input, idx);
-        }
-
-        Ok(vec![out])
+        indices
     }
 }
 

@@ -34,6 +34,34 @@ pub trait Filter {
         Ok(outputs)
     }
 
+    /// Run the filter taking ownership of its inputs.
+    ///
+    /// The default delegates to the borrowing [`run`](Self::run). Filters that
+    /// can transform a view in place (such as `filters.sort`) override this to
+    /// avoid allocating a second full copy of the point buffer. Only the
+    /// in-process pipeline executor uses this path; the C ABI filter bridge
+    /// still goes through `run`, so overriding it must stay observably
+    /// identical to `run`.
+    fn run_owned(&mut self, inputs: Vec<PointView>) -> Result<Vec<PointView>, StageError> {
+        self.run(&inputs)
+    }
+
+    /// Whether this filter can run in PDAL streaming mode (point-by-point over
+    /// fixed-size chunks). Point-wise filters (assign, range, decimation,
+    /// ferry) are streamable; filters that need all points at once (sort,
+    /// stats, voxel) are not. Default: not streamable.
+    fn streamable(&self) -> bool {
+        false
+    }
+
+    /// Transform one streaming chunk in place: mutate points and/or compact the
+    /// view down to the kept points. Only called when
+    /// [`streamable`](Self::streamable) returns true, and must produce the same
+    /// per-point result as the materializing [`run`](Self::run).
+    fn stream_chunk(&mut self, _chunk: &mut PointView) -> Result<(), StageError> {
+        Err(StageError("filter does not support streaming".into()))
+    }
+
     /// Run the filter over a single input view.
     ///
     /// This is the primary implementation point for most filters.

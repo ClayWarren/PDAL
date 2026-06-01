@@ -140,6 +140,40 @@ fn swap_points_exchanges_data_and_source_indices() {
 }
 
 #[test]
+fn reorder_applies_gather_permutation_in_place() {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    let layout = Rc::new(layout);
+
+    let mut view = PointView::new(Rc::clone(&layout));
+    for i in 0..5 {
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, i as f64);
+    }
+    let id_before = view.id();
+
+    // output[i] = old[order[i]]
+    view.reorder(&[3, 1, 4, 0, 2]);
+
+    let xs: Vec<f64> = (0..view.len())
+        .map(|i| view.get_f64(i, &DimId::X))
+        .collect();
+    assert_eq!(xs, vec![3.0, 1.0, 4.0, 0.0, 2.0]);
+    // source indices track the moved rows.
+    let srcs: Vec<u64> = (0..view.len()).map(|i| view.source_index(i)).collect();
+    assert_eq!(srcs, vec![3, 1, 4, 0, 2]);
+    // In-place: identity is preserved (PDAL sorts the same view).
+    assert_eq!(view.id(), id_before);
+
+    // A wrong-length permutation is a no-op.
+    view.reorder(&[0, 1]);
+    let xs2: Vec<f64> = (0..view.len())
+        .map(|i| view.get_f64(i, &DimId::X))
+        .collect();
+    assert_eq!(xs2, vec![3.0, 1.0, 4.0, 0.0, 2.0]);
+}
+
+#[test]
 fn calculate_bounds_matches_point_view_contract() {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);

@@ -106,6 +106,18 @@ impl Filter for AssignFilter {
         }
         Ok(vec![output])
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        // Same per-point assignment as `run_one`; assign keeps every point.
+        for idx in 0..chunk.len() {
+            self.assign_point(chunk, idx);
+        }
+        Ok(())
+    }
 }
 
 impl Streamable for AssignFilter {
@@ -165,6 +177,49 @@ mod tests {
         assert_eq!(output.get_f64(1, &DimId::Classification), 7.0);
         assert_eq!(output.get_f64(2, &DimId::Classification), 7.0);
         assert_eq!(input.get_f64(0, &DimId::Classification), 1.0);
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        let make_filter = || {
+            AssignFilter::new(
+                Some(AssignCondition {
+                    dim_name: "X".to_string(),
+                    lower_bound: 0.0,
+                    upper_bound: 10.0,
+                    inclusive_lower: true,
+                    inclusive_upper: true,
+                    negate: false,
+                }),
+                vec![AssignRange {
+                    dim_name: "Classification".to_string(),
+                    value: 7.0,
+                    lower_bound: 1.0,
+                    upper_bound: 1.0,
+                    inclusive_lower: true,
+                    inclusive_upper: true,
+                    negate: false,
+                }],
+            )
+        };
+
+        let input = view(&[0.0, 5.0, 10.0, 15.0]);
+        assert!(make_filter().streamable());
+
+        let standard = make_filter().run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input.clone();
+        make_filter().stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), standard.len());
+        for i in 0..standard.len() {
+            assert_eq!(
+                chunk.get_f64(i, &DimId::Classification),
+                standard.get_f64(i, &DimId::Classification),
+                "point {i}"
+            );
+            assert_eq!(chunk.get_f64(i, &DimId::X), standard.get_f64(i, &DimId::X));
+        }
     }
 
     #[test]
