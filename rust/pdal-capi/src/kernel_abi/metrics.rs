@@ -1,5 +1,9 @@
 use crate::error::pdal_string_free;
 use crate::metrics_abi::{pdal_chamfer, pdal_delta_ex, pdal_eval, pdal_hausdorff};
+use pdal_kernels::{
+    build_chamfer_plan, build_delta_plan, build_eval_plan, build_hausdorff_plan, MetricPairPlan,
+    MetricPlan,
+};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -8,17 +12,11 @@ pub(super) unsafe fn run_hausdorff_kernel(argc: i32, argv: *const *const c_char)
         Ok(args) => args,
         Err(code) => return code,
     };
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.hausdorff: Missing value for positional argument 'source'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal hausdorff <source> <candidate>");
-        return 0;
-    }
-
-    let (c_source, c_candidate, source, candidate) = match c_metric_paths("hausdorff", &args) {
+    let plan = match build_hausdorff_plan(&args) {
+        MetricPlan::Run(plan) => plan,
+        MetricPlan::Return(code) => return code,
+    };
+    let (c_source, c_candidate) = match c_metric_paths(&plan) {
         Ok(paths) => paths,
         Err(code) => return code,
     };
@@ -36,7 +34,7 @@ pub(super) unsafe fn run_hausdorff_kernel(argc: i32, argv: *const *const c_char)
     }
 
     let report = serde_json::json!({
-        "filenames": [source, candidate],
+        "filenames": [plan.source, plan.candidate],
         "hausdorff": hausdorff,
         "modified_hausdorff": modified,
     });
@@ -49,17 +47,11 @@ pub(super) unsafe fn run_chamfer_kernel(argc: i32, argv: *const *const c_char) -
         Ok(args) => args,
         Err(code) => return code,
     };
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.chamfer: Missing value for positional argument 'source'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal chamfer <source> <candidate>");
-        return 0;
-    }
-
-    let (c_source, c_candidate, source, candidate) = match c_metric_paths("chamfer", &args) {
+    let plan = match build_chamfer_plan(&args) {
+        MetricPlan::Run(plan) => plan,
+        MetricPlan::Return(code) => return code,
+    };
+    let (c_source, c_candidate) = match c_metric_paths(&plan) {
         Ok(paths) => paths,
         Err(code) => return code,
     };
@@ -70,7 +62,7 @@ pub(super) unsafe fn run_chamfer_kernel(argc: i32, argv: *const *const c_char) -
     }
 
     let report = serde_json::json!({
-        "filenames": [source, candidate],
+        "filenames": [plan.source, plan.candidate],
         "chamfer": chamfer,
     });
     println!("{}", serde_json::to_string(&report).unwrap());
@@ -82,27 +74,13 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
         Ok(args) => args,
         Err(code) => return code,
     };
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.delta: Missing value for positional argument 'source'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal delta <source> <candidate>");
-        return 0;
-    }
-
-    let (detail, all_dims, paths) = match parse_delta_args(&args) {
-        Ok(parsed) => parsed,
-        Err(message) => {
-            eprintln!("Error: {message}");
-            return 1;
-        }
+    let plan = match build_delta_plan(&args) {
+        MetricPlan::Run(plan) => plan,
+        MetricPlan::Return(code) => return code,
     };
-    let (source, candidate) = paths;
     let (c_source, c_candidate) = match (
-        CString::new(source.as_str()),
-        CString::new(candidate.as_str()),
+        CString::new(plan.source.as_str()),
+        CString::new(plan.candidate.as_str()),
     ) {
         (Ok(c_source), Ok(c_candidate)) => (c_source, c_candidate),
         _ => {
@@ -110,7 +88,12 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
             return 1;
         }
     };
-    let json = pdal_delta_ex(c_source.as_ptr(), c_candidate.as_ptr(), detail, all_dims);
+    let json = pdal_delta_ex(
+        c_source.as_ptr(),
+        c_candidate.as_ptr(),
+        plan.detail,
+        plan.all_dims,
+    );
     if json.is_null() {
         print_last_error();
         return 1;
@@ -120,71 +103,14 @@ pub(super) unsafe fn run_delta_kernel(argc: i32, argv: *const *const c_char) -> 
     0
 }
 
-fn parse_delta_args(args: &[String]) -> Result<(bool, bool, (String, String)), String> {
-    let mut source = None;
-    let mut candidate = None;
-    let mut detail = false;
-    let mut all_dims = false;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--detail" => detail = true,
-            "--alldims" => all_dims = true,
-            "--source" => {
-                let Some(value) = iter.next() else {
-                    return Err("--source requires a filename".to_string());
-                };
-                source = Some(value.clone());
-            }
-            "--candidate" => {
-                let Some(value) = iter.next() else {
-                    return Err("--candidate requires a filename".to_string());
-                };
-                candidate = Some(value.clone());
-            }
-            _ if let Some(value) = arg.strip_prefix("--source=") => {
-                source = Some(value.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--candidate=") => {
-                candidate = Some(value.to_string());
-            }
-            _ if arg.starts_with("--") => return Err(format!("unknown delta option '{arg}'")),
-            _ if source.is_none() => source = Some(arg.clone()),
-            _ if candidate.is_none() => candidate = Some(arg.clone()),
-            _ => return Err("delta expects exactly two filenames".to_string()),
-        }
-    }
-
-    match (source, candidate) {
-        (Some(source), Some(candidate)) => Ok((detail, all_dims, (source, candidate))),
-        _ => Err("delta expects exactly two filenames".to_string()),
-    }
-}
-
 pub(super) unsafe fn run_eval_kernel(argc: i32, argv: *const *const c_char) -> i32 {
     let args = match argv_to_vec(argc, argv) {
         Ok(args) => args,
         Err(code) => return code,
     };
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.eval: Missing value for positional argument 'predicted'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!(
-            "  pdal eval <predicted> <truth> --labels=<l1,l2,...> \
-             [--prediction_dim=Classification] [--truth_dim=Classification]"
-        );
-        return 0;
-    }
-
-    let eval = match parse_eval_args(&args) {
-        Ok(eval) => eval,
-        Err(message) => {
-            eprintln!("Error: {message}");
-            return 1;
-        }
+    let eval = match build_eval_plan(&args) {
+        MetricPlan::Run(eval) => eval,
+        MetricPlan::Return(code) => return code,
     };
     let (c_predicted, c_truth, c_labels, c_prediction_dim, c_truth_dim) = match (
         CString::new(eval.predicted.as_str()),
@@ -216,118 +142,12 @@ pub(super) unsafe fn run_eval_kernel(argc: i32, argv: *const *const c_char) -> i
     0
 }
 
-struct EvalArgs {
-    predicted: String,
-    truth: String,
-    labels: String,
-    prediction_dim: String,
-    truth_dim: String,
-}
-
-fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
-    let mut predicted = None;
-    let mut truth = None;
-    let mut labels = String::new();
-    let mut prediction_dim = String::from("Classification");
-    let mut truth_dim = String::from("Classification");
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if let Some(rest) = arg.strip_prefix("--") {
-            let (key, value) = match rest.split_once('=') {
-                Some(pair) => pair,
-                None => {
-                    let Some(value) = iter.next() else {
-                        return Err(format!("option '{arg}' requires a value"));
-                    };
-                    (rest, value.as_str())
-                }
-            };
-            match key {
-                "predicted" => predicted = Some(value.to_string()),
-                "truth" => truth = Some(value.to_string()),
-                "labels" => labels = value.to_string(),
-                "prediction_dim" => prediction_dim = value.to_string(),
-                "truth_dim" => truth_dim = value.to_string(),
-                _ => return Err(format!("unknown eval option '--{key}'")),
-            }
-        } else if predicted.is_none() {
-            predicted = Some(arg.clone());
-        } else if truth.is_none() {
-            truth = Some(arg.clone());
-        } else {
-            return Err("eval expects a predicted path and a truth path".to_string());
-        }
-    }
-
-    let (Some(predicted), Some(truth)) = (predicted, truth) else {
-        return Err("eval expects a predicted path and a truth path".to_string());
-    };
-    if labels.is_empty() {
-        return Err("eval requires --labels=<comma-separated classification labels>".to_string());
-    }
-
-    Ok(EvalArgs {
-        predicted,
-        truth,
-        labels,
-        prediction_dim,
-        truth_dim,
-    })
-}
-
-fn parse_source_candidate_args(command: &str, args: &[String]) -> Result<(String, String), String> {
-    let mut source = None;
-    let mut candidate = None;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--source" {
-            let Some(value) = iter.next() else {
-                return Err("--source requires a filename".to_string());
-            };
-            source = Some(value.clone());
-        } else if let Some(value) = arg.strip_prefix("--source=") {
-            source = Some(value.to_string());
-        } else if arg == "--candidate" {
-            let Some(value) = iter.next() else {
-                return Err("--candidate requires a filename".to_string());
-            };
-            candidate = Some(value.clone());
-        } else if let Some(value) = arg.strip_prefix("--candidate=") {
-            candidate = Some(value.to_string());
-        } else if arg.starts_with("--") {
-            return Err(format!("unknown {command} option '{arg}'"));
-        } else if source.is_none() {
-            source = Some(arg.clone());
-        } else if candidate.is_none() {
-            candidate = Some(arg.clone());
-        } else {
-            return Err(format!("{command} expects exactly two filenames"));
-        }
-    }
-
-    match (source, candidate) {
-        (Some(source), Some(candidate)) => Ok((source, candidate)),
-        _ => Err(format!("{command} expects exactly two filenames")),
-    }
-}
-
-fn c_metric_paths(
-    command: &str,
-    args: &[String],
-) -> Result<(CString, CString, String, String), i32> {
-    let (source, candidate) = match parse_source_candidate_args(command, args) {
-        Ok(paths) => paths,
-        Err(message) => {
-            eprintln!("Error: {message}");
-            return Err(1);
-        }
-    };
-
+fn c_metric_paths(plan: &MetricPairPlan) -> Result<(CString, CString), i32> {
     match (
-        CString::new(source.as_str()),
-        CString::new(candidate.as_str()),
+        CString::new(plan.source.as_str()),
+        CString::new(plan.candidate.as_str()),
     ) {
-        (Ok(c_source), Ok(c_candidate)) => Ok((c_source, c_candidate, source, candidate)),
+        (Ok(c_source), Ok(c_candidate)) => Ok((c_source, c_candidate)),
         _ => {
             eprintln!("Error: a filename contains an interior NUL byte");
             Err(1)

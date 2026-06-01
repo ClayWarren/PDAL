@@ -7,6 +7,7 @@
 mod density;
 mod fauxplugin;
 mod merge;
+mod metrics;
 mod random;
 mod registry;
 mod sort;
@@ -19,6 +20,10 @@ mod translate;
 pub use density::build_density_pipeline;
 pub use fauxplugin::FauxPluginKernel;
 pub use merge::build_merge_pipeline;
+pub use metrics::{
+    build_chamfer_plan, build_delta_plan, build_eval_plan, build_hausdorff_plan, DeltaPlan,
+    EvalPlan, MetricPairPlan, MetricPlan,
+};
 pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};
 pub use sort::build_sort_pipeline;
