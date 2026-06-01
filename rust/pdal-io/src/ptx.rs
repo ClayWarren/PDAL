@@ -27,6 +27,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
+use std::io::{BufRead, BufReader};
 use std::rc::Rc;
 
 /// One PTX cloud header: grid size and the 4x4 transform.
@@ -52,6 +53,17 @@ impl PtxHeader {
 pub struct PtxReader {
     filename: String,
     discard_missing_points: bool,
+    stream: Option<PtxStreamState>,
+}
+
+struct PtxStreamState {
+    reader: BufReader<Box<dyn source::ReadSeek>>,
+    layout: Rc<PointLayout>,
+    dims: Vec<DimId>,
+    pending_line: Option<String>,
+    current_header: Option<PtxHeader>,
+    remaining_in_cloud: usize,
+    finished: bool,
 }
 
 impl PtxReader {
@@ -59,7 +71,44 @@ impl PtxReader {
         Self {
             filename: options.get_str("filename", ""),
             discard_missing_points: options.get_bool("discard_missing_points", true),
+            stream: None,
         }
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "PtxReader requires a filename option.".to_string(),
+            ));
+        }
+
+        let file = source::open_seek(&self.filename)
+            .map_err(|_| StageError(format!("Unable to open file '{}'.", self.filename)))?;
+        let mut reader = BufReader::new(file);
+        let header = parse_header_from_reader(&mut reader, &self.filename)?;
+        let mut first_data = String::new();
+        reader
+            .read_line(&mut first_data)
+            .map_err(|err| StageError(err.to_string()))?;
+        let fields = split_fields(&first_data);
+        let dims = dims_for(fields.len()).ok_or_else(|| {
+            StageError(format!(
+                "Invalid number of fields for the first point in file '{}'.",
+                self.filename
+            ))
+        })?;
+        let layout = layout_for_dims(&dims);
+        let grid = header.columns.saturating_mul(header.rows);
+        self.stream = Some(PtxStreamState {
+            reader,
+            layout,
+            dims,
+            pending_line: Some(first_data),
+            current_header: Some(header),
+            remaining_in_cloud: grid,
+            finished: false,
+        });
+        Ok(())
     }
 }
 
@@ -92,11 +141,7 @@ impl Reader for PtxReader {
             ))
         })?;
 
-        let mut layout = PointLayout::new();
-        for dim in &dims {
-            layout.register(dim.clone(), dim_type(dim));
-        }
-        let mut view = PointView::new(Rc::new(layout));
+        let mut view = PointView::new(layout_for_dims(&dims));
 
         // Each cloud is a header followed by columns*rows grid lines.
         let mut cursor = 0usize;
@@ -111,40 +156,7 @@ impl Reader for PtxReader {
                 if raw.is_empty() {
                     continue;
                 }
-                let fields = split_fields(raw);
-                // Lines with an unexpected field count are skipped, as in PDAL.
-                if fields.len() != dims.len() {
-                    continue;
-                }
-
-                let mut values = vec![0.0f64; dims.len()];
-                for (i, field) in fields.iter().enumerate() {
-                    let mut value = field.parse::<f64>().unwrap_or(0.0);
-                    // PTX intensity is 0.0..1.0; PDAL maps it to 0..4096.
-                    if dims[i] == DimId::Intensity {
-                        value = (value * 4096.0).round();
-                    }
-                    values[i] = value;
-                }
-
-                // Fully populated PTX grids carry "0 0 0" gap points.
-                if self.discard_missing_points
-                    && values[0] == 0.0
-                    && values[1] == 0.0
-                    && values[2] == 0.0
-                {
-                    continue;
-                }
-
-                let (x, y, z) = header.apply(values[0], values[1], values[2]);
-                values[0] = x;
-                values[1] = y;
-                values[2] = z;
-
-                let point = view.add_point();
-                for (dim, value) in dims.iter().zip(&values) {
-                    view.set_f64(point, dim, *value);
-                }
+                append_ptx_line(&mut view, &header, &dims, raw, self.discard_missing_points)?;
             }
         }
 
@@ -154,6 +166,132 @@ impl Reader for PtxReader {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.ptx")
     }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty() && source::open_seek(&self.filename).is_ok()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let discard_missing_points = self.discard_missing_points;
+        stream_next(
+            self.stream.as_mut().expect("stream initialized above"),
+            capacity,
+            discard_missing_points,
+            &self.filename,
+        )
+    }
+}
+
+fn layout_for_dims(dims: &[DimId]) -> Rc<PointLayout> {
+    let mut layout = PointLayout::new();
+    for dim in dims {
+        layout.register(dim.clone(), dim_type(dim));
+    }
+    Rc::new(layout)
+}
+
+fn stream_next(
+    state: &mut PtxStreamState,
+    capacity: usize,
+    discard_missing_points: bool,
+    filename: &str,
+) -> Result<Option<PointView>, StageError> {
+    if state.finished {
+        return Ok(None);
+    }
+
+    let mut view = PointView::new(Rc::clone(&state.layout));
+    let target = capacity.max(1);
+    while view.len() < target as u64 {
+        if state.current_header.is_none() {
+            match parse_header_from_reader(&mut state.reader, filename) {
+                Ok(header) => {
+                    state.remaining_in_cloud = header.columns.saturating_mul(header.rows);
+                    state.current_header = Some(header);
+                }
+                Err(err) if err.0.contains("Unable to read header") => {
+                    state.finished = true;
+                    break;
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        if state.remaining_in_cloud == 0 {
+            state.current_header = None;
+            continue;
+        }
+
+        let mut raw = state.pending_line.take().unwrap_or_default();
+        if raw.is_empty() {
+            state
+                .reader
+                .read_line(&mut raw)
+                .map_err(|err| StageError(err.to_string()))?;
+        }
+        state.remaining_in_cloud -= 1;
+        if raw.is_empty() {
+            state.finished = true;
+            break;
+        }
+        append_ptx_line(
+            &mut view,
+            state.current_header.as_ref().expect("header checked above"),
+            &state.dims,
+            &raw,
+            discard_missing_points,
+        )?;
+    }
+
+    if view.is_empty() && state.finished {
+        Ok(None)
+    } else {
+        Ok(Some(view))
+    }
+}
+
+fn append_ptx_line(
+    view: &mut PointView,
+    header: &PtxHeader,
+    dims: &[DimId],
+    raw: &str,
+    discard_missing_points: bool,
+) -> Result<(), StageError> {
+    let fields = split_fields(raw);
+    if fields.len() != dims.len() {
+        return Ok(());
+    }
+
+    let mut values = vec![0.0f64; dims.len()];
+    for (i, field) in fields.iter().enumerate() {
+        let mut value = field.parse::<f64>().unwrap_or(0.0);
+        if dims[i] == DimId::Intensity {
+            value = (value * 4096.0).round();
+        }
+        values[i] = value;
+    }
+
+    if discard_missing_points && values[0] == 0.0 && values[1] == 0.0 && values[2] == 0.0 {
+        return Ok(());
+    }
+
+    let (x, y, z) = header.apply(values[0], values[1], values[2]);
+    values[0] = x;
+    values[1] = y;
+    values[2] = z;
+
+    let point = view.add_point();
+    for (dim, value) in dims.iter().zip(&values) {
+        view.set_f64(point, dim, *value);
+    }
+    Ok(())
 }
 
 /// Parse a 10-line PTX cloud header, advancing `cursor` past it.
@@ -216,6 +354,63 @@ fn parse_header(
     })
 }
 
+fn parse_header_from_reader<R: BufRead>(
+    reader: &mut R,
+    filename: &str,
+) -> Result<PtxHeader, StageError> {
+    fn take<R: BufRead>(reader: &mut R, filename: &str) -> Result<String, StageError> {
+        let mut line = String::new();
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|err| StageError(err.to_string()))?;
+        if read == 0 {
+            return Err(StageError(format!(
+                "Unable to read header for file '{filename}'."
+            )));
+        }
+        Ok(line)
+    }
+
+    let columns: usize = take(reader, filename)?.trim().parse().map_err(|_| {
+        StageError(format!(
+            "Invalid column size in header for file '{filename}'."
+        ))
+    })?;
+    let rows: usize = take(reader, filename)?
+        .trim()
+        .parse()
+        .map_err(|_| StageError(format!("Invalid row size in header for file '{filename}'.")))?;
+
+    for _ in 0..4 {
+        take(reader, filename)?;
+    }
+
+    let mut transform = [0.0f64; 16];
+    for ty in 0..4 {
+        let row = take(reader, filename)?;
+        let fields = split_fields(&row);
+        if fields.len() != 4 {
+            return Err(StageError(format!(
+                "Invalid transform row '{}' in header for file '{filename}'.",
+                row.trim_end()
+            )));
+        }
+        for (tx, field) in fields.iter().enumerate() {
+            transform[tx + ty * 4] = field.parse().map_err(|_| {
+                StageError(format!(
+                    "Invalid transform value '{field}' in header for file '{filename}'."
+                ))
+            })?;
+        }
+    }
+
+    Ok(PtxHeader {
+        columns,
+        rows,
+        transform,
+    })
+}
+
 /// The fixed PTX dimension set for a given field count.
 fn dims_for(field_count: usize) -> Option<Vec<DimId>> {
     match field_count {
@@ -244,7 +439,7 @@ fn dim_type(dim: &DimId) -> DimType {
 /// Split a PTX line on spaces, dropping empty tokens (PDAL's `split2`).
 fn split_fields(line: &str) -> Vec<&str> {
     line.split(' ')
-        .map(|field| field.trim_end_matches('\r'))
+        .map(|field| field.trim_end_matches(['\r', '\n']))
         .filter(|field| !field.is_empty())
         .collect()
 }
@@ -354,6 +549,51 @@ mod tests {
                 view.get_f64(i + 4, &DimId::Z)
             ));
         }
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("ptx/multiple-and-transform.ptx"));
+
+        let mut full_reader = PtxReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = PtxReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(3).unwrap().unwrap();
+        let second = stream_reader.stream_next(3).unwrap().unwrap();
+        let third = stream_reader.stream_next(3).unwrap().unwrap();
+        assert!(stream_reader.stream_next(3).unwrap().is_none());
+
+        assert_eq!(first.len() + second.len() + third.len(), full.len());
+        assert!(close(
+            first.get_f64(0, &DimId::X),
+            full.get_f64(0, &DimId::X)
+        ));
+        assert!(close(
+            second.get_f64(0, &DimId::Y),
+            full.get_f64(3, &DimId::Y)
+        ));
+        assert!(close(
+            third.get_f64(1, &DimId::Z),
+            full.get_f64(7, &DimId::Z)
+        ));
+    }
+
+    #[test]
+    fn streaming_keeps_missing_points_when_requested() {
+        let mut options = Options::new();
+        options.add("filename", data_path("ptx/complex-transform.ptx"));
+        options.add("discard_missing_points", false);
+
+        let mut reader = PtxReader::new(&options);
+        assert!(reader.streamable());
+        let mut count = 0;
+        while let Some(chunk) = reader.stream_next(5).unwrap() {
+            count += chunk.len();
+        }
+        assert_eq!(count, 12);
     }
 
     #[test]
