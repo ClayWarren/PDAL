@@ -38,6 +38,31 @@ pub(super) fn read_value(buf: &[u8], ty: DimType) -> f64 {
     }
 }
 
+/// Decode a little-endian dimension value to an exact `u64`.
+///
+/// For 64-bit integer storage this reads the raw bytes so values above
+/// `2^53` are preserved exactly (an `f64` round-trip would lose the low
+/// bits). Smaller or floating types fall back to the `f64` decode.
+pub(super) fn read_u64(buf: &[u8], ty: DimType) -> u64 {
+    match ty {
+        DimType::U64 => u64::from_le_bytes(buf.try_into().unwrap()),
+        DimType::I64 => i64::from_le_bytes(buf.try_into().unwrap()) as u64,
+        _ => read_value(buf, ty) as u64,
+    }
+}
+
+/// Encode an exact `u64` into a little-endian dimension value of type `ty`.
+///
+/// For 64-bit integer storage this writes the raw bytes so large values are
+/// preserved exactly. Other types reuse the `f64` encode path.
+pub(super) fn write_u64(buf: &mut [u8], ty: DimType, v: u64) {
+    match ty {
+        DimType::U64 => buf.copy_from_slice(&v.to_le_bytes()),
+        DimType::I64 => buf.copy_from_slice(&(v as i64).to_le_bytes()),
+        _ => write_value(buf, ty, v as f64),
+    }
+}
+
 /// Encode an `f64` into a little-endian dimension value of type `ty`.
 pub(super) fn write_value(buf: &mut [u8], ty: DimType, v: f64) {
     match ty {

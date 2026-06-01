@@ -231,6 +231,60 @@ pub unsafe extern "C" fn pdal_point_view_try_set_f64(
     }
 }
 
+/// Write a dimension value to a point from an exact `u64`.
+///
+/// 64-bit integer dimensions (such as the uint64 `H3` index) store the value
+/// without an intermediate `f64` conversion, so values above `2^53` are
+/// preserved exactly.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+/// `dim_name` must be a valid, NUL-terminated C string.
+/// `idx` must be less than the number of points in the view.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_set_u64(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    val: u64,
+) {
+    if let (Some(view), false) = (view.as_mut(), dim_name.is_null()) {
+        let n = CStr::from_ptr(dim_name).to_string_lossy();
+        view.set_u64(idx, &dim_id_from_name(&n), val);
+    }
+}
+
+/// Get a dimension value from a point, as an exact `u64`.
+///
+/// 64-bit integer dimensions are read from their raw storage, so the low bits
+/// of large indexes survive (an `f64` getter would round them away). Returns
+/// `false` (and leaves `*out` untouched) if `view`/`dim_name`/`out` are null.
+///
+/// # Safety
+///
+/// `view` must be a valid pointer returned by `pdal_point_view_create`.
+/// `dim_name` must be a valid, NUL-terminated C string.
+/// `idx` must be less than the number of points in the view.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_u64(
+    view: *mut PointView,
+    idx: u64,
+    dim_name: *const c_char,
+    out: *mut u64,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    if let (Some(view), false) = (view.as_ref(), dim_name.is_null()) {
+        let n = CStr::from_ptr(dim_name).to_string_lossy();
+        *out = view.get_u64(idx, &dim_id_from_name(&n));
+        true
+    } else {
+        false
+    }
+}
+
 /// Get a dimension value from a point, as `f64`.
 ///
 /// # Safety

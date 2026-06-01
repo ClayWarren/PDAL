@@ -601,6 +601,34 @@ impl PointView {
         }
     }
 
+    /// Read a dimension of point `idx` as an exact `u64`.
+    ///
+    /// Unlike [`PointView::get_f64`], 64-bit integer dimensions (such as the
+    /// uint64 `H3` index) are read from their raw storage, so values above
+    /// `2^53` are preserved without `f64` rounding. Unregistered dimensions
+    /// read as `0`.
+    pub fn get_u64(&self, idx: PointId, dim: &DimId) -> u64 {
+        match self.layout.dim(dim) {
+            Some((off, ty)) => {
+                let base = (idx as usize) * self.layout.point_size() + off;
+                read_u64(&self.data[base..base + ty.size()], ty)
+            }
+            None => 0,
+        }
+    }
+
+    /// Write a dimension of point `idx` from an exact `u64`.
+    ///
+    /// 64-bit integer dimensions store the value without an intermediate
+    /// `f64` conversion, so large indexes are preserved exactly. Unregistered
+    /// dimensions are ignored.
+    pub fn set_u64(&mut self, idx: PointId, dim: &DimId, value: u64) {
+        if let Some((off, ty)) = self.layout.dim(dim) {
+            let base = (idx as usize) * self.layout.point_size() + off;
+            write_u64(&mut self.data[base..base + ty.size()], ty, value);
+        }
+    }
+
     /// Checked variant of [`PointView::set_f64`]. Returns `false` if the point,
     /// dimension, or target type cannot accept the value.
     pub fn try_set_f64(&mut self, idx: PointId, dim: &DimId, value: f64) -> bool {
@@ -619,7 +647,7 @@ impl PointView {
 
 #[path = "point/value_io.rs"]
 mod value_io;
-use value_io::{read_value, value_fits_type, write_value};
+use value_io::{read_u64, read_value, value_fits_type, write_u64, write_value};
 
 #[cfg(test)]
 mod tests;

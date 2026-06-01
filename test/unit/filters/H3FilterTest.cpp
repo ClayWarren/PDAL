@@ -77,4 +77,21 @@ TEST(H3FilterTest, stream_test_2)
     h3.prepare(table1);
     PointViewSet s1 = h3.execute(table1);
     PointViewPtr v1 = *(s1.begin());
+
+    // The filter must populate the uint64 H3 dimension, and the values must
+    // survive the Rust -> C ABI -> C++ bridge as exact 64-bit integers. A
+    // resolution-12 H3 index uses low bits that an f64 mantissa cannot hold,
+    // so the old `u64 -> f64` path would store a value equal to its own
+    // double truncation for every point. Require that at least one point
+    // retains those low bits, which only the typed transfer preserves.
+    ASSERT_GT(v1->size(), 0u);
+    bool anyExactLowBits = false;
+    for (PointId i = 0; i < v1->size(); ++i)
+    {
+        uint64_t h3 = v1->getFieldAs<uint64_t>(Dimension::Id::H3, i);
+        EXPECT_GT(h3, 0u);
+        if (h3 != static_cast<uint64_t>(static_cast<double>(h3)))
+            anyExactLowBits = true;
+    }
+    EXPECT_TRUE(anyExactLowBits);
 }

@@ -646,7 +646,15 @@ Known mixed binaries:
   Dimension ferrying routes through the Rust C ABI in batch and streaming paths.
   Stage factory smoke coverage remains C++ wrapper behavior.
 - `pdal_filters_h3_test`: only `stream_test_2` counts; H3 indexing routes
-  through the Rust C ABI. Stage creation remains C++ factory behavior.
+  through the Rust C ABI. Stage creation remains C++ factory behavior. The
+  uint64 H3 index is now carried losslessly end-to-end: Rust stores it via the
+  exact `PointView::set_u64` path (not `u64 as f64`), and the
+  `RustViewConverter` readback uses the typed `pdal_point_view_get_u64` C ABI
+  for `Unsigned64` dimensions so the low bits survive Rust -> C ABI -> C++.
+  `stream_test_2` was strengthened from a no-assertion smoke into a real parity
+  check: it requires resolution-12 indexes whose low bits an `f64` mantissa
+  cannot hold, which fails on the old `u64 -> f64` path and passes on the typed
+  path.
 - `pdal_filters_hexbin_test`: `HexbinFilterTest_test_1`,
   `HexbinFilterTest_test_2`, `HexGrid_issue_2507`, `H3Grid_issue_2507`, and
   `issue_4899` count. Hexbin stage execution and the native/H3 hex-grid

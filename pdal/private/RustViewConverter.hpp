@@ -198,6 +198,27 @@ inline pdal_point_view_t* toRustPoint(PointRef& point, PointLayoutPtr layout)
     return rustView;
 }
 
+// Copy one dimension value back from a Rust view into a C++ container.
+// 64-bit integer dimensions (such as the uint64 H3 index) are read through
+// the exact typed C ABI getter so values above 2^53 keep their low bits; all
+// other types use the f64 path. `SetField` adapts to PointRef vs PointView.
+template <typename SetField>
+inline void copyFieldFromRust(pdal_point_view_t* rustView, uint64_t rustIdx,
+                              const std::string& name, Dimension::Type type,
+                              SetField&& setField)
+{
+    if (type == Dimension::Type::Unsigned64)
+    {
+        uint64_t v = 0;
+        if (pdal_point_view_get_u64(rustView, rustIdx, name.c_str(), &v))
+        {
+            setField(v);
+            return;
+        }
+    }
+    setField(pdal_point_view_get_f64(rustView, rustIdx, name.c_str()));
+}
+
 inline void fromRustPoint(pdal_point_view_t* rust_out_view, uint64_t rust_idx,
                           PointRef& outPoint)
 {
@@ -211,9 +232,9 @@ inline void fromRustPoint(pdal_point_view_t* rust_out_view, uint64_t rust_idx,
             Dimension::Id id = outPoint.layout()->findDim(dimName);
             if (id != Dimension::Id::Unknown)
             {
-                double v = pdal_point_view_get_f64(rust_out_view, rust_idx,
-                                                   dimName.c_str());
-                outPoint.setField(id, v);
+                copyFieldFromRust(rust_out_view, rust_idx, dimName,
+                                  outPoint.layout()->dimType(id),
+                                  [&](auto v) { outPoint.setField(id, v); });
             }
         }
     }
@@ -292,9 +313,10 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointView& outView)
             }
             for (auto dim : outView.layout()->dims())
             {
-                double v = pdal_point_view_get_f64(
-                    rust_out_view, idx, outView.layout()->dimName(dim).c_str());
-                outView.setField(dim, out_idx, v);
+                copyFieldFromRust(
+                    rust_out_view, idx, outView.layout()->dimName(dim),
+                    outView.layout()->dimType(dim),
+                    [&](auto v) { outView.setField(dim, out_idx, v); });
             }
         }
         copyMeshFromRust(rust_out_view, outView);
@@ -317,9 +339,10 @@ inline void fromRust(pdal_point_view_t* rust_out_view, PointViewPtr baseView,
             PointId out_idx = outView.size() - 1;
             for (auto dim : outView.layout()->dims())
             {
-                double v = pdal_point_view_get_f64(
-                    rust_out_view, idx, outView.layout()->dimName(dim).c_str());
-                outView.setField(dim, out_idx, v);
+                copyFieldFromRust(
+                    rust_out_view, idx, outView.layout()->dimName(dim),
+                    outView.layout()->dimType(dim),
+                    [&](auto v) { outView.setField(dim, out_idx, v); });
             }
         }
         copyMeshFromRust(rust_out_view, outView);
