@@ -5,6 +5,8 @@ export BASE=`pwd`
 conda activate test
 conda install cmake ninja compilers -y
 
+./rust/scripts/check_installed_capi_consumer.sh --prefix "$CONDA_PREFIX"
+
 if [ "$PDAL_PLATFORM" == "windows-latest" ]; then
 
 export CC=cl.exe

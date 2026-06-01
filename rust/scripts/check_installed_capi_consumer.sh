@@ -4,7 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${1:-${ROOT_DIR}/.build}"
 
-if [[ ! -d "${BUILD_DIR}" ]]; then
+INSTALL_PREFIX=""
+if [[ "${BUILD_DIR}" == "--prefix" ]]; then
+    if [[ $# -ne 2 ]]; then
+        echo "Usage: $0 [build-dir] | --prefix install-prefix" >&2
+        exit 1
+    fi
+    INSTALL_PREFIX="$2"
+elif [[ ! -d "${BUILD_DIR}" ]]; then
     echo "Build directory does not exist: ${BUILD_DIR}" >&2
     exit 1
 fi
@@ -12,10 +19,12 @@ fi
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pdal-capi-install.XXXXXX")"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
-INSTALL_PREFIX="${TMP_DIR}/install"
-CONSUMER_DIR="${TMP_DIR}/consumer"
+if [[ -z "${INSTALL_PREFIX}" ]]; then
+    INSTALL_PREFIX="${TMP_DIR}/install"
+    cmake --install "${BUILD_DIR}" --prefix "${INSTALL_PREFIX}" >/dev/null
+fi
 
-cmake --install "${BUILD_DIR}" --prefix "${INSTALL_PREFIX}" >/dev/null
+CONSUMER_DIR="${TMP_DIR}/consumer"
 
 mkdir -p "${CONSUMER_DIR}"
 cat >"${CONSUMER_DIR}/CMakeLists.txt" <<'CMAKE'
