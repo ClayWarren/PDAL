@@ -1,4 +1,3 @@
-use super::CliStageOption;
 use crate::pipeline_abi::{
     pdal_pipeline_result_t, pipeline_result_to_json_for_kernel, PipelineHandle,
 };
