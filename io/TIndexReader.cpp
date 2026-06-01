@@ -473,7 +473,8 @@ bool TIndexReader::canUseRustReader() const
     if (jsonIndex && (!m_args->m_attributeFilter.empty() ||
                       !m_args->m_sql.empty()))
         return false;
-    if (!m_args->m_wkt.empty() && !m_args->m_filterSRS.empty())
+    if (!m_args->m_wkt.empty() && !m_args->m_filterSRS.empty() &&
+        m_args->m_tgtSrsString.empty())
         return false;
 
     return m_args->m_ogr.empty();
@@ -497,6 +498,7 @@ void TIndexReader::loadRustView()
     addOption(options, "sql", m_args->m_sql);
     addOption(options, "dialect", m_args->m_dialect);
     addOption(options, "polygon", m_args->m_wkt);
+    addOption(options, "filter_srs", m_args->m_filterSRS);
     addOption(options, "t_srs", m_args->m_tgtSrsString);
     if (m_args->m_rawReaderArgs.size())
         addOption(options, "reader_args", NL::json(m_args->m_rawReaderArgs).dump());

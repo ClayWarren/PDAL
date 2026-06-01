@@ -20,6 +20,7 @@ pub struct TindexReader {
     sql: String,
     dialect: String,
     polygon: String,
+    filter_srs: String,
     target_srs: String,
     reader_args: String,
     bounds: String,
@@ -36,6 +37,7 @@ impl TindexReader {
             sql: options.get_str("sql", ""),
             dialect: options.get_str("dialect", "OGRSQL"),
             polygon: options.get_str("polygon", ""),
+            filter_srs: options.get_str("filter_srs", ""),
             target_srs: options.get_str("t_srs", ""),
             reader_args: options.get_str("reader_args", ""),
             bounds: options.get_str("bounds", ""),
@@ -56,7 +58,7 @@ impl Reader for TindexReader {
         }
 
         let bounds = parse_tindex_bounds(&self.bounds)?;
-        let polygon = parse_tindex_polygon(&self.polygon)?;
+        let polygon = parse_tindex_polygon(&self.polygon, &self.filter_srs, &self.target_srs)?;
         let features = read_index_features(
             &self.filename,
             &self.layer_name,
@@ -396,11 +398,22 @@ fn parse_tindex_bounds(bounds: &str) -> Result<Option<Bounds2D>, StageError> {
         .map_err(StageError)
 }
 
-fn parse_tindex_polygon(polygon: &str) -> Result<Option<Geometry>, StageError> {
+fn parse_tindex_polygon(
+    polygon: &str,
+    filter_srs: &str,
+    target_srs: &str,
+) -> Result<Option<Geometry>, StageError> {
     if polygon.trim().is_empty() {
         return Ok(None);
     }
-    Geometry::from_wkt(polygon).map(Some).map_err(StageError)
+    let geometry = Geometry::from_wkt(polygon).map_err(StageError)?;
+    if filter_srs.trim().is_empty() || target_srs.trim().is_empty() {
+        return Ok(Some(geometry));
+    }
+    geometry
+        .transform(filter_srs, target_srs)
+        .map(Some)
+        .map_err(StageError)
 }
 
 fn feature_matches_bounds(
@@ -1009,6 +1022,20 @@ mod tests {
         assert!((view.get_f64(point, &DimId::X) - 111_319.49).abs() < 1.0);
         assert!((view.get_f64(point, &DimId::Y) - 111_325.14).abs() < 1.0);
         assert_eq!(view.spatial_reference().wkt(), "EPSG:3857");
+    }
+
+    #[test]
+    fn polygon_filter_reprojects_from_filter_srs() {
+        let polygon =
+            parse_tindex_polygon("POLYGON((0 0,2 0,2 2,0 2,0 0))", "EPSG:4326", "EPSG:3857")
+                .unwrap()
+                .unwrap();
+        let feature = Geometry::from_wkt(
+            "POLYGON((100000 100000,120000 100000,120000 120000,100000 120000,100000 100000))",
+        )
+        .unwrap();
+
+        assert!(feature.intersects(&polygon).unwrap());
     }
 
     #[test]

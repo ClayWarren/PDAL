@@ -1,7 +1,9 @@
 //! Geometry support via GEOS.
 
+use crate::srs::user_input_to_wkt;
 use geos::{CoordDimensions, CoordSeq, Geom, Geometry as GeosGeometry, WKTWriter};
 use serde_json::Value;
+use std::ffi::{c_char, c_void, CStr, CString};
 
 /// A geometry (PDAL's `Geometry`).
 pub struct Geometry {
@@ -70,6 +72,12 @@ impl Geometry {
         self.geos_geom
             .intersects(&other.geos_geom)
             .map_err(|e| e.to_string())
+    }
+
+    pub fn transform(&self, src_srs: &str, dst_srs: &str) -> Result<Self, String> {
+        let wkt = self.to_wkt()?;
+        let transformed = transform_wkt(&wkt, src_srs, dst_srs)?;
+        Self::from_wkt(&transformed)
     }
 
     pub fn area(&self) -> Result<f64, String> {
@@ -163,6 +171,81 @@ impl Geometry {
             geos_geom: boundary,
         })
     }
+}
+
+fn transform_wkt(wkt: &str, src_srs: &str, dst_srs: &str) -> Result<String, String> {
+    if src_srs.trim().is_empty() || dst_srs.trim().is_empty() {
+        return Ok(wkt.to_string());
+    }
+    let src = user_input_to_wkt(src_srs)?.wkt;
+    let dst = user_input_to_wkt(dst_srs)?.wkt;
+    let src_c = CString::new(src).map_err(|e| e.to_string())?;
+    let dst_c = CString::new(dst).map_err(|e| e.to_string())?;
+    let wkt_c = CString::new(wkt).map_err(|e| e.to_string())?;
+
+    unsafe {
+        let src_handle = import_srs_wkt(&src_c)?;
+        let dst_handle = match import_srs_wkt(&dst_c) {
+            Ok(handle) => handle,
+            Err(err) => {
+                gdal_sys::OSRDestroySpatialReference(src_handle);
+                return Err(err);
+            }
+        };
+        let transform = gdal_sys::OCTNewCoordinateTransformation(src_handle, dst_handle);
+        gdal_sys::OSRDestroySpatialReference(src_handle);
+        gdal_sys::OSRDestroySpatialReference(dst_handle);
+        if transform.is_null() {
+            return Err(format!(
+                "Failed to create geometry transformation from '{src_srs}' to '{dst_srs}'."
+            ));
+        }
+
+        let mut geom = std::ptr::null_mut();
+        let mut wkt_ptr = wkt_c.as_ptr() as *mut c_char;
+        if gdal_sys::OGR_G_CreateFromWkt(&mut wkt_ptr, std::ptr::null_mut(), &mut geom)
+            != gdal_sys::OGRErr::OGRERR_NONE
+        {
+            gdal_sys::OCTDestroyCoordinateTransformation(transform);
+            return Err("Failed to parse geometry WKT for transformation.".to_string());
+        }
+
+        let err = gdal_sys::OGR_G_Transform(geom, transform);
+        gdal_sys::OCTDestroyCoordinateTransformation(transform);
+        if err != gdal_sys::OGRErr::OGRERR_NONE {
+            gdal_sys::OGR_G_DestroyGeometry(geom);
+            return Err("Failed to transform geometry.".to_string());
+        }
+
+        let mut out = std::ptr::null_mut();
+        if gdal_sys::OGR_G_ExportToWkt(geom, &mut out) != gdal_sys::OGRErr::OGRERR_NONE
+            || out.is_null()
+        {
+            gdal_sys::OGR_G_DestroyGeometry(geom);
+            return Err("Failed to export transformed geometry WKT.".to_string());
+        }
+        let result = CStr::from_ptr(out).to_string_lossy().into_owned();
+        gdal_sys::VSIFree(out as *mut c_void);
+        gdal_sys::OGR_G_DestroyGeometry(geom);
+        Ok(result)
+    }
+}
+
+unsafe fn import_srs_wkt(wkt: &CString) -> Result<gdal_sys::OGRSpatialReferenceH, String> {
+    let srs = gdal_sys::OSRNewSpatialReference(std::ptr::null());
+    if srs.is_null() {
+        return Err("OSRNewSpatialReference returned null".to_string());
+    }
+    let mut wkt_ptr = wkt.as_ptr() as *mut c_char;
+    if gdal_sys::OSRImportFromWkt(srs, &mut wkt_ptr) != gdal_sys::OGRErr::OGRERR_NONE {
+        gdal_sys::OSRDestroySpatialReference(srs);
+        return Err("OSRImportFromWkt failed".to_string());
+    }
+    gdal_sys::OSRSetAxisMappingStrategy(
+        srs,
+        gdal_sys::OSRAxisMappingStrategy::OAMS_TRADITIONAL_GIS_ORDER,
+    );
+    Ok(srs)
 }
 
 fn normalize_wkt(wkt: &str) -> String {
@@ -517,6 +600,18 @@ mod tests {
         let geometry = Geometry::from_wkt("POINT (1 2)").unwrap();
         let wkt = geometry.to_wkt().unwrap();
         assert!(wkt.contains("POINT (1") && wkt.contains("2)"));
+    }
+
+    #[test]
+    fn transform_reprojects_geometry() {
+        let geometry = Geometry::from_wkt("POINT (1 1)").unwrap();
+        let transformed = geometry.transform("EPSG:4326", "EPSG:3857").unwrap();
+        let (minx, maxx, miny, maxy, _, _) = transformed.bounds().unwrap();
+
+        assert!((minx - 111_319.49).abs() < 1.0);
+        assert!((maxx - 111_319.49).abs() < 1.0);
+        assert!((miny - 111_325.14).abs() < 1.0);
+        assert!((maxy - 111_325.14).abs() < 1.0);
     }
 
     #[test]
