@@ -10,7 +10,7 @@ find_package(Threads REQUIRED)
 
 add_executable(batch_streamer batch_streamer.cpp)
 
-target_link_libraries(batch_streamer PRIVATE ${PDAL_LIBRARIES} PRIVATE Threads::Threads)
+target_link_libraries(batch_streamer PRIVATE PDAL::PDAL Threads::Threads)
 target_include_directories(batch_streamer PRIVATE
     ${PDAL_INCLUDE_DIRS}
     ${PDAL_INCLUDE_DIRS}/pdal)

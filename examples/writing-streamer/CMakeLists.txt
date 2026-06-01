@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(writing_streamer writing_streamer.cpp)
 
-target_link_libraries(writing_streamer PRIVATE ${PDAL_LIBRARIES})
+target_link_libraries(writing_streamer PRIVATE PDAL::PDAL)
 target_include_directories(writing_streamer PRIVATE
     ${PDAL_INCLUDE_DIRS}
     ${PDAL_INCLUDE_DIRS}/pdal)

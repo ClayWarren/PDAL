@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(filter_streamer filter_streamer.cpp)
 
-target_link_libraries(filter_streamer PRIVATE ${PDAL_LIBRARIES})
+target_link_libraries(filter_streamer PRIVATE PDAL::PDAL)
 target_include_directories(filter_streamer PRIVATE
     ${PDAL_INCLUDE_DIRS}
     ${PDAL_INCLUDE_DIRS}/pdal)
