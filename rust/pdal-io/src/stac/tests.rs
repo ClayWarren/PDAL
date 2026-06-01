@@ -601,6 +601,53 @@ fn ogr_bounds_filter_supports_multipolygon_geojson() {
 }
 
 #[test]
+fn ogr_bounds_filter_reads_native_datasource_by_sql_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let datasource = temp.path().join("boundary.shp");
+    {
+        let vector =
+            pdal_native::gdal::Vector::create(datasource.to_str().unwrap(), "ESRI Shapefile")
+                .unwrap();
+        let layer = vector.open_or_create_layer("boundary", "").unwrap();
+        unsafe {
+            pdal_native::gdal::Vector::create_string_field(layer, "id").unwrap();
+            pdal_native::gdal::Vector::add_feature(
+                layer,
+                "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+                &[("id", "1")],
+            )
+            .unwrap();
+            pdal_native::gdal::Vector::add_feature(
+                layer,
+                "POLYGON((50 -10,51 -10,51 0,50 0,50 -10))",
+                &[("id", "2")],
+            )
+            .unwrap();
+        }
+    }
+
+    let ogr = format!(
+        r#"{{"type":"ogr","datasource":"{}","sql":"select * from boundary WHERE id = 2"}}"#,
+        datasource.display()
+    );
+    let bounds = parse_ogr_bounds(&ogr).unwrap().unwrap();
+    assert_eq!(bounds.minx, 50.0);
+    assert_eq!(bounds.maxx, 51.0);
+    assert_eq!(bounds.miny, -10.0);
+    assert_eq!(bounds.maxy, 0.0);
+
+    let ogr = format!(
+        r#"{{"type":"ogr","datasource":"{}","sql":"select * from boundary"}}"#,
+        datasource.display()
+    );
+    let bounds = parse_ogr_bounds(&ogr).unwrap().unwrap();
+    assert_eq!(bounds.minx, 0.0);
+    assert_eq!(bounds.maxx, 51.0);
+    assert_eq!(bounds.miny, -10.0);
+    assert_eq!(bounds.maxy, 1.0);
+}
+
+#[test]
 fn ogr_bounds_filter_rejects_invalid_polygon() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(

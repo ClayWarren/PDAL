@@ -5,6 +5,7 @@ use chrono::{DateTime, FixedOffset};
 use pdal_core::ogr_spec::parse_ogr_spec_json;
 use pdal_core::options::Options;
 use pdal_core::stage::StageError;
+use pdal_native::geometry::Geometry;
 use regex::Regex;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -378,23 +379,30 @@ pub(super) fn parse_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> 
 
 pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> {
     let spec = parse_ogr_spec_json(value).map_err(StageError)?;
-    let text = source::read_to_string(&spec.datasource).map_err(|err| {
-        StageError(format!(
-            "Can't open OGR datasource '{}': {err}",
-            spec.datasource
-        ))
-    })?;
-    let json: Value = serde_json::from_str(&text).map_err(|err| {
-        StageError(format!(
-            "OGR datasource '{}' is not valid GeoJSON: {err}",
-            spec.datasource
-        ))
-    })?;
     let id_filter = ogr_sql_id_filter(&spec.sql);
+    match source::read_to_string(&spec.datasource) {
+        Ok(text) => match parse_geojson_ogr_bounds(&spec.datasource, &text, id_filter) {
+            Ok(bounds) => Ok(bounds),
+            Err(json_err) => parse_native_ogr_bounds(&spec.datasource, id_filter).or(Err(json_err)),
+        },
+        Err(text_err) => parse_native_ogr_bounds(&spec.datasource, id_filter)
+            .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
+    }
+}
+
+fn parse_geojson_ogr_bounds(
+    datasource: &str,
+    text: &str,
+    id_filter: Option<i64>,
+) -> Result<Option<Bounds2D>, StageError> {
+    let json: Value = serde_json::from_str(text).map_err(|err| {
+        StageError(format!(
+            "OGR datasource '{datasource}' is not valid GeoJSON: {err}"
+        ))
+    })?;
     let features = json["features"].as_array().ok_or_else(|| {
         StageError(format!(
-            "OGR datasource '{}' is missing GeoJSON features.",
-            spec.datasource
+            "OGR datasource '{datasource}' is missing GeoJSON features."
         ))
     })?;
     let mut out: Option<Bounds2D> = None;
@@ -406,6 +414,39 @@ pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageErr
         }
         let Some(bounds) = geojson_geometry_bounds(&feature["geometry"])? else {
             continue;
+        };
+        match &mut out {
+            Some(out) => out.grow_bounds(&bounds),
+            None => out = Some(bounds),
+        }
+    }
+    Ok(out)
+}
+
+fn parse_native_ogr_bounds(
+    datasource: &str,
+    id_filter: Option<i64>,
+) -> Result<Option<Bounds2D>, StageError> {
+    let vector = pdal_native::gdal::Vector::open(datasource).map_err(StageError)?;
+    let wkts = if let Some(id_filter) = id_filter {
+        vector
+            .get_features(0, "id")
+            .map_err(StageError)?
+            .into_iter()
+            .filter_map(|(wkt, id)| (id as i64 == id_filter).then_some(wkt))
+            .collect()
+    } else {
+        vector.get_feature_wkts(0).map_err(StageError)?
+    };
+    let mut out: Option<Bounds2D> = None;
+    for wkt in wkts {
+        let geometry = Geometry::from_wkt(&wkt).map_err(StageError)?;
+        let (minx, maxx, miny, maxy, _, _) = geometry.bounds().map_err(StageError)?;
+        let bounds = Bounds2D {
+            minx,
+            maxx,
+            miny,
+            maxy,
         };
         match &mut out {
             Some(out) => out.grow_bounds(&bounds),

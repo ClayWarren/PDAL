@@ -235,6 +235,39 @@ impl Vector {
             Ok(result)
         }
     }
+
+    pub fn get_feature_wkts(&self, layer_idx: i32) -> Result<Vec<String>, String> {
+        unsafe {
+            let mut result = Vec::new();
+            let layer = gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx);
+            if layer.is_null() {
+                return Err("Failed to get layer".to_string());
+            }
+            gdal_sys::OGR_L_ResetReading(layer);
+
+            loop {
+                let feature = gdal_sys::OGR_L_GetNextFeature(layer);
+                if feature.is_null() {
+                    break;
+                }
+
+                let geom = gdal_sys::OGR_F_GetGeometryRef(feature);
+                if !geom.is_null() {
+                    let mut wkt_ptr: *mut std::os::raw::c_char = std::ptr::null_mut();
+                    if gdal_sys::OGR_G_ExportToWkt(geom, &mut wkt_ptr) == CPLErr::CE_None {
+                        result.push(
+                            std::ffi::CStr::from_ptr(wkt_ptr)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
+                        gdal_sys::VSIFree(wkt_ptr as *mut _);
+                    }
+                }
+                gdal_sys::OGR_F_Destroy(feature);
+            }
+            Ok(result)
+        }
+    }
 }
 
 impl Drop for Vector {
