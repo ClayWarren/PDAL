@@ -1,5 +1,6 @@
 //! `writers.gdal` -- Write point clouds as GDAL rasters.
 
+use pdal_core::gdal::RasterDataType;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
@@ -20,7 +21,15 @@ enum OutputStat {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OutputDataType {
     Float64,
+    Float32,
+    Int8,
+    UInt8,
+    Int16,
+    UInt16,
     Int32,
+    UInt32,
+    Int64,
+    UInt64,
 }
 
 pub struct GdalWriter {
@@ -170,72 +179,31 @@ impl Writer for GdalWriter {
         let srs_wkt = resolve_srs(views, &self.override_srs, &self.default_srs);
 
         pdal_core::gdal::register_drivers();
-        match self.data_type {
-            OutputDataType::Float64 => {
-                let mut raster = pdal_core::gdal::Raster::create_float64(
-                    &self.filename,
-                    &self.driver_name,
-                    grid.width as i32,
-                    grid.height as i32,
-                    bands.len() as i32,
-                    geo_transform,
-                    &srs_wkt,
+        let mut raster = pdal_core::gdal::Raster::create_typed(
+            &self.filename,
+            &self.driver_name,
+            grid.width as i32,
+            grid.height as i32,
+            bands.len() as i32,
+            geo_transform,
+            &srs_wkt,
+            self.data_type.gdal_type(),
+        )
+        .map_err(StageError)?;
+        for (idx, (name, data)) in bands.iter().enumerate() {
+            raster
+                .write_band_f64(
+                    idx as i32 + 1,
+                    grid.width,
+                    grid.height,
+                    data,
+                    self.no_data,
+                    name,
                 )
                 .map_err(StageError)?;
-                for (idx, (name, data)) in bands.iter().enumerate() {
-                    raster
-                        .write_band_f64(
-                            idx as i32 + 1,
-                            grid.width,
-                            grid.height,
-                            data,
-                            self.no_data,
-                            name,
-                        )
-                        .map_err(StageError)?;
-                }
-                for (key, value) in &self.metadata {
-                    raster.set_metadata_item(key, value).map_err(StageError)?;
-                }
-            }
-            OutputDataType::Int32 => {
-                let no_data = self.no_data.round() as i32;
-                let mut raster = pdal_core::gdal::Raster::create_int32(
-                    &self.filename,
-                    &self.driver_name,
-                    grid.width as i32,
-                    grid.height as i32,
-                    bands.len() as i32,
-                    geo_transform,
-                    &srs_wkt,
-                )
-                .map_err(StageError)?;
-                for (idx, (name, data)) in bands.iter().enumerate() {
-                    let int_data: Vec<i32> = data
-                        .iter()
-                        .map(|value| {
-                            if (*value - self.no_data).abs() < f64::EPSILON {
-                                no_data
-                            } else {
-                                value.round() as i32
-                            }
-                        })
-                        .collect();
-                    raster
-                        .write_band_i32(
-                            idx as i32 + 1,
-                            grid.width,
-                            grid.height,
-                            &int_data,
-                            no_data,
-                            name,
-                        )
-                        .map_err(StageError)?;
-                }
-                for (key, value) in &self.metadata {
-                    raster.set_metadata_item(key, value).map_err(StageError)?;
-                }
-            }
+        }
+        for (key, value) in &self.metadata {
+            raster.set_metadata_item(key, value).map_err(StageError)?;
         }
         Ok(())
     }
@@ -248,13 +216,38 @@ impl Writer for GdalWriter {
 fn parse_data_type(value: &str) -> (OutputDataType, Option<String>) {
     match value.to_ascii_lowercase().as_str() {
         "double" | "float64" => (OutputDataType::Float64, None),
+        "float" | "float32" => (OutputDataType::Float32, None),
+        "int8" | "signed8" => (OutputDataType::Int8, None),
+        "uint8" | "unsigned8" | "byte" => (OutputDataType::UInt8, None),
+        "int16" | "int16_t" | "signed16" => (OutputDataType::Int16, None),
+        "uint16" | "uint16_t" | "unsigned16" => (OutputDataType::UInt16, None),
         "int32" | "int32_t" | "signed32" | "int" => (OutputDataType::Int32, None),
+        "uint32" | "uint32_t" | "unsigned32" => (OutputDataType::UInt32, None),
+        "int64" | "int64_t" | "signed64" => (OutputDataType::Int64, None),
+        "uint64" | "uint64_t" | "unsigned64" => (OutputDataType::UInt64, None),
         _ => (
             OutputDataType::Float64,
             Some(format!(
                 "Unsupported GDAL writer data_type '{value}' for the Rust-backed path."
             )),
         ),
+    }
+}
+
+impl OutputDataType {
+    fn gdal_type(self) -> RasterDataType {
+        match self {
+            OutputDataType::Float64 => RasterDataType::Float64,
+            OutputDataType::Float32 => RasterDataType::Float32,
+            OutputDataType::Int8 => RasterDataType::Int8,
+            OutputDataType::UInt8 => RasterDataType::UInt8,
+            OutputDataType::Int16 => RasterDataType::Int16,
+            OutputDataType::UInt16 => RasterDataType::UInt16,
+            OutputDataType::Int32 => RasterDataType::Int32,
+            OutputDataType::UInt32 => RasterDataType::UInt32,
+            OutputDataType::Int64 => RasterDataType::Int64,
+            OutputDataType::UInt64 => RasterDataType::UInt64,
+        }
     }
 }
 

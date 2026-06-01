@@ -7,6 +7,37 @@ pub struct Raster {
     ds: GDALDatasetH,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RasterDataType {
+    Float64,
+    Float32,
+    Int8,
+    UInt8,
+    Int16,
+    UInt16,
+    Int32,
+    UInt32,
+    Int64,
+    UInt64,
+}
+
+impl RasterDataType {
+    fn gdal_type(self) -> gdal_sys::GDALDataType::Type {
+        match self {
+            RasterDataType::Float64 => GDALDataType::GDT_Float64,
+            RasterDataType::Float32 => GDALDataType::GDT_Float32,
+            RasterDataType::Int8 => GDALDataType::GDT_Int8,
+            RasterDataType::UInt8 => GDALDataType::GDT_UInt8,
+            RasterDataType::Int16 => GDALDataType::GDT_Int16,
+            RasterDataType::UInt16 => GDALDataType::GDT_UInt16,
+            RasterDataType::Int32 => GDALDataType::GDT_Int32,
+            RasterDataType::UInt32 => GDALDataType::GDT_UInt32,
+            RasterDataType::Int64 => GDALDataType::GDT_Int64,
+            RasterDataType::UInt64 => GDALDataType::GDT_UInt64,
+        }
+    }
+}
+
 impl Raster {
     pub fn open(path: &str) -> Result<Self, String> {
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
@@ -58,6 +89,29 @@ impl Raster {
             geo_transform,
             srs_wkt,
             GDALDataType::GDT_Int32,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_typed(
+        path: &str,
+        driver_name: &str,
+        width: i32,
+        height: i32,
+        band_count: i32,
+        geo_transform: [f64; 6],
+        srs_wkt: &str,
+        pixel_type: RasterDataType,
+    ) -> Result<Self, String> {
+        Self::create(
+            path,
+            driver_name,
+            width,
+            height,
+            band_count,
+            geo_transform,
+            srs_wkt,
+            pixel_type.gdal_type(),
         )
     }
 
@@ -118,6 +172,24 @@ impl Raster {
 
     pub fn band_count(&self) -> i32 {
         unsafe { gdal_sys::GDALGetRasterCount(self.ds) }
+    }
+
+    pub fn band_type_name(&self, band_idx: i32) -> Result<String, String> {
+        unsafe {
+            let band = GDALGetRasterBand(self.ds, band_idx);
+            if band.is_null() {
+                return Err(format!("Failed to get band {}", band_idx));
+            }
+            let data_type = gdal_sys::GDALGetRasterDataType(band);
+            let name = gdal_sys::GDALGetDataTypeName(data_type);
+            if name.is_null() {
+                return Err(format!(
+                    "Failed to get data type name for band {}",
+                    band_idx
+                ));
+            }
+            Ok(CStr::from_ptr(name).to_string_lossy().into_owned())
+        }
     }
 
     pub fn get_geo_transform(&self) -> Result<[f64; 6], String> {

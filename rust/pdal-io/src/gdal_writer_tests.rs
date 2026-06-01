@@ -196,10 +196,18 @@ fn writer_errors_on_empty_view_without_allow_empty() {
 fn parse_data_type_branches() {
     assert_eq!(parse_data_type("float64").0, OutputDataType::Float64);
     assert_eq!(parse_data_type("double").0, OutputDataType::Float64);
+    assert_eq!(parse_data_type("float").0, OutputDataType::Float32);
+    assert_eq!(parse_data_type("int8").0, OutputDataType::Int8);
+    assert_eq!(parse_data_type("uint8").0, OutputDataType::UInt8);
+    assert_eq!(parse_data_type("int16").0, OutputDataType::Int16);
+    assert_eq!(parse_data_type("uint16").0, OutputDataType::UInt16);
     assert_eq!(parse_data_type("int32").0, OutputDataType::Int32);
     assert_eq!(parse_data_type("int32_t").0, OutputDataType::Int32);
     assert_eq!(parse_data_type("signed32").0, OutputDataType::Int32);
     assert_eq!(parse_data_type("int").0, OutputDataType::Int32);
+    assert_eq!(parse_data_type("uint32").0, OutputDataType::UInt32);
+    assert_eq!(parse_data_type("int64").0, OutputDataType::Int64);
+    assert_eq!(parse_data_type("uint64").0, OutputDataType::UInt64);
     assert!(parse_data_type("mystery").1.is_some());
 }
 
@@ -272,6 +280,30 @@ fn writer_writes_int32_output() {
 }
 
 #[test]
+fn writer_writes_other_gdal_numeric_types() {
+    for (name, data_type, expected) in [
+        ("u8", "uint8", "Byte"),
+        ("i16", "int16", "Int16"),
+        ("u16", "uint16", "UInt16"),
+        ("f32", "float", "Float32"),
+    ] {
+        let out = tmp_tif(&format!("{name}.tif"));
+        let mut options = Options::new();
+        options.add("filename", out.to_str().unwrap());
+        options.add("resolution", 1.0);
+        options.add("radius", 0.1);
+        options.add("output_type", "min");
+        options.add("data_type", data_type);
+        let mut writer = GdalWriter::new(&options);
+        writer.write(&[make_view_with_points()]).unwrap();
+
+        let raster = pdal_core::gdal::Raster::open(out.to_str().unwrap()).unwrap();
+        assert_eq!(raster.band_type_name(1).unwrap(), expected);
+        let _ = std::fs::remove_file(&out);
+    }
+}
+
+#[test]
 fn writer_writes_with_metadata_items() {
     let out = tmp_tif("meta.tif");
     let mut options = Options::new();
@@ -338,7 +370,7 @@ fn writer_propagates_data_type_error() {
     let mut options = Options::new();
     options.add("filename", "/tmp/x.tif");
     options.add("resolution", 1.0);
-    options.add("data_type", "uint8");
+    options.add("data_type", "mystery");
     let mut writer = GdalWriter::new(&options);
     let view = make_view_with_points();
     let err = writer.write(&[view]).unwrap_err();

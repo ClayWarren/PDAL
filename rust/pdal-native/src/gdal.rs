@@ -6,7 +6,7 @@ mod vector_writer;
 
 use std::ffi::{CStr, CString};
 
-pub use raster::Raster;
+pub use raster::{Raster, RasterDataType};
 pub use vector::Vector;
 pub use vector_writer::{VectorFieldType, VectorFieldValue, VectorPointWriter};
 
