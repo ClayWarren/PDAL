@@ -579,6 +579,159 @@ fn ogr_bounds_filter_rejects_invalid_polygon() {
 }
 
 #[test]
+fn stac_filter_helpers_cover_validation_and_matching_edges() {
+    let feature = serde_json::json!({
+        "type": "Feature",
+        "id": "item-01",
+        "stac_version": "1.0.0",
+        "geometry": null,
+        "bbox": [0.0, 0.0, 1.0, 1.0],
+        "collection": "collection-a",
+        "properties": {
+            "datetime": "2024-01-02T03:04:05Z",
+            "quality": "good",
+            "count": 2
+        },
+        "assets": {
+            "data": {"href": "points.las"},
+            "thumbnail": {"href": "thumb.png"}
+        }
+    });
+    assert!(validate_stac_object(&feature, "item.json").is_ok());
+    assert!(item_has_requested_asset(
+        &feature,
+        &[String::from("thumbnail")]
+    ));
+    assert!(!item_has_requested_asset(
+        &feature,
+        &[String::from("missing")]
+    ));
+
+    let id_filters = compile_regexes(&[String::from("item-\\d+")], "items").unwrap();
+    assert!(item_matches_id_filters(&feature, &id_filters));
+    let collection_filters =
+        compile_regexes(&[String::from("collection-[ab]")], "collections").unwrap();
+    assert!(collection_matches(&feature, &collection_filters));
+    assert!(!collection_matches(
+        &serde_json::json!({}),
+        &collection_filters
+    ));
+    assert!(catalog_matches(
+        &serde_json::json!({"id": "root-catalog"}),
+        &compile_regexes(&[String::from("root-.*")], "catalogs").unwrap()
+    ));
+    assert!(!catalog_matches(&serde_json::json!({}), &id_filters));
+
+    let property_filters =
+        parse_property_filters(r#"{"quality":["bad","good"],"count":2}"#).unwrap();
+    assert!(item_matches_property_filters(&feature, &property_filters).unwrap());
+    let rejected = parse_property_filters(r#"{"quality":"bad"}"#).unwrap();
+    assert!(!item_matches_property_filters(&feature, &rejected).unwrap());
+    assert!(item_matches_property_filters(&serde_json::json!({}), &property_filters).is_err());
+    assert!(parse_property_filters("").unwrap().is_empty());
+    assert!(parse_property_filters("[]").is_err());
+}
+
+#[test]
+fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
+    let args = parse_reader_args(
+        r#"[{"type":"readers.las","nosrs":true,"count":2,"bounds":{"x":[0,1]}}]"#,
+    )
+    .unwrap();
+    assert_eq!(args.len(), 1);
+    assert_eq!(args[0].driver, "readers.las");
+    assert_eq!(args[0].options.get_str("nosrs", ""), "true");
+    assert_eq!(args[0].options.get_str("count", ""), "2");
+    assert!(args[0].options.get_str("bounds", "").contains("\"x\""));
+    assert!(parse_reader_args("{}").is_err());
+    assert!(parse_reader_args(r#"[{"count":2}]"#).is_err());
+
+    assert_eq!(normalize_stac_time("2024-1-2T3:4:5Z"), "2024-1-2T03:04:05Z");
+    assert_eq!(normalize_stac_time("2024-01-02"), "2024-01-02");
+    let ranges = parse_date_ranges(&[String::from(
+        r#"["2024-01-01T00:00:00Z","2024-01-31T00:00:00Z"]"#,
+    )])
+    .unwrap();
+    assert!(item_matches_dates(
+        &serde_json::json!({"properties":{"start_datetime":"2024-01-15T00:00:00Z","end_datetime":"2024-01-16T00:00:00Z"}}),
+        &ranges
+    ));
+    assert!(!item_matches_dates(
+        &serde_json::json!({"properties":{}}),
+        &ranges
+    ));
+    assert!(parse_date_ranges(&[String::from(r#"["2024-01-01T00:00:00Z"]"#)]).is_err());
+    assert!(parse_stac_time("not-a-date").is_err());
+
+    let bounds = parse_bounds("([5,1],[9,3])/EPSG:4326").unwrap().unwrap();
+    assert_eq!(
+        (bounds.minx, bounds.maxx, bounds.miny, bounds.maxy),
+        (1.0, 5.0, 3.0, 9.0)
+    );
+    assert!(parse_bounds("").unwrap().is_none());
+    assert!(parse_bounds("([1],[2])").is_err());
+    assert!(item_matches_bounds(
+        &serde_json::json!({"bbox":[0.0, 0.0, 2.0, 2.0]}),
+        &Bounds2D {
+            minx: 1.0,
+            maxx: 3.0,
+            miny: 1.0,
+            maxy: 3.0
+        }
+    ));
+    assert!(!item_matches_bounds(
+        &serde_json::json!({"bbox":[0.0]}),
+        &bounds
+    ));
+
+    assert_eq!(
+        remote_base("https://example.com/a/b/item.json"),
+        "https://example.com/a/b"
+    );
+    assert_eq!(remote_base("item.json"), "");
+    assert_eq!(
+        resolve_stac_link("https://example.com/root", "./item.json"),
+        "https://example.com/root/item.json"
+    );
+    assert_eq!(
+        resolve_stac_link("/tmp/base", "/absolute/item.json"),
+        "/absolute/item.json"
+    );
+    assert_eq!(
+        normalize_local_location("/vsicurl/https://example.com/item.json"),
+        "/vsicurl/https://example.com/item.json"
+    );
+}
+
+#[test]
+fn geojson_geometry_bounds_reports_null_and_invalid_shapes() {
+    assert!(geojson_geometry_bounds(&Value::Null).unwrap().is_none());
+    let point_err = geojson_geometry_bounds(&serde_json::json!({"type":"Point"}));
+    assert!(point_err.is_err());
+    assert!(point_err.err().unwrap().0.contains("Unsupported"));
+    assert!(geojson_geometry_bounds(&serde_json::json!({"type":"Polygon"})).is_err());
+    assert!(geojson_geometry_bounds(
+        &serde_json::json!({"type":"Polygon","coordinates":[[[0,0],[0,1],[1,1],[1,"bad"],[0,0]]]})
+    )
+    .is_err());
+
+    let bounds = geojson_geometry_bounds(
+        &serde_json::json!({"type":"Polygon","coordinates":[[[0,0],[2,0],[2,3],[0,3],[0,0]]]}),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        (bounds.minx, bounds.maxx, bounds.miny, bounds.maxy),
+        (0.0, 2.0, 0.0, 3.0)
+    );
+    assert_eq!(
+        ogr_sql_id_filter("select * from x WHERE id = -42"),
+        Some(-42)
+    );
+    assert_eq!(ogr_sql_id_filter("select * from x"), None);
+}
+
+#[test]
 fn is_remote_detects_url_schemes() {
     assert!(is_remote("http://example.com/x"));
     assert!(is_remote("https://example.com/x"));
