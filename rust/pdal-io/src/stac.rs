@@ -1,9 +1,11 @@
-//! `readers.stac` -- local STAC asset reader.
+//! `readers.stac` -- fixture-scoped STAC asset reader.
 //!
-//! This is a narrow local-file slice: STAC Item assets and local
-//! Catalog/Collection/FeatureCollection traversal. Remote asset breadth,
-//! full schema validation, and EPT/COPC-specific behavior stay with the later
-//! vendor/remote I/O milestone.
+//! This handles local and covered remote STAC Item/Catalog/Collection/
+//! FeatureCollection traversal, then dispatches assets through already-ported
+//! readers. Date, item/catalog/collection, property, bbox, and GeoJSON
+//! OGR-boundary filters are intentionally narrow and fixture-backed. Full JSON
+//! schema resolution, broad remote traversal, and threaded catalog crawling
+//! remain outside this module's current contract.
 
 use crate::tindex::{append_view, read_point_location};
 use pdal_core::metadata::MetadataNode;

@@ -1,10 +1,13 @@
-//! `readers.ept` -- local LASzip EPT full-read slice.
+//! `readers.ept` -- fixture-scoped EPT reader.
 //!
-//! This handles local `ept.json` datasets whose `dataType` is `laszip`,
-//! `binary`, or `zstandard` by walking JSON hierarchy files and merging local
-//! tiles. Bounds queries prune hierarchy nodes before tile reads and are also
-//! applied to individual points. Reprojection, polygon/OGR filters, addons,
-//! remote access, and streaming are deferred.
+//! This handles `ept.json` datasets whose `dataType` is `laszip`, `binary`, or
+//! `zstandard` by walking JSON hierarchy files and merging matching tiles.
+//! Bounds and resolution queries prune hierarchy nodes before tile reads and
+//! are also applied to individual points. Same-SRS and reprojected
+//! polygon/OGR filters, local addon metadata, remote LASzip paths covered by
+//! GDAL VSI, and C++ streaming-wrapper materialization are supported for the
+//! existing parity cases. Broad remote binary/zstandard and spatial-filter
+//! preview remain outside this module's current contract.
 
 use crate::tindex::append_view;
 use pdal_core::bounds::{parse_bounds2d, parse_bounds3d, Bounds2D, Bounds3D};
