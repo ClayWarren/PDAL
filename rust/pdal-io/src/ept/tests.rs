@@ -653,6 +653,21 @@ fn applies_reprojected_3d_bounds_filter() {
 }
 
 #[test]
+fn applies_reprojected_2d_bounds_filter() {
+    let mut options = Options::new();
+    options.add("filename", data_path("ept/bcbf/ept.json").display());
+    options.add(
+        "bounds",
+        "([-180,180],[80,90]) / +proj=longlat +R=1000 +no_defs +type=crs",
+    );
+    let mut reader = EptReader::new(&options);
+    let views = reader.read().unwrap();
+
+    let count: u64 = views.iter().map(PointView::len).sum();
+    assert_eq!(count, 5);
+}
+
+#[test]
 fn test_parse_type_all_cases() {
     assert_eq!(dim_type("unsigned", 1).unwrap(), DimType::U8);
     assert_eq!(dim_type("unsigned", 2).unwrap(), DimType::U16);

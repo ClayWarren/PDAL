@@ -473,15 +473,7 @@ impl EptReader {
         let parsed = parse_bounds2d(&self.bounds, 0)
             .map_err(|err| StageError(format!("Invalid EPT bounds option: {err}")))?;
         let target_srs = parsed_bounds_srs(&self.bounds, parsed.pos);
-        if !target_srs.is_empty() {
-            return Err(StageError(
-                "For lon/lat 'bounds', bounds must be 3D".to_string(),
-            ));
-        }
-        Ok(Some(BoundsFilter {
-            query: QueryBounds::Two(parsed.bounds),
-            transform: None,
-        }))
+        BoundsFilter::new(QueryBounds::Two(parsed.bounds), &target_srs, info).map(Some)
     }
 
     fn origin_filter(&self, root: &Path) -> Result<Option<u64>, StageError> {
