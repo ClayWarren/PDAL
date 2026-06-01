@@ -109,6 +109,47 @@ fn translate_supports_reader_writer_and_filter_options() {
 }
 
 #[test]
+fn translate_enforces_stream_and_overwrite_options() {
+    let input = data_path("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("pdal-rs-translate-options");
+    let stream_output = temp.join("stream.pcd");
+    let sort_output = temp.join("sort.pcd");
+    let same_io = temp.join("same.ply");
+    fs::copy(&input, &same_io).unwrap();
+
+    let result = run_translate(&[
+        input.to_str().unwrap(),
+        stream_output.to_str().unwrap(),
+        "--stream",
+    ]);
+    assert!(
+        result.status.success(),
+        "pdal-rs translate --stream failed\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let result = run_translate(&[
+        input.to_str().unwrap(),
+        sort_output.to_str().unwrap(),
+        "filters.sort",
+        "--stream",
+    ]);
+    assert!(!result.status.success());
+
+    let result = run_translate(&[
+        input.to_str().unwrap(),
+        stream_output.to_str().unwrap(),
+        "--stream",
+        "--nostream",
+    ]);
+    assert!(!result.status.success());
+
+    let same = same_io.to_str().unwrap();
+    assert!(!run_translate(&[same, same]).status.success());
+    assert!(run_translate(&[same, same, "--overwrite"]).status.success());
+}
+
+#[test]
 fn translate_without_paths_prints_usage_and_fails() {
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("translate")

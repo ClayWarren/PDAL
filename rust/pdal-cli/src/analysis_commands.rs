@@ -919,6 +919,15 @@ impl App {
 
     /// Build a pipeline from assembled stage objects and execute it.
     pub(super) fn execute_stage_pipeline(&self, stages: Vec<serde_json::Value>) -> i32 {
+        self.execute_stage_pipeline_with_stream(stages, false, false)
+    }
+
+    pub(super) fn execute_stage_pipeline_with_stream(
+        &self,
+        stages: Vec<serde_json::Value>,
+        stream_allowed: bool,
+        stream_required: bool,
+    ) -> i32 {
         let pipeline_json = serde_json::Value::Array(stages).to_string();
         let c_json = match CString::new(pipeline_json) {
             Ok(json) => json,
@@ -932,6 +941,23 @@ impl App {
         if pipeline.is_null() {
             self.output_last_error();
             return 1;
+        }
+        if stream_allowed {
+            let streamed = unsafe { pdal_capi::pdal_pipeline_execute_streaming(pipeline) };
+            if streamed >= 0 {
+                unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+                return 0;
+            }
+            if streamed == -2 && stream_required {
+                eprintln!("Error: pipeline is not streamable");
+                unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+                return 1;
+            }
+            if streamed == -1 {
+                self.output_last_error();
+                unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+                return 1;
+            }
         }
         let mut result = empty_pipeline_result();
         let status = unsafe {

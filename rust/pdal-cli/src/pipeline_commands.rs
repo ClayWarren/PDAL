@@ -352,6 +352,9 @@ impl App {
         let mut writer_override: Option<&str> = None;
         let mut filters: Vec<&str> = Vec::new();
         let mut stage_options: Vec<StageOption> = Vec::new();
+        let mut stream_allowed = true;
+        let mut stream_required = false;
+        let mut overwrite = false;
 
         let mut args = self.command_args.iter();
         while let Some(arg) = args.next() {
@@ -385,6 +388,21 @@ impl App {
                     return 1;
                 };
                 filters.push(value);
+            } else if arg == "--stream" {
+                if !stream_allowed {
+                    eprintln!("Error: can't specify both --stream and --nostream");
+                    return 1;
+                }
+                stream_allowed = true;
+                stream_required = true;
+            } else if arg == "--nostream" {
+                if stream_required {
+                    eprintln!("Error: can't specify both --stream and --nostream");
+                    return 1;
+                }
+                stream_allowed = false;
+            } else if arg == "--overwrite" {
+                overwrite = true;
             } else if arg.starts_with("--") {
                 match parse_stage_option_arg(arg) {
                     Ok(option) => stage_options.push(option),
@@ -410,6 +428,10 @@ impl App {
             eprintln!("Error: translate needs an input path and an output path");
             return 1;
         };
+        if input == output && !overwrite {
+            eprintln!("Error: input and output filenames are equal; pass --overwrite to allow it");
+            return 1;
+        }
 
         let reader = match reader_override
             .map(str::to_string)
@@ -449,7 +471,7 @@ impl App {
             eprintln!("Error: {message}");
             return 1;
         }
-        self.execute_stage_pipeline(stages)
+        self.execute_stage_pipeline_with_stream(stages, stream_allowed, stream_required)
     }
 
     pub(super) fn run_merge(&self) -> i32 {

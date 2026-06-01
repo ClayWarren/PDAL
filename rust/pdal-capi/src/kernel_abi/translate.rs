@@ -29,6 +29,9 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
     let mut metadata_file = None;
     let mut serialization_file = None;
     let mut filter_json = None;
+    let mut stream_allowed = true;
+    let mut stream_required = false;
+    let mut overwrite = false;
 
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -74,7 +77,25 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
                 return 1;
             };
             serialization_file = Some(value.clone());
-        } else if arg == "--stream" || arg == "--nostream" || arg == "--overwrite" {
+        } else if arg == "--stream" {
+            if !stream_allowed {
+                eprintln!(
+                    "PDAL: kernels.translate: Can't specify both 'stream' and 'nostream' options."
+                );
+                return 1;
+            }
+            stream_allowed = true;
+            stream_required = true;
+        } else if arg == "--nostream" {
+            if stream_required {
+                eprintln!(
+                    "PDAL: kernels.translate: Can't specify both 'stream' and 'nostream' options."
+                );
+                return 1;
+            }
+            stream_allowed = false;
+        } else if arg == "--overwrite" {
+            overwrite = true;
         } else if arg == "--dims" {
             let Some(_) = iter.next() else {
                 eprintln!("PDAL: kernels.translate: Missing value for option '--dims'.");
@@ -112,6 +133,12 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
     };
     if filter_json.is_some() && !filters.is_empty() {
         eprintln!("PDAL: kernels.translate: Cannot set both --filter options and --json options");
+        return 1;
+    }
+    if input == output && !overwrite {
+        eprintln!(
+            "PDAL: kernels.translate: Input and output filenames are equal and no --overwrite option was provided!"
+        );
         return 1;
     }
     let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
@@ -155,7 +182,13 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
     if !apply_cli_stage_options(&mut stages, &stage_options) {
         return -1;
     }
-    execute_translate_pipeline(stages, metadata_file, serialization_file)
+    execute_translate_pipeline(
+        stages,
+        metadata_file,
+        serialization_file,
+        stream_allowed,
+        stream_required,
+    )
 }
 
 pub(super) fn translate_json_stages(
@@ -249,6 +282,8 @@ fn execute_translate_pipeline(
     stages: Vec<serde_json::Value>,
     metadata_file: Option<String>,
     serialization_file: Option<String>,
+    stream_allowed: bool,
+    stream_required: bool,
 ) -> i32 {
     let stage_types = translate_stage_types(&stages);
     let pipeline_json = serde_json::Value::Array(stages);
@@ -269,6 +304,21 @@ fn execute_translate_pipeline(
             return 1;
         }
     };
+
+    if stream_allowed && metadata_file.is_none() {
+        match pipeline.execute_streaming() {
+            Ok(Some(_)) => return 0,
+            Ok(None) if stream_required => {
+                eprintln!("PDAL: kernels.translate: Pipeline is not streamable.");
+                return 1;
+            }
+            Ok(None) => {}
+            Err(err) => {
+                eprintln!("PDAL: kernels.translate: {err}");
+                return 1;
+            }
+        }
+    }
 
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {

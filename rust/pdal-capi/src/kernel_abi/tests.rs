@@ -366,6 +366,44 @@ fn rust_kernel_run_reports_translate_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_enforces_translate_stream_and_overwrite_options() {
+    let input = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data/ply/simple_text.ply");
+    let dir = std::env::temp_dir().join(format!(
+        "pdal-rs-kernel-translate-options-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let stream_out = dir.join("stream.pcd");
+    let sort_out = dir.join("sort.pcd");
+    let same_io = dir.join("same.ply");
+    std::fs::copy(&input, &same_io).unwrap();
+
+    let run = |input: &std::path::Path, output: &std::path::Path, extra: &[&str]| -> i32 {
+        let name = CString::new("translate").unwrap();
+        let mut owned = vec![
+            CString::new(input.to_str().unwrap()).unwrap(),
+            CString::new(output.to_str().unwrap()).unwrap(),
+        ];
+        for arg in extra {
+            owned.push(CString::new(*arg).unwrap());
+        }
+        let argv: Vec<_> = owned.iter().map(|c| c.as_ptr()).collect();
+        unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) }
+    };
+
+    assert_eq!(run(&input, &stream_out, &["--stream"]), 0);
+    assert_eq!(run(&input, &sort_out, &["filters.sort", "--stream"]), 1);
+    assert_eq!(run(&input, &stream_out, &["--stream", "--nostream"]), 1);
+    assert_eq!(run(&same_io, &same_io, &[]), 1);
+    assert_eq!(run(&same_io, &same_io, &["--overwrite"]), 0);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn translate_json_replaces_pipeline_reader_and_writer() {
     let json = r#"{
         "pipeline": [
