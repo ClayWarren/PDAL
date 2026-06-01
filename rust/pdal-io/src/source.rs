@@ -1,6 +1,22 @@
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::path::Path;
+
+pub trait ReadSeek: Read + Seek {}
+
+impl<T: Read + Seek> ReadSeek for T {}
+
+pub fn open_seek(filename: &str) -> Result<Box<dyn ReadSeek>, String> {
+    if is_vsi_path(filename) {
+        let path = vsi_path(filename);
+        return pdal_native::vsi::VsiFile::open(&path)
+            .map(|file| Box::new(file) as Box<dyn ReadSeek>);
+    }
+
+    fs::File::open(Path::new(filename))
+        .map(|file| Box::new(file) as Box<dyn ReadSeek>)
+        .map_err(|err| err.to_string())
+}
 
 pub fn read_bytes(filename: &str) -> Result<Vec<u8>, String> {
     if is_vsi_path(filename) {

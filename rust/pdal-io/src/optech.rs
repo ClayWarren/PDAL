@@ -2,6 +2,7 @@
 //!
 //! Port of `io/OptechReader.cpp` for local CSD fixtures.
 
+use crate::source;
 use byteorder::{LittleEndian, ReadBytesExt};
 use pdal_core::georeference::{create_optech_rotation_matrix, georeference_wgs84, Xyz};
 use pdal_core::metadata::MetadataNode;
@@ -10,9 +11,7 @@ use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use pdal_core::stage::StageError;
-use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
 use std::rc::Rc;
 
 const MAX_RETURNS: usize = 4;
@@ -61,7 +60,7 @@ impl Reader for OptechReader {
                 "OptechReader requires a filename option.".to_string(),
             ));
         }
-        let file = File::open(Path::new(&self.filename))
+        let file = source::open_seek(&self.filename)
             .map_err(|_| StageError(format!("Unable to open {} for reading.", self.filename)))?;
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;

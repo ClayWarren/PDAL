@@ -3,15 +3,14 @@
 //! Port of `io/TerrasolidReader.cpp` for the deterministic local format 2 path
 //! covered by PDAL's existing fixture.
 
+use crate::source;
 use byteorder::{LittleEndian, ReadBytesExt};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
 use std::rc::Rc;
 
 const FORMAT_1: i32 = 20010712;
@@ -51,7 +50,7 @@ impl Reader for TerrasolidReader {
                 "TerrasolidReader requires a filename option.".to_string(),
             ));
         }
-        let file = File::open(Path::new(&self.filename))
+        let file = source::open_seek(&self.filename)
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;
