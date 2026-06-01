@@ -5,7 +5,7 @@ use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -37,13 +37,88 @@ struct Header {
 /// PCD reader.
 pub struct PcdReader {
     filename: String,
+    stream: Option<PcdReaderStreamState>,
+}
+
+struct PcdReaderStreamState {
+    reader: BufReader<Box<dyn source::ReadSeek>>,
+    header: Header,
+    layout: Rc<PointLayout>,
+    remaining: u64,
+    eof: bool,
 }
 
 impl PcdReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            stream: None,
         }
+    }
+
+    fn layout_for(header: &Header) -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        for field in &header.fields {
+            layout.register(field.id.clone(), dim_type(field));
+        }
+        Rc::new(layout)
+    }
+
+    fn append_ascii_line(view: &mut PointView, header: &Header, line: &str) -> bool {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() != header.fields.len() {
+            return false;
+        }
+
+        let point = view.add_point();
+        for (field, value) in header.fields.iter().zip(fields) {
+            let parsed = value.parse::<f64>().unwrap_or(0.0);
+            view.set_f64(point, &field.id, storage_value(parsed, field));
+        }
+        true
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "PcdReader requires a filename option.".to_string(),
+            ));
+        }
+
+        let file = source::open_seek(&self.filename)
+            .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
+        let mut reader = BufReader::new(file);
+        let mut header_bytes = Vec::new();
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let read = reader
+                .read_line(&mut line)
+                .map_err(|err| StageError(err.to_string()))?;
+            if read == 0 {
+                break;
+            }
+            header_bytes.extend_from_slice(line.as_bytes());
+            if line.trim_start().to_ascii_lowercase().starts_with("data ") {
+                break;
+            }
+        }
+
+        let header = parse_header(&header_bytes)?;
+        if header.storage != "ascii" {
+            return Err(StageError(
+                "PCD streaming is only supported for ASCII input.".to_string(),
+            ));
+        }
+        let layout = Self::layout_for(&header);
+        self.stream = Some(PcdReaderStreamState {
+            reader,
+            remaining: header.points,
+            header,
+            layout,
+            eof: false,
+        });
+        Ok(())
     }
 }
 
@@ -63,27 +138,13 @@ impl Reader for PcdReader {
             .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
         let header = parse_header(&bytes)?;
 
-        let mut layout = PointLayout::new();
-        for field in &header.fields {
-            layout.register(field.id.clone(), dim_type(field));
-        }
-        let layout = Rc::new(layout);
-        let mut view = PointView::new(layout);
+        let mut view = PointView::new(Self::layout_for(&header));
 
         if header.storage == "ascii" {
             let body = std::str::from_utf8(&bytes[header.data_start..])
                 .map_err(|_| StageError("PCD ASCII body is not valid UTF-8.".to_string()))?;
             for line in body.lines() {
-                let fields: Vec<&str> = line.split_whitespace().collect();
-                if fields.len() != header.fields.len() {
-                    continue;
-                }
-
-                let point = view.add_point();
-                for (field, value) in header.fields.iter().zip(fields) {
-                    let parsed = value.parse::<f64>().unwrap_or(0.0);
-                    view.set_f64(point, &field.id, storage_value(parsed, field));
-                }
+                Self::append_ascii_line(&mut view, &header, line);
                 if view.len() >= header.points {
                     break;
                 }
@@ -105,6 +166,52 @@ impl Reader for PcdReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.pcd")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.eof || state.remaining == 0 {
+            return Ok(None);
+        }
+
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        let mut line = String::new();
+        while view.len() < capacity.max(1) as u64 && state.remaining > 0 {
+            line.clear();
+            if state
+                .reader
+                .read_line(&mut line)
+                .map_err(|err| StageError(err.to_string()))?
+                == 0
+            {
+                state.eof = true;
+                break;
+            }
+            if Self::append_ascii_line(
+                &mut view,
+                &state.header,
+                line.trim_end_matches(['\r', '\n']),
+            ) {
+                state.remaining -= 1;
+            }
+        }
+
+        if view.len() == 0 && (state.eof || state.remaining == 0) {
+            Ok(None)
+        } else {
+            Ok(Some(view))
+        }
     }
 }
 

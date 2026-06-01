@@ -2,6 +2,7 @@
 mod tests {
     use super::*;
     use crate::faux::FauxReader;
+    use crate::text_writer::TextWriter;
     use pdal_core::pipeline::{FilterWrapper, Pipeline, Writer};
     use pdal_filters::decimation::DecimationFilter;
     use pdal_filters::range::{RangeFilter, RangeLimit};
@@ -30,6 +31,77 @@ mod tests {
         assert_eq!(view.get_f64(0, &DimId::Y), 4320978.5);
         assert_eq!(view.get_f64(0, &DimId::Z), 170.75999450683594);
         assert_eq!(view.get_f64(9, &DimId::X), 289818.5);
+    }
+
+    #[test]
+    fn streaming_ascii_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/utm17_space.pcd"));
+
+        let mut full_reader = PcdReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = PcdReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(4).unwrap().unwrap();
+        let second = stream_reader.stream_next(4).unwrap().unwrap();
+        let third = stream_reader.stream_next(4).unwrap().unwrap();
+        assert!(stream_reader.stream_next(4).unwrap().is_none());
+
+        assert_eq!(first.len(), 4);
+        assert_eq!(second.len(), 4);
+        assert_eq!(third.len(), 2);
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(second.get_f64(0, &DimId::Y), full.get_f64(4, &DimId::Y));
+        assert_eq!(third.get_f64(1, &DimId::Z), full.get_f64(9, &DimId::Z));
+    }
+
+    #[test]
+    fn pipeline_streams_pcd_reader_to_csv_writer() {
+        let output = temp_path("stream-reader-pipeline.csv");
+        let mut reader_options = Options::new();
+        reader_options.add("filename", data_path("pcd/utm17_space.pcd"));
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 289814.0,
+            upper_bound: 289815.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("order", "X,Y,Z")
+            .add("quote_header", false)
+            .add("precision", 2);
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.pcd",
+            Box::new(PcdReader::new(&reader_options)),
+            reader_options,
+        );
+        let filter = pipeline.add_stage(
+            "filters.range",
+            Box::new(FilterWrapper::new(RangeFilter::new(limits))),
+            Options::new(),
+        );
+        let writer = pipeline.add_writer(
+            "writers.text",
+            Box::new(TextWriter::new(&writer_options)),
+            writer_options,
+        );
+        pipeline.add_dependency(filter, reader).unwrap();
+        pipeline.add_dependency(writer, filter).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(2));
+        let written = fs::read_to_string(&output).unwrap();
+        let _ = fs::remove_file(output);
+        let lines: Vec<_> = written.lines().collect();
+        assert_eq!(lines[0], "X,Y,Z");
+        assert_eq!(lines.len(), 3);
+        assert!(lines[1].starts_with("289814.16,4320978.50,170.76"));
     }
 
     #[test]
