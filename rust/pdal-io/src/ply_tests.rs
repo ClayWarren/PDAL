@@ -274,6 +274,46 @@ end_header
     }
 
     #[test]
+    fn streaming_binary_writer_matches_materialized_write() {
+        let view = xyz_view(&[
+            (-1.5, 0.0, 0.25),
+            (0.0, 1.0, 2.0),
+            (3.5, -4.25, 5.0),
+            (6.0, 7.0, 8.0),
+        ]);
+        let mut first = view.clone();
+        first.truncate(2);
+        let mut second = view.make_new();
+        for idx in 2..view.len() {
+            second.append_point(&view, idx);
+        }
+        let materialized = temp_path("materialized-binary-stream-compare.ply");
+        let streamed = temp_path("streamed-binary-stream-compare.ply");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("storage_mode", "binary_little_endian")
+            .add("dims", "X=double,Y=double,Z=double");
+        let mut stream_options = Options::new();
+        stream_options
+            .add("filename", &streamed)
+            .add("storage_mode", "binary_little_endian")
+            .add("dims", "X=double,Y=double,Z=double");
+        let mut materialized_writer = PlyWriter::new(&materialized_options).unwrap();
+        materialized_writer
+            .write(&[first.clone(), second.clone()])
+            .unwrap();
+        let mut stream_writer = PlyWriter::new(&stream_options).unwrap();
+        assert!(stream_writer.streamable());
+        stream_writer.stream_write(&first).unwrap();
+        stream_writer.stream_write(&second).unwrap();
+        stream_writer.stream_finish().unwrap();
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
     fn pipeline_streams_to_ascii_ply_writer() {
         let output = temp_path("stream-pipeline.ply");
 

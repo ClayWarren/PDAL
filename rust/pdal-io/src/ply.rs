@@ -481,6 +481,7 @@ struct PlyStreamState {
     rows: BufWriter<File>,
     rows_path: String,
     dims: Vec<(DimId, DimType, String)>,
+    format: PlyFormat,
 }
 
 impl PlyWriter {
@@ -587,10 +588,11 @@ impl PlyWriter {
         Ok(output)
     }
 
-    fn write_ascii_vertex_rows<W: Write>(
+    fn write_vertex_rows<W: Write>(
         &mut self,
         writer: &mut W,
         views: &[PointView],
+        format: PlyFormat,
         dims: &[(DimId, DimType, String)],
     ) -> Result<(), StageError> {
         let mut row = Vec::new();
@@ -598,18 +600,17 @@ impl PlyWriter {
             for point in 0..view.len() {
                 row.clear();
                 for (idx, (dim, ty, _)) in dims.iter().enumerate() {
-                    write_ply_value(
-                        &mut row,
-                        PlyFormat::Ascii,
-                        view.get_f64(point, dim),
-                        *ty,
-                        self.precision,
-                    )?;
-                    if idx + 1 < dims.len() {
+                    let precision = (format == PlyFormat::Ascii)
+                        .then_some(self.precision)
+                        .flatten();
+                    write_ply_value(&mut row, format, view.get_f64(point, dim), *ty, precision)?;
+                    if format == PlyFormat::Ascii && idx + 1 < dims.len() {
                         row.push(b' ');
                     }
                 }
-                row.push(b'\n');
+                if format == PlyFormat::Ascii {
+                    row.push(b'\n');
+                }
                 writer.write_all(&row).map_err(|err| {
                     StageError(format!("Failed writing '{}': {err}", self.filename))
                 })?;
@@ -658,21 +659,9 @@ impl PlyWriter {
 
         if format == PlyFormat::Ascii {
             self.point_count = 0;
-            self.write_ascii_vertex_rows(&mut output, views, &dims)?;
+            self.write_vertex_rows(&mut output, views, format, &dims)?;
         } else {
-            for view in views {
-                for point in 0..view.len() {
-                    for (dim, ty, _) in &dims {
-                        write_ply_value(
-                            &mut output,
-                            format,
-                            view.get_f64(point, dim),
-                            *ty,
-                            self.precision,
-                        )?;
-                    }
-                }
-            }
+            self.write_vertex_rows(&mut output, views, format, &dims)?;
         }
         if self.faces {
             let mut point_offset = 0;
@@ -741,16 +730,22 @@ impl Writer for PlyWriter {
     fn streamable(&self) -> bool {
         !self.filename.is_empty()
             && !self.filename.contains('#')
-            && self.format == Some(PlyFormat::Ascii)
+            && matches!(
+                self.format,
+                Some(PlyFormat::Ascii | PlyFormat::BinaryLittleEndian | PlyFormat::BinaryBigEndian)
+            )
             && !self.faces
     }
 
     fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
         if !self.streamable() {
             return Err(StageError(
-                "PLY streaming is only supported for ASCII single-file vertex output.".to_string(),
+                "PLY streaming is only supported for single-file vertex output.".to_string(),
             ));
         }
+        let format = self
+            .format
+            .ok_or_else(|| StageError("Invalid PLY storage mode.".to_string()))?;
         if self.stream.is_none() {
             let dims = self.resolve_dims(chunk.layout())?;
             let rows_path = self.stream_rows_path();
@@ -761,11 +756,17 @@ impl Writer for PlyWriter {
                 rows,
                 rows_path,
                 dims,
+                format,
             });
         }
 
         let mut state = self.stream.take().expect("stream initialized above");
-        self.write_ascii_vertex_rows(&mut state.rows, std::slice::from_ref(chunk), &state.dims)?;
+        self.write_vertex_rows(
+            &mut state.rows,
+            std::slice::from_ref(chunk),
+            state.format,
+            &state.dims,
+        )?;
         self.stream = Some(state);
         Ok(())
     }
@@ -789,7 +790,7 @@ impl Writer for PlyWriter {
                 ))
             })?;
         output
-            .write_all(&self.header_bytes(PlyFormat::Ascii, &state.dims, self.point_count, 0)?)
+            .write_all(&self.header_bytes(state.format, &state.dims, self.point_count, 0)?)
             .map_err(|err| StageError(format!("Failed writing '{}': {err}", self.filename)))?;
         let mut rows = File::open(&state.rows_path)
             .map(BufReader::new)
