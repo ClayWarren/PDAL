@@ -22,6 +22,7 @@ pub mod obb;
 pub mod ogr_spec;
 pub mod options;
 pub mod pipeline;
+pub mod pipeline_reader;
 pub mod point;
 pub mod program_args;
 pub mod raster;
