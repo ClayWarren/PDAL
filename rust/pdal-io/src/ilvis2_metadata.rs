@@ -1,16 +1,15 @@
 //! XML metadata sidecar parser for `readers.ilvis2`.
 
+use crate::source;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::stage::StageError;
 use roxmltree::{Document, Node, ParsingOptions};
-use std::fs;
-use std::path::Path;
 
-pub fn read_metadata_file(path: &Path) -> Result<MetadataNode, StageError> {
-    let text = fs::read_to_string(path).map_err(|_| {
+pub fn read_metadata_file(filename: &str) -> Result<MetadataNode, StageError> {
+    let text = source::read_to_string(filename).map_err(|_| {
         StageError(format!(
             "Unable to open ILVIS2 metadata file '{}'.",
-            path.display()
+            filename
         ))
     })?;
     read_metadata_str(&text)
@@ -487,6 +486,7 @@ fn text<'a, 'input>(node: Node<'a, 'input>) -> &'a str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn value<'a>(metadata: &'a MetadataNode, name: &str) -> &'a MetadataValue {
         metadata
@@ -512,7 +512,7 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join("test/data/ilvis2/ILVIS2_TEST_FILE.TXT.xml");
-        let metadata = read_metadata_file(&path).unwrap();
+        let metadata = read_metadata_file(&path.display().to_string()).unwrap();
 
         assert_eq!(
             value(&metadata, "GranuleUR"),

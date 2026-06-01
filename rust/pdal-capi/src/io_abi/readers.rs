@@ -576,7 +576,7 @@ pub unsafe extern "C" fn pdal_ilvis2_metadata_read(filename: *const c_char) -> *
         }
     };
 
-    match pdal_io::ilvis2_metadata::read_metadata_file(Path::new(path)) {
+    match pdal_io::ilvis2_metadata::read_metadata_file(path) {
         Ok(metadata) => {
             clear_last_error();
             Box::into_raw(Box::new(metadata))

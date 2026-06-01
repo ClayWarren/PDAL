@@ -22,7 +22,6 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::path::Path;
 use std::rc::Rc;
 
 /// Which elevation(s) of each waveform shot to emit as points.
@@ -147,8 +146,7 @@ impl Reader for Ilvis2Reader {
         }
 
         if !self.metadata_filename.is_empty() {
-            self.metadata =
-                crate::ilvis2_metadata::read_metadata_file(Path::new(&self.metadata_filename))?;
+            self.metadata = crate::ilvis2_metadata::read_metadata_file(&self.metadata_filename)?;
         }
 
         Ok(vec![view])
