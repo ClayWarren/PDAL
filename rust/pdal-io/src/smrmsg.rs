@@ -15,12 +15,20 @@ use std::rc::Rc;
 
 pub struct SmrmsgReader {
     filename: String,
+    stream: Option<SmrmsgStreamState>,
+}
+
+struct SmrmsgStreamState {
+    reader: BufReader<Box<dyn crate::source::ReadSeek>>,
+    layout: Rc<PointLayout>,
+    remaining: u64,
 }
 
 impl SmrmsgReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            stream: None,
         }
     }
 
@@ -38,6 +46,54 @@ impl SmrmsgReader {
             DimId::HeadingRMS,
         ]
     }
+
+    fn point_size() -> u64 {
+        (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64
+    }
+
+    fn layout() -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        for dim in Self::file_dimensions() {
+            layout.register(dim.clone(), DimType::F64);
+        }
+        Rc::new(layout)
+    }
+
+    fn append_record(
+        view: &mut PointView,
+        reader: &mut BufReader<Box<dyn crate::source::ReadSeek>>,
+    ) -> Result<(), StageError> {
+        let id = view.add_point();
+        let dims = Self::file_dimensions();
+        let mut buf = [0u8; 8];
+        for dim in dims {
+            reader
+                .read_exact(&mut buf)
+                .map_err(|e| StageError(e.to_string()))?;
+            let val = (&buf[..]).read_f64::<LittleEndian>().unwrap();
+            view.set_f64(id, dim, val);
+        }
+        Ok(())
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "SmrmsgReader requires a filename option.".to_string(),
+            ));
+        }
+        let point_size = Self::point_size();
+        let (reader, file_size) = open_smrmsg_reader(&self.filename)?;
+        if file_size == 0 || file_size % point_size != 0 {
+            return Err(StageError("Invalid file size.".to_string()));
+        }
+        self.stream = Some(SmrmsgStreamState {
+            reader,
+            layout: Self::layout(),
+            remaining: file_size / point_size,
+        });
+        Ok(())
+    }
 }
 
 impl Reader for SmrmsgReader {
@@ -51,30 +107,15 @@ impl Reader for SmrmsgReader {
                 "SmrmsgReader requires a filename option.".to_string(),
             ));
         }
-        let point_size = (Self::file_dimensions().len() * std::mem::size_of::<f64>()) as u64;
+        let point_size = Self::point_size();
         let (mut reader, file_size) = open_smrmsg_reader(&self.filename)?;
         if file_size == 0 || file_size % point_size != 0 {
             return Err(StageError("Invalid file size.".to_string()));
         }
 
-        let mut layout = PointLayout::new();
-        for dim in Self::file_dimensions() {
-            layout.register(dim.clone(), DimType::F64);
-        }
-
-        let mut view = PointView::new(Rc::new(layout));
-        let dims = Self::file_dimensions();
-        let mut buf = [0u8; 8];
-
+        let mut view = PointView::new(Self::layout());
         for _ in 0..(file_size / point_size) {
-            let id = view.add_point();
-            for dim in dims {
-                reader
-                    .read_exact(&mut buf)
-                    .map_err(|e| StageError(e.to_string()))?;
-                let val = (&buf[..]).read_f64::<LittleEndian>().unwrap();
-                view.set_f64(id, dim, val);
-            }
+            Self::append_record(&mut view, &mut reader)?;
         }
 
         Ok(vec![view])
@@ -82,6 +123,32 @@ impl Reader for SmrmsgReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.smrmsg")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.remaining == 0 {
+            return Ok(None);
+        }
+
+        let take = (capacity.max(1) as u64).min(state.remaining);
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        for _ in 0..take {
+            Self::append_record(&mut view, &mut state.reader)?;
+        }
+        state.remaining -= take;
+        Ok(Some(view))
     }
 }
 
@@ -127,6 +194,38 @@ mod tests {
         assert_near(view.get_f64(0, &DimId::RollRMS), 0.236985);
         assert_near(view.get_f64(1, &DimId::GpsTime), 536259.0);
         assert_near(view.get_f64(2, &DimId::HeadingRMS), 3.010406);
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("smrmsg/smrmsg.smrmsg"));
+
+        let mut full_reader = SmrmsgReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = SmrmsgReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(10_000).unwrap().unwrap();
+        let second = stream_reader.stream_next(10_000).unwrap().unwrap();
+        let third = stream_reader.stream_next(10_000).unwrap().unwrap();
+        assert!(stream_reader.stream_next(10_000).unwrap().is_none());
+
+        assert_eq!(first.len(), 10_000);
+        assert_eq!(second.len(), 10_000);
+        assert_eq!(third.len(), full.len() - 20_000);
+        assert_near(
+            first.get_f64(0, &DimId::GpsTime),
+            full.get_f64(0, &DimId::GpsTime),
+        );
+        assert_near(
+            second.get_f64(0, &DimId::NorthPositionRMS),
+            full.get_f64(10_000, &DimId::NorthPositionRMS),
+        );
+        assert_near(
+            third.get_f64(third.len() - 1, &DimId::HeadingRMS),
+            full.get_f64(full.len() - 1, &DimId::HeadingRMS),
+        );
     }
 
     #[test]
