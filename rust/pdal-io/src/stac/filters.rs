@@ -7,7 +7,6 @@ use pdal_core::options::Options;
 use pdal_core::stage::StageError;
 use regex::Regex;
 use serde_json::Value;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 pub(super) fn validate_stac_object(json: &Value, location: &str) -> Result<(), StageError> {
@@ -547,20 +546,13 @@ pub(super) fn item_matches_bounds(item: &Value, bounds: &Bounds2D) -> bool {
 
 pub(super) fn read_stac_text(location: &str) -> Result<(String, String), StageError> {
     if is_remote(location) || location.starts_with("/vsi") {
-        let vsi_path = if location.starts_with("http://") || location.starts_with("https://") {
-            format!("/vsicurl/{location}")
-        } else {
-            location.to_string()
-        };
-        let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
+        let text = source::read_to_string(location)
             .map_err(|err| StageError(format!("Can't open STAC file '{location}': {err}")))?;
-        let mut text = String::new();
-        file.read_to_string(&mut text)
-            .map_err(|err| StageError(format!("Can't read STAC file '{location}': {err}")))?;
         Ok((text, remote_base(location)))
     } else {
         let path = canonical_or_original(Path::new(location));
-        let text = std::fs::read_to_string(&path).map_err(|err| {
+        let path_text = path.to_string_lossy();
+        let text = source::read_to_string(&path_text).map_err(|err| {
             StageError(format!("Can't open STAC file '{}': {err}", path.display()))
         })?;
         let base = path.parent().unwrap_or(Path::new("")).display().to_string();

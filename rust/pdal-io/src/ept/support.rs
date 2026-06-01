@@ -6,7 +6,8 @@
 use super::*;
 
 pub(super) fn read_json(path: &Path) -> Result<Value, StageError> {
-    let text = std::fs::read_to_string(path)
+    let location = path.to_string_lossy();
+    let text = crate::source::read_to_string(&location)
         .map_err(|err| StageError(format!("Can't open EPT file '{}': {err}", path.display())))?;
     serde_json::from_str(&text).map_err(|err| {
         StageError(format!(
@@ -17,23 +18,10 @@ pub(super) fn read_json(path: &Path) -> Result<Value, StageError> {
 }
 
 pub(super) fn read_json_location(location: &str) -> Result<Value, StageError> {
-    if is_remote_location(location) || location.starts_with("/vsi") {
-        let vsi_path = if location.starts_with("http://") || location.starts_with("https://") {
-            format!("/vsicurl/{location}")
-        } else {
-            location.to_string()
-        };
-        let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
-            .map_err(|err| StageError(format!("Can't open EPT file '{location}': {err}")))?;
-        let mut text = String::new();
-        use std::io::Read as _;
-        file.read_to_string(&mut text)
-            .map_err(|err| StageError(format!("Can't read EPT file '{location}': {err}")))?;
-        serde_json::from_str(&text)
-            .map_err(|err| StageError(format!("EPT file '{location}' is not valid JSON: {err}")))
-    } else {
-        read_json(Path::new(location))
-    }
+    let text = crate::source::read_to_string(location)
+        .map_err(|err| StageError(format!("Can't open EPT file '{location}': {err}")))?;
+    serde_json::from_str(&text)
+        .map_err(|err| StageError(format!("EPT file '{location}' is not valid JSON: {err}")))
 }
 
 pub(super) fn location_parent(location: &str) -> String {
