@@ -277,6 +277,13 @@ impl Bounds2D {
         self.miny = self.miny.min(y);
         self.maxy = self.maxy.max(y);
     }
+
+    fn grow_bounds(&mut self, other: &Bounds2D) {
+        self.minx = self.minx.min(other.minx);
+        self.maxx = self.maxx.max(other.maxx);
+        self.miny = self.miny.min(other.miny);
+        self.maxy = self.maxy.max(other.maxy);
+    }
 }
 
 pub(super) fn parse_date_ranges(values: &[String]) -> Result<Vec<DateRange>, StageError> {
@@ -390,6 +397,7 @@ pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageErr
             spec.datasource
         ))
     })?;
+    let mut out: Option<Bounds2D> = None;
     for feature in features {
         if let Some(id) = id_filter {
             if feature["properties"]["id"].as_i64() != Some(id) {
@@ -399,9 +407,12 @@ pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageErr
         let Some(bounds) = geojson_geometry_bounds(&feature["geometry"])? else {
             continue;
         };
-        return Ok(Some(bounds));
+        match &mut out {
+            Some(out) => out.grow_bounds(&bounds),
+            None => out = Some(bounds),
+        }
     }
-    Ok(None)
+    Ok(out)
 }
 
 pub(super) fn ogr_sql_id_filter(sql: &str) -> Option<i64> {
@@ -416,15 +427,43 @@ pub(super) fn geojson_geometry_bounds(geometry: &Value) -> Result<Option<Bounds2
     if geometry.is_null() {
         return Ok(None);
     }
-    let geom_type = geometry["type"].as_str().unwrap_or("");
-    if geom_type != "Polygon" {
-        return Err(StageError(format!(
+    match geometry["type"].as_str().unwrap_or("") {
+        "Polygon" => polygon_bounds(geometry),
+        "MultiPolygon" => multipolygon_bounds(geometry),
+        geom_type => Err(StageError(format!(
             "Unsupported OGR geometry type '{geom_type}'."
-        )));
+        ))),
     }
+}
+
+fn multipolygon_bounds(geometry: &Value) -> Result<Option<Bounds2D>, StageError> {
+    let Some(polygons) = geometry["coordinates"].as_array() else {
+        return Err(StageError("Invalid OGR multipolygon geometry.".to_string()));
+    };
+    let mut bounds: Option<Bounds2D> = None;
+    for polygon in polygons {
+        let Some(rings) = polygon.as_array() else {
+            return Err(StageError("Invalid OGR multipolygon geometry.".to_string()));
+        };
+        let Some(polygon_bounds) = rings_bounds(rings)? else {
+            continue;
+        };
+        match &mut bounds {
+            Some(bounds) => bounds.grow_bounds(&polygon_bounds),
+            None => bounds = Some(polygon_bounds),
+        }
+    }
+    Ok(bounds)
+}
+
+fn polygon_bounds(geometry: &Value) -> Result<Option<Bounds2D>, StageError> {
     let Some(rings) = geometry["coordinates"].as_array() else {
         return Err(StageError("Invalid OGR polygon geometry.".to_string()));
     };
+    rings_bounds(rings)
+}
+
+fn rings_bounds(rings: &[Value]) -> Result<Option<Bounds2D>, StageError> {
     let Some(outer) = rings.first().and_then(Value::as_array) else {
         return Err(StageError("Invalid OGR polygon geometry.".to_string()));
     };

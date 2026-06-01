@@ -560,6 +560,44 @@ fn ogr_bounds_filter_reads_geojson_feature_by_sql_id() {
     assert_eq!(bounds.maxx, 51.0);
     assert_eq!(bounds.miny, -10.0);
     assert_eq!(bounds.maxy, 0.0);
+
+    let ogr = format!(
+        r#"{{"type":"ogr","datasource":"{}","sql":"select * from ogr_boundary"}}"#,
+        temp.path().display()
+    );
+    let bounds = parse_ogr_bounds(&ogr).unwrap().unwrap();
+    assert_eq!(bounds.minx, 0.0);
+    assert_eq!(bounds.maxx, 51.0);
+    assert_eq!(bounds.miny, -10.0);
+    assert_eq!(bounds.maxy, 1.0);
+}
+
+#[test]
+fn ogr_bounds_filter_supports_multipolygon_geojson() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"id":1},"geometry":{"type":"MultiPolygon","coordinates":[
+      [[[10,10],[11,10],[11,11],[10,11],[10,10]]],
+      [[[-2,-3],[-1,-3],[-1,-2],[-2,-2],[-2,-3]]]
+    ]}}
+  ]
+}"#,
+    )
+    .unwrap();
+    let ogr = format!(
+        r#"{{"type":"ogr","datasource":"{}","sql":"select * from ogr_boundary"}}"#,
+        temp.path().display()
+    );
+    let bounds = parse_ogr_bounds(&ogr).unwrap().unwrap();
+
+    assert_eq!(bounds.minx, -2.0);
+    assert_eq!(bounds.maxx, 11.0);
+    assert_eq!(bounds.miny, -3.0);
+    assert_eq!(bounds.maxy, 11.0);
 }
 
 #[test]
