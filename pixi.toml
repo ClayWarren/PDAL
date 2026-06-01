@@ -153,6 +153,8 @@ rust-cpp-test-parity = { cmd = "python3 rust/scripts/audit_cpp_test_parity.py --
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test", "rust-coverage-check", "rust-license-audit"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }
+rust-bench = { cmd = "python3 rust/scripts/benchmark_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
+rust-bench-memory = { cmd = "python3 rust/scripts/benchmark_memory_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
 
 [feature.doc.tasks]
 configure = { cmd = [ "cmake",

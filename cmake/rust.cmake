@@ -29,6 +29,24 @@ if(NOT CARGO_EXECUTABLE)
     message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
 endif()
 
+# Build libpdal_capi.a with cargo and make the given PDAL library target depend
+# on it. Call once, after the library target exists (the archive is then linked
+# in alongside the other C++ dependencies). Keeping the cargo invocation here
+# groups it with the cargo discovery and source globbing above.
+macro(pdal_build_rust_capi _pdal_target)
+    add_custom_command(
+        OUTPUT ${RUST_CAPI_LIB}
+        COMMAND ${CMAKE_COMMAND} -E env
+            MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
+            ${CARGO_EXECUTABLE} build --release
+        DEPENDS ${RUST_CAPI_SOURCES}
+        WORKING_DIRECTORY ${RUST_CAPI_DIR}
+        COMMENT "Building Rust C ABI (pdal-capi) with cargo"
+    )
+    add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
+    add_dependencies(${_pdal_target} pdal_rust_capi)
+endmacro()
+
 find_library(GEOS_C_LIBRARY NAMES geos_c)
 if(APPLE)
     find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)

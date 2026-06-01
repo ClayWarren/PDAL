@@ -253,17 +253,9 @@ if (WIN32)
 endif()
 add_library(PDAL::PDAL ALIAS ${PDAL_LIB_NAME})
 
-add_custom_command(
-    OUTPUT ${RUST_CAPI_LIB}
-    COMMAND ${CMAKE_COMMAND} -E env
-        MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
-        ${CARGO_EXECUTABLE} build --release
-    DEPENDS ${RUST_CAPI_SOURCES}
-    WORKING_DIRECTORY ${RUST_CAPI_DIR}
-    COMMENT "Building Rust C ABI (pdal-capi) with cargo"
-)
-add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
-add_dependencies(${PDAL_LIB_NAME} pdal_rust_capi)
+# Wire the cargo build of libpdal_capi.a (defined in cmake/rust.cmake) to the
+# PDAL library target now that the target exists.
+pdal_build_rust_capi(${PDAL_LIB_NAME})
 
 target_include_directories(${PDAL_LIB_NAME}
     PUBLIC
