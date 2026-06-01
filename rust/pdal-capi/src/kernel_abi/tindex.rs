@@ -5,63 +5,14 @@ use pdal_core::expr::ConditionalExpression;
 use pdal_core::gdal::{LayerHandle, Vector};
 use pdal_core::point::DimId;
 use pdal_filters::hexer::HexGrid;
+use pdal_kernels::{
+    parse_tindex_create_args, print_tindex_usage, BoundaryOptions, TindexCreateArgs as CreateArgs,
+    TindexParseResult, INVALID_TINDEX_FILTER_STAGE_MESSAGE,
+};
 use pdal_native::geometry::Geometry;
 use std::ffi::CStr;
-use std::io::Read;
 use std::os::raw::c_char;
 use std::path::Path;
-
-/// Defaults match the C++ TIndexKernel option defaults; `fast_boundary`
-/// short-circuits to bbox output, and `boundary_expr` is rejected because
-/// we don't have point-level expression filtering wired up here yet.
-struct BoundaryOptions {
-    density: i32,
-    edge_length: f64,
-    sample_size: u32,
-    smooth: bool,
-    fast_boundary: bool,
-    where_expr: Option<String>,
-}
-
-impl Default for BoundaryOptions {
-    fn default() -> Self {
-        Self {
-            density: 15,
-            edge_length: 0.0,
-            sample_size: 5000,
-            smooth: true,
-            fast_boundary: false,
-            where_expr: None,
-        }
-    }
-}
-
-impl BoundaryOptions {
-    fn exact(&self) -> bool {
-        !self.fast_boundary
-    }
-}
-
-struct CreateArgs {
-    tindex_file: String,
-    files: Vec<String>,
-    driver_name: String,
-    target_srs: String,
-    assign_srs: String,
-    override_source_srs: bool,
-    path_prefix: Option<String>,
-    write_absolute_path: bool,
-    layer_name: String,
-    location_field: String,
-    lco_description: Option<String>,
-    rich_boundary_options: bool,
-    boundary: BoundaryOptions,
-    stdin_requested: bool,
-    input_methods: u8,
-    filelists: Vec<String>,
-    skip_different_srs: bool,
-    unsupported_input: bool,
-}
 
 struct Entry {
     location: String,
@@ -85,7 +36,7 @@ pub(super) unsafe fn run_tindex_kernel(argc: i32, argv: *const *const c_char) ->
             eprintln!("PDAL: kernels.tindex: Missing subcommand.");
             return 1;
         }
-        print_usage();
+        print_tindex_usage();
         return 0;
     }
 
@@ -99,25 +50,17 @@ pub(super) unsafe fn run_tindex_kernel(argc: i32, argv: *const *const c_char) ->
     }
 }
 
-fn print_usage() {
-    println!("Usage:");
-    println!("  pdal tindex create --tindex <output> <files...> [-f GeoJSON]");
-    println!("  pdal tindex create --tindex <output> --filelist <path> [-f GeoJSON]");
-    println!("  pdal tindex create --tindex <output> --glob <pattern> [-f GeoJSON]");
-    println!("  pdal tindex merge --tindex <index> --filespec <output>");
-}
-
 fn run_create(args: &[String]) -> i32 {
-    let args = match parse_create_args(args) {
+    let args = match parse_tindex_create_args(args) {
         Ok(args) => args,
-        Err(ParseResult::Error(message)) => {
-            if message == INVALID_FILTER_STAGE_MESSAGE {
+        Err(TindexParseResult::Error(message)) => {
+            if message == INVALID_TINDEX_FILTER_STAGE_MESSAGE {
                 println!("PDAL: kernels.tindex: {message}");
             }
             eprintln!("PDAL: kernels.tindex: {message}");
             return 1;
         }
-        Err(ParseResult::Unsupported) => return -1,
+        Err(TindexParseResult::Unsupported) => return -1,
     };
 
     if args.tindex_file == "/vsistdout/" {
@@ -158,328 +101,6 @@ fn run_create(args: &[String]) -> i32 {
         return 1;
     }
     add_features(layer, &args.location_field, entries)
-}
-
-pub(super) enum ParseResult {
-    Error(String),
-    Unsupported,
-}
-
-/// Handle the `--key=value` forms of the boundary-shaping create args. Returns
-/// `Ok(true)` when `arg` matched one of them (and was applied), `Ok(false)`
-/// when it is not a boundary `=` option.
-fn try_parse_boundary_eq_arg(parsed: &mut CreateArgs, arg: &str) -> Result<bool, ParseResult> {
-    if let Some(value) = arg.strip_prefix("--threshold=") {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.density = parse_int(value, "--threshold")?;
-    } else if let Some(value) = arg
-        .strip_prefix("--resolution=")
-        .or_else(|| arg.strip_prefix("--edge_length="))
-    {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.edge_length = parse_float(value, "--resolution")?;
-    } else if let Some(value) = arg.strip_prefix("--sample_size=") {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.sample_size = parse_uint(value, "--sample_size")?;
-    } else if let Some(value) = arg.strip_prefix("--simplify=") {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.smooth = parse_bool(value, "--simplify")?;
-    } else if let Some(value) = arg.strip_prefix("--fast_boundary=") {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.fast_boundary = parse_bool(value, "--fast_boundary")?;
-    } else if let Some(value) = arg.strip_prefix("--where=") {
-        parsed.rich_boundary_options = true;
-        parsed.boundary.where_expr = Some(value.to_string());
-    } else {
-        return Ok(false);
-    }
-    Ok(true)
-}
-
-fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
-    let mut parsed = CreateArgs {
-        tindex_file: String::new(),
-        files: Vec::new(),
-        driver_name: "ESRI Shapefile".to_string(),
-        target_srs: "EPSG:4326".to_string(),
-        assign_srs: "EPSG:4326".to_string(),
-        override_source_srs: false,
-        path_prefix: None,
-        write_absolute_path: false,
-        layer_name: "pdal".to_string(),
-        location_field: "location".to_string(),
-        lco_description: None,
-        rich_boundary_options: false,
-        boundary: BoundaryOptions::default(),
-        stdin_requested: false,
-        input_methods: 0,
-        filelists: Vec::new(),
-        skip_different_srs: false,
-        unsupported_input: false,
-    };
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--tindex" => parsed.tindex_file = next_value(&mut iter, "--tindex")?.clone(),
-            "--filelist" => {
-                parsed.input_methods += 1;
-                let path = next_value(&mut iter, "--filelist")?;
-                parsed.filelists.push(path.clone());
-            }
-            "--glob" => {
-                parsed.input_methods += 1;
-                let pattern = next_value(&mut iter, "--glob")?;
-                parsed.files.extend(read_glob(pattern)?);
-            }
-            "--path_prefix" => parsed.path_prefix = Some(next_value(&mut iter, arg)?.clone()),
-            "--write_absolute_path" => parsed.write_absolute_path = true,
-            "--lyr_name" => parsed.layer_name = next_value(&mut iter, arg)?.clone(),
-            "--tindex_name" => parsed.location_field = next_value(&mut iter, arg)?.clone(),
-            "-f" | "--ogrdriver" => parsed.driver_name = next_value(&mut iter, arg)?.clone(),
-            "--threads" | "--requests" => {
-                let _ = next_value(&mut iter, arg)?;
-            }
-            "--t_srs" => parsed.target_srs = next_value(&mut iter, arg)?.clone(),
-            "--a_srs" => {
-                parsed.assign_srs = next_value(&mut iter, arg)?.clone();
-                parsed.override_source_srs = true;
-            }
-            "--lco" => apply_layer_creation_option(&mut parsed, next_value(&mut iter, arg)?)?,
-            "--log" => {
-                let _ = next_value(&mut iter, "--log")?;
-            }
-            "--stdin" | "-s" => {
-                parsed.input_methods += 1;
-                parsed.stdin_requested = true;
-            }
-            "--threshold" => {
-                parsed.rich_boundary_options = true;
-                let value = next_value(&mut iter, arg)?;
-                parsed.boundary.density = parse_int(value, arg)?;
-            }
-            "--resolution" | "--edge_length" => {
-                parsed.rich_boundary_options = true;
-                let value = next_value(&mut iter, arg)?;
-                parsed.boundary.edge_length = parse_float(value, arg)?;
-            }
-            "--sample_size" => {
-                parsed.rich_boundary_options = true;
-                let value = next_value(&mut iter, arg)?;
-                parsed.boundary.sample_size = parse_uint(value, arg)?;
-            }
-            "--simplify" => {
-                parsed.rich_boundary_options = true;
-                let value = next_value(&mut iter, arg)?;
-                parsed.boundary.smooth = parse_bool(value, arg)?;
-            }
-            "--fast_boundary" => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.fast_boundary = true;
-            }
-            "--skip_different_srs" => {
-                let value = next_value(&mut iter, arg)?;
-                parsed.skip_different_srs = parse_bool(value, arg)?;
-            }
-            "--where" => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.where_expr = Some(next_value(&mut iter, arg)?.clone());
-            }
-            _ if let Some(value) = arg.strip_prefix("--filespec=") => {
-                parsed.input_methods += 1;
-                if is_glob_pattern(value) {
-                    parsed.files.extend(read_glob(value)?);
-                } else {
-                    parsed.files.push(value.to_string());
-                }
-            }
-            _ if let Some(pattern) = arg.strip_prefix("--glob=") => {
-                parsed.input_methods += 1;
-                parsed.files.extend(read_glob(pattern)?);
-            }
-            _ if let Some(path) = arg.strip_prefix("--filelist=") => {
-                parsed.input_methods += 1;
-                parsed.filelists.push(path.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--write_absolute_path=") => {
-                parsed.write_absolute_path = matches!(
-                    value.to_ascii_lowercase().as_str(),
-                    "true" | "1" | "yes" | "on"
-                );
-            }
-            _ if arg
-                .strip_prefix("--threads=")
-                .or_else(|| arg.strip_prefix("--requests="))
-                .is_some() => {}
-            _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
-                parsed.path_prefix = Some(value.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
-                parsed.target_srs = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("--a_srs=") => {
-                parsed.assign_srs = value.to_string();
-                parsed.override_source_srs = true;
-            }
-            _ if arg.starts_with("--log=") => {}
-            _ if let Some(value) = arg.strip_prefix("--lco=") => {
-                apply_layer_creation_option(&mut parsed, value)?;
-            }
-            _ if try_parse_boundary_eq_arg(&mut parsed, arg)? => {}
-            _ if let Some(value) = arg.strip_prefix("--skip_different_srs=") => {
-                parsed.skip_different_srs = parse_bool(value, "--skip_different_srs")?;
-            }
-            _ if arg.starts_with("--filters.hexbin.smooth") => {
-                return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
-            }
-            _ if arg.starts_with("--filters.") => {
-                return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
-            }
-            _ if arg.starts_with('-') => {
-                return Err(ParseResult::Error(format!("unknown tindex option '{arg}'")));
-            }
-            _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
-            _ if is_glob_pattern(arg) => {
-                parsed.input_methods += 1;
-                parsed.files.extend(read_glob(arg)?);
-            }
-            _ => parsed.files.push(arg.clone()),
-        }
-    }
-    if parsed.input_methods > 1 {
-        return Err(ParseResult::Error(
-            "Can't specify more than one source of tindex input files.".to_string(),
-        ));
-    }
-    if parsed.unsupported_input {
-        return Err(ParseResult::Unsupported);
-    }
-    for path in &parsed.filelists {
-        parsed.files.extend(read_filelist(path)?);
-    }
-    if parsed.stdin_requested {
-        parsed.files.extend(read_stdin_files()?);
-    }
-    if parsed.tindex_file.is_empty() {
-        return Err(ParseResult::Error(
-            "tindex create requires --tindex <output>".to_string(),
-        ));
-    }
-    if parsed.files.is_empty() {
-        return Err(ParseResult::Error(
-            "tindex create needs at least one input file".to_string(),
-        ));
-    }
-    Ok(parsed)
-}
-
-const INVALID_FILTER_STAGE_MESSAGE: &str = "Argument references invalid/unused stage";
-
-fn apply_layer_creation_option(args: &mut CreateArgs, value: &str) -> Result<(), ParseResult> {
-    let Some((name, option)) = value.split_once('=') else {
-        return Err(ParseResult::Unsupported);
-    };
-    if name.eq_ignore_ascii_case("DESCRIPTION") {
-        args.lco_description = Some(option.to_string());
-        Ok(())
-    } else {
-        Err(ParseResult::Unsupported)
-    }
-}
-
-pub(super) fn next_value<'a, I>(iter: &mut I, arg: &str) -> Result<&'a String, ParseResult>
-where
-    I: Iterator<Item = &'a String>,
-{
-    iter.next()
-        .ok_or_else(|| ParseResult::Error(format!("{arg} requires a value")))
-}
-
-fn parse_int(value: &str, arg: &str) -> Result<i32, ParseResult> {
-    value
-        .parse::<i32>()
-        .map_err(|_| ParseResult::Error(format!("{arg} requires an integer value, got '{value}'")))
-}
-
-fn parse_uint(value: &str, arg: &str) -> Result<u32, ParseResult> {
-    value.parse::<u32>().map_err(|_| {
-        ParseResult::Error(format!(
-            "{arg} requires a non-negative integer value, got '{value}'"
-        ))
-    })
-}
-
-fn parse_float(value: &str, arg: &str) -> Result<f64, ParseResult> {
-    value
-        .parse::<f64>()
-        .map_err(|_| ParseResult::Error(format!("{arg} requires a numeric value, got '{value}'")))
-}
-
-fn parse_bool(value: &str, arg: &str) -> Result<bool, ParseResult> {
-    match value.to_ascii_lowercase().as_str() {
-        "true" | "1" | "yes" | "on" => Ok(true),
-        "false" | "0" | "no" | "off" => Ok(false),
-        _ => Err(ParseResult::Error(format!(
-            "{arg} requires a boolean value, got '{value}'"
-        ))),
-    }
-}
-
-fn read_glob(pattern: &str) -> Result<Vec<String>, ParseResult> {
-    let entries = glob::glob(pattern).map_err(|err| ParseResult::Error(format!("{err}")))?;
-    let mut files = Vec::new();
-    for entry in entries {
-        match entry {
-            Ok(path) => files.push(path.to_string_lossy().into_owned()),
-            Err(_) => return Err(ParseResult::Unsupported),
-        }
-    }
-    if files.is_empty() {
-        return Err(ParseResult::Error(format!(
-            "glob pattern '{pattern}' did not match any files"
-        )));
-    }
-    Ok(files)
-}
-
-fn is_glob_pattern(value: &str) -> bool {
-    value.contains('*') || value.contains('?') || value.contains('[')
-}
-
-fn read_stdin_files() -> Result<Vec<String>, ParseResult> {
-    let mut input = String::new();
-    std::io::stdin()
-        .read_to_string(&mut input)
-        .map_err(|err| ParseResult::Error(format!("unable to read stdin file list: {err}")))?;
-    let files = input
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(str::to_string)
-        .collect::<Vec<_>>();
-    if files.is_empty() {
-        return Err(ParseResult::Error(
-            "stdin contained no tindex input files".to_string(),
-        ));
-    }
-    Ok(files)
-}
-
-fn read_filelist(path: &str) -> Result<Vec<String>, ParseResult> {
-    let input = std::fs::read_to_string(path)
-        .map_err(|err| ParseResult::Error(format!("unable to read filelist '{path}': {err}")))?;
-    let files = input
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(str::to_string)
-        .collect::<Vec<_>>();
-    if files.is_empty() {
-        return Err(ParseResult::Error(format!(
-            "filelist '{path}' contained no tindex input files"
-        )));
-    }
-    Ok(files)
 }
 
 fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {

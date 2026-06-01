@@ -1,7 +1,7 @@
-use super::{next_value, ParseResult};
 use crate::registry::pipeline_from_json;
 use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
+use pdal_kernels::{tindex_next_value as next_value, TindexParseResult as ParseResult};
 use pdal_native::geometry::Geometry;
 
 struct MergeClip {
