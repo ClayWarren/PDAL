@@ -16,6 +16,7 @@ use std::rc::Rc;
 const FORMAT_1: i32 = 20010712;
 const FORMAT_2: i32 = 20020715;
 
+#[derive(Clone)]
 struct Header {
     hdr_version: i32,
     pnt_cnt: i32,
@@ -29,22 +30,33 @@ struct Header {
 
 pub struct TerrasolidReader {
     filename: String,
+    stream: Option<TerrasolidStreamState>,
+}
+
+struct TerrasolidStreamState {
+    reader: BufReader<Box<dyn source::ReadSeek>>,
+    layout: Rc<PointLayout>,
+    header: Header,
+    remaining: i32,
+    point_idx: i32,
+    base_time: u32,
 }
 
 impl TerrasolidReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            stream: None,
         }
     }
-}
 
-impl Reader for TerrasolidReader {
-    fn name(&self) -> &str {
-        "readers.terrasolid"
+    fn layout(header: &Header) -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        register_dimensions(&mut layout, header);
+        Rc::new(layout)
     }
 
-    fn read(&mut self) -> Result<Vec<PointView>, StageError> {
+    fn open(&self) -> Result<(BufReader<Box<dyn source::ReadSeek>>, Header), StageError> {
         if self.filename.is_empty() {
             return Err(StageError(
                 "TerrasolidReader requires a filename option.".to_string(),
@@ -54,50 +66,82 @@ impl Reader for TerrasolidReader {
             .map_err(|_| StageError(format!("Couldn't open '{}'.", self.filename)))?;
         let mut reader = BufReader::new(file);
         let header = read_header(&mut reader)?;
-        let mut layout = PointLayout::new();
-        register_dimensions(&mut layout, &header);
-        let mut view = PointView::new(Rc::new(layout));
-
         reader.seek(SeekFrom::Start(56)).map_err(io_error)?;
+        Ok((reader, header))
+    }
+
+    fn append_record(
+        view: &mut PointView,
+        reader: &mut BufReader<Box<dyn source::ReadSeek>>,
+        header: &Header,
+        point_idx: i32,
+        base_time: &mut u32,
+    ) -> Result<(), StageError> {
+        let point = view.add_point();
+        match header.hdr_version {
+            FORMAT_1 => read_format_1(reader, view, point, header)?,
+            FORMAT_2 => read_format_2(reader, view, point, header)?,
+            _ => unreachable!(),
+        }
+        if header.time != 0 {
+            let mut t = reader.read_u32::<LittleEndian>().map_err(io_error)?;
+            if point_idx == 0 {
+                *base_time = t;
+            }
+            t -= *base_time;
+            t /= 5;
+            view.set_f64(point, &DimId::OffsetTime, t as f64);
+        }
+        if header.color != 0 {
+            view.set_f64(
+                point,
+                &DimId::Red,
+                reader.read_u8().map_err(io_error)? as f64,
+            );
+            view.set_f64(
+                point,
+                &DimId::Green,
+                reader.read_u8().map_err(io_error)? as f64,
+            );
+            view.set_f64(
+                point,
+                &DimId::Blue,
+                reader.read_u8().map_err(io_error)? as f64,
+            );
+            view.set_f64(
+                point,
+                &DimId::Alpha,
+                reader.read_u8().map_err(io_error)? as f64,
+            );
+        }
+        Ok(())
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        let (reader, header) = self.open()?;
+        self.stream = Some(TerrasolidStreamState {
+            reader,
+            layout: Self::layout(&header),
+            remaining: header.pnt_cnt,
+            header,
+            point_idx: 0,
+            base_time: 0,
+        });
+        Ok(())
+    }
+}
+
+impl Reader for TerrasolidReader {
+    fn name(&self) -> &str {
+        "readers.terrasolid"
+    }
+
+    fn read(&mut self) -> Result<Vec<PointView>, StageError> {
+        let (mut reader, header) = self.open()?;
+        let mut view = PointView::new(Self::layout(&header));
         let mut base_time = 0u32;
         for point_idx in 0..header.pnt_cnt {
-            let point = view.add_point();
-            match header.hdr_version {
-                FORMAT_1 => read_format_1(&mut reader, &mut view, point, &header)?,
-                FORMAT_2 => read_format_2(&mut reader, &mut view, point, &header)?,
-                _ => unreachable!(),
-            }
-            if header.time != 0 {
-                let mut t = reader.read_u32::<LittleEndian>().map_err(io_error)?;
-                if point_idx == 0 {
-                    base_time = t;
-                }
-                t -= base_time;
-                t /= 5;
-                view.set_f64(point, &DimId::OffsetTime, t as f64);
-            }
-            if header.color != 0 {
-                view.set_f64(
-                    point,
-                    &DimId::Red,
-                    reader.read_u8().map_err(io_error)? as f64,
-                );
-                view.set_f64(
-                    point,
-                    &DimId::Green,
-                    reader.read_u8().map_err(io_error)? as f64,
-                );
-                view.set_f64(
-                    point,
-                    &DimId::Blue,
-                    reader.read_u8().map_err(io_error)? as f64,
-                );
-                view.set_f64(
-                    point,
-                    &DimId::Alpha,
-                    reader.read_u8().map_err(io_error)? as f64,
-                );
-            }
+            Self::append_record(&mut view, &mut reader, &header, point_idx, &mut base_time)?;
         }
 
         Ok(vec![view])
@@ -105,6 +149,39 @@ impl Reader for TerrasolidReader {
 
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.terrasolid")
+    }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.remaining == 0 {
+            return Ok(None);
+        }
+
+        let take = (capacity.max(1) as i32).min(state.remaining);
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        for _ in 0..take {
+            Self::append_record(
+                &mut view,
+                &mut state.reader,
+                &state.header,
+                state.point_idx,
+                &mut state.base_time,
+            )?;
+            state.point_idx += 1;
+            state.remaining -= 1;
+        }
+        Ok(Some(view))
     }
 }
 
@@ -365,6 +442,7 @@ mod tests {
     fn empty_filename_is_error() {
         let mut r = TerrasolidReader {
             filename: String::new(),
+            stream: None,
         };
         match r.read().err() {
             Some(e) => assert!(e.0.contains("requires a filename")),
@@ -376,6 +454,7 @@ mod tests {
     fn name_returns_readers_terrasolid() {
         let r = TerrasolidReader {
             filename: "dummy".to_string(),
+            stream: None,
         };
         assert_eq!(r.name(), "readers.terrasolid");
     }
@@ -448,6 +527,40 @@ mod tests {
         let views = reader.read().expect("read terrasolid fixture");
         assert!(!views.is_empty());
         assert!(views[0].len() > 0);
+    }
+
+    #[test]
+    fn streaming_chunks_match_full_read() {
+        let path = format!(
+            "{}/../../test/data/terrasolid/20020715-time-color.bin",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+
+        let mut full_reader = TerrasolidReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = TerrasolidReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(1).unwrap().unwrap();
+        let second = stream_reader.stream_next(1).unwrap().unwrap();
+        let mut total = first.len() + second.len();
+        while let Some(chunk) = stream_reader.stream_next(7).unwrap() {
+            total += chunk.len();
+        }
+
+        assert_eq!(total, full.len());
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(
+            first.get_f64(0, &DimId::OffsetTime),
+            full.get_f64(0, &DimId::OffsetTime)
+        );
+        assert_eq!(
+            second.get_f64(0, &DimId::OffsetTime),
+            full.get_f64(1, &DimId::OffsetTime)
+        );
+        assert_eq!(second.get_f64(0, &DimId::Red), full.get_f64(1, &DimId::Red));
     }
 
     fn synth_terra_header(version: i32, pnt_cnt: i32, time: i32, color: i32) -> Vec<u8> {
