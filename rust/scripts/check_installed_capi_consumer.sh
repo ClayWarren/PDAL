@@ -42,4 +42,10 @@ CPP
 cmake -S "${CONSUMER_DIR}" -B "${CONSUMER_DIR}/build" -G Ninja \
     -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" >/dev/null
 cmake --build "${CONSUMER_DIR}/build" >/dev/null
-"${CONSUMER_DIR}/build/consumer"
+
+CONSUMER_EXE="${CONSUMER_DIR}/build/consumer"
+if [[ -f "${CONSUMER_EXE}.exe" ]]; then
+    CONSUMER_EXE="${CONSUMER_EXE}.exe"
+fi
+
+PATH="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/lib:${PATH}" "${CONSUMER_EXE}"
