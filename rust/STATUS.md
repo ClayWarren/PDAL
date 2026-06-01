@@ -91,9 +91,9 @@ the Rust-backed shape of PDAL.
 ## Plugin Status
 
 These are optional PDAL plugin directories, not the core static stage surface.
-Do not start a broad plugin sweep until local core, I/O, and command parity are
-farther along. One-off checkpoints are allowed when they prove a dependency or
-ABI pattern without forcing a plugin SDK decision.
+The broad plugin triage is complete enough to separate C ABI-backed
+checkpoints from dependency-bound native adapters without forcing a plugin SDK
+decision.
 
 Plugin backlog is now measurable with:
 
@@ -189,11 +189,13 @@ holdouts. Measure it with:
 ```sh
 python3 rust/scripts/audit_cpp_port_backlog.py
 python3 rust/scripts/audit_cpp_port_backlog.py --area io --top 40
+python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40
 python3 rust/scripts/audit_cpp_port_backlog.py --show holdout
 ```
 
 The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
-`kernels/`, `apps/`, `tools/`) by `cloc` code LOC into:
+`kernels/`, `apps/`, `tools/`) and, with `--include-plugins`, optional plugin
+files by `cloc` code LOC into:
 
 - `c-abi-backed`: includes the Rust C ABI header (or is a known Rust bridge
   header). A header inherits its sibling `.cpp`'s category, so interface headers
@@ -208,7 +210,7 @@ The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
   Keep this list small and cited in the script.
 - `port-candidate`: pure C++ with no C ABI reference — the actionable backlog.
 
-Current snapshot (mainline, excluding `test/`, `vendor/`, and deferred
+Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 `plugins/`):
 
 | category | LOC | files |
@@ -224,6 +226,10 @@ Port-candidate backlog by area: `pdal`, `io`, `filters`,
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
+With `--include-plugins`, optional plugin port-candidate backlog is also 0:
+plugin tests are excluded, C ABI-backed checkpoints are tracked as backed, and
+dependency-bound plugin integrations are tracked as native adapters rather than
+line-by-line Rust rewrite work.
 (The latest kernel sweeps moved direct C++ `DeltaKernel`/`EvalKernel`/
 `GroundKernel`/`MergeKernel`/`PipelineKernel`/`RandomKernel`/`SortKernel`/
 `SplitKernel`/`TIndexKernel`/`TileKernel`/`TranslateKernel`, and supported
@@ -439,14 +445,12 @@ install/export, CI, performance, platform, and plugin decisions.
 
 Current remaining C++ port-candidate ceiling for that checkpoint, excluding
 C++ tests and vendor, is `0` code LOC across `0` files in the main first-party
-surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, and `tools`). This
-does not mean the port is complete: mixed wrapper files may still contain legacy
-compatibility behavior, native adapters remain intentionally native, and
-documented holdouts remain C++ until the C++ SDK compatibility surface is no
-longer required or a specific replacement design is approved. Optional
-`plugins/` add another deferred ceiling of about `36,476` code LOC; plugin work
-should stay separate from the mainline implementation-replacement checkpoint
-until the plugin ABI/support decision is made.
+surface (`pdal/`, `filters/`, `io/`, `kernels/`, `apps/`, `tools/`) and remains
+`0` when optional `plugins/` are included. This does not mean the port is
+complete: mixed wrapper files may still contain legacy compatibility behavior,
+native adapters remain intentionally native, and documented holdouts remain C++
+until the C++ SDK compatibility surface is no longer required or a specific
+replacement design is approved.
 
 Using the same simple nonblank/noncomment line counter, the current first-party
 C++ implementation ceilings by area are approximately:
@@ -460,14 +464,15 @@ C++ implementation ceilings by area are approximately:
 | `apps/` | 340 | 340 | 0 |
 | `tools/` | 12 | 12 | 0 |
 | Mainline total | 73,596 | 26,462 | 47,134 |
-| `plugins/` deferred | 36,738 | 262 | 36,476 |
+| `plugins/` optional | 36,738 | 262 | 36,476 |
 
 The numbers in this section are the older coarse manual estimate. The
 `rust/scripts/audit_cpp_port_backlog.py` audit (see "C++
 Implementation-Replacement Backlog" above) is now the authoritative,
 repeatable measurement; it folds interface headers into their backed `.cpp`
-and separates native adapters and documented holdouts. The legacy recompute
-recipe below is kept only for cross-checking that coarse ceiling:
+and separates native adapters and documented holdouts, including optional
+plugins when `--include-plugins` is used. The legacy recompute recipe below is
+kept only for cross-checking that coarse ceiling:
 
 ```sh
 tmp=$(mktemp)
