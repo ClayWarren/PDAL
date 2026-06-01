@@ -40,8 +40,16 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Dimension to interpolate colors from.",
                 Some(json!("Z")),
             ),
-            option("minimum", "Minimum value for scaling (auto if unset).", None),
-            option("maximum", "Maximum value for scaling (auto if unset).", None),
+            option(
+                "minimum",
+                "Minimum value for scaling (auto if unset).",
+                None,
+            ),
+            option(
+                "maximum",
+                "Maximum value for scaling (auto if unset).",
+                None,
+            ),
             option(
                 "clamp",
                 "Clamp values outside [minimum, maximum] to the range.",
@@ -52,11 +60,7 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
                 "Named built-in ramp or GDAL-readable color ramp image.",
                 Some(json!("pestel_shades")),
             ),
-            option(
-                "invert",
-                "Invert the ramp direction.",
-                Some(json!(false)),
-            ),
+            option("invert", "Invert the ramp direction.", Some(json!(false))),
             option(
                 "mad",
                 "Use Median Absolute Deviation with 'k' to compute bounds.",

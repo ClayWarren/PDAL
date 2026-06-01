@@ -146,8 +146,11 @@ pub unsafe extern "C" fn pdal_stage_create_colorinterp(
 
     Box::into_raw(Box::new(StageWrapper {
         filter: Box::new(
-            ColorinterpFilter::new(&dim_name, &ramp, min, max, clamp, invert)
-                .with_bounds_params(mad, mad_multiplier, k),
+            ColorinterpFilter::new(&dim_name, &ramp, min, max, clamp, invert).with_bounds_params(
+                mad,
+                mad_multiplier,
+                k,
+            ),
         ),
     }))
 }

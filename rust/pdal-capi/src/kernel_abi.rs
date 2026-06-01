@@ -2,12 +2,12 @@ use crate::error::string_to_c_ptr;
 use crate::registry::pipeline_from_json;
 use crate::tile_abi::{tile_file, TileRequest};
 use pdal_core::kernel::{parse_stage_option, ParseStageResult};
-use pdal_core::options::Options;
 use pdal_kernels::{
     build_density_pipeline, build_merge_pipeline, build_random_pipeline, build_sort_pipeline,
-    FauxPluginKernel, Kernel, KernelArgs, KernelPipelinePlan, KERNEL_LIST_JSON,
+    build_tile_plan, FauxPluginKernel, Kernel, KernelArgs, KernelPipelinePlan, TileKernelPlan,
+    KERNEL_LIST_JSON,
 };
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
 mod ground;
@@ -257,108 +257,20 @@ unsafe fn run_tile_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         Err(code) => return code,
     };
 
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.tile: Missing value for positional argument 'input'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal tile <input> <output-template> [--length=N] [--origin_x=X] [--origin_y=Y] [--buffer=N]");
-        return 0;
-    }
-
-    let mut input = None;
-    let mut output = None;
-    let mut length = 1000.0;
-    let mut origin_x = f64::NAN;
-    let mut origin_y = f64::NAN;
-    let mut buffer = 0.0;
-    let mut out_srs = None;
-    let mut writer_options = Options::new();
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--input" || arg == "-i" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
-                return 1;
-            };
-            input = Some(value.clone());
-        } else if arg == "--output" || arg == "-o" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
-                return 1;
-            };
-            output = Some(value.clone());
-        } else if let Some(rest) = arg.strip_prefix("--") {
-            let (key, value) = match rest.split_once('=') {
-                Some(pair) => pair,
-                None => {
-                    let Some(value) = iter.next() else {
-                        eprintln!("PDAL: kernels.tile: Missing value for option '{arg}'.");
-                        return 1;
-                    };
-                    (rest, value.as_str())
-                }
-            };
-            let target = match key {
-                "length" => &mut length,
-                "origin_x" => &mut origin_x,
-                "origin_y" => &mut origin_y,
-                "buffer" => &mut buffer,
-                "out_srs" => {
-                    out_srs = Some(value.to_string());
-                    continue;
-                }
-                _ => {
-                    let option_text = format!("--{key}={value}");
-                    let parsed = parse_stage_option(&option_text, true);
-                    if parsed.result == ParseStageResult::Ok && parsed.stage == "writers.text" {
-                        writer_options.add(&parsed.option, parsed.value);
-                        continue;
-                    }
-                    return -1;
-                }
-            };
-            match value.parse::<f64>() {
-                Ok(parsed) => *target = parsed,
-                Err(_) => {
-                    eprintln!("PDAL: kernels.tile: Option '--{key}' expects a number.");
-                    return 1;
-                }
-            }
-        } else if input.is_none() {
-            input = Some(arg.clone());
-        } else if output.is_none() {
-            output = Some(arg.clone());
-        } else {
-            eprintln!("PDAL: kernels.tile: Unexpected argument '{arg}'.");
-            return 1;
-        }
-    }
-
-    let Some(input) = input else {
-        eprintln!("PDAL: kernels.tile: Missing value for positional argument 'input'.");
-        return 1;
+    let plan = match build_tile_plan(&args) {
+        TileKernelPlan::Run(plan) => plan,
+        TileKernelPlan::Return(code) => return code,
     };
-    let Some(output) = output else {
-        eprintln!("PDAL: kernels.tile: Missing value for positional argument 'output'.");
-        return 1;
-    };
-    if CString::new(input.as_str()).is_err() || CString::new(output.as_str()).is_err() {
-        eprintln!("PDAL: kernels.tile: Path contains an interior NUL byte.");
-        return 1;
-    }
 
     let request = TileRequest {
-        input_path: &input,
-        output_template: &output,
-        length,
-        origin_x,
-        origin_y,
-        buffer,
-        out_srs: out_srs.as_deref(),
-        writer_options: &writer_options,
+        input_path: &plan.input,
+        output_template: &plan.output,
+        length: plan.length,
+        origin_x: plan.origin_x,
+        origin_y: plan.origin_y,
+        buffer: plan.buffer,
+        out_srs: plan.out_srs.as_deref(),
+        writer_options: &plan.writer_options,
     };
     let count = match tile_file(request) {
         Ok(count) => count,

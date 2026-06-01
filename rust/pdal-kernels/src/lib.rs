@@ -13,6 +13,7 @@ mod sort;
 mod split;
 mod stage_options;
 mod text;
+mod tile;
 
 pub use density::build_density_pipeline;
 pub use fauxplugin::FauxPluginKernel;
@@ -22,6 +23,7 @@ pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, 
 pub use sort::build_sort_pipeline;
 pub use split::{build_split_plan, numbered_split_output, SplitKernelPlan, SplitPlan};
 pub use text::word_wrap;
+pub use tile::{build_tile_plan, TileKernelPlan, TilePlan};
 
 pub enum KernelPipelinePlan {
     Pipeline(serde_json::Value),

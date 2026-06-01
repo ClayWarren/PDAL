@@ -216,10 +216,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 0 | 0 |
-| c-abi-backed | 45,335 | 398 |
+| c-abi-backed | 45,228 | 398 |
 | native-adapter | 5,905 | 57 |
 | holdout | 6,960 | 66 |
-| total | 58,200 | 521 |
+| total | 58,093 | 521 |
 
 Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
