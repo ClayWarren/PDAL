@@ -286,6 +286,48 @@ mod tests {
     }
 
     #[test]
+    fn streaming_binary_writer_matches_materialized_write() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/autzen-utm.pcd"));
+        let mut reader = PcdReader::new(&options);
+        let view = reader.read().unwrap().pop().unwrap();
+
+        let mut first = view.clone();
+        first.truncate(500);
+        let mut second = view.make_new();
+        for idx in 500..view.len() {
+            second.append_point(&view, idx);
+        }
+
+        let materialized = temp_path("materialized-binary-stream-compare.pcd");
+        let streamed = temp_path("streamed-binary-stream-compare.pcd");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("compression", "binary")
+            .add("order", "X=Float,Y=Float,Z=Float,GpsTime=Double");
+        let mut stream_options = Options::new();
+        stream_options
+            .add("filename", &streamed)
+            .add("compression", "binary")
+            .add("order", "X=Float,Y=Float,Z=Float,GpsTime=Double");
+
+        let mut materialized_writer = PcdWriter::new(&materialized_options);
+        materialized_writer
+            .write(&[first.clone(), second.clone()])
+            .unwrap();
+        let mut stream_writer = PcdWriter::new(&stream_options);
+        assert!(stream_writer.streamable());
+        stream_writer.stream_write(&first).unwrap();
+        stream_writer.stream_write(&second).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
     fn per_dimension_precision_matches_existing_writer_shape() {
         let mut layout = PointLayout::new();
         layout.register(DimId::X, DimType::F64);

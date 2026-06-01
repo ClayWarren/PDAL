@@ -465,7 +465,7 @@ impl Writer for PcdWriter {
     }
 
     fn streamable(&self) -> bool {
-        !self.filename.is_empty() && self.compression == "ascii"
+        !self.filename.is_empty() && matches!(self.compression.as_str(), "ascii" | "binary")
     }
 
     fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
@@ -475,9 +475,9 @@ impl Writer for PcdWriter {
             ));
         }
         self.validate()?;
-        if self.compression != "ascii" {
+        if self.compression != "ascii" && self.compression != "binary" {
             return Err(StageError(
-                "PCD streaming is only supported for ASCII output.".to_string(),
+                "PCD streaming is only supported for ASCII and binary output.".to_string(),
             ));
         }
         if self.stream.is_none() {
@@ -494,7 +494,17 @@ impl Writer for PcdWriter {
         }
 
         let mut state = self.stream.take().expect("stream initialized above");
-        self.write_ascii_rows(&mut state.rows, std::slice::from_ref(chunk), &state.specs)?;
+        if self.compression == "ascii" {
+            self.write_ascii_rows(&mut state.rows, std::slice::from_ref(chunk), &state.specs)?;
+        } else {
+            let mut bytes = Vec::new();
+            write_interleaved_binary_points(&mut bytes, std::slice::from_ref(chunk), &state.specs)?;
+            state
+                .rows
+                .write_all(&bytes)
+                .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+            self.point_count += chunk.len();
+        }
         self.stream = Some(state);
         Ok(())
     }
