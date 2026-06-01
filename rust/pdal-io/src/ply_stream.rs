@@ -16,6 +16,12 @@ pub(super) struct PlyReaderStreamState {
     remaining: usize,
 }
 
+type VertexStream = (
+    BufReader<Box<dyn source::ReadSeek>>,
+    Vec<Element>,
+    PlyFormat,
+);
+
 pub(super) fn streamable(filename: &str) -> bool {
     open_vertex_stream(filename)
         .and_then(|(_reader, elements, _format)| streamable_vertex_element(&elements).map(|_| ()))
@@ -62,16 +68,7 @@ pub(super) fn stream_next(
     Ok(Some(view))
 }
 
-fn open_vertex_stream(
-    filename: &str,
-) -> Result<
-    (
-        BufReader<Box<dyn source::ReadSeek>>,
-        Vec<Element>,
-        PlyFormat,
-    ),
-    StageError,
-> {
+fn open_vertex_stream(filename: &str) -> Result<VertexStream, StageError> {
     if filename.is_empty() {
         return Err(StageError(
             "PlyReader requires a filename option.".to_string(),

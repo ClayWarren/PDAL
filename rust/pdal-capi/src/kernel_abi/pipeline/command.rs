@@ -15,113 +15,12 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         Err(code) => return code,
     };
 
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal pipeline <pipeline.json>");
-        println!("  pdal pipeline --input <pipeline.json>");
-        println!("  pdal pipeline --stdin");
-        return 0;
-    }
+    let parsed = match parse_pipeline_args(&args) {
+        PipelineArgsResult::Run(parsed) => parsed,
+        PipelineArgsResult::Return(code) => return code,
+    };
 
-    let mut input = None;
-    let mut read_stdin = false;
-    let mut validate_only = false;
-    let mut metadata_file = None;
-    let mut progress_file = None;
-    let mut serialization_file = None;
-    let mut summary_stdout = false;
-    let mut stream_allowed = true;
-    let mut stream_required = false;
-    let mut stage_options: Vec<CliStageOption> = Vec::new();
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--input" || arg == "-i" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
-                return 1;
-            };
-            input = Some(value.clone());
-        } else if arg == "--stdin" || arg == "-s" {
-            read_stdin = true;
-        } else if arg == "--validate" {
-            validate_only = true;
-        } else if arg == "--showjson" {
-            summary_stdout = true;
-        } else if arg == "--stream" {
-            if !stream_allowed {
-                eprintln!(
-                    "PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options"
-                );
-                return 1;
-            }
-            stream_allowed = true;
-            stream_required = true;
-        } else if arg == "--nostream" {
-            if stream_required {
-                eprintln!(
-                    "PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options"
-                );
-                return 1;
-            }
-            stream_allowed = false;
-        } else if arg == "--dims" {
-            let Some(_) = iter.next() else {
-                eprintln!("PDAL: kernels.pipeline: Missing value for option '--dims'.");
-                return 1;
-            };
-        } else if arg == "--progress" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
-                return 1;
-            };
-            progress_file = Some(value.clone());
-        } else if arg == "--pointcloudschema" {
-            let Some(_) = iter.next() else {
-                eprintln!("PDAL: kernels.pipeline: Missing value for option '{arg}'.");
-                return 1;
-            };
-            return -1;
-        } else if arg == "--metadata" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.pipeline: Missing value for option '--metadata'.");
-                return 1;
-            };
-            metadata_file = Some(value.clone());
-        } else if arg == "--pipeline-serialization" {
-            let Some(value) = iter.next() else {
-                eprintln!(
-                    "PDAL: kernels.pipeline: Missing value for option '--pipeline-serialization'."
-                );
-                return 1;
-            };
-            serialization_file = Some(value.clone());
-        } else if let Some(stage_option) = parse_cli_stage_option(arg) {
-            stage_options.push(stage_option);
-        } else if arg.starts_with("--") || arg.starts_with("-v") {
-            return -1;
-        } else if input.replace(arg.clone()).is_some() {
-            eprintln!("PDAL: kernels.pipeline: Unexpected argument '{arg}'.");
-            return 1;
-        }
-    }
-
-    if read_stdin && input.is_some() {
-        eprintln!(
-            "PDAL: kernels.pipeline: Expected either --stdin or an input filename, not both."
-        );
-        return 1;
-    }
-    if !read_stdin && input.is_none() {
-        eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
-        return 1;
-    }
-
-    let json = if read_stdin {
+    let json = if parsed.read_stdin {
         let mut json = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut json) {
             eprintln!("PDAL: kernels.pipeline: Unable to read pipeline from stdin: {err}");
@@ -129,7 +28,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         }
         json
     } else {
-        let input = input.unwrap();
+        let input = parsed.input.expect("input validated");
         match std::fs::read_to_string(&input) {
             Ok(json) => json,
             Err(err) => {
@@ -139,23 +38,23 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         }
     };
 
-    let json = match apply_stage_options_to_pipeline_json(&json, &stage_options) {
+    let json = match apply_stage_options_to_pipeline_json(&json, &parsed.stage_options) {
         Ok(json) => json,
         Err(()) => return -1,
     };
 
-    let mut progress = match open_progress_file(progress_file.as_deref()) {
+    let mut progress = match open_progress_file(parsed.progress_file.as_deref()) {
         Ok(progress) => progress,
         Err(()) => return 1,
     };
 
-    if validate_only {
+    if parsed.validate_only {
         let validation = validate_pipeline_for_kernel(&json);
         println!("{}", serde_json::to_string_pretty(&validation).unwrap());
         return 0;
     }
 
-    if let Some(path) = serialization_file {
+    if let Some(path) = parsed.serialization_file {
         if let Err(err) = std::fs::write(&path, &json) {
             eprintln!(
                 "PDAL: kernels.pipeline: Unable to write pipeline serialization '{path}': {err}"
@@ -174,13 +73,13 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.
-    if stream_allowed && metadata_file.is_none() && !summary_stdout {
+    if parsed.stream_allowed && parsed.metadata_file.is_none() && !parsed.summary_stdout {
         match pipeline.execute_streaming() {
             Ok(Some(_)) => {
                 write_progress(&mut progress, "DONEPIPELINE", "pipeline");
                 return 0;
             }
-            Ok(None) if stream_required => {
+            Ok(None) if parsed.stream_required => {
                 eprintln!(
                     "PDAL: kernels.pipeline: Attempting to use stream mode with a stage that doesn't support streaming."
                 );
@@ -196,10 +95,10 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
             write_progress(&mut progress, "DONEPIPELINE", "pipeline");
-            if metadata_file.is_some() || summary_stdout {
+            if parsed.metadata_file.is_some() || parsed.summary_stdout {
                 let handle = PipelineHandle { pipeline };
                 let summary = pipeline_result_to_json_for_kernel(result, &handle);
-                if let Some(path) = metadata_file {
+                if let Some(path) = parsed.metadata_file {
                     if let Err(err) = std::fs::write(&path, &summary) {
                         eprintln!(
                             "PDAL: kernels.pipeline: Unable to write metadata '{path}': {err}"
@@ -207,7 +106,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
                         return 1;
                     }
                 }
-                if summary_stdout {
+                if parsed.summary_stdout {
                     println!("{summary}");
                 }
             }
@@ -216,6 +115,133 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         Err(err) => {
             eprintln!("PDAL: kernels.pipeline: {err}");
             1
+        }
+    }
+}
+
+struct ParsedPipelineArgs {
+    input: Option<String>,
+    read_stdin: bool,
+    validate_only: bool,
+    metadata_file: Option<String>,
+    progress_file: Option<String>,
+    serialization_file: Option<String>,
+    summary_stdout: bool,
+    stream_allowed: bool,
+    stream_required: bool,
+    stage_options: Vec<CliStageOption>,
+}
+
+enum PipelineArgsResult {
+    Run(ParsedPipelineArgs),
+    Return(i32),
+}
+
+fn parse_pipeline_args(args: &[String]) -> PipelineArgsResult {
+    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.is_empty() {
+            eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
+            return PipelineArgsResult::Return(1);
+        }
+        println!("Usage:");
+        println!("  pdal pipeline <pipeline.json>");
+        println!("  pdal pipeline --input <pipeline.json>");
+        println!("  pdal pipeline --stdin");
+        return PipelineArgsResult::Return(0);
+    }
+
+    let mut parsed = ParsedPipelineArgs {
+        input: None,
+        read_stdin: false,
+        validate_only: false,
+        metadata_file: None,
+        progress_file: None,
+        serialization_file: None,
+        summary_stdout: false,
+        stream_allowed: true,
+        stream_required: false,
+        stage_options: Vec::new(),
+    };
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Err(code) = parse_pipeline_arg(arg, &mut iter, &mut parsed) {
+            return PipelineArgsResult::Return(code);
+        }
+    }
+
+    if parsed.read_stdin && parsed.input.is_some() {
+        eprintln!(
+            "PDAL: kernels.pipeline: Expected either --stdin or an input filename, not both."
+        );
+        return PipelineArgsResult::Return(1);
+    }
+    if !parsed.read_stdin && parsed.input.is_none() {
+        eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
+        return PipelineArgsResult::Return(1);
+    }
+
+    PipelineArgsResult::Run(parsed)
+}
+
+fn parse_pipeline_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut ParsedPipelineArgs,
+) -> Result<(), i32> {
+    if arg == "--input" || arg == "-i" {
+        parsed.input = Some(next_option_value(arg, iter)?.clone());
+    } else if arg == "--stdin" || arg == "-s" {
+        parsed.read_stdin = true;
+    } else if arg == "--validate" {
+        parsed.validate_only = true;
+    } else if arg == "--showjson" {
+        parsed.summary_stdout = true;
+    } else if arg == "--stream" {
+        if !parsed.stream_allowed {
+            eprintln!("PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options");
+            return Err(1);
+        }
+        parsed.stream_allowed = true;
+        parsed.stream_required = true;
+    } else if arg == "--nostream" {
+        if parsed.stream_required {
+            eprintln!("PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options");
+            return Err(1);
+        }
+        parsed.stream_allowed = false;
+    } else if arg == "--dims" {
+        next_option_value("--dims", iter)?;
+    } else if arg == "--progress" {
+        parsed.progress_file = Some(next_option_value(arg, iter)?.clone());
+    } else if arg == "--pointcloudschema" {
+        next_option_value(arg, iter)?;
+        return Err(-1);
+    } else if arg == "--metadata" {
+        parsed.metadata_file = Some(next_option_value("--metadata", iter)?.clone());
+    } else if arg == "--pipeline-serialization" {
+        parsed.serialization_file =
+            Some(next_option_value("--pipeline-serialization", iter)?.clone());
+    } else if let Some(stage_option) = parse_cli_stage_option(arg) {
+        parsed.stage_options.push(stage_option);
+    } else if arg.starts_with("--") || arg.starts_with("-v") {
+        return Err(-1);
+    } else if parsed.input.replace(arg.to_string()).is_some() {
+        eprintln!("PDAL: kernels.pipeline: Unexpected argument '{arg}'.");
+        return Err(1);
+    }
+    Ok(())
+}
+
+fn next_option_value<'a>(
+    option: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+) -> Result<&'a String, i32> {
+    match iter.next() {
+        Some(value) => Ok(value),
+        None => {
+            eprintln!("PDAL: kernels.pipeline: Missing value for option '{option}'.");
+            Err(1)
         }
     }
 }

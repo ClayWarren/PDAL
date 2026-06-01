@@ -59,17 +59,18 @@ impl Reader for TindexReader {
 
         let bounds = parse_tindex_bounds(&self.bounds)?;
         let polygon = parse_tindex_polygon(&self.polygon, &self.filter_srs, &self.target_srs)?;
-        let features = read_index_features(
-            &self.filename,
-            &self.layer_name,
-            &self.location_field,
-            &self.srs_field,
-            &self.attribute_filter,
-            &self.sql,
-            &self.dialect,
-            bounds.as_ref(),
-            polygon.as_ref(),
-        )?;
+        let query = TindexFeatureQuery {
+            filename: &self.filename,
+            layer_name: &self.layer_name,
+            location_field: &self.location_field,
+            srs_field: &self.srs_field,
+            attribute_filter: &self.attribute_filter,
+            sql: &self.sql,
+            dialect: &self.dialect,
+            bounds: bounds.as_ref(),
+            polygon: polygon.as_ref(),
+        };
+        let features = read_index_features(&query)?;
         let reader_args = parse_reader_args(&self.reader_args)?;
 
         let mut merged: Option<PointView> = None;
@@ -137,47 +138,34 @@ struct ReaderArgs {
     options: Options,
 }
 
-fn read_index_features(
-    filename: &str,
-    layer_name: &str,
-    location_field: &str,
-    srs_field: &str,
-    attribute_filter: &str,
-    sql: &str,
-    dialect: &str,
-    bounds: Option<&Bounds2D>,
-    polygon: Option<&Geometry>,
-) -> Result<Vec<IndexFeature>, StageError> {
-    match source::read_to_string(filename) {
+struct TindexFeatureQuery<'a> {
+    filename: &'a str,
+    layer_name: &'a str,
+    location_field: &'a str,
+    srs_field: &'a str,
+    attribute_filter: &'a str,
+    sql: &'a str,
+    dialect: &'a str,
+    bounds: Option<&'a Bounds2D>,
+    polygon: Option<&'a Geometry>,
+}
+
+fn read_index_features(query: &TindexFeatureQuery<'_>) -> Result<Vec<IndexFeature>, StageError> {
+    match source::read_to_string(query.filename) {
         Ok(text) => {
-            match read_geojson_index_features(&text, location_field, srs_field, bounds, polygon) {
+            match read_geojson_index_features(
+                &text,
+                query.location_field,
+                query.srs_field,
+                query.bounds,
+                query.polygon,
+            ) {
                 Ok(features) => Ok(features),
-                Err(json_err) => read_ogr_index_features(
-                    filename,
-                    layer_name,
-                    location_field,
-                    srs_field,
-                    attribute_filter,
-                    sql,
-                    dialect,
-                    bounds,
-                    polygon,
-                )
-                .or(Err(json_err)),
+                Err(json_err) => read_ogr_index_features(query).or(Err(json_err)),
             }
         }
-        Err(text_err) => read_ogr_index_features(
-            filename,
-            layer_name,
-            location_field,
-            srs_field,
-            attribute_filter,
-            sql,
-            dialect,
-            bounds,
-            polygon,
-        )
-        .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
+        Err(text_err) => read_ogr_index_features(query)
+            .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
     }
 }
 
@@ -218,40 +206,32 @@ fn read_geojson_index_features(
 }
 
 fn read_ogr_index_features(
-    filename: &str,
-    layer_name: &str,
-    location_field: &str,
-    srs_field: &str,
-    attribute_filter: &str,
-    sql: &str,
-    dialect: &str,
-    bounds: Option<&Bounds2D>,
-    polygon: Option<&Geometry>,
+    query: &TindexFeatureQuery<'_>,
 ) -> Result<Vec<IndexFeature>, StageError> {
-    let vector = pdal_native::gdal::Vector::open(filename).map_err(StageError)?;
-    let features = if sql.is_empty() {
+    let vector = pdal_native::gdal::Vector::open(query.filename).map_err(StageError)?;
+    let features = if query.sql.is_empty() {
         vector
             .get_string_pair_features_by_layer(
-                layer_name,
-                location_field,
-                srs_field,
-                attribute_filter,
+                query.layer_name,
+                query.location_field,
+                query.srs_field,
+                query.attribute_filter,
             )
             .map_err(StageError)?
     } else {
         vector
             .get_string_pair_features_by_sql(
-                sql,
-                dialect,
-                location_field,
-                srs_field,
-                attribute_filter,
+                query.sql,
+                query.dialect,
+                query.location_field,
+                query.srs_field,
+                query.attribute_filter,
             )
             .map_err(StageError)?
     };
     let mut output = Vec::new();
     for (wkt, location, srs) in features {
-        if !wkt_matches_bounds(&wkt, bounds, polygon)? {
+        if !wkt_matches_bounds(&wkt, query.bounds, query.polygon)? {
             continue;
         }
         output.push(IndexFeature { location, srs });

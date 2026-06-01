@@ -26,7 +26,14 @@ impl App {
             }
         };
         let argv: Vec<_> = args.iter().map(|arg| arg.as_ptr()).collect();
-        unsafe { pdal_capi::pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) }
+        let code = unsafe {
+            pdal_capi::pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr())
+        };
+        if code < 0 {
+            1
+        } else {
+            code
+        }
     }
 
     pub(super) fn run_tile(&self) -> i32 {

@@ -106,7 +106,9 @@ impl Reader for GdalReader {
             return Ok(None);
         }
 
-        let rows = ((capacity.max(1) + state.width as usize - 1) / state.width as usize)
+        let rows = capacity
+            .max(1)
+            .div_ceil(state.width as usize)
             .max(1)
             .min((state.height - state.next_row) as usize);
         let y_start = state.next_row;

@@ -697,6 +697,10 @@ unsafe fn run_random_kernel(argc: i32, argv: *const *const c_char) -> i32 {
                 eprintln!("PDAL: kernels.random: Missing value for option '{arg}'.");
                 return 1;
             };
+            if output.is_some() {
+                eprintln!("PDAL: kernels.random: Unexpected argument '{value}'.");
+                return 1;
+            }
             output = Some(value.clone());
         } else if arg.starts_with("--") {
             if !apply_writer_stage_option(arg, &mut writer_options) {
