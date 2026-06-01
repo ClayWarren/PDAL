@@ -277,13 +277,6 @@ impl App {
         }
     }
 
-    fn output_last_error(&self) {
-        match safe_cstr(pdal_capi::pdal_last_error()) {
-            Some(message) if !message.is_empty() => eprintln!("{}", message),
-            _ => eprintln!("Rust pipeline execution failed"),
-        }
-    }
-
     fn command_help_requested(&self) -> bool {
         self.command_args
             .iter()

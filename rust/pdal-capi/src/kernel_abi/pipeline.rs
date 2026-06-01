@@ -37,11 +37,7 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
 
     let mut filename = None;
     let mut driver_override = None;
-    let mut mode = InfoMode::Stats {
-        dimensions: None,
-        enumerate: None,
-        breakout: None,
-    };
+    let mut mode = InfoMode::Summary;
     let mut pc_type = "lidar".to_string();
     let mut serialization_file = None;
     let mut read_stdin = false;
@@ -283,7 +279,14 @@ pub(super) unsafe fn run_info_kernel(argc: i32, argv: *const *const c_char) -> i
         InfoMode::Summary => match pipeline.execute_with_result(Vec::new()) {
             Ok(result) => {
                 let handle = PipelineHandle { pipeline };
-                println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
+                println!(
+                    "{}",
+                    info_summary_json(
+                        pipeline_result_to_json_for_kernel(result, &handle),
+                        Some(&filename),
+                        Some(&driver),
+                    )
+                );
                 0
             }
             Err(err) => {
@@ -355,7 +358,14 @@ fn run_info_pipeline_json(
         InfoMode::Summary => match pipeline.execute_with_result(Vec::new()) {
             Ok(result) => {
                 let handle = PipelineHandle { pipeline };
-                println!("{}", pipeline_result_to_json_for_kernel(result, &handle));
+                println!(
+                    "{}",
+                    info_summary_json(
+                        pipeline_result_to_json_for_kernel(result, &handle),
+                        Some("STDIN"),
+                        None,
+                    )
+                );
                 0
             }
             Err(err) => {
@@ -375,6 +385,22 @@ fn run_info_pipeline_json(
             }
         },
     }
+}
+
+fn info_summary_json(summary: String, filename: Option<&str>, driver: Option<&str>) -> String {
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&summary) else {
+        return summary;
+    };
+    let Some(object) = value.as_object_mut() else {
+        return summary;
+    };
+    if let Some(filename) = filename {
+        object.insert("filename".to_string(), serde_json::json!(filename));
+    }
+    if let Some(driver) = driver {
+        object.insert("driver".to_string(), serde_json::json!(driver));
+    }
+    serde_json::to_string(&value).unwrap_or(summary)
 }
 
 fn append_info_stage_to_pipeline_json(

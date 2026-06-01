@@ -470,11 +470,6 @@ fn options_for_unknown_stage_does_not_panic() {
 }
 
 #[test]
-fn output_last_error_falls_back_without_message() {
-    App::new().output_last_error();
-}
-
-#[test]
 fn run_with_no_command_outputs_help() {
     let app = App::new();
     assert_eq!(app.run(), 0);
