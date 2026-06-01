@@ -303,10 +303,9 @@ preserved in one place. With that, the `io` port-candidate backlog is 0:
 `io/private/ept/TileContents.{cpp,hpp}` is reclassified as a native adapter,
 matching the `io/private/stac` precedent. Its entire read path goes through the
 Arbiter-backed `connector::Connector` (`m_connector`), and the C++ `EptReader`
-only reaches it on the remote (or 2D-bounds-with-SRS) fallback —
-`EptReader::ready()` routes every local, non-2D-bounds-SRS read through the Rust
-`pdal_reader_create_ept` path. The former local 2D-bounds-with-SRS fallback is
-closed: Rust EPT now accepts and reprojects 2D query bounds with an SRS,
+only reaches it on the remote fallback. `EptReader::ready()` routes every local
+read through the Rust `pdal_reader_create_ept` path, including 2D query bounds
+with an SRS. Rust EPT now accepts and reprojects 2D query bounds with an SRS,
 matching the existing transformed 3D bounds path.
 Rerun the audit after each change.
 **API-parity note:** removing dead code is

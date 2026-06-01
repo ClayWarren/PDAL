@@ -406,7 +406,7 @@ void EptReader::initialize()
         const SpatialReference& boundsSrs = m_args->m_bounds.spatialReference();
         if (m_args->m_bounds.is2d())
         {
-            if (boundsSrs.isGeographic() &&
+            if (Utils::isRemote(m_filename) && boundsSrs.isGeographic() &&
                 !getSpatialReference().isGeographic())
                 throwError("For lon/lat 'bounds', bounds must be 3D");
 
@@ -806,10 +806,7 @@ void EptReader::ready(PointTableRef table)
         m_p->pool.reset(new ThreadPool(m_args->m_threads));
     }
 
-    bool rustBoundsSupported =
-        m_args->m_bounds.spatialReference().empty() || !m_args->m_bounds.is2d();
-
-    if (!Utils::isRemote(m_filename) && rustBoundsSupported)
+    if (!Utils::isRemote(m_filename))
     {
         pdal_options_t* options = pdal_options_create();
         addOption(options, "filename", m_filename);

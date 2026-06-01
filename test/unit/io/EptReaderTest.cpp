@@ -1044,9 +1044,8 @@ TEST(EptReaderTest, ogrCrop)
     EXPECT_GE(sourceNp, 86u);
 }
 
-TEST(EptReaderTest, bcbfToLonLat2dBoundsThrows)
+TEST(EptReaderTest, bcbfToLonLat2dBounds)
 {
-    // A 2D bounds is not allowed for this lon/lat queries against BCBF data.
     SrsBounds bounds(BOX2D(-180, 80, 180, 90),
                      "+proj=longlat +R=1000 +no_defs +type=crs");
 
@@ -1058,7 +1057,22 @@ TEST(EptReaderTest, bcbfToLonLat2dBoundsThrows)
         reader.setOptions(options);
     }
     PointTable eptTable;
-    EXPECT_THROW(reader.prepare(eptTable), pdal_error);
+    reader.prepare(eptTable);
+    const auto set(reader.execute(eptTable));
+
+    uint64_t np(0);
+    for (const PointViewPtr& view : set)
+    {
+        for (point_count_t i(0); i < view->size(); ++i)
+        {
+            ++np;
+            EXPECT_EQ(view->getFieldAs<double>(Dimension::Id::X, i), 1);
+            EXPECT_EQ(view->getFieldAs<double>(Dimension::Id::Y, i), 1);
+            EXPECT_EQ(view->getFieldAs<double>(Dimension::Id::Z, i), 999);
+        }
+    }
+
+    EXPECT_EQ(np, 5);
 }
 
 TEST(EptReaderTest, bcbfToLonLat)
