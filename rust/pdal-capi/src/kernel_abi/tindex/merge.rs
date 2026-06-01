@@ -78,7 +78,7 @@ pub(super) fn run_merge(args: &[String]) -> i32 {
             return 1;
         };
         let Some(reader) = infer_reader_driver(location) else {
-            eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{location}'.");
+            eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{location}'.");
             return 1;
         };
         let tag = format!("tindex_input_{index}");

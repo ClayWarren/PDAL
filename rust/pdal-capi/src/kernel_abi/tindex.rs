@@ -275,8 +275,7 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             }
             "--fast_boundary" => {
                 parsed.rich_boundary_options = true;
-                let value = next_value(&mut iter, arg)?;
-                parsed.boundary.fast_boundary = parse_bool(value, arg)?;
+                parsed.boundary.fast_boundary = true;
             }
             "--skip_different_srs" => {
                 let value = next_value(&mut iter, arg)?;
@@ -333,27 +332,23 @@ fn parse_create_args(args: &[String]) -> Result<CreateArgs, ParseResult> {
             _ if arg.starts_with("--filters.hexbin.smooth") => {
                 return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
             }
-            _ if arg.starts_with("--filters.") => return Err(ParseResult::Unsupported),
-            _ if arg.starts_with('-') => return Err(ParseResult::Unsupported),
+            _ if arg.starts_with("--filters.") => {
+                return Err(ParseResult::Error(INVALID_FILTER_STAGE_MESSAGE.to_string()));
+            }
+            _ if arg.starts_with('-') => {
+                return Err(ParseResult::Error(format!("unknown tindex option '{arg}'")));
+            }
             _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
             _ if is_glob_pattern(arg) => {
                 parsed.input_methods += 1;
                 parsed.files.extend(read_glob(arg)?);
             }
-            _ => {
-                parsed.input_methods += 1;
-                parsed.files.push(arg.clone());
-            }
+            _ => parsed.files.push(arg.clone()),
         }
     }
     if parsed.input_methods > 1 {
         return Err(ParseResult::Error(
             "Can't specify more than one source of tindex input files.".to_string(),
-        ));
-    }
-    if parsed.path_prefix.is_some() && parsed.write_absolute_path {
-        return Err(ParseResult::Error(
-            "Can't specify both path_prefix and write_absolute_path.".to_string(),
         ));
     }
     if parsed.unsupported_input {
@@ -551,7 +546,7 @@ fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
 /// file has too few points to populate at least one dense hex cell.
 fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<String>, ()> {
     let Some(driver) = infer_reader_driver(file) else {
-        eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{file}'.");
+        eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{file}'.");
         return Err(());
     };
     let mut pipeline = match pipeline_from_json(
@@ -681,7 +676,7 @@ fn ensure_multipolygon(wkt: &str) -> String {
 
 fn summary_for_file(file: &str) -> Result<serde_json::Value, ()> {
     let Some(driver) = infer_reader_driver(file) else {
-        eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{file}'.");
+        eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{file}'.");
         return Err(());
     };
     let mut pipeline = match pipeline_from_json(
@@ -713,7 +708,7 @@ fn summary_for_file(file: &str) -> Result<serde_json::Value, ()> {
 
 fn srs_for_file(file: &str) -> Result<String, ()> {
     let Some(driver) = infer_reader_driver(file) else {
-        eprintln!("PDAL: kernels.tindex: Unable to infer reader driver for '{file}'.");
+        eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{file}'.");
         return Err(());
     };
     let mut pipeline = match pipeline_from_json(
