@@ -173,7 +173,7 @@ impl Reader for PcdReader {
     }
 
     fn streamable(&self) -> bool {
-        !self.filename.is_empty()
+        pcd_input_is_streamable(&self.filename)
     }
 
     fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
@@ -650,6 +650,36 @@ fn parse_header(bytes: &[u8]) -> Result<Header, StageError> {
     Err(StageError(
         "unrecognized PCD header, or missing DATA marker".to_string(),
     ))
+}
+
+fn pcd_input_is_streamable(filename: &str) -> bool {
+    if filename.is_empty() {
+        return false;
+    }
+
+    let Ok(file) = source::open_seek(filename) else {
+        return false;
+    };
+    let mut reader = BufReader::new(file);
+    let mut header_bytes = Vec::new();
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let Ok(read) = reader.read_line(&mut line) else {
+            return false;
+        };
+        if read == 0 {
+            return false;
+        }
+        header_bytes.extend_from_slice(line.as_bytes());
+        if line.trim_start().to_ascii_lowercase().starts_with("data ") {
+            break;
+        }
+    }
+
+    parse_header(&header_bytes)
+        .map(|header| matches!(header.storage.as_str(), "ascii" | "binary"))
+        .unwrap_or(false)
 }
 
 fn read_binary_value(bytes: &[u8], offset: &mut usize, field: &Field) -> Result<f64, StageError> {

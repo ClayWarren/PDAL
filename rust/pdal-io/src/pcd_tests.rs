@@ -469,6 +469,7 @@ mod tests {
         let mut read_options = Options::new();
         read_options.add("filename", &output);
         let mut reader = PcdReader::new(&read_options);
+        assert!(!reader.streamable());
         let roundtrip = reader.read().unwrap().pop().unwrap();
 
         assert_eq!(roundtrip.len(), 3);
