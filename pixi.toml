@@ -148,6 +148,8 @@ rust-clippy = { cmd = "cargo clippy --manifest-path rust/Cargo.toml --workspace 
 rust-test = { cmd = "cargo test --manifest-path rust/Cargo.toml --workspace", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
 rust-coverage-check = { cmd = "rust/scripts/run_coverage.sh --fail-under-lines 91", env = { DYLD_FALLBACK_LIBRARY_PATH = "$CONDA_PREFIX/lib:/usr/lib", LD_LIBRARY_PATH = "$CONDA_PREFIX/lib" } }
 rust-license-audit = { cmd = "rust/scripts/audit_rust_licenses.py" }
+rust-cpp-port-audit = { cmd = "python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40" }
+rust-cpp-test-parity = { cmd = "python3 rust/scripts/audit_cpp_test_parity.py --build-dir .build", depends-on = ["build"] }
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test", "rust-coverage-check", "rust-license-audit"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }
