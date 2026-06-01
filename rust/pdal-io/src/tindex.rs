@@ -5,6 +5,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
+use pdal_native::geometry::Geometry;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -37,33 +38,13 @@ impl Reader for TindexReader {
             ));
         }
 
-        let text = source::read_to_string(&self.filename)
-            .map_err(|err| StageError(format!("Can't open file '{}': {err}", self.filename)))?;
-        let json: serde_json::Value = serde_json::from_str(&text).map_err(|err| {
-            StageError(format!(
-                "TindexReader expected a GeoJSON FeatureCollection: {err}"
-            ))
-        })?;
-        let features = json["features"].as_array().ok_or_else(|| {
-            StageError("TindexReader expected a GeoJSON FeatureCollection.".to_string())
-        })?;
         let bounds = parse_tindex_bounds(&self.bounds)?;
+        let features = read_index_features(&self.filename, &self.location_field, bounds.as_ref())?;
 
         let mut merged: Option<PointView> = None;
         let base = location_base(&self.filename);
         for feature in features {
-            if !feature_matches_bounds(feature, bounds.as_ref())? {
-                continue;
-            }
-            let location = feature["properties"][self.location_field.as_str()]
-                .as_str()
-                .ok_or_else(|| {
-                    StageError(format!(
-                        "TindexReader feature is missing '{}'.",
-                        self.location_field
-                    ))
-                })?;
-            let location = resolve_location_text(&base, location);
+            let location = resolve_location_text(&base, &feature.location);
             let mut views = read_point_location(&location, None, &Options::new())?;
             for view in views.drain(..) {
                 append_view(&mut merged, &view, Path::new(&location))?;
@@ -79,6 +60,79 @@ impl Reader for TindexReader {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.tindex")
     }
+}
+
+struct IndexFeature {
+    location: String,
+}
+
+fn read_index_features(
+    filename: &str,
+    location_field: &str,
+    bounds: Option<&Bounds2D>,
+) -> Result<Vec<IndexFeature>, StageError> {
+    match source::read_to_string(filename) {
+        Ok(text) => match read_geojson_index_features(&text, location_field, bounds) {
+            Ok(features) => Ok(features),
+            Err(json_err) => {
+                read_ogr_index_features(filename, location_field, bounds).or(Err(json_err))
+            }
+        },
+        Err(text_err) => read_ogr_index_features(filename, location_field, bounds)
+            .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
+    }
+}
+
+fn read_geojson_index_features(
+    text: &str,
+    location_field: &str,
+    bounds: Option<&Bounds2D>,
+) -> Result<Vec<IndexFeature>, StageError> {
+    let json: serde_json::Value = serde_json::from_str(text).map_err(|err| {
+        StageError(format!(
+            "TindexReader expected a GeoJSON FeatureCollection: {err}"
+        ))
+    })?;
+    let features = json["features"].as_array().ok_or_else(|| {
+        StageError("TindexReader expected a GeoJSON FeatureCollection.".to_string())
+    })?;
+    let mut output = Vec::new();
+    for feature in features {
+        if !feature_matches_bounds(feature, bounds)? {
+            continue;
+        }
+        let location = feature["properties"][location_field]
+            .as_str()
+            .ok_or_else(|| {
+                StageError(format!(
+                    "TindexReader feature is missing '{}'.",
+                    location_field
+                ))
+            })?;
+        output.push(IndexFeature {
+            location: location.to_string(),
+        });
+    }
+    Ok(output)
+}
+
+fn read_ogr_index_features(
+    filename: &str,
+    location_field: &str,
+    bounds: Option<&Bounds2D>,
+) -> Result<Vec<IndexFeature>, StageError> {
+    let vector = pdal_native::gdal::Vector::open(filename).map_err(StageError)?;
+    let features = vector
+        .get_string_features(0, location_field)
+        .map_err(StageError)?;
+    let mut output = Vec::new();
+    for (wkt, location) in features {
+        if !wkt_matches_bounds(&wkt, bounds)? {
+            continue;
+        }
+        output.push(IndexFeature { location });
+    }
+    Ok(output)
 }
 
 pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
@@ -113,6 +167,21 @@ fn resolve_location_text(base: &str, location: &str) -> String {
     } else {
         Path::new(base).join(location).display().to_string()
     }
+}
+
+fn wkt_matches_bounds(wkt: &str, bounds: Option<&Bounds2D>) -> Result<bool, StageError> {
+    let Some(bounds) = bounds else {
+        return Ok(true);
+    };
+    let geometry = Geometry::from_wkt(wkt).map_err(StageError)?;
+    let (minx, maxx, miny, maxy, _, _) = geometry.bounds().map_err(StageError)?;
+    Ok(Bounds2D {
+        minx,
+        maxx,
+        miny,
+        maxy,
+    }
+    .overlaps(bounds))
 }
 
 fn parse_tindex_bounds(bounds: &str) -> Result<Option<Bounds2D>, StageError> {
@@ -406,6 +475,47 @@ mod tests {
         let mut reader = TindexReader::new(&options);
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
+    }
+
+    #[test]
+    fn reads_ogr_index_and_merges_referenced_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        let source_copy = temp.path().join("simple_text.ply");
+        std::fs::copy(&source, &source_copy).unwrap();
+        let index = temp.path().join("index.shp");
+        {
+            let vector =
+                pdal_native::gdal::Vector::create(index.to_str().unwrap(), "ESRI Shapefile")
+                    .unwrap();
+            let layer = vector.open_or_create_layer("index", "").unwrap();
+            unsafe {
+                pdal_native::gdal::Vector::create_string_field(layer, "location").unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+                    &[("location", "simple_text.ply")],
+                )
+                .unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((50 50,51 50,51 51,50 51,50 50))",
+                    &[("location", "simple_text.ply")],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        options.add("bounds", "([0, 2],[0, 2])");
+        let mut reader = TindexReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 3);
     }
 
     #[test]
