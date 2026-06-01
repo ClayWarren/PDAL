@@ -3,99 +3,6 @@ use std::ffi::CString;
 use std::io::Read;
 use std::path::Path;
 
-struct DeltaArgs {
-    source: String,
-    candidate: String,
-    detail: bool,
-    all_dims: bool,
-}
-
-fn parse_delta_args(args: &[String]) -> Result<DeltaArgs, String> {
-    let mut source = None;
-    let mut candidate = None;
-    let mut detail = false;
-    let mut all_dims = false;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--detail" => detail = true,
-            "--alldims" => all_dims = true,
-            "--source" => {
-                let Some(value) = iter.next() else {
-                    return Err("--source requires a filename".to_string());
-                };
-                source = Some(value.clone());
-            }
-            "--candidate" => {
-                let Some(value) = iter.next() else {
-                    return Err("--candidate requires a filename".to_string());
-                };
-                candidate = Some(value.clone());
-            }
-            _ if let Some(value) = arg.strip_prefix("--source=") => {
-                source = Some(value.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--candidate=") => {
-                candidate = Some(value.to_string());
-            }
-            _ if arg.starts_with("--") => return Err(format!("unknown delta option '{arg}'")),
-            _ if source.is_none() => source = Some(arg.clone()),
-            _ if candidate.is_none() => candidate = Some(arg.clone()),
-            _ => return Err("delta expects exactly two filenames".to_string()),
-        }
-    }
-
-    let (Some(source), Some(candidate)) = (source, candidate) else {
-        return Err("delta expects exactly two filenames".to_string());
-    };
-
-    Ok(DeltaArgs {
-        source,
-        candidate,
-        detail,
-        all_dims,
-    })
-}
-
-fn parse_source_candidate_args<'a>(
-    command: &str,
-    args: &'a [String],
-) -> Result<(&'a str, &'a str), String> {
-    let mut source = None;
-    let mut candidate = None;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--source" {
-            let Some(value) = iter.next() else {
-                return Err("--source requires a filename".to_string());
-            };
-            source = Some(value.as_str());
-        } else if let Some(value) = arg.strip_prefix("--source=") {
-            source = Some(value);
-        } else if arg == "--candidate" {
-            let Some(value) = iter.next() else {
-                return Err("--candidate requires a filename".to_string());
-            };
-            candidate = Some(value.as_str());
-        } else if let Some(value) = arg.strip_prefix("--candidate=") {
-            candidate = Some(value);
-        } else if arg.starts_with("--") {
-            return Err(format!("unknown {command} option '{arg}'"));
-        } else if source.is_none() {
-            source = Some(arg.as_str());
-        } else if candidate.is_none() {
-            candidate = Some(arg.as_str());
-        } else {
-            return Err(format!("{command} expects exactly two filenames"));
-        }
-    }
-
-    match (source, candidate) {
-        (Some(source), Some(candidate)) => Ok((source, candidate)),
-        _ => Err(format!("{command} expects exactly two filenames")),
-    }
-}
-
 struct TindexCreateArgs {
     tindex_file: String,
     files: Vec<String>,
@@ -463,44 +370,7 @@ impl App {
                 0
             };
         }
-        let (source, candidate) = match parse_source_candidate_args("hausdorff", &self.command_args)
-        {
-            Ok(paths) => paths,
-            Err(message) => {
-                eprintln!("Error: {message}");
-                return 1;
-            }
-        };
-        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
-            (Ok(source), Ok(candidate)) => (source, candidate),
-            _ => {
-                eprintln!("Error: a filename contains an interior NUL byte");
-                return 1;
-            }
-        };
-
-        let mut hausdorff = 0.0f64;
-        let mut modified = 0.0f64;
-        let status = unsafe {
-            pdal_capi::pdal_hausdorff(
-                c_source.as_ptr(),
-                c_candidate.as_ptr(),
-                &mut hausdorff,
-                &mut modified,
-            )
-        };
-        if status < 0 {
-            self.output_last_error();
-            return 1;
-        }
-
-        let report = serde_json::json!({
-            "filenames": [source, candidate],
-            "hausdorff": hausdorff,
-            "modified_hausdorff": modified,
-        });
-        println!("{}", serde_json::to_string(&report).unwrap());
-        0
+        self.run_rust_kernel("hausdorff")
     }
 
     pub(super) fn run_chamfer(&self) -> i32 {
@@ -513,36 +383,7 @@ impl App {
                 0
             };
         }
-        let (source, candidate) = match parse_source_candidate_args("chamfer", &self.command_args) {
-            Ok(paths) => paths,
-            Err(message) => {
-                eprintln!("Error: {message}");
-                return 1;
-            }
-        };
-        let (c_source, c_candidate) = match (CString::new(source), CString::new(candidate)) {
-            (Ok(source), Ok(candidate)) => (source, candidate),
-            _ => {
-                eprintln!("Error: a filename contains an interior NUL byte");
-                return 1;
-            }
-        };
-
-        let mut chamfer = 0.0f64;
-        let status = unsafe {
-            pdal_capi::pdal_chamfer(c_source.as_ptr(), c_candidate.as_ptr(), &mut chamfer)
-        };
-        if status < 0 {
-            self.output_last_error();
-            return 1;
-        }
-
-        let report = serde_json::json!({
-            "filenames": [source, candidate],
-            "chamfer": chamfer,
-        });
-        println!("{}", serde_json::to_string(&report).unwrap());
-        0
+        self.run_rust_kernel("chamfer")
     }
 
     pub(super) fn run_delta(&self) -> i32 {
@@ -555,41 +396,7 @@ impl App {
                 0
             };
         }
-        let args = match parse_delta_args(&self.command_args) {
-            Ok(args) => args,
-            Err(message) => {
-                eprintln!("Error: {message}");
-                return 1;
-            }
-        };
-        let (c_source, c_candidate) = match (
-            CString::new(args.source.as_str()),
-            CString::new(args.candidate.as_str()),
-        ) {
-            (Ok(source), Ok(candidate)) => (source, candidate),
-            _ => {
-                eprintln!("Error: a filename contains an interior NUL byte");
-                return 1;
-            }
-        };
-
-        let json_ptr = unsafe {
-            pdal_capi::pdal_delta_ex(
-                c_source.as_ptr(),
-                c_candidate.as_ptr(),
-                args.detail,
-                args.all_dims,
-            )
-        };
-        if json_ptr.is_null() {
-            self.output_last_error();
-            return 1;
-        }
-        if let Some(json) = safe_cstr(json_ptr) {
-            println!("{}", json);
-        }
-        unsafe { pdal_capi::pdal_string_free(json_ptr) };
-        0
+        self.run_rust_kernel("delta")
     }
 
     pub(super) fn run_tindex(&self) -> i32 {
@@ -860,85 +667,7 @@ impl App {
             };
         }
 
-        let mut predicted: Option<&str> = None;
-        let mut truth: Option<&str> = None;
-        let mut labels = String::new();
-        let mut prediction_dim = String::from("Classification");
-        let mut truth_dim = String::from("Classification");
-        let mut args = self.command_args.iter();
-        while let Some(arg) = args.next() {
-            if let Some(rest) = arg.strip_prefix("--") {
-                let (key, value) = match rest.split_once('=') {
-                    Some(pair) => pair,
-                    None => {
-                        let Some(value) = args.next() else {
-                            eprintln!("Error: option '{arg}' requires a value");
-                            return 1;
-                        };
-                        (rest, value.as_str())
-                    }
-                };
-                match key {
-                    "predicted" => predicted = Some(value),
-                    "truth" => truth = Some(value),
-                    "labels" => labels = value.to_string(),
-                    "prediction_dim" => prediction_dim = value.to_string(),
-                    "truth_dim" => truth_dim = value.to_string(),
-                    _ => {
-                        eprintln!("Error: unknown eval option '--{key}'");
-                        return 1;
-                    }
-                }
-            } else if predicted.is_none() {
-                predicted = Some(arg);
-            } else if truth.is_none() {
-                truth = Some(arg);
-            } else {
-                eprintln!("Error: eval expects a predicted path and a truth path");
-                return 1;
-            }
-        }
-        let (Some(predicted), Some(truth)) = (predicted, truth) else {
-            eprintln!("Error: eval expects a predicted path and a truth path");
-            return 1;
-        };
-        if labels.is_empty() {
-            eprintln!("Error: eval requires --labels=<comma-separated classification labels>");
-            return 1;
-        }
-
-        let (c_predicted, c_truth, c_labels, c_prediction_dim, c_truth_dim) = match (
-            CString::new(predicted),
-            CString::new(truth),
-            CString::new(labels.as_str()),
-            CString::new(prediction_dim.as_str()),
-            CString::new(truth_dim.as_str()),
-        ) {
-            (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e)) => (a, b, c, d, e),
-            _ => {
-                eprintln!("Error: an argument contains an interior NUL byte");
-                return 1;
-            }
-        };
-
-        let json_ptr = unsafe {
-            pdal_capi::pdal_eval(
-                c_predicted.as_ptr(),
-                c_truth.as_ptr(),
-                c_labels.as_ptr(),
-                c_prediction_dim.as_ptr(),
-                c_truth_dim.as_ptr(),
-            )
-        };
-        if json_ptr.is_null() {
-            self.output_last_error();
-            return 1;
-        }
-        if let Some(json) = safe_cstr(json_ptr) {
-            println!("{}", json);
-        }
-        unsafe { pdal_capi::pdal_string_free(json_ptr) };
-        0
+        self.run_rust_kernel("eval")
     }
 
     /// Build a pipeline from assembled stage objects and execute it.
