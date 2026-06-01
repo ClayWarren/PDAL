@@ -46,6 +46,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <sstream>
+
 namespace pdal
 {
 
@@ -472,7 +474,7 @@ bool TIndexReader::canUseRustReader() const
     return m_args->m_srsColumnName.empty() && m_args->m_wkt.empty() &&
            m_args->m_ogr.empty() && m_args->m_attributeFilter.empty() &&
            m_args->m_sql.empty() && m_args->m_rawReaderArgs.empty() &&
-           m_args->m_bounds.empty() && m_args->m_tgtSrsString.empty();
+           m_args->m_tgtSrsString.empty();
 }
 
 void TIndexReader::loadRustView()
@@ -487,6 +489,12 @@ void TIndexReader::loadRustView()
     pdal_options_t* options = pdal_options_create();
     addOption(options, "filename", m_filename);
     addOption(options, "tindex_name", m_args->m_tileIndexColumnName);
+    if (!m_args->m_bounds.empty())
+    {
+        std::ostringstream bounds;
+        bounds << m_args->m_bounds;
+        addOption(options, "bounds", bounds.str());
+    }
 
     pdal_reader_t* reader = pdal_reader_create_tindex(options);
     if (!reader)

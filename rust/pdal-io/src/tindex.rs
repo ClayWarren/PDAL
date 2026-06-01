@@ -1,3 +1,4 @@
+use pdal_core::bounds::{parse_bounds2d, Bounds2D};
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
@@ -10,6 +11,7 @@ use std::rc::Rc;
 pub struct TindexReader {
     filename: String,
     location_field: String,
+    bounds: String,
 }
 
 impl TindexReader {
@@ -17,6 +19,7 @@ impl TindexReader {
         Self {
             filename: options.get_str("filename", ""),
             location_field: options.get_str("tindex_name", "location"),
+            bounds: options.get_str("bounds", ""),
         }
     }
 }
@@ -43,10 +46,14 @@ impl Reader for TindexReader {
         let features = json["features"].as_array().ok_or_else(|| {
             StageError("TindexReader expected a GeoJSON FeatureCollection.".to_string())
         })?;
+        let bounds = parse_tindex_bounds(&self.bounds)?;
 
         let mut merged: Option<PointView> = None;
         let base = Path::new(&self.filename).parent().unwrap_or(Path::new(""));
         for feature in features {
+            if !feature_matches_bounds(feature, bounds.as_ref())? {
+                continue;
+            }
             let location = feature["properties"][self.location_field.as_str()]
                 .as_str()
                 .ok_or_else(|| {
@@ -79,6 +86,106 @@ pub(crate) fn resolve_location(base: &Path, location: &str) -> PathBuf {
         path.to_path_buf()
     } else {
         base.join(path)
+    }
+}
+
+fn parse_tindex_bounds(bounds: &str) -> Result<Option<Bounds2D>, StageError> {
+    if bounds.trim().is_empty() {
+        return Ok(None);
+    }
+    parse_bounds2d(bounds, 0)
+        .map(|parsed| Some(parsed.bounds))
+        .map_err(StageError)
+}
+
+fn feature_matches_bounds(
+    feature: &serde_json::Value,
+    bounds: Option<&Bounds2D>,
+) -> Result<bool, StageError> {
+    let Some(bounds) = bounds else {
+        return Ok(true);
+    };
+    let Some(feature_bounds) = geojson_geometry_bounds(&feature["geometry"])? else {
+        return Ok(false);
+    };
+    Ok(feature_bounds.overlaps(bounds))
+}
+
+fn geojson_geometry_bounds(geometry: &serde_json::Value) -> Result<Option<Bounds2D>, StageError> {
+    if geometry.is_null() {
+        return Ok(None);
+    }
+    match geometry["type"].as_str().unwrap_or("") {
+        "Polygon" => polygon_bounds(geometry),
+        "MultiPolygon" => multipolygon_bounds(geometry),
+        other => Err(StageError(format!(
+            "Unsupported TIndex GeoJSON geometry type '{other}'."
+        ))),
+    }
+}
+
+fn multipolygon_bounds(geometry: &serde_json::Value) -> Result<Option<Bounds2D>, StageError> {
+    let Some(polygons) = geometry["coordinates"].as_array() else {
+        return Err(StageError(
+            "Invalid TIndex MultiPolygon geometry.".to_string(),
+        ));
+    };
+    let mut bounds = None;
+    for polygon in polygons {
+        let Some(rings) = polygon.as_array() else {
+            return Err(StageError(
+                "Invalid TIndex MultiPolygon geometry.".to_string(),
+            ));
+        };
+        let Some(polygon_bounds) = rings_bounds(rings)? else {
+            continue;
+        };
+        grow_optional_bounds(&mut bounds, polygon_bounds);
+    }
+    Ok(bounds)
+}
+
+fn polygon_bounds(geometry: &serde_json::Value) -> Result<Option<Bounds2D>, StageError> {
+    let Some(rings) = geometry["coordinates"].as_array() else {
+        return Err(StageError("Invalid TIndex Polygon geometry.".to_string()));
+    };
+    rings_bounds(rings)
+}
+
+fn rings_bounds(rings: &[serde_json::Value]) -> Result<Option<Bounds2D>, StageError> {
+    let Some(outer) = rings.first().and_then(serde_json::Value::as_array) else {
+        return Ok(None);
+    };
+    let mut bounds = None;
+    for coord in outer {
+        let values = coord
+            .as_array()
+            .ok_or_else(|| StageError("Invalid TIndex polygon coordinate.".to_string()))?;
+        let x = values
+            .first()
+            .and_then(serde_json::Value::as_f64)
+            .ok_or_else(|| StageError("Invalid TIndex polygon coordinate.".to_string()))?;
+        let y = values
+            .get(1)
+            .and_then(serde_json::Value::as_f64)
+            .ok_or_else(|| StageError("Invalid TIndex polygon coordinate.".to_string()))?;
+        grow_optional_bounds(
+            &mut bounds,
+            Bounds2D {
+                minx: x,
+                maxx: x,
+                miny: y,
+                maxy: y,
+            },
+        );
+    }
+    Ok(bounds)
+}
+
+fn grow_optional_bounds(bounds: &mut Option<Bounds2D>, other: Bounds2D) {
+    match bounds {
+        Some(bounds) => bounds.grow_bounds(&other),
+        None => *bounds = Some(other),
     }
 }
 
@@ -277,6 +384,68 @@ mod tests {
         let mut reader = TindexReader::new(&options);
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
+    }
+
+    #[test]
+    fn bounds_filter_skips_non_overlapping_features() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        let source_copy = temp.path().join("simple_text.ply");
+        std::fs::copy(&source, &source_copy).unwrap();
+        let index = temp.path().join("index.geojson");
+        std::fs::write(
+            &index,
+            r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    },
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply"},
+      "geometry":{"type":"Polygon","coordinates":[[[50,50],[51,50],[51,51],[50,51],[50,50]]]}
+    }
+  ]
+}"#,
+        )
+        .unwrap();
+
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        options.add("bounds", "([0, 2],[0, 2])");
+        let mut reader = TindexReader::new(&options);
+        let views = reader.read().unwrap();
+
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].len(), 3);
+    }
+
+    #[test]
+    fn bounds_filter_supports_multipolygon_features() {
+        let geometry = serde_json::json!({
+            "type": "MultiPolygon",
+            "coordinates": [
+                [[[10,10],[11,10],[11,11],[10,11],[10,10]]],
+                [[[0,0],[1,0],[1,1],[0,1],[0,0]]]
+            ]
+        });
+        let bounds = geojson_geometry_bounds(&geometry).unwrap().unwrap();
+
+        assert_eq!(bounds.minx, 0.0);
+        assert_eq!(bounds.maxx, 11.0);
+        assert_eq!(bounds.miny, 0.0);
+        assert_eq!(bounds.maxy, 11.0);
+    }
+
+    #[test]
+    fn bounds_filter_rejects_unsupported_geometry() {
+        let geometry = serde_json::json!({"type": "LineString", "coordinates": [[0, 0], [1, 1]]});
+        assert!(geojson_geometry_bounds(&geometry).is_err());
     }
 
     #[test]
