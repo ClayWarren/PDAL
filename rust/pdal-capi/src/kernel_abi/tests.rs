@@ -172,36 +172,6 @@ fn rust_kernel_run_enforces_pipeline_stream_options() {
 }
 
 #[test]
-fn density_pipeline_json_appends_hexbin_stage() {
-    let pipeline = r#"{"pipeline":[{"type":"readers.faux","count":5}]}"#;
-    let value = append_stage_to_pipeline_json(
-        pipeline,
-        serde_json::json!({
-            "type": "filters.hexbin",
-            "density": "density.geojson",
-        }),
-    )
-    .unwrap();
-
-    let stages = value["pipeline"].as_array().unwrap();
-    assert_eq!(stages.len(), 2);
-    assert_eq!(stages[1]["type"], "filters.hexbin");
-    assert_eq!(stages[1]["density"], "density.geojson");
-}
-
-#[test]
-fn density_pipeline_json_rejects_missing_pipeline_array() {
-    let err = append_stage_to_pipeline_json(
-        r#"{"type":"readers.faux"}"#,
-        serde_json::json!({"type":"filters.hexbin"}),
-    )
-    .err()
-    .unwrap();
-
-    assert!(err.contains("pipeline"));
-}
-
-#[test]
 fn rust_kernel_run_reports_metric_missing_inputs() {
     for command in ["hausdorff", "chamfer", "delta", "eval"] {
         let name = CString::new(command).unwrap();

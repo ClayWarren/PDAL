@@ -1,16 +1,13 @@
 use crate::error::string_to_c_ptr;
 use crate::registry::pipeline_from_json;
 use crate::tile_abi::{tile_file, TileRequest};
-use pdal_core::driver::infer_reader_driver;
 use pdal_core::kernel::{parse_stage_option, ParseStageResult};
 use pdal_core::options::Options;
 use pdal_kernels::{
-    build_merge_pipeline, build_random_pipeline, build_sort_pipeline, FauxPluginKernel, Kernel,
-    KernelArgs, KernelPipelinePlan, KERNEL_LIST_JSON,
+    build_density_pipeline, build_merge_pipeline, build_random_pipeline, build_sort_pipeline,
+    FauxPluginKernel, Kernel, KernelArgs, KernelPipelinePlan, KERNEL_LIST_JSON,
 };
 use std::ffi::{CStr, CString};
-use std::fs;
-use std::io::Read;
 use std::os::raw::c_char;
 
 mod ground;
@@ -96,174 +93,9 @@ unsafe fn run_density_kernel(argc: i32, argv: *const *const c_char) -> i32 {
         Err(code) => return code,
     };
 
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.density: Missing value for positional argument 'input'.");
-            return 1;
-        }
-        println!("Usage:");
-        println!("  pdal density <input> <output.geojson> [--<stage>.<key>=<value> ...]");
-        return 0;
-    }
-
-    let mut input = None;
-    let mut output = None;
-    let mut reader_override = None;
-    let mut hexbin_stage = serde_json::json!({
-        "type": "filters.hexbin",
-    });
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if arg == "--input" || arg == "-i" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
-                return 1;
-            };
-            input = Some(value.clone());
-        } else if arg == "--output" || arg == "-o" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
-                return 1;
-            };
-            output = Some(value.clone());
-        } else if arg == "--driver" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '--driver'.");
-                return 1;
-            };
-            reader_override = Some(value.clone());
-        } else if let Some(value) = arg.strip_prefix("--driver=") {
-            reader_override = Some(value.to_string());
-        } else if arg == "--ogrdriver" || arg == "-f" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
-                return 1;
-            };
-            hexbin_stage["ogrdriver"] = serde_json::json!(value);
-        } else if let Some(value) = arg.strip_prefix("--ogrdriver=") {
-            hexbin_stage["ogrdriver"] = serde_json::json!(value);
-        } else if let Some(value) = arg.strip_prefix("-f=") {
-            hexbin_stage["ogrdriver"] = serde_json::json!(value);
-        } else if arg == "--lyr_name" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '--lyr_name'.");
-                return 1;
-            };
-            hexbin_stage["lyr_name"] = serde_json::json!(value);
-        } else if let Some(value) = arg.strip_prefix("--lyr_name=") {
-            hexbin_stage["lyr_name"] = serde_json::json!(value);
-        } else if arg == "--edge_length" || arg == "--threshold" {
-            let Some(value) = iter.next() else {
-                eprintln!("PDAL: kernels.density: Missing value for option '{arg}'.");
-                return 1;
-            };
-            hexbin_stage[arg.trim_start_matches("--")] = parse_option_value(value);
-        } else if let Some(value) = arg.strip_prefix("--edge_length=") {
-            hexbin_stage["edge_length"] = parse_option_value(value);
-        } else if let Some(value) = arg.strip_prefix("--threshold=") {
-            hexbin_stage["threshold"] = parse_option_value(value);
-        } else if arg.starts_with("--") {
-            let Some(option) = parse_cli_stage_option(arg) else {
-                return -1;
-            };
-            if option.stage != "filters.hexbin" && option.stage != "hexbin" {
-                return -1;
-            }
-            hexbin_stage[option.key.as_str()] = parse_option_value(&option.value);
-        } else if input.is_none() {
-            input = Some(arg.clone());
-        } else if output.is_none() {
-            output = Some(arg.clone());
-        } else {
-            eprintln!("PDAL: kernels.density: Unexpected argument '{arg}'.");
-            return 1;
-        }
-    }
-
-    let Some(input) = input else {
-        eprintln!("PDAL: kernels.density: Missing value for positional argument 'input'.");
-        return 1;
-    };
-    let Some(output) = output else {
-        eprintln!("PDAL: kernels.density: Missing value for positional argument 'output'.");
-        return 1;
-    };
-
-    hexbin_stage["density"] = serde_json::json!(output);
-
-    if input == "STDIN" || input == "-" {
-        let mut json = String::new();
-        if let Err(err) = std::io::stdin().read_to_string(&mut json) {
-            eprintln!("PDAL: kernels.density: Unable to read pipeline from stdin: {err}");
-            return 1;
-        }
-        return execute_density_pipeline_json(&json, hexbin_stage);
-    }
-
-    if input.ends_with(".json") {
-        let json = match fs::read_to_string(&input) {
-            Ok(json) => json,
-            Err(err) => {
-                eprintln!("PDAL: kernels.density: Unable to read pipeline '{input}': {err}");
-                return 1;
-            }
-        };
-        return execute_density_pipeline_json(&json, hexbin_stage);
-    }
-
-    if input.ends_with(".xml") {
-        return -1;
-    }
-
-    let Some(reader) = reader_override.or_else(|| infer_reader_driver(&input).map(str::to_string))
-    else {
-        eprintln!("PDAL: kernels.density: Unable to infer reader driver for '{input}'.");
-        return 1;
-    };
-
-    execute_kernel_pipeline(
-        "density",
-        serde_json::json!([
-            { "type": reader, "filename": input },
-            hexbin_stage,
-        ]),
-    )
-}
-
-fn execute_density_pipeline_json(json: &str, hexbin_stage: serde_json::Value) -> i32 {
-    let value = match append_stage_to_pipeline_json(json, hexbin_stage) {
-        Ok(value) => value,
-        Err(err) => {
-            eprintln!("PDAL: kernels.density: {err}");
-            return 1;
-        }
-    };
-    execute_kernel_pipeline("density", value)
-}
-
-fn append_stage_to_pipeline_json(
-    json: &str,
-    stage: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let mut value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
-    match &mut value {
-        serde_json::Value::Array(stages) => {
-            stages.push(stage);
-            Ok(value)
-        }
-        serde_json::Value::Object(object) => {
-            let Some(pipeline) = object.get_mut("pipeline") else {
-                return Err("Pipeline JSON object is missing a 'pipeline' array.".to_string());
-            };
-            let Some(stages) = pipeline.as_array_mut() else {
-                return Err("Pipeline JSON object has a non-array 'pipeline' member.".to_string());
-            };
-            stages.push(stage);
-            Ok(value)
-        }
-        _ => Err("Pipeline JSON must be an array or object.".to_string()),
+    match build_density_pipeline(&args) {
+        KernelPipelinePlan::Pipeline(value) => execute_kernel_pipeline("density", value),
+        KernelPipelinePlan::Return(code) => code,
     }
 }
 

@@ -23,3 +23,21 @@ pub(crate) fn parse_option_value(value: &str) -> serde_json::Value {
         serde_json::json!(value)
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct CliStageOption {
+    pub(crate) stage: String,
+    pub(crate) key: String,
+    pub(crate) value: String,
+}
+
+pub(crate) fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
+    let spec = arg.strip_prefix("--")?;
+    let (lhs, value) = spec.split_once('=')?;
+    let (stage, key) = lhs.rsplit_once('.')?;
+    Some(CliStageOption {
+        stage: stage.to_string(),
+        key: key.to_string(),
+        value: value.to_string(),
+    })
+}
