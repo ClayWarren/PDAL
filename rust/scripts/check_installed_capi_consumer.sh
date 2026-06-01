@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+BUILD_DIR="${1:-${ROOT_DIR}/.build}"
+
+if [[ ! -d "${BUILD_DIR}" ]]; then
+    echo "Build directory does not exist: ${BUILD_DIR}" >&2
+    exit 1
+fi
+
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pdal-capi-install.XXXXXX")"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+INSTALL_PREFIX="${TMP_DIR}/install"
+CONSUMER_DIR="${TMP_DIR}/consumer"
+
+cmake --install "${BUILD_DIR}" --prefix "${INSTALL_PREFIX}" >/dev/null
+
+mkdir -p "${CONSUMER_DIR}"
+cat >"${CONSUMER_DIR}/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.13)
+project(pdal_capi_consumer CXX)
+
+find_package(PDAL CONFIG REQUIRED)
+
+add_executable(consumer main.cpp)
+target_link_libraries(consumer PRIVATE PDAL::CAPI)
+CMAKE
+
+cat >"${CONSUMER_DIR}/main.cpp" <<'CPP'
+#include <pdal_capi.h>
+
+int main()
+{
+    const char* version = pdal_version_string();
+    pdal_capi_free(nullptr);
+    return version ? 0 : 1;
+}
+CPP
+
+cmake -S "${CONSUMER_DIR}" -B "${CONSUMER_DIR}/build" -G Ninja \
+    -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" >/dev/null
+cmake --build "${CONSUMER_DIR}/build" >/dev/null
+"${CONSUMER_DIR}/build/consumer"
