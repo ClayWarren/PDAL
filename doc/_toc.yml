@@ -280,6 +280,7 @@ parts:
     - file: development/docs
     - file: development/errorhandling
     - file: development/metadata
+    - file: development/rust-port
     - file: development/writing
     - file: development/plugins
     - file: development/writing-filter
