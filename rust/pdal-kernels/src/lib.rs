@@ -14,6 +14,7 @@ mod split;
 mod stage_options;
 mod text;
 mod tile;
+mod translate;
 
 pub use density::build_density_pipeline;
 pub use fauxplugin::FauxPluginKernel;
@@ -22,8 +23,13 @@ pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};
 pub use sort::build_sort_pipeline;
 pub use split::{build_split_plan, numbered_split_output, SplitKernelPlan, SplitPlan};
+pub use stage_options::CliStageOption;
 pub use text::word_wrap;
 pub use tile::{build_tile_plan, TileKernelPlan, TilePlan};
+pub use translate::{
+    build_translate_plan, expand_translate_option_files, parse_option_file, translate_json_stages,
+    TranslateKernelPlan, TranslatePlan,
+};
 
 pub enum KernelPipelinePlan {
     Pipeline(serde_json::Value),

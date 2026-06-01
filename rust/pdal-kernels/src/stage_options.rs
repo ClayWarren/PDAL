@@ -25,13 +25,13 @@ pub(crate) fn parse_option_value(value: &str) -> serde_json::Value {
 }
 
 #[derive(Debug)]
-pub(crate) struct CliStageOption {
-    pub(crate) stage: String,
-    pub(crate) key: String,
-    pub(crate) value: String,
+pub struct CliStageOption {
+    pub stage: String,
+    pub key: String,
+    pub value: String,
 }
 
-pub(crate) fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
+pub fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
     let spec = arg.strip_prefix("--")?;
     let (lhs, value) = spec.split_once('=')?;
     let (stage, key) = lhs.rsplit_once('.')?;
@@ -40,4 +40,36 @@ pub(crate) fn parse_cli_stage_option(arg: &str) -> Option<CliStageOption> {
         key: key.to_string(),
         value: value.to_string(),
     })
+}
+
+pub fn apply_cli_stage_options(
+    stages: &mut [serde_json::Value],
+    options: &[CliStageOption],
+) -> bool {
+    for option in options {
+        let qualified = format!("filters.{}", option.stage);
+        let mut applied = false;
+        for entry in stages.iter_mut() {
+            let entry_type = entry["type"].as_str();
+            if entry_type == Some(option.stage.as_str()) || entry_type == Some(qualified.as_str()) {
+                let value = parse_option_value(&option.value);
+                match entry.get_mut(option.key.as_str()) {
+                    Some(existing) => {
+                        if let Some(values) = existing.as_array_mut() {
+                            values.push(value);
+                        } else {
+                            let first = std::mem::take(existing);
+                            *existing = serde_json::json!([first, value]);
+                        }
+                    }
+                    None => entry[option.key.as_str()] = value,
+                }
+                applied = true;
+            }
+        }
+        if !applied {
+            return false;
+        }
+    }
+    true
 }

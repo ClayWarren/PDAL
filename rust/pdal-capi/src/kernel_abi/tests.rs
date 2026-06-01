@@ -1,5 +1,8 @@
-use super::translate::{expand_translate_option_files, parse_option_file, translate_json_stages};
 use super::*;
+use pdal_kernels::{
+    expand_translate_option_files, parse_option_file, translate_json_stages,
+    CliStageOption as KernelCliStageOption,
+};
 use std::ffi::{CStr, CString};
 
 #[test]
@@ -411,7 +414,7 @@ fn translate_json_wraps_filter_only_pipeline() {
 
 #[test]
 fn translate_option_file_expands_command_options() {
-    let options = vec![CliStageOption {
+    let options = vec![KernelCliStageOption {
         stage: "filters.range".to_string(),
         key: "option_file".to_string(),
         value: "../../test/data/apps/good_cmd_opt".to_string(),
@@ -427,7 +430,7 @@ fn translate_option_file_expands_command_options() {
 
 #[test]
 fn translate_option_file_expands_json_options() {
-    let options = vec![CliStageOption {
+    let options = vec![KernelCliStageOption {
         stage: "filters.range".to_string(),
         key: "option_file".to_string(),
         value: "../../test/data/apps/good_json_opt".to_string(),
