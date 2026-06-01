@@ -1,8 +1,8 @@
 //! `readers.bpf` / `writers.bpf` -- Binary Point Format.
 //!
-//! This slice covers deterministic local BPF files. Remote files and full
-//! polarization/ULEM metadata remain C++ territory until a later I/O checkpoint
-//! needs them.
+//! This covers deterministic BPF files over local paths and GDAL VSI byte
+//! sources. Full polarization/ULEM metadata remain C++ territory until a later
+//! I/O checkpoint needs them.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use flate2::read::ZlibDecoder;
@@ -123,9 +123,7 @@ impl Reader for BpfReader {
             ));
         }
 
-        let file = File::open(Path::new(&self.filename))
-            .map_err(|_| StageError(format!("Can't open file '{}'.", self.filename)))?;
-        let mut reader = BufReader::new(file);
+        let mut reader = open_bpf_reader(&self.filename)?;
         let header = read_header(&mut reader)?;
         let dims = read_dimensions(&mut reader, &header, self.fix_dims)?;
         self.metadata = reader_metadata(&mut reader, &header, &dims)?;
@@ -165,6 +163,33 @@ impl Reader for BpfReader {
 
     fn metadata(&self) -> MetadataNode {
         self.metadata.clone()
+    }
+}
+
+fn open_bpf_reader(filename: &str) -> Result<BufReader<Box<dyn ReadSeek>>, StageError> {
+    if is_bpf_vsi_path(filename) {
+        let vsi_path = bpf_vsi_path(filename);
+        let file = pdal_native::vsi::VsiFile::open(&vsi_path)
+            .map_err(|err| StageError(format!("Can't open file '{filename}': {err}")))?;
+        return Ok(BufReader::new(Box::new(file)));
+    }
+
+    let file = File::open(Path::new(filename))
+        .map_err(|_| StageError(format!("Can't open file '{filename}'.")))?;
+    Ok(BufReader::new(Box::new(file)))
+}
+
+fn is_bpf_vsi_path(filename: &str) -> bool {
+    filename.starts_with("/vsi")
+        || filename.starts_with("http://")
+        || filename.starts_with("https://")
+}
+
+fn bpf_vsi_path(filename: &str) -> String {
+    if filename.starts_with("http://") || filename.starts_with("https://") {
+        format!("/vsicurl/{filename}")
+    } else {
+        filename.to_string()
     }
 }
 
