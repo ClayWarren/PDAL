@@ -19,18 +19,110 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
+use std::io::{BufRead, BufReader};
 use std::rc::Rc;
 
 /// Reader for the Leica PTS ASCII point format.
 pub struct PtsReader {
     filename: String,
+    stream: Option<PtsStreamState>,
+}
+
+struct PtsStreamState {
+    reader: BufReader<Box<dyn source::ReadSeek>>,
+    remaining: u64,
+    dims: Vec<DimId>,
+    layout: Rc<PointLayout>,
+    pending_line: Option<String>,
+    eof: bool,
 }
 
 impl PtsReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            stream: None,
         }
+    }
+
+    fn layout_for(dims: &[DimId]) -> Rc<PointLayout> {
+        let mut layout = PointLayout::new();
+        for dim in dims {
+            layout.register(dim.clone(), dim_type(dim));
+        }
+        Rc::new(layout)
+    }
+
+    fn append_line(view: &mut PointView, dims: &[DimId], line: &str) -> bool {
+        if line.is_empty() {
+            return false;
+        }
+        let fields = split_fields(line);
+        if fields.len() != dims.len() {
+            return false;
+        }
+
+        let point = view.add_point();
+        for (idx, (field, dim)) in fields.iter().zip(dims).enumerate() {
+            let mut value = field.parse::<f64>().unwrap_or(0.0);
+            if idx == 3 {
+                value += 2048.0;
+            }
+            view.set_f64(point, dim, value);
+        }
+        true
+    }
+
+    fn stream_init(&mut self) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "PtsReader requires a filename option.".to_string(),
+            ));
+        }
+
+        let file = source::open_seek(&self.filename)
+            .map_err(|_| StageError(format!("Unable to open file '{}'.", self.filename)))?;
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        if reader
+            .read_line(&mut line)
+            .map_err(|err| StageError(err.to_string()))?
+            == 0
+        {
+            return Err(StageError(format!(
+                "Unable to read expected point count at top of the file '{}'.",
+                self.filename
+            )));
+        }
+        let point_count: u64 = trim_line_endings(&line).trim().parse().map_err(|_| {
+            StageError(format!(
+                "Unable to read expected point count at top of the file '{}'.",
+                self.filename
+            ))
+        })?;
+
+        line.clear();
+        reader
+            .read_line(&mut line)
+            .map_err(|err| StageError(err.to_string()))?;
+        let first_data = split_fields(trim_line_endings(&line));
+        let dims = dims_for(first_data.len()).ok_or_else(|| {
+            StageError(format!(
+                "Invalid number of fields for the first point in file '{}'.",
+                self.filename
+            ))
+        })?;
+        let layout = Self::layout_for(&dims);
+
+        self.stream = Some(PtsStreamState {
+            reader,
+            remaining: point_count,
+            dims,
+            layout,
+            pending_line: Some(trim_line_endings(&line).to_string()),
+            eof: false,
+        });
+        Ok(())
     }
 }
 
@@ -73,34 +165,13 @@ impl Reader for PtsReader {
             ))
         })?;
 
-        let mut layout = PointLayout::new();
-        for dim in &dims {
-            layout.register(dim.clone(), dim_type(dim));
-        }
-        let mut view = PointView::new(Rc::new(layout));
+        let mut view = PointView::new(Self::layout_for(&dims));
 
         for line in lines.iter().skip(1) {
             if view.len() >= point_count {
                 break;
             }
-            if line.is_empty() {
-                continue;
-            }
-            let fields = split_fields(line);
-            // Lines with an unexpected field count are skipped, as in PDAL.
-            if fields.len() != dims.len() {
-                continue;
-            }
-
-            let point = view.add_point();
-            for (idx, (field, dim)) in fields.iter().zip(&dims).enumerate() {
-                let mut value = field.parse::<f64>().unwrap_or(0.0);
-                // PTS intensity (field 3) is -2048..2047; map to 0..4095.
-                if idx == 3 {
-                    value += 2048.0;
-                }
-                view.set_f64(point, dim, value);
-            }
+            Self::append_line(&mut view, &dims, line);
         }
 
         Ok(vec![view])
@@ -109,6 +180,58 @@ impl Reader for PtsReader {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.pts")
     }
+
+    fn reset(&mut self) {
+        self.stream = None;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty()
+    }
+
+    fn stream_next(&mut self, capacity: usize) -> Result<Option<PointView>, StageError> {
+        if self.stream.is_none() {
+            self.stream_init()?;
+        }
+        let state = self.stream.as_mut().expect("stream initialized above");
+        if state.eof || state.remaining == 0 {
+            return Ok(None);
+        }
+
+        let mut view = PointView::new(Rc::clone(&state.layout));
+        let mut line = String::new();
+
+        while view.len() < capacity.max(1) as u64 && state.remaining > 0 {
+            if let Some(pending) = state.pending_line.take() {
+                line = pending;
+            } else {
+                if state
+                    .reader
+                    .read_line(&mut line)
+                    .map_err(|err| StageError(err.to_string()))?
+                    == 0
+                {
+                    state.eof = true;
+                    break;
+                }
+            }
+            let parsed = Self::append_line(&mut view, &state.dims, trim_line_endings(&line));
+            line.clear();
+            if parsed {
+                state.remaining -= 1;
+            }
+        }
+
+        if view.len() == 0 && (state.eof || state.remaining == 0) {
+            Ok(None)
+        } else {
+            Ok(Some(view))
+        }
+    }
+}
+
+fn trim_line_endings(line: &str) -> &str {
+    line.trim_end_matches(['\r', '\n'])
 }
 
 /// The fixed PTS dimension set for a given field count.
@@ -190,6 +313,35 @@ mod tests {
     }
 
     #[test]
+    fn streaming_chunks_match_full_read() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pts/test.pts"));
+
+        let mut full_reader = PtsReader::new(&options);
+        let full = full_reader.read().unwrap().pop().unwrap();
+
+        let mut stream_reader = PtsReader::new(&options);
+        assert!(stream_reader.streamable());
+        let first = stream_reader.stream_next(7).unwrap().unwrap();
+        let second = stream_reader.stream_next(7).unwrap().unwrap();
+        let third = stream_reader.stream_next(7).unwrap().unwrap();
+        assert!(stream_reader.stream_next(7).unwrap().is_none());
+
+        assert_eq!(first.len(), 7);
+        assert_eq!(second.len(), 7);
+        assert_eq!(third.len(), 5);
+        assert_eq!(first.get_f64(0, &DimId::X), full.get_f64(0, &DimId::X));
+        assert_eq!(
+            second.get_f64(0, &DimId::Intensity),
+            full.get_f64(7, &DimId::Intensity)
+        );
+        assert_eq!(
+            third.get_f64(4, &DimId::from_name("Blue")),
+            full.get_f64(18, &DimId::from_name("Blue"))
+        );
+    }
+
+    #[test]
     fn reads_three_dimension_pts_and_honors_the_point_count() {
         // bunny_8.pts declares 8 points but holds 9 data lines; only the
         // declared count is read.
@@ -223,6 +375,26 @@ mod tests {
         // The 2-field and 4-field lines are dropped.
         assert_eq!(view.len(), 2);
         assert_eq!(view.get_f64(1, &DimId::X), 10.0);
+    }
+
+    #[test]
+    fn streaming_skips_bad_rows_and_honors_declared_count() {
+        let path = temp_file(
+            "stream-badrows.pts",
+            "3\n1 2 3\n4 5\n6 7 8\n10 11 12\n13 14 15\n",
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+        let mut reader = PtsReader::new(&options);
+
+        let first = reader.stream_next(2).unwrap().unwrap();
+        let second = reader.stream_next(2).unwrap().unwrap();
+        assert!(reader.stream_next(2).unwrap().is_none());
+
+        assert_eq!(first.len(), 2);
+        assert_eq!(second.len(), 1);
+        assert_eq!(first.get_f64(1, &DimId::X), 6.0);
+        assert_eq!(second.get_f64(0, &DimId::X), 10.0);
     }
 
     #[test]
