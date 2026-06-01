@@ -3,6 +3,10 @@ use std::ffi::CString;
 
 impl App {
     pub(super) fn run_rust_kernel(&self, name: &str) -> i32 {
+        self.run_rust_kernel_with_args(name, &self.command_args)
+    }
+
+    pub(super) fn run_rust_kernel_with_args(&self, name: &str, command_args: &[String]) -> i32 {
         let name = match CString::new(name) {
             Ok(name) => name,
             Err(_) => {
@@ -10,8 +14,7 @@ impl App {
                 return 1;
             }
         };
-        let args = match self
-            .command_args
+        let args = match command_args
             .iter()
             .map(|arg| CString::new(arg.as_str()))
             .collect::<Result<Vec<_>, _>>()

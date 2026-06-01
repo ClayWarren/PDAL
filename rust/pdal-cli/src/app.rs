@@ -519,29 +519,6 @@ pub fn run(args: Vec<String>) -> i32 {
     app.run()
 }
 
-fn empty_pipeline_result() -> pdal_capi::pdal_pipeline_result_t {
-    pdal_capi::pdal_pipeline_result_t {
-        point_count: 0,
-        view_count: 0,
-        has_bounds_2d: false,
-        bounds_2d: pdal_capi::pdal_bounds2d_t {
-            minx: 0.0,
-            maxx: 0.0,
-            miny: 0.0,
-            maxy: 0.0,
-        },
-        has_bounds_3d: false,
-        bounds_3d: pdal_capi::pdal_bounds3d_t {
-            minx: 0.0,
-            maxx: 0.0,
-            miny: 0.0,
-            maxy: 0.0,
-            minz: 0.0,
-            maxz: 0.0,
-        },
-    }
-}
-
 #[cfg(test)]
 #[path = "app_tests.rs"]
 mod tests;

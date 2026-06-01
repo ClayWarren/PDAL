@@ -33,6 +33,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     let mut metadata_file = None;
     let mut progress_file = None;
     let mut serialization_file = None;
+    let mut summary_stdout = false;
     let mut stream_allowed = true;
     let mut stream_required = false;
     let mut stage_options: Vec<CliStageOption> = Vec::new();
@@ -49,6 +50,8 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             read_stdin = true;
         } else if arg == "--validate" {
             validate_only = true;
+        } else if arg == "--showjson" {
+            summary_stdout = true;
         } else if arg == "--stream" {
             if !stream_allowed {
                 eprintln!(
@@ -171,7 +174,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.
-    if stream_allowed && metadata_file.is_none() {
+    if stream_allowed && metadata_file.is_none() && !summary_stdout {
         match pipeline.execute_streaming() {
             Ok(Some(_)) => {
                 write_progress(&mut progress, "DONEPIPELINE", "pipeline");
@@ -193,12 +196,19 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
             write_progress(&mut progress, "DONEPIPELINE", "pipeline");
-            if let Some(path) = metadata_file {
+            if metadata_file.is_some() || summary_stdout {
                 let handle = PipelineHandle { pipeline };
                 let summary = pipeline_result_to_json_for_kernel(result, &handle);
-                if let Err(err) = std::fs::write(&path, summary) {
-                    eprintln!("PDAL: kernels.pipeline: Unable to write metadata '{path}': {err}");
-                    return 1;
+                if let Some(path) = metadata_file {
+                    if let Err(err) = std::fs::write(&path, &summary) {
+                        eprintln!(
+                            "PDAL: kernels.pipeline: Unable to write metadata '{path}': {err}"
+                        );
+                        return 1;
+                    }
+                }
+                if summary_stdout {
+                    println!("{summary}");
                 }
             }
             0
