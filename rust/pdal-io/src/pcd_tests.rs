@@ -1,8 +1,10 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdal_core::pipeline::{FilterWrapper, Pipeline};
+    use crate::faux::FauxReader;
+    use pdal_core::pipeline::{FilterWrapper, Pipeline, Writer};
     use pdal_filters::decimation::DecimationFilter;
+    use pdal_filters::range::{RangeFilter, RangeLimit};
 
     fn data_path(path: &str) -> String {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -98,6 +100,88 @@ mod tests {
         assert_eq!(roundtrip.len(), view.len());
         assert_eq!(roundtrip.get_f64(0, &DimId::X), view.get_f64(0, &DimId::X));
         assert_eq!(roundtrip.get_f64(9, &DimId::Z), view.get_f64(9, &DimId::Z));
+    }
+
+    #[test]
+    fn streaming_ascii_writer_matches_materialized_write() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/utm17_space.pcd"));
+        let mut reader = PcdReader::new(&options);
+        let view = reader.read().unwrap().pop().unwrap();
+
+        let mut first = view.clone();
+        first.truncate(4);
+        let mut second = view.make_new();
+        for idx in 4..view.len() {
+            second.append_point(&view, idx);
+        }
+
+        let materialized = temp_path("materialized-stream-compare.pcd");
+        let streamed = temp_path("streamed-stream-compare.pcd");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("order", "X,Y,Z")
+            .add("precision", 2);
+        let mut stream_options = Options::new();
+        stream_options
+            .add("filename", &streamed)
+            .add("order", "X,Y,Z")
+            .add("precision", 2);
+
+        let mut materialized_writer = PcdWriter::new(&materialized_options);
+        materialized_writer
+            .write(&[first.clone(), second.clone()])
+            .unwrap();
+        let mut stream_writer = PcdWriter::new(&stream_options);
+        assert!(stream_writer.streamable());
+        stream_writer.stream_write(&first).unwrap();
+        stream_writer.stream_write(&second).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
+    fn streaming_ascii_writer_handles_empty_first_chunk() {
+        let mut options = Options::new();
+        options.add("filename", data_path("pcd/utm17_space.pcd"));
+        let mut reader = PcdReader::new(&options);
+        let view = reader.read().unwrap().pop().unwrap();
+
+        let empty = view.make_new();
+        let mut nonempty = view.make_new();
+        nonempty.append_point(&view, 0);
+
+        let materialized = temp_path("materialized-empty-first.pcd");
+        let streamed = temp_path("streamed-empty-first.pcd");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("order", "X,Y,Z")
+            .add("precision", 2);
+        let mut stream_options = Options::new();
+        stream_options
+            .add("filename", &streamed)
+            .add("order", "X,Y,Z")
+            .add("precision", 2);
+
+        let mut materialized_writer = PcdWriter::new(&materialized_options);
+        materialized_writer
+            .write(&[empty.clone(), nonempty.clone()])
+            .unwrap();
+        let mut stream_writer = PcdWriter::new(&stream_options);
+        stream_writer.stream_write(&empty).unwrap();
+        stream_writer.stream_write(&nonempty).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let written = fs::read_to_string(&streamed).unwrap();
+        assert!(written.contains("POINTS 1\nDATA ascii\n"));
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
     }
 
     #[test]
@@ -289,6 +373,56 @@ mod tests {
         assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
         let written = fs::read_to_string(output).unwrap();
         assert!(written.contains("POINTS 5\nDATA ascii\n"));
+    }
+
+    #[test]
+    fn pipeline_streams_to_ascii_pcd_writer() {
+        let output = temp_path("stream-pipeline.pcd");
+
+        let mut reader_options = Options::new();
+        reader_options
+            .add("count", "12")
+            .add("mode", "ramp")
+            .add("bounds", "([0,11],[0,11],[0,11])");
+        let limits = vec![RangeLimit {
+            dim_name: "X".to_string(),
+            lower_bound: 0.0,
+            upper_bound: 5.0,
+            inclusive_lower: true,
+            inclusive_upper: true,
+            negate: false,
+        }];
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("order", "X,Y,Z")
+            .add("precision", 0);
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.faux",
+            Box::new(FauxReader::new(&reader_options).unwrap()),
+            reader_options,
+        );
+        let filter = pipeline.add_stage(
+            "filters.range",
+            Box::new(FilterWrapper::new(RangeFilter::new(limits))),
+            Options::new(),
+        );
+        let writer = pipeline.add_writer(
+            "writers.pcd",
+            Box::new(PcdWriter::new(&writer_options)),
+            writer_options,
+        );
+        pipeline.add_dependency(filter, reader).unwrap();
+        pipeline.add_dependency(writer, filter).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(6));
+        let written = fs::read_to_string(&output).unwrap();
+        assert!(written.contains("POINTS 6\nDATA ascii\n"));
+        assert!(written.contains("0 0 0 "));
+        assert!(written.contains("5 5 5 "));
+        let _ = fs::remove_file(output);
     }
 
     // --- Pure helper unit tests ---

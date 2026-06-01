@@ -4,7 +4,8 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -115,6 +116,13 @@ pub struct PcdWriter {
     dim_order: String,
     precision: usize,
     point_count: u64,
+    stream: Option<PcdStreamState>,
+}
+
+struct PcdStreamState {
+    rows: BufWriter<File>,
+    rows_path: String,
+    specs: Vec<Field>,
 }
 
 impl PcdWriter {
@@ -126,6 +134,7 @@ impl PcdWriter {
             dim_order: options.get_str("order", ""),
             precision: options.get_u64("precision", 2) as usize,
             point_count: 0,
+            stream: None,
         }
     }
 
@@ -189,6 +198,98 @@ impl PcdWriter {
 
         Ok(field)
     }
+    fn validate(&self) -> Result<(), StageError> {
+        if !matches!(
+            self.compression.as_str(),
+            "ascii" | "binary" | "compressed" | "binary_compressed"
+        ) {
+            return Err(StageError(format!(
+                "PCD compression '{}' is not supported by the Rust port.",
+                self.compression
+            )));
+        }
+        Ok(())
+    }
+
+    fn header_bytes(&self, specs: &[Field], count: u64) -> Vec<u8> {
+        let mut header = String::new();
+        header.push_str("VERSION 0.7\n");
+        header.push_str("FIELDS");
+        for field in specs {
+            header.push(' ');
+            header.push_str(&field.label.to_lowercase());
+        }
+        header.push_str("\nSIZE");
+        for field in specs {
+            header.push_str(&format!(" {}", field.size));
+        }
+        header.push_str("\nTYPE");
+        for field in specs {
+            header.push_str(match field.ty {
+                FieldType::Signed => " I",
+                FieldType::Unsigned => " U",
+                FieldType::Float => " F",
+            });
+        }
+        header.push_str("\nCOUNT");
+        for field in specs {
+            header.push_str(&format!(" {}", field.count));
+        }
+        header.push_str(&format!("\nWIDTH {count}\nHEIGHT 1\n"));
+        header
+            .push_str("VIEWPOINT 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000\n");
+        header.push_str(&format!(
+            "POINTS {count}\nDATA {}\n",
+            data_storage_label(&self.compression)
+        ));
+        header.into_bytes()
+    }
+
+    fn write_ascii_rows<W: Write>(
+        &mut self,
+        writer: &mut W,
+        views: &[PointView],
+        specs: &[Field],
+    ) -> Result<(), StageError> {
+        let mut row = Vec::new();
+        for view in views {
+            for point in 0..view.len() {
+                row.clear();
+                for field in specs {
+                    row.extend_from_slice(
+                        format_number(
+                            view.get_f64(point, &field.id),
+                            field.precision,
+                            field.ty,
+                            field.size,
+                        )
+                        .as_bytes(),
+                    );
+                    row.push(b' ');
+                }
+                row.push(b'\n');
+                writer
+                    .write_all(&row)
+                    .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+                self.point_count += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn stream_rows_path(&self) -> String {
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir()
+            .join(format!(
+                "pdal-rust-pcd-stream-{}-{suffix}.rows",
+                std::process::id()
+            ))
+            .display()
+            .to_string()
+    }
 }
 
 impl Writer for PcdWriter {
@@ -202,15 +303,7 @@ impl Writer for PcdWriter {
                 "PcdWriter requires a filename option.".to_string(),
             ));
         }
-        if !matches!(
-            self.compression.as_str(),
-            "ascii" | "binary" | "compressed" | "binary_compressed"
-        ) {
-            return Err(StageError(format!(
-                "PCD compression '{}' is not supported by the Rust port.",
-                self.compression
-            )));
-        }
+        self.validate()?;
 
         let Some(first) = views.first() else {
             fs::write(Path::new(&self.filename), "").map_err(|_| {
@@ -222,57 +315,10 @@ impl Writer for PcdWriter {
         let count: u64 = views.iter().map(PointView::len).sum();
         self.point_count = count;
 
-        let mut output = Vec::new();
-        let mut header = String::new();
-        header.push_str("VERSION 0.7\n");
-        header.push_str("FIELDS");
-        for field in &specs {
-            header.push(' ');
-            header.push_str(&field.label.to_lowercase());
-        }
-        header.push_str("\nSIZE");
-        for field in &specs {
-            header.push_str(&format!(" {}", field.size));
-        }
-        header.push_str("\nTYPE");
-        for field in &specs {
-            header.push_str(match field.ty {
-                FieldType::Signed => " I",
-                FieldType::Unsigned => " U",
-                FieldType::Float => " F",
-            });
-        }
-        header.push_str("\nCOUNT");
-        for field in &specs {
-            header.push_str(&format!(" {}", field.count));
-        }
-        header.push_str(&format!("\nWIDTH {count}\nHEIGHT 1\n"));
-        header
-            .push_str("VIEWPOINT 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000\n");
-        header.push_str(&format!(
-            "POINTS {count}\nDATA {}\n",
-            data_storage_label(&self.compression)
-        ));
-        output.extend_from_slice(header.as_bytes());
-
+        let mut output = self.header_bytes(&specs, count);
         if self.compression == "ascii" {
-            for view in views {
-                for point in 0..view.len() {
-                    for field in &specs {
-                        output.extend_from_slice(
-                            format_number(
-                                view.get_f64(point, &field.id),
-                                field.precision,
-                                field.ty,
-                                field.size,
-                            )
-                            .as_bytes(),
-                        );
-                        output.push(b' ');
-                    }
-                    output.push(b'\n');
-                }
-            }
+            self.point_count = 0;
+            self.write_ascii_rows(&mut output, views, &specs)?;
         } else if self.compression == "binary" {
             write_interleaved_binary_points(&mut output, views, &specs)?;
         } else {
@@ -289,6 +335,76 @@ impl Writer for PcdWriter {
         node.add_value("filename", MetadataValue::String(self.filename.clone()));
         node.add_value("point_count", MetadataValue::U64(self.point_count));
         node
+    }
+
+    fn reset(&mut self) {
+        if let Some(state) = self.stream.take() {
+            let _ = fs::remove_file(state.rows_path);
+        }
+        self.point_count = 0;
+    }
+
+    fn streamable(&self) -> bool {
+        !self.filename.is_empty() && self.compression == "ascii"
+    }
+
+    fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
+        if self.filename.is_empty() {
+            return Err(StageError(
+                "PcdWriter requires a filename option.".to_string(),
+            ));
+        }
+        self.validate()?;
+        if self.compression != "ascii" {
+            return Err(StageError(
+                "PCD streaming is only supported for ASCII output.".to_string(),
+            ));
+        }
+        if self.stream.is_none() {
+            let specs = self.dimension_specs(chunk.layout())?;
+            let rows_path = self.stream_rows_path();
+            let rows = File::create(&rows_path)
+                .map(BufWriter::new)
+                .map_err(|e| StageError(format!("Failed creating PCD row stream: {e}")))?;
+            self.stream = Some(PcdStreamState {
+                rows,
+                rows_path,
+                specs,
+            });
+        }
+
+        let mut state = self.stream.take().expect("stream initialized above");
+        self.write_ascii_rows(&mut state.rows, std::slice::from_ref(chunk), &state.specs)?;
+        self.stream = Some(state);
+        Ok(())
+    }
+
+    fn stream_finish(&mut self) -> Result<(), StageError> {
+        let Some(mut state) = self.stream.take() else {
+            return self.write(&[]);
+        };
+        state
+            .rows
+            .flush()
+            .map_err(|e| StageError(format!("Failed writing PCD row stream: {e}")))?;
+        drop(state.rows);
+
+        let mut output = File::create(Path::new(&self.filename))
+            .map(BufWriter::new)
+            .map_err(|_| StageError(format!("Couldn't open '{}' for output.", self.filename)))?;
+        output
+            .write_all(&self.header_bytes(&state.specs, self.point_count))
+            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        let mut rows = File::open(&state.rows_path)
+            .map(BufReader::new)
+            .map_err(|e| StageError(format!("Failed reopening PCD row stream: {e}")))?;
+        std::io::copy(&mut rows, &mut output)
+            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        output
+            .flush()
+            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        let _ = fs::remove_file(state.rows_path);
+        Ok(())
     }
 }
 
