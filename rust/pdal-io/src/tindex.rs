@@ -4,6 +4,7 @@ use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_core::srs::{SpatialReference, SrsTransform};
 use pdal_core::stage::StageError;
 use pdal_native::geometry::Geometry;
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ pub struct TindexReader {
     sql: String,
     dialect: String,
     polygon: String,
+    target_srs: String,
     bounds: String,
 }
 
@@ -31,6 +33,7 @@ impl TindexReader {
             sql: options.get_str("sql", ""),
             dialect: options.get_str("dialect", "OGRSQL"),
             polygon: options.get_str("polygon", ""),
+            target_srs: options.get_str("t_srs", ""),
             bounds: options.get_str("bounds", ""),
         }
     }
@@ -66,7 +69,8 @@ impl Reader for TindexReader {
         for feature in features {
             let location = resolve_location_text(&base, &feature.location);
             let mut views = read_point_location(&location, None, &Options::new())?;
-            for view in views.drain(..) {
+            for mut view in views.drain(..) {
+                reproject_to_target_srs(&mut view, &self.target_srs)?;
                 append_view(&mut merged, &view, Path::new(&location))?;
             }
         }
@@ -80,6 +84,30 @@ impl Reader for TindexReader {
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.tindex")
     }
+}
+
+fn reproject_to_target_srs(view: &mut PointView, target_srs: &str) -> Result<(), StageError> {
+    if target_srs.trim().is_empty() || view.spatial_reference().is_empty() {
+        return Ok(());
+    }
+    let target = SpatialReference::new(target_srs);
+    if target.is_empty() {
+        return Ok(());
+    }
+    let transform = SrsTransform::new(view.spatial_reference(), &target).map_err(StageError)?;
+    for idx in 0..view.len() {
+        let mut x = view.get_f64(idx, &DimId::X);
+        let mut y = view.get_f64(idx, &DimId::Y);
+        let mut z = view.get_f64(idx, &DimId::Z);
+        if !transform.transform(&mut x, &mut y, &mut z) {
+            return Err(StageError("TindexReader reprojection failed.".to_string()));
+        }
+        view.set_f64(idx, &DimId::X, x);
+        view.set_f64(idx, &DimId::Y, y);
+        view.set_f64(idx, &DimId::Z, z);
+    }
+    view.set_spatial_reference(target);
+    Ok(())
 }
 
 struct IndexFeature {
@@ -849,6 +877,26 @@ mod tests {
     fn bounds_filter_rejects_unsupported_geometry() {
         let geometry = serde_json::json!({"type": "LineString", "coordinates": [[0, 0], [1, 1]]});
         assert!(geojson_geometry_bounds(&geometry).is_err());
+    }
+
+    #[test]
+    fn target_srs_reprojects_indexed_views() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
+        let point = view.add_point();
+        view.set_f64(point, &DimId::X, 1.0);
+        view.set_f64(point, &DimId::Y, 1.0);
+        view.set_f64(point, &DimId::Z, 0.0);
+
+        reproject_to_target_srs(&mut view, "EPSG:3857").unwrap();
+
+        assert!((view.get_f64(point, &DimId::X) - 111_319.49).abs() < 1.0);
+        assert!((view.get_f64(point, &DimId::Y) - 111_325.14).abs() < 1.0);
+        assert_eq!(view.spatial_reference().wkt(), "EPSG:3857");
     }
 
     #[test]

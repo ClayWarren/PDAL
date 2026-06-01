@@ -477,7 +477,7 @@ bool TIndexReader::canUseRustReader() const
         return false;
 
     return m_args->m_srsColumnName.empty() && m_args->m_ogr.empty() &&
-           m_args->m_rawReaderArgs.empty() && m_args->m_tgtSrsString.empty();
+           m_args->m_rawReaderArgs.empty();
 }
 
 void TIndexReader::loadRustView()
@@ -497,6 +497,7 @@ void TIndexReader::loadRustView()
     addOption(options, "sql", m_args->m_sql);
     addOption(options, "dialect", m_args->m_dialect);
     addOption(options, "polygon", m_args->m_wkt);
+    addOption(options, "t_srs", m_args->m_tgtSrsString);
     if (!m_args->m_bounds.empty())
     {
         std::ostringstream bounds;
