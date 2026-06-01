@@ -1,7 +1,7 @@
 use super::*;
 use pdal_kernels::{
-    expand_translate_option_files, parse_option_file, translate_json_stages,
-    CliStageOption as KernelCliStageOption,
+    apply_cli_stage_options, expand_translate_option_files, parse_option_file,
+    translate_json_stages, CliStageOption as KernelCliStageOption,
 };
 use std::ffi::{CStr, CString};
 
@@ -82,12 +82,12 @@ fn rust_kernel_dispatch_recognizes_all_cpp_kernel_names() {
 fn cli_stage_options_preserve_repeated_values() {
     let mut stages = vec![serde_json::json!({ "type": "filters.returns" })];
     let options = vec![
-        CliStageOption {
+        KernelCliStageOption {
             stage: "filters.returns".to_string(),
             key: "groups".to_string(),
             value: "last".to_string(),
         },
-        CliStageOption {
+        KernelCliStageOption {
             stage: "filters.returns".to_string(),
             key: "groups".to_string(),
             value: "first".to_string(),

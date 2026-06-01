@@ -1,7 +1,10 @@
-use super::super::{apply_cli_stage_options, parse_cli_stage_option, CliStageOption};
 use super::argv_to_vec;
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
+use pdal_kernels::{
+    apply_stage_options_to_pipeline_json, parse_pipeline_args, validate_pipeline_json_shape,
+    PipelineArgsResult,
+};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::raw::c_char;
@@ -40,7 +43,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
 
     let json = match apply_stage_options_to_pipeline_json(&json, &parsed.stage_options) {
         Ok(json) => json,
-        Err(()) => return -1,
+        Err(_) => return -1,
     };
 
     let mut progress = match open_progress_file(parsed.progress_file.as_deref()) {
@@ -119,133 +122,6 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     }
 }
 
-struct ParsedPipelineArgs {
-    input: Option<String>,
-    read_stdin: bool,
-    validate_only: bool,
-    metadata_file: Option<String>,
-    progress_file: Option<String>,
-    serialization_file: Option<String>,
-    summary_stdout: bool,
-    stream_allowed: bool,
-    stream_required: bool,
-    stage_options: Vec<CliStageOption>,
-}
-
-enum PipelineArgsResult {
-    Run(ParsedPipelineArgs),
-    Return(i32),
-}
-
-fn parse_pipeline_args(args: &[String]) -> PipelineArgsResult {
-    if args.is_empty() || args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        if args.is_empty() {
-            eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
-            return PipelineArgsResult::Return(1);
-        }
-        println!("Usage:");
-        println!("  pdal pipeline <pipeline.json>");
-        println!("  pdal pipeline --input <pipeline.json>");
-        println!("  pdal pipeline --stdin");
-        return PipelineArgsResult::Return(0);
-    }
-
-    let mut parsed = ParsedPipelineArgs {
-        input: None,
-        read_stdin: false,
-        validate_only: false,
-        metadata_file: None,
-        progress_file: None,
-        serialization_file: None,
-        summary_stdout: false,
-        stream_allowed: true,
-        stream_required: false,
-        stage_options: Vec::new(),
-    };
-
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        if let Err(code) = parse_pipeline_arg(arg, &mut iter, &mut parsed) {
-            return PipelineArgsResult::Return(code);
-        }
-    }
-
-    if parsed.read_stdin && parsed.input.is_some() {
-        eprintln!(
-            "PDAL: kernels.pipeline: Expected either --stdin or an input filename, not both."
-        );
-        return PipelineArgsResult::Return(1);
-    }
-    if !parsed.read_stdin && parsed.input.is_none() {
-        eprintln!("PDAL: kernels.pipeline: Missing value for positional argument 'input'.");
-        return PipelineArgsResult::Return(1);
-    }
-
-    PipelineArgsResult::Run(parsed)
-}
-
-fn parse_pipeline_arg<'a>(
-    arg: &str,
-    iter: &mut impl Iterator<Item = &'a String>,
-    parsed: &mut ParsedPipelineArgs,
-) -> Result<(), i32> {
-    if arg == "--input" || arg == "-i" {
-        parsed.input = Some(next_option_value(arg, iter)?.clone());
-    } else if arg == "--stdin" || arg == "-s" {
-        parsed.read_stdin = true;
-    } else if arg == "--validate" {
-        parsed.validate_only = true;
-    } else if arg == "--showjson" {
-        parsed.summary_stdout = true;
-    } else if arg == "--stream" {
-        if !parsed.stream_allowed {
-            eprintln!("PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options");
-            return Err(1);
-        }
-        parsed.stream_allowed = true;
-        parsed.stream_required = true;
-    } else if arg == "--nostream" {
-        if parsed.stream_required {
-            eprintln!("PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options");
-            return Err(1);
-        }
-        parsed.stream_allowed = false;
-    } else if arg == "--dims" {
-        next_option_value("--dims", iter)?;
-    } else if arg == "--progress" {
-        parsed.progress_file = Some(next_option_value(arg, iter)?.clone());
-    } else if arg == "--pointcloudschema" {
-        next_option_value(arg, iter)?;
-        return Err(-1);
-    } else if arg == "--metadata" {
-        parsed.metadata_file = Some(next_option_value("--metadata", iter)?.clone());
-    } else if arg == "--pipeline-serialization" {
-        parsed.serialization_file =
-            Some(next_option_value("--pipeline-serialization", iter)?.clone());
-    } else if let Some(stage_option) = parse_cli_stage_option(arg) {
-        parsed.stage_options.push(stage_option);
-    } else if arg.starts_with("--") || arg.starts_with("-v") {
-        return Err(-1);
-    } else if parsed.input.replace(arg.to_string()).is_some() {
-        eprintln!("PDAL: kernels.pipeline: Unexpected argument '{arg}'.");
-        return Err(1);
-    }
-    Ok(())
-}
-
-fn next_option_value<'a>(
-    option: &str,
-    iter: &mut impl Iterator<Item = &'a String>,
-) -> Result<&'a String, i32> {
-    match iter.next() {
-        Some(value) => Ok(value),
-        None => {
-            eprintln!("PDAL: kernels.pipeline: Missing value for option '{option}'.");
-            Err(1)
-        }
-    }
-}
-
 fn open_progress_file(path: Option<&str>) -> Result<Option<File>, ()> {
     let Some(path) = path else {
         return Ok(None);
@@ -288,61 +164,4 @@ pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {
             "streamable": false,
         }),
     }
-}
-
-pub(super) fn validate_pipeline_json_shape(json: &str) -> Result<(), String> {
-    let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
-    let stages = if let Some(stages) = value.as_array() {
-        stages
-    } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
-        stages
-    } else {
-        return Err("Pipeline JSON must be an array or an object with a 'pipeline' array.".into());
-    };
-
-    for (position, stage) in stages.iter().enumerate() {
-        if stage.is_string() {
-            continue;
-        }
-        let Some(object) = stage.as_object() else {
-            return Err(format!(
-                "Pipeline stage {position} must be a JSON object or filename string."
-            ));
-        };
-        if let Some(stage_type) = object.get("type") {
-            if !stage_type.is_string() {
-                return Err(format!(
-                    "Pipeline stage {position} has a non-string 'type'."
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-pub(super) fn apply_stage_options_to_pipeline_json(
-    json: &str,
-    stage_options: &[CliStageOption],
-) -> Result<String, ()> {
-    if stage_options.is_empty() {
-        return Ok(json.to_string());
-    }
-
-    let mut value: serde_json::Value = serde_json::from_str(json).map_err(|_| ())?;
-    let stages = if let Some(stages) = value.as_array_mut() {
-        stages
-    } else if let Some(stages) = value
-        .get_mut("pipeline")
-        .and_then(serde_json::Value::as_array_mut)
-    {
-        stages
-    } else {
-        return Err(());
-    };
-
-    if !apply_cli_stage_options(stages, stage_options) {
-        return Err(());
-    }
-    serde_json::to_string(&value).map_err(|_| ())
 }

@@ -10,6 +10,7 @@ mod ground;
 mod info;
 mod merge;
 mod metrics;
+mod pipeline;
 mod random;
 mod registry;
 mod sort;
@@ -29,11 +30,15 @@ pub use metrics::{
     build_chamfer_plan, build_delta_plan, build_eval_plan, build_hausdorff_plan, DeltaPlan,
     EvalPlan, MetricPairPlan, MetricPlan,
 };
+pub use pipeline::{
+    apply_stage_options_to_pipeline_json, parse_pipeline_args, validate_pipeline_json_shape,
+    ParsedPipelineArgs, PipelineArgsResult,
+};
 pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};
 pub use sort::build_sort_pipeline;
 pub use split::{build_split_plan, numbered_split_output, SplitKernelPlan, SplitPlan};
-pub use stage_options::CliStageOption;
+pub use stage_options::{apply_cli_stage_options, CliStageOption};
 pub use text::word_wrap;
 pub use tile::{build_tile_plan, TileKernelPlan, TilePlan};
 pub use tindex::{
