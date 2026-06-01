@@ -218,9 +218,25 @@ fn decode_base64(value: &str) -> Option<Vec<u8>> {
 }
 
 /// A named metadata node.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MetadataKind {
+    Instance,
+    Array,
+}
+
+impl MetadataKind {
+    pub fn as_u8(self) -> u8 {
+        match self {
+            MetadataKind::Instance => 0,
+            MetadataKind::Array => 1,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MetadataNode {
     name: String,
+    kind: MetadataKind,
     value: Option<MetadataValue>,
     type_name: Option<String>,
     description: Option<String>,
@@ -231,6 +247,7 @@ impl MetadataNode {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            kind: MetadataKind::Instance,
             value: None,
             type_name: None,
             description: None,
@@ -244,6 +261,14 @@ impl MetadataNode {
 
     pub fn set_name(&mut self, name: impl Into<String>) {
         self.name = name.into();
+    }
+
+    pub fn kind(&self) -> MetadataKind {
+        self.kind
+    }
+
+    pub fn set_kind(&mut self, kind: MetadataKind) {
+        self.kind = kind;
     }
 
     pub fn value(&self) -> Option<&MetadataValue> {
@@ -278,7 +303,33 @@ impl MetadataNode {
         self.description = Some(description.into());
     }
 
-    pub fn add_child(&mut self, child: MetadataNode) {
+    pub fn add_child(&mut self, mut child: MetadataNode) {
+        if self
+            .children
+            .iter()
+            .any(|existing| existing.name == child.name)
+        {
+            child.kind = MetadataKind::Array;
+            for existing in self
+                .children
+                .iter_mut()
+                .filter(|existing| existing.name == child.name)
+            {
+                existing.kind = MetadataKind::Array;
+            }
+        }
+        self.children.push(child);
+    }
+
+    pub fn add_list_child(&mut self, mut child: MetadataNode) {
+        child.kind = MetadataKind::Array;
+        for existing in self
+            .children
+            .iter_mut()
+            .filter(|existing| existing.name == child.name)
+        {
+            existing.kind = MetadataKind::Array;
+        }
         self.children.push(child);
     }
 
@@ -287,7 +338,7 @@ impl MetadataNode {
         name: impl Into<String>,
         value: MetadataValue,
     ) -> &mut MetadataNode {
-        self.children.push(MetadataNode::new(name));
+        self.add_child(MetadataNode::new(name));
         let child = self.children.last_mut().expect("child just pushed");
         child.set_value(value);
         child
@@ -385,6 +436,7 @@ mod tests {
 
         assert_eq!(root.child_count(), 2);
         assert_eq!(root.children()[0].name(), "first");
+        assert_eq!(root.children()[0].kind(), MetadataKind::Instance);
         assert_eq!(root.children()[0].type_name(), Some("string"));
         assert_eq!(root.children()[0].description(), Some("first child"));
         assert_eq!(root.children()[1].name(), "second");
@@ -408,6 +460,28 @@ mod tests {
         assert_eq!(child.children()[0].name(), "new");
         assert_eq!(child.children()[1].name(), "newer");
         assert_eq!(root.children_named("child").len(), 1);
+    }
+
+    #[test]
+    fn duplicate_children_become_array_kind() {
+        let mut root = MetadataNode::new("root");
+        root.add_value("item", MetadataValue::U64(1));
+        root.add_value("item", MetadataValue::U64(2));
+
+        assert_eq!(root.child_count(), 2);
+        assert_eq!(root.children()[0].kind(), MetadataKind::Array);
+        assert_eq!(root.children()[1].kind(), MetadataKind::Array);
+    }
+
+    #[test]
+    fn explicit_list_child_is_array_from_first_entry() {
+        let mut root = MetadataNode::new("root");
+        let mut child = MetadataNode::new("item");
+        child.set_value(MetadataValue::U64(1));
+        root.add_list_child(child);
+
+        assert_eq!(root.child_count(), 1);
+        assert_eq!(root.children()[0].kind(), MetadataKind::Array);
     }
 
     #[test]

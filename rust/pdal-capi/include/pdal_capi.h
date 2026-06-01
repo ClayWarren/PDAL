@@ -954,6 +954,7 @@ extern "C"
     double pdal_metadata_node_value_f64(const pdal_metadata_node_t* node);
     bool pdal_metadata_node_value_bool(const pdal_metadata_node_t* node);
     void* pdal_metadata_node_value_pointer(const pdal_metadata_node_t* node);
+    uint8_t pdal_metadata_node_kind(const pdal_metadata_node_t* node);
     char* pdal_metadata_json_value(const char* type_name, const char* value);
     bool pdal_metadata_value_as_i64(const char* type_name, const char* value,
                                     int64_t* out_value);
@@ -965,8 +966,12 @@ extern "C"
                                      bool* out_value);
     void pdal_metadata_node_add_child(pdal_metadata_node_t* node,
                                       pdal_metadata_node_t* child);
+    void pdal_metadata_node_add_list_child(pdal_metadata_node_t* node,
+                                           pdal_metadata_node_t* child);
     void pdal_metadata_node_add_child_clone(pdal_metadata_node_t* node,
                                             const pdal_metadata_node_t* child);
+    void pdal_metadata_node_add_list_child_clone(
+        pdal_metadata_node_t* node, const pdal_metadata_node_t* child);
     void pdal_metadata_node_add_or_update_child(pdal_metadata_node_t* node,
                                                 pdal_metadata_node_t* child);
     void pdal_metadata_node_add_or_update_child_clone(

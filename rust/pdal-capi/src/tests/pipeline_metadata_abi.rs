@@ -268,6 +268,7 @@ fn metadata_tree_roundtrips_through_c_abi() {
         pdal_metadata_node_set_description(child, child_description.as_ptr());
         pdal_metadata_node_add_child(root, child);
 
+        assert_eq!(pdal_metadata_node_kind(root), 0);
         assert_eq!(pdal_metadata_node_child_count(root), 1);
         assert_eq!(
             pdal_metadata_node_child_named_count(root, child_name.as_ptr()),
@@ -299,6 +300,55 @@ fn metadata_tree_roundtrips_through_c_abi() {
         assert_eq!(take_string(pdal_metadata_node_name(path_child)), "child");
         pdal_metadata_node_destroy(path_child);
         assert!(pdal_metadata_node_find_child_path(root, std::ptr::null()).is_null());
+
+        pdal_metadata_node_destroy(root);
+    }
+}
+
+#[test]
+fn metadata_array_kind_roundtrips_through_c_abi() {
+    unsafe {
+        let root_name = CString::new("root").unwrap();
+        let item_name = CString::new("item").unwrap();
+
+        let root = pdal_metadata_node_create(root_name.as_ptr());
+        let first = pdal_metadata_node_create(item_name.as_ptr());
+        pdal_metadata_node_set_u64(first, 1);
+        pdal_metadata_node_add_child(root, first);
+
+        let copied = pdal_metadata_node_child(root, 0);
+        assert_eq!(pdal_metadata_node_kind(copied), 0);
+        pdal_metadata_node_destroy(copied);
+
+        let second = pdal_metadata_node_create(item_name.as_ptr());
+        pdal_metadata_node_set_u64(second, 2);
+        pdal_metadata_node_add_child(root, second);
+
+        assert_eq!(
+            pdal_metadata_node_child_named_count(root, item_name.as_ptr()),
+            2
+        );
+        for idx in 0..2 {
+            let item = pdal_metadata_node_child_named(root, item_name.as_ptr(), idx);
+            assert_eq!(pdal_metadata_node_kind(item), 1);
+            assert_eq!(pdal_metadata_node_value_u64(item), idx + 1);
+            pdal_metadata_node_destroy(item);
+        }
+
+        let explicit = pdal_metadata_node_create(CString::new("explicit").unwrap().as_ptr());
+        pdal_metadata_node_add_list_child(root, explicit);
+        let copied =
+            pdal_metadata_node_child_named(root, CString::new("explicit").unwrap().as_ptr(), 0);
+        assert_eq!(pdal_metadata_node_kind(copied), 1);
+        pdal_metadata_node_destroy(copied);
+
+        let cloned = pdal_metadata_node_create(CString::new("clone").unwrap().as_ptr());
+        pdal_metadata_node_add_list_child_clone(root, cloned);
+        let copied =
+            pdal_metadata_node_child_named(root, CString::new("clone").unwrap().as_ptr(), 0);
+        assert_eq!(pdal_metadata_node_kind(copied), 1);
+        pdal_metadata_node_destroy(copied);
+        pdal_metadata_node_destroy(cloned);
 
         pdal_metadata_node_destroy(root);
     }
@@ -363,6 +413,7 @@ fn metadata_scalar_conversions_and_nulls_follow_c_abi_contract() {
         assert_eq!(take_string(pdal_metadata_node_type(empty)), "");
         assert_eq!(take_string(pdal_metadata_node_description(empty)), "");
         assert_eq!(pdal_metadata_node_value_kind(empty), 255);
+        assert_eq!(pdal_metadata_node_kind(std::ptr::null()), 255);
         assert_eq!(pdal_metadata_node_child_count(std::ptr::null()), 0);
         assert!(pdal_metadata_node_clone(std::ptr::null()).is_null());
         assert!(pdal_metadata_node_child(empty, 0).is_null());
@@ -427,8 +478,10 @@ fn metadata_scalar_conversions_and_nulls_follow_c_abi_contract() {
             std::ptr::null_mut(),
         ));
         pdal_metadata_node_add_child_clone(std::ptr::null_mut(), empty);
+        pdal_metadata_node_add_list_child_clone(std::ptr::null_mut(), empty);
         pdal_metadata_node_add_or_update_child_clone(std::ptr::null_mut(), empty);
         pdal_metadata_node_add_child(std::ptr::null_mut(), std::ptr::null_mut());
+        pdal_metadata_node_add_list_child(std::ptr::null_mut(), std::ptr::null_mut());
         pdal_metadata_node_add_or_update_child(std::ptr::null_mut(), std::ptr::null_mut());
         assert_eq!(
             take_string(pdal_metadata_node_to_json(std::ptr::null())),

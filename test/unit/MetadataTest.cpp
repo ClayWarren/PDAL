@@ -257,6 +257,43 @@ TEST(MetadataTest, test_metadata_set)
     pdal_metadata_node_destroy(m);
 }
 
+TEST(MetadataTest, array_kind)
+{
+    pdal_metadata_node_t* root = pdal_metadata_node_create("root");
+    pdal_metadata_node_t* item = pdal_metadata_node_create("item");
+    pdal_metadata_node_set_u64(item, 1);
+    pdal_metadata_node_add_child(root, item);
+
+    pdal_metadata_node_t* copied =
+        pdal_metadata_node_child_named(root, "item", 0);
+    ASSERT_NE(copied, nullptr);
+    EXPECT_EQ(pdal_metadata_node_kind(copied), 0u);
+    pdal_metadata_node_destroy(copied);
+
+    item = pdal_metadata_node_create("item");
+    pdal_metadata_node_set_u64(item, 2);
+    pdal_metadata_node_add_child(root, item);
+
+    ASSERT_EQ(pdal_metadata_node_child_named_count(root, "item"), 2u);
+    for (uint64_t i = 0; i < 2; ++i)
+    {
+        copied = pdal_metadata_node_child_named(root, "item", i);
+        ASSERT_NE(copied, nullptr);
+        EXPECT_EQ(pdal_metadata_node_kind(copied), 1u);
+        EXPECT_EQ(pdal_metadata_node_value_u64(copied), i + 1);
+        pdal_metadata_node_destroy(copied);
+    }
+
+    item = pdal_metadata_node_create("explicit");
+    pdal_metadata_node_add_list_child(root, item);
+    copied = pdal_metadata_node_child_named(root, "explicit", 0);
+    ASSERT_NE(copied, nullptr);
+    EXPECT_EQ(pdal_metadata_node_kind(copied), 1u);
+    pdal_metadata_node_destroy(copied);
+
+    pdal_metadata_node_destroy(root);
+}
+
 TEST(MetadataTest, test_vlr_metadata)
 {
     pdal_metadata_node_t* m = pdal_metadata_node_create("");

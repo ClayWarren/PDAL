@@ -1,7 +1,7 @@
 use crate::error::string_to_c_ptr;
 use pdal_core::metadata::{
-    json_scalar_value, scalar_as_bool, scalar_as_f64, scalar_as_i64, scalar_as_u64, MetadataNode,
-    MetadataValue,
+    json_scalar_value, scalar_as_bool, scalar_as_f64, scalar_as_i64, scalar_as_u64, MetadataKind,
+    MetadataNode, MetadataValue,
 };
 use serde_json::json;
 use std::ffi::c_void;
@@ -221,6 +221,17 @@ pub unsafe extern "C" fn pdal_metadata_node_value_kind(node: *const MetadataNode
         .unwrap_or(255)
 }
 
+/// Return the metadata node kind: 0 instance, 1 array, 255 null.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_metadata_node_kind(node: *const MetadataNode) -> u8 {
+    node.as_ref().map(|node| node.kind().as_u8()).unwrap_or(255)
+}
+
 /// Return a node's scalar value as a string. Caller must free with
 /// `pdal_string_free`.
 ///
@@ -433,6 +444,24 @@ pub unsafe extern "C" fn pdal_metadata_node_add_child(
 }
 
 #[no_mangle]
+/// Add a child as a metadata list/array entry, transferring ownership.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `child` must be null or a valid pointer
+/// returned by `pdal_metadata_node_create`; if non-null, it must not be used
+/// after this call.
+pub unsafe extern "C" fn pdal_metadata_node_add_list_child(
+    node: *mut MetadataNode,
+    child: *mut MetadataNode,
+) {
+    if let (Some(node), false) = (node.as_mut(), child.is_null()) {
+        node.add_list_child(*Box::from_raw(child));
+    }
+}
+
+#[no_mangle]
 /// Add a cloned child to a node without transferring ownership.
 ///
 /// # Safety
@@ -446,6 +475,24 @@ pub unsafe extern "C" fn pdal_metadata_node_add_child_clone(
 ) {
     if let (Some(node), Some(child)) = (node.as_mut(), child.as_ref()) {
         node.add_child(child.clone());
+    }
+}
+
+#[no_mangle]
+/// Add a cloned child as a metadata list/array entry without transferring
+/// ownership.
+///
+/// # Safety
+///
+/// `node` must be null or a valid pointer returned by
+/// `pdal_metadata_node_create`. `child` must be null or a valid metadata node
+/// pointer.
+pub unsafe extern "C" fn pdal_metadata_node_add_list_child_clone(
+    node: *mut MetadataNode,
+    child: *const MetadataNode,
+) {
+    if let (Some(node), Some(child)) = (node.as_mut(), child.as_ref()) {
+        node.add_list_child(child.clone());
     }
 }
 
@@ -612,6 +659,9 @@ pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
 pub(crate) fn metadata_node_to_json(node: &MetadataNode) -> serde_json::Value {
     let mut object = serde_json::Map::new();
     object.insert("name".to_string(), json!(node.name()));
+    if node.kind() == MetadataKind::Array {
+        object.insert("kind".to_string(), json!("array"));
+    }
 
     if let Some(value) = node.value() {
         object.insert("value".to_string(), metadata_value_to_json(value));
