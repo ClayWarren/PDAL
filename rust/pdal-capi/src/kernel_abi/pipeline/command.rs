@@ -34,6 +34,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     let mut progress_file = None;
     let mut serialization_file = None;
     let mut stream_allowed = true;
+    let mut stream_required = false;
     let mut stage_options: Vec<CliStageOption> = Vec::new();
 
     let mut iter = args.iter();
@@ -49,8 +50,21 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         } else if arg == "--validate" {
             validate_only = true;
         } else if arg == "--stream" {
+            if !stream_allowed {
+                eprintln!(
+                    "PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options"
+                );
+                return 1;
+            }
             stream_allowed = true;
+            stream_required = true;
         } else if arg == "--nostream" {
+            if stream_required {
+                eprintln!(
+                    "PDAL: kernels.pipeline: Can't execute with 'stream' and 'nostream' options"
+                );
+                return 1;
+            }
             stream_allowed = false;
         } else if arg == "--dims" {
             let Some(_) = iter.next() else {
@@ -162,6 +176,12 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             Ok(Some(_)) => {
                 write_progress(&mut progress, "DONEPIPELINE", "pipeline");
                 return 0;
+            }
+            Ok(None) if stream_required => {
+                eprintln!(
+                    "PDAL: kernels.pipeline: Attempting to use stream mode with a stage that doesn't support streaming."
+                );
+                return 1;
             }
             Ok(None) => {}
             Err(err) => {

@@ -125,6 +125,53 @@ fn rust_kernel_run_reports_density_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_enforces_pipeline_stream_options() {
+    let dir = std::env::temp_dir().join(format!(
+        "pdal-rs-kernel-pipeline-stream-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let streamable = dir.join("streamable.json");
+    let nonstreamable = dir.join("nonstreamable.json");
+    std::fs::write(
+        &streamable,
+        r#"{"pipeline":[
+            {"type":"readers.faux","count":10,"mode":"ramp"},
+            {"type":"filters.range","limits":"X[0:9]"},
+            {"type":"writers.null"}
+        ]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        &nonstreamable,
+        r#"{"pipeline":[
+            {"type":"readers.faux","count":10,"mode":"ramp"},
+            {"type":"filters.sort","dimension":"X"},
+            {"type":"writers.null"}
+        ]}"#,
+    )
+    .unwrap();
+
+    let run = |path: &std::path::Path, extra: &[&str]| -> i32 {
+        let name = CString::new("pipeline").unwrap();
+        let mut owned = vec![CString::new(path.to_str().unwrap()).unwrap()];
+        for arg in extra {
+            owned.push(CString::new(*arg).unwrap());
+        }
+        let argv: Vec<_> = owned.iter().map(|arg| arg.as_ptr()).collect();
+        unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) }
+    };
+
+    assert_eq!(run(&streamable, &["--stream"]), 0);
+    assert_eq!(run(&streamable, &["--nostream"]), 0);
+    assert_eq!(run(&nonstreamable, &["--stream"]), 1);
+    assert_eq!(run(&streamable, &["--stream", "--nostream"]), 1);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn density_pipeline_json_appends_hexbin_stage() {
     let pipeline = r#"{"pipeline":[{"type":"readers.faux","count":5}]}"#;
     let value = append_stage_to_pipeline_json(

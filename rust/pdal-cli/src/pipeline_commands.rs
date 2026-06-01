@@ -23,6 +23,7 @@ impl App {
         let mut metadata_file: Option<&str> = None;
         let mut serialization_file: Option<&str> = None;
         let mut stream_allowed = true;
+        let mut stream_required = false;
         let mut args = self.command_args.iter();
         while let Some(arg) = args.next() {
             if arg == "--input" || arg == "-i" {
@@ -36,8 +37,17 @@ impl App {
             } else if arg == "--validate" {
                 validate_only = true;
             } else if arg == "--stream" {
+                if !stream_allowed {
+                    eprintln!("Error: can't execute with --stream and --nostream");
+                    return 1;
+                }
                 stream_allowed = true;
+                stream_required = true;
             } else if arg == "--nostream" {
+                if stream_required {
+                    eprintln!("Error: can't execute with --stream and --nostream");
+                    return 1;
+                }
                 stream_allowed = false;
             } else if arg == "--metadata" {
                 let Some(value) = args.next() else {
@@ -147,6 +157,11 @@ impl App {
             if streamed >= 0 {
                 unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
                 return 0;
+            }
+            if streamed == -2 && stream_required {
+                eprintln!("Error: pipeline is not streamable");
+                unsafe { pdal_capi::pdal_pipeline_destroy(pipeline) };
+                return 1;
             }
             if streamed == -1 {
                 self.output_last_error();
