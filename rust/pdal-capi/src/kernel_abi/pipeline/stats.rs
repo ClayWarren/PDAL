@@ -1,4 +1,4 @@
-use super::*;
+use pdal_core::point::{DimId, DimType, PointView};
 
 pub(super) struct InfoDimensionStats {
     pub(super) name: String,

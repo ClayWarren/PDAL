@@ -4,7 +4,8 @@ use command::{
     apply_stage_options_to_pipeline_json, validate_pipeline_for_kernel,
     validate_pipeline_json_shape,
 };
-use pdal_core::point::PointLayout;
+use pdal_core::metadata::MetadataNode;
+use pdal_core::point::{PointLayout, PointView};
 use pdal_core::srs::SpatialReference;
 use std::rc::Rc;
 
@@ -82,7 +83,7 @@ fn stac_report_uses_requested_pointcloud_type() {
     view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
     view.add_point();
 
-    let report = stac_report(&[view], &MetadataNode::new("root"), "sample.las", "sonar");
+    let report = info::stac_report(&[view], &MetadataNode::new("root"), "sample.las", "sonar");
     let json: serde_json::Value = serde_json::from_str(&report).unwrap();
 
     assert_eq!(json["stac"]["properties"]["pc:type"], "sonar");
