@@ -6,6 +6,7 @@ license.workspace = true
 description = "CLI kernels for the PDAL Rust port."
 
 [dependencies]
+chrono = "0.4"
 glob = "0.3"
 pdal-core = { path = "../pdal-core" }
 serde_json = "1"

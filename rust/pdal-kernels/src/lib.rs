@@ -8,6 +8,7 @@ mod density;
 mod fauxplugin;
 mod ground;
 mod info;
+mod info_report;
 mod merge;
 mod metrics;
 mod pipeline;
@@ -25,6 +26,9 @@ pub use density::build_density_pipeline;
 pub use fauxplugin::FauxPluginKernel;
 pub use ground::build_ground_pipeline;
 pub use info::{build_info_plan, InfoKernelPlan, InfoMode, InfoRunPlan, QueryRequest};
+pub use info_report::{
+    point_report, query_report, schema_body, schema_report, stac_report, stats_body, stats_report,
+};
 pub use merge::build_merge_pipeline;
 pub use metrics::{
     build_chamfer_plan, build_delta_plan, build_eval_plan, build_hausdorff_plan, DeltaPlan,

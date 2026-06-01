@@ -4,7 +4,6 @@ use std::os::raw::c_char;
 
 mod command;
 mod info;
-mod stats;
 
 pub(in crate::kernel_abi) use command::run_pipeline_kernel;
 pub(super) use info::run_info_kernel;
