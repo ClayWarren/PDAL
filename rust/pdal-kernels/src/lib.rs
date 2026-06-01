@@ -37,9 +37,9 @@ pub use stage_options::CliStageOption;
 pub use text::word_wrap;
 pub use tile::{build_tile_plan, TileKernelPlan, TilePlan};
 pub use tindex::{
-    parse_tindex_create_args, parse_tindex_merge_args, print_tindex_usage, tindex_next_value,
-    BoundaryOptions, TindexCreateArgs, TindexMergeArgs, TindexMergeClip, TindexParseResult,
-    INVALID_TINDEX_FILTER_STAGE_MESSAGE,
+    build_tindex_merge_plan, parse_tindex_create_args, parse_tindex_merge_args, print_tindex_usage,
+    tindex_next_value, BoundaryOptions, TindexCreateArgs, TindexMergeArgs, TindexMergeClip,
+    TindexMergePlan, TindexParseResult, TindexResolvedClip, INVALID_TINDEX_FILTER_STAGE_MESSAGE,
 };
 pub use translate::{
     build_translate_plan, expand_translate_option_files, parse_option_file, translate_json_stages,

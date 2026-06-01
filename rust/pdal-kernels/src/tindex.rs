@@ -1,4 +1,5 @@
 use pdal_core::bounds::{parse_bounds2d, Bounds2D};
+use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 use std::io::Read;
 
 pub const INVALID_TINDEX_FILTER_STAGE_MESSAGE: &str = "Argument references invalid/unused stage";
@@ -98,6 +99,19 @@ pub struct TindexMergeArgs {
 pub enum TindexMergeClip {
     Bounds { bounds: Bounds2D, value: String },
     Polygon { value: String },
+}
+
+#[derive(Clone, Debug)]
+pub struct TindexResolvedClip {
+    pub bounds: Bounds2D,
+    pub stage_key: &'static str,
+    pub stage_value: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct TindexMergePlan {
+    pub file_count: usize,
+    pub pipeline_json: serde_json::Value,
 }
 
 pub fn print_tindex_usage() {
@@ -362,6 +376,144 @@ fn parse_merge_bounds(value: &str) -> Result<TindexMergeClip, TindexParseResult>
     })
 }
 
+pub fn build_tindex_merge_plan(
+    args: &TindexMergeArgs,
+    index_json: &str,
+    clip: Option<TindexResolvedClip>,
+) -> Result<TindexMergePlan, TindexParseResult> {
+    let index: serde_json::Value = serde_json::from_str(index_json).map_err(|err| {
+        TindexParseResult::Error(format!(
+            "Unable to parse GeoJSON tindex '{}': {err}",
+            args.tindex_file
+        ))
+    })?;
+    let Some(features) = index["features"].as_array() else {
+        return Err(TindexParseResult::Error(
+            "tindex merge expects a GeoJSON FeatureCollection.".to_string(),
+        ));
+    };
+    if features.is_empty() {
+        return Err(TindexParseResult::Error(
+            "tindex contains no features.".to_string(),
+        ));
+    }
+
+    let mut stages = Vec::new();
+    let mut tags = Vec::new();
+    let mut file_count = 0;
+    for (index, feature) in features.iter().enumerate() {
+        if let Some(clip) = &clip {
+            let Some(feature_bounds) = feature_bounds_2d(feature) else {
+                return Err(TindexParseResult::Error(
+                    "Feature has invalid geometry.".to_string(),
+                ));
+            };
+            if !feature_bounds.overlaps(&clip.bounds) {
+                continue;
+            }
+        }
+        let Some(location) = feature["properties"][&args.location_field].as_str() else {
+            return Err(TindexParseResult::Error(format!(
+                "Feature is missing '{}'.",
+                args.location_field
+            )));
+        };
+        let Some(reader) = infer_reader_driver(location) else {
+            return Err(TindexParseResult::Error(format!(
+                "unable to infer reader driver for '{location}'."
+            )));
+        };
+        let tag = format!("tindex_input_{index}");
+        stages.push(serde_json::json!({
+            "type": reader,
+            "filename": location,
+            "tag": tag.clone(),
+        }));
+        let mut input_tag = tag;
+        let feature_srs = feature["properties"]["srs"].as_str().unwrap_or("");
+        if !feature_srs.is_empty() && feature_srs != args.target_srs {
+            let reprojection_tag = format!("tindex_reprojection_{index}");
+            stages.push(serde_json::json!({
+                "type": "filters.reprojection",
+                "in_srs": feature_srs,
+                "out_srs": &args.target_srs,
+                "inputs": [input_tag],
+                "tag": reprojection_tag,
+            }));
+            input_tag = reprojection_tag;
+        }
+        if let Some(clip) = &clip {
+            let crop_tag = format!("tindex_crop_{index}");
+            stages.push(serde_json::json!({
+                "type": "filters.crop",
+                (clip.stage_key): clip.stage_value,
+                "inputs": [input_tag],
+                "tag": crop_tag,
+            }));
+            tags.push(crop_tag);
+        } else {
+            tags.push(input_tag);
+        }
+        file_count += 1;
+    }
+    if stages.is_empty() {
+        return Err(TindexParseResult::Error(
+            "No indexed files matched merge criteria.".to_string(),
+        ));
+    }
+    if stages.len() > 1 {
+        stages.push(serde_json::json!({
+            "type": "filters.merge",
+            "inputs": tags,
+        }));
+    }
+    let Some(writer) = infer_writer_driver(&args.output_file) else {
+        return Err(TindexParseResult::Error(format!(
+            "Unable to infer writer driver for '{}'.",
+            args.output_file
+        )));
+    };
+    stages.push(serde_json::json!({ "type": writer, "filename": args.output_file }));
+    Ok(TindexMergePlan {
+        file_count,
+        pipeline_json: serde_json::Value::Array(stages),
+    })
+}
+
+fn feature_bounds_2d(feature: &serde_json::Value) -> Option<Bounds2D> {
+    let geometry = feature.get("geometry")?;
+    match geometry.get("type")?.as_str()? {
+        "Polygon" => bounds_from_positions(geometry.get("coordinates")?.get(0)?.as_array()?),
+        "MultiPolygon" => {
+            let polygons = geometry.get("coordinates")?.as_array()?;
+            let mut output: Option<Bounds2D> = None;
+            for polygon in polygons {
+                let ring = polygon.get(0)?.as_array()?;
+                let bounds = bounds_from_positions(ring)?;
+                if let Some(out) = output.as_mut() {
+                    out.grow_bounds(&bounds);
+                } else {
+                    output = Some(bounds);
+                }
+            }
+            output
+        }
+        _ => None,
+    }
+}
+
+fn bounds_from_positions(positions: &[serde_json::Value]) -> Option<Bounds2D> {
+    let mut iter = positions.iter();
+    let first = iter.next()?.as_array()?;
+    let mut bounds = Bounds2D::empty();
+    bounds.grow_point(first.first()?.as_f64()?, first.get(1)?.as_f64()?);
+    for position in iter {
+        let coords = position.as_array()?;
+        bounds.grow_point(coords.first()?.as_f64()?, coords.get(1)?.as_f64()?);
+    }
+    Some(bounds)
+}
+
 fn try_parse_boundary_eq_arg(
     parsed: &mut TindexCreateArgs,
     arg: &str,
@@ -616,5 +768,90 @@ mod tests {
             }
             TindexMergeClip::Bounds { .. } => panic!("expected polygon clip"),
         }
+    }
+
+    #[test]
+    fn merge_plan_builds_reader_merge_writer_graph() {
+        let parsed = parse_tindex_merge_args(&strings(&[
+            "--tindex",
+            "idx.geojson",
+            "--filespec",
+            "out.las",
+        ]))
+        .unwrap();
+        let index = serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": { "location": "a.las", "srs": "EPSG:4326" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "location": "b.las", "srs": "EPSG:3857" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[2.0, 2.0], [3.0, 2.0], [3.0, 3.0], [2.0, 2.0]]]
+                    }
+                }
+            ]
+        });
+        let plan = build_tindex_merge_plan(&parsed, &index.to_string(), None).unwrap();
+        assert_eq!(plan.file_count, 2);
+        let stages = plan.pipeline_json.as_array().unwrap();
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[1]["type"], "readers.las");
+        assert_eq!(stages[2]["type"], "filters.reprojection");
+        assert_eq!(stages[3]["type"], "filters.merge");
+        assert_eq!(stages[4]["type"], "writers.las");
+    }
+
+    #[test]
+    fn merge_plan_applies_clip_bounds_and_crop_stage() {
+        let parsed = parse_tindex_merge_args(&strings(&["idx.geojson", "out.las"])).unwrap();
+        let index = serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": { "location": "keep.las", "srs": "" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0.0, 0.0], [5.0, 0.0], [5.0, 5.0], [0.0, 0.0]]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "location": "skip.las", "srs": "" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[10.0, 10.0], [11.0, 10.0], [11.0, 11.0], [10.0, 10.0]]]
+                    }
+                }
+            ]
+        });
+        let clip = TindexResolvedClip {
+            bounds: Bounds2D {
+                minx: 1.0,
+                maxx: 2.0,
+                miny: 1.0,
+                maxy: 2.0,
+            },
+            stage_key: "bounds",
+            stage_value: "([1,2],[1,2])".to_string(),
+        };
+        let plan = build_tindex_merge_plan(&parsed, &index.to_string(), Some(clip)).unwrap();
+        assert_eq!(plan.file_count, 1);
+        let stages = plan.pipeline_json.as_array().unwrap();
+        assert_eq!(stages.len(), 4);
+        assert_eq!(stages[0]["filename"], "keep.las");
+        assert_eq!(stages[1]["type"], "filters.crop");
+        assert_eq!(stages[1]["bounds"], "([1,2],[1,2])");
+        assert_eq!(stages[2]["type"], "filters.merge");
+        assert_eq!(stages[3]["type"], "writers.las");
     }
 }
