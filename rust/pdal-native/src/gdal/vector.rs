@@ -194,34 +194,50 @@ impl Vector {
         if layer.is_null() {
             return Err("Failed to get layer".to_string());
         }
-        self.get_string_features_from_layer(layer, column)
+        self.get_string_features_from_layer(layer, column, "")
     }
 
     pub fn get_string_features_by_layer(
         &self,
         layer_name: &str,
         column: &str,
+        attribute_filter: &str,
     ) -> Result<Vec<(String, String)>, String> {
         if layer_name.is_empty() {
-            return self.get_string_features(0, column);
+            let layer = unsafe { gdal_sys::OGR_DS_GetLayer(self.ds, 0) };
+            if layer.is_null() {
+                return Err("Failed to get layer".to_string());
+            }
+            return self.get_string_features_from_layer(layer, column, attribute_filter);
         }
         let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
         let layer = unsafe { gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr()) };
         if layer.is_null() {
             return Err(format!("Failed to get layer '{}'.", layer_name));
         }
-        self.get_string_features_from_layer(layer, column)
+        self.get_string_features_from_layer(layer, column, attribute_filter)
     }
 
     fn get_string_features_from_layer(
         &self,
         layer: gdal_sys::OGRLayerH,
         column: &str,
+        attribute_filter: &str,
     ) -> Result<Vec<(String, String)>, String> {
         let column_c = CString::new(column).map_err(|e| e.to_string())?;
+        let filter_c = CString::new(attribute_filter).map_err(|e| e.to_string())?;
         unsafe {
             let mut result = Vec::new();
             gdal_sys::OGR_L_ResetReading(layer);
+            if !attribute_filter.is_empty()
+                && gdal_sys::OGR_L_SetAttributeFilter(layer, filter_c.as_ptr())
+                    != gdal_sys::OGRErr::OGRERR_NONE
+            {
+                return Err(format!(
+                    "Unable to set attribute filter '{}'.",
+                    attribute_filter
+                ));
+            }
 
             loop {
                 let feature = gdal_sys::OGR_L_GetNextFeature(layer);
@@ -255,6 +271,9 @@ impl Vector {
                     }
                 }
                 gdal_sys::OGR_F_Destroy(feature);
+            }
+            if !attribute_filter.is_empty() {
+                gdal_sys::OGR_L_SetAttributeFilter(layer, std::ptr::null());
             }
             Ok(result)
         }

@@ -76,6 +76,13 @@ void throwLastRustError(const std::string& fallback)
     throw pdal_error(fallback);
 }
 
+bool hasSuffix(const std::string& value, const std::string& suffix)
+{
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) ==
+               0;
+}
+
 } // namespace
 
 std::string TIndexReader::getName() const
@@ -461,10 +468,14 @@ PointViewSet TIndexReader::run(PointViewPtr view)
 
 bool TIndexReader::canUseRustReader() const
 {
+    const bool jsonIndex =
+        hasSuffix(m_filename, ".json") || hasSuffix(m_filename, ".geojson");
+    if (jsonIndex && !m_args->m_attributeFilter.empty())
+        return false;
+
     return m_args->m_srsColumnName.empty() && m_args->m_wkt.empty() &&
-           m_args->m_ogr.empty() && m_args->m_attributeFilter.empty() &&
-           m_args->m_sql.empty() && m_args->m_rawReaderArgs.empty() &&
-           m_args->m_tgtSrsString.empty();
+           m_args->m_ogr.empty() && m_args->m_sql.empty() &&
+           m_args->m_rawReaderArgs.empty() && m_args->m_tgtSrsString.empty();
 }
 
 void TIndexReader::loadRustView()
@@ -480,6 +491,7 @@ void TIndexReader::loadRustView()
     addOption(options, "filename", m_filename);
     addOption(options, "lyr_name", m_args->m_layerName);
     addOption(options, "tindex_name", m_args->m_tileIndexColumnName);
+    addOption(options, "where", m_args->m_attributeFilter);
     if (!m_args->m_bounds.empty())
     {
         std::ostringstream bounds;

@@ -14,6 +14,7 @@ pub struct TindexReader {
     filename: String,
     layer_name: String,
     location_field: String,
+    attribute_filter: String,
     bounds: String,
 }
 
@@ -23,6 +24,7 @@ impl TindexReader {
             filename: options.get_str("filename", ""),
             layer_name: options.get_str("lyr_name", ""),
             location_field: options.get_str("tindex_name", "location"),
+            attribute_filter: options.get_str("where", ""),
             bounds: options.get_str("bounds", ""),
         }
     }
@@ -45,6 +47,7 @@ impl Reader for TindexReader {
             &self.filename,
             &self.layer_name,
             &self.location_field,
+            &self.attribute_filter,
             bounds.as_ref(),
         )?;
 
@@ -77,16 +80,29 @@ fn read_index_features(
     filename: &str,
     layer_name: &str,
     location_field: &str,
+    attribute_filter: &str,
     bounds: Option<&Bounds2D>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     match source::read_to_string(filename) {
         Ok(text) => match read_geojson_index_features(&text, location_field, bounds) {
             Ok(features) => Ok(features),
-            Err(json_err) => read_ogr_index_features(filename, layer_name, location_field, bounds)
-                .or(Err(json_err)),
+            Err(json_err) => read_ogr_index_features(
+                filename,
+                layer_name,
+                location_field,
+                attribute_filter,
+                bounds,
+            )
+            .or(Err(json_err)),
         },
-        Err(text_err) => read_ogr_index_features(filename, layer_name, location_field, bounds)
-            .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
+        Err(text_err) => read_ogr_index_features(
+            filename,
+            layer_name,
+            location_field,
+            attribute_filter,
+            bounds,
+        )
+        .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
     }
 }
 
@@ -127,11 +143,12 @@ fn read_ogr_index_features(
     filename: &str,
     layer_name: &str,
     location_field: &str,
+    attribute_filter: &str,
     bounds: Option<&Bounds2D>,
 ) -> Result<Vec<IndexFeature>, StageError> {
     let vector = pdal_native::gdal::Vector::open(filename).map_err(StageError)?;
     let features = vector
-        .get_string_features_by_layer(layer_name, location_field)
+        .get_string_features_by_layer(layer_name, location_field, attribute_filter)
         .map_err(StageError)?;
     let mut output = Vec::new();
     for (wkt, location) in features {
@@ -553,6 +570,46 @@ mod tests {
         let mut options = Options::new();
         options.add("filename", index.display());
         options.add("lyr_name", "tiles");
+        let mut reader = TindexReader::new(&options);
+
+        assert_eq!(reader.read().unwrap()[0].len(), 3);
+    }
+
+    #[test]
+    fn reads_ogr_index_with_attribute_filter() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply");
+        let source_copy = temp.path().join("simple_text.ply");
+        std::fs::copy(&source, &source_copy).unwrap();
+        let index = temp.path().join("index.gpkg");
+        {
+            let vector = pdal_native::gdal::Vector::create(index.to_str().unwrap(), "GPKG")
+                .expect("GPKG driver is available");
+            let layer = vector.open_or_create_layer("tiles", "").unwrap();
+            unsafe {
+                pdal_native::gdal::Vector::create_string_field(layer, "location").unwrap();
+                pdal_native::gdal::Vector::create_string_field(layer, "bucket").unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+                    &[("location", "simple_text.ply"), ("bucket", "keep")],
+                )
+                .unwrap();
+                pdal_native::gdal::Vector::add_feature(
+                    layer,
+                    "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+                    &[("location", "simple_text.ply"), ("bucket", "skip")],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut options = Options::new();
+        options.add("filename", index.display());
+        options.add("lyr_name", "tiles");
+        options.add("where", "bucket = 'keep'");
         let mut reader = TindexReader::new(&options);
 
         assert_eq!(reader.read().unwrap()[0].len(), 3);
