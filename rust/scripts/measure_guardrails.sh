@@ -7,6 +7,19 @@ ITERATIONS="${PDAL_RUST_PERF_ITERS:-5}"
 COLD_BUILD=0
 TEST_SUITES=0
 
+# Locate the configured C++ build tree (used by --test-suites' ctest run).
+# The pixi dev environment configures into .build; a plain CMake build may use
+# build. Honor an explicit PDAL_BUILD_DIR, otherwise auto-detect.
+BUILD_DIR="${PDAL_BUILD_DIR:-}"
+if [[ -z "${BUILD_DIR}" ]]; then
+    for candidate in "${ROOT_DIR}/.build" "${ROOT_DIR}/build"; do
+        if [[ -f "${candidate}/CTestTestfile.cmake" ]]; then
+            BUILD_DIR="${candidate}"
+            break
+        fi
+    done
+fi
+
 if [[ -n "${CONDA_PREFIX:-}" ]]; then
     export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/lib}"
     export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
@@ -196,6 +209,11 @@ else
 fi
 
 if [[ "${TEST_SUITES}" == "1" ]]; then
-    time_command "cpp-full-test-suite" ctest --test-dir "${ROOT_DIR}/build" --output-on-failure
+    if [[ -z "${BUILD_DIR}" || ! -f "${BUILD_DIR}/CTestTestfile.cmake" ]]; then
+        echo "error: --test-suites needs a configured C++ build tree with registered tests;" >&2
+        echo "       set PDAL_BUILD_DIR or build into .build/ or build/ first." >&2
+        exit 2
+    fi
+    time_command "cpp-full-test-suite" ctest --test-dir "${BUILD_DIR}" --output-on-failure
     time_command "rust-full-test-suite" cargo test --manifest-path "${RUST_DIR}/Cargo.toml" --workspace -- --test-threads=1
 fi
