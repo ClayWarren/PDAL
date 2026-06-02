@@ -4,6 +4,11 @@ This is still a work in progress and is not yet at full feature parity with
 C++ PDAL. Bugs may exist. Check this list before assuming a behavior is
 intentional or before asking an agent to broaden the port.
 
+Closed decisions live in `rust/DECISIONS.md`. When this status file says a
+bucket is a native adapter, compatibility shell, or holdout, that ledger is the
+source of truth for whether it should be ported, FFI-bound, left in C++, or
+deferred.
+
 Status definitions:
 
 - `done`: believed done for the stated scope. No known major deficits in that
@@ -64,8 +69,8 @@ Status definitions:
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | prototype | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard`. |
 | Unsafe Rust footprint | in progress | Current first-party Rust count, excluding `rust/target`, is 331 `unsafe { ... }` blocks, 556 `unsafe extern "C" fn` exports, 84 total `unsafe fn` helpers, two unsafe extern callback type aliases, no unsafe extern blocks, and two `unsafe impl`s. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
-| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` is the source of truth. Two are actively replaced in Rust today (`vendor/h3` -> `h3o`, `vendor/lazperf` -> `las`/`laz`), four have a clear no-direct-port stance (`eigen`, `gtest`, `nanoflann`, `nlohmann`), and five remain deferred or adapter-bound (`arbiter`, `kazhdan`, `lepcc`, `schema-validator`, `utfcpp`). Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
-| Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below. `pdal-plugins` holds discovery metadata, `kernels.fauxplugin` is a compatibility marker, and `readers.spz`/`writers.spz` are the first fixture-backed plugin reader/writer checkpoint. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
+| Vendor/native strategy | in progress | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` describes the vendor boundary and `rust/DECISIONS.md` records the closed choices. Current decisions: `h3` -> `h3o`, `lazperf` -> `las`/`laz`, `eigen`/`gtest`/`nanoflann`/`nlohmann` are not direct Rust port targets, and `arbiter`/`kazhdan`/`lepcc`/`schema-validator`/`utfcpp` are adapter-bound or deferred to named milestones. Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. |
+| Plugins | prototype | There are 18 top-level plugin directories. Track each plugin below and in `rust/DECISIONS.md`. `faux`, `nitf`, and `spz` are the only completed compatibility checkpoints. All other optional plugins are native adapters/deferred by decision, not unplanned pure-port backlog. A Rust plugin SDK and broad optional plugin sweep are still not ready. |
 | Remote/object-store I/O | in progress | `pdal-native::vsi::VsiFile` opens local, URL, and `/vsicurl/` paths through GDAL VSI and now implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) now counts as Rust C ABI-backed. STAC remote JSON traversal, remote LASzip EPT reads, and `pdal info` remote pointless-LAS header/VLR/EVLR extraction consume the same adapter. Broader object-store option parity remains open. |
 | Broad kernels/apps/tools migration | in progress | Simple `pdal-rs` commands may continue proving lower layers. **`apps/` is complete** (0 port-candidate LOC -- `apps/pdal.cpp` is a thin entry-point peer; see the `C++ \`pdal\` app shell` row). The standalone tools have C ABI-backed dispatch shells, and broad `kernels/` command parity still depends on lower-layer kernel coverage. The C++ `pdal pipeline`, `pdal translate`, `pdal random`, `pdal density`, `pdal ground`, `pdal split`, `pdal sort`, `pdal merge`, `pdal delta`, `pdal tindex`, and simple `pdal tile` app paths now execute through Rust for local reader/filter/writer workflows. `pdal-rs` now routes every first-party command wrapper (`pipeline`, `info`, `translate`, `merge`, `sort`, `ground`, `density`, `random`, `split`, `tile`, `tindex`, and metric/eval commands) through that same Rust C ABI kernel runner after usage handling, so the CLI no longer carries parallel local command implementations. `pdal density` also owns JSON pipeline and stdin JSON pipeline inputs through Rust; XML remains the explicit C++ fallback. Direct exported C++ `DeltaKernel`, `EvalKernel`, `GroundKernel`, `MergeKernel`, `PipelineKernel`, `RandomKernel`, `SortKernel`, `SplitKernel`, `TIndexKernel`, and `TileKernel` execution now reaches the same Rust C ABI runner, reducing the remaining kernel implementation backlog while preserving the public C++ classes. `pdal info` supports stdin pipeline JSON through Rust. `pdal translate` supports `filters.range` option files for the existing app guard. Standalone `lasdump` and `nitfwrap` dispatch through the Rust C ABI; `lasdump` covers LAS/LAZ header, VLR/EVLR, and point checksum output, and `nitfwrap` uses the Nitro native adapter for LIDARA DES wrap/unwrap with LAS/BPF fixture parity. |
 
@@ -113,24 +118,24 @@ dependency adapters that wait on a future plugin SDK/packaging decision.
 
 | Plugin | Status | Notes |
 |---|---|---|
-| `plugins/arrow` | native-adapter | Arrow/Parquet integration is an optional columnar native dependency adapter. Revisit only with a deliberate Arrow Rust/FFI strategy. |
-| `plugins/cpd` | native-adapter | Registration filter wrapper over the external CPD library. Keep as an optional native adapter unless a Rust CPD implementation is deliberately chosen. |
-| `plugins/draco` | native-adapter | Draco mesh/point-cloud codec integration is an optional codec adapter. Revisit only with a deliberate codec FFI or replacement decision. |
+| `plugins/arrow` | native-adapter | Decision: keep Arrow/Parquet integration as an optional columnar native dependency adapter. A Rust Arrow path would be a separate plugin milestone, not remaining pure-port backlog. |
+| `plugins/cpd` | native-adapter | Decision: keep the registration filter wrapper as an optional native solver adapter over the external CPD library. |
+| `plugins/draco` | native-adapter | Decision: keep Draco mesh/point-cloud codec integration as an optional native codec adapter. |
 | `plugins/e57` | native-adapter | E57 reader/writer is a major external-format adapter with bundled `libE57Format` native/vendor code. Do not port the bundled library line-by-line. |
 | `plugins/faux` | done | `kernels.fauxplugin` is a thin C++ plugin shell over the Rust C ABI kernel runner; plugin command discovery and the existing app plugin load test pass through Rust. |
-| `plugins/hdf` | native-adapter | HDF integration is an optional HDF5 native dependency adapter. Revisit only with a deliberate multidimensional-array I/O strategy. |
-| `plugins/icebridge` | native-adapter | IceBridge is a domain reader over HDF5-style inputs; keep as an optional native adapter unless a Rust HDF strategy is chosen. |
-| `plugins/matlab` | native-adapter | MATLAB reader/filter integration is an optional external-runtime adapter. |
-| `plugins/mbio` | native-adapter | MB-System bathymetry integration is an optional native dependency adapter. |
+| `plugins/hdf` | native-adapter | Decision: keep HDF integration as an optional HDF5 native dependency adapter. |
+| `plugins/icebridge` | native-adapter | Decision: keep IceBridge as an optional domain/HDF native adapter. |
+| `plugins/matlab` | native-adapter | Decision: keep MATLAB reader/filter integration as an optional external-runtime adapter. |
+| `plugins/mbio` | native-adapter | Decision: keep MB-System bathymetry integration as an optional native/domain adapter. |
 | `plugins/nitf` | done | `tools.nitfwrap` has a Nitro-backed native adapter for byte-preserving LAS/BPF wrap and unwrap workflows. `readers.nitf` and `writers.nitf` Rust stages run behind the C ABI: the reader uses `pdal_nitf_lidar_segment` plus a shifted `LasReader` (via `start_offset`) for the embedded LAS payload and exposes NITF header/TRE metadata through `pdal_nitf_read_metadata`; the writer plumbs `ftitle`/`fsclas`/`oname`/`ophone`/`idatim`/`iid2`/`aimidb`/`acftb`/security through `pdal_nitf_write`, defers LAS payload generation to `LasWriter` (writing to a temp file that gets wrapped), and supports `#` multi-view filename templating. The C++ plugin wrappers in `plugins/nitf/io/NitfReader.cpp` and `NitfWriter.cpp` are thin shims over those C ABI entries; `pdal_io_nitf_reader_test` and `pdal_io_nitf_writer_test` pass through Rust. Dead reader-side Nitro metadata helpers were removed from the plugin build; the remaining `NitfFileWriter`/TRE helper is tracked as a Nitro native adapter for writer option storage and TRE registration. |
-| `plugins/openscenegraph` | native-adapter | OpenSceneGraph scene reader wrapper over the external OSG library. Keep as an optional native adapter unless a Rust scene dependency is deliberately chosen. |
-| `plugins/pgpointcloud` | native-adapter | PostgreSQL PointCloud I/O is an optional database-backed native/service adapter. |
-| `plugins/rdb` | native-adapter | RIEGL RDB integration is an optional proprietary/native dependency adapter. |
-| `plugins/rxp` | native-adapter | RIEGL RXP integration is an optional proprietary/native dependency adapter. |
+| `plugins/openscenegraph` | native-adapter | Decision: keep OpenSceneGraph scene reading as an optional native scene adapter. |
+| `plugins/pgpointcloud` | native-adapter | Decision: keep PostgreSQL PointCloud I/O as an optional database-backed native/service adapter. |
+| `plugins/rdb` | native-adapter | Decision: keep RIEGL RDB integration as an optional proprietary/native adapter. |
+| `plugins/rxp` | native-adapter | Decision: keep RIEGL RXP integration as an optional proprietary/native adapter. |
 | `plugins/spz` | done | `readers.spz` and `writers.spz` have Rust fixture-backed implementations through `pdal-io`, and the C++ plugin classes are thin C ABI-backed reader/writer shells. Current local CMake has SPZ disabled, so C++ plugin tests are not built in this configuration; Rust SPZ tests and C++ wrapper syntax checks pass. |
-| `plugins/teaser` | native-adapter | Registration filter wrapper over external TEASER++/Eigen behavior. Keep as an optional native adapter unless a Rust TEASER implementation is deliberately chosen. |
-| `plugins/tiledb` | native-adapter | TileDB I/O is an optional array-storage native dependency adapter. |
-| `plugins/trajectory` | native-adapter | Trajectory fitting is an optional Ceres/Eigen/SuiteSparse optimization plugin. Keep as a native adapter unless a Rust trajectory solver is deliberately chosen. |
+| `plugins/teaser` | native-adapter | Decision: keep TEASER++/Eigen behavior as an optional native solver adapter. |
+| `plugins/tiledb` | native-adapter | Decision: keep TileDB I/O as an optional array-storage native dependency adapter. |
+| `plugins/trajectory` | native-adapter | Decision: keep trajectory fitting as an optional Ceres/Eigen/SuiteSparse native solver adapter. |
 
 ## Vendor Status
 

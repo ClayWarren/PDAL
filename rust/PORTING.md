@@ -3,6 +3,11 @@
 This directory is a Rust port spike behind a C ABI. The existing C++ API and
 tests remain the behavioral contract while the Rust implementation grows.
 
+For closed porting choices, read `rust/DECISIONS.md` first. It is the decision
+ledger for vendor, plugin, native-adapter, C++ compatibility, and holdout
+questions. `PORTING.md` describes how to move; `DECISIONS.md` says which
+remaining forks are already settled.
+
 ## Goal: A Behavior-Preserving Port
 
 The objective is a port to Rust that **keeps all existing functionality**. The
@@ -62,6 +67,8 @@ Off limits unless the user explicitly revises this plan:
   work without a concrete parity milestone. LAS/LAZ, the first GDAL reader
   path, simple command work, and narrow plugin checkpoints have started; new
   work in those families must stay narrow and regression-backed.
+- Do not reopen a decision in `rust/DECISIONS.md` unless a concrete parity
+  failure proves the current decision cannot preserve PDAL behavior.
 - Do not add new concrete CLI commands just because `pdal-cli` can dispatch
   them. User-visible commands must satisfy the command readiness checkpoint
   below and include installed-PDAL regression coverage.
@@ -156,6 +163,9 @@ Current active milestone:
    is reliable. Plugin-backed readers/writers may be added only one at a time
    when they reuse the existing Rust I/O/C ABI shape and come with fixture
    coverage.
+6. If work reaches a native dependency, plugin, or public C++ compatibility
+   question, check `rust/DECISIONS.md`. A listed decision is not a TODO; it is
+   the current shape unless a named parity gate fails.
 
 Every commit should say which checkpoint it advances. If the answer is "none",
 it probably should not be part of this port.

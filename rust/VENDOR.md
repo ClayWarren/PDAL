@@ -11,6 +11,10 @@ into Rust crates as a way to make progress. Treat it as one of three things:
 This file exists so agents do not have to infer the vendor plan from scattered
 includes.
 
+For the current keep/replace/FFI/defer choices, `rust/DECISIONS.md` is the
+decision ledger. This file explains the vendor boundary; the ledger closes the
+remaining decision forks.
+
 Rust native-library bindings should be centralized through `pdal-native` or an
 equally explicit adapter crate. Feature crates such as `pdal-core`,
 `pdal-filters`, and `pdal-io` should depend on PDAL-level wrappers, not raw
