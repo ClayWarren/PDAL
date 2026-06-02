@@ -6,8 +6,9 @@
 //! are also applied to individual points. Same-SRS and reprojected
 //! polygon/OGR filters, local addon metadata, remote LASzip paths covered by
 //! GDAL VSI, and C++ streaming-wrapper materialization are supported for the
-//! existing parity cases. Broad remote binary/zstandard and spatial-filter
-//! preview remain outside this module's current contract.
+//! existing parity cases. Resolution-limited preview uses the same hierarchy
+//! pruning as reads. Broad remote binary/zstandard and bounds/polygon/OGR
+//! spatial-filter preview remain outside this module's current contract.
 
 use crate::source;
 use crate::tindex::append_view;
@@ -280,10 +281,17 @@ pub struct EptPreview {
     pub dim_names: Vec<String>,
 }
 
+pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
+    read_ept_preview_with_options(filename, "")
+}
+
 /// Read EPT preview metadata from the `ept.json` at `filename`. Mirrors the
 /// dim-name expansion in `EptInfo::initialize` so laszip and `ClassFlags`
 /// datasets include the Withheld/KeyPoint/Synthetic/Overlap flags.
-pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
+pub fn read_ept_preview_with_options(
+    filename: &str,
+    resolution: &str,
+) -> Result<EptPreview, StageError> {
     if filename.is_empty() {
         return Err(StageError(
             "EptReader requires a filename option.".to_string(),
@@ -293,9 +301,7 @@ pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
     let info = read_json(path)?;
 
     let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
-    let point_count = info["points"]
-        .as_u64()
-        .ok_or_else(|| StageError(format!("EPT file '{}' is missing points.", path.display())))?;
+    let point_count = preview_point_count(filename, &info, resolution)?;
     let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
 
     let data_type = info["dataType"].as_str().ok_or_else(|| {
@@ -338,6 +344,29 @@ pub fn read_ept_preview(filename: &str) -> Result<EptPreview, StageError> {
         srs_wkt,
         dim_names,
     })
+}
+
+fn preview_point_count(filename: &str, info: &Value, resolution: &str) -> Result<u64, StageError> {
+    if resolution.trim().is_empty() {
+        return info["points"].as_u64().ok_or_else(|| {
+            StageError(format!(
+                "EPT file '{}' is missing points.",
+                Path::new(filename).display()
+            ))
+        });
+    }
+
+    let mut options = Options::new();
+    options.add("filename", filename);
+    options.add("resolution", resolution);
+    let reader = EptReader::new(&options);
+    let Some(max_depth) = reader.resolution_filter(info)? else {
+        return Ok(0);
+    };
+    let root = location_parent(filename);
+    let root_bounds = ept_bounds(info)?;
+    let (tiles, _) = hierarchy_tiles(&root, Some(max_depth), None, root_bounds)?;
+    Ok(tiles.iter().map(|tile| tile.expected_points).sum())
 }
 
 /// Build the SRS WKT/user-input string from an EPT info `srs` object, matching

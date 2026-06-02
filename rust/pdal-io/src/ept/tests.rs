@@ -300,6 +300,16 @@ fn preview_returns_bounds_conforming_and_expanded_flags_for_laszip() {
 }
 
 #[test]
+fn preview_applies_resolution_limit_to_hierarchy_count() {
+    let path = data_path("ept/lone-star-laszip/ept.json")
+        .to_string_lossy()
+        .into_owned();
+    let preview = read_ept_preview_with_options(&path, "0.1").unwrap();
+
+    assert_eq!(preview.point_count, 479269);
+}
+
+#[test]
 fn preview_for_binary_does_not_inject_class_flags() {
     let path = data_path("ept/ellipsoid-binary/ept.json")
         .to_string_lossy()

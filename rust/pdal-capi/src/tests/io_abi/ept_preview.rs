@@ -58,6 +58,20 @@ fn ept_preview_returns_bounds_count_srs_and_dim_names() {
 }
 
 #[test]
+fn ept_preview_options_apply_resolution_limit() {
+    unsafe {
+        let path = data_path("ept/lone-star-laszip/ept.json");
+        let path_c = cstring(&path);
+        let resolution = cstring("0.1");
+        let handle =
+            pdal_ept_reader_preview_create_with_options(path_c.as_ptr(), resolution.as_ptr());
+        assert!(!handle.is_null());
+        assert_eq!(pdal_ept_reader_preview_point_count(handle), 479269);
+        pdal_ept_reader_preview_destroy(handle);
+    }
+}
+
+#[test]
 fn ept_preview_rejects_null_and_missing_files() {
     unsafe {
         assert!(pdal_ept_reader_preview_create(std::ptr::null()).is_null());

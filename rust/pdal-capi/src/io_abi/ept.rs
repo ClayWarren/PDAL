@@ -232,6 +232,19 @@ pub struct EptReaderPreviewHandle {
 pub unsafe extern "C" fn pdal_ept_reader_preview_create(
     filename: *const c_char,
 ) -> *mut EptReaderPreviewHandle {
+    pdal_ept_reader_preview_create_with_options(filename, std::ptr::null())
+}
+
+/// Read EPT preview metadata with supported preview-only options.
+///
+/// # Safety
+/// `filename` must be a valid NUL-terminated C string pointer. `resolution`
+/// may be null or a valid NUL-terminated C string pointer.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_options(
+    filename: *const c_char,
+    resolution: *const c_char,
+) -> *mut EptReaderPreviewHandle {
     if filename.is_null() {
         set_last_error("null filename");
         return std::ptr::null_mut();
@@ -240,7 +253,18 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create(
         set_last_error("non-UTF8 filename");
         return std::ptr::null_mut();
     };
-    match pdal_io::ept::read_ept_preview(filename) {
+    let resolution = if resolution.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(resolution).to_str() {
+            Ok(resolution) => resolution,
+            Err(_) => {
+                set_last_error("non-UTF8 resolution");
+                return std::ptr::null_mut();
+            }
+        }
+    };
+    match pdal_io::ept::read_ept_preview_with_options(filename, resolution) {
         Ok(preview) => {
             clear_last_error();
             Box::into_raw(Box::new(EptReaderPreviewHandle { preview }))

@@ -634,8 +634,18 @@ QuickInfo EptReader::inspect()
     // sole source of truth for boundsConforming/points/dim-name expansion.
     if (!m_p->hasSpatialFilter() && !Utils::isRemote(m_filename))
     {
+        std::string resolution;
+        if (m_args->m_resolution > 0)
+        {
+            std::ostringstream out;
+            out.precision(17);
+            out << m_args->m_resolution;
+            resolution = out.str();
+        }
         pdal_ept_reader_preview_t* preview =
-            pdal_ept_reader_preview_create(m_filename.c_str());
+            pdal_ept_reader_preview_create_with_options(
+                m_filename.c_str(),
+                resolution.empty() ? nullptr : resolution.c_str());
         if (preview)
         {
             double minx, miny, minz, maxx, maxy, maxz;
