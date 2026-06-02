@@ -71,6 +71,8 @@ impl StacReader {
         };
         let item_filters = compile_regexes(&self.items, "items")?;
         let catalog_filters = compile_regexes(&self.catalogs, "catalogs")?;
+        let collection_filters = compile_regexes(&self.collections, "collections")?;
+        let property_filters = parse_property_filters(&self.properties)?;
         let date_ranges = parse_date_ranges(&self.date_ranges)?;
         let bounds = if self.ogr.trim().is_empty() {
             parse_bounds(&self.bounds)?
@@ -81,6 +83,8 @@ impl StacReader {
             asset_names: &self.asset_names,
             item_filters: &item_filters,
             catalog_filters: &catalog_filters,
+            collection_filters: &collection_filters,
+            property_filters: &property_filters,
             date_ranges: &date_ranges,
             bounds: bounds.as_ref(),
             validate_schema: self.validate_schema,
@@ -92,6 +96,8 @@ impl StacReader {
         if preview.item_ids.is_empty()
             && (!item_filters.is_empty()
                 || !catalog_filters.is_empty()
+                || !collection_filters.is_empty()
+                || !property_filters.is_empty()
                 || !date_ranges.is_empty()
                 || bounds.is_some())
         {
@@ -349,6 +355,8 @@ struct StacPreviewContext<'a> {
     asset_names: &'a [String],
     item_filters: &'a [Regex],
     catalog_filters: &'a [Regex],
+    collection_filters: &'a [Regex],
+    property_filters: &'a [PropertyFilter],
     date_ranges: &'a [DateRange],
     bounds: Option<&'a Bounds2D>,
     validate_schema: bool,
@@ -373,14 +381,7 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
     }
     match json["type"].as_str() {
         Some("Feature") => {
-            collect_item_preview(
-                &json,
-                context.asset_names,
-                context.item_filters,
-                context.date_ranges,
-                context.bounds,
-                context.preview,
-            );
+            collect_item_preview(&json, context)?;
             Ok(())
         }
         Some("Catalog") | Some("Collection") | Some("FeatureCollection") => {
@@ -399,14 +400,7 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
             }
             if let Some(features) = json["features"].as_array() {
                 for feature in features {
-                    collect_item_preview(
-                        feature,
-                        context.asset_names,
-                        context.item_filters,
-                        context.date_ranges,
-                        context.bounds,
-                        context.preview,
-                    );
+                    collect_item_preview(feature, context)?;
                 }
             }
             if let Some(links) = json["links"].as_array() {
@@ -442,33 +436,38 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
 
 fn collect_item_preview(
     item: &Value,
-    asset_names: &[String],
-    item_filters: &[Regex],
-    date_ranges: &[DateRange],
-    bounds: Option<&Bounds2D>,
-    preview: &mut StacPreview,
-) {
-    if !item_has_requested_asset(item, asset_names) {
-        return;
+    context: &mut StacPreviewContext<'_>,
+) -> Result<(), StageError> {
+    if !item_has_requested_asset(item, context.asset_names) {
+        return Ok(());
     }
     let Some(id) = item["id"].as_str() else {
-        return;
+        return Ok(());
     };
-    if !item_filters.is_empty() && !item_filters.iter().any(|regex| regex.is_match(id)) {
-        return;
+    if !context.item_filters.is_empty()
+        && !context.item_filters.iter().any(|regex| regex.is_match(id))
+    {
+        return Ok(());
     }
-    if !date_ranges.is_empty() && !item_matches_dates(item, date_ranges) {
-        return;
+    if !context.date_ranges.is_empty() && !item_matches_dates(item, context.date_ranges) {
+        return Ok(());
     }
-    if let Some(bounds) = bounds {
+    if let Some(bounds) = context.bounds {
         if !item_matches_bounds(item, bounds) {
-            return;
+            return Ok(());
         }
     }
-    preview.item_ids.push(id.to_string());
-    if let Some(count) = item["properties"]["pc:count"].as_u64() {
-        preview.point_count += count;
+    if !collection_matches(item, context.collection_filters) {
+        return Ok(());
     }
+    if !item_matches_property_filters(item, context.property_filters)? {
+        return Ok(());
+    }
+    context.preview.item_ids.push(id.to_string());
+    if let Some(count) = item["properties"]["pc:count"].as_u64() {
+        context.preview.point_count += count;
+    }
+    Ok(())
 }
 
 mod filters;

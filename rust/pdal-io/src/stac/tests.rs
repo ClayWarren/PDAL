@@ -158,6 +158,99 @@ fn collection_filter_rejects_invalid_regex() {
 }
 
 #[test]
+fn preview_applies_collection_and_property_filters_like_read() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "accepted",
+      "collection": "collection-a",
+      "properties": {"quality": "good", "pc:count": 7},
+      "assets": {"data": {"href": "accepted.las"}}
+    },
+    {
+      "type": "Feature",
+      "id": "wrong-collection",
+      "collection": "collection-b",
+      "properties": {"quality": "good", "pc:count": 11},
+      "assets": {"data": {"href": "wrong-collection.las"}}
+    },
+    {
+      "type": "Feature",
+      "id": "wrong-property",
+      "collection": "collection-a",
+      "properties": {"quality": "bad", "pc:count": 13},
+      "assets": {"data": {"href": "wrong-property.las"}}
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("collections", "collection-a");
+    options.add("properties", r#"{"quality":"good"}"#);
+    let reader = StacReader::new(&options);
+
+    let preview = reader.preview().unwrap();
+    assert_eq!(preview.item_ids, vec!["accepted"]);
+    assert_eq!(preview.point_count, 7);
+}
+
+#[test]
+fn preview_reports_empty_after_collection_or_property_filtering() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{
+  "type": "Feature",
+  "id": "item",
+  "collection": "collection-a",
+  "properties": {"quality": "good", "pc:count": 5},
+  "assets": {"data": {"href": "item.las"}}
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("collections", "no-match");
+    let reader = StacReader::new(&options);
+    let err = reader.preview().err().unwrap();
+    assert!(err.0.contains("Reader list is empty after filtering"));
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("properties", r#"{"quality":"bad"}"#);
+    let reader = StacReader::new(&options);
+    let err = reader.preview().err().unwrap();
+    assert!(err.0.contains("Reader list is empty after filtering"));
+}
+
+#[test]
+fn preview_validates_property_filter_input() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{"type":"Feature","id":"item","properties":{},"assets":{"data":{"href":"item.las"}}}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("properties", "not-json");
+    let reader = StacReader::new(&options);
+
+    let err = reader.preview().err().unwrap();
+    assert!(err.0.contains("Properties argument must be valid JSON"));
+}
+
+#[test]
 fn reader_errors_without_filename() {
     let mut reader = StacReader::new(&Options::new());
     let err = reader.read().err().expect("missing filename");
