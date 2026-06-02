@@ -411,6 +411,207 @@ mod tests {
     use pdal_core::srs::SpatialReference;
     use std::rc::Rc;
 
+    fn sample_view() -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::U16);
+        layout.register(DimId::ReturnNumber, DimType::U8);
+        let mut view = PointView::new(Rc::new(layout));
+        for (source, x, y, z, intensity, return_number) in [
+            (10, 1.0, 4.0, 7.0, 100.0, 1.0),
+            (11, 2.0, 5.0, 8.0, 200.0, 1.0),
+            (12, 3.0, 6.0, 9.0, 200.0, 2.0),
+        ] {
+            let point = view.add_point();
+            view.set_source_index(point, source);
+            view.set_f64(point, &DimId::X, x);
+            view.set_f64(point, &DimId::Y, y);
+            view.set_f64(point, &DimId::Z, z);
+            view.set_f64(point, &DimId::Intensity, intensity);
+            view.set_f64(point, &DimId::ReturnNumber, return_number);
+        }
+        view
+    }
+
+    #[test]
+    fn point_report_returns_single_point_or_null() {
+        let view = sample_view();
+        let report = point_report(&[view], &[11]);
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert_eq!(json["points"]["point"]["PointId"], 11.0);
+        assert_eq!(json["points"]["point"]["X"], 2.0);
+        assert_eq!(json["reader"], "readers.las");
+
+        let missing = point_report(&[], &[7]);
+        let json: serde_json::Value = serde_json::from_str(&missing).unwrap();
+        assert!(json["points"]["point"].is_null());
+    }
+
+    #[test]
+    fn point_report_lists_only_found_points() {
+        let view = sample_view();
+        let report = point_report(&[view], &[12, 99, 10]);
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+        let points = json["points"]["point"].as_array().unwrap();
+
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0]["PointId"], 12.0);
+        assert_eq!(points[1]["PointId"], 10.0);
+    }
+
+    #[test]
+    fn query_report_uses_xy_and_optional_z_distance() {
+        let view = sample_view();
+        let report = query_report(
+            &[view],
+            QueryRequest {
+                x: 2.0,
+                y: 5.0,
+                z: Some(8.4),
+                count: 2,
+            },
+        );
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+        let points = json["points"]["point"].as_array().unwrap();
+
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0]["PointId"], 11.0);
+        assert_eq!(points[1]["PointId"], 12.0);
+    }
+
+    #[test]
+    fn query_report_skips_views_without_xy() {
+        let layout = Rc::new(PointLayout::new());
+        let mut view = PointView::new(layout);
+        view.add_point();
+        let report = query_report(
+            &[view],
+            QueryRequest {
+                x: 0.0,
+                y: 0.0,
+                z: None,
+                count: 3,
+            },
+        );
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert!(json["points"]["point"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn schema_report_lists_registered_dimensions() {
+        let view = sample_view();
+        let report = schema_report(&[view]);
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+        let dims = json["schema"]["dimensions"].as_array().unwrap();
+
+        assert_eq!(dims[0]["name"], "X");
+        assert_eq!(dims[0]["type"], "floating");
+        assert_eq!(dims[3]["name"], "Intensity");
+        assert_eq!(dims[3]["type"], "unsigned");
+    }
+
+    #[test]
+    fn stats_report_filters_enumerates_and_breaks_out_dimensions() {
+        let view = sample_view();
+        let report = stats_report(
+            &[view],
+            Some(&[DimId::Intensity, DimId::Other("Missing".into())]),
+            Some(&[DimId::Intensity]),
+            Some(&DimId::Classification),
+        );
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+        let stats = json["stats"]["statistic"].as_array().unwrap();
+
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0]["name"], "Intensity");
+        assert_eq!(stats[0]["count"], 3);
+        assert_eq!(stats[0]["minimum"], 100.0);
+        assert_eq!(stats[0]["maximum"], 200.0);
+        assert_eq!(stats[0]["values"].as_array().unwrap().len(), 2);
+        assert_eq!(json["stats"]["breakout"]["dimension"], "Classification");
+        assert_eq!(
+            json["stats"]["breakout"]["statistic"][0]["expression"],
+            "(Withheld==1)"
+        );
+    }
+
+    #[test]
+    fn empty_schema_and_stats_reports_are_valid_json() {
+        let schema = schema_report(&[]);
+        let schema_json: serde_json::Value = serde_json::from_str(&schema).unwrap();
+        assert!(schema_json["schema"]["dimensions"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+
+        let stats = stats_report(&[], None, None, None);
+        let stats_json: serde_json::Value = serde_json::from_str(&stats).unwrap();
+        assert!(stats_json["stats"]["statistic"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn schema_report_names_signed_dimensions() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::ScanAngleRank, DimType::I8);
+        let view = PointView::new(Rc::new(layout));
+        let report = schema_report(&[view]);
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert_eq!(json["schema"]["dimensions"][0]["type"], "signed");
+    }
+
+    #[test]
+    fn single_value_stats_have_zero_sample_variance() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::Z, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        let point = view.add_point();
+        view.set_f64(point, &DimId::Z, 12.25);
+
+        let report = stats_report(&[view], Some(&[DimId::Z]), None, None);
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+        let stat = &json["stats"]["statistic"][0];
+
+        assert_eq!(stat["average"], 12.25);
+        assert_eq!(stat["variance"], 0.0);
+        assert_eq!(stat["stddev"], 0.0);
+    }
+
+    #[test]
+    fn stac_report_errors_without_spatial_reference() {
+        let layout = Rc::new(PointLayout::new());
+        let mut view = PointView::new(layout);
+        view.add_point();
+        let report = stac_report(&[view], &MetadataNode::new("root"), "sample", "lidar");
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert_eq!(json["stac"]["status"], "error");
+    }
+
+    #[test]
+    fn stac_report_defaults_datetime_and_unknown_extension() {
+        let layout = Rc::new(PointLayout::new());
+        let mut view = PointView::new(layout);
+        view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
+        view.add_point();
+
+        let report = stac_report(&[view], &MetadataNode::new("root"), "sample", "lidar");
+        let json: serde_json::Value = serde_json::from_str(&report).unwrap();
+
+        assert_eq!(
+            json["stac"]["properties"]["datetime"],
+            "1970-01-01T00:00:00Z"
+        );
+        assert_eq!(json["stac"]["properties"]["pc:encoding"], "?");
+    }
+
     #[test]
     fn stac_report_uses_requested_pointcloud_type() {
         let layout = Rc::new(PointLayout::new());

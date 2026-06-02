@@ -407,4 +407,99 @@ mod tests {
             _ => panic!("expected query mode"),
         }
     }
+
+    #[test]
+    fn named_modes_and_driver_options_parse() {
+        for (flag, expected_boundary) in [
+            ("--schema", false),
+            ("--metadata", false),
+            ("--all", true),
+            ("--boundary", true),
+            ("--stac", false),
+        ] {
+            match build_info_plan(&strings(&[
+                flag,
+                "--driver=readers.ply",
+                "--pc_type",
+                "mesh",
+                "--pipeline-serialization=pipe.json",
+                "--input",
+                "mesh.ply",
+            ])) {
+                InfoKernelPlan::Run(InfoRunPlan::File {
+                    filename,
+                    driver,
+                    mode,
+                    pc_type,
+                    serialization_file,
+                }) => {
+                    assert_eq!(filename, "mesh.ply");
+                    assert_eq!(driver, "readers.ply");
+                    assert_eq!(mode.needs_boundary(), expected_boundary);
+                    assert_eq!(pc_type, "mesh");
+                    assert_eq!(serialization_file.as_deref(), Some("pipe.json"));
+                }
+                _ => panic!("expected file plan for {flag}"),
+            }
+        }
+    }
+
+    #[test]
+    fn short_options_and_two_dimensional_query_parse() {
+        match build_info_plan(&strings(&[
+            "-p",
+            "2",
+            "--driver",
+            "readers.las",
+            "-i",
+            "in.las",
+        ])) {
+            InfoKernelPlan::Run(InfoRunPlan::File {
+                mode: InfoMode::Points(ids),
+                driver,
+                ..
+            }) => {
+                assert_eq!(ids, vec![2]);
+                assert_eq!(driver, "readers.las");
+            }
+            _ => panic!("expected point mode"),
+        }
+
+        match build_info_plan(&strings(&["--query", "1,2/3", "in.las"])) {
+            InfoKernelPlan::Run(InfoRunPlan::File {
+                mode: InfoMode::Query(query),
+                ..
+            }) => {
+                assert_eq!(query.x, 1.0);
+                assert_eq!(query.y, 2.0);
+                assert_eq!(query.z, None);
+                assert_eq!(query.count, 3);
+            }
+            _ => panic!("expected query mode"),
+        }
+    }
+
+    #[test]
+    fn info_rejects_invalid_inputs_and_values() {
+        for args in [
+            vec!["--point=3-1", "in.las"],
+            vec!["--point=bad", "in.las"],
+            vec!["--query=1/2", "in.las"],
+            vec!["--query=1,2,3,4/5", "in.las"],
+            vec!["--query=1,2/bad", "in.las"],
+            vec!["--input"],
+            vec!["--driver"],
+            vec!["--stdin", "in.las"],
+            vec!["--input", "a.las", "--input", "b.las"],
+            vec!["a.las", "b.las"],
+            vec!["in.unknown"],
+            vec!["--unknown", "in.las"],
+        ] {
+            let args = strings(&args);
+            assert!(
+                matches!(build_info_plan(&args), InfoKernelPlan::Return(_)),
+                "{args:?}"
+            );
+        }
+    }
 }

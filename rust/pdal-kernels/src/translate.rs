@@ -397,6 +397,13 @@ mod tests {
         }
     }
 
+    fn scratch_file(name: &str, text: &str) -> String {
+        let path =
+            std::env::temp_dir().join(format!("pdal-translate-{name}-{}", std::process::id()));
+        std::fs::write(&path, text).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
     #[test]
     fn builds_basic_translate_plan() {
         let plan = plan(&["in.las", "out.las", "sort"]);
@@ -406,11 +413,181 @@ mod tests {
     }
 
     #[test]
+    fn builds_translate_plan_with_named_options() {
+        let plan = plan(&[
+            "--input",
+            "in.las",
+            "--output",
+            "out.copc.laz",
+            "--reader",
+            "readers.las",
+            "--writer",
+            "writers.copc",
+            "--filter",
+            "filters.range",
+            "--metadata",
+            "metadata.json",
+            "--pipeline",
+            "pipeline.json",
+            "--nostream",
+            "--filters.range.limits=Classification[2:2]",
+        ]);
+
+        assert_eq!(plan.stages[0]["type"], "readers.las");
+        assert_eq!(plan.stages[1]["type"], "filters.range");
+        assert_eq!(
+            plan.stages[1]["limits"],
+            serde_json::Value::String("Classification[2:2]".to_string())
+        );
+        assert_eq!(plan.stages[2]["type"], "writers.copc");
+        assert_eq!(plan.metadata_file.as_deref(), Some("metadata.json"));
+        assert_eq!(plan.serialization_file.as_deref(), Some("pipeline.json"));
+        assert!(!plan.stream_allowed);
+        assert!(!plan.stream_required);
+    }
+
+    #[test]
+    fn stream_option_requires_streaming() {
+        let plan = plan(&["in.las", "out.las", "--stream"]);
+        assert!(plan.stream_allowed);
+        assert!(plan.stream_required);
+    }
+
+    #[test]
     fn rejects_same_input_output_without_overwrite() {
         let args = vec!["same.las".to_string(), "same.las".to_string()];
         assert!(matches!(
             build_translate_plan(&args),
             TranslateKernelPlan::Return(1)
         ));
+    }
+
+    #[test]
+    fn rejects_missing_unknown_and_conflicting_options() {
+        for args in [
+            vec!["--input"],
+            vec!["in.las"],
+            vec!["in.las", "out.las", "--stream", "--nostream"],
+            vec!["in.las", "out.las", "--json", "[]", "range"],
+            vec!["in.unknown", "out.las"],
+            vec!["in.las", "out.unknown"],
+            vec!["in.las", "out.las", "--not-a-stage-option"],
+        ] {
+            let args = strings(&args);
+            assert!(
+                matches!(build_translate_plan(&args), TranslateKernelPlan::Return(_)),
+                "{args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn allows_overwrite_for_equal_input_and_output() {
+        let plan = plan(&["same.las", "same.las", "--overwrite"]);
+        assert_eq!(plan.stages[0]["filename"], "same.las");
+        assert_eq!(plan.stages[1]["filename"], "same.las");
+    }
+
+    #[test]
+    fn translate_json_replaces_existing_reader_and_writer() {
+        let json = r#"[
+            {"type":"readers.ept","filename":"old.ept","tag":"reader"},
+            {"type":"filters.decimation","step":2},
+            {"type":"writers.bpf","filename":"old.bpf","tag":"writer"}
+        ]"#;
+        let stages =
+            translate_json_stages(json, "in.las", "out.laz", "readers.las", "writers.las").unwrap();
+
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[0]["filename"], "in.las");
+        assert_eq!(stages[0]["tag"], "reader");
+        assert_eq!(stages[1]["type"], "filters.decimation");
+        assert_eq!(stages[2]["type"], "writers.las");
+        assert_eq!(stages[2]["filename"], "out.laz");
+        assert_eq!(stages[2]["tag"], "writer");
+    }
+
+    #[test]
+    fn translate_json_accepts_pipeline_object_and_inserts_missing_io() {
+        let json = r#"{"pipeline":[{"type":"filters.sort","dimension":"X"}]}"#;
+        let stages =
+            translate_json_stages(json, "in.las", "out.las", "readers.las", "writers.las").unwrap();
+
+        assert_eq!(stages.len(), 3);
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[1]["type"], "filters.sort");
+        assert_eq!(stages[2]["type"], "writers.las");
+    }
+
+    #[test]
+    fn translate_json_replaces_filename_only_endpoint_stages() {
+        let json = r#"["old.las", {"type":"filters.head"}, {"filename":"old.bpf"}]"#;
+        let stages =
+            translate_json_stages(json, "in.laz", "out.bpf", "readers.las", "writers.bpf").unwrap();
+
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[0]["filename"], "in.laz");
+        assert_eq!(stages[2]["type"], "writers.bpf");
+        assert_eq!(stages[2]["filename"], "out.bpf");
+    }
+
+    #[test]
+    fn translate_json_reports_invalid_pipeline_json() {
+        for json in ["not-json", r#"{"pipeline":{}}"#] {
+            assert!(
+                translate_json_stages(json, "in.las", "out.las", "readers.las", "writers.las")
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn option_files_parse_text_and_json_forms() {
+        let text = parse_option_file("filters.range", "--limits=Classification[2:2]").unwrap();
+        assert_eq!(text[0].stage, "filters.range");
+        assert_eq!(text[0].key, "limits");
+        assert_eq!(text[0].value, "Classification[2:2]");
+
+        let json = parse_option_file("filters.range", r#"{"limits":"Z[0:10]","ignored":false}"#);
+        assert!(json.is_err());
+
+        let json = parse_option_file("filters.range", r#"{"limits":true}"#).unwrap();
+        assert_eq!(json[0].value, "true");
+    }
+
+    #[test]
+    fn expands_option_file_arguments() {
+        let path = scratch_file("option-file", "--limits=Classification[2:2]");
+        let options = vec![CliStageOption {
+            stage: "filters.range".to_string(),
+            key: "option_file".to_string(),
+            value: path,
+        }];
+
+        let expanded = expand_translate_option_files(options).unwrap();
+        assert_eq!(expanded.len(), 1);
+        assert_eq!(expanded[0].key, "limits");
+    }
+
+    #[test]
+    fn option_files_reject_bad_content_and_missing_files() {
+        let bad = scratch_file("bad-option-file", "--limits");
+        let options = vec![CliStageOption {
+            stage: "filters.range".to_string(),
+            key: "option_file".to_string(),
+            value: bad,
+        }];
+        assert!(expand_translate_option_files(options).is_err());
+
+        let missing = vec![CliStageOption {
+            stage: "filters.range".to_string(),
+            key: "option_file".to_string(),
+            value: "/definitely/missing/pdal-option-file".to_string(),
+        }];
+        assert!(expand_translate_option_files(missing).is_err());
+    }
+
+    fn strings(args: &[&str]) -> Vec<String> {
+        args.iter().map(|arg| arg.to_string()).collect()
     }
 }
