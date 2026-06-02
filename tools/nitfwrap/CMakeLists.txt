@@ -6,14 +6,12 @@ add_executable(nitfwrap
 )
 pdal_target_compile_settings(nitfwrap)
 target_link_libraries(nitfwrap PRIVATE
-    ${RUST_CAPI_LIB}
     ${PDAL_LIB_NAME}
     GDAL::GDAL
     PROJ::proj
-    ${GEOS_C_LIBRARY}
-    ${NITRO_LIBRARIES}
-    ${COREFOUNDATION_FRAMEWORK}
 )
+# Rust C ABI archive + the native libraries it embeds (see cmake/rust.cmake).
+pdal_link_rust_capi(nitfwrap)
 
 target_include_directories(nitfwrap PRIVATE
     ${RUST_CAPI_HEADER_DIR}

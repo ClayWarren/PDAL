@@ -10,14 +10,12 @@ add_executable(lasdump
 )
 
 target_link_libraries(lasdump PRIVATE
-    ${RUST_CAPI_LIB}
     ${PDAL_LIB_NAME}
     GDAL::GDAL
     PROJ::proj
-    ${GEOS_C_LIBRARY}
-    ${NITRO_LIBRARIES}
-    ${COREFOUNDATION_FRAMEWORK}
 )
+# Rust C ABI archive + the native libraries it embeds (see cmake/rust.cmake).
+pdal_link_rust_capi(lasdump)
 
 if (LIBLZMA_FOUND)
     target_link_libraries(lasdump PRIVATE LibLZMA::LibLZMA)

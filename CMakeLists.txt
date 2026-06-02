@@ -304,8 +304,6 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${PDAL_LAZPERF_LIB_NAME}
         ${UTFCPP_LIB_NAME}
         ${BACKTRACE_LIBRARIES}
-        ${GEOS_C_LIBRARY}
-        ${COREFOUNDATION_FRAMEWORK}
        "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:-lstdc++fs>"
     PUBLIC
         ${WINSOCK_LIBRARY}
@@ -314,21 +312,11 @@ target_link_libraries(${PDAL_LIB_NAME}
         ${WINSOCK_LIBRARY}
 )
 
-target_link_libraries(${PDAL_LIB_NAME}
-    PRIVATE
-        ${RUST_CAPI_LIB}
-)
-
-# The Rust C ABI archive embeds the Nitro NITF bridge (nitf_bridge.o) which
-# references symbols from nitf-c and nitf-cpp. Link those native libraries
-# into pdalcpp so the static archive's references resolve regardless of
-# whether the NITF plugin itself is built.
-if (NITRO_FOUND AND NITRO_LIBRARIES)
-    target_link_libraries(${PDAL_LIB_NAME}
-        PRIVATE
-            ${NITRO_LIBRARIES}
-    )
-endif()
+# Link the Rust C ABI archive plus the native libraries it embeds (GEOS, the
+# Nitro NITF bridge, CoreFoundation on Apple). The Nitro symbols come from the
+# archive's nitf_bridge.o and must resolve regardless of whether the NITF
+# plugin itself is built. See pdal_link_rust_capi in cmake/rust.cmake.
+pdal_link_rust_capi(${PDAL_LIB_NAME})
 
 if (ZSTD_FOUND)
     target_link_libraries(${PDAL_LIB_NAME}

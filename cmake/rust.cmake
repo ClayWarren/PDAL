@@ -69,3 +69,26 @@ if (WIN32)
 else()
     add_definitions("-D__POSIX")
 endif()
+
+# Link a target against the Rust C ABI archive and the native libraries that
+# archive embeds: GEOS (via the `geos` crate), the Nitro NITF bridge, and
+# CoreFoundation on Apple. Use this for every target that links
+# libpdal_capi.a directly -- the main pdalcpp library and the standalone
+# Rust-backed tools (lasdump, nitfwrap) -- so the Nitro/GEOS link details live
+# here instead of being repeated at each call site. The archive is listed
+# first so its references resolve against the native libraries that follow.
+# Call after the target exists.
+macro(pdal_link_rust_capi _target)
+    target_link_libraries(${_target}
+        PRIVATE
+            ${RUST_CAPI_LIB}
+            ${GEOS_C_LIBRARY}
+            ${COREFOUNDATION_FRAMEWORK}
+    )
+    if (NITRO_FOUND AND NITRO_LIBRARIES)
+        target_link_libraries(${_target}
+            PRIVATE
+                ${NITRO_LIBRARIES}
+        )
+    endif()
+endmacro()
