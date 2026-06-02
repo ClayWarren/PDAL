@@ -20,6 +20,20 @@ Status definitions:
   used as a migration base yet.
 - `deferred`: intentionally left for a later milestone or left in C++ for now.
 
+Promotion to `done` is intentionally strict. A row is done only when there is
+no known remaining work for that row's stated scope: C++ behavior is preserved
+through the Rust C ABI and compatibility wrapper where applicable, pre-existing
+C++ tests for that area pass through the Rust-backed path, Rust tests and
+installed-PDAL parity/regression coverage exist for externally visible
+behavior, and any remaining C++ is only documented glue, public API
+compatibility, or an intentional native/vendor adapter. If the notes still name
+an unsupported option, parity gap, packaging uncertainty, missing test path, or
+"broader X remains open" caveat, the row is not done.
+
+`native-adapter` is a terminal status when a plugin or dependency is
+intentionally kept behind a C/C++/vendor boundary. It is not hidden pure-port
+backlog unless a later milestone explicitly reopens that adapter.
+
 ## Feature Status
 
 | Feature | Status | Notes |
