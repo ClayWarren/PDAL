@@ -33,6 +33,229 @@ fn every_listed_filter_driver_constructs() {
 }
 
 #[test]
+fn registry_filters_declare_output_dimensions() {
+    let mut assign_options = Options::new();
+    assign_options.add("value", "NewDim = Z + 1");
+
+    let mut covariance_options = Options::new();
+    covariance_options.add("feature_set", "all");
+
+    let mut colorization_options = Options::new();
+    colorization_options.add("raster", "dummy.tif");
+    colorization_options.add("dimensions", "Red:1:1.0,Green:2:1.0,Blue:3:1.0");
+
+    let mut geom_options = Options::new();
+    geom_options.add("geometry", "POINT (0 0)");
+    geom_options.add("dimension", "DistanceToOrigin");
+
+    let cases: Vec<(&str, Options, Vec<(DimId, DimType)>)> = vec![
+        (
+            "filters.approximatecoplanar",
+            Options::new(),
+            vec![(DimId::Coplanar, DimType::F64)],
+        ),
+        (
+            "filters.assign",
+            assign_options,
+            vec![(DimId::from_name("NewDim"), DimType::F64)],
+        ),
+        (
+            "filters.cluster",
+            Options::new(),
+            vec![(DimId::ClusterID, DimType::F64)],
+        ),
+        (
+            "filters.colorinterp",
+            Options::new(),
+            vec![
+                (DimId::Red, DimType::U16),
+                (DimId::Green, DimType::U16),
+                (DimId::Blue, DimType::U16),
+            ],
+        ),
+        (
+            "filters.colorization",
+            colorization_options,
+            vec![
+                (DimId::Red, DimType::F64),
+                (DimId::Green, DimType::F64),
+                (DimId::Blue, DimType::F64),
+            ],
+        ),
+        (
+            "filters.covariancefeatures",
+            covariance_options,
+            vec![
+                (DimId::from_name("Linearity"), DimType::F64),
+                (DimId::from_name("Density"), DimType::F64),
+            ],
+        ),
+        (
+            "filters.csf",
+            Options::new(),
+            vec![(DimId::Classification, DimType::U8)],
+        ),
+        (
+            "filters.dbscan",
+            Options::new(),
+            vec![(DimId::ClusterID, DimType::F64)],
+        ),
+        (
+            "filters.eigenvalues",
+            Options::new(),
+            vec![
+                (DimId::Eigenvalue0, DimType::F64),
+                (DimId::Eigenvalue1, DimType::F64),
+                (DimId::Eigenvalue2, DimType::F64),
+            ],
+        ),
+        (
+            "filters.elm",
+            Options::new(),
+            vec![(DimId::Classification, DimType::F64)],
+        ),
+        (
+            "filters.geomdistance",
+            geom_options,
+            vec![(DimId::from_name("DistanceToOrigin"), DimType::F64)],
+        ),
+        (
+            "filters.h3",
+            default_filter_options("filters.h3"),
+            vec![(DimId::H3, DimType::U64)],
+        ),
+        (
+            "filters.hag_delaunay",
+            Options::new(),
+            vec![(DimId::HeightAboveGround, DimType::F64)],
+        ),
+        (
+            "filters.hag_dem",
+            default_filter_options("filters.hag_dem"),
+            vec![(DimId::HeightAboveGround, DimType::F64)],
+        ),
+        (
+            "filters.hag_nn",
+            Options::new(),
+            vec![(DimId::HeightAboveGround, DimType::F64)],
+        ),
+        (
+            "filters.label_duplicates",
+            Options::new(),
+            vec![(DimId::from_name("Duplicate"), DimType::F64)],
+        ),
+        (
+            "filters.litree",
+            Options::new(),
+            vec![(DimId::ClusterID, DimType::F64)],
+        ),
+        (
+            "filters.lloydkmeans",
+            Options::new(),
+            vec![(DimId::ClusterID, DimType::F64)],
+        ),
+        (
+            "filters.lof",
+            Options::new(),
+            vec![
+                (DimId::NNDistance, DimType::F64),
+                (DimId::LocalReachabilityDistance, DimType::F64),
+                (DimId::LocalOutlierFactor, DimType::F64),
+            ],
+        ),
+        (
+            "filters.m3c2",
+            Options::new(),
+            vec![
+                (DimId::from_name("m3c2_distance"), DimType::F64),
+                (DimId::from_name("m3c2_significant"), DimType::U8),
+            ],
+        ),
+        (
+            "filters.miniball",
+            Options::new(),
+            vec![(DimId::from_name("Miniball"), DimType::F64)],
+        ),
+        (
+            "filters.nndistance",
+            Options::new(),
+            vec![(DimId::NNDistance, DimType::F64)],
+        ),
+        (
+            "filters.normal",
+            Options::new(),
+            vec![
+                (DimId::NormalX, DimType::F64),
+                (DimId::NormalY, DimType::F64),
+                (DimId::NormalZ, DimType::F64),
+                (DimId::from_name("Curvature"), DimType::F64),
+            ],
+        ),
+        (
+            "filters.optimalneighborhood",
+            Options::new(),
+            vec![
+                (DimId::OptimalKNN, DimType::F64),
+                (DimId::OptimalRadius, DimType::F64),
+            ],
+        ),
+        (
+            "filters.outlier",
+            Options::new(),
+            vec![(DimId::Classification, DimType::F64)],
+        ),
+        (
+            "filters.planefit",
+            Options::new(),
+            vec![(DimId::PlaneFit, DimType::F64)],
+        ),
+        (
+            "filters.pmf",
+            Options::new(),
+            vec![(DimId::Classification, DimType::U8)],
+        ),
+        (
+            "filters.radialdensity",
+            Options::new(),
+            vec![(DimId::RadialDensity, DimType::F64)],
+        ),
+        (
+            "filters.reciprocity",
+            Options::new(),
+            vec![(DimId::Reciprocity, DimType::F64)],
+        ),
+        (
+            "filters.smrf",
+            Options::new(),
+            vec![(DimId::Classification, DimType::U8)],
+        ),
+        (
+            "filters.supervoxel",
+            Options::new(),
+            vec![(DimId::ClusterID, DimType::F64)],
+        ),
+        (
+            "filters.zsmooth",
+            default_filter_options("filters.zsmooth"),
+            vec![(DimId::Z, DimType::F64)],
+        ),
+    ];
+
+    for (name, options, expected) in cases {
+        let filter = create_filter(name, &options).unwrap_or_else(|err| {
+            panic!("{name} should construct before checking output dimensions: {err}")
+        });
+        let declared = filter.output_dimensions();
+        for dim in expected {
+            assert!(
+                declared.contains(&dim),
+                "{name} should declare output dimension {dim:?}; declared {declared:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn every_listed_writer_driver_constructs() {
     let options = Options::new();
     for name in WRITER_DRIVERS {
