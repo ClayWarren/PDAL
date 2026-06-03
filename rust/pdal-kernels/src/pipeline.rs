@@ -226,6 +226,7 @@ pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
             .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?
             .to_string();
         decode_typed_json_options(&mut object);
+        normalize_inputs(&mut object, position)?;
         let tag = if !object.contains_key("tag") {
             let tag = pdal_core::pipeline::generate_stage_tag(
                 &stage_type,
@@ -267,6 +268,28 @@ pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
     serde_json::to_string_pretty(&root)
         .map(|text| text + "\n")
         .map_err(|err| format!("Unable to serialize pipeline JSON: {err}"))
+}
+
+fn normalize_inputs(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    position: usize,
+) -> Result<(), String> {
+    let Some(value) = object.get_mut("inputs") else {
+        return Ok(());
+    };
+    if let Some(input) = value.as_str() {
+        *value = serde_json::Value::Array(vec![serde_json::Value::String(input.to_string())]);
+        return Ok(());
+    }
+    if value
+        .as_array()
+        .is_some_and(|items| items.iter().all(serde_json::Value::is_string))
+    {
+        return Ok(());
+    }
+    Err(format!(
+        "Pipeline stage {position} has invalid 'inputs'; expected a string or array of strings."
+    ))
 }
 
 fn serialized_stage_object(
@@ -554,6 +577,24 @@ mod tests {
         assert_eq!(parsed["pipeline"][1]["inputs"][0], "readers_las1");
         assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
         assert_eq!(parsed["pipeline"][2]["inputs"][0], "filters_decimation1");
+    }
+
+    #[test]
+    fn serializes_explicit_string_inputs_as_arrays() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                {"type":"readers.text", "filename":"in.txt", "tag":"A"},
+                {"type":"filters.decimation", "step":2, "tag":"B", "inputs":"A"},
+                {"type":"writers.null", "inputs":"B"}
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][1]["inputs"][0], "A");
+        assert_eq!(parsed["pipeline"][2]["inputs"][0], "B");
+        assert!(parsed["pipeline"][1]["inputs"].is_array());
+        assert!(parsed["pipeline"][2]["inputs"].is_array());
     }
 
     #[test]
