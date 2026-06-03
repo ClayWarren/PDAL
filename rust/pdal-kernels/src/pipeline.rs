@@ -152,6 +152,8 @@ pub fn apply_stage_options_to_pipeline_json(
         return Ok(json.to_string());
     }
 
+    validate_pipeline_json_shape(json)?;
+
     let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let mut value: serde_json::Value =
         serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
@@ -416,6 +418,23 @@ mod tests {
         assert!(apply_stage_options_to_pipeline_json(json, &options)
             .unwrap_err()
             .contains("Unable to apply stage option"));
+    }
+
+    #[test]
+    fn rejects_invalid_stage_metadata_before_applying_cli_stage_options() {
+        let json = r#"[
+            {"type":"readers.faux","tag":"A"},
+            {"type":"readers.faux","inputs":["A"]}
+        ]"#;
+        let options = vec![CliStageOption {
+            stage: "readers.faux".to_string(),
+            key: "count".to_string(),
+            value: "4".to_string(),
+        }];
+
+        assert!(apply_stage_options_to_pipeline_json(json, &options)
+            .unwrap_err()
+            .contains("Inputs not permitted"));
     }
 
     #[test]
