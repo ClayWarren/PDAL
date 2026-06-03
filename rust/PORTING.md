@@ -569,9 +569,9 @@ Current caveat classes:
   explicit native-adapter plumbing and regression coverage before they can be
   claimed.
 - EPT/COPC/STAC preview and remote breadth: transformed EPT preview point
-  counts plus local polygon/OGR preview point counts are Rust-pruned, but
-  transformed preview bounds clipping, origin preview, broad remote traversal,
-  schema validation, and object-store option parity remain named work items.
+  counts plus local origin/polygon/OGR preview point counts are Rust-pruned,
+  but transformed preview bounds clipping, broad remote traversal, schema
+  validation, and object-store option parity remain named work items.
 - Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
   but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.
 - Packaging, CI, install/export, and release policy: these must prove the

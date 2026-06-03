@@ -125,6 +125,36 @@ fn ept_preview_options_handle_bounds_polygon_and_ogr_filters() {
 }
 
 #[test]
+fn ept_preview_options_apply_origin_filter() {
+    unsafe {
+        let options = preview_options(&[
+            ("filename", data_path("ept/ellipsoid-binary/ept.json")),
+            ("origin", "ellipsoid".to_string()),
+        ]);
+        let preview = pdal_ept_reader_preview_create_with_reader_options(options);
+        assert!(!preview.is_null());
+        assert_eq!(pdal_ept_reader_preview_point_count(preview), 100000);
+
+        let mut minx = 0.0;
+        let mut miny = 0.0;
+        let mut minz = 0.0;
+        let mut maxx = 0.0;
+        let mut maxy = 0.0;
+        let mut maxz = 0.0;
+        assert!(pdal_ept_reader_preview_bounds(
+            preview, &mut minx, &mut miny, &mut minz, &mut maxx, &mut maxy, &mut maxz,
+        ));
+        assert_eq!(minx, -8242746.01);
+        assert_eq!(maxx, -8242445.99);
+        assert_eq!(minz, -50.01);
+        assert_eq!(maxz, 50.01);
+
+        pdal_ept_reader_preview_destroy(preview);
+        pdal_options_destroy(options);
+    }
+}
+
+#[test]
 fn ept_preview_options_apply_resolution_limit() {
     unsafe {
         let path = data_path("ept/lone-star-laszip/ept.json");

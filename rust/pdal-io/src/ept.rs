@@ -7,9 +7,9 @@
 //! polygon/OGR filters, local addon metadata, GDAL VSI-backed remote paths, and
 //! C++ streaming-wrapper materialization are supported for the existing parity
 //! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
-//! Same-SRS, transformed-bounds, local polygon, and local GeoJSON OGR
+//! Same-SRS, transformed-bounds, origin, local polygon, and local GeoJSON OGR
 //! point-count preview are Rust-backed; transformed preview bounds clipping
-//! plus origin preview remain outside this module's current contract.
+//! remains outside this module's current contract.
 
 use crate::source;
 use crate::tindex::append_view;
@@ -107,9 +107,16 @@ impl Reader for EptReader {
         let max_depth = self.resolution_filter(&info)?;
         let bounds = self.bounds_filter(&info)?;
         let polygons = self.polygon_filters()?;
+        let origin_bounds = self.origin_bounds(Path::new(&root), &info)?;
         let root_bounds = ept_bounds(&info)?;
-        let (tiles, hierarchy_step) =
-            hierarchy_tiles(&root, max_depth, bounds.as_ref(), &polygons, root_bounds)?;
+        let (tiles, hierarchy_step) = hierarchy_tiles(
+            &root,
+            max_depth,
+            bounds.as_ref(),
+            origin_bounds.as_ref(),
+            &polygons,
+            root_bounds,
+        )?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
@@ -364,11 +371,20 @@ fn preview_bounds_and_point_count(
     polygons: &[PolygonFilter],
 ) -> Result<(Bounds3D, u64), StageError> {
     let bounds = reader.bounds_filter(info)?;
+    let origin_bounds =
+        reader.origin_bounds(Path::new(&location_parent(&reader.filename)), info)?;
     if let Some(bounds) = bounds.as_ref().and_then(BoundsFilter::preview_clip_bounds) {
         bounds_conforming.clip(&bounds);
     }
+    if let Some(origin_bounds) = &origin_bounds {
+        bounds_conforming.clip(origin_bounds);
+    }
 
-    if reader.resolution.trim().is_empty() && bounds.is_none() && polygons.is_empty() {
+    if reader.resolution.trim().is_empty()
+        && bounds.is_none()
+        && origin_bounds.is_none()
+        && polygons.is_empty()
+    {
         return info["points"]
             .as_u64()
             .ok_or_else(|| {
@@ -383,7 +399,14 @@ fn preview_bounds_and_point_count(
     let max_depth = reader.resolution_filter(info)?;
     let root = location_parent(&reader.filename);
     let root_bounds = ept_bounds(info)?;
-    let (tiles, _) = hierarchy_tiles(&root, max_depth, bounds.as_ref(), polygons, root_bounds)?;
+    let (tiles, _) = hierarchy_tiles(
+        &root,
+        max_depth,
+        bounds.as_ref(),
+        origin_bounds.as_ref(),
+        polygons,
+        root_bounds,
+    )?;
     let count = tiles.iter().map(|tile| tile.expected_points).sum();
     Ok((bounds_conforming, count))
 }
@@ -542,6 +565,19 @@ impl EptReader {
             .ok_or_else(|| StageError(format!("Invalid EPT origin '{}'.", self.origin)))
     }
 
+    fn origin_bounds(&self, root: &Path, info: &Value) -> Result<Option<Bounds3D>, StageError> {
+        let Some(origin) = self.origin_filter(root)? else {
+            return Ok(None);
+        };
+        let mut bounds = source_origins(root)?
+            .into_iter()
+            .find(|source| source.id == origin)
+            .and_then(|source| source.bounds)
+            .ok_or_else(|| StageError(format!("Invalid EPT origin '{}'.", self.origin)))?;
+        bounds.grow_distance(ept_xy_scale(info));
+        Ok(Some(bounds))
+    }
+
     fn resolution_filter(&self, info: &Value) -> Result<Option<u64>, StageError> {
         if self.resolution.is_empty() {
             return Ok(None);
@@ -695,6 +731,7 @@ impl EptAddon {
 struct SourceOrigin {
     id: u64,
     names: Vec<String>,
+    bounds: Option<Bounds3D>,
 }
 
 impl SourceOrigin {
@@ -712,6 +749,7 @@ fn hierarchy_tiles(
     root: &str,
     max_depth: Option<u64>,
     query: Option<&BoundsFilter>,
+    origin_bounds: Option<&Bounds3D>,
     polygons: &[PolygonFilter],
     root_bounds: Bounds3D,
 ) -> Result<(Vec<EptTile>, u64), StageError> {
@@ -732,6 +770,9 @@ fn hierarchy_tiles(
             let key = EptKey::parse(node, root_bounds)?;
             let depth = key.depth;
             if query.is_some_and(|query| !query.overlaps_box(&key.bounds)) {
+                continue;
+            }
+            if origin_bounds.is_some_and(|bounds| !bounds.overlaps(&key.bounds)) {
                 continue;
             }
             if !polygons_overlap_box(polygons, &key.bounds)? {
@@ -883,6 +924,18 @@ fn validate_tile_count(
     Ok(())
 }
 
+fn ept_xy_scale(info: &Value) -> f64 {
+    let mut scale: f64 = 0.0;
+    if let Some(schema) = info["schema"].as_array() {
+        for dim in schema {
+            if matches!(dim["name"].as_str(), Some("X" | "Y")) {
+                scale = scale.max(dim["scale"].as_f64().unwrap_or(0.0));
+            }
+        }
+    }
+    scale
+}
+
 fn source_origins(root: &Path) -> Result<Vec<SourceOrigin>, StageError> {
     let sources = root.join("ept-sources");
     let manifest = sources.join("manifest.json");
@@ -906,8 +959,24 @@ fn source_origins_from_array(value: &Value) -> Result<Vec<SourceOrigin>, StageEr
         .map(|(idx, item)| SourceOrigin {
             id: item["origin"].as_u64().unwrap_or(idx as u64),
             names: source_origin_names(item),
+            bounds: source_origin_bounds(item),
         })
         .collect())
+}
+
+fn source_origin_bounds(item: &Value) -> Option<Bounds3D> {
+    let bounds = item["bounds"].as_array()?;
+    if bounds.len() < 6 {
+        return None;
+    }
+    Some(Bounds3D {
+        minx: bounds[0].as_f64()?,
+        miny: bounds[1].as_f64()?,
+        minz: bounds[2].as_f64()?,
+        maxx: bounds[3].as_f64()?,
+        maxy: bounds[4].as_f64()?,
+        maxz: bounds[5].as_f64()?,
+    })
 }
 
 fn source_origin_names(item: &Value) -> Vec<String> {

@@ -633,9 +633,7 @@ QuickInfo EptReader::inspect()
     const bool rustOwnsOgr = m_args->m_ogr.size() == 0 ||
                              (m_args->m_addons.empty() &&
                               m_args->m_bounds.spatialReference().empty());
-    const bool rustPreviewSupported =
-        !Utils::isRemote(m_filename) && m_args->m_origin.empty() &&
-        rustOwnsOgr;
+    const bool rustPreviewSupported = !Utils::isRemote(m_filename) && rustOwnsOgr;
 
     // Route the Rust-supported preview path through the C ABI so EPT metadata
     // and bounds previews aren't owned solely by the C++ EptInfo path.
@@ -647,6 +645,8 @@ QuickInfo EptReader::inspect()
             addOption(options, "source_srs", getSpatialReference().getWKT());
         if (!queryBounds.empty())
             addOption(options, "bounds", queryBounds);
+        if (!m_args->m_origin.empty())
+            addOption(options, "origin", m_args->m_origin);
         if (m_args->m_resolution > 0)
             addOption(options, "resolution", m_args->m_resolution);
         for (const Polygon& poly : m_args->m_polys)
