@@ -151,8 +151,8 @@ Current active milestone:
    `audit_cpp_port_backlog.py --include-plugins` is currently `0`
    port-candidate LOC. Those are guardrails, not the finish line.
 2. Work the named caveats in `rust/STATUS.md`, not old directory goals. The
-   current remaining work is specific: OGR/vector-source breadth, EPT preview
-   fallbacks, remote/STAC/schema breadth, optional plugin/native-adapter
+   current remaining work is specific: OGR/vector-source breadth,
+   remote/STAC/schema breadth, optional plugin/native-adapter
    policy, packaging/CI/release readiness, C ABI stability, and final
    regression/performance evidence.
 3. When a caveat can be closed in code, close it with focused parity coverage.
@@ -569,10 +569,10 @@ Current caveat classes:
   explicit native-adapter plumbing and regression coverage before they can be
   claimed.
 - EPT/COPC/STAC preview and remote breadth: transformed EPT preview point
-  counts, semantically same-SRS transformed preview bounds clipping, and local
-  origin/polygon/OGR preview point counts are Rust-pruned, but true cross-SRS
-  transformed preview bounds clipping, broad remote traversal, schema
-  validation, and object-store option parity remain named work items.
+  counts, semantically same-SRS and true cross-SRS transformed preview bounds
+  clipping, and local origin/polygon/OGR preview point counts are Rust-pruned,
+  but broad remote traversal, schema validation, and object-store option parity
+  remain named work items.
 - Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
   but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.
 - Packaging, CI, install/export, and release policy: these must prove the

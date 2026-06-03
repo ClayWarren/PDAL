@@ -8,6 +8,7 @@ pub(super) enum QueryBounds {
 pub(super) struct BoundsFilter {
     pub(super) query: QueryBounds,
     pub(super) transform: Option<GdalSrsTransform>,
+    inverse_transform: Option<GdalSrsTransform>,
     conservative_hierarchy_overlap: bool,
 }
 
@@ -28,29 +29,66 @@ impl BoundsFilter {
                 return Ok(Self {
                     query,
                     transform: None,
+                    inverse_transform: None,
                     conservative_hierarchy_overlap,
                 });
             }
             conservative_hierarchy_overlap =
                 pdal_native::srs::is_geocentric(&source.wkt, source.epoch)
                     && pdal_native::srs::is_geographic(&target.wkt, target.epoch);
-            Some(
-                GdalSrsTransform::new(
-                    &source.wkt2,
-                    source.epoch,
-                    &target.wkt2,
-                    target.epoch,
-                    &[],
-                    &[],
-                )
-                .map_err(StageError)?,
+            let forward = GdalSrsTransform::new(
+                &source.wkt2,
+                source.epoch,
+                &target.wkt2,
+                target.epoch,
+                &[],
+                &[],
             )
+            .map_err(StageError)?;
+            let inverse = GdalSrsTransform::new(
+                &target.wkt2,
+                target.epoch,
+                &source.wkt2,
+                source.epoch,
+                &[],
+                &[],
+            )
+            .map_err(StageError)?;
+            return Ok(Self {
+                query,
+                transform: Some(forward),
+                inverse_transform: Some(inverse),
+                conservative_hierarchy_overlap,
+            });
         };
         Ok(Self {
             query,
             transform,
+            inverse_transform: None,
             conservative_hierarchy_overlap,
         })
+    }
+
+    fn query_bounds_for_preview(&self, source_bounds: &Bounds3D) -> Bounds3D {
+        match &self.query {
+            QueryBounds::Two(bounds) => Bounds3D {
+                minx: bounds.minx,
+                maxx: bounds.maxx,
+                miny: bounds.miny,
+                maxy: bounds.maxy,
+                minz: source_bounds.minz,
+                maxz: source_bounds.maxz,
+            },
+            QueryBounds::Three(bounds) => *bounds,
+        }
+    }
+
+    pub(super) fn preview_clip_bounds(&self, source_bounds: &Bounds3D) -> Option<Bounds3D> {
+        let query = self.query_bounds_for_preview(source_bounds);
+        match &self.inverse_transform {
+            None => Some(query),
+            Some(transform) => transform_bounds_via_corners(&query, transform),
+        }
     }
 
     fn contains(&self, view: &PointView, idx: PointId) -> bool {
@@ -74,13 +112,6 @@ impl BoundsFilter {
             Some(transform) => transform_bounds_via_corners(bounds, transform)
                 .is_some_and(|bounds| self.query.overlaps_box(&bounds)),
         }
-    }
-
-    pub(super) fn preview_clip_bounds(&self) -> Option<Bounds3D> {
-        if self.transform.is_some() {
-            return None;
-        }
-        Some(self.query.to_bounds3d())
     }
 }
 
@@ -122,20 +153,6 @@ impl QueryBounds {
                 maxy: bounds.maxy,
             }),
             QueryBounds::Three(query) => query.overlaps(bounds),
-        }
-    }
-
-    fn to_bounds3d(&self) -> Bounds3D {
-        match self {
-            QueryBounds::Two(bounds) => Bounds3D {
-                minx: bounds.minx,
-                maxx: bounds.maxx,
-                miny: bounds.miny,
-                maxy: bounds.maxy,
-                minz: -f64::MAX,
-                maxz: f64::MAX,
-            },
-            QueryBounds::Three(bounds) => *bounds,
         }
     }
 }

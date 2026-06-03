@@ -373,7 +373,10 @@ fn preview_bounds_and_point_count(
     let bounds = reader.bounds_filter(info)?;
     let origin_bounds =
         reader.origin_bounds(Path::new(&location_parent(&reader.filename)), info)?;
-    if let Some(bounds) = bounds.as_ref().and_then(BoundsFilter::preview_clip_bounds) {
+    if let Some(bounds) = bounds
+        .as_ref()
+        .and_then(|bounds| bounds.preview_clip_bounds(&bounds_conforming))
+    {
         bounds_conforming.clip(&bounds);
     }
     if let Some(origin_bounds) = &origin_bounds {

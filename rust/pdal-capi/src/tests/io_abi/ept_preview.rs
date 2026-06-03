@@ -235,6 +235,44 @@ fn ept_preview_options_apply_transformed_bounds() {
 }
 
 #[test]
+fn ept_preview_options_clip_cross_srs_bounds() {
+    unsafe {
+        let path = data_path("ept/lone-star-laszip/ept.json");
+        let path_c = cstring(&path);
+        let bounds = cstring(
+            "([-110.806808465464,-110.806556642360], \
+             [44.418280204485,44.418459837981], \
+             [2322,2339]) / EPSG:4326",
+        );
+        let handle = pdal_ept_reader_preview_create_with_bounds(
+            path_c.as_ptr(),
+            std::ptr::null(),
+            bounds.as_ptr(),
+        );
+        assert!(!handle.is_null());
+        assert_eq!(pdal_ept_reader_preview_point_count(handle), 430376);
+
+        let mut minx = 0.0;
+        let mut miny = 0.0;
+        let mut minz = 0.0;
+        let mut maxx = 0.0;
+        let mut maxy = 0.0;
+        let mut maxz = 0.0;
+        assert!(pdal_ept_reader_preview_bounds(
+            handle, &mut minx, &mut miny, &mut minz, &mut maxx, &mut maxy, &mut maxz,
+        ));
+        assert!((minx - 515380.0).abs() < 0.1);
+        assert!((miny - 4918350.0).abs() < 1e-5);
+        assert_eq!(minz, 2322.0);
+        assert!((maxx - 515400.0).abs() < 0.1);
+        assert!((maxy - 4918370.0).abs() < 1e-5);
+        assert_eq!(maxz, 2339.0);
+
+        pdal_ept_reader_preview_destroy(handle);
+    }
+}
+
+#[test]
 fn ept_preview_rejects_null_and_missing_files() {
     unsafe {
         assert!(pdal_ept_reader_preview_create(std::ptr::null()).is_null());
