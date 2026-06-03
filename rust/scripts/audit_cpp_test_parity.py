@@ -870,9 +870,22 @@ def baseline_tests(ref: str) -> set[str]:
     return tests
 
 
+def default_build_dir() -> str:
+    env_dir = Path.cwd() / ".build"
+    plain_dir = Path.cwd() / "build"
+    for candidate in (env_dir, plain_dir):
+        if (candidate / "bin").is_dir():
+            return str(candidate)
+    return "build"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--build-dir", default="build")
+    parser.add_argument(
+        "--build-dir",
+        default=default_build_dir(),
+        help="CMake build directory. Defaults to .build when present, then build.",
+    )
     parser.add_argument(
         "--baseline-ref",
         default=DEFAULT_BASELINE_REF,
