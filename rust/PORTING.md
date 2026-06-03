@@ -568,7 +568,8 @@ Current caveat classes:
 - OGR/vector-source breadth: broad OGR datasource/update workflows still need
   explicit native-adapter plumbing and regression coverage before they can be
   claimed.
-- EPT/COPC/STAC preview and remote breadth: transformed preview bounds,
+- EPT/COPC/STAC preview and remote breadth: transformed EPT preview point
+  counts are Rust-pruned, but transformed preview bounds clipping,
   origin/polygon/OGR preview paths, broad remote traversal, schema validation,
   and object-store option parity remain named work items.
 - Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,

@@ -49,8 +49,12 @@ impl BoundsFilter {
         self.query.contains_point(x, y, z)
     }
 
-    pub(super) fn hierarchy_query_bounds(&self) -> Option<&QueryBounds> {
-        self.transform.is_none().then_some(&self.query)
+    pub(super) fn overlaps_box(&self, bounds: &Bounds3D) -> bool {
+        match &self.transform {
+            None => self.query.overlaps_box(bounds),
+            Some(transform) => transform_bounds_via_corners(bounds, transform)
+                .is_some_and(|bounds| self.query.overlaps_box(&bounds)),
+        }
     }
 
     pub(super) fn preview_clip_bounds(&self) -> Option<Bounds3D> {
@@ -59,6 +63,27 @@ impl BoundsFilter {
         }
         Some(self.query.to_bounds3d())
     }
+}
+
+fn transform_bounds_via_corners(
+    bounds: &Bounds3D,
+    transform: &GdalSrsTransform,
+) -> Option<Bounds3D> {
+    let mut output = Bounds3D::empty();
+    for x in [bounds.minx, bounds.maxx] {
+        for y in [bounds.miny, bounds.maxy] {
+            for z in [bounds.minz, bounds.maxz] {
+                let mut x = x;
+                let mut y = y;
+                let mut z = z;
+                if !transform.transform_xyz(&mut x, &mut y, &mut z) {
+                    return None;
+                }
+                output.grow_point(x, y, z);
+            }
+        }
+    }
+    Some(output)
 }
 
 impl QueryBounds {

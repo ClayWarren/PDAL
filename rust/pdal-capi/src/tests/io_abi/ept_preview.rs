@@ -106,6 +106,23 @@ fn ept_preview_options_apply_same_srs_bounds() {
 }
 
 #[test]
+fn ept_preview_options_apply_transformed_bounds() {
+    unsafe {
+        let path = data_path("ept/lone-star-laszip/ept.json");
+        let path_c = cstring(&path);
+        let bounds = cstring("([515380,515400],[4918350,4918370]) / EPSG:26912");
+        let handle = pdal_ept_reader_preview_create_with_bounds(
+            path_c.as_ptr(),
+            std::ptr::null(),
+            bounds.as_ptr(),
+        );
+        assert!(!handle.is_null());
+        assert_eq!(pdal_ept_reader_preview_point_count(handle), 430376);
+        pdal_ept_reader_preview_destroy(handle);
+    }
+}
+
+#[test]
 fn ept_preview_rejects_null_and_missing_files() {
     unsafe {
         assert!(pdal_ept_reader_preview_create(std::ptr::null()).is_null());

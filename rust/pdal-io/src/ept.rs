@@ -107,11 +107,8 @@ impl Reader for EptReader {
         let bounds = self.bounds_filter(&info)?;
         let polygons = self.polygon_filters()?;
         let root_bounds = ept_bounds(&info)?;
-        let hierarchy_bounds = bounds
-            .as_ref()
-            .and_then(|filter| filter.hierarchy_query_bounds());
         let (tiles, hierarchy_step) =
-            hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
+            hierarchy_tiles(&root, max_depth, bounds.as_ref(), root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
@@ -364,14 +361,6 @@ fn preview_bounds_and_point_count(
     mut bounds_conforming: Bounds3D,
 ) -> Result<(Bounds3D, u64), StageError> {
     let bounds = reader.bounds_filter(info)?;
-    if bounds
-        .as_ref()
-        .is_some_and(|filter| filter.hierarchy_query_bounds().is_none())
-    {
-        return Err(StageError(
-            "EPT preview with transformed bounds is not supported by Rust.".to_string(),
-        ));
-    }
     if let Some(bounds) = bounds.as_ref().and_then(BoundsFilter::preview_clip_bounds) {
         bounds_conforming.clip(&bounds);
     }
@@ -391,10 +380,7 @@ fn preview_bounds_and_point_count(
     let max_depth = reader.resolution_filter(info)?;
     let root = location_parent(&reader.filename);
     let root_bounds = ept_bounds(info)?;
-    let hierarchy_bounds = bounds
-        .as_ref()
-        .and_then(|filter| filter.hierarchy_query_bounds());
-    let (tiles, _) = hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
+    let (tiles, _) = hierarchy_tiles(&root, max_depth, bounds.as_ref(), root_bounds)?;
     let count = tiles.iter().map(|tile| tile.expected_points).sum();
     Ok((bounds_conforming, count))
 }
@@ -722,7 +708,7 @@ impl SourceOrigin {
 fn hierarchy_tiles(
     root: &str,
     max_depth: Option<u64>,
-    query: Option<&QueryBounds>,
+    query: Option<&BoundsFilter>,
     root_bounds: Bounds3D,
 ) -> Result<(Vec<EptTile>, u64), StageError> {
     let mut tiles = Vec::new();
