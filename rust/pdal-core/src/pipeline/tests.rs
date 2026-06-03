@@ -209,6 +209,7 @@ impl Reader for TestReader {
 struct TestWriter {
     view_count: usize,
     point_count: u64,
+    dimension_count: usize,
 }
 
 impl TestWriter {
@@ -216,6 +217,7 @@ impl TestWriter {
         Self {
             view_count: 0,
             point_count: 0,
+            dimension_count: 0,
         }
     }
 }
@@ -229,6 +231,7 @@ impl Writer for TestWriter {
         self.view_count += views.len();
         for v in views {
             self.point_count += v.len();
+            self.dimension_count = v.layout().dim_count();
         }
         Ok(())
     }
@@ -237,6 +240,10 @@ impl Writer for TestWriter {
         let mut node = MetadataNode::new("writers.test");
         node.add_value("view_count", MetadataValue::U64(self.view_count as u64));
         node.add_value("point_count", MetadataValue::U64(self.point_count));
+        node.add_value(
+            "dimension_count",
+            MetadataValue::U64(self.dimension_count as u64),
+        );
         node
     }
 }
@@ -428,6 +435,48 @@ fn test_where_filters_writer_inputs() {
             .unwrap()
             .as_u64(),
         3
+    );
+}
+
+#[test]
+fn test_allowed_dimensions_filter_writer_inputs_and_summary() {
+    let mut pipeline = Pipeline::new();
+    let reader = pipeline.add_reader("readers.test", Box::new(TestReader::new(3)), Options::new());
+    let writer = pipeline.add_writer("writers.test", Box::new(TestWriter::new()), Options::new());
+    pipeline.add_dependency(writer, reader).unwrap();
+    pipeline.set_allowed_dims(vec![DimId::Z, DimId::X]);
+
+    let result = pipeline.execute_with_result(Vec::new()).unwrap();
+
+    assert_eq!(result.point_count, 3);
+    assert_eq!(result.output_views.len(), 1);
+    assert_eq!(result.output_views[0].layout().dim_count(), 2);
+    assert_eq!(
+        result.output_views[0].layout().dim_at(0).unwrap().0,
+        &DimId::Z
+    );
+    assert_eq!(
+        result.output_views[0].layout().dim_at(1).unwrap().0,
+        &DimId::X
+    );
+    assert!(result.output_views[0].layout().dim(&DimId::Y).is_none());
+    let summary_names: Vec<&str> = result
+        .dimension_summaries
+        .iter()
+        .map(|summary| summary.name.as_str())
+        .collect();
+    assert_eq!(summary_names, vec!["Z", "X"]);
+
+    let metadata = pipeline.metadata();
+    let writer_meta = metadata.find_child("stage_1").unwrap();
+    assert_eq!(
+        writer_meta
+            .find_child("dimension_count")
+            .unwrap()
+            .value()
+            .unwrap()
+            .as_u64(),
+        2
     );
 }
 

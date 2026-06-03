@@ -115,6 +115,31 @@ fn append_point_preserves_source_index() {
 }
 
 #[test]
+fn select_dimensions_keeps_requested_order_and_exact_values() {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::H3, DimType::U64);
+    layout.register(DimId::Intensity, DimType::U16);
+    let mut view = PointView::new(Rc::new(layout));
+    let point = view.add_point();
+    let h3 = (1_u64 << 60) + 123;
+    view.set_f64(point, &DimId::X, 10.0);
+    view.set_u64(point, &DimId::H3, h3);
+    view.set_f64(point, &DimId::Intensity, 7.0);
+    view.set_source_index(point, 42);
+
+    let selected = view.select_dimensions(&[DimId::H3, DimId::X]);
+
+    assert_eq!(selected.layout().dim_count(), 2);
+    assert_eq!(selected.layout().dim_at(0).unwrap().0, &DimId::H3);
+    assert_eq!(selected.layout().dim_at(1).unwrap().0, &DimId::X);
+    assert!(selected.layout().dim(&DimId::Intensity).is_none());
+    assert_eq!(selected.get_u64(0, &DimId::H3), h3);
+    assert_eq!(selected.get_f64(0, &DimId::X), 10.0);
+    assert_eq!(selected.source_index(0), 42);
+}
+
+#[test]
 fn swap_points_exchanges_data_and_source_indices() {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);

@@ -1,6 +1,7 @@
 use super::argv_to_vec;
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
+use pdal_core::point::DimId;
 use pdal_kernels::{
     apply_stage_options_to_pipeline_json, parse_pipeline_args, serialize_pipeline_json,
     validate_pipeline_json_shape, PipelineArgsResult,
@@ -84,6 +85,13 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             return 1;
         }
     };
+    pipeline.set_allowed_dims(
+        parsed
+            .allowed_dims
+            .iter()
+            .map(|name| DimId::from_name(name))
+            .collect(),
+    );
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.

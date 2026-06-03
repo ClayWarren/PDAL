@@ -4,6 +4,7 @@ pub struct ParsedPipelineArgs {
     pub input: Option<String>,
     pub read_stdin: bool,
     pub validate_only: bool,
+    pub allowed_dims: Vec<String>,
     pub metadata_file: Option<String>,
     pub progress_file: Option<String>,
     pub pointcloud_schema_file: Option<String>,
@@ -36,6 +37,7 @@ pub fn parse_pipeline_args(args: &[String]) -> PipelineArgsResult {
         input: None,
         read_stdin: false,
         validate_only: false,
+        allowed_dims: Vec::new(),
         metadata_file: None,
         progress_file: None,
         pointcloud_schema_file: None,
@@ -96,8 +98,9 @@ fn parse_pipeline_arg<'a>(
         }
         parsed.stream_allowed = false;
     } else if arg == "--dims" {
-        next_option_value("--dims", iter)?;
-    } else if arg.starts_with("--dims=") {
+        parsed.allowed_dims = parse_dim_names(next_option_value("--dims", iter)?);
+    } else if let Some(value) = arg.strip_prefix("--dims=") {
+        parsed.allowed_dims = parse_dim_names(value);
     } else if arg == "--progress" {
         parsed.progress_file = Some(next_option_value(arg, iter)?.clone());
     } else if let Some(value) = arg.strip_prefix("--progress=") {
@@ -125,6 +128,15 @@ fn parse_pipeline_arg<'a>(
         return Err(1);
     }
     Ok(())
+}
+
+fn parse_dim_names(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 fn next_option_value<'a>(
@@ -388,6 +400,21 @@ mod tests {
         assert_eq!(parsed.serialization_file.as_deref(), Some("serial.json"));
         assert_eq!(parsed.progress_file.as_deref(), Some("progress.txt"));
         assert_eq!(parsed.pointcloud_schema_file.as_deref(), Some("schema.xml"));
+        assert_eq!(parsed.allowed_dims, vec!["X", "Y"]);
+    }
+
+    #[test]
+    fn parses_space_form_for_dims() {
+        let args = vec![
+            "pipeline.json".to_string(),
+            "--dims".to_string(),
+            "X, Y,,Intensity".to_string(),
+        ];
+        let PipelineArgsResult::Run(parsed) = parse_pipeline_args(&args) else {
+            panic!("expected runnable pipeline args");
+        };
+
+        assert_eq!(parsed.allowed_dims, vec!["X", "Y", "Intensity"]);
     }
 
     #[test]

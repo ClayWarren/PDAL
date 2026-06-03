@@ -14,7 +14,7 @@ pub use traits::{Reader, StageKind, StageWrapper, Writer};
 
 use crate::metadata::MetadataNode;
 use crate::options::Options;
-use crate::point::{Bounds2D, Bounds3D, DimensionSummary, PointView};
+use crate::point::{Bounds2D, Bounds3D, DimId, DimensionSummary, PointView};
 use crate::stage::StageError;
 use adapters::{ReaderAdapter, WriterAdapter};
 use std::collections::{HashMap, HashSet};
@@ -43,6 +43,7 @@ pub struct ExecResult {
 pub struct Pipeline {
     nodes: Vec<StageNode>,
     tags: HashMap<String, usize>,
+    allowed_dims: Vec<DimId>,
     last_writer_point_count: u64,
     last_writer_view_count: usize,
     last_output_views: Vec<PointView>,
@@ -80,6 +81,7 @@ impl Pipeline {
         Self {
             nodes: Vec::new(),
             tags: HashMap::new(),
+            allowed_dims: Vec::new(),
             last_writer_point_count: 0,
             last_writer_view_count: 0,
             last_output_views: Vec::new(),
@@ -328,6 +330,7 @@ impl Pipeline {
         self.last_output_views.clear();
 
         let mut outputs: HashMap<usize, Vec<PointView>> = HashMap::new();
+        let allowed_dims = self.allowed_dims.clone();
 
         // How many downstream nodes still need each producer's output. The last
         // consumer moves the views out of `outputs` instead of cloning, so a
@@ -374,7 +377,10 @@ impl Pipeline {
                         &input_views,
                     );
 
-                    let writer_inputs = apply_writer_where(node, inputs_for_node)?;
+                    let writer_inputs = select_allowed_dimensions(
+                        apply_writer_where(node, inputs_for_node)?,
+                        &allowed_dims,
+                    );
                     self.last_writer_point_count +=
                         writer_inputs.iter().map(PointView::len).sum::<u64>();
                     self.last_writer_view_count += writer_inputs.len();
@@ -402,10 +408,11 @@ impl Pipeline {
         input_views: Vec<PointView>,
     ) -> Result<ExecResult, StageError> {
         let views = self.execute(input_views)?;
+        let allowed_dims = self.allowed_dims.clone();
         let output_views = if views.is_empty() {
             self.last_output_views.clone()
         } else {
-            views.clone()
+            select_allowed_dimensions(views.clone(), &allowed_dims)
         };
         let point_count: u64 =
             views.iter().map(|v| v.len()).sum::<u64>() + self.last_writer_point_count;
@@ -500,6 +507,7 @@ impl Pipeline {
         for node in &mut self.nodes {
             node.stage.reset();
         }
+        let allowed_dims = self.allowed_dims.clone();
         self.last_writer_point_count = 0;
         self.last_writer_view_count = 0;
         self.last_output_views.clear();
@@ -513,6 +521,7 @@ impl Pipeline {
                 self.nodes[filter].stage.stream_chunk(&mut chunk)?;
             }
             total_points += chunk.len();
+            let chunk = select_allowed_dimension(chunk, &allowed_dims);
             self.nodes[writer].stage.stream_write(&chunk)?;
         }
         self.nodes[writer].stage.stream_finish()?;
@@ -547,6 +556,10 @@ impl Pipeline {
 
     pub fn has_reader(&self) -> bool {
         self.nodes.iter().any(|node| node.kind == StageKind::Reader)
+    }
+
+    pub fn set_allowed_dims(&mut self, dims: Vec<DimId>) {
+        self.allowed_dims = dims;
     }
 
     pub fn roots_are_readers(&self) -> bool {
@@ -606,6 +619,24 @@ fn apply_writer_where(
         outputs.push(keeps);
     }
     Ok(outputs)
+}
+
+fn select_allowed_dimensions(views: Vec<PointView>, allowed_dims: &[DimId]) -> Vec<PointView> {
+    if allowed_dims.is_empty() {
+        return views;
+    }
+    views
+        .into_iter()
+        .map(|view| view.select_dimensions(allowed_dims))
+        .collect()
+}
+
+fn select_allowed_dimension(view: PointView, allowed_dims: &[DimId]) -> PointView {
+    if allowed_dims.is_empty() {
+        view
+    } else {
+        view.select_dimensions(allowed_dims)
+    }
 }
 
 fn split_where(input: &PointView, where_expr: &str) -> Result<(PointView, PointView), StageError> {

@@ -266,6 +266,45 @@ impl PointView {
         output
     }
 
+    /// Return a copy of this view containing only dimensions already present in
+    /// this view and named in `dims`, preserving the requested order.
+    pub fn select_dimensions(&self, dims: &[DimId]) -> PointView {
+        let mut layout = PointLayout::new();
+        let mut selected = Vec::new();
+        for dim in dims {
+            if let Some((_, ty)) = self.layout.dim(dim) {
+                layout.register(dim.clone(), ty);
+                selected.push(dim.clone());
+            }
+        }
+
+        let mut output = PointView::new(Rc::new(layout));
+        output.spatial_reference = self.spatial_reference.clone();
+        output.meshes = self.meshes.clone();
+        output.rasters = self.rasters.clone();
+
+        for idx in 0..self.len() {
+            let out_idx = output.add_point();
+            for dim in &selected {
+                let Some((in_off, ty)) = self.layout.dim(dim) else {
+                    continue;
+                };
+                let Some((out_off, _)) = output.layout.dim(dim) else {
+                    continue;
+                };
+                let in_base = (idx as usize) * self.layout.point_size() + in_off;
+                let out_base = (out_idx as usize) * output.layout.point_size() + out_off;
+                output.data[out_base..out_base + ty.size()]
+                    .copy_from_slice(&self.data[in_base..in_base + ty.size()]);
+            }
+            if let Some(source_index) = self.source_indices.get(idx as usize) {
+                output.source_indices[out_idx as usize] = *source_index;
+            }
+        }
+
+        output
+    }
+
     /// The view's layout.
     pub fn layout(&self) -> &Rc<PointLayout> {
         &self.layout
