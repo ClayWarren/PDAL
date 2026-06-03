@@ -605,6 +605,40 @@ TEST(GDALWriterTest, btint)
         EXPECT_NEAR(arr[i], data[i], .001);
 }
 
+TEST(GDALWriterTest, floatDataType)
+{
+    std::string outfile = Support::temppath("tmp_float.tif");
+    FileUtils::deleteFile(outfile);
+
+    Options ro;
+    ro.add("filename", Support::datapath("gdal/grid.txt"));
+
+    TextReader r;
+    r.setOptions(ro);
+
+    Options wo;
+    wo.add("gdaldriver", "GTiff");
+    wo.add("output_type", "count");
+    wo.add("resolution", 1);
+    wo.add("radius", .7071);
+    wo.add("data_type", "float");
+    wo.add("filename", outfile);
+
+    GDALWriter w;
+    w.setOptions(wo);
+    w.setInput(r);
+
+    PointTable t;
+    w.prepare(t);
+    w.execute(t);
+
+    gdal::Raster raster(outfile, "GTiff");
+    ASSERT_EQ(raster.open(), gdal::GDALError::None);
+    auto types = raster.getPDALDimensionTypes();
+    ASSERT_EQ(types.size(), 1u);
+    EXPECT_EQ(types[0], Dimension::Type::Float);
+}
+
 TEST(GDALWriterTest, no_points)
 {
     std::string outfile(Support::temppath("out.tif"));

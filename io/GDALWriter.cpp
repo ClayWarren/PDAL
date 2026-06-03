@@ -440,9 +440,19 @@ void GDALWriter::doneFile()
 
 bool GDALWriter::useRustWriter() const
 {
-    return m_supportsView && m_options.empty() && !m_writePDALMetadata &&
-           (m_dataType == Dimension::Type::Double ||
-            m_dataType == Dimension::Type::Signed32);
+    switch (m_dataType)
+    {
+    case Dimension::Type::Unsigned8:
+    case Dimension::Type::Signed16:
+    case Dimension::Type::Unsigned16:
+    case Dimension::Type::Signed32:
+    case Dimension::Type::Unsigned32:
+    case Dimension::Type::Float:
+    case Dimension::Type::Double:
+        return m_supportsView && m_options.empty() && !m_writePDALMetadata;
+    default:
+        return false;
+    }
 }
 
 void GDALWriter::writeRustOutput()
