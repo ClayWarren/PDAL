@@ -332,7 +332,7 @@ mod tests {
         let view = triangle_view();
         let output = filter.run_one(&view).unwrap().pop().unwrap();
         let raster = output.raster("faceraster").unwrap();
-        assert!(raster.data().len() > 0);
+        assert!(!raster.data().is_empty());
     }
 
     #[test]

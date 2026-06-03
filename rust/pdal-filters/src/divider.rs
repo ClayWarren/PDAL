@@ -1,3 +1,4 @@
+use pdal_core::expr::ConditionalExpression;
 use pdal_core::point::PointView;
 use pdal_core::stage::{Filter, StageError, Streamable};
 
@@ -19,6 +20,8 @@ pub struct DividerFilter {
     pub size_mode: DividerSizeMode,
     pub size: u64,
     pub evals: Vec<bool>,
+    expression: Option<ConditionalExpression>,
+    prepared: bool,
 }
 
 impl DividerFilter {
@@ -28,7 +31,38 @@ impl DividerFilter {
             size_mode,
             size,
             evals,
+            expression: None,
+            prepared: false,
         }
+    }
+
+    pub fn new_expression(
+        size_mode: DividerSizeMode,
+        size: u64,
+        expression: &str,
+    ) -> Result<Self, StageError> {
+        let expression = ConditionalExpression::parse(expression)
+            .map_err(|err| StageError(format!("Invalid divider expression: {err}")))?;
+        Ok(Self {
+            mode: DividerMode::Expression,
+            size_mode,
+            size,
+            evals: Vec::new(),
+            expression: Some(expression),
+            prepared: false,
+        })
+    }
+
+    fn ensure_prepared(&mut self, view: &PointView) -> Result<(), StageError> {
+        if !self.prepared {
+            if let Some(expression) = &mut self.expression {
+                expression
+                    .prepare(view.layout().as_ref())
+                    .map_err(StageError)?;
+            }
+            self.prepared = true;
+        }
+        Ok(())
     }
 }
 
@@ -88,10 +122,13 @@ impl Filter for DividerFilter {
                 }
             }
             DividerMode::Expression => {
+                self.ensure_prepared(view)?;
                 views.push(PointView::new(view.layout().clone()));
                 let mut view_num = 0;
                 for i in 0..size {
-                    let passed = if i < self.evals.len() as u64 {
+                    let passed = if let Some(expression) = &self.expression {
+                        expression.eval(view, i)
+                    } else if i < self.evals.len() as u64 {
                         self.evals[i as usize]
                     } else {
                         false
@@ -193,6 +230,15 @@ mod tests {
         assert_eq!(outputs.len(), 3);
         assert_eq!(xs(&outputs[0]), vec![0.0]);
         assert_eq!(xs(&outputs[1]), vec![1.0, 2.0]);
+        assert_eq!(xs(&outputs[2]), vec![3.0, 4.0]);
+
+        let outputs = DividerFilter::new_expression(DividerSizeMode::Count, 0, "X >= 2 && X < 4")
+            .unwrap()
+            .run_one(&input)
+            .unwrap();
+        assert_eq!(outputs.len(), 3);
+        assert_eq!(xs(&outputs[0]), vec![0.0, 1.0]);
+        assert_eq!(xs(&outputs[1]), vec![2.0]);
         assert_eq!(xs(&outputs[2]), vec![3.0, 4.0]);
     }
 

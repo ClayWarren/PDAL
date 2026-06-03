@@ -197,24 +197,16 @@ pub fn create_filter(
         )))),
         "filters.decimation" => Ok(Box::new(FilterWrapper::new(DecimationFilter::new(options)))),
         "filters.divider" => {
-            // `expression` mode (implicit when the `expression` option is set)
-            // splits on a per-point conditional whose delegation is not wired
-            // through the registry; reject it explicitly.
             let mode_str = options.get_str("mode", "partition");
-            if mode_str == "expression" || options.has("expression") {
-                return Err(StageError(
-                    "filters.divider: 'expression' mode is not supported in the Rust \
-                     pipeline registry."
-                        .to_string(),
-                ));
-            }
+            let expression = options.get_str("expression", "");
             let mode = match mode_str.as_str() {
                 "partition" => DividerMode::Partition,
                 "round_robin" => DividerMode::RoundRobin,
+                "expression" => DividerMode::Expression,
                 other => {
                     return Err(StageError(format!(
                         "filters.divider: invalid 'mode' '{other}'. Valid options are \
-                         'partition' and 'round_robin'."
+                         'partition', 'round_robin', and 'expression'."
                     )));
                 }
             };
@@ -228,6 +220,19 @@ pub fn create_filter(
                 return Err(StageError(
                     "filters.divider: option 'capacity' must be greater than 0.".to_string(),
                 ));
+            }
+            if mode == DividerMode::Expression || options.has("expression") {
+                if expression.trim().is_empty() {
+                    return Err(StageError(
+                        "filters.divider: expression mode requires an 'expression' option."
+                            .to_string(),
+                    ));
+                }
+                return Ok(Box::new(FilterWrapper::new(DividerFilter::new_expression(
+                    size_mode,
+                    size,
+                    &expression,
+                )?)));
             }
             Ok(Box::new(FilterWrapper::new(DividerFilter::new(
                 mode,

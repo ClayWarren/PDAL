@@ -126,6 +126,6 @@ mod tests {
         let output = filter.run_one(&input).unwrap().pop().unwrap();
 
         assert_eq!(output.len(), input.len());
-        assert!(output.mesh_named("delaunay2d").unwrap().len() > 0);
+        assert!(!output.mesh_named("delaunay2d").unwrap().is_empty());
     }
 }

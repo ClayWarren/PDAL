@@ -267,7 +267,7 @@ fn smrf_returns_filter_first_only() {
     );
     let result = filter.run_one(&grid_view_with_returns()).unwrap();
     assert_eq!(result.len(), 1);
-    assert!(result[0].len() > 0);
+    assert!(!result[0].is_empty());
 }
 
 #[test]

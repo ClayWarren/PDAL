@@ -510,6 +510,26 @@ fn pipeline_json_runs_newly_registry_visible_filter_families() {
 }
 
 #[test]
+fn registry_divider_expression_mode_splits_on_condition() {
+    let json = r#"[
+        {"type":"readers.faux", "count":5, "mode":"ramp", "minx":0, "maxx":4, "miny":0, "maxy":0, "minz":0, "maxz":0},
+        {"type":"filters.divider", "mode":"expression", "expression":"X >= 2 && X < 4"}
+    ]"#;
+    let mut pipeline = pipeline_from_json(json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+
+    assert_eq!(views.len(), 3);
+    assert_eq!(views[0].len(), 2);
+    assert_eq!(views[0].get_f64(0, &DimId::X), 0.0);
+    assert_eq!(views[0].get_f64(1, &DimId::X), 1.0);
+    assert_eq!(views[1].len(), 1);
+    assert_eq!(views[1].get_f64(0, &DimId::X), 2.0);
+    assert_eq!(views[2].len(), 2);
+    assert_eq!(views[2].get_f64(0, &DimId::X), 3.0);
+    assert_eq!(views[2].get_f64(1, &DimId::X), 4.0);
+}
+
+#[test]
 fn registry_dem_filter_keeps_points_within_raster_limits() {
     // Mirrors the C++ DEMFilterTest: keep points whose Z is within
     // [v, v + 100] of the float32.tif raster sample at their X/Y.

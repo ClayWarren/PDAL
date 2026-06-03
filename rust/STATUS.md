@@ -715,7 +715,9 @@ Known mixed binaries:
 - `pdal_filters_divider_test`: `partition_count`, `partition_capacity`,
   `round_robin_count`, `round_robin_capacity`, `break_on_expression`, and
   `break_on_userdata` count. View partitioning routes through the Rust C ABI.
-  Option validation and C++ expression evaluation remain C++.
+  The direct C++ wrapper still prepares the expression mask before constructing
+  the Rust stage, while the Rust pipeline registry now parses and evaluates
+  expression mode inside `DividerFilter` for JSON/registry pipelines.
 - `pdal_filters_sparsesurface_test`: only `lowest_is_ground_rest_low_noise`
   counts; classification assignment routes through the Rust C ABI. Factory
   registration and equal-class option validation remain C++.

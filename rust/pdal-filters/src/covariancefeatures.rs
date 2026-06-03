@@ -454,12 +454,12 @@ mod tests {
 
         let mut filter_raw = CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Raw, false, "all");
         let out_raw = filter_raw.run_one(&view).unwrap().pop().unwrap();
-        assert!(out_raw.len() > 0);
+        assert!(!out_raw.is_empty());
 
         let mut filter_norm =
             CovarianceFeaturesFilter::new(3, 1, None, 1, Mode::Normalized, false, "all");
         let out_norm = filter_norm.run_one(&view).unwrap().pop().unwrap();
-        assert!(out_norm.len() > 0);
+        assert!(!out_norm.is_empty());
     }
 
     #[test]
