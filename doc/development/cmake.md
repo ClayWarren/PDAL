@@ -14,62 +14,43 @@ We assume you have either {ref}`built or installed<building>` PDAL.
 Begin by creating a file named CMakeLists.txt that contains:
 
 ```cmake
-cmake_minimum_required(VERSION 2.8)
-project(MY_PDAL_PROJECT)
-find_package(PDAL 1.0.0 REQUIRED CONFIG)
-include_directories(${PDAL_INCLUDE_DIRS})
-link_directories(${PDAL_LIBRARY_DIRS})
-add_definitions(${PDAL_DEFINITIONS})
-set(CMAKE_CXX_FLAGS "-std=c++11")
+cmake_minimum_required(VERSION 3.13)
+project(MY_PDAL_PROJECT LANGUAGES CXX)
+find_package(PDAL 2.0.0 REQUIRED CONFIG)
 add_executable(tutorial tutorial.cpp)
-target_link_libraries(tutorial PRIVATE ${PDAL_LIBRARIES})
+target_link_libraries(tutorial PRIVATE PDAL::PDAL)
 ```
 
 ## CMakeLists explained
 
 ```cmake
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.13)
 ```
 
 The `cmake_minimum_required` command specifies the minimum required version of
-CMake. We use some recent additions to CMake in PDAL that require version
-2.8.12.
+CMake.
 
 ```cmake
-project(MY_PDAL_PROJECT)
+project(MY_PDAL_PROJECT LANGUAGES CXX)
 ```
 
 The CMake `project` command names your project and sets a number of useful
 CMake variables.
 
 ```cmake
-find_package(PDAL 1.0.0 REQUIRED CONFIG)
+find_package(PDAL 2.0.0 REQUIRED CONFIG)
 ```
 
-We next ask CMake to locate the PDAL package, requiring version 1.0.0 or higher.
+We next ask CMake to locate the PDAL package, requiring version 2.0.0 or higher.
 
 ```cmake
-include_directories(${PDAL_INCLUDE_DIRS})
-link_directories(${PDAL_LIBRARY_DIRS})
-add_definitions(${PDAL_DEFINITIONS})
+target_link_libraries(tutorial PRIVATE PDAL::PDAL)
 ```
 
-If PDAL is found, the following variables will be set:
-
-- *PDAL_FOUND*: set to 1 if PDAL is found, otherwise unset
-- *PDAL_INCLUDE_DIRS*: set to the paths to PDAL installed headers and the dependency headers
-- *PDAL_LIBRARIES*: set to the file names of the built and installed PDAL libraries
-- *PDAL_LIBRARY_DIRS*: set to the paths where PDAL libraries and 3rd party dependencies reside
-- *PDAL_VERSION*: the detected version of PDAL
-- *PDAL_DEFINITIONS*: list the needed preprocessor definitions and compiler flags
-
-```cmake
-set(CMAKE_CXX_FLAGS "-std=c++11")
-```
-
-We haven't quite implemented the setting of *PDAL_DEFINITIONS* within the
-`PDALConfig.cmake` file, so for now you should specify the c++11 compiler flag,
-as we use it extensively throughout PDAL.
+If PDAL is found, it provides the imported `PDAL::PDAL` target. Link your
+executable or library to that target so CMake receives the installed include
+directories, compile features, and link dependencies from PDAL's package
+configuration.
 
 ```cmake
 add_executable(tutorial tutorial.cpp)
@@ -79,12 +60,12 @@ We use the `add_executable` command to tell CMake to create an executable named
 `tutorial` from the source file `tutorial.cpp`.
 
 ```cmake
-target_link_libraries(tutorial PRIVATE ${PDAL_LIBRARIES})
+target_link_libraries(tutorial PRIVATE PDAL::PDAL)
 ```
 
 We assume that the tutorial executable makes calls to PDAL functions. To make
 the linker aware of the PDAL libraries, we use `target_link_libraries` to link
-`tutorial` against the *PDAL_LIBRARIES*.
+`tutorial` against the imported `PDAL::PDAL` target.
 
 ## Compiling the project
 
