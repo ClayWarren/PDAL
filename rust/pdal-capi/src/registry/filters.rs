@@ -589,12 +589,6 @@ pub fn create_filter(
             get_u64(options, "class", 7)? as u8,
         )))),
         "filters.overlay" => {
-            // The Rust OverlayFilter reads polygons from layer 0 of the OGR
-            // datasource with the given attribute column. The OGR SQL `query`,
-            // explicit `layer`/`lyr_name`, and spatial `bounds` options need
-            // OGR query/layer plumbing the registry path does not drive; error
-            // explicitly on them. `threads` is accepted but ignored (the Rust
-            // filter runs single-threaded).
             let dimension = options.get_str("dimension", "");
             if dimension.trim().is_empty() {
                 return Err(StageError(
@@ -607,20 +601,30 @@ pub fn create_filter(
                     "filters.overlay: missing 'datasource' option.".to_string(),
                 ));
             }
-            for opt in ["query", "layer", "lyr_name", "bounds"] {
-                if !options.get_str(opt, "").trim().is_empty() {
-                    return Err(StageError(format!(
-                        "filters.overlay: the '{opt}' option is not supported in \
-                         the Rust pipeline registry (uses layer 0, no OGR query/\
-                         spatial filter)."
-                    )));
-                }
+            if !options.get_str("bounds", "").trim().is_empty() {
+                return Err(StageError(
+                    "filters.overlay: the 'bounds' option is not supported in \
+                     the Rust pipeline registry (no OGR spatial filter)."
+                        .to_string(),
+                ));
             }
-            Ok(Box::new(FilterWrapper::new(OverlayFilter::new(
-                &dimension,
-                &datasource,
-                &options.get_str("column", ""),
-            ))))
+            let layer_name = {
+                let layer = options.get_str("layer", "");
+                if layer.is_empty() {
+                    options.get_str("lyr_name", "")
+                } else {
+                    layer
+                }
+            };
+            Ok(Box::new(FilterWrapper::new(
+                OverlayFilter::with_layer_or_query(
+                    &dimension,
+                    &datasource,
+                    &options.get_str("column", ""),
+                    &layer_name,
+                    &options.get_str("query", ""),
+                ),
+            )))
         }
         "filters.planefit" => Ok(Box::new(FilterWrapper::new(PlaneFitFilter::new(get_u64(
             options, "knn", 8,

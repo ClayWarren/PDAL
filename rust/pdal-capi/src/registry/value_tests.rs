@@ -1,7 +1,9 @@
 use super::*;
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+use pdal_native::gdal::{VectorFieldType, VectorFieldValue, VectorPointWriter};
 use std::rc::Rc;
+use tempfile::TempDir;
 
 #[test]
 fn registry_assign_filter_supports_value_expressions() {
@@ -67,4 +69,89 @@ fn registry_radiusassign_filter_supports_value_expressions() {
     assert_eq!(views[0].get_f64(1, &DimId::Classification), 3.0);
     assert_eq!(views[0].get_f64(2, &DimId::Classification), 0.0);
     assert_eq!(views[0].get_f64(3, &DimId::Classification), 0.0);
+}
+
+fn overlay_datasource() -> (TempDir, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("overlay.gpkg");
+    let writer =
+        VectorPointWriter::create_polygon(path.to_str().unwrap(), "GPKG", "", "zones").unwrap();
+    writer
+        .create_field("cls", VectorFieldType::Integer)
+        .unwrap();
+    writer
+        .write_geometry_wkt(
+            "MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0)))",
+            &[VectorFieldValue::Integer(5)],
+        )
+        .unwrap();
+    writer
+        .write_geometry_wkt(
+            "MULTIPOLYGON (((20 0, 30 0, 30 10, 20 10, 20 0)))",
+            &[VectorFieldValue::Integer(7)],
+        )
+        .unwrap();
+    drop(writer);
+    (dir, path.display().to_string())
+}
+
+fn overlay_view(x: f64, y: f64) -> PointView {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    layout.register(DimId::Classification, DimType::U8);
+    let mut view = PointView::new(Rc::new(layout));
+    let idx = view.add_point();
+    view.set_f64(idx, &DimId::X, x);
+    view.set_f64(idx, &DimId::Y, y);
+    view.set_f64(idx, &DimId::Z, 0.0);
+    view.set_f64(idx, &DimId::Classification, 0.0);
+    view
+}
+
+#[test]
+fn registry_overlay_filter_supports_named_layers() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Classification");
+    options.add("datasource", datasource);
+    options.add("column", "cls");
+    options.add("lyr_name", "zones");
+    let mut filter = create_filter("filters.overlay", &options).unwrap();
+
+    let views = filter.run(&[overlay_view(5.0, 5.0)]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 5.0);
+}
+
+#[test]
+fn registry_overlay_filter_supports_sql_queries() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Classification");
+    options.add("datasource", datasource);
+    options.add("column", "cls");
+    options.add("query", "SELECT * FROM zones WHERE cls = 7");
+    let mut filter = create_filter("filters.overlay", &options).unwrap();
+
+    let views = filter.run(&[overlay_view(25.0, 5.0)]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 7.0);
+}
+
+#[test]
+fn registry_overlay_filter_prefers_layer_over_query() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Classification");
+    options.add("datasource", datasource);
+    options.add("column", "cls");
+    options.add("layer", "zones");
+    options.add("query", "SELECT * FROM zones WHERE cls = 7");
+    let mut filter = create_filter("filters.overlay", &options).unwrap();
+
+    let views = filter.run(&[overlay_view(5.0, 5.0)]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 5.0);
 }

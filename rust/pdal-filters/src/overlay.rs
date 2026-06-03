@@ -9,15 +9,29 @@ pub struct OverlayFilter {
     dim_name: String,
     datasource: String,
     column: String,
+    layer_name: String,
+    query: String,
     polygons: Vec<(Geometry, i32)>,
 }
 
 impl OverlayFilter {
     pub fn new(dim_name: &str, datasource: &str, column: &str) -> Self {
+        Self::with_layer_or_query(dim_name, datasource, column, "", "")
+    }
+
+    pub fn with_layer_or_query(
+        dim_name: &str,
+        datasource: &str,
+        column: &str,
+        layer_name: &str,
+        query: &str,
+    ) -> Self {
         Self {
             dim_name: dim_name.to_string(),
             datasource: datasource.to_string(),
             column: column.to_string(),
+            layer_name: layer_name.to_string(),
+            query: query.to_string(),
             polygons: Vec::new(),
         }
     }
@@ -26,7 +40,15 @@ impl OverlayFilter {
         if self.polygons.is_empty() {
             gdal::register_drivers();
             let ds = Vector::open(&self.datasource).map_err(StageError)?;
-            let features = ds.get_features(0, &self.column).map_err(StageError)?;
+            let features = if !self.layer_name.is_empty() {
+                ds.get_features_by_layer(&self.layer_name, &self.column)
+                    .map_err(StageError)?
+            } else if !self.query.is_empty() {
+                ds.get_features_by_sql(&self.query, &self.column)
+                    .map_err(StageError)?
+            } else {
+                ds.get_features(0, &self.column).map_err(StageError)?
+            };
             for (wkt, val) in features {
                 let geom = Geometry::from_wkt(&wkt).map_err(StageError)?;
                 self.polygons.push((geom, val));
