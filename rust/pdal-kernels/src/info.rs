@@ -33,7 +33,11 @@ pub enum InfoMode {
     },
     Schema,
     Metadata,
-    All,
+    All {
+        dimensions: Option<Vec<DimId>>,
+        enumerate: Option<Vec<DimId>>,
+        breakout: Option<DimId>,
+    },
     Boundary,
     Stac,
     Points(Vec<PointId>),
@@ -42,7 +46,7 @@ pub enum InfoMode {
 
 impl InfoMode {
     pub fn needs_boundary(&self) -> bool {
-        matches!(self, Self::All | Self::Boundary)
+        matches!(self, Self::All { .. } | Self::Boundary)
     }
 }
 
@@ -171,29 +175,46 @@ fn parse_info_arg<'a>(
 ) -> Result<(), i32> {
     if arg == "--summary" {
         parsed.requests.summary = true;
-        parsed.mode = InfoMode::Summary;
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Summary;
+        }
     } else if arg == "--stats" {
         parsed.requests.stats = true;
-        parsed.mode = InfoMode::Stats {
-            dimensions: None,
-            enumerate: None,
-            breakout: None,
-        };
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Stats {
+                dimensions: None,
+                enumerate: None,
+                breakout: None,
+            };
+        }
     } else if arg == "--schema" {
         parsed.requests.schema = true;
-        parsed.mode = InfoMode::Schema;
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Schema;
+        }
     } else if arg == "--metadata" {
         parsed.requests.metadata = true;
-        parsed.mode = InfoMode::Metadata;
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Metadata;
+        }
     } else if arg == "--all" {
         parsed.requests.all = true;
-        parsed.mode = InfoMode::All;
+        let (dimensions, enumerate, breakout) = stats_selection(&parsed.mode);
+        parsed.mode = InfoMode::All {
+            dimensions,
+            enumerate,
+            breakout,
+        };
     } else if arg == "--boundary" {
         parsed.requests.boundary = true;
-        parsed.mode = InfoMode::Boundary;
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Boundary;
+        }
     } else if arg == "--stac" {
         parsed.requests.stac = true;
-        parsed.mode = InfoMode::Stac;
+        if !parsed.requests.all {
+            parsed.mode = InfoMode::Stac;
+        }
     } else if arg == "-p" || arg == "--point" {
         let Some(point_ids) = parse_point_spec(&next_value(iter, arg)?) else {
             return Err(-1);
@@ -315,51 +336,55 @@ fn validate_info_args(parsed: &InfoArgs) -> Result<(), i32> {
 }
 
 fn apply_stats_dimensions(parsed: &mut InfoArgs, dimensions: Option<Vec<DimId>>) {
-    let (enumerate, breakout) = match parsed.mode.clone() {
-        InfoMode::Stats {
-            enumerate,
-            breakout,
-            ..
-        } => (enumerate, breakout),
-        _ => (None, None),
-    };
-    parsed.mode = InfoMode::Stats {
-        dimensions,
-        enumerate,
-        breakout,
-    };
+    let (_, enumerate, breakout) = stats_selection(&parsed.mode);
+    apply_stats_selection(parsed, dimensions, enumerate, breakout);
 }
 
 fn apply_stats_enumerate(parsed: &mut InfoArgs, enumerate: Option<Vec<DimId>>) {
-    let (dimensions, breakout) = match parsed.mode.clone() {
-        InfoMode::Stats {
-            dimensions,
-            breakout,
-            ..
-        } => (dimensions, breakout),
-        _ => (None, None),
-    };
-    parsed.mode = InfoMode::Stats {
-        dimensions,
-        enumerate,
-        breakout,
-    };
+    let (dimensions, _, breakout) = stats_selection(&parsed.mode);
+    apply_stats_selection(parsed, dimensions, enumerate, breakout);
 }
 
 fn apply_stats_breakout(parsed: &mut InfoArgs, breakout: Option<DimId>) {
-    let (dimensions, enumerate) = match parsed.mode.clone() {
+    let (dimensions, enumerate, _) = stats_selection(&parsed.mode);
+    apply_stats_selection(parsed, dimensions, enumerate, breakout);
+}
+
+fn stats_selection(mode: &InfoMode) -> (Option<Vec<DimId>>, Option<Vec<DimId>>, Option<DimId>) {
+    match mode.clone() {
         InfoMode::Stats {
             dimensions,
             enumerate,
-            ..
-        } => (dimensions, enumerate),
-        _ => (None, None),
-    };
-    parsed.mode = InfoMode::Stats {
-        dimensions,
-        enumerate,
-        breakout,
-    };
+            breakout,
+        }
+        | InfoMode::All {
+            dimensions,
+            enumerate,
+            breakout,
+        } => (dimensions, enumerate, breakout),
+        _ => (None, None, None),
+    }
+}
+
+fn apply_stats_selection(
+    parsed: &mut InfoArgs,
+    dimensions: Option<Vec<DimId>>,
+    enumerate: Option<Vec<DimId>>,
+    breakout: Option<DimId>,
+) {
+    if parsed.requests.all {
+        parsed.mode = InfoMode::All {
+            dimensions,
+            enumerate,
+            breakout,
+        };
+    } else {
+        parsed.mode = InfoMode::Stats {
+            dimensions,
+            enumerate,
+            breakout,
+        };
+    }
 }
 
 fn next_value<'a>(
@@ -530,6 +555,37 @@ mod tests {
                     assert_eq!(serialization_file.as_deref(), Some("pipe.json"));
                 }
                 _ => panic!("expected file plan for {flag}"),
+            }
+        }
+    }
+
+    #[test]
+    fn all_mode_survives_later_display_flags_and_preserves_stats_options() {
+        for args in [
+            vec!["--all", "--schema", "--dimensions=X", "in.las"],
+            vec![
+                "--dimensions=X",
+                "--enumerate=Classification",
+                "--all",
+                "in.las",
+            ],
+        ] {
+            match build_info_plan(&strings(&args)) {
+                InfoKernelPlan::Run(InfoRunPlan::File {
+                    mode:
+                        InfoMode::All {
+                            dimensions,
+                            enumerate,
+                            ..
+                        },
+                    ..
+                }) => {
+                    assert_eq!(dimensions.unwrap(), vec![DimId::X]);
+                    if args.iter().any(|arg| arg.starts_with("--enumerate")) {
+                        assert_eq!(enumerate.unwrap(), vec![DimId::Classification]);
+                    }
+                }
+                _ => panic!("expected all mode for {args:?}"),
             }
         }
     }

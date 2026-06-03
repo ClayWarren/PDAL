@@ -89,7 +89,7 @@ pub(in crate::kernel_abi) unsafe fn run_info_kernel(argc: i32, argv: *const *con
         InfoMode::Stats { .. }
         | InfoMode::Schema
         | InfoMode::Metadata
-        | InfoMode::All
+        | InfoMode::All { .. }
         | InfoMode::Boundary
         | InfoMode::Stac
         | InfoMode::Points(_)
@@ -256,13 +256,23 @@ fn info_report(
         ),
         InfoMode::Schema => schema_report(views),
         InfoMode::Metadata => metadata_report(metadata),
-        InfoMode::All => {
+        InfoMode::All {
+            dimensions,
+            enumerate,
+            breakout,
+        } => {
             let mut output = String::from("{\n");
             output.push_str("  \"schema\":\n");
             output.push_str(&schema_body(views, 2));
             output.push_str(",\n");
             output.push_str("  \"stats\":\n");
-            output.push_str(&stats_body(views, 2, None, None, None));
+            output.push_str(&stats_body(
+                views,
+                2,
+                dimensions.as_deref(),
+                enumerate.as_deref(),
+                breakout.as_ref(),
+            ));
             output.push_str(",\n");
             output.push_str("  \"metadata\": ");
             let metadata_json = metadata_node_to_json_flat(metadata);
