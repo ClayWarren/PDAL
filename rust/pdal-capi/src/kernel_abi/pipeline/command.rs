@@ -84,7 +84,11 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.
-    if parsed.stream_allowed && parsed.metadata_file.is_none() && !parsed.summary_stdout {
+    if parsed.stream_allowed
+        && parsed.metadata_file.is_none()
+        && parsed.pointcloud_schema_file.is_none()
+        && !parsed.summary_stdout
+    {
         match pipeline.execute_streaming() {
             Ok(Some(_)) => {
                 write_progress(&mut progress, "DONEPIPELINE", "pipeline");
@@ -106,6 +110,15 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
             write_progress(&mut progress, "DONEPIPELINE", "pipeline");
+            if let Some(path) = parsed.pointcloud_schema_file {
+                let xml = pdal_core::xml_schema::point_cloud_schema_xml(&result.output_views);
+                if let Err(err) = std::fs::write(&path, xml) {
+                    eprintln!(
+                        "PDAL: kernels.pipeline: Unable to write PointCloudSchema '{path}': {err}"
+                    );
+                    return 1;
+                }
+            }
             if parsed.metadata_file.is_some() || parsed.summary_stdout {
                 let handle = PipelineHandle { pipeline };
                 let summary = pipeline_result_to_json_for_kernel(result, &handle);

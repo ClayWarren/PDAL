@@ -175,6 +175,44 @@ fn rust_kernel_run_enforces_pipeline_stream_options() {
 }
 
 #[test]
+fn rust_kernel_run_writes_pipeline_pointcloud_schema() {
+    let dir = std::env::temp_dir().join(format!(
+        "pdal-rs-kernel-pipeline-schema-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let pipeline = dir.join("pipeline.json");
+    let schema = dir.join("schema.xml");
+    std::fs::write(
+        &pipeline,
+        r#"{"pipeline":[
+            {"type":"readers.faux","count":2,"mode":"ramp"},
+            {"type":"writers.null"}
+        ]}"#,
+    )
+    .unwrap();
+
+    let name = CString::new("pipeline").unwrap();
+    let input = CString::new(pipeline.to_str().unwrap()).unwrap();
+    let option = CString::new("--pointcloudschema").unwrap();
+    let output = CString::new(schema.to_str().unwrap()).unwrap();
+    let argv = [input.as_ptr(), option.as_ptr(), output.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 0);
+    let xml = std::fs::read_to_string(&schema).unwrap();
+    assert!(xml.contains("<pc:PointCloudSchema"));
+    assert!(xml.contains("<pc:name>X</pc:name>"));
+    assert!(xml.contains("<pc:name>Y</pc:name>"));
+    assert!(xml.contains("<pc:name>Z</pc:name>"));
+    assert!(xml.contains("<pc:orientation>point</pc:orientation>"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn rust_kernel_run_reports_metric_missing_inputs() {
     for command in ["hausdorff", "chamfer", "delta", "eval"] {
         let name = CString::new(command).unwrap();

@@ -36,6 +36,7 @@ pub struct ExecResult {
     pub bounds_2d: Option<Bounds2D>,
     pub bounds_3d: Option<Bounds3D>,
     pub dimension_summaries: Vec<DimensionSummary>,
+    pub output_views: Vec<PointView>,
 }
 
 /// A pipeline of stages represented as a DAG.
@@ -44,6 +45,7 @@ pub struct Pipeline {
     tags: HashMap<String, usize>,
     last_writer_point_count: u64,
     last_writer_view_count: usize,
+    last_output_views: Vec<PointView>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +82,7 @@ impl Pipeline {
             tags: HashMap::new(),
             last_writer_point_count: 0,
             last_writer_view_count: 0,
+            last_output_views: Vec::new(),
         }
     }
 
@@ -322,6 +325,7 @@ impl Pipeline {
         }
         self.last_writer_point_count = 0;
         self.last_writer_view_count = 0;
+        self.last_output_views.clear();
 
         let mut outputs: HashMap<usize, Vec<PointView>> = HashMap::new();
 
@@ -374,6 +378,7 @@ impl Pipeline {
                     self.last_writer_point_count +=
                         writer_inputs.iter().map(PointView::len).sum::<u64>();
                     self.last_writer_view_count += writer_inputs.len();
+                    self.last_output_views.extend(writer_inputs.iter().cloned());
                     node.stage.write(&writer_inputs)?;
                     outputs.insert(node_idx, Vec::new());
                 }
@@ -397,14 +402,20 @@ impl Pipeline {
         input_views: Vec<PointView>,
     ) -> Result<ExecResult, StageError> {
         let views = self.execute(input_views)?;
+        let output_views = if views.is_empty() {
+            self.last_output_views.clone()
+        } else {
+            views.clone()
+        };
         let point_count: u64 =
             views.iter().map(|v| v.len()).sum::<u64>() + self.last_writer_point_count;
         Ok(ExecResult {
             point_count,
             view_count: views.len() + self.last_writer_view_count,
-            bounds_2d: aggregate_bounds_2d(&views),
-            bounds_3d: aggregate_bounds_3d(&views),
-            dimension_summaries: aggregate_dimension_summaries(&views),
+            bounds_2d: aggregate_bounds_2d(&output_views),
+            bounds_3d: aggregate_bounds_3d(&output_views),
+            dimension_summaries: aggregate_dimension_summaries(&output_views),
+            output_views,
         })
     }
 
@@ -491,6 +502,7 @@ impl Pipeline {
         }
         self.last_writer_point_count = 0;
         self.last_writer_view_count = 0;
+        self.last_output_views.clear();
 
         let mut total_points = 0u64;
         while let Some(mut chunk) = self.nodes[reader]

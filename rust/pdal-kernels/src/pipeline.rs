@@ -6,6 +6,7 @@ pub struct ParsedPipelineArgs {
     pub validate_only: bool,
     pub metadata_file: Option<String>,
     pub progress_file: Option<String>,
+    pub pointcloud_schema_file: Option<String>,
     pub serialization_file: Option<String>,
     pub summary_stdout: bool,
     pub stream_allowed: bool,
@@ -37,6 +38,7 @@ pub fn parse_pipeline_args(args: &[String]) -> PipelineArgsResult {
         validate_only: false,
         metadata_file: None,
         progress_file: None,
+        pointcloud_schema_file: None,
         serialization_file: None,
         summary_stdout: false,
         stream_allowed: true,
@@ -96,8 +98,7 @@ fn parse_pipeline_arg<'a>(
     } else if arg == "--progress" {
         parsed.progress_file = Some(next_option_value(arg, iter)?.clone());
     } else if arg == "--pointcloudschema" {
-        next_option_value(arg, iter)?;
-        return Err(-1);
+        parsed.pointcloud_schema_file = Some(next_option_value(arg, iter)?.clone());
     } else if arg == "--metadata" {
         parsed.metadata_file = Some(next_option_value("--metadata", iter)?.clone());
     } else if arg == "--pipeline-serialization" {
@@ -321,6 +322,21 @@ mod tests {
         assert_eq!(parsed.metadata_file.as_deref(), Some("meta.json"));
         assert_eq!(parsed.stage_options.len(), 1);
         assert_eq!(parsed.stage_options[0].stage, "filters.sort");
+    }
+
+    #[test]
+    fn parses_pointcloud_schema_output_path() {
+        let args = vec![
+            "pipeline.json".to_string(),
+            "--pointcloudschema".to_string(),
+            "schema.xml".to_string(),
+        ];
+        let PipelineArgsResult::Run(parsed) = parse_pipeline_args(&args) else {
+            panic!("expected runnable pipeline args");
+        };
+
+        assert_eq!(parsed.input.as_deref(), Some("pipeline.json"));
+        assert_eq!(parsed.pointcloud_schema_file.as_deref(), Some("schema.xml"));
     }
 
     #[test]
