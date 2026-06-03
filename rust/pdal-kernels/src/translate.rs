@@ -244,8 +244,9 @@ pub fn translate_json_stages(
     writer: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
     let json = fs::read_to_string(json_arg).unwrap_or_else(|_| json_arg.to_string());
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(&json);
     let value: serde_json::Value =
-        serde_json::from_str(&json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     let stages = if let Some(array) = value.as_array() {
         array.clone()
     } else if let Some(array) = value.get("pipeline").and_then(serde_json::Value::as_array) {
@@ -567,6 +568,24 @@ mod tests {
         assert_eq!(stages.len(), 3);
         assert_eq!(stages[0]["type"], "readers.las");
         assert_eq!(stages[1]["type"], "filters.sort");
+        assert_eq!(stages[2]["type"], "writers.las");
+    }
+
+    #[test]
+    fn translate_json_accepts_commented_pipeline_object() {
+        let json = r#"{
+            "pipeline": [
+                // filter provided by --json
+                {"type":"filters.range","limits":"Z[0:10]"}
+            ]
+        }"#;
+        let stages =
+            translate_json_stages(json, "in.las", "out.las", "readers.las", "writers.las").unwrap();
+
+        assert_eq!(stages.len(), 3);
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[1]["type"], "filters.range");
+        assert_eq!(stages[1]["limits"], "Z[0:10]");
         assert_eq!(stages[2]["type"], "writers.las");
     }
 
