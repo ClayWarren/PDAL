@@ -39,8 +39,15 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
             )));
         };
 
+        validate_type_field(object, position)?;
+        let tag = tag_from_object(object)?;
         let options = options_from_object(object)?;
         let driver_name = stage_name(object, position, stages.len(), &options)?;
+        if driver_name.starts_with("readers.") && object.contains_key("inputs") {
+            return Err(StageError(
+                "JSON pipeline: Inputs not permitted for reader.".to_string(),
+            ));
+        }
         let stage = create_stage(&driver_name, &options)?;
 
         let idx = match stage {
@@ -49,7 +56,7 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
             CreatedStage::Writer(w) => pipeline.add_writer(&driver_name, w, options),
         };
 
-        if let Some(tag) = object.get("tag").and_then(Value::as_str) {
+        if let Some(tag) = tag {
             pipeline.set_tag(idx, tag)?;
             tags.insert(tag.to_string(), idx);
         }
@@ -64,6 +71,45 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
     }
 
     Ok(pipeline)
+}
+
+fn validate_type_field(
+    object: &serde_json::Map<String, Value>,
+    position: usize,
+) -> Result<(), StageError> {
+    match object.get("type") {
+        None | Some(Value::Null) | Some(Value::String(_)) => Ok(()),
+        Some(_) => Err(StageError(format!(
+            "Pipeline stage {position} has a non-string 'type'."
+        ))),
+    }
+}
+
+fn tag_from_object(object: &serde_json::Map<String, Value>) -> Result<Option<&str>, StageError> {
+    let tag = match object.get("tag") {
+        None | Some(Value::Null) => return Ok(None),
+        Some(Value::String(tag)) => tag.as_str(),
+        Some(_) => {
+            return Err(StageError(
+                "JSON pipeline: tag must be specified as a string.".to_string(),
+            ));
+        }
+    };
+    if !valid_tag_name(tag) {
+        return Err(StageError(format!(
+            "JSON pipeline: Invalid tag name '{tag}'. Must start with letter. Remainder can be letters, digits or underscores."
+        )));
+    }
+    Ok(Some(tag))
+}
+
+fn valid_tag_name(tag: &str) -> bool {
+    let mut chars = tag.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 fn filename_stage_object(filename: &str) -> serde_json::Map<String, Value> {

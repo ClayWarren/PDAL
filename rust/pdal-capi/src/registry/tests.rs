@@ -887,6 +887,40 @@ fn pipeline_json_rejects_root_object_without_pipeline_array() {
 }
 
 #[test]
+fn pipeline_json_rejects_invalid_stage_metadata() {
+    let cases = [
+        (r#"[{"type":7,"filename":"in.las"}]"#, "non-string 'type'"),
+        (
+            r#"[{"type":"readers.faux","tag":7}]"#,
+            "tag must be specified as a string",
+        ),
+        (
+            r#"[{"type":"readers.faux","tag":"1bad"}]"#,
+            "Invalid tag name '1bad'",
+        ),
+        (
+            r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","tag":"A"}]"#,
+            "duplicate pipeline tag",
+        ),
+        (
+            r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","inputs":["A"]}]"#,
+            "Inputs not permitted for reader",
+        ),
+    ];
+
+    for (json, message) in cases {
+        let err = match pipeline_from_json(json) {
+            Ok(_) => panic!("{json} should fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains(message),
+            "{message:?} not found in {err}"
+        );
+    }
+}
+
+#[test]
 fn pipeline_json_uses_tagged_inputs() {
     let json = r#"[
             {"type":"readers.faux", "count":10, "tag":"A"},
