@@ -31,9 +31,12 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
+#include <fstream>
 #include <string>
 
+#include <nlohmann/json.hpp>
 #include <pdal/pdal_test_main.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include "Support.hpp"
 
@@ -45,6 +48,17 @@ namespace
 std::string appName()
 {
     return Support::binpath("pdal");
+}
+
+std::string appCommand()
+{
+#ifdef __APPLE__
+    const std::string binDir = FileUtils::getDirectory(appName());
+    const std::string libDir = FileUtils::getDirectory(binDir) + "/lib";
+    return "DYLD_LIBRARY_PATH=\"" + libDir + "\" " + appName();
+#else
+    return appName();
+#endif
 }
 } // unnamed namespace
 
@@ -136,6 +150,37 @@ TEST(PdalApp, option_file)
               Support::datapath("apps/bad_json_opt") + " 2>&1";
     Utils::run_shell_command(command, output);
     EXPECT_TRUE(output.find("Unexpected argument") != std::string::npos);
+}
+
+TEST(PdalApp, pipeline_dims_limits_metadata_dimensions)
+{
+    const std::string pipelineFile = Support::temppath("pipeline-dims.json");
+    const std::string metadataFile =
+        Support::temppath("pipeline-dims-meta.json");
+    FileUtils::deleteFile(pipelineFile);
+    FileUtils::deleteFile(metadataFile);
+
+    std::ofstream pipeline(pipelineFile);
+    pipeline << R"({
+        "pipeline": [
+            {"type": "readers.faux", "mode": "ramp", "count": 3},
+            {"type": "writers.null"}
+        ]
+    })";
+    pipeline.close();
+
+    std::string output;
+    const std::string command = appCommand() + " pipeline " + pipelineFile +
+                                " --nostream --metadata " + metadataFile +
+                                " --dims Z,X 2>&1";
+    ASSERT_EQ(0, Utils::run_shell_command(command, output)) << output;
+
+    const std::string metadata = FileUtils::readFileIntoString(metadataFile);
+    const nlohmann::json json = nlohmann::json::parse(metadata);
+    ASSERT_TRUE(json.contains("dimension_summaries"));
+    ASSERT_EQ(2u, json["dimension_summaries"].size());
+    EXPECT_EQ("Z", json["dimension_summaries"][0]["name"].get<std::string>());
+    EXPECT_EQ("X", json["dimension_summaries"][1]["name"].get<std::string>());
 }
 
 } // namespace pdal
