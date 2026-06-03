@@ -121,53 +121,7 @@ fn stage_name(
 pub(crate) fn options_from_object(
     object: &serde_json::Map<String, Value>,
 ) -> Result<Options, StageError> {
-    let mut options = Options::new();
-    for (key, value) in object {
-        if matches!(key.as_str(), "type" | "tag" | "inputs") {
-            continue;
-        }
-        match value {
-            Value::String(s) => {
-                options.add(key, s);
-            }
-            Value::Bool(b) => {
-                options.add(key, *b);
-            }
-            Value::Number(n) => {
-                options.add(key, n);
-            }
-            Value::Array(items) => {
-                let joined = items
-                    .iter()
-                    .map(option_value_to_string)
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(",");
-                options.add(key, joined);
-            }
-            // A nested object option value is stored as its JSON text, matching
-            // C++ PDAL (e.g. filters.mongo's `expression` query object).
-            Value::Object(_) => {
-                options.add(key, value.to_string());
-            }
-            Value::Null => {
-                return Err(StageError(format!(
-                    "Option '{key}' must be a scalar, scalar array, or object."
-                )));
-            }
-        }
-    }
-    Ok(options)
-}
-
-fn option_value_to_string(value: &Value) -> Result<String, StageError> {
-    match value {
-        Value::String(s) => Ok(s.clone()),
-        Value::Bool(b) => Ok(b.to_string()),
-        Value::Number(n) => Ok(n.to_string()),
-        _ => Err(StageError(
-            "Array options must contain only scalar values.".to_string(),
-        )),
-    }
+    Options::from_pipeline_stage_object(object).map_err(StageError)
 }
 
 fn add_explicit_inputs(

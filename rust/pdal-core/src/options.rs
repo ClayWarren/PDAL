@@ -5,6 +5,10 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::{Map, Value};
+
+use crate::utils::simple_wordexp;
+
 /// A set of named option values for a stage.
 #[derive(Debug, Default, Clone)]
 pub struct Options {
@@ -66,6 +70,81 @@ impl Options {
     /// Replace every value for an option key with a single new value.
     pub fn replace(&mut self, key: &str, value: impl ToString) -> &mut Self {
         self.remove(key).add(key, value)
+    }
+
+    /// Build options from a JSON object as used by PDAL option files.
+    pub fn from_json_object(object: &Map<String, Value>) -> Result<Self, String> {
+        let mut options = Options::new();
+        for (key, value) in object {
+            options.add(key, json_option_value_to_string(key, value)?);
+        }
+        Ok(options)
+    }
+
+    /// Build options from a pipeline stage object.
+    ///
+    /// Framework keys are skipped, and scalar arrays are represented as the
+    /// comma-separated strings expected by current Rust stage option parsers.
+    pub fn from_pipeline_stage_object(object: &Map<String, Value>) -> Result<Self, String> {
+        let mut options = Options::new();
+        for (key, value) in object {
+            if matches!(key.as_str(), "type" | "tag" | "inputs") {
+                continue;
+            }
+            match value {
+                Value::Array(items) => {
+                    let joined = items
+                        .iter()
+                        .map(|item| scalar_option_value_to_string(key, item))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(",");
+                    options.add(key, joined);
+                }
+                Value::Object(_) => {
+                    options.add(key, value.to_string());
+                }
+                Value::Null => {
+                    return Err(format!(
+                        "Option '{key}' must be a scalar, scalar array, or object."
+                    ));
+                }
+                _ => {
+                    options.add(key, scalar_option_value_to_string(key, value)?);
+                }
+            }
+        }
+        Ok(options)
+    }
+
+    /// Build options from a command-line option file body.
+    pub fn from_command_line_text(text: &str) -> Result<Self, String> {
+        let args = simple_wordexp(text);
+        let mut options = Options::new();
+        let mut i = 0;
+        while i < args.len() {
+            let option = &args[i];
+            let Some(spec) = option.strip_prefix("--") else {
+                return Err(format!("Option '{option}' missing leading \"--\"."));
+            };
+            if spec.is_empty() {
+                return Err(format!("Invalid option '{option}'."));
+            }
+            let (name, value) = if let Some((name, value)) = spec.split_once('=') {
+                (name, value.to_string())
+            } else {
+                i += 1;
+                let Some(value) = args.get(i) else {
+                    return Err(format!("No value found for option '{option}'."));
+                };
+                (spec, value.clone())
+            };
+            if name.is_empty() || value.is_empty() {
+                return Err(format!("No value found for option '{option}'."));
+            }
+            options.add(name, value);
+            i += 1;
+        }
+        Ok(options)
     }
 
     /// Whether `key` was set.
@@ -224,6 +303,25 @@ pub fn option_name_valid(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+fn json_option_value_to_string(key: &str, value: &Value) -> Result<String, String> {
+    match value {
+        Value::Null => Ok(String::new()),
+        Value::Array(_) | Value::Object(_) => Ok(value.to_string()),
+        _ => scalar_option_value_to_string(key, value),
+    }
+}
+
+fn scalar_option_value_to_string(key: &str, value: &Value) -> Result<String, String> {
+    match value {
+        Value::String(value) => Ok(value.clone()),
+        Value::Bool(value) => Ok(value.to_string()),
+        Value::Number(value) => Ok(value.to_string()),
+        _ => Err(format!(
+            "Value of stage option '{key}' cannot be converted."
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +430,59 @@ mod tests {
         options.remove("mode");
         assert!(!options.has("mode"));
         assert_eq!(options.len(), 1);
+    }
+
+    #[test]
+    fn json_options_preserve_pdal_option_file_shapes() {
+        let object = serde_json::json!({
+            "string": "text",
+            "uint": 42,
+            "float": 1.5,
+            "flag": true,
+            "empty": null,
+            "array": [1, "two"],
+            "object": {"a": 1}
+        });
+        let options = Options::from_json_object(object.as_object().unwrap()).unwrap();
+
+        assert_eq!(options.value("string"), Some("text"));
+        assert_eq!(options.value("uint"), Some("42"));
+        assert_eq!(options.value("float"), Some("1.5"));
+        assert_eq!(options.value("flag"), Some("true"));
+        assert_eq!(options.value("empty"), Some(""));
+        assert_eq!(options.value("array"), Some("[1,\"two\"]"));
+        assert_eq!(options.value("object"), Some("{\"a\":1}"));
+    }
+
+    #[test]
+    fn pipeline_stage_options_skip_framework_keys_and_join_arrays() {
+        let object = serde_json::json!({
+            "type": "filters.crop",
+            "tag": "cropper",
+            "inputs": ["reader"],
+            "bounds": ["([0,1],[0,1])", "([2,3],[2,3])"],
+            "polygon": {"type": "Polygon"}
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+
+        assert!(!options.has("type"));
+        assert!(!options.has("tag"));
+        assert!(!options.has("inputs"));
+        assert_eq!(options.value("bounds"), Some("([0,1],[0,1]),([2,3],[2,3])"));
+        assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
+    }
+
+    #[test]
+    fn parses_command_line_option_file_text() {
+        let options =
+            Options::from_command_line_text("--alpha=1 --beta two --gamma \"three four\"").unwrap();
+
+        assert_eq!(options.value("alpha"), Some("1"));
+        assert_eq!(options.value("beta"), Some("two"));
+        assert_eq!(options.value("gamma"), Some("three four"));
+        assert!(Options::from_command_line_text("alpha=1").is_err());
+        assert!(Options::from_command_line_text("--alpha").is_err());
+        assert!(Options::from_command_line_text("--alpha=").is_err());
     }
 
     #[test]
