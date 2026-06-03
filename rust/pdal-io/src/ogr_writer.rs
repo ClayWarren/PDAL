@@ -2,8 +2,8 @@
 //!
 //! The C++ writer is a broad OGR/GDAL adapter. This Rust writer covers local
 //! GeoJSON output plus native OGR-backed Shapefile and GeoPackage point output
-//! for the covered C++ test shapes. Transactions stay deferred to later native
-//! OGR milestones.
+//! for the covered C++ test shapes, including native OGR transactions where
+//! the target driver supports them.
 
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
