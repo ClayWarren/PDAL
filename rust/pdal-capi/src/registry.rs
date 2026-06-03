@@ -240,6 +240,8 @@ pub fn create_stage(name: &str, options: &Options) -> Result<CreatedStage, Stage
 }
 
 #[cfg(test)]
+mod pipeline_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod value_tests;
