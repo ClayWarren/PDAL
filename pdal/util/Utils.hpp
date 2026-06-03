@@ -795,7 +795,6 @@ inline std::string toString(bool from)
 */
 PDAL_EXPORT std::string toString(double from, size_t precision = 10);
 
-
 /**
   Convert a float to string with a precision of 10 decimal places.
 
@@ -974,7 +973,7 @@ StatusWithReason fromString(const std::string& from, T& to)
     return !failure;
 }
 
-template <> PDAL_EXPORT StatusWithReason fromString(const std::string& from, int& to);
+PDAL_EXPORT StatusWithReason fromString(const std::string& from, int& to);
 
 // Optimization of above.
 template <>
@@ -1084,7 +1083,7 @@ inline StatusWithReason fromString(const std::string& s, signed char& to)
   \param d  Converted value.
   \return  \c true if the conversion was successful, \c false otherwise.
 */
-template <> PDAL_EXPORT StatusWithReason fromString(const std::string& s, double& d);
+PDAL_EXPORT StatusWithReason fromString(const std::string& s, double& d);
 
 /**
   Return the argument cast to its underlying type.  Typically used on

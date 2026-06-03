@@ -136,7 +136,6 @@ std::string Utils::toString(int from)
 #endif
 }
 
-template <>
 Utils::StatusWithReason Utils::fromString(const std::string& from, int& to)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI
@@ -186,7 +185,6 @@ template <> bool Utils::numericCast(double in, float& out)
 #endif
 }
 
-template <>
 Utils::StatusWithReason Utils::fromString(const std::string& s, double& d)
 {
 #ifndef PDAL_UTILS_NO_RUST_CAPI
