@@ -43,6 +43,7 @@
 #include "Support.hpp"
 
 #include <fstream>
+#include <utility>
 
 namespace
 {
@@ -53,6 +54,12 @@ const std::string xml_int_ref =
 const std::string xml_str_ref =
     "<Name>my_string</Name><Value>Yow.</Value><Description>This is my stringy "
     "option.</Description>";
+
+void expectCommandLine(const pdal::Options& options,
+                       const pdal::StringList& expected)
+{
+    EXPECT_EQ(options.toCommandLine(), expected);
+}
 } // namespace
 
 namespace pdal
@@ -129,6 +136,39 @@ TEST(OptionsTest, json_file_allows_leading_comments)
     Options ops = Options::fromFile(file.filename());
     EXPECT_EQ(ops.getValues("count"), StringList({"7"}));
     EXPECT_EQ(ops.getValues("name"), StringList({"autzen"}));
+}
+
+TEST(OptionsTest, rust_mirror_tracks_lifecycle_mutations)
+{
+    Options original;
+    original.add("beta", "2");
+    original.add("alpha", "1");
+    original.add("alpha", "second");
+    expectCommandLine(original,
+                      StringList({"--alpha=1", "--alpha=second", "--beta=2"}));
+
+    Options copied(original);
+    copied.replace("alpha", "replacement");
+    copied.remove(Option("beta", ""));
+    copied.addConditional(Option("alpha", "ignored"));
+    copied.addConditional(Option("gamma", "3"));
+    expectCommandLine(copied, StringList({"--alpha=replacement", "--gamma=3"}));
+    expectCommandLine(original,
+                      StringList({"--alpha=1", "--alpha=second", "--beta=2"}));
+
+    Options assigned;
+    assigned = copied;
+    expectCommandLine(assigned,
+                      StringList({"--alpha=replacement", "--gamma=3"}));
+
+    Options moved(std::move(assigned));
+    expectCommandLine(moved, StringList({"--alpha=replacement", "--gamma=3"}));
+
+    Options moveAssigned;
+    moveAssigned.add("old", "value");
+    moveAssigned = std::move(moved);
+    expectCommandLine(moveAssigned,
+                      StringList({"--alpha=replacement", "--gamma=3"}));
 }
 
 TEST(OptionsTest, programargs)
