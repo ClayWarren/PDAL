@@ -449,7 +449,7 @@ bool GDALWriter::useRustWriter() const
     case Dimension::Type::Unsigned32:
     case Dimension::Type::Float:
     case Dimension::Type::Double:
-        return m_supportsView && m_options.empty() && !m_writePDALMetadata;
+        return m_supportsView && m_options.empty();
     default:
         return false;
     }

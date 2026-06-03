@@ -954,6 +954,7 @@ TEST(GDALWriterTest, testMetadata)
     wo.add("resolution", 1);
     wo.add("radius", .7071);
     wo.add("metadata", "AREA_OR_PIXEL=Pixel,empty=,equals=some_more_equals===");
+    wo.add("pdal_metadata", true);
     wo.add("filename", outfile);
     wo.add("window_size", 2);
 
@@ -980,6 +981,14 @@ TEST(GDALWriterTest, testMetadata)
         FAIL() << "Couldn't find raster metadata equals";
 
     EXPECT_EQ(l.value(), "some_more_equals===");
+
+    l = raster.getMetadata().findChild("pdal_metadata");
+    if (l.empty())
+        FAIL() << "Couldn't find raster metadata pdal_metadata";
+
+    l = raster.getMetadata().findChild("pdal_pipeline");
+    if (l.empty())
+        FAIL() << "Couldn't find raster metadata pdal_pipeline";
 }
 
 } // namespace pdal
