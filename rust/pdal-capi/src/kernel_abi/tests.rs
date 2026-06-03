@@ -389,6 +389,19 @@ fn rust_kernel_run_reports_translate_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_rejects_unmatched_translate_stage_option() {
+    let name = CString::new("translate").unwrap();
+    let input = CString::new("in.las").unwrap();
+    let output = CString::new("out.las").unwrap();
+    let option = CString::new("--filters.sort.dimension=Y").unwrap();
+    let argv = [input.as_ptr(), output.as_ptr(), option.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
 fn rust_kernel_run_enforces_translate_stream_and_overwrite_options() {
     let input = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")

@@ -92,7 +92,8 @@ pub fn build_translate_plan(args: &[String]) -> TranslateKernelPlan {
         Err(code) => return TranslateKernelPlan::Return(code),
     };
     if !apply_cli_stage_options(&mut stages, &stage_options) {
-        return TranslateKernelPlan::Return(-1);
+        eprintln!("PDAL: kernels.translate: Unable to apply stage option to pipeline.");
+        return TranslateKernelPlan::Return(1);
     }
 
     TranslateKernelPlan::Run(TranslatePlan {
@@ -207,7 +208,10 @@ fn parse_translate_arg<'a>(
     } else if arg.starts_with("--") {
         match parse_cli_stage_option(arg) {
             Some(option) => parsed.stage_options.push(option),
-            None => return Err(-1),
+            None => {
+                eprintln!("PDAL: kernels.translate: Unknown option '{arg}'.");
+                return Err(1);
+            }
         }
     } else if parsed.input.is_none() {
         parsed.input = Some(arg.to_string());
@@ -518,10 +522,11 @@ mod tests {
             vec!["in.unknown", "out.las"],
             vec!["in.las", "out.unknown"],
             vec!["in.las", "out.las", "--not-a-stage-option"],
+            vec!["in.las", "out.las", "--filters.sort.dimension=X"],
         ] {
             let args = strings(&args);
             assert!(
-                matches!(build_translate_plan(&args), TranslateKernelPlan::Return(_)),
+                matches!(build_translate_plan(&args), TranslateKernelPlan::Return(1)),
                 "{args:?}"
             );
         }
