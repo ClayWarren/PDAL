@@ -215,6 +215,21 @@ fn ept_preview_options_apply_transformed_bounds() {
         );
         assert!(!handle.is_null());
         assert_eq!(pdal_ept_reader_preview_point_count(handle), 430376);
+        let mut minx = 0.0;
+        let mut miny = 0.0;
+        let mut minz = 0.0;
+        let mut maxx = 0.0;
+        let mut maxy = 0.0;
+        let mut maxz = 0.0;
+        assert!(pdal_ept_reader_preview_bounds(
+            handle, &mut minx, &mut miny, &mut minz, &mut maxx, &mut maxy, &mut maxz,
+        ));
+        assert_eq!(minx, 515380.0);
+        assert_eq!(miny, 4918350.0);
+        assert_eq!(minz, 2322.0);
+        assert_eq!(maxx, 515400.0);
+        assert_eq!(maxy, 4918370.0);
+        assert_eq!(maxz, 2339.0);
         pdal_ept_reader_preview_destroy(handle);
     }
 }

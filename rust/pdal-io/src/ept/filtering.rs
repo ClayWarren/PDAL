@@ -24,6 +24,13 @@ impl BoundsFilter {
             let source_srs = info["srs"]["wkt"].as_str().unwrap_or("");
             let source = user_input_to_wkt(source_srs).map_err(StageError)?;
             let target = user_input_to_wkt(target_srs).map_err(StageError)?;
+            if pdal_native::srs::is_same(&source.wkt, &target.wkt, source.epoch) {
+                return Ok(Self {
+                    query,
+                    transform: None,
+                    conservative_hierarchy_overlap,
+                });
+            }
             conservative_hierarchy_overlap =
                 pdal_native::srs::is_geocentric(&source.wkt, source.epoch)
                     && pdal_native::srs::is_geographic(&target.wkt, target.epoch);

@@ -432,10 +432,10 @@ fn preview_applies_transformed_bounds_to_hierarchy_count() {
     let preview = read_ept_preview_with_reader_options(&options).unwrap();
 
     assert_eq!(preview.point_count, 430376);
-    assert!(preview.bounds_conforming.minx < 515380.0);
-    assert!(preview.bounds_conforming.maxx > 515400.0);
-    assert!(preview.bounds_conforming.miny < 4918350.0);
-    assert!(preview.bounds_conforming.maxy > 4918370.0);
+    assert_eq!(preview.bounds_conforming.minx, 515380.0);
+    assert_eq!(preview.bounds_conforming.maxx, 515400.0);
+    assert_eq!(preview.bounds_conforming.miny, 4918350.0);
+    assert_eq!(preview.bounds_conforming.maxy, 4918370.0);
 }
 
 #[test]
