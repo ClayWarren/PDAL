@@ -457,17 +457,26 @@ fn parse_native_ogr_bounds(
         vector
             .get_feature_wkts_by_sql(&spec.sql, dialect)
             .map_err(StageError)?
+    } else if let Some(id_filter) = id_filter {
+        if spec.layer.is_empty() {
+            vector
+                .get_features(0, "id")
+                .map_err(StageError)?
+                .into_iter()
+                .filter_map(|(wkt, id)| (id as i64 == id_filter).then_some(wkt))
+                .collect()
+        } else {
+            vector
+                .get_features_by_layer(&spec.layer, "id")
+                .map_err(StageError)?
+                .into_iter()
+                .filter_map(|(wkt, id)| (id as i64 == id_filter).then_some(wkt))
+                .collect()
+        }
     } else if !spec.layer.is_empty() {
         vector
             .get_feature_wkts_by_layer(&spec.layer)
             .map_err(StageError)?
-    } else if let Some(id_filter) = id_filter {
-        vector
-            .get_features(0, "id")
-            .map_err(StageError)?
-            .into_iter()
-            .filter_map(|(wkt, id)| (id as i64 == id_filter).then_some(wkt))
-            .collect()
     } else {
         vector.get_feature_wkts(0).map_err(StageError)?
     };
