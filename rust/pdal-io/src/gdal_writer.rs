@@ -50,6 +50,7 @@ pub struct GdalWriter {
     bounds: String,
     fixed_grid: Option<FixedGrid>,
     fixed_grid_arg_count: usize,
+    gdal_options: Vec<String>,
     metadata: Vec<(String, String)>,
     override_srs: String,
     default_srs: String,
@@ -104,6 +105,7 @@ impl GdalWriter {
             bounds: options.get_str("bounds", ""),
             fixed_grid: fixed_grid(options),
             fixed_grid_arg_count: fixed_grid_arg_count(options),
+            gdal_options: parse_gdal_options(options),
             metadata: parse_metadata(options),
             override_srs: options.get_str("override_srs", ""),
             default_srs: options.get_str("default_srs", ""),
@@ -179,7 +181,7 @@ impl Writer for GdalWriter {
         let srs_wkt = resolve_srs(views, &self.override_srs, &self.default_srs);
 
         pdal_core::gdal::register_drivers();
-        let mut raster = pdal_core::gdal::Raster::create_typed(
+        let mut raster = pdal_core::gdal::Raster::create_typed_with_options(
             &self.filename,
             &self.driver_name,
             grid.width as i32,
@@ -188,6 +190,7 @@ impl Writer for GdalWriter {
             geo_transform,
             &srs_wkt,
             self.data_type.gdal_type(),
+            &self.gdal_options,
         )
         .map_err(StageError)?;
         for (idx, (name, data)) in bands.iter().enumerate() {
@@ -663,6 +666,17 @@ fn parse_metadata(options: &Options) -> Vec<(String, String)> {
             let (key, value) = entry.split_once('=')?;
             Some((key.trim().to_string(), value.to_string()))
         })
+        .collect()
+}
+
+fn parse_gdal_options(options: &Options) -> Vec<String> {
+    options
+        .values("gdalopts")
+        .iter()
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
         .collect()
 }
 

@@ -48,6 +48,34 @@ fn metadata_roundtrip_includes_empty_values_in_memory() {
 }
 
 #[test]
+fn raster_create_applies_creation_options() {
+    register_drivers();
+    let path = temp_tif("creation-options");
+    let mut raster = Raster::create_typed_with_options(
+        path.to_str().unwrap(),
+        "GTiff",
+        1,
+        1,
+        1,
+        [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
+        "",
+        RasterDataType::Float64,
+        &["COMPRESS=LZW".to_string()],
+    )
+    .unwrap();
+    raster
+        .write_band_f64(1, 1, 1, &[1.0], -9999.0, "Z")
+        .unwrap();
+    drop(raster);
+
+    let raster = Raster::open(path.to_str().unwrap()).unwrap();
+    assert_eq!(
+        raster.metadata_item_domain("COMPRESSION", "IMAGE_STRUCTURE"),
+        Some("LZW".to_string())
+    );
+}
+
+#[test]
 fn test_raster_create_invalid_driver() {
     let path = temp_tif("invalid-driver");
     let res = Raster::create_float64(

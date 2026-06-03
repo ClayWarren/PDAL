@@ -2,6 +2,7 @@ use gdal_sys::{
     CPLErr, GDALAccess, GDALDataType, GDALDatasetH, GDALGetRasterBand, GDALRWFlag, GDALRasterIO,
 };
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 
 pub struct Raster {
     ds: GDALDatasetH,
@@ -68,6 +69,7 @@ impl Raster {
             geo_transform,
             srs_wkt,
             GDALDataType::GDT_Float64,
+            &[],
         )
     }
 
@@ -89,6 +91,7 @@ impl Raster {
             geo_transform,
             srs_wkt,
             GDALDataType::GDT_Int32,
+            &[],
         )
     }
 
@@ -103,6 +106,31 @@ impl Raster {
         srs_wkt: &str,
         pixel_type: RasterDataType,
     ) -> Result<Self, String> {
+        Self::create_typed_with_options(
+            path,
+            driver_name,
+            width,
+            height,
+            band_count,
+            geo_transform,
+            srs_wkt,
+            pixel_type,
+            &[],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_typed_with_options(
+        path: &str,
+        driver_name: &str,
+        width: i32,
+        height: i32,
+        band_count: i32,
+        geo_transform: [f64; 6],
+        srs_wkt: &str,
+        pixel_type: RasterDataType,
+        creation_options: &[String],
+    ) -> Result<Self, String> {
         Self::create(
             path,
             driver_name,
@@ -112,6 +140,7 @@ impl Raster {
             geo_transform,
             srs_wkt,
             pixel_type.gdal_type(),
+            creation_options,
         )
     }
 
@@ -125,9 +154,19 @@ impl Raster {
         geo_transform: [f64; 6],
         srs_wkt: &str,
         pixel_type: gdal_sys::GDALDataType::Type,
+        creation_options: &[String],
     ) -> Result<Self, String> {
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let driver_name_c = CString::new(driver_name).map_err(|e| e.to_string())?;
+        let option_strings = creation_options
+            .iter()
+            .map(|option| CString::new(option.as_str()).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut option_ptrs = option_strings
+            .iter()
+            .map(|option| option.as_ptr() as *mut c_char)
+            .collect::<Vec<_>>();
+        option_ptrs.push(std::ptr::null_mut());
         unsafe {
             let driver = gdal_sys::GDALGetDriverByName(driver_name_c.as_ptr());
             if driver.is_null() {
@@ -140,7 +179,7 @@ impl Raster {
                 height,
                 band_count,
                 pixel_type,
-                std::ptr::null_mut(),
+                option_ptrs.as_mut_ptr(),
             );
             if ds.is_null() {
                 return Err(format!("Failed to create GDAL dataset: {}", path));
@@ -407,8 +446,12 @@ impl Raster {
     }
 
     pub fn metadata_item(&self, key: &str) -> Option<String> {
+        self.metadata_item_domain(key, "")
+    }
+
+    pub fn metadata_item_domain(&self, key: &str, domain: &str) -> Option<String> {
         let key_c = CString::new(key).ok()?;
-        let domain_c = CString::new("").ok()?;
+        let domain_c = CString::new(domain).ok()?;
         unsafe {
             let value = gdal_sys::GDALGetMetadataItem(
                 self.ds as gdal_sys::GDALMajorObjectH,

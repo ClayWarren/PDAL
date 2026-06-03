@@ -14,6 +14,7 @@ pub struct RasterWriter {
     raster_names: Vec<String>,
     data_type: RasterDataType,
     data_type_error: Option<String>,
+    gdal_options: Vec<String>,
     no_data: f64,
 }
 
@@ -26,6 +27,7 @@ impl RasterWriter {
             raster_names: raster_names(options),
             data_type,
             data_type_error,
+            gdal_options: parse_gdal_options(options),
             no_data: options.get_f64("nodata", f64::NAN),
         }
     }
@@ -75,7 +77,7 @@ impl Writer for RasterWriter {
             .unwrap_or_default();
 
         pdal_core::gdal::register_drivers();
-        let mut output = pdal_core::gdal::Raster::create_typed(
+        let mut output = pdal_core::gdal::Raster::create_typed_with_options(
             &self.filename,
             &self.driver_name,
             limits.width as i32,
@@ -84,6 +86,7 @@ impl Writer for RasterWriter {
             geo_transform,
             &srs_wkt,
             self.data_type,
+            &self.gdal_options,
         )
         .map_err(StageError)?;
 
@@ -165,6 +168,17 @@ fn convert_no_data(values: &[f64], source_no_data: f64, output_no_data: f64) -> 
 fn raster_names(options: &Options) -> Vec<String> {
     options
         .values("rasters")
+        .iter()
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn parse_gdal_options(options: &Options) -> Vec<String> {
+    options
+        .values("gdalopts")
         .iter()
         .flat_map(|value| value.split(','))
         .map(str::trim)
@@ -295,13 +309,18 @@ mod tests {
         let mut options = Options::new();
         options
             .add("filename", output.display())
-            .add("data_type", "float");
+            .add("data_type", "float")
+            .add("gdalopts", "COMPRESS=LZW");
         let mut writer = RasterWriter::new(&options);
 
         writer.write(&[view]).unwrap();
 
         let raster = pdal_core::gdal::Raster::open(output.to_str().unwrap()).unwrap();
         assert_eq!(raster.band_type_name(1).unwrap(), "Float32");
+        assert_eq!(
+            raster.metadata_item_domain("COMPRESSION", "IMAGE_STRUCTURE"),
+            Some("LZW".to_string())
+        );
     }
 
     #[test]

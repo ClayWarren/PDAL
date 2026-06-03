@@ -310,10 +310,16 @@ fn writer_writes_with_metadata_items() {
     options.add("filename", out.to_str().unwrap());
     options.add("resolution", 1.0);
     options.add("output_type", "mean");
+    options.add("gdalopts", "COMPRESS=LZW");
     options.add("metadata", "AREA_OR_PIXEL=Pixel,Author=test");
     let mut writer = GdalWriter::new(&options);
     let view = make_view_with_points();
-    let _ = writer.write(&[view]);
+    writer.write(&[view]).unwrap();
+    let raster = pdal_core::gdal::Raster::open(out.to_str().unwrap()).unwrap();
+    assert_eq!(
+        raster.metadata_item_domain("COMPRESSION", "IMAGE_STRUCTURE"),
+        Some("LZW".to_string())
+    );
     let _ = std::fs::remove_file(&out);
 }
 
