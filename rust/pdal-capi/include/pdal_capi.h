@@ -51,6 +51,9 @@ extern "C"
                               const char* value);
     void pdal_options_add_conditional_str(pdal_options_t* ops, const char* key,
                                           const char* value);
+    void pdal_options_extend(pdal_options_t* ops, const pdal_options_t* other);
+    void pdal_options_extend_conditional(pdal_options_t* ops,
+                                         const pdal_options_t* other);
     void pdal_options_remove(pdal_options_t* ops, const char* key);
     void pdal_options_replace_str(pdal_options_t* ops, const char* key,
                                   const char* value);

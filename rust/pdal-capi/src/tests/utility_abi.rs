@@ -60,8 +60,30 @@ fn options_abi_exposes_sorted_entries_and_command_line() {
             take_string(pdal_options_value(options, a.as_ptr())),
             "replacement"
         );
+
+        let other = pdal_options_create();
+        pdal_options_add_str(other, a.as_ptr(), cstring("from-other").as_ptr());
+        pdal_options_add_str(other, cstring("c").as_ptr(), cstring("third").as_ptr());
+        pdal_options_extend_conditional(options, other);
+        assert_eq!(pdal_options_count(options), 4);
+        assert_eq!(
+            take_string(pdal_options_value(options, a.as_ptr())),
+            "replacement"
+        );
+        assert_eq!(
+            take_string(pdal_options_value(options, cstring("c").as_ptr())),
+            "third"
+        );
+        pdal_options_extend(options, other);
+        assert_eq!(pdal_options_count(options), 6);
+        assert_eq!(
+            take_string(pdal_options_value(options, a.as_ptr())),
+            "from-other"
+        );
+        pdal_options_destroy(other);
+
         pdal_options_remove(options, a.as_ptr());
-        assert_eq!(pdal_options_count(options), 2);
+        assert_eq!(pdal_options_count(options), 4);
         assert!(!pdal_options_has(options, a.as_ptr()));
         assert!(pdal_options_key(options, 99).is_null());
         assert!(pdal_options_entry_value(options, 99).is_null());

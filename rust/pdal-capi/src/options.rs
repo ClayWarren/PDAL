@@ -132,6 +132,30 @@ pub unsafe extern "C" fn pdal_options_add_conditional_str(
     }
 }
 
+/// Append all options from another set, preserving duplicate-key order.
+///
+/// # Safety
+///
+/// `ops` and `other` must be valid pointers returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_extend(ops: *mut Options, other: *const Options) {
+    if let (Some(ops), Some(other)) = (ops.as_mut(), other.as_ref()) {
+        ops.extend(other);
+    }
+}
+
+/// Append options from another set only for keys missing from this set.
+///
+/// # Safety
+///
+/// `ops` and `other` must be valid pointers returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_extend_conditional(ops: *mut Options, other: *const Options) {
+    if let (Some(ops), Some(other)) = (ops.as_mut(), other.as_ref()) {
+        ops.extend_conditional(other);
+    }
+}
+
 /// Remove every value for an option key.
 ///
 /// # Safety

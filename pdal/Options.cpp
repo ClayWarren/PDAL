@@ -170,7 +170,9 @@ void Options::add(const Option& option)
 void Options::add(const Options& o)
 {
     for (const auto& op : o.m_options)
-        add(op.second);
+        m_options.insert({op.second.getName(), op.second});
+    if (m_rustOptions && o.m_rustOptions)
+        pdal_options_extend(m_rustOptions, o.m_rustOptions);
 }
 
 void Options::addConditional(const Option& option)
@@ -188,6 +190,9 @@ void Options::addConditional(const Option& option)
 
 void Options::addConditional(const Options& other)
 {
+    if (m_rustOptions && other.m_rustOptions)
+        pdal_options_extend_conditional(m_rustOptions, other.m_rustOptions);
+
     for (auto oi = other.m_options.begin(); oi != other.m_options.end();)
     {
         const std::string& name = oi->first;
@@ -195,9 +200,7 @@ void Options::addConditional(const Options& other)
         {
             do
             {
-                const Option option = oi->second;
                 m_options.insert(*oi++);
-                syncRustOption(option);
             } while (oi != other.m_options.end() && name == oi->first);
         }
         else
