@@ -352,6 +352,7 @@ fn decode_typed_json_options(object: &mut serde_json::Map<String, serde_json::Va
         "in_srs",
         "out_srs",
         "a_srs",
+        "polygon",
     ] {
         let Some(value) = object.get_mut(key) else {
             continue;
@@ -381,6 +382,7 @@ fn decode_typed_json_options(object: &mut serde_json::Map<String, serde_json::Va
                 | "in_srs"
                 | "out_srs"
                 | "a_srs"
+                | "polygon"
         ) {
             continue;
         }
@@ -664,6 +666,10 @@ mod tests {
                     "out_srs": "{\"$schema\":\"https://proj.org/schemas/v0.7/projjson.schema.json\",\"type\":\"GeographicCRS\"}"
                 },
                 {
+                    "type": "filters.crop",
+                    "polygon": "{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[1,0],[1,1],[0,0]]]}"
+                },
+                {
                     "type": "writers.las",
                     "filename": "/tmp/out.las"
                 }
@@ -677,7 +683,8 @@ mod tests {
             parsed["pipeline"][1]["out_srs"]["$schema"],
             "https://proj.org/schemas/v0.7/projjson.schema.json"
         );
-        assert_eq!(parsed["pipeline"][2]["filename"], "/tmp/out.las");
+        assert_eq!(parsed["pipeline"][2]["polygon"]["type"], "Polygon");
+        assert_eq!(parsed["pipeline"][3]["filename"], "/tmp/out.las");
     }
 
     #[test]

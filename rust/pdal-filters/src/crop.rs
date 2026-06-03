@@ -38,8 +38,8 @@ impl CropFilter {
         distance: f64,
     ) -> Result<Self, StageError> {
         let mut polygons = Vec::new();
-        for wkt in polygons_wkt {
-            polygons.push(Geometry::from_wkt(&wkt).map_err(StageError)?);
+        for polygon in polygons_wkt {
+            polygons.push(parse_polygon_geometry(&polygon).map_err(StageError)?);
         }
         Ok(CropFilter {
             outside,
@@ -98,6 +98,15 @@ impl CropFilter {
             }
         }
         output
+    }
+}
+
+fn parse_polygon_geometry(text: &str) -> Result<Geometry, String> {
+    let trimmed = text.trim_start();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        Geometry::from_geojson(text)
+    } else {
+        Geometry::from_wkt(text)
     }
 }
 
@@ -216,6 +225,25 @@ mod tests {
             0.0,
         );
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn geojson_polygon_string_crops_points() {
+        let input = view(&[(0.75, 0.25, 0.0), (2.0, 2.0, 0.0)]);
+        let mut filter = CropFilter::new(
+            false,
+            vec![],
+            vec![r#"{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}"#.to_string()],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+
+        let outputs = filter.run_one(&input).unwrap();
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].len(), 1);
+        assert_eq!(outputs[0].get_f64(0, &DimId::X), 0.75);
     }
 
     #[test]
