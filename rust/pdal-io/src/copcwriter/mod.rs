@@ -15,8 +15,8 @@
 //! - `pyramid`: bottom-up octree build driver (`Pyramid`).
 //! - `output_format`: byte-exact `copc` info VLR + hierarchy entries.
 //!
-//! The remaining layer (LAS header + LAZ chunk encoding + file assembly) builds
-//! on `output_format`; the C++ `writers.copc` remains the contract until then.
+//! `chunk_writer`, `output`, and `writer` complete the LAS header, LAZ chunk
+//! encoding, hierarchy EVLR, and C ABI-backed stage handoff.
 
 pub mod cell_manager;
 pub mod chunk_writer;
