@@ -126,6 +126,25 @@ fn pipeline_json_accepts_multiple_filename_string_readers() {
 }
 
 #[test]
+fn pipeline_json_merges_branch_layout_mutations() {
+    let json = r#"[
+            {"type":"readers.faux", "tag":"A", "count":2},
+            {"type":"filters.assign", "tag":"B", "inputs":"A", "value":"Classification = 2"},
+            {"type":"filters.range", "tag":"C", "inputs":"A", "limits":"X[0:]"},
+            {"type":"filters.merge", "inputs":["B", "C"]}
+        ]"#;
+
+    let mut pipeline = pipeline_from_json(json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 4);
+    assert!(views[0].layout().dim(&DimId::Classification).is_some());
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 2.0);
+    assert_eq!(views[0].get_f64(2, &DimId::Classification), 0.0);
+}
+
+#[test]
 fn pipeline_json_executes_filespec_string_filename() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/las/epsg_4326.las");

@@ -266,10 +266,54 @@ pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
         serialized.push(serde_json::Value::Object(object));
     }
 
+    let serialized = serialize_stage_graph(serialized)?;
     let root = serde_json::json!({ "pipeline": serialized });
     serde_json::to_string_pretty(&root)
         .map(|text| text + "\n")
         .map_err(|err| format!("Unable to serialize pipeline JSON: {err}"))
+}
+
+fn serialize_stage_graph(stages: Vec<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+    if stages.is_empty() {
+        return Ok(stages);
+    }
+    let mut by_tag = std::collections::HashMap::new();
+    for (idx, stage) in stages.iter().enumerate() {
+        let tag = stage
+            .get("tag")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("Serialized pipeline stage {idx} is missing a tag."))?;
+        by_tag.insert(tag.to_string(), idx);
+    }
+
+    let mut output = Vec::new();
+    emit_serialized_stage(stages.len() - 1, &stages, &by_tag, &mut output)?;
+    Ok(output)
+}
+
+fn emit_serialized_stage(
+    idx: usize,
+    stages: &[serde_json::Value],
+    by_tag: &std::collections::HashMap<String, usize>,
+    output: &mut Vec<serde_json::Value>,
+) -> Result<(), String> {
+    let stage = stages
+        .get(idx)
+        .ok_or_else(|| format!("Serialized pipeline stage {idx} is out of range."))?;
+    if let Some(inputs) = stage.get("inputs").and_then(serde_json::Value::as_array) {
+        for input in inputs {
+            let tag = input.as_str().ok_or_else(|| {
+                format!("Serialized pipeline stage {idx} has a non-string input.")
+            })?;
+            let input_idx = by_tag
+                .get(tag)
+                .copied()
+                .ok_or_else(|| format!("Serialized pipeline stage {idx} references '{tag}'."))?;
+            emit_serialized_stage(input_idx, stages, by_tag, output)?;
+        }
+    }
+    output.push(stage.clone());
+    Ok(())
 }
 
 fn normalize_inputs(
@@ -621,6 +665,30 @@ mod tests {
         assert_eq!(parsed["pipeline"][2]["inputs"][0], "B");
         assert!(parsed["pipeline"][1]["inputs"].is_array());
         assert!(parsed["pipeline"][2]["inputs"].is_array());
+    }
+
+    #[test]
+    fn serializes_shared_inputs_like_stage_writer_recursion() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                {"type":"readers.faux", "tag":"A", "count":2},
+                {"type":"filters.assign", "tag":"B", "inputs":"A", "value":"Classification = 2"},
+                {"type":"filters.range", "tag":"C", "inputs":"A", "limits":"X[0:]"},
+                {"type":"filters.merge", "inputs":["B","C"]},
+                {"type":"writers.null"}
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        let stages = parsed["pipeline"].as_array().unwrap();
+
+        assert_eq!(stages.len(), 6);
+        assert_eq!(stages[0]["tag"], "A");
+        assert_eq!(stages[1]["tag"], "B");
+        assert_eq!(stages[2]["tag"], "A");
+        assert_eq!(stages[3]["tag"], "C");
+        assert_eq!(stages[4]["type"], "filters.merge");
+        assert_eq!(stages[5]["type"], "writers.null");
     }
 
     #[test]
