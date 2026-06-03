@@ -102,6 +102,19 @@ impl AssignFilter {
         Ok(())
     }
 
+    fn validate_assignment_dimensions(&self, view: &PointView) -> Result<(), StageError> {
+        for assignment in &self.assignments {
+            let dim = DimId::from_name(&assignment.dim_name);
+            if view.layout().dim(&dim).is_none() {
+                return Err(StageError(format!(
+                    "filters.assign: Invalid dimension name in 'assignment' option: '{}'.",
+                    assignment.dim_name
+                )));
+            }
+        }
+        Ok(())
+    }
+
     pub fn assign_point(&self, view: &mut PointView, idx: u64) {
         if let Some(ref cond) = self.condition {
             let dim = DimId::from_name(&cond.dim_name);
@@ -154,6 +167,7 @@ impl Filter for AssignFilter {
     }
 
     fn run_one(&mut self, view: &PointView) -> Result<Vec<PointView>, StageError> {
+        self.validate_assignment_dimensions(view)?;
         self.prepare_value_assignments(view)?;
         let size = view.len();
         let mut output = PointView::new(view.layout().clone());
@@ -177,6 +191,7 @@ impl Filter for AssignFilter {
     }
 
     fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        self.validate_assignment_dimensions(chunk)?;
         self.prepare_value_assignments(chunk)?;
         // Same per-point assignment as `run_one`; assign keeps every point.
         for idx in 0..chunk.len() {
@@ -210,6 +225,17 @@ mod tests {
             let id = view.add_point();
             view.set_f64(id, &DimId::X, *value);
             view.set_f64(id, &DimId::Classification, 1.0);
+        }
+        view
+    }
+
+    fn x_only_view(values: &[f64]) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for value in values {
+            let id = view.add_point();
+            view.set_f64(id, &DimId::X, *value);
         }
         view
     }
@@ -286,6 +312,37 @@ mod tests {
             );
             assert_eq!(chunk.get_f64(i, &DimId::X), standard.get_f64(i, &DimId::X));
         }
+    }
+
+    #[test]
+    fn assignment_requires_existing_target_dimension() {
+        let mut filter = AssignFilter::new(
+            None,
+            vec![AssignRange {
+                dim_name: "Classification".to_string(),
+                value: 7.0,
+                lower_bound: f64::NEG_INFINITY,
+                upper_bound: f64::INFINITY,
+                inclusive_lower: true,
+                inclusive_upper: true,
+                negate: false,
+            }],
+        );
+        let input = x_only_view(&[1.0]);
+
+        let err = match filter.run_one(&input) {
+            Ok(_) => panic!("expected missing assignment dimension to fail"),
+            Err(err) => err,
+        };
+        assert!(err
+            .0
+            .contains("Invalid dimension name in 'assignment' option: 'Classification'"));
+
+        let mut chunk = input;
+        let err = filter.stream_chunk(&mut chunk).unwrap_err();
+        assert!(err
+            .0
+            .contains("Invalid dimension name in 'assignment' option: 'Classification'"));
     }
 
     #[test]

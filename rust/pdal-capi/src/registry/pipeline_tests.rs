@@ -599,6 +599,27 @@ fn pipeline_json_rejects_unknown_assign_option() {
 }
 
 #[test]
+fn pipeline_execution_rejects_assignment_to_missing_dimension() {
+    let mut pipeline = pipeline_from_json(
+        r#"[
+                {"type":"readers.faux", "count":4},
+                {"type":"filters.assign", "assignment":"Classification[:]=2"},
+                {"type":"writers.null"}
+            ]"#,
+    )
+    .unwrap();
+
+    let err = match pipeline.execute_with_result(Vec::new()) {
+        Ok(_) => panic!("expected missing assignment dimension to fail"),
+        Err(err) => err,
+    };
+
+    assert!(err
+        .to_string()
+        .contains("Invalid dimension name in 'assignment' option: 'Classification'"));
+}
+
+#[test]
 fn pipeline_json_rejects_root_object_without_pipeline_array() {
     let err = match pipeline_from_json(r#"{"type":"readers.faux"}"#) {
         Ok(_) => panic!("expected root object without pipeline array to fail"),
