@@ -126,6 +126,29 @@ fn pipeline_json_accepts_multiple_filename_string_readers() {
 }
 
 #[test]
+fn pipeline_json_executes_filespec_string_filename() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/las/epsg_4326.las");
+    let filespec = serde_json::json!({
+        "path": input,
+        "headers": {"header_key": "header_value"}
+    })
+    .to_string();
+
+    let json = format!(
+        r#"[
+                {{"type":"readers.las", "filename":{}}},
+                {{"type":"writers.null"}}
+            ]"#,
+        serde_json::to_string(&filespec).unwrap()
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let result = pipeline.execute_with_result(Vec::new()).unwrap();
+    assert_eq!(result.point_count, 5380);
+}
+
+#[test]
 fn pipeline_json_rejects_las_writer_with_mixed_input_srs() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let simple = repo.join("test/data/las/simple.las");

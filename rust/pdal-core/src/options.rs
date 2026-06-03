@@ -94,6 +94,9 @@ impl Options {
                 continue;
             }
             match value {
+                Value::String(text) if key == "filename" => {
+                    options.add(key, filename_option_string(text));
+                }
                 Value::Array(items) => {
                     let repeat_items = pipeline_array_option_repeats(stage_type, key)
                         || items
@@ -113,7 +116,11 @@ impl Options {
                     }
                 }
                 Value::Object(_) => {
-                    options.add(key, value.to_string());
+                    if key == "filename" {
+                        options.add(key, filename_option_value(value));
+                    } else {
+                        options.add(key, value.to_string());
+                    }
                 }
                 Value::Null => {
                     options.add(key, "");
@@ -298,6 +305,25 @@ impl Options {
             })
             .unwrap_or(Ok(default))
     }
+}
+
+fn filename_option_string(text: &str) -> String {
+    let trimmed = text.trim_start();
+    if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
+        return text.to_string();
+    }
+    match serde_json::from_str::<Value>(text) {
+        Ok(value) => filename_option_value(&value),
+        Err(_) => text.to_string(),
+    }
+}
+
+fn filename_option_value(value: &Value) -> String {
+    value
+        .get("path")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
 }
 
 fn pipeline_array_option_repeats(stage_type: Option<&str>, key: &str) -> bool {
@@ -504,6 +530,29 @@ mod tests {
         assert_eq!(options.value("dimensions"), Some("X,Y"));
         assert_eq!(options.value("empty"), Some(""));
         assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
+    }
+
+    #[test]
+    fn pipeline_stage_options_decode_filespec_path_for_execution() {
+        let object = serde_json::json!({
+            "type": "readers.las",
+            "filename": {
+                "path": "/tmp/input.las",
+                "headers": {"Authorization": "token"}
+            },
+            "polygon": {"type": "Polygon"}
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+
+        assert_eq!(options.value("filename"), Some("/tmp/input.las"));
+        assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
+
+        let object = serde_json::json!({
+            "type": "readers.las",
+            "filename": "{\"path\":\"/tmp/string.las\",\"headers\":{\"k\":\"v\"}}"
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(options.value("filename"), Some("/tmp/string.las"));
     }
 
     #[test]
