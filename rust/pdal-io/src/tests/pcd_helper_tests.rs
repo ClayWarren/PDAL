@@ -93,6 +93,7 @@ fn read_binary_value_u8() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn read_binary_value_f32() {
     let v = 3.14_f32;
     let bytes = v.to_le_bytes().to_vec();
@@ -111,6 +112,7 @@ fn write_binary_value_u16() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn write_binary_value_f32() {
     let mut out = Vec::new();
     write_binary_value(&mut out, 3.14, FieldType::Float, 4).unwrap();
@@ -140,6 +142,7 @@ fn data_storage_label_normalizes() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn storage_value_f32_loses_precision() {
     let field = Field { id: DimId::X, label: "X".into(), ty: FieldType::Float, count: 1, size: 4, precision: 2 };
     assert!((storage_value(3.1415926535, &field) - 3.1415927_f64).abs() < 0.0001);
@@ -152,6 +155,7 @@ fn format_number_integer_unsigned() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn format_number_float() {
     let result = format_number(3.14159, 3, FieldType::Float, 8);
     assert_eq!(result, "3.142");
@@ -383,22 +387,22 @@ fn test_extract_dim_errors() {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);
     let view = PointView::new(Rc::new(layout));
-    assert!(writer.write(&[view.clone()]).is_err());
+    assert!(writer.write(std::slice::from_ref(&view)).is_err());
     let mut writer_opts2 = Options::new();
     writer_opts2.add("filename", temp.clone());
     writer_opts2.add("order", "X=Float:abc");
     let mut writer2 = PcdWriter::new(&writer_opts2);
-    assert!(writer2.write(&[view.clone()]).is_err());
+    assert!(writer2.write(std::slice::from_ref(&view)).is_err());
     let mut writer_opts3 = Options::new();
     writer_opts3.add("filename", temp.clone());
     writer_opts3.add("order", "X=Float:2:extra");
     let mut writer3 = PcdWriter::new(&writer_opts3);
-    assert!(writer3.write(&[view.clone()]).is_err());
+    assert!(writer3.write(std::slice::from_ref(&view)).is_err());
     let mut writer_opts4 = Options::new();
     writer_opts4.add("filename", temp.clone());
     writer_opts4.add("order", "X=Float=Extra");
     let mut writer4 = PcdWriter::new(&writer_opts4);
-    assert!(writer4.write(&[view.clone()]).is_err());
+    assert!(writer4.write(std::slice::from_ref(&view)).is_err());
 }
 
 #[test]

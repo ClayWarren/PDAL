@@ -98,7 +98,7 @@ fn test_rust_ply_pipeline_standalone() {
     run_rust_pipeline(&input, &rust_output);
     assert!(rust_output.exists());
     let view = read_pcd(&rust_output);
-    assert!(view.len() > 0);
+    assert!(!view.is_empty());
 }
 
 fn read_pcd(path: &Path) -> pdal_core::point::PointView {

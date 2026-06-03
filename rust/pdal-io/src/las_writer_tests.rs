@@ -338,6 +338,7 @@ mod tests {
     // --- Pure helper unit tests ---
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn pdal_sround_positive_and_negative() {
         assert!((pdal_sround(3.14159) - 3.0).abs() < 0.001);
         assert!((pdal_sround(-2.71828) - -3.0).abs() < 0.001);
@@ -385,6 +386,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn las_inverse_ceil_and_floor() {
         let t = las::Transform { scale: 0.0001, offset: 0.0 };
         assert!((las_inverse_ceil(3.14159, &t) - 31416.0).abs() < 0.0001);

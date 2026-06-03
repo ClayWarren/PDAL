@@ -293,7 +293,7 @@ fn writer_skips_invalid_bundled_files() {
 #[test]
 fn read_autzen_dd_bpf() {
     let view = read_bpf(&data_path("bpf/autzen-dd.bpf"));
-    assert!(view.len() > 0);
+    assert!(!view.is_empty());
 }
 
 #[test]

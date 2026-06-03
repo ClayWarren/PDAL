@@ -384,7 +384,7 @@ mod tests {
     fn writer_errors_without_filename() {
         let mut writer = SpzWriter::new(&Options::new());
         let view = xyz_view();
-        let err = writer.write(&[view]).err().expect("missing filename");
+        let err = writer.write(&[view]).expect_err("missing filename");
         assert!(err.0.contains("filename"));
     }
 

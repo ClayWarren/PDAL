@@ -444,8 +444,10 @@ mod tests {
 
     #[test]
     fn test_read_header_lenient_compressed_error() {
-        let mut raw_header = las::raw::Header::default();
-        raw_header.point_data_record_format = 128 + 3;
+        let raw_header = las::raw::Header {
+            point_data_record_format: 128 + 3,
+            ..Default::default()
+        };
         let mut cursor = std::io::Cursor::new(vec![]);
         let res = read_header_lenient(&mut cursor, raw_header);
         assert!(res.is_err());
@@ -456,10 +458,12 @@ mod tests {
     fn test_read_header_lenient_ordering_and_evlr() {
         use std::io::Cursor;
         
-        let mut raw_header = las::raw::Header::default();
-        raw_header.point_data_record_format = 0;
-        raw_header.number_of_variable_length_records = 0;
-        raw_header.offset_to_point_data = 300;
+        let raw_header = las::raw::Header {
+            point_data_record_format: 0,
+            number_of_variable_length_records: 0,
+            offset_to_point_data: 300,
+            ..Default::default()
+        };
         
         let mut cursor = Cursor::new(vec![0u8; 1000]);
         let res = read_header_lenient(&mut cursor, raw_header.clone());
@@ -504,8 +508,10 @@ mod tests {
             value_offset: 0.0,
         };
         
-        let mut point = las::Point::default();
-        point.extra_bytes = vec![1u8];
+        let point = las::Point {
+            extra_bytes: vec![1u8],
+            ..Default::default()
+        };
         let res = set_extra_dims(&mut view, id, &point, &[ed]);
         assert!(res.is_ok());
         
@@ -517,8 +523,10 @@ mod tests {
             scale: 1.0,
             value_offset: 0.0,
         };
-        let mut point2 = las::Point::default();
-        point2.extra_bytes = vec![1u8];
+        let point2 = las::Point {
+            extra_bytes: vec![1u8],
+            ..Default::default()
+        };
         let res2 = set_extra_dims(&mut view, id, &point2, &[malformed_ed]);
         assert!(res2.is_err());
     }
@@ -713,8 +721,10 @@ mod tests {
         let mut view = PointView::new(Rc::new(layout));
         let id = view.add_point();
         
-        let mut point = las::Point::default();
-        point.is_edge_of_flight_line = true;
+        let point = las::Point {
+            is_edge_of_flight_line: true,
+            ..Default::default()
+        };
         
         set_standard_dims(&mut view, id, &point, 3);
         assert_eq!(view.get_f64(id, &DimId::EdgeOfFlightLine), 1.0);

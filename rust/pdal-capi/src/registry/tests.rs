@@ -9,6 +9,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+type ExpectedDims = Vec<(DimId, DimType)>;
+type RegistryCase = (&'static str, Options, ExpectedDims);
+
 #[test]
 fn every_listed_reader_driver_constructs() {
     let options = Options::new();
@@ -48,7 +51,7 @@ fn registry_filters_declare_output_dimensions() {
     geom_options.add("geometry", "POINT (0 0)");
     geom_options.add("dimension", "DistanceToOrigin");
 
-    let cases: Vec<(&str, Options, Vec<(DimId, DimType)>)> = vec![
+    let cases: Vec<RegistryCase> = vec![
         (
             "filters.approximatecoplanar",
             Options::new(),

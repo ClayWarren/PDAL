@@ -526,7 +526,7 @@ mod tests {
         let mut reader = TerrasolidReader::new(&options);
         let views = reader.read().expect("read terrasolid fixture");
         assert!(!views.is_empty());
-        assert!(views[0].len() > 0);
+        assert!(!views[0].is_empty());
     }
 
     #[test]

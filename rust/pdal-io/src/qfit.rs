@@ -319,7 +319,7 @@ mod tests {
         };
         let views = r.read().unwrap();
         assert!(!views.is_empty());
-        assert!(views[0].len() > 0);
+        assert!(!views[0].is_empty());
     }
 
     #[test]
@@ -356,7 +356,7 @@ mod tests {
         };
         let views = r.read().unwrap();
         assert!(!views.is_empty());
-        assert!(views[0].len() > 0);
+        assert!(!views[0].is_empty());
     }
 
     #[test]
@@ -411,7 +411,7 @@ mod tests {
 
         assert!(view.layout().dim(&DimId::PassiveSignal).is_some());
         assert!(view.layout().dim(&DimId::PassiveX).is_some());
-        assert!(view.len() > 0);
+        assert!(!view.is_empty());
     }
 
     #[test]

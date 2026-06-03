@@ -817,7 +817,7 @@ mod tests {
         let mut reader = FbiReader::new(&options);
         let views = reader.read().expect("read fbi fixture");
         assert!(!views.is_empty());
-        assert!(views[0].len() > 0);
+        assert!(!views[0].is_empty());
     }
 
     #[test]

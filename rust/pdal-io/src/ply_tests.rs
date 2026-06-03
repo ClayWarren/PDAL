@@ -469,6 +469,7 @@ end_header
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn read_binary_value_big_endian_and_integer_types() {
         use std::io::Cursor;
         let mut buf = Vec::new();
@@ -626,6 +627,7 @@ end_header
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn format_value_binary_variants() {
         assert_eq!(format_value(-5.7, DimType::I8, None), "-6");
         assert_eq!(format_value(42.3, DimType::U16, None), "42");
@@ -637,6 +639,7 @@ end_header
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn write_ply_value_ascii_success() {
         let mut out = Vec::new();
         write_ply_value(&mut out, PlyFormat::Ascii, 3.14, DimType::F64, None).unwrap();
@@ -644,6 +647,7 @@ end_header
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn write_ply_value_binary_success() {
         let mut out = Vec::new();
         write_ply_value(&mut out, PlyFormat::BinaryLittleEndian, -3.0, DimType::I8, None)
