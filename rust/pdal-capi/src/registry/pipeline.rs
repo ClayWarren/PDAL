@@ -17,7 +17,8 @@ use std::os::raw::c_char;
 use crate::registry::{create_stage, CreatedStage};
 
 pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
-    let value: Value = serde_json::from_str(json)
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
+    let value: Value = serde_json::from_str(&stripped)
         .map_err(|err| StageError(format!("Invalid pipeline JSON: {err}")))?;
     let stages = pipeline_stages(&value)?;
 

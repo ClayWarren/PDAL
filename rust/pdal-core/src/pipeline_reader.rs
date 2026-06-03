@@ -8,7 +8,7 @@
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 
-fn strip_json_comments(input: &str) -> String {
+pub fn strip_json_comments(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;

@@ -410,6 +410,25 @@ fn pipeline_json_accepts_root_pipeline_object() {
 }
 
 #[test]
+fn pipeline_json_accepts_comments_in_runnable_pipeline() {
+    let json = r#"{
+            // accepted by C++ PipelineReaderJSON
+            "pipeline": [
+                {"type":"readers.faux", "count":6, "mode":"ramp"},
+                {"type":"filters.decimation", "step":2},
+                {"type":"filters.assign", "value":"Z = 42"}
+            ]
+        }"#;
+
+    let mut pipeline = pipeline_from_json(json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 3);
+    assert_eq!(views[0].get_f64(0, &DimId::Z), 42.0);
+}
+
+#[test]
 fn pipeline_json_accepts_filename_string_stages() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");

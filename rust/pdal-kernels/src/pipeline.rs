@@ -141,8 +141,9 @@ fn next_option_value<'a>(
 }
 
 pub fn validate_pipeline_json_shape(json: &str) -> Result<(), String> {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     let stages = if let Some(stages) = value.as_array() {
         stages
     } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
@@ -179,8 +180,9 @@ pub fn apply_stage_options_to_pipeline_json(
         return Ok(json.to_string());
     }
 
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let mut value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     let stages = if let Some(stages) = value.as_array_mut() {
         stages
     } else if let Some(stages) = value
@@ -199,8 +201,9 @@ pub fn apply_stage_options_to_pipeline_json(
 }
 
 pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     let stages = if let Some(stages) = value.as_array() {
         stages
     } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
@@ -407,6 +410,29 @@ mod tests {
     }
 
     #[test]
+    fn applies_cli_stage_options_to_commented_pipeline_json() {
+        let json = r#"{
+            // accepted by C++ PipelineReaderJSON
+            "pipeline": [
+                {"type":"readers.faux", "count":4},
+                {"type":"filters.sort", "dimension":"X"},
+                {"type":"writers.null"}
+            ]
+        }"#;
+        let options = vec![CliStageOption {
+            stage: "filters.sort".to_string(),
+            key: "dimension".to_string(),
+            value: "Y".to_string(),
+        }];
+
+        let updated = apply_stage_options_to_pipeline_json(json, &options).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&updated).unwrap();
+
+        assert_eq!(parsed["pipeline"][1]["dimension"][0], "X");
+        assert_eq!(parsed["pipeline"][1]["dimension"][1], "Y");
+    }
+
+    #[test]
     fn rejects_unmatched_cli_stage_options() {
         let json = r#"{"pipeline":[{"type":"readers.faux"},{"type":"writers.null"}]}"#;
         let options = vec![CliStageOption {
@@ -450,6 +476,24 @@ mod tests {
     }
 
     #[test]
+    fn serializes_commented_pipeline_json() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                // input
+                "in.las",
+                {"type":"filters.decimation", "step":2},
+                "out.las"
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
+        assert_eq!(parsed["pipeline"][1]["type"], "filters.decimation");
+        assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+    }
+
+    #[test]
     fn serializes_typed_json_option_strings_as_objects() {
         let json = r#"{
             "pipeline": [
@@ -481,6 +525,18 @@ mod tests {
     #[test]
     fn validate_shape_accepts_object_valued_options() {
         let json = r#"[{"type":"readers.ept","filename":"ept.json"},{"type":"writers.ept_addon","addons":{"Z":"Z"}}]"#;
+
+        assert!(validate_pipeline_json_shape(json).is_ok());
+    }
+
+    #[test]
+    fn validate_shape_accepts_commented_pipeline_json() {
+        let json = r#"{
+            "pipeline": [
+                {"type":"readers.faux"}, // source
+                {"type":"writers.null"}
+            ]
+        }"#;
 
         assert!(validate_pipeline_json_shape(json).is_ok());
     }
