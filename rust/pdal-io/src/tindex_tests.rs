@@ -404,7 +404,11 @@ fn geojson_features_capture_srs_column() {
 #[test]
 fn reader_args_select_options_by_driver() {
     let args = parse_reader_args(
-        r#"[{"type":"readers.las","count":2},{"type":"readers.ply","precision":3}]"#,
+        r#"[
+            // reader-specific options forwarded from readers.tindex
+            {"type":"readers.las","count":2},
+            {"type":"readers.ply","precision":3}
+        ]"#,
     )
     .unwrap();
 

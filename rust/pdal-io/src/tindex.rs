@@ -253,7 +253,8 @@ fn parse_reader_args(input: &str) -> Result<Vec<ReaderArgs>, StageError> {
     if input.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let mut value: serde_json::Value = serde_json::from_str(input)
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(input);
+    let mut value: serde_json::Value = serde_json::from_str(&stripped)
         .map_err(|err| StageError(format!("reader_args must be valid JSON: {err}")))?;
     if value.is_object() {
         value = serde_json::Value::Array(vec![value]);

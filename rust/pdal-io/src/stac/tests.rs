@@ -884,7 +884,10 @@ fn stac_filter_helpers_cover_validation_and_matching_edges() {
 #[test]
 fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
     let args = parse_reader_args(
-        r#"[{"type":"readers.las","nosrs":true,"count":2,"bounds":{"x":[0,1]}}]"#,
+        r#"[
+            // reader-specific options forwarded from readers.stac
+            {"type":"readers.las","nosrs":true,"count":2,"bounds":{"x":[0,1]}}
+        ]"#,
     )
     .unwrap();
     assert_eq!(args.len(), 1);

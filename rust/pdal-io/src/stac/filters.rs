@@ -174,7 +174,8 @@ pub(super) fn parse_reader_args(input: &str) -> Result<Vec<ReaderArgs>, StageErr
     if input.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let json: Value = serde_json::from_str(input)
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(input);
+    let json: Value = serde_json::from_str(&stripped)
         .map_err(|err| StageError(format!("reader_args must be valid JSON: {err}")))?;
     let entries = json
         .as_array()
