@@ -13,6 +13,21 @@ fn data_path(path: &str) -> String {
         .to_string()
 }
 
+fn data_file(path: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data")
+        .join(path)
+}
+
+unsafe fn preview_options(entries: &[(&str, String)]) -> *mut pdal_core::options::Options {
+    let options = pdal_options_create();
+    for (key, value) in entries {
+        pdal_options_add_str(options, cstring(key).as_ptr(), cstring(value).as_ptr());
+    }
+    options
+}
+
 #[test]
 fn ept_preview_returns_bounds_count_srs_and_dim_names() {
     unsafe {
@@ -54,6 +69,58 @@ fn ept_preview_returns_bounds_count_srs_and_dim_names() {
         assert!(pdal_ept_reader_preview_dim_name(handle, count).is_null());
 
         pdal_ept_reader_preview_destroy(handle);
+    }
+}
+
+#[test]
+fn ept_preview_options_handle_bounds_polygon_and_ogr_filters() {
+    unsafe {
+        let path = data_path("ept/1.2-with-color/ept.json");
+        let selection = std::fs::read_to_string(data_file("autzen/autzen-selection.wkt")).unwrap();
+        let source_srs = std::fs::read_to_string(data_file("autzen/autzen-srs.wkt")).unwrap();
+        let attributes = data_path("autzen/attributes.json");
+
+        let bounds_options = preview_options(&[
+            ("filename", path.clone()),
+            ("source_srs", source_srs.clone()),
+            (
+                "bounds",
+                "([636577.1, 637297.4225], [850571.42, 851489.34])".to_string(),
+            ),
+            ("polygon", selection.clone()),
+            ("polygon_srs", "EPSG:3644".to_string()),
+        ]);
+        let bounds_preview = pdal_ept_reader_preview_create_with_reader_options(bounds_options);
+        assert!(!bounds_preview.is_null());
+        assert_eq!(pdal_ept_reader_preview_point_count(bounds_preview), 1065);
+        pdal_ept_reader_preview_destroy(bounds_preview);
+        pdal_options_destroy(bounds_options);
+
+        let polygon_options = preview_options(&[
+            ("filename", path.clone()),
+            ("source_srs", source_srs.clone()),
+            ("polygon", selection),
+            ("polygon_srs", "EPSG:3644".to_string()),
+        ]);
+        let polygon_preview = pdal_ept_reader_preview_create_with_reader_options(polygon_options);
+        assert!(!polygon_preview.is_null());
+        let polygon_count = pdal_ept_reader_preview_point_count(polygon_preview);
+        assert_eq!(polygon_count, 1065);
+        pdal_ept_reader_preview_destroy(polygon_preview);
+        pdal_options_destroy(polygon_options);
+
+        let ogr = format!(
+            r#"{{"type":"ogr","drivers":["GeoJSON"],"datasource":"{}","sql":"select \"_ogr_geometry_\" from attributes"}}"#,
+            attributes
+        );
+        let ogr_options =
+            preview_options(&[("filename", path), ("source_srs", source_srs), ("ogr", ogr)]);
+        let ogr_preview = pdal_ept_reader_preview_create_with_reader_options(ogr_options);
+        assert!(!ogr_preview.is_null());
+        let ogr_count = pdal_ept_reader_preview_point_count(ogr_preview);
+        assert_eq!(ogr_count, 1065);
+        pdal_ept_reader_preview_destroy(ogr_preview);
+        pdal_options_destroy(ogr_options);
     }
 }
 

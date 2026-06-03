@@ -7,9 +7,9 @@
 //! polygon/OGR filters, local addon metadata, GDAL VSI-backed remote paths, and
 //! C++ streaming-wrapper materialization are supported for the existing parity
 //! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
-//! Same-SRS and transformed-bounds point-count preview are Rust-backed;
-//! transformed preview bounds clipping plus polygon and OGR spatial-filter
-//! preview remain outside this module's current contract.
+//! Same-SRS, transformed-bounds, local polygon, and local GeoJSON OGR
+//! point-count preview are Rust-backed; transformed preview bounds clipping
+//! plus origin preview remain outside this module's current contract.
 
 use crate::source;
 use crate::tindex::append_view;
@@ -99,7 +99,7 @@ impl Reader for EptReader {
         })?;
         if data_type != "laszip" && data_type != "binary" && data_type != "zstandard" {
             return Err(StageError(format!(
-                "EptReader Rust slice supports only laszip, binary, and zstandard dataType, not '{data_type}'."
+                "EptReader Rust path supports only laszip, binary, and zstandard dataType, not '{data_type}'."
             )));
         }
 
@@ -109,7 +109,7 @@ impl Reader for EptReader {
         let polygons = self.polygon_filters()?;
         let root_bounds = ept_bounds(&info)?;
         let (tiles, hierarchy_step) =
-            hierarchy_tiles(&root, max_depth, bounds.as_ref(), root_bounds)?;
+            hierarchy_tiles(&root, max_depth, bounds.as_ref(), &polygons, root_bounds)?;
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
@@ -310,8 +310,9 @@ pub fn read_ept_preview_with_reader_options(options: &Options) -> Result<EptPrev
 
     let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
     let reader = EptReader::new(options);
+    let polygons = reader.polygon_filters()?;
     let (bounds_conforming, point_count) =
-        preview_bounds_and_point_count(&reader, &info, bounds_conforming)?;
+        preview_bounds_and_point_count(&reader, &info, bounds_conforming, &polygons)?;
     let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
 
     let data_type = info["dataType"].as_str().ok_or_else(|| {
@@ -360,13 +361,14 @@ fn preview_bounds_and_point_count(
     reader: &EptReader,
     info: &Value,
     mut bounds_conforming: Bounds3D,
+    polygons: &[PolygonFilter],
 ) -> Result<(Bounds3D, u64), StageError> {
     let bounds = reader.bounds_filter(info)?;
     if let Some(bounds) = bounds.as_ref().and_then(BoundsFilter::preview_clip_bounds) {
         bounds_conforming.clip(&bounds);
     }
 
-    if reader.resolution.trim().is_empty() && bounds.is_none() {
+    if reader.resolution.trim().is_empty() && bounds.is_none() && polygons.is_empty() {
         return info["points"]
             .as_u64()
             .ok_or_else(|| {
@@ -381,7 +383,7 @@ fn preview_bounds_and_point_count(
     let max_depth = reader.resolution_filter(info)?;
     let root = location_parent(&reader.filename);
     let root_bounds = ept_bounds(info)?;
-    let (tiles, _) = hierarchy_tiles(&root, max_depth, bounds.as_ref(), root_bounds)?;
+    let (tiles, _) = hierarchy_tiles(&root, max_depth, bounds.as_ref(), polygons, root_bounds)?;
     let count = tiles.iter().map(|tile| tile.expected_points).sum();
     Ok((bounds_conforming, count))
 }
@@ -710,6 +712,7 @@ fn hierarchy_tiles(
     root: &str,
     max_depth: Option<u64>,
     query: Option<&BoundsFilter>,
+    polygons: &[PolygonFilter],
     root_bounds: Bounds3D,
 ) -> Result<(Vec<EptTile>, u64), StageError> {
     let mut tiles = Vec::new();
@@ -731,6 +734,9 @@ fn hierarchy_tiles(
             if query.is_some_and(|query| !query.overlaps_box(&key.bounds)) {
                 continue;
             }
+            if !polygons_overlap_box(polygons, &key.bounds)? {
+                continue;
+            }
             match count.as_i64() {
                 Some(points) if points > 0 && max_depth.is_none_or(|max| depth <= max) => tiles
                     .push(EptTile {
@@ -748,6 +754,45 @@ fn hierarchy_tiles(
         }
     }
     Ok((tiles, hierarchy_step))
+}
+
+fn polygons_overlap_box(polygons: &[PolygonFilter], bounds: &Bounds3D) -> Result<bool, StageError> {
+    if polygons.is_empty() {
+        return Ok(true);
+    }
+    for polygon in polygons {
+        let bounds = if let Some(transform) = &polygon.transform {
+            transform_bounds_via_corners(bounds, transform)
+                .ok_or_else(|| StageError("Failed to transform EPT tile bounds.".to_string()))?
+        } else {
+            *bounds
+        };
+        if polygon
+            .geometry
+            .intersects(&bounds_polygon(bounds)?)
+            .map_err(StageError)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn bounds_polygon(bounds: Bounds3D) -> Result<Geometry, StageError> {
+    Geometry::from_wkt(&format!(
+        "POLYGON (({} {}, {} {}, {} {}, {} {}, {} {}))",
+        bounds.minx,
+        bounds.miny,
+        bounds.maxx,
+        bounds.miny,
+        bounds.maxx,
+        bounds.maxy,
+        bounds.minx,
+        bounds.maxy,
+        bounds.minx,
+        bounds.miny
+    ))
+    .map_err(StageError)
 }
 
 struct EptKey {
@@ -900,8 +945,8 @@ fn metadata_from_info(info: &Value) -> MetadataNode {
 
 mod filtering;
 use filtering::{
-    apply_bounds, apply_origin, apply_polygons, parsed_bounds_srs, polygon_transform, BoundsFilter,
-    PolygonFilter, QueryBounds,
+    apply_bounds, apply_origin, apply_polygons, parsed_bounds_srs, polygon_transform,
+    transform_bounds_via_corners, BoundsFilter, PolygonFilter, QueryBounds,
 };
 
 #[cfg(test)]

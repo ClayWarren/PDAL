@@ -77,7 +77,7 @@ impl BoundsFilter {
     }
 }
 
-fn transform_bounds_via_corners(
+pub(super) fn transform_bounds_via_corners(
     bounds: &Bounds3D,
     transform: &GdalSrsTransform,
 ) -> Option<Bounds3D> {

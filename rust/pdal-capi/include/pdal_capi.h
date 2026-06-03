@@ -1535,6 +1535,9 @@ extern "C"
         const char* filename, const char* resolution);
     pdal_ept_reader_preview_t* pdal_ept_reader_preview_create_with_bounds(
         const char* filename, const char* resolution, const char* bounds);
+    pdal_ept_reader_preview_t*
+    pdal_ept_reader_preview_create_with_reader_options(
+        const pdal_options_t* ops);
     uint64_t pdal_ept_reader_preview_point_count(
         const pdal_ept_reader_preview_t* handle);
     bool pdal_ept_reader_preview_bounds(const pdal_ept_reader_preview_t* handle,

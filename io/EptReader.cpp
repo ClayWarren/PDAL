@@ -630,27 +630,40 @@ QuickInfo EptReader::inspect()
     initialize();
 
     const std::string queryBounds = boundsOption(m_args->m_bounds);
+    const bool rustOwnsOgr = m_args->m_ogr.size() == 0 ||
+                             (m_args->m_addons.empty() &&
+                              m_args->m_bounds.spatialReference().empty());
     const bool rustPreviewSupported =
         !Utils::isRemote(m_filename) && m_args->m_origin.empty() &&
-        m_args->m_polys.empty() && m_args->m_ogr.empty();
+        rustOwnsOgr;
 
     // Route the Rust-supported preview path through the C ABI so EPT metadata
     // and bounds previews aren't owned solely by the C++ EptInfo path.
     if (rustPreviewSupported)
     {
-        std::string resolution;
+        pdal_options_t* options = pdal_options_create();
+        addOption(options, "filename", m_filename);
+        if (getSpatialReference().valid())
+            addOption(options, "source_srs", getSpatialReference().getWKT());
+        if (!queryBounds.empty())
+            addOption(options, "bounds", queryBounds);
         if (m_args->m_resolution > 0)
+            addOption(options, "resolution", m_args->m_resolution);
+        for (const Polygon& poly : m_args->m_polys)
         {
-            std::ostringstream out;
-            out.precision(17);
-            out << m_args->m_resolution;
-            resolution = out.str();
+            addOption(options, "polygon", poly.wkt(20));
+            addOption(options, "polygon_srs",
+                      poly.getSpatialReference().getWKT());
+        }
+        if (m_args->m_ogr.size())
+        {
+            std::stringstream ogr;
+            ogr << m_args->m_ogr;
+            addOption(options, "ogr", ogr.str());
         }
         pdal_ept_reader_preview_t* preview =
-            pdal_ept_reader_preview_create_with_bounds(
-                m_filename.c_str(),
-                resolution.empty() ? nullptr : resolution.c_str(),
-                queryBounds.empty() ? nullptr : queryBounds.c_str());
+            pdal_ept_reader_preview_create_with_reader_options(options);
+        pdal_options_destroy(options);
         if (preview)
         {
             double minx, miny, minz, maxx, maxy, maxz;

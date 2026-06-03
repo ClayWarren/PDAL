@@ -297,7 +297,26 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_bounds(
     if !bounds.trim().is_empty() {
         options.add("bounds", bounds);
     }
-    match pdal_io::ept::read_ept_preview_with_reader_options(&options) {
+    create_preview_from_options(&options)
+}
+
+/// Read EPT preview metadata with an options handle.
+///
+/// # Safety
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_reader_options(
+    ops: *const Options,
+) -> *mut EptReaderPreviewHandle {
+    let Some(options) = ops.as_ref() else {
+        set_last_error("null EPT preview options");
+        return std::ptr::null_mut();
+    };
+    create_preview_from_options(options)
+}
+
+fn create_preview_from_options(options: &Options) -> *mut EptReaderPreviewHandle {
+    match pdal_io::ept::read_ept_preview_with_reader_options(options) {
         Ok(preview) => {
             clear_last_error();
             Box::into_raw(Box::new(EptReaderPreviewHandle { preview }))
