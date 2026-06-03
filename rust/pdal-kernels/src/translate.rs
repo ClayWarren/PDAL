@@ -354,9 +354,11 @@ pub fn expand_translate_option_files(
 
 pub fn parse_option_file(stage: &str, text: &str) -> Result<Vec<CliStageOption>, String> {
     let trimmed = text.trim();
-    if trimmed.starts_with('{') {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(text);
+    let json_trimmed = stripped.trim();
+    if json_trimmed.starts_with('{') {
         let value: serde_json::Value =
-            serde_json::from_str(trimmed).map_err(|_| "Unexpected argument".to_string())?;
+            serde_json::from_str(json_trimmed).map_err(|_| "Unexpected argument".to_string())?;
         let object = value
             .as_object()
             .ok_or_else(|| "Unexpected argument".to_string())?;
@@ -623,6 +625,25 @@ mod tests {
 
         let json = parse_option_file("filters.range", r#"{"limits":true}"#).unwrap();
         assert_eq!(json[0].value, "true");
+    }
+
+    #[test]
+    fn option_files_parse_commented_json_form() {
+        let json = parse_option_file(
+            "filters.range",
+            r#"
+                // accepted at the JSON option-file boundary
+                {
+                    /* range limits */
+                    "limits": "Z[0:10]"
+                }
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(json.len(), 1);
+        assert_eq!(json[0].key, "limits");
+        assert_eq!(json[0].value, "Z[0:10]");
     }
 
     #[test]
