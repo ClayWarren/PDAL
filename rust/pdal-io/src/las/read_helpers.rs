@@ -11,6 +11,44 @@ pub(super) fn srs_vlr_order_from_options(options: &Options) -> Vec<SrsVlrKind> {
         .collect()
 }
 
+pub(super) fn ignore_vlrs_from_options(options: &Options) -> Vec<IgnoreVlrSpec> {
+    let mut ignored = vec![
+        IgnoreVlrSpec {
+            user_id: "copc".to_string(),
+            record_id: None,
+        },
+        IgnoreVlrSpec {
+            user_id: "LASF_Spec".to_string(),
+            record_id: Some(7),
+        },
+    ];
+    for spec in options.values("ignore_vlr") {
+        let parts: Vec<_> = spec.split('/').map(str::trim).collect();
+        match parts.as_slice() {
+            [user_id] if !user_id.is_empty() => ignored.push(IgnoreVlrSpec {
+                user_id: (*user_id).to_string(),
+                record_id: None,
+            }),
+            [user_id, record_id] if !user_id.is_empty() => {
+                if let Ok(record_id) = record_id.parse::<u16>() {
+                    ignored.push(IgnoreVlrSpec {
+                        user_id: (*user_id).to_string(),
+                        record_id: Some(record_id),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+    ignored
+}
+
+pub(super) fn should_ignore_vlr(vlr: &las::Vlr, ignored: &[IgnoreVlrSpec]) -> bool {
+    ignored.iter().any(|spec| {
+        vlr.user_id == spec.user_id && spec.record_id.is_none_or(|id| id == vlr.record_id)
+    })
+}
+
 pub(super) fn parse_srs_vlr_kind(name: &str) -> Option<SrsVlrKind> {
     match name.to_ascii_lowercase().as_str() {
         "wkt1" => Some(SrsVlrKind::Wkt1),
@@ -37,12 +75,15 @@ pub(super) fn find_vlr<'a>(
     header: &'a Header,
     user_id: &str,
     record_id: u16,
+    ignored: &[IgnoreVlrSpec],
 ) -> Option<&'a las::Vlr> {
     header
         .vlrs()
         .iter()
         .chain(header.evlrs().iter())
-        .find(|vlr| vlr.user_id == user_id && vlr.record_id == record_id)
+        .find(|vlr| {
+            vlr.user_id == user_id && vlr.record_id == record_id && !should_ignore_vlr(vlr, ignored)
+        })
 }
 
 pub(super) fn vlr_as_string(data: &[u8]) -> String {
@@ -57,6 +98,7 @@ pub(super) fn vlr_as_string(data: &[u8]) -> String {
 pub(super) fn resolve_spatial_reference_from_vlrs(
     header: &Header,
     order: &[SrsVlrKind],
+    ignored: &[IgnoreVlrSpec],
 ) -> Result<Option<pdal_core::srs::SpatialReference>, StageError> {
     let order = if order.is_empty() {
         default_srs_vlr_order(header)
@@ -67,7 +109,7 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
     for kind in order {
         match kind {
             SrsVlrKind::Wkt2 => {
-                if let Some(vlr) = find_vlr(header, TRANSFORM_USER_ID, WKT2_RECORD_ID) {
+                if let Some(vlr) = find_vlr(header, TRANSFORM_USER_ID, WKT2_RECORD_ID, ignored) {
                     let wkt = vlr_as_string(&vlr.data);
                     if !wkt.is_empty() {
                         return Ok(Some(pdal_core::srs::SpatialReference::new(&wkt)));
@@ -75,7 +117,7 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
                 }
             }
             SrsVlrKind::Proj => {
-                if let Some(vlr) = find_vlr(header, PDAL_USER_ID, PROJJSON_RECORD_ID) {
+                if let Some(vlr) = find_vlr(header, PDAL_USER_ID, PROJJSON_RECORD_ID, ignored) {
                     let text = vlr_as_string(&vlr.data);
                     if !text.is_empty() {
                         return Ok(Some(pdal_core::srs::SpatialReference::new(&text)));
@@ -83,8 +125,8 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
                 }
             }
             SrsVlrKind::Wkt1 => {
-                let vlr = find_vlr(header, TRANSFORM_USER_ID, WKT_RECORD_ID)
-                    .or_else(|| find_vlr(header, LIBLAS_USER_ID, WKT_RECORD_ID));
+                let vlr = find_vlr(header, TRANSFORM_USER_ID, WKT_RECORD_ID, ignored)
+                    .or_else(|| find_vlr(header, LIBLAS_USER_ID, WKT_RECORD_ID, ignored));
                 if let Some(vlr) = vlr {
                     let wkt = vlr_as_string(&vlr.data);
                     if !wkt.is_empty() {
@@ -93,7 +135,14 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
                 }
             }
             SrsVlrKind::Geotiff => {
-                if find_vlr(header, TRANSFORM_USER_ID, GEOTIFF_DIRECTORY_RECORD_ID).is_some() {
+                if find_vlr(
+                    header,
+                    TRANSFORM_USER_ID,
+                    GEOTIFF_DIRECTORY_RECORD_ID,
+                    ignored,
+                )
+                .is_some()
+                {
                     if let Some(srs) = spatial_reference_from_geotiff_vlrs(header)? {
                         return Ok(Some(srs));
                     }

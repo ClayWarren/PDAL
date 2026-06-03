@@ -98,6 +98,32 @@ mod tests {
     }
 
     #[test]
+    fn reader_honors_ignore_vlr_option_for_metadata() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/lots_of_vlr.las"
+        );
+        let mut options = Options::new();
+        options.add("filename", path);
+        options.add("ignore_vlr", "Merrick");
+        options.add("count", "1");
+        let mut reader = LasReader::new(&options);
+
+        reader.read().expect("read lots_of_vlr.las");
+        let metadata = reader.metadata();
+
+        assert!(metadata.find_child("vlr_0").is_some());
+        assert!(metadata.find_child("vlr_1").is_some());
+        assert!(metadata.find_child("vlr_2").is_none());
+        assert!(metadata
+            .children()
+            .iter()
+            .filter_map(|node| node.find_child("user_id"))
+            .filter_map(|node| node.value())
+            .all(|value| value.as_string() != "Merrick"));
+    }
+
+    #[test]
     fn reader_expands_filename_globs() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test/data/autzen/thin*.las");
         let mut options = Options::new();
@@ -230,6 +256,26 @@ mod tests {
         let options = Options::new();
         let order = srs_vlr_order_from_options(&options);
         assert!(order.is_empty());
+    }
+
+    #[test]
+    fn ignore_vlrs_from_options_includes_defaults_and_user_specs() {
+        let mut options = Options::new();
+        options.add("ignore_vlr", "Merrick");
+        options.add("ignore_vlr", "PDAL/13");
+
+        let ignored = ignore_vlrs_from_options(&options);
+
+        assert!(ignored.iter().any(|spec| spec.user_id == "copc" && spec.record_id.is_none()));
+        assert!(ignored
+            .iter()
+            .any(|spec| spec.user_id == "LASF_Spec" && spec.record_id == Some(7)));
+        assert!(ignored
+            .iter()
+            .any(|spec| spec.user_id == "Merrick" && spec.record_id.is_none()));
+        assert!(ignored
+            .iter()
+            .any(|spec| spec.user_id == "PDAL" && spec.record_id == Some(13)));
     }
 
     #[test]

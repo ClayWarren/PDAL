@@ -78,7 +78,7 @@ struct SrsOrderSpec
 };
 
 void addExtraDimsToOptions(pdal_options_t* options,
-                         const std::vector<las::ExtraDim>& extraDims)
+                           const std::vector<las::ExtraDim>& extraDims)
 {
     for (const las::ExtraDim& dim : extraDims)
     {
@@ -515,6 +515,8 @@ void LasReader::ready(PointTableRef table)
     pdal_options_add_str(options, "nosrs", d->opts.nosrs ? "true" : "false");
     pdal_options_add_str(options, "ignore_missing_vlrs",
                          d->opts.ignoreMissingVLRs ? "true" : "false");
+    for (const std::string& ignore : d->opts.ignoreVLROption)
+        pdal_options_add_str(options, "ignore_vlr", ignore.c_str());
     if (m_startOffset > 0)
         pdal_options_add_u64(options, "start_offset", m_startOffset);
     if (!d->opts.extraDimSpec.empty())
@@ -529,7 +531,8 @@ void LasReader::ready(PointTableRef table)
     if (!reader)
     {
         pdal_options_destroy(options);
-        rust_view_converter::throwLastError("Failed to create Rust LAS reader.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust LAS reader.");
     }
 
     d->rustView = pdal_reader_read_first(reader);

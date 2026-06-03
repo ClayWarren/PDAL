@@ -43,6 +43,12 @@ struct ConfiguredExtraDim {
     type_name: String,
 }
 
+#[derive(Clone)]
+pub(super) struct IgnoreVlrSpec {
+    user_id: String,
+    record_id: Option<u16>,
+}
+
 pub struct LasReader {
     filename: String,
     start: u64,
@@ -53,6 +59,7 @@ pub struct LasReader {
     start_length: u64,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     srs_vlr_order: Vec<SrsVlrKind>,
+    ignore_vlrs: Vec<IgnoreVlrSpec>,
     /// `override_srs` (synonym `spatialreference`): force this SRS, ignoring
     /// any SRS read from the file. Mirrors `pdal::Reader`.
     override_srs: Option<String>,
@@ -76,6 +83,7 @@ impl Clone for LasReader {
             start_length: self.start_length,
             configured_extra_dims: self.configured_extra_dims.clone(),
             srs_vlr_order: self.srs_vlr_order.clone(),
+            ignore_vlrs: self.ignore_vlrs.clone(),
             override_srs: self.override_srs.clone(),
             default_srs: self.default_srs.clone(),
             metadata: self.metadata.clone(),
@@ -118,6 +126,7 @@ impl LasReader {
             start_length: options.get_u64("start_length", 0),
             configured_extra_dims: configured_extra_dims_from_options(options),
             srs_vlr_order: srs_vlr_order_from_options(options),
+            ignore_vlrs: ignore_vlrs_from_options(options),
             override_srs: non_empty_option(options, "override_srs")
                 .or_else(|| non_empty_option(options, "spatialreference")),
             default_srs: non_empty_option(options, "default_srs"),
@@ -217,10 +226,12 @@ impl LasReader {
         // Surface VLRs as metadata, matching C++ las::addVlrMetadata (called per
         // VLR from LasReader). Without this the pure-Rust read path (e.g.
         // `pdal info --metadata`) drops all VLR records.
+        let ignored = self.ignore_vlrs.clone();
         for (index, vlr) in header
             .vlrs()
             .iter()
             .chain(header.evlrs().iter())
+            .filter(|vlr| !should_ignore_vlr(vlr, &ignored))
             .enumerate()
         {
             self.add_vlr_metadata(vlr, index);
@@ -284,7 +295,9 @@ impl LasReader {
             return Ok(());
         }
 
-        if let Some(srs) = resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order)? {
+        if let Some(srs) =
+            resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order, &self.ignore_vlrs)?
+        {
             view.set_spatial_reference(srs);
             return Ok(());
         }
