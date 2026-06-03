@@ -1,8 +1,8 @@
 //! `readers.bpf` / `writers.bpf` -- Binary Point Format.
 //!
 //! This covers deterministic BPF files over local paths and GDAL VSI byte
-//! sources. Full polarization/ULEM metadata remain C++ territory until a later
-//! I/O checkpoint needs them.
+//! sources. ULEM and polarization trailing sections are recognized and skipped
+//! so bundled/header metadata lands at the same offsets as the C++ reader.
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use flate2::read::ZlibDecoder;
