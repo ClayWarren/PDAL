@@ -155,7 +155,10 @@ pub(super) fn item_matches_property_filters(
 }
 
 pub(super) fn driver_for_asset(asset: &Value, location: &str) -> Result<String, StageError> {
-    if asset["type"].as_str() == Some("application/vnd.laszip+copc") {
+    if asset["type"]
+        .as_str()
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("application/vnd.laszip+copc"))
+    {
         return Ok("readers.copc".to_string());
     }
     pdal_core::driver::infer_reader_driver(location)

@@ -406,6 +406,19 @@ fn collects_remote_asset_locations() {
 }
 
 #[test]
+fn copc_asset_content_type_matching_is_case_insensitive() {
+    let asset = serde_json::json!({
+        "href": "http://example.com/no-extension",
+        "type": "Application/VND.LASZIP+COPC"
+    });
+
+    assert_eq!(
+        driver_for_asset(&asset, "http://example.com/no-extension").unwrap(),
+        "readers.copc"
+    );
+}
+
+#[test]
 fn collect_assets_applies_date_ranges() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
