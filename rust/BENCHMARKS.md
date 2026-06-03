@@ -158,7 +158,7 @@ line only appears when ctest exits clean; the numbers below are from direct runs
 
 | suite | tests | wall (s) | result |
 |---|---:|---:|---|
-| C++ ctest (`ctest` in `.build`) | 187 executables | 304.8 | 7 failing (see note) |
+| C++ ctest (`ctest` in `.build`) | 187 executables | 304.8 | green |
 | Rust workspace (`cargo test --workspace`) | 66 binaries | 22 | green |
 
 This is **not** a fair head-to-head — it is a visibility data point. The C++
@@ -168,14 +168,12 @@ workspace runs compiled test binaries grouped per crate. The ~14× wall-clock
 difference is dominated by that process/startup structure, not by per-assertion
 compute.
 
-The 7 currently-failing C++ tests are pre-existing on this branch and unrelated
-to the Rust-backed implementation paths under measurement:
-`pdal_io_las_writer_test` (`pdal_wkt2_with_derivedprojcrs_vlr` — the documented
-GDAL-3.13 WKT1-fallback VLR-count gap; see the `pdal_io_las_writer_test` note in
-`rust/STATUS.md`), `pdal_program_arg_test`, `pdal_info_test` (`Info.stats`),
-`pdal_io_fbi_test`, `pdal_tindex_test`, `pc2pc_test`, and
-`pdal_io_draco_reader_test`. They are recorded here so the suite-timing figure is
-not mistaken for a green run.
+The C++ suite was later re-run after parity fixes for the seven failures exposed
+by this measurement pass (`pdal_program_arg_test`, `pdal_info_test`,
+`pdal_io_fbi_test`, `pdal_tindex_test`, `pc2pc_test`,
+`pdal_io_draco_reader_test`, and the GDAL-version-sensitive LAS SRS VLR case).
+It is now green locally on this branch; the timing value remains the original
+direct-run measurement.
 
 ## Not yet measured
 

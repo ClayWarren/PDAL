@@ -761,16 +761,10 @@ Known mixed binaries:
   writes, header and VLR forwarding, PDAL metadata/pipeline VLRs, user-specified VLRs/EVLRs,
   enhanced SRS VLRs, configured extra bytes, discard-high-return handling, auto scale/offset, legacy header count zeroing, and
   supported header options route through the Rust C ABI for the gated subset. C++ header inspection
-  tests remain legacy.
-  Known environment-dependent gap: `pdal_wkt2_with_derivedprojcrs_vlr`
-  expects exactly two SRS VLRs (WKT2 + PROJJSON) for a DerivedProjectedCRS,
-  assuming GDAL's WKT1 export fails for that CRS so no WKT1 VLR is written.
-  GDAL 3.13 instead exports a fallback WKT1 (logging a PROJ error but
-  returning success), so two extra WKT1 VLRs are written and the count is 4.
-  This matches the pre-port C++ path (`exportToWkt` used the buffer
-  regardless of the return code), so it is a GDAL/PROJ-version behavior
-  change, not a Rust-port regression. Revisit when the GeoTIFF/WKT1 SRS-VLR
-  encoding holdout is addressed.
+  tests remain legacy. The GDAL-version-sensitive
+  `pdal_wkt2_with_derivedprojcrs_vlr` case now passes by honoring explicit SRS
+  VLR bytes from the C++ compatibility wrapper instead of regenerating forms
+  that the CRS cannot express in that toolchain.
 - `pdal_io_text_reader_test`: `t1`, `t1a`, `t2`, `t3`, `badheader`, `s1`,
   `strip_whitespace_from_dimension_names`, `issue3859`, `issue1939`,
   `warnMissingHeader`, `overrideHeader`, `insertHeader`, and `quotedHeader`
