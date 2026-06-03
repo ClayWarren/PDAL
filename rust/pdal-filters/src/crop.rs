@@ -104,9 +104,36 @@ impl CropFilter {
 fn parse_polygon_geometry(text: &str) -> Result<Geometry, String> {
     let trimmed = text.trim_start();
     if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        ensure_geojson_polygon(trimmed)?;
         Geometry::from_geojson(text)
     } else {
+        ensure_wkt_polygon(trimmed)?;
         Geometry::from_wkt(text)
+    }
+}
+
+fn ensure_geojson_polygon(text: &str) -> Result<(), String> {
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("Failed to parse GeoJSON: {e}"))?;
+    let geometry_type = value
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    if geometry_type.eq_ignore_ascii_case("Polygon")
+        || geometry_type.eq_ignore_ascii_case("MultiPolygon")
+    {
+        Ok(())
+    } else {
+        Err("pdal::Polygon() cannot construct geometry because OGR geometry is not Polygon or MultiPolygon.".to_string())
+    }
+}
+
+fn ensure_wkt_polygon(text: &str) -> Result<(), String> {
+    let upper = text.to_ascii_uppercase();
+    if upper.starts_with("POLYGON") || upper.starts_with("MULTIPOLYGON") {
+        Ok(())
+    } else {
+        Err("pdal::Polygon() cannot construct geometry because OGR geometry is not Polygon or MultiPolygon.".to_string())
     }
 }
 
@@ -225,6 +252,20 @@ mod tests {
             0.0,
         );
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn polygon_option_rejects_non_polygon_geometry() {
+        for polygon in [
+            "POINT (0 0)",
+            r#"{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,0]]]}}"#,
+        ] {
+            let res = CropFilter::new(false, vec![], vec![polygon.to_string()], vec![], 0.0);
+            match res {
+                Ok(_) => panic!("expected non-polygon geometry to be rejected"),
+                Err(err) => assert!(err.0.contains("not Polygon or MultiPolygon")),
+            }
+        }
     }
 
     #[test]
