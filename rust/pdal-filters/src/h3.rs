@@ -61,6 +61,18 @@ impl Filter for H3Filter {
         }
         Ok(vec![output])
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        self.ensure_transform(chunk.spatial_reference())?;
+        for idx in 0..chunk.len() {
+            self.process_one(chunk, idx);
+        }
+        Ok(())
+    }
 }
 
 impl Streamable for H3Filter {
@@ -150,5 +162,21 @@ mod tests {
         let out = filter.run_one(&view).unwrap().remove(0);
         // Default H3 value should be 0 because Resolution::try_from(99) errors
         assert_eq!(out.get_u64(0, &DimId::H3), 0);
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        let input = view_with_srs("EPSG:4326");
+        let mut standard = H3Filter::new(8);
+        let expected = standard.run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input;
+        let mut streamed = H3Filter::new(8);
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(
+            chunk.get_u64(0, &DimId::H3),
+            expected.get_u64(0, &DimId::H3)
+        );
     }
 }

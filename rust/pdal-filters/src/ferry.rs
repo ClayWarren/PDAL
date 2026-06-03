@@ -88,6 +88,17 @@ impl Filter for FerryFilter {
         Ok(vec![out])
     }
 
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        for idx in 0..chunk.len() {
+            self.ferry_point(chunk, idx);
+        }
+        Ok(())
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -110,6 +121,8 @@ impl Streamable for FerryFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pdal_core::point::{DimType, PointLayout};
+    use std::rc::Rc;
 
     #[test]
     fn parse_specs_empty_is_error() {
@@ -154,5 +167,31 @@ mod tests {
         assert_eq!(dims.len(), 2);
         assert_eq!(dims[0], ("X".to_string(), "Z".to_string()));
         assert_eq!(dims[1], ("Y".to_string(), "Intensity".to_string()));
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Other("Foo".to_string()), DimType::F64);
+        let mut input = PointView::new(Rc::new(layout));
+        for value in [1.0, 2.0] {
+            let idx = input.add_point();
+            input.set_f64(idx, &DimId::X, value);
+        }
+
+        let mut standard = FerryFilter::new(vec![("X".to_string(), "Foo".to_string())]);
+        let expected = standard.run_one(&input).unwrap().remove(0);
+        let mut chunk = input;
+        let mut streamed = FerryFilter::new(vec![("X".to_string(), "Foo".to_string())]);
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), expected.len());
+        for idx in 0..chunk.len() {
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::Other("Foo".to_string())),
+                expected.get_f64(idx, &DimId::Other("Foo".to_string()))
+            );
+        }
     }
 }

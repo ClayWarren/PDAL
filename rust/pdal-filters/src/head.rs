@@ -48,6 +48,25 @@ impl Filter for HeadFilter {
 
         Ok(vec![out])
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        let n = chunk.len();
+        let mut write = 0u64;
+        for read in 0..n {
+            if self.process_one(chunk, read) {
+                if write != read {
+                    chunk.copy_point_within(read, write);
+                }
+                write += 1;
+            }
+        }
+        chunk.truncate(write);
+        Ok(())
+    }
 }
 
 impl Streamable for HeadFilter {
@@ -70,5 +89,42 @@ impl Streamable for HeadFilter {
 
     fn reset(&mut self) {
         self.index = 0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimId, DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(count: u64) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for value in 0..count {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, value as f64);
+        }
+        view
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        let input = view(6);
+        let mut standard = HeadFilter::new(3, false);
+        let expected = standard.run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input;
+        let mut streamed = HeadFilter::new(3, false);
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), expected.len());
+        for idx in 0..chunk.len() {
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::X),
+                expected.get_f64(idx, &DimId::X)
+            );
+        }
     }
 }

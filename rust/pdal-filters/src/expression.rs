@@ -76,6 +76,31 @@ impl Filter for ExpressionFilter {
 
         Ok(views)
     }
+
+    fn streamable(&self) -> bool {
+        self.expressions.len() == 1
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        self.ensure_prepared(chunk.layout().as_ref())?;
+        if self.expressions.len() != 1 {
+            return Err(StageError(
+                "filters.expression streaming requires exactly one expression.".to_string(),
+            ));
+        }
+
+        let mut write = 0;
+        for read in 0..chunk.len() {
+            if self.expressions[0].eval(chunk, read) {
+                if write != read {
+                    chunk.copy_point_within(read, write);
+                }
+                write += 1;
+            }
+        }
+        chunk.truncate(write);
+        Ok(())
+    }
 }
 
 impl Streamable for ExpressionFilter {
@@ -160,5 +185,24 @@ mod tests {
             .filter(|&i| filter.process_one(&mut input, i))
             .collect();
         assert_eq!(kept, vec![1, 3]);
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one_for_single_expression() {
+        let input = classified(&[1.0, 2.0, 2.0, 7.0]);
+        let mut standard = ExpressionFilter::new(&["Classification == 2".to_string()]).unwrap();
+        let expected = standard.run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input;
+        let mut streamed = ExpressionFilter::new(&["Classification == 2".to_string()]).unwrap();
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), expected.len());
+        for idx in 0..chunk.len() {
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::Classification),
+                expected.get_f64(idx, &DimId::Classification)
+            );
+        }
     }
 }
