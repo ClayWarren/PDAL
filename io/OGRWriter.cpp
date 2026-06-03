@@ -438,9 +438,9 @@ bool OGRWriter::useRustWriter() const
                std::all_of(m_ogrOptions.begin(), m_ogrOptions.end(),
                            rustSupportedOgrOption);
 
-    return (m_driverName == "ESRI Shapefile" && m_ogrOptions.empty()) ||
-           (m_driverName == "GPKG" && m_ogrOptions.empty() &&
-            m_multiCount == 1 && m_measureDimName.empty());
+    return m_driverName == "ESRI Shapefile" ||
+           (m_driverName == "GPKG" && m_multiCount == 1 &&
+            m_measureDimName.empty());
 }
 
 void OGRWriter::writeRustOutput()

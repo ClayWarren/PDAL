@@ -1,6 +1,7 @@
 use super::register_drivers;
 use gdal_sys::{CPLErr, OGRDataSourceH, OGRLayerH};
 use std::ffi::CString;
+use std::os::raw::c_char;
 
 pub struct VectorPointWriter {
     ds: OGRDataSourceH,
@@ -32,6 +33,16 @@ impl VectorPointWriter {
         srs_wkt: &str,
         measured: bool,
     ) -> Result<Self, String> {
+        Self::create_point_with_options(path, driver_name, srs_wkt, measured, &[])
+    }
+
+    pub fn create_point_with_options(
+        path: &str,
+        driver_name: &str,
+        srs_wkt: &str,
+        measured: bool,
+        layer_options: &[String],
+    ) -> Result<Self, String> {
         Self::create_with_geometry(
             path,
             driver_name,
@@ -41,15 +52,26 @@ impl VectorPointWriter {
             } else {
                 gdal_sys::OGRwkbGeometryType::wkbPoint25D
             },
+            layer_options,
         )
     }
 
     pub fn create_multipoint(path: &str, driver_name: &str, srs_wkt: &str) -> Result<Self, String> {
+        Self::create_multipoint_with_options(path, driver_name, srs_wkt, &[])
+    }
+
+    pub fn create_multipoint_with_options(
+        path: &str,
+        driver_name: &str,
+        srs_wkt: &str,
+        layer_options: &[String],
+    ) -> Result<Self, String> {
         Self::create_with_geometry(
             path,
             driver_name,
             srs_wkt,
             gdal_sys::OGRwkbGeometryType::wkbMultiPoint25D,
+            layer_options,
         )
     }
 
@@ -63,12 +85,23 @@ impl VectorPointWriter {
         srs_wkt: &str,
         layer_name: &str,
     ) -> Result<Self, String> {
+        Self::create_polygon_with_options(path, driver_name, srs_wkt, layer_name, &[])
+    }
+
+    pub fn create_polygon_with_options(
+        path: &str,
+        driver_name: &str,
+        srs_wkt: &str,
+        layer_name: &str,
+        layer_options: &[String],
+    ) -> Result<Self, String> {
         Self::create_with_geometry_named(
             path,
             driver_name,
             srs_wkt,
             layer_name,
             gdal_sys::OGRwkbGeometryType::wkbMultiPolygon,
+            layer_options,
         )
     }
 
@@ -77,8 +110,16 @@ impl VectorPointWriter {
         driver_name: &str,
         srs_wkt: &str,
         geometry_type: gdal_sys::OGRwkbGeometryType::Type,
+        layer_options: &[String],
     ) -> Result<Self, String> {
-        Self::create_with_geometry_named(path, driver_name, srs_wkt, "points", geometry_type)
+        Self::create_with_geometry_named(
+            path,
+            driver_name,
+            srs_wkt,
+            "points",
+            geometry_type,
+            layer_options,
+        )
     }
 
     fn create_with_geometry_named(
@@ -87,11 +128,21 @@ impl VectorPointWriter {
         srs_wkt: &str,
         layer_name: &str,
         geometry_type: gdal_sys::OGRwkbGeometryType::Type,
+        layer_options: &[String],
     ) -> Result<Self, String> {
         register_drivers();
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let driver_c = CString::new(driver_name).map_err(|e| e.to_string())?;
         let layer_c = CString::new(layer_name).map_err(|e| e.to_string())?;
+        let option_strings = layer_options
+            .iter()
+            .map(|option| CString::new(option.as_str()).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut option_ptrs = option_strings
+            .iter()
+            .map(|option| option.as_ptr() as *mut c_char)
+            .collect::<Vec<_>>();
+        option_ptrs.push(std::ptr::null_mut());
         unsafe {
             let driver = gdal_sys::OGRGetDriverByName(driver_c.as_ptr());
             if driver.is_null() {
@@ -119,7 +170,7 @@ impl VectorPointWriter {
                 layer_c.as_ptr(),
                 srs,
                 geometry_type,
-                std::ptr::null_mut(),
+                option_ptrs.as_mut_ptr(),
             );
             gdal_sys::OSRDestroySpatialReference(srs);
             if layer.is_null() {

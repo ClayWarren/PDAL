@@ -2,8 +2,8 @@
 //!
 //! The C++ writer is a broad OGR/GDAL adapter. This Rust writer covers local
 //! GeoJSON output plus native OGR-backed Shapefile and GeoPackage point output
-//! for the covered C++ test shapes. Transactions and broader creation options
-//! stay deferred to later native OGR milestones.
+//! for the covered C++ test shapes. Transactions stay deferred to later native
+//! OGR milestones.
 
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
@@ -19,6 +19,7 @@ pub struct OgrWriter {
     driver_name: String,
     attr_dims: Vec<String>,
     creation_options: GeoJsonCreationOptions,
+    native_creation_options: Vec<String>,
     input_srs: String,
     multicount: u64,
     measure_dim: String,
@@ -32,6 +33,7 @@ impl OgrWriter {
             driver_name: options.get_str("ogrdriver", ""),
             attr_dims: comma_values(options, "attr_dims"),
             creation_options: GeoJsonCreationOptions::from_options(options),
+            native_creation_options: comma_values(options, "ogr_options"),
             input_srs: options.get_str("input_srs", ""),
             multicount: options.get_u64("multicount", 1),
             measure_dim: options.get_str("measure_dim", ""),
@@ -125,12 +127,6 @@ impl OgrWriter {
                         .to_string(),
                 ));
             }
-            if self.creation_options != GeoJsonCreationOptions::default() {
-                return Err(StageError(
-                    "OgrWriter Rust implementation does not support native OGR creation options."
-                        .to_string(),
-                ));
-            }
         }
         if self.multicount == 0 {
             return Err(StageError(
@@ -147,7 +143,9 @@ impl OgrWriter {
                 "OgrWriter Rust implementation does not support measure_dim.".to_string(),
             ));
         }
-        self.creation_options.validate(&self.input_srs)?;
+        if driver == "GeoJSON" {
+            self.creation_options.validate(&self.input_srs)?;
+        }
         Ok(())
     }
 
@@ -267,11 +265,12 @@ impl OgrWriter {
 
         let driver = self.resolved_driver();
         let measure_dim = self.resolve_optional_dim(views, &self.measure_dim)?;
-        let writer = pdal_native::gdal::VectorPointWriter::create_point(
+        let writer = pdal_native::gdal::VectorPointWriter::create_point_with_options(
             &self.filename,
             &driver,
             &self.input_srs,
             measure_dim.is_some() || driver == "GPKG",
+            &self.native_creation_options,
         )
         .map_err(StageError)?;
         for view in views {
@@ -323,10 +322,11 @@ impl OgrWriter {
     }
 
     fn write_native_multipoints(&mut self, views: &[PointView]) -> Result<(), StageError> {
-        let writer = pdal_native::gdal::VectorPointWriter::create_multipoint(
+        let writer = pdal_native::gdal::VectorPointWriter::create_multipoint_with_options(
             &self.filename,
             &self.resolved_driver(),
             &self.input_srs,
+            &self.native_creation_options,
         )
         .map_err(StageError)?;
         let mut points = Vec::new();
@@ -704,6 +704,23 @@ mod tests {
 
         assert!(path.exists());
         assert_eq!(writer.point_count, 2);
+    }
+
+    #[test]
+    fn writes_geopackage_layer_creation_options() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("points.gpkg");
+        let mut options = Options::new();
+        options
+            .add("filename", path.display())
+            .add("ogrdriver", "GPKG")
+            .add("ogr_options", "GEOMETRY_NAME=pdal_geom");
+        let mut writer = OgrWriter::new(&options);
+
+        writer.write(&[test_view()]).unwrap();
+
+        let vector = pdal_native::gdal::Vector::open(&path.display().to_string()).unwrap();
+        assert_eq!(vector.geometry_column(0).unwrap(), "pdal_geom");
     }
 
     #[test]

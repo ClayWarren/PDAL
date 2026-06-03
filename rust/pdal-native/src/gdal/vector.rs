@@ -1,6 +1,6 @@
 use super::register_drivers;
 use gdal_sys::{CPLErr, OGRDataSourceH};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 pub struct Vector {
     ds: OGRDataSourceH,
@@ -437,6 +437,20 @@ impl Vector {
                 gdal_sys::OGR_F_Destroy(feature);
             }
             Ok(result)
+        }
+    }
+
+    pub fn geometry_column(&self, layer_idx: i32) -> Result<String, String> {
+        unsafe {
+            let layer = gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx);
+            if layer.is_null() {
+                return Err("Failed to get layer".to_string());
+            }
+            let name = gdal_sys::OGR_L_GetGeometryColumn(layer);
+            if name.is_null() {
+                return Ok(String::new());
+            }
+            Ok(CStr::from_ptr(name).to_string_lossy().into_owned())
         }
     }
 }
