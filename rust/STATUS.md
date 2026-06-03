@@ -45,8 +45,8 @@ optional plugins are included.
 Those numbers are guardrails, not the finish line. The work left is to close
 or explicitly accept the named caveats below:
 
-- OGR/vector-source breadth: `filters.geomdistance` OGR sources, broad OGR
-  datasource/update workflows, and similar native vector edge cases.
+- OGR/vector-source breadth: broad OGR datasource/update workflows and similar
+  native vector edge cases.
 - EPT/COPC/STAC/remote breadth: transformed preview bounds, origin/polygon/OGR
   preview fallbacks, broad remote traversal, schema validation, object-store
   option parity, and accepted addon limitations.
@@ -82,7 +82,7 @@ Do not restart old directory sweeps or add placeholder Rust modules.
 | Expressions | in progress | Conditional, math, and assignment parser/evaluator support current Rust expression/assign work. Full C++ expression surface is not claimed. |
 | C ABI bridge | in progress | Rust-owned handles are the contract. Metadata, summaries, views, `where` view splitting, and pipeline calls are exposed. Never pass C++ object pointers as Rust handles. |
 | C++ filter wrappers | in progress | Safe ports use explicit Rust view conversion. Existing C++ filter tests remain the parity gate. |
-| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; the portable filter implementation backlog is now at 0 port-candidate LOC. Remaining C++ under `filters/` is wrapper/compatibility surface plus the exported `filters/private/Point` OGR geometry adapter used by C++ option parsing (`filters.crop` centers and `filters.normal` viewpoint). `filters.delaunay` is now registry-visible and attaches the `delaunay2d` mesh through the existing Rust triangulation helper. Registry exposure is not the same as full pipeline parity. |
+| Filter ports | in progress | 84 first-party filter/static stage files exist in C++; the portable filter implementation backlog is now at 0 port-candidate LOC. Remaining C++ under `filters/` is wrapper/compatibility surface plus the exported `filters/private/Point` OGR geometry adapter used by C++ option parsing (`filters.crop` centers and `filters.normal` viewpoint). `filters.delaunay` is now registry-visible and attaches the `delaunay2d` mesh through the existing Rust triangulation helper. `filters.geomdistance` registry construction supports inline geometry plus OGR layer/SQL geometry sources for covered local vector datasources. Registry exposure is not the same as full pipeline parity. |
 | Filter layout mutation | in progress | The Rust filter trait exposes declared output dimensions and the pipeline prepares those dimensions before execution. Registry coverage now checks the derived-dimension filters that write classification, clustering, HAG, normal/curvature, covariance, color, H3, LOF, M3C2, and custom output dimensions. More complex layout mutation and dynamic prepare behavior can still grow from concrete parity cases. |
 | Pure/local I/O harness | done | `readers.faux` and `writers.null` support in-memory pipeline testing, streaming pipeline execution, Rust C ABI kernel dispatch, and Rust CLI pipeline command coverage. |
 | Text I/O | done | Existing C++ reader/writer unit-test shapes pass through the Rust-backed path, and installed-PDAL regression coverage exists for scoped workflows. Reader input can open local files and GDAL VSI/HTTP(S) text sources. Reader input plus CSV and GeoJSON writer output are streamable in the Rust pipeline executor. |

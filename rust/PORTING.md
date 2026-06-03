@@ -157,9 +157,10 @@ Current active milestone:
    regression/performance evidence.
 3. When a caveat can be closed in code, close it with focused parity coverage.
    Recent examples are registry support for `filters.radiusassign` value
-   expressions and `filters.overlay` layer/query/bounds options. When a caveat
-   is an intentional holdout or native-adapter boundary, record that decision
-   instead of porting around it.
+   expressions, `filters.overlay` layer/query/bounds options, and
+   `filters.geomdistance` OGR layer/SQL sources. When a caveat is an
+   intentional holdout or native-adapter boundary, record that decision instead
+   of porting around it.
 4. New I/O, command, vendor, and plugin work should be narrow and
    fixture-backed. Broad sweeps are only appropriate after a named finish-line
    caveat is converted into a concrete, regression-testable milestone.
@@ -564,9 +565,9 @@ The remaining work is the explicit caveat set in `rust/STATUS.md`.
 
 Current caveat classes:
 
-- OGR/vector-source breadth: for example `filters.geomdistance` OGR sources and
-  broad OGR datasource/update workflows still need explicit native-adapter
-  plumbing and regression coverage before they can be claimed.
+- OGR/vector-source breadth: broad OGR datasource/update workflows still need
+  explicit native-adapter plumbing and regression coverage before they can be
+  claimed.
 - EPT/COPC/STAC preview and remote breadth: transformed preview bounds,
   origin/polygon/OGR preview paths, broad remote traversal, schema validation,
   and object-store option parity remain named work items.

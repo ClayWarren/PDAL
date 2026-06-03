@@ -2,6 +2,7 @@ use super::*;
 use pdal_core::options::Options;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_native::gdal::{VectorFieldType, VectorFieldValue, VectorPointWriter};
+use serde_json::json;
 use std::rc::Rc;
 use tempfile::TempDir;
 
@@ -190,4 +191,52 @@ fn registry_overlay_filter_supports_bounds() {
     assert_eq!(views.len(), 1);
     assert_eq!(views[0].get_f64(0, &DimId::Classification), 0.0);
     assert_eq!(views[0].get_f64(1, &DimId::Classification), 7.0);
+}
+
+#[test]
+fn registry_geomdistance_filter_supports_ogr_layers() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Distance");
+    options.add(
+        "ogr",
+        json!({
+            "type": "OGR",
+            "datasource": datasource,
+            "layer": "zones",
+        })
+        .to_string(),
+    );
+    let mut filter = create_filter("filters.geomdistance", &options).unwrap();
+
+    let output_dims = filter.output_dimensions();
+    let views = filter
+        .run(&[overlay_view_points(&[(15.0, 5.0)]).with_dimensions(&output_dims)])
+        .unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::from_name("Distance")), 5.0);
+}
+
+#[test]
+fn registry_geomdistance_filter_supports_ogr_sql() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Distance");
+    options.add(
+        "ogr",
+        json!({
+            "type": "OGR",
+            "datasource": datasource,
+            "sql": "SELECT * FROM zones WHERE cls = 7",
+        })
+        .to_string(),
+    );
+    let mut filter = create_filter("filters.geomdistance", &options).unwrap();
+
+    let output_dims = filter.output_dimensions();
+    let views = filter
+        .run(&[overlay_view_points(&[(5.0, 5.0)]).with_dimensions(&output_dims)])
+        .unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::from_name("Distance")), 15.0);
 }

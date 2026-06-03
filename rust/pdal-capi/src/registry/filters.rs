@@ -5,6 +5,8 @@
 //! module; the filter-only option-string parsers live in `filter_parse`.
 
 use pdal_core::bounds::{bounds2d_to_wkt, parse_bounds2d, parse_bounds3d};
+use pdal_core::gdal::Vector;
+use pdal_core::ogr_spec::{parse_ogr_spec_json, OgrSpecOptions};
 use pdal_core::options::Options;
 use pdal_core::pipeline::FilterWrapper;
 use pdal_core::point::DimId;
@@ -93,6 +95,51 @@ use crate::registry::{get_bool, get_f64, get_u64};
 
 mod filter_parse;
 use filter_parse::*;
+
+fn geomdistance_geometry_wkt(options: &Options) -> Result<String, StageError> {
+    let ogr = options.get_str("ogr", "");
+    if ogr.trim().is_empty() {
+        return Ok(options.get_str("geometry", ""));
+    }
+
+    let spec = parse_ogr_spec_json(&ogr).map_err(StageError)?;
+    geomdistance_geometry_from_ogr(&spec)
+}
+
+fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, StageError> {
+    if !spec.drivers.is_empty() || !spec.open_options.is_empty() {
+        return Err(StageError(
+            "filters.geomdistance: OGR drivers/openoptions are not supported in the Rust registry."
+                .to_string(),
+        ));
+    }
+    if !spec.geometry.is_empty() {
+        return Err(StageError(
+            "filters.geomdistance: OGR SQL geometry filters are not supported in the Rust registry."
+                .to_string(),
+        ));
+    }
+
+    let ds = Vector::open(&spec.datasource).map_err(StageError)?;
+    let wkts = if spec.sql.is_empty() {
+        ds.get_feature_wkts_by_layer(&spec.layer)
+    } else {
+        let dialect = if spec.dialect.is_empty() {
+            "OGRSQL"
+        } else {
+            &spec.dialect
+        };
+        ds.get_feature_wkts_by_sql(&spec.sql, dialect)
+    }
+    .map_err(StageError)?;
+
+    wkts.into_iter().next().ok_or_else(|| {
+        StageError(format!(
+            "filters.geomdistance: OGR datasource '{}' did not contain any geometries.",
+            spec.datasource
+        ))
+    })
+}
 
 pub fn create_filter(
     name: &str,
@@ -334,16 +381,7 @@ pub fn create_filter(
         )))),
         "filters.faceraster" => Ok(Box::new(FilterWrapper::new(FaceRasterFilter::new(options)))),
         "filters.geomdistance" => {
-            // The Rust filter takes an inline WKT/GeoJSON geometry; the OGR
-            // vector-source option needs a reader the registry can't drive.
-            if !options.get_str("ogr", "").trim().is_empty() {
-                return Err(StageError(
-                    "filters.geomdistance: the 'ogr' geometry source is not supported in \
-                     the Rust pipeline registry."
-                        .to_string(),
-                ));
-            }
-            let geometry = options.get_str("geometry", "");
+            let geometry = geomdistance_geometry_wkt(options)?;
             if geometry.trim().is_empty() {
                 return Err(StageError(
                     "filters.geomdistance: missing 'geometry' option.".to_string(),

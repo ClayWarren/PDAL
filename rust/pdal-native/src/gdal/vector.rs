@@ -454,12 +454,55 @@ impl Vector {
     }
 
     pub fn get_feature_wkts(&self, layer_idx: i32) -> Result<Vec<String>, String> {
+        let layer = unsafe { gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx) };
+        if layer.is_null() {
+            return Err("Failed to get layer".to_string());
+        }
+        self.get_feature_wkts_from_layer(layer)
+    }
+
+    pub fn get_feature_wkts_by_layer(&self, layer_name: &str) -> Result<Vec<String>, String> {
+        if layer_name.is_empty() {
+            return self.get_feature_wkts(0);
+        }
+        let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
+        let layer = unsafe { gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr()) };
+        if layer.is_null() {
+            return Err(format!("Failed to get layer '{}'.", layer_name));
+        }
+        self.get_feature_wkts_from_layer(layer)
+    }
+
+    pub fn get_feature_wkts_by_sql(&self, sql: &str, dialect: &str) -> Result<Vec<String>, String> {
+        let sql_c = CString::new(sql).map_err(|e| e.to_string())?;
+        let dialect_c = CString::new(dialect).map_err(|e| e.to_string())?;
+        let dialect_ptr = if dialect.is_empty() {
+            std::ptr::null()
+        } else {
+            dialect_c.as_ptr()
+        };
+        unsafe {
+            let layer = gdal_sys::OGR_DS_ExecuteSQL(
+                self.ds,
+                sql_c.as_ptr(),
+                std::ptr::null_mut(),
+                dialect_ptr,
+            );
+            if layer.is_null() {
+                return Err(format!("Failed to execute OGR SQL '{}'.", sql));
+            }
+            let result = self.get_feature_wkts_from_layer(layer);
+            gdal_sys::OGR_DS_ReleaseResultSet(self.ds, layer);
+            result
+        }
+    }
+
+    fn get_feature_wkts_from_layer(
+        &self,
+        layer: gdal_sys::OGRLayerH,
+    ) -> Result<Vec<String>, String> {
         unsafe {
             let mut result = Vec::new();
-            let layer = gdal_sys::OGR_DS_GetLayer(self.ds, layer_idx);
-            if layer.is_null() {
-                return Err("Failed to get layer".to_string());
-            }
             gdal_sys::OGR_L_ResetReading(layer);
 
             loop {
@@ -467,19 +510,7 @@ impl Vector {
                 if feature.is_null() {
                     break;
                 }
-
-                let geom = gdal_sys::OGR_F_GetGeometryRef(feature);
-                if !geom.is_null() {
-                    let mut wkt_ptr: *mut std::os::raw::c_char = std::ptr::null_mut();
-                    if gdal_sys::OGR_G_ExportToWkt(geom, &mut wkt_ptr) == CPLErr::CE_None {
-                        result.push(
-                            std::ffi::CStr::from_ptr(wkt_ptr)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
-                        gdal_sys::VSIFree(wkt_ptr as *mut _);
-                    }
-                }
+                push_feature_wkt(feature, &mut result);
                 gdal_sys::OGR_F_Destroy(feature);
             }
             Ok(result)
@@ -515,4 +546,20 @@ fn drop_optional_string_column(
     rows.into_iter()
         .map(|(wkt, value, _)| (wkt, value))
         .collect()
+}
+
+unsafe fn push_feature_wkt(feature: gdal_sys::OGRFeatureH, result: &mut Vec<String>) {
+    let geom = gdal_sys::OGR_F_GetGeometryRef(feature);
+    if geom.is_null() {
+        return;
+    }
+    let mut wkt_ptr: *mut std::os::raw::c_char = std::ptr::null_mut();
+    if gdal_sys::OGR_G_ExportToWkt(geom, &mut wkt_ptr) == CPLErr::CE_None {
+        result.push(
+            std::ffi::CStr::from_ptr(wkt_ptr)
+                .to_string_lossy()
+                .into_owned(),
+        );
+        gdal_sys::VSIFree(wkt_ptr as *mut _);
+    }
 }
