@@ -731,6 +731,42 @@ fn registry_assign_filter_supports_value_expressions() {
 }
 
 #[test]
+fn registry_radiusassign_filter_supports_value_expressions() {
+    let mut options = Options::new();
+    options.add("radius", 1.0);
+    options.add("is3d", true);
+    options.add("reference_domain", "Classification[1:1]");
+    options.add("update_expression", "Classification = Z + 3 WHERE X < 1");
+    let mut filter = create_filter("filters.radiusassign", &options).unwrap();
+
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    layout.register(DimId::Classification, DimType::U8);
+    let mut view = PointView::new(Rc::new(layout));
+    for (x, y, z, class) in [
+        (0.0, 0.0, 0.0, 1.0),
+        (0.5, 0.0, 0.0, 0.0),
+        (0.0, 0.5, -2.0, 0.0),
+        (10.0, 0.0, 0.0, 0.0),
+    ] {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, x);
+        view.set_f64(idx, &DimId::Y, y);
+        view.set_f64(idx, &DimId::Z, z);
+        view.set_f64(idx, &DimId::Classification, class);
+    }
+
+    let views = filter.run(&[view]).unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 3.0);
+    assert_eq!(views[0].get_f64(1, &DimId::Classification), 3.0);
+    assert_eq!(views[0].get_f64(2, &DimId::Classification), 0.0);
+    assert_eq!(views[0].get_f64(3, &DimId::Classification), 0.0);
+}
+
+#[test]
 fn pipeline_json_runs_colorization_against_raster() {
     // Mirrors the C++ ColorizationFilterTest.test1: colorize autzen points from
     // autzen.jpg with "Red, Green,Blue::255" and check point 0 == 210/205/47175

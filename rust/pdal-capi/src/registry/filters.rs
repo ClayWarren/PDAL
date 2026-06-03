@@ -10,7 +10,6 @@ use pdal_core::pipeline::FilterWrapper;
 use pdal_core::point::DimId;
 use pdal_core::stage::StageError;
 
-use pdal_core::point::{DimType, PointLayout};
 use pdal_filters::approximate_coplanar::ApproximateCoplanarFilter;
 use pdal_filters::assign::{AssignCondition, AssignFilter, AssignRange};
 use pdal_filters::chipper::ChipperFilter;
@@ -64,7 +63,7 @@ use pdal_filters::planefit::PlaneFitFilter;
 use pdal_filters::pmf::PmfFilter;
 use pdal_filters::proj_pipeline::ProjPipelineFilter;
 use pdal_filters::radialdensity::RadialDensityFilter;
-use pdal_filters::radiusassign::{parse_assignments, RadiusAssignFilter};
+use pdal_filters::radiusassign::RadiusAssignFilter;
 use pdal_filters::randomize::RandomizeFilter;
 use pdal_filters::range::{parse_range_limit, RangeFilter, RangeLimit};
 use pdal_filters::reciprocity::ReciprocityFilter;
@@ -276,32 +275,17 @@ pub fn create_filter(
                         .to_string(),
                 ));
             }
-            // Build a synthetic layout from the assignment LHS dimensions so the
-            // statements can be prepared at build time (matching the C ABI
-            // pdal_stage_create_radiusassign). Expressions referencing other
-            // dimensions error here rather than silently misbehaving.
-            let mut layout = PointLayout::default();
-            for expr in &update_exprs {
-                if let Some((dim, _)) = expr.split_once('=') {
-                    layout.register(DimId::from_name(dim.trim()), DimType::F64);
-                }
-            }
-            let assignments = parse_assignments(&update_exprs, &layout).map_err(|e| {
-                StageError(format!(
-                    "{} (expressions referencing other dimensions are not \
-                    supported in the Rust pipeline registry)",
-                    e.0
-                ))
-            })?;
-            Ok(Box::new(FilterWrapper::new(RadiusAssignFilter::new(
-                src_domain,
-                reference_domain,
-                assignments,
-                get_f64(options, "radius", 0.0)?,
-                get_bool(options, "is3d", false)?,
-                get_f64(options, "max2d_above", -1.0)?,
-                get_f64(options, "max2d_below", -1.0)?,
-            ))))
+            Ok(Box::new(FilterWrapper::new(
+                RadiusAssignFilter::with_update_expressions(
+                    src_domain,
+                    reference_domain,
+                    &update_exprs,
+                    get_f64(options, "radius", 0.0)?,
+                    get_bool(options, "is3d", false)?,
+                    get_f64(options, "max2d_above", -1.0)?,
+                    get_f64(options, "max2d_below", -1.0)?,
+                )?,
+            )))
         }
         "filters.dem" => {
             // C++ DEMFilter parses `limits` (a DimRange like "Z[0:100]") into a

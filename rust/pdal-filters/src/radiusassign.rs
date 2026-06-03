@@ -8,6 +8,7 @@ pub struct RadiusAssignFilter {
     src_domain: Vec<RangeLimit>,
     reference_domain: Vec<RangeLimit>,
     assignments: Vec<AssignStatement>,
+    assignments_prepared: bool,
     radius: f64,
     search_3d: bool,
     max_2d_above: f64,
@@ -28,11 +29,34 @@ impl RadiusAssignFilter {
             src_domain,
             reference_domain,
             assignments,
+            assignments_prepared: true,
             radius,
             search_3d,
             max_2d_above,
             max_2d_below,
         }
+    }
+
+    pub fn with_update_expressions(
+        src_domain: Vec<RangeLimit>,
+        reference_domain: Vec<RangeLimit>,
+        expressions: &[String],
+        radius: f64,
+        search_3d: bool,
+        max_2d_above: f64,
+        max_2d_below: f64,
+    ) -> Result<Self, StageError> {
+        let assignments = parse_unprepared_assignments(expressions)?;
+        Ok(Self {
+            src_domain,
+            reference_domain,
+            assignments,
+            assignments_prepared: false,
+            radius,
+            search_3d,
+            max_2d_above,
+            max_2d_below,
+        })
     }
 
     fn point_passes_domain(domain: &[RangeLimit], view: &PointView, idx: u64) -> bool {
@@ -82,6 +106,19 @@ impl RadiusAssignFilter {
 
         false
     }
+
+    fn prepare_assignments(&mut self, view: &PointView) -> Result<(), StageError> {
+        if self.assignments_prepared {
+            return Ok(());
+        }
+        for assignment in &mut self.assignments {
+            assignment
+                .prepare(view.layout().as_ref())
+                .map_err(|err| StageError(format!("filters.radiusassign: {err}")))?;
+        }
+        self.assignments_prepared = true;
+        Ok(())
+    }
 }
 
 impl Filter for RadiusAssignFilter {
@@ -95,6 +132,8 @@ impl Filter for RadiusAssignFilter {
                 "filters.radiusassign: radius must be greater than zero.".to_string(),
             ));
         }
+
+        self.prepare_assignments(view)?;
 
         let references = self.reference_ids(view);
         let mut output = view.make_new();
@@ -135,22 +174,31 @@ pub fn parse_assignments(
     expressions: &[String],
     layout: &pdal_core::point::PointLayout,
 ) -> Result<Vec<AssignStatement>, StageError> {
-    let mut assignments = Vec::new();
-    for expression in expressions {
-        let mut statement = AssignStatement::parse(expression)
-            .map_err(|err| StageError(format!("filters.radiusassign: {err}")))?;
+    let mut assignments = parse_unprepared_assignments(expressions)?;
+    for statement in &mut assignments {
         statement
             .prepare(layout)
             .map_err(|err| StageError(format!("filters.radiusassign: {err}")))?;
-        assignments.push(statement);
     }
-    if assignments.is_empty() {
+    Ok(assignments)
+}
+
+fn parse_unprepared_assignments(
+    expressions: &[String],
+) -> Result<Vec<AssignStatement>, StageError> {
+    if expressions.is_empty() {
         return Err(StageError(
             "Empty 'update_expression' option, must be set to apply any change on the data"
                 .to_string(),
         ));
     }
-    Ok(assignments)
+    expressions
+        .iter()
+        .map(|expression| {
+            AssignStatement::parse(expression)
+                .map_err(|err| StageError(format!("filters.radiusassign: {err}")))
+        })
+        .collect()
 }
 
 impl Streamable for RadiusAssignFilter {
@@ -240,5 +288,25 @@ mod tests {
         let out = filter.run_one(&view).unwrap().remove(0);
         assert_eq!(out.get_f64(1, &DimId::Classification), 2.0);
         assert_eq!(out.get_f64(2, &DimId::Classification), 0.0);
+    }
+
+    #[test]
+    fn update_expressions_prepare_against_input_layout() {
+        let view = test_view();
+        let mut filter = RadiusAssignFilter::with_update_expressions(
+            Vec::new(),
+            class_one_domain(),
+            &[String::from("Classification = Z + 3 WHERE X < 1")],
+            1.0,
+            true,
+            -1.0,
+            -1.0,
+        )
+        .unwrap();
+        let out = filter.run_one(&view).unwrap().remove(0);
+        assert_eq!(out.get_f64(0, &DimId::Classification), 3.0);
+        assert_eq!(out.get_f64(1, &DimId::Classification), 3.0);
+        assert_eq!(out.get_f64(2, &DimId::Classification), 0.0);
+        assert_eq!(out.get_f64(3, &DimId::Classification), 0.0);
     }
 }
