@@ -54,6 +54,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
         Ok(progress) => progress,
         Err(()) => return 1,
     };
+    let progress_targets = progress_file_targets(&json);
 
     if parsed.validate_only {
         let validation = validate_pipeline_for_kernel(&json);
@@ -92,6 +93,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
             .map(|name| DimId::from_name(name))
             .collect(),
     );
+    write_ready_progress(&mut progress, &progress_targets);
     // When no metadata summary is requested, try chunked streaming first
     // (bounded peak memory). `Ok(None)` means the pipeline is not streaming-
     // eligible -- fall through to the materializing path with no side effects.
@@ -102,7 +104,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     {
         match pipeline.execute_streaming() {
             Ok(Some(_)) => {
-                write_progress(&mut progress, "DONEPIPELINE", "pipeline");
+                write_done_progress(&mut progress, &progress_targets);
                 return 0;
             }
             Ok(None) if parsed.stream_required => {
@@ -120,7 +122,7 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     }
     match pipeline.execute_with_result(Vec::new()) {
         Ok(result) => {
-            write_progress(&mut progress, "DONEPIPELINE", "pipeline");
+            write_done_progress(&mut progress, &progress_targets);
             if let Some(path) = parsed.pointcloud_schema_file {
                 let xml = pdal_core::xml_schema::point_cloud_schema_xml(&result.output_views);
                 if let Err(err) = std::fs::write(&path, xml) {
@@ -159,14 +161,30 @@ fn open_progress_file(path: Option<&str>) -> Result<Option<File>, ()> {
         return Ok(None);
     };
     match std::fs::OpenOptions::new().write(true).open(path) {
-        Ok(file) => {
-            let mut progress = Some(file);
-            write_progress(&mut progress, "READYPIPELINE", "pipeline");
-            Ok(progress)
-        }
+        Ok(file) => Ok(Some(file)),
         Err(_) => {
             eprintln!("Can't open progress file '{path}'.");
             Err(())
+        }
+    }
+}
+
+fn write_ready_progress(file: &mut Option<File>, targets: &[String]) {
+    if targets.is_empty() {
+        write_progress(file, "READYPIPELINE", "pipeline");
+    } else {
+        for target in targets {
+            write_progress(file, "READYFILE", target);
+        }
+    }
+}
+
+fn write_done_progress(file: &mut Option<File>, targets: &[String]) {
+    if targets.is_empty() {
+        write_progress(file, "DONEPIPELINE", "pipeline");
+    } else {
+        for target in targets {
+            write_progress(file, "DONEFILE", target);
         }
     }
 }
@@ -175,6 +193,23 @@ fn write_progress(file: &mut Option<File>, event: &str, text: &str) {
     if let Some(file) = file {
         let _ = writeln!(file, "{event}:{text}");
     }
+}
+
+pub(super) fn progress_file_targets(json: &str) -> Vec<String> {
+    let Ok(descriptors) = pdal_core::pipeline_reader::parse_pipeline_descriptors(json) else {
+        return Vec::new();
+    };
+    let Some(stages) = descriptors.as_array() else {
+        return Vec::new();
+    };
+
+    stages
+        .iter()
+        .filter(|stage| stage["role"] == "writer")
+        .filter_map(|stage| stage["filename"].as_str())
+        .filter(|filename| !filename.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {

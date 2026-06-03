@@ -1,5 +1,5 @@
 use super::*;
-use command::validate_pipeline_for_kernel;
+use command::{progress_file_targets, validate_pipeline_for_kernel};
 
 #[test]
 fn validate_pipeline_reports_actual_streamability() {
@@ -34,4 +34,34 @@ fn validate_pipeline_rejects_non_reader_roots_even_when_a_reader_exists() {
         .as_str()
         .unwrap()
         .contains("start with a reader"));
+}
+
+#[test]
+fn progress_targets_are_writer_filenames() {
+    let json = r#"{"pipeline":[
+        "input.las",
+        {"type":"filters.sort", "dimension":"X"},
+        "output.laz"
+    ]}"#;
+    assert_eq!(progress_file_targets(json), vec!["output.laz".to_string()]);
+
+    let typed_writers = r#"{"pipeline":[
+        {"type":"readers.faux", "count":1},
+        {"type":"writers.las", "filename":"output.laz"},
+        {"type":"writers.text", "filename":"summary.txt"}
+    ]}"#;
+    assert_eq!(
+        progress_file_targets(typed_writers),
+        vec!["output.laz".to_string(), "summary.txt".to_string()]
+    );
+}
+
+#[test]
+fn progress_targets_ignore_writerless_pipelines() {
+    let json = r#"{"pipeline":[
+        {"type":"readers.faux", "count":1},
+        {"type":"filters.decimation", "step":2}
+    ]}"#;
+
+    assert!(progress_file_targets(json).is_empty());
 }

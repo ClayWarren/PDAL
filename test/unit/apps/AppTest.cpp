@@ -183,4 +183,25 @@ TEST(PdalApp, pipeline_dims_limits_metadata_dimensions)
     EXPECT_EQ("X", json["dimension_summaries"][1]["name"].get<std::string>());
 }
 
+TEST(PdalApp, pipeline_progress_reports_writer_file)
+{
+    const std::string progressFile = Support::temppath("pipeline-progress.out");
+    FileUtils::deleteFile(progressFile);
+    auto handle = FileUtils::createFile(progressFile);
+    FileUtils::closeFile(handle);
+
+    std::string output;
+    const std::string command =
+        appCommand() + " pipeline " +
+        Support::configuredpath("pipeline/bpf2las.json") + " --progress " +
+        progressFile + " 2>&1";
+    ASSERT_EQ(0, Utils::run_shell_command(command, output)) << output;
+
+    const std::string progress = FileUtils::readFileIntoString(progressFile);
+    EXPECT_NE(progress.find("READYFILE:"), std::string::npos);
+    EXPECT_NE(progress.find("DONEFILE:"), std::string::npos);
+    EXPECT_EQ(progress.find("READYPIPELINE:"), std::string::npos);
+    EXPECT_EQ(progress.find("DONEPIPELINE:"), std::string::npos);
+}
+
 } // namespace pdal
