@@ -79,6 +79,8 @@ mod tests {
         assert!(simple_srs.is_empty());
         assert!(!autzen_srs.is_empty());
         assert_ne!(simple_srs.wkt(), autzen_srs.wkt());
+        assert!(autzen_srs.wkt().contains("Lambert_Conformal_Conic"));
+        assert!(!autzen_srs.wkt().contains("EPSG:32767"));
     }
 
     #[test]

@@ -36,11 +36,11 @@ it unless a concrete parity failure proves the decision wrong.
 | Boundary | Decision | Notes |
 |---|---|---|
 | GDAL raster/vector | Use `pdal-native` with `gdal-sys`; keep C++ GDAL compatibility where Rust does not yet own parity. | Applies to GDAL reader/writer, OGR writer, TIndex/OGR paths, raster helpers, and covered GeoJSON/Shapefile/GPKG cases. |
-| PROJ/SRS | Use `pdal-native`/Rust C ABI for SRS and transforms where already covered; retain C++ GDAL/OGR consumers that still require C++ objects. | `SrsTransform::get()` consumers and GeoTIFF VLR encoding remain C++ for now. |
+| PROJ/SRS | Use `pdal-native`/Rust C ABI for SRS and transforms where already covered; retain C++ GDAL/OGR consumers that still require C++ objects. | `SrsTransform::get()` consumers and GeoTIFF VLR encoding remain C++ for now; LAS GeoTIFF VLR decoding now has a Rust/native libgeotiff path. |
 | GEOS | Use Rust GEOS only through isolated `pdal-native` paths. Do not call it from legacy C++ `Geometry`/`Polygon` methods. | Direct mixed GEOS hooks were unstable on macOS; C++ geometry stays on existing GDAL/OGR path. |
 | Nitro | Use `pdal-native` Nitro adapter for NITF wrap/unwrap and NITF reader/writer parity. | Do not port Nitro itself. |
 | Arbiter/connector | Keep C++ Arbiter connector as a native adapter. Rust remote reads use GDAL VSI for covered paths. | Do not build a Rust Arbiter mirror unless a concrete parity case requires it. |
-| libgeotiff | Keep GeoTIFF GeoKey encoding as a C++ holdout. | Revisit only if LAS SRS VLR parity requires a Rust/native replacement. |
+| libgeotiff | Use the `pdal-native` libgeotiff adapter for LAS GeoTIFF GeoKey decoding; keep GeoKey encoding as a C++ holdout until LAS writer parity requires it. | Added when user-defined GeoTIFF SRS VLRs were needed for LAS/STAC parity. |
 | LEPCC/I3S/SLPK | Keep ESRI reader family as LEPCC-backed native adapter for now. | `readers.slpk`/`readers.i3s` may be inferred but must fail cleanly in the Rust registry until a real port/FFI decision lands. |
 | E57 bundled library | Treat `plugins/e57/libE57Format` as vendor/native adapter, not first-party code to rewrite. | A future E57 milestone may choose FFI or a Rust E57 crate, but not a line-by-line port. |
 | Arrow/Parquet | Keep optional Arrow plugin as native adapter until a deliberate Arrow Rust/FFI strategy is chosen. | No broad Arrow port in the first-party milestone. |

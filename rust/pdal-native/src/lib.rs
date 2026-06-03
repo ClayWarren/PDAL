@@ -6,6 +6,7 @@
 
 pub mod gdal;
 pub mod geometry;
+pub mod geotiff;
 pub mod nitf;
 pub mod srs;
 pub mod vsi;

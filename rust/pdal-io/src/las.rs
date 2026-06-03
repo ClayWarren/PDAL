@@ -28,6 +28,8 @@ const WKT_RECORD_ID: u16 = 2112;
 const WKT2_RECORD_ID: u16 = 4224;
 const PROJJSON_RECORD_ID: u16 = 4225;
 const GEOTIFF_DIRECTORY_RECORD_ID: u16 = 34735;
+const GEOTIFF_DOUBLES_RECORD_ID: u16 = 34736;
+const GEOTIFF_ASCII_RECORD_ID: u16 = 34737;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SrsVlrKind {

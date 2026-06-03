@@ -143,7 +143,7 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
                 )
                 .is_some()
                 {
-                    if let Some(srs) = spatial_reference_from_geotiff_vlrs(header)? {
+                    if let Some(srs) = spatial_reference_from_geotiff_vlrs(header, ignored)? {
                         return Ok(Some(srs));
                     }
                 }
@@ -156,12 +156,37 @@ pub(super) fn resolve_spatial_reference_from_vlrs(
 
 pub(super) fn spatial_reference_from_geotiff_vlrs(
     header: &Header,
+    ignored: &[IgnoreVlrSpec],
 ) -> Result<Option<pdal_core::srs::SpatialReference>, StageError> {
     // Match C++ las::Srs::extractGeotiff: a GeoTIFF directory that cannot be
     // turned into a CRS -- empty/missing ascii or double VLRs, or keys that
     // libgeotiff rejects -- is tolerated as "no SRS", not a hard read failure.
     // The points still load; downstream stages that need an SRS (e.g.
     // filters.reprojection) error on the resulting empty SRS instead.
+    let Some(directory) = find_vlr(
+        header,
+        TRANSFORM_USER_ID,
+        GEOTIFF_DIRECTORY_RECORD_ID,
+        ignored,
+    ) else {
+        return Ok(None);
+    };
+    let doubles = find_vlr(
+        header,
+        TRANSFORM_USER_ID,
+        GEOTIFF_DOUBLES_RECORD_ID,
+        ignored,
+    )
+    .map(|vlr| vlr.data.as_slice())
+    .unwrap_or(&[]);
+    let ascii = find_vlr(header, TRANSFORM_USER_ID, GEOTIFF_ASCII_RECORD_ID, ignored)
+        .map(|vlr| vlr.data.as_slice())
+        .unwrap_or(&[]);
+
+    if let Some(wkt) = pdal_native::geotiff::wkt_from_tags(&directory.data, doubles, ascii) {
+        return Ok(Some(pdal_core::srs::SpatialReference::new(&wkt)));
+    }
+
     let geotiff = match header.get_geotiff_crs() {
         Ok(Some(geotiff)) => geotiff,
         Ok(None) | Err(_) => return Ok(None),
@@ -170,9 +195,12 @@ pub(super) fn spatial_reference_from_geotiff_vlrs(
         Ok(crs) => crs,
         Err(_) => return Ok(None),
     };
+    let horizontal = crs.get_horizontal();
+    if horizontal == 0 || horizontal == 32767 {
+        return Ok(None);
+    }
     Ok(Some(pdal_core::srs::SpatialReference::new(&format!(
-        "EPSG:{}",
-        crs.get_horizontal()
+        "EPSG:{horizontal}"
     ))))
 }
 
