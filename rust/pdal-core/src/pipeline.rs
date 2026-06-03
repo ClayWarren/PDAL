@@ -492,6 +492,54 @@ impl Pipeline {
         self.streaming_chain().is_some()
     }
 
+    /// Return whether validation should report the pipeline stages as
+    /// streamable. Unlike execution streaming, PDAL validation does not require
+    /// the pipeline to terminate in a writer.
+    pub fn validation_streamable(&self) -> bool {
+        let n = self.nodes.len();
+        if n == 0 {
+            return false;
+        }
+        let Ok(order) = self.topological_order() else {
+            return false;
+        };
+        if order.len() != n {
+            return false;
+        }
+        let mut consumers = vec![0usize; n];
+        for node in &self.nodes {
+            for &input in &node.inputs {
+                if input < n {
+                    consumers[input] += 1;
+                }
+            }
+        }
+        for (pos, &idx) in order.iter().enumerate() {
+            let node = &self.nodes[idx];
+            if !node.stage.streamable() || !node.options.get_str("where", "").trim().is_empty() {
+                return false;
+            }
+            if pos == 0 {
+                if node.kind != StageKind::Reader || !node.inputs.is_empty() {
+                    return false;
+                }
+            } else if node.inputs.len() != 1 || node.inputs[0] != order[pos - 1] {
+                return false;
+            }
+            if pos + 1 < order.len() {
+                if consumers[idx] != 1 {
+                    return false;
+                }
+                if pos > 0 && node.kind != StageKind::Filter {
+                    return false;
+                }
+            } else if consumers[idx] != 0 {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Execute the pipeline in chunked streaming mode when it is a fully
     /// streamable linear chain, keeping peak memory bounded by the chunk size
     /// instead of materializing every point. Returns `Ok(Some(point_count))`

@@ -22,6 +22,18 @@ fn validate_pipeline_reports_actual_streamability() {
 }
 
 #[test]
+fn validate_pipeline_reports_writerless_streamable_chain() {
+    let writerless = r#"{"pipeline":[
+        {"type":"readers.faux","count":10,"mode":"ramp"},
+        {"type":"filters.range","limits":"X[0:5]"}
+    ]}"#;
+
+    let validation = validate_pipeline_for_kernel(writerless);
+    assert_eq!(validation["valid"], true);
+    assert_eq!(validation["streamable"], true);
+}
+
+#[test]
 fn validate_pipeline_rejects_non_reader_roots_even_when_a_reader_exists() {
     let invalid = r#"{"pipeline":[
         {"type":"writers.null", "tag":"W"},

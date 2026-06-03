@@ -201,3 +201,23 @@ fn returns_none_for_non_streamable_pipeline() {
     let (mut pipe, _sink) = build_collecting_chain(10, false);
     assert_eq!(pipe.execute_streaming().unwrap(), None);
 }
+
+#[test]
+fn validation_streamable_does_not_require_writer() {
+    let mut pipeline = Pipeline::new();
+    let reader = pipeline.add_reader(
+        "readers.streamtest",
+        Box::new(StreamingTestReader::new(10)),
+        Options::new(),
+    );
+    let filter = pipeline.add_stage(
+        "filters.keepeven",
+        Box::new(FilterWrapper::new(KeepEvenFilter)),
+        Options::new(),
+    );
+    pipeline.add_dependency(filter, reader).unwrap();
+
+    assert!(pipeline.validation_streamable());
+    assert!(!pipeline.streamable());
+    assert_eq!(pipeline.execute_streaming().unwrap(), None);
+}

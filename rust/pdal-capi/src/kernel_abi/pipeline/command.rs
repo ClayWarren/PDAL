@@ -218,7 +218,7 @@ pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {
         if !pipeline.roots_are_readers() {
             return Err("Pipeline does not start with a reader.".to_string());
         }
-        Ok(pipeline.streamable())
+        Ok(pipeline.validation_streamable())
     }) {
         Ok(streamable) => serde_json::json!({
             "valid": true,

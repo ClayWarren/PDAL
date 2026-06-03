@@ -51,6 +51,29 @@ impl Filter for DecimationFilter {
 
         Ok(vec![out])
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        if self.step < 1.0 {
+            return Err(StageError("Option step must be >= 1.0".to_string()));
+        }
+
+        let n = chunk.len();
+        let mut write = 0u64;
+        for read in 0..n {
+            if self.process_one(chunk, read) {
+                if write != read {
+                    chunk.copy_point_within(read, write);
+                }
+                write += 1;
+            }
+        }
+        chunk.truncate(write);
+        Ok(())
+    }
 }
 
 impl Streamable for DecimationFilter {
@@ -71,5 +94,51 @@ impl Streamable for DecimationFilter {
         }
         self.index += 1;
         keep
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdal_core::point::{DimId, DimType, PointLayout};
+    use std::rc::Rc;
+
+    fn view(count: u64) -> PointView {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+        for value in 0..count {
+            let idx = view.add_point();
+            view.set_f64(idx, &DimId::X, value as f64);
+        }
+        view
+    }
+
+    fn options(entries: &[(&str, &str)]) -> Options {
+        let mut options = Options::new();
+        for (key, value) in entries {
+            options.add(key, *value);
+        }
+        options
+    }
+
+    #[test]
+    fn stream_chunk_matches_run_one() {
+        let opts = options(&[("step", "2"), ("offset", "1"), ("limit", "8")]);
+        let input = view(10);
+        let mut standard = DecimationFilter::new(&opts);
+        let expected = standard.run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input;
+        let mut streamed = DecimationFilter::new(&opts);
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), expected.len());
+        for idx in 0..chunk.len() {
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::X),
+                expected.get_f64(idx, &DimId::X)
+            );
+        }
     }
 }
