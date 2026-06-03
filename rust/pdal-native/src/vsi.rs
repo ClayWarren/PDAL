@@ -9,6 +9,35 @@ const SEEK_SET: i32 = 0;
 const SEEK_CUR: i32 = 1;
 const SEEK_END: i32 = 2;
 
+pub fn write_mem_file(path: &str, bytes: &[u8]) -> Result<(), String> {
+    let path_c = CString::new(path).map_err(|e| e.to_string())?;
+    unsafe {
+        let data = gdal_sys::VSIMalloc(bytes.len()) as *mut u8;
+        if data.is_null() {
+            return Err(format!("Failed to allocate VSI memory file: {path}"));
+        }
+        ptr::copy_nonoverlapping(bytes.as_ptr(), data, bytes.len());
+        let handle = gdal_sys::VSIFileFromMemBuffer(path_c.as_ptr(), data, bytes.len() as u64, 1);
+        if handle.is_null() {
+            gdal_sys::VSIFree(data.cast());
+            return Err(format!("Failed to create VSI memory file: {path}"));
+        }
+        if gdal_sys::VSIFCloseL(handle) != 0 {
+            return Err(format!("Failed to close VSI memory file: {path}"));
+        }
+    }
+    Ok(())
+}
+
+pub fn unlink(path: &str) -> Result<(), String> {
+    let path_c = CString::new(path).map_err(|e| e.to_string())?;
+    let result = unsafe { gdal_sys::VSIUnlink(path_c.as_ptr()) };
+    if result != 0 {
+        return Err(format!("Failed to unlink VSI path: {path}"));
+    }
+    Ok(())
+}
+
 #[derive(Debug)]
 pub struct VsiFile {
     handle: *mut gdal_sys::VSILFILE,
@@ -127,6 +156,18 @@ mod tests {
     fn vsi_reports_missing_paths() {
         let err = VsiFile::open("/no/such/pdal-vsi-file").unwrap_err();
         assert!(err.contains("Failed to open VSI path"));
+    }
+
+    #[test]
+    fn vsi_reads_memory_file() {
+        let path = format!("/vsimem/pdal-vsi-{}.bin", std::process::id());
+        write_mem_file(&path, b"abcdefghijklmnopqrstuvwxyz").unwrap();
+
+        let mut vsi = VsiFile::open(&path).unwrap();
+        assert_eq!(vsi.len().unwrap(), 26);
+        assert_eq!(vsi.read_exact_at(2, 4).unwrap(), b"cdef");
+
+        unlink(&path).unwrap();
     }
 
     #[test]

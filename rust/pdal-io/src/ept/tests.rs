@@ -1,6 +1,7 @@
 //! Tests for the EPT reader (split out of `ept.rs` to keep it under ~1k LOC).
 
 use super::*;
+use std::io::Cursor;
 use std::path::PathBuf;
 
 fn data_path(path: &str) -> PathBuf {
@@ -8,6 +9,76 @@ fn data_path(path: &str) -> PathBuf {
         .join("../..")
         .join("test/data")
         .join(path)
+}
+
+struct VsiEptDataset {
+    root: String,
+    paths: Vec<String>,
+}
+
+impl VsiEptDataset {
+    fn new(data_type: &str, tile_bytes: Vec<u8>, extension: &str) -> Self {
+        let root = format!("/vsimem/pdal-ept-{}-{data_type}", std::process::id());
+        let ept = format!("{root}/ept.json");
+        let hierarchy = format!("{root}/ept-hierarchy/0-0-0-0.json");
+        let tile = format!("{root}/ept-data/0-0-0-0.{extension}");
+        let ept_json = format!(
+            r#"{{
+  "dataType": "{data_type}",
+  "hierarchyType": "json",
+  "span": 128,
+  "bounds": [0, 0, 0, 1, 1, 1],
+  "boundsConforming": [0, 0, 0, 1, 1, 1],
+  "points": 1,
+  "schema": [
+    {{"name": "X", "type": "float", "size": 8}},
+    {{"name": "Y", "type": "float", "size": 8}},
+    {{"name": "Z", "type": "float", "size": 8}}
+  ]
+}}"#
+        );
+        for (path, bytes) in [
+            (ept.as_str(), ept_json.into_bytes()),
+            (hierarchy.as_str(), br#"{"0-0-0-0":1}"#.to_vec()),
+            (tile.as_str(), tile_bytes),
+        ] {
+            pdal_native::vsi::write_mem_file(path, &bytes).unwrap();
+        }
+        Self {
+            root,
+            paths: vec![ept, hierarchy, tile],
+        }
+    }
+
+    fn ept_json(&self) -> String {
+        format!("{}/ept.json", self.root)
+    }
+}
+
+impl Drop for VsiEptDataset {
+    fn drop(&mut self) {
+        for path in &self.paths {
+            let _ = pdal_native::vsi::unlink(path);
+        }
+    }
+}
+
+fn ept_tile_bytes() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for value in [1.0_f64, 2.0, 3.0] {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    bytes
+}
+
+fn read_vsi_ept(data_type: &str, tile_bytes: Vec<u8>, extension: &str) -> PointView {
+    let dataset = VsiEptDataset::new(data_type, tile_bytes, extension);
+    let mut options = Options::new();
+    options.add("filename", dataset.ept_json());
+    let mut reader = EptReader::new(&options);
+    let views = reader.read().unwrap();
+    assert_eq!(views.len(), 1);
+    views.into_iter().next().unwrap()
 }
 
 #[test]
@@ -52,6 +123,16 @@ fn reads_local_binary_ept() {
 }
 
 #[test]
+fn reads_vsi_binary_ept() {
+    let view = read_vsi_ept("binary", ept_tile_bytes(), "bin");
+
+    assert_eq!(view.len(), 1);
+    assert_eq!(view.get_f64(0, &DimId::X), 1.0);
+    assert_eq!(view.get_f64(0, &DimId::Y), 2.0);
+    assert_eq!(view.get_f64(0, &DimId::Z), 3.0);
+}
+
+#[test]
 fn reads_local_zstandard_ept() {
     let mut options = Options::new();
     options.add(
@@ -64,6 +145,17 @@ fn reads_local_zstandard_ept() {
     assert_eq!(views.len(), 1);
     assert_eq!(views[0].len(), 100000);
     assert!((views[0].get_f64(42, &DimId::X) + 8242698.0).abs() < 1e-9);
+}
+
+#[test]
+fn reads_vsi_zstandard_ept() {
+    let encoded = zstd::stream::encode_all(Cursor::new(ept_tile_bytes()), 0).unwrap();
+    let view = read_vsi_ept("zstandard", encoded, "zst");
+
+    assert_eq!(view.len(), 1);
+    assert_eq!(view.get_f64(0, &DimId::X), 1.0);
+    assert_eq!(view.get_f64(0, &DimId::Y), 2.0);
+    assert_eq!(view.get_f64(0, &DimId::Z), 3.0);
 }
 
 #[test]

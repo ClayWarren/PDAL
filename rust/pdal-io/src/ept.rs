@@ -4,11 +4,11 @@
 //! `zstandard` by walking JSON hierarchy files and merging matching tiles.
 //! Bounds and resolution queries prune hierarchy nodes before tile reads and
 //! are also applied to individual points. Same-SRS and reprojected
-//! polygon/OGR filters, local addon metadata, remote LASzip paths covered by
-//! GDAL VSI, and C++ streaming-wrapper materialization are supported for the
-//! existing parity cases. Resolution-limited preview uses the same hierarchy
-//! pruning as reads. Broad remote binary/zstandard and bounds/polygon/OGR
-//! spatial-filter preview remain outside this module's current contract.
+//! polygon/OGR filters, local addon metadata, GDAL VSI-backed remote paths, and
+//! C++ streaming-wrapper materialization are supported for the existing parity
+//! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
+//! Bounds/polygon/OGR spatial-filter preview remains outside this module's
+//! current contract.
 
 use crate::source;
 use crate::tindex::append_view;

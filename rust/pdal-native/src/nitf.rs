@@ -307,16 +307,18 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let input = repo().join("test/data/las/simple.las");
         let output = temp.path().join("opts.ntf");
-        let mut opts = NitfWriteOptions::default();
-        opts.file_title = Some("LiDAR from somewhere".to_string());
-        opts.origin_name = Some("Howard Butler".to_string());
-        opts.origin_phone = Some("5155554628".to_string());
-        opts.image_date_time = Some("20110516183337".to_string());
-        opts.file_class = Some("S".to_string());
-        opts.minx = 0.0;
-        opts.miny = 0.0;
-        opts.maxx = 1.0;
-        opts.maxy = 1.0;
+        let opts = NitfWriteOptions {
+            file_title: Some("LiDAR from somewhere".to_string()),
+            origin_name: Some("Howard Butler".to_string()),
+            origin_phone: Some("5155554628".to_string()),
+            image_date_time: Some("20110516183337".to_string()),
+            file_class: Some("S".to_string()),
+            minx: 0.0,
+            miny: 0.0,
+            maxx: 1.0,
+            maxy: 1.0,
+            ..Default::default()
+        };
         write(input.to_str().unwrap(), output.to_str().unwrap(), &opts).unwrap();
 
         let meta = read_metadata(output.to_str().unwrap()).unwrap();
