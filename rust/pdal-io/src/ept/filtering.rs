@@ -22,8 +22,8 @@ impl BoundsFilter {
         let transform = if target_srs.is_empty() {
             None
         } else {
-            let source_srs = info["srs"]["wkt"].as_str().unwrap_or("");
-            let source = user_input_to_wkt(source_srs).map_err(StageError)?;
+            let source_srs = ept_srs_wkt(info)?.unwrap_or_default();
+            let source = user_input_to_wkt(&source_srs).map_err(StageError)?;
             let target = user_input_to_wkt(target_srs).map_err(StageError)?;
             if pdal_native::srs::is_same(&source.wkt, &target.wkt, source.epoch) {
                 return Ok(Self {
