@@ -462,6 +462,21 @@ fn pipeline_json_runs_groupby_filter() {
 }
 
 #[test]
+fn pipeline_json_preserves_repeated_expression_options() {
+    let json = r#"[
+            {"type":"readers.faux", "count":5, "mode":"ramp", "minx":0, "maxx":4},
+            {"type":"filters.expression", "expression":["X < 2", "X > 3"]}
+        ]"#;
+    let mut pipeline = pipeline_from_json(json).unwrap();
+    let views = pipeline.execute(Vec::new()).unwrap();
+    assert_eq!(views.len(), 2);
+    assert_eq!(views[0].len(), 2);
+    assert_eq!(views[1].len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::X), 0.0);
+    assert_eq!(views[1].get_f64(0, &DimId::X), 4.0);
+}
+
+#[test]
 fn pipeline_json_runs_newly_registry_visible_filter_families() {
     let cases = [
         (

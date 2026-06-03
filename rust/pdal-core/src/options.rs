@@ -83,22 +83,30 @@ impl Options {
 
     /// Build options from a pipeline stage object.
     ///
-    /// Framework keys are skipped, and scalar arrays are represented as the
-    /// comma-separated strings expected by current Rust stage option parsers.
+    /// Framework keys are skipped. Scalar arrays are represented either as
+    /// repeated option entries for PDAL multi-options or as comma-separated
+    /// strings for list-valued scalar options.
     pub fn from_pipeline_stage_object(object: &Map<String, Value>) -> Result<Self, String> {
         let mut options = Options::new();
+        let stage_type = object.get("type").and_then(Value::as_str);
         for (key, value) in object {
             if matches!(key.as_str(), "type" | "tag" | "inputs") {
                 continue;
             }
             match value {
                 Value::Array(items) => {
-                    let joined = items
-                        .iter()
-                        .map(|item| scalar_option_value_to_string(key, item))
-                        .collect::<Result<Vec<_>, _>>()?
-                        .join(",");
-                    options.add(key, joined);
+                    if pipeline_array_option_repeats(stage_type, key) {
+                        for item in items {
+                            options.add(key, scalar_option_value_to_string(key, item)?);
+                        }
+                    } else {
+                        let joined = items
+                            .iter()
+                            .map(|item| scalar_option_value_to_string(key, item))
+                            .collect::<Result<Vec<_>, _>>()?
+                            .join(",");
+                        options.add(key, joined);
+                    }
                 }
                 Value::Object(_) => {
                     options.add(key, value.to_string());
@@ -290,6 +298,24 @@ impl Options {
     }
 }
 
+fn pipeline_array_option_repeats(stage_type: Option<&str>, key: &str) -> bool {
+    matches!(
+        (stage_type, key),
+        (Some("filters.assign"), "assignment" | "value")
+            | (Some("filters.crop"), "bounds" | "polygon" | "point")
+            | (Some("filters.expression"), "expression" | "limits")
+            | (Some("filters.expressionstats"), "expressions")
+            | (Some("filters.ferry"), "dimensions")
+            | (Some("filters.neighborclassifier"), "domain")
+            | (
+                Some("filters.radiusassign"),
+                "src_domain" | "reference_domain" | "update_expression"
+            )
+            | (Some("filters.range"), "limits")
+            | (Some("filters.smrf"), "ignore")
+    )
+}
+
 /// Return whether `name` is a valid PDAL option name.
 ///
 /// Valid names start with a lowercase ASCII letter and then contain only
@@ -460,7 +486,7 @@ mod tests {
             "type": "filters.crop",
             "tag": "cropper",
             "inputs": ["reader"],
-            "bounds": ["([0,1],[0,1])", "([2,3],[2,3])"],
+            "dimensions": ["X", "Y"],
             "polygon": {"type": "Polygon"}
         });
         let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
@@ -468,8 +494,31 @@ mod tests {
         assert!(!options.has("type"));
         assert!(!options.has("tag"));
         assert!(!options.has("inputs"));
-        assert_eq!(options.value("bounds"), Some("([0,1],[0,1]),([2,3],[2,3])"));
+        assert_eq!(options.value("dimensions"), Some("X,Y"));
         assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
+    }
+
+    #[test]
+    fn pipeline_stage_options_repeat_known_multi_options() {
+        let object = serde_json::json!({
+            "type": "filters.expression",
+            "expression": ["X < 2", "X > 3"]
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(
+            options.values("expression"),
+            &["X < 2".to_string(), "X > 3".to_string()]
+        );
+
+        let object = serde_json::json!({
+            "type": "filters.crop",
+            "bounds": ["([0,1],[0,1])", "([2,3],[2,3])"]
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(
+            options.values("bounds"),
+            &["([0,1],[0,1])".to_string(), "([2,3],[2,3])".to_string()]
+        );
     }
 
     #[test]
