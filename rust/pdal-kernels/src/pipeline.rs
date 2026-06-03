@@ -118,7 +118,8 @@ fn parse_pipeline_arg<'a>(
     } else if let Some(stage_option) = parse_cli_stage_option(arg) {
         parsed.stage_options.push(stage_option);
     } else if arg.starts_with("--") || arg.starts_with("-v") {
-        return Err(-1);
+        eprintln!("PDAL: kernels.pipeline: Unknown option '{arg}'.");
+        return Err(1);
     } else if parsed.input.replace(arg.to_string()).is_some() {
         eprintln!("PDAL: kernels.pipeline: Unexpected argument '{arg}'.");
         return Err(1);
@@ -381,6 +382,15 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unknown_options_as_rust_errors() {
+        let args = vec!["pipeline.json".to_string(), "--bogus".to_string()];
+        assert!(matches!(
+            parse_pipeline_args(&args),
+            PipelineArgsResult::Return(1)
+        ));
+    }
+
+    #[test]
     fn applies_cli_stage_options_to_object_pipeline() {
         let json = r#"{"pipeline":[{"type":"readers.faux"},{"type":"filters.sort","dimension":"X"},{"type":"writers.las"}]}"#;
         let options = vec![CliStageOption {
@@ -394,6 +404,20 @@ mod tests {
 
         assert_eq!(parsed["pipeline"][1]["dimension"][0], "X");
         assert_eq!(parsed["pipeline"][1]["dimension"][1], "Y");
+    }
+
+    #[test]
+    fn rejects_unmatched_cli_stage_options() {
+        let json = r#"{"pipeline":[{"type":"readers.faux"},{"type":"writers.null"}]}"#;
+        let options = vec![CliStageOption {
+            stage: "filters.sort".to_string(),
+            key: "dimension".to_string(),
+            value: "Y".to_string(),
+        }];
+
+        assert!(apply_stage_options_to_pipeline_json(json, &options)
+            .unwrap_err()
+            .contains("Unable to apply stage option"));
     }
 
     #[test]

@@ -627,6 +627,29 @@ fn rust_kernel_run_handles_tindex_merge_polygon_options() {
 }
 
 #[test]
+fn rust_kernel_run_rejects_unmatched_pipeline_stage_option() {
+    let dir = std::env::temp_dir().join(format!("pdal-rs-pipeline-stage-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let pipeline = dir.join("pipeline.json");
+    std::fs::write(
+        &pipeline,
+        r#"[{"type":"readers.faux","count":1},{"type":"writers.null"}]"#,
+    )
+    .unwrap();
+
+    let name = CString::new("pipeline").unwrap();
+    let input = CString::new(pipeline.to_str().unwrap()).unwrap();
+    let option = CString::new("--filters.sort.dimension=Y").unwrap();
+    let argv = [input.as_ptr(), option.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn rust_kernel_run_accepts_info_help() {
     let name = CString::new("info").unwrap();
     let arg = CString::new("--help").unwrap();

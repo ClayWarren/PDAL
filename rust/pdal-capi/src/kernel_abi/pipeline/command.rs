@@ -43,7 +43,10 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
 
     let json = match apply_stage_options_to_pipeline_json(&json, &parsed.stage_options) {
         Ok(json) => json,
-        Err(_) => return -1,
+        Err(err) => {
+            eprintln!("PDAL: kernels.pipeline: {err}");
+            return 1;
+        }
     };
 
     let mut progress = match open_progress_file(parsed.progress_file.as_deref()) {
