@@ -112,9 +112,7 @@ impl Options {
                     options.add(key, value.to_string());
                 }
                 Value::Null => {
-                    return Err(format!(
-                        "Option '{key}' must be a scalar, scalar array, or object."
-                    ));
+                    options.add(key, "");
                 }
                 _ => {
                     options.add(key, scalar_option_value_to_string(key, value)?);
@@ -487,6 +485,7 @@ mod tests {
             "tag": "cropper",
             "inputs": ["reader"],
             "dimensions": ["X", "Y"],
+            "empty": null,
             "polygon": {"type": "Polygon"}
         });
         let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
@@ -495,6 +494,7 @@ mod tests {
         assert!(!options.has("tag"));
         assert!(!options.has("inputs"));
         assert_eq!(options.value("dimensions"), Some("X,Y"));
+        assert_eq!(options.value("empty"), Some(""));
         assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
     }
 

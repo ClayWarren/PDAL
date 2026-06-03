@@ -67,6 +67,18 @@ fn pipeline_json_accepts_comments_in_runnable_pipeline() {
 }
 
 #[test]
+fn pipeline_json_accepts_null_stage_options_as_empty_strings() {
+    let object = serde_json::json!({
+        "type": "filters.head",
+        "tag": "head",
+        "where": null
+    });
+    let options = options_from_object(object.as_object().unwrap()).unwrap();
+
+    assert_eq!(options.value("where"), Some(""));
+}
+
+#[test]
 fn pipeline_json_accepts_filename_string_stages() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");
