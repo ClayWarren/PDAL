@@ -17,9 +17,9 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
                 let path = tindex_next_value(&mut iter, "--filelist")?;
                 parsed.filelists.push(path.clone());
             }
-            "--glob" => {
+            "--glob" | "--filespec" => {
                 parsed.input_methods += 1;
-                let pattern = tindex_next_value(&mut iter, "--glob")?;
+                let pattern = tindex_next_value(&mut iter, arg)?;
                 parsed.files.extend(read_glob(pattern)?);
             }
             "--path_prefix" => {
@@ -62,7 +62,7 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
                 let value = tindex_next_value(&mut iter, arg)?;
                 parsed.boundary.sample_size = parse_uint(value, arg)?;
             }
-            "--simplify" => {
+            "--simplify" | "--smooth" => {
                 parsed.rich_boundary_options = true;
                 let value = tindex_next_value(&mut iter, arg)?;
                 parsed.boundary.smooth = parse_bool(value, arg)?;
@@ -71,10 +71,7 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
                 parsed.rich_boundary_options = true;
                 parsed.boundary.fast_boundary = true;
             }
-            "--skip_different_srs" => {
-                let value = tindex_next_value(&mut iter, arg)?;
-                parsed.skip_different_srs = parse_bool(value, arg)?;
-            }
+            "--skip_different_srs" => parsed.skip_different_srs = true,
             "--where" => {
                 parsed.rich_boundary_options = true;
                 parsed.boundary.where_expr = Some(tindex_next_value(&mut iter, arg)?.clone());
@@ -194,7 +191,10 @@ fn try_parse_boundary_eq_arg(
     } else if let Some(value) = arg.strip_prefix("--sample_size=") {
         parsed.rich_boundary_options = true;
         parsed.boundary.sample_size = parse_uint(value, "--sample_size")?;
-    } else if let Some(value) = arg.strip_prefix("--simplify=") {
+    } else if let Some(value) = arg
+        .strip_prefix("--simplify=")
+        .or_else(|| arg.strip_prefix("--smooth="))
+    {
         parsed.rich_boundary_options = true;
         parsed.boundary.smooth = parse_bool(value, "--simplify")?;
     } else if let Some(value) = arg.strip_prefix("--fast_boundary=") {

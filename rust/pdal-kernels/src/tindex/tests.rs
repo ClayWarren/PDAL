@@ -55,6 +55,30 @@ fn create_tracks_boundary_and_srs_options() {
 }
 
 #[test]
+fn create_accepts_cpp_synonym_switch_forms() {
+    let dir = scratch_dir("tindex-synonyms");
+    let input = dir.join("in.las");
+    std::fs::write(&input, b"placeholder").unwrap();
+    let pattern = dir.join("*.las").to_string_lossy().into_owned();
+
+    let parsed = parse_tindex_create_args(&strings(&[
+        "--tindex",
+        "out.geojson",
+        "--filespec",
+        &pattern,
+        "--smooth",
+        "false",
+        "--skip_different_srs",
+    ]))
+    .unwrap();
+
+    assert_eq!(parsed.files, vec![input.to_string_lossy().into_owned()]);
+    assert!(parsed.rich_boundary_options);
+    assert!(!parsed.boundary.smooth);
+    assert!(parsed.skip_different_srs);
+}
+
+#[test]
 fn create_rejects_multiple_input_methods() {
     let Err(err) = parse_tindex_create_args(&strings(&[
         "--tindex",
@@ -227,15 +251,13 @@ fn create_rejects_invalid_option_values() {
         ("--resolution", "not-float", "numeric"),
         ("--sample_size", "-1", "non-negative"),
         ("--simplify", "maybe", "boolean"),
-        ("--skip_different_srs", "sometimes", "boolean"),
+        ("--skip_different_srs=sometimes", "", "boolean"),
     ] {
-        let Err(err) = parse_tindex_create_args(&strings(&[
-            "--tindex",
-            "out.geojson",
-            "--filespec=in.las",
-            arg,
-            value,
-        ])) else {
+        let mut args = vec!["--tindex", "out.geojson", "--filespec=in.las", arg];
+        if !value.is_empty() {
+            args.push(value);
+        }
+        let Err(err) = parse_tindex_create_args(&strings(&args)) else {
             panic!("expected {arg} to fail");
         };
         assert!(
