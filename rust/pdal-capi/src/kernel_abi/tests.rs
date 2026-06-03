@@ -577,6 +577,29 @@ fn rust_kernel_run_handles_tindex_srs_options() {
 }
 
 #[test]
+fn rust_kernel_run_handles_tindex_layer_creation_options() {
+    let name = CString::new("tindex").unwrap();
+    let create = CString::new("create").unwrap();
+    let tindex = CString::new("--tindex").unwrap();
+    let output = CString::new("out.gpkg").unwrap();
+    let driver = CString::new("--ogrdriver=GPKG").unwrap();
+    let lco = CString::new("--lco=GEOMETRY_NAME=tile_geom").unwrap();
+    let file = CString::new("input.las").unwrap();
+    let argv = [
+        create.as_ptr(),
+        tindex.as_ptr(),
+        output.as_ptr(),
+        driver.as_ptr(),
+        lco.as_ptr(),
+        file.as_ptr(),
+    ];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
 fn rust_kernel_run_handles_tindex_merge_polygon_options() {
     let name = CString::new("tindex").unwrap();
     let merge = CString::new("merge").unwrap();

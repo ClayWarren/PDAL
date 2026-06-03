@@ -214,14 +214,15 @@ fn apply_layer_creation_option(
     value: &str,
 ) -> Result<(), TindexParseResult> {
     let Some((name, option)) = value.split_once('=') else {
-        return Err(TindexParseResult::Unsupported);
+        return Err(TindexParseResult::Error(format!(
+            "--lco requires NAME=VALUE, got '{value}'"
+        )));
     };
+    args.lco_options.push(value.to_string());
     if name.eq_ignore_ascii_case("DESCRIPTION") {
         args.lco_description = Some(option.to_string());
-        Ok(())
-    } else {
-        Err(TindexParseResult::Unsupported)
     }
+    Ok(())
 }
 
 fn parse_int(value: &str, arg: &str) -> Result<i32, TindexParseResult> {

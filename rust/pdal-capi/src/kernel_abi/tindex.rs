@@ -90,7 +90,11 @@ fn run_create(args: &[String]) -> i32 {
             "PDAL: kernels.tindex: ESRI Shapefile field 'srs' supports a maximum of 254 characters."
         );
     }
-    let layer = match dataset.open_or_create_layer(&args.layer_name, &args.target_srs) {
+    let layer = match dataset.open_or_create_layer_with_options(
+        &args.layer_name,
+        &args.target_srs,
+        &args.lco_options,
+    ) {
         Ok(layer) => layer,
         Err(err) => {
             eprintln!("PDAL: kernels.tindex: Error creating layer: {err}");

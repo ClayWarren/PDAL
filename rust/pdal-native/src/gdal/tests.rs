@@ -339,6 +339,23 @@ fn test_vector_creation_and_fields() {
     assert!(vector.get_features(99, "name").is_err());
 }
 
+#[test]
+fn vector_layer_creation_options_are_forwarded() {
+    register_drivers();
+    let path = temp_tif("vector-options").with_extension("gpkg");
+    let _ = fs::remove_file(&path);
+
+    let vector = Vector::create(path.to_str().unwrap(), "GPKG").unwrap();
+    let layer = vector
+        .open_or_create_layer_with_options("tiles", "", &["GEOMETRY_NAME=tile_geom".to_string()])
+        .unwrap();
+    assert!(!layer.is_null());
+    drop(vector);
+
+    let vector = Vector::open(path.to_str().unwrap()).unwrap();
+    assert_eq!(vector.geometry_column(0).unwrap(), "tile_geom");
+}
+
 fn temp_geojson(name: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("pdal-native-{name}-{}.json", std::process::id()));
     let _ = fs::remove_file(&path);

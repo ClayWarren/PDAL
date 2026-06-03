@@ -1,6 +1,7 @@
 use super::register_drivers;
 use gdal_sys::{CPLErr, OGRDataSourceH};
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 
 pub struct Vector {
     ds: OGRDataSourceH,
@@ -73,7 +74,25 @@ impl Vector {
         layer_name: &str,
         srs_wkt: &str,
     ) -> Result<gdal_sys::OGRLayerH, String> {
+        self.open_or_create_layer_with_options(layer_name, srs_wkt, &[])
+    }
+
+    pub fn open_or_create_layer_with_options(
+        &self,
+        layer_name: &str,
+        srs_wkt: &str,
+        layer_options: &[String],
+    ) -> Result<gdal_sys::OGRLayerH, String> {
         let layer_name_c = CString::new(layer_name).map_err(|e| e.to_string())?;
+        let option_strings = layer_options
+            .iter()
+            .map(|option| CString::new(option.as_str()).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut option_ptrs = option_strings
+            .iter()
+            .map(|option| option.as_ptr() as *mut c_char)
+            .collect::<Vec<_>>();
+        option_ptrs.push(std::ptr::null_mut());
         unsafe {
             let mut layer = gdal_sys::OGR_DS_GetLayerByName(self.ds, layer_name_c.as_ptr());
             if layer.is_null() {
@@ -88,7 +107,7 @@ impl Vector {
                     layer_name_c.as_ptr(),
                     srs,
                     gdal_sys::OGRwkbGeometryType::wkbMultiPolygon,
-                    std::ptr::null_mut(),
+                    option_ptrs.as_mut_ptr(),
                 );
                 gdal_sys::OSRDestroySpatialReference(srs);
                 if layer.is_null() {

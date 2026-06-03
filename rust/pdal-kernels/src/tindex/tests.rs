@@ -162,6 +162,7 @@ fn create_accepts_filelist_and_named_options() {
     assert_eq!(parsed.location_field, "path");
     assert_eq!(parsed.driver_name, "GPKG");
     assert_eq!(parsed.target_srs, "EPSG:3857");
+    assert_eq!(parsed.lco_options, vec!["DESCRIPTION=sample index"]);
     assert_eq!(parsed.lco_description.as_deref(), Some("sample index"));
 }
 
@@ -202,6 +203,7 @@ fn create_accepts_equals_options_and_glob_inputs() {
     assert_eq!(parsed.assign_srs, "EPSG:26915");
     assert!(parsed.override_source_srs);
     assert!(!parsed.skip_different_srs);
+    assert_eq!(parsed.lco_options, vec!["DESCRIPTION=glob index"]);
     assert_eq!(parsed.lco_description.as_deref(), Some("glob index"));
     assert_eq!(parsed.boundary.density, 7);
     assert_eq!(parsed.boundary.edge_length, 2.5);
@@ -268,18 +270,32 @@ fn create_rejects_invalid_option_values() {
 }
 
 #[test]
-fn create_rejects_unsupported_lco_and_filter_options() {
-    let Err(lco) = parse_tindex_create_args(&strings(&[
+fn create_accepts_layer_creation_options_and_rejects_bad_lco_shape() {
+    let parsed = parse_tindex_create_args(&strings(&[
         "--tindex",
         "out.geojson",
         "--filespec=in.las",
         "--lco",
         "ENCODING=UTF-8",
-    ])) else {
-        panic!("expected unsupported lco");
-    };
-    assert_eq!(lco, TindexParseResult::Unsupported);
+    ]))
+    .unwrap();
+    assert_eq!(parsed.lco_options, vec!["ENCODING=UTF-8"]);
+    assert_eq!(parsed.lco_description, None);
 
+    let Err(bad_lco) = parse_tindex_create_args(&strings(&[
+        "--tindex",
+        "out.geojson",
+        "--filespec=in.las",
+        "--lco",
+        "ENCODING",
+    ])) else {
+        panic!("expected malformed lco");
+    };
+    assert!(matches!(bad_lco, TindexParseResult::Error(message) if message.contains("NAME=VALUE")));
+}
+
+#[test]
+fn create_rejects_filter_options() {
     let Err(filter) = parse_tindex_create_args(&strings(&[
         "--tindex",
         "out.geojson",
