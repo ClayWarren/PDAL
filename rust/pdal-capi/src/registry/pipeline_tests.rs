@@ -503,15 +503,16 @@ fn pipeline_json_rejects_root_object_without_pipeline_array() {
         Ok(_) => panic!("expected root object without pipeline array to fail"),
         Err(err) => err,
     };
-    assert!(err
-        .to_string()
-        .contains("object must contain a 'pipeline' array"));
+    assert!(err.to_string().contains("root element is not a pipeline"));
 }
 
 #[test]
 fn pipeline_json_rejects_invalid_stage_metadata() {
     let cases = [
-        (r#"[{"type":7,"filename":"in.las"}]"#, "non-string 'type'"),
+        (
+            r#"[{"type":7,"filename":"in.las"}]"#,
+            "'type' must be specified as a string",
+        ),
         (
             r#"[{"type":"readers.faux","tag":7}]"#,
             "tag must be specified as a string",
@@ -522,7 +523,7 @@ fn pipeline_json_rejects_invalid_stage_metadata() {
         ),
         (
             r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","tag":"A"}]"#,
-            "duplicate pipeline tag",
+            "duplicate tag 'A'",
         ),
         (
             r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","inputs":["A"]}]"#,

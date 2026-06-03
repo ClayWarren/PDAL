@@ -137,7 +137,7 @@ fn extract_inputs(
             let mut names = Vec::with_capacity(items.len());
             for item in items {
                 let name = item.as_str().ok_or_else(|| {
-                    "JSON pipeline: 'inputs' tag must  be specified as a string or array of strings."
+                    "JSON pipeline: 'inputs' tag must be specified as a string or array of strings."
                         .to_string()
                 })?;
                 names.push(name.to_string());
@@ -146,7 +146,7 @@ fn extract_inputs(
         }
         _ => {
             return Err(
-                "JSON pipeline: 'inputs' tag must  be specified as a string or array of strings."
+                "JSON pipeline: 'inputs' tag must be specified as a string or array of strings."
                     .to_string(),
             );
         }
@@ -209,7 +209,7 @@ pub fn parse_pipeline_descriptors(json: &str) -> Result<Value, String> {
         let role = classify_role(&stage_type, position, count);
 
         if role == "reader" && explicit_inputs {
-            return Err("JSON pipeline: Inputs not permitted for  reader.".to_string());
+            return Err("JSON pipeline: Inputs not permitted for reader.".to_string());
         }
 
         let filename = object.get("filename").cloned().unwrap_or(Value::Null);
