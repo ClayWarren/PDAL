@@ -6,7 +6,53 @@
 //! (unique) triangulation.
 
 use delaunator::{triangulate, Point};
+use pdal_core::point::PointId;
 use pdal_core::point::{DimId, PointView};
+use pdal_core::stage::{Filter, StageError, Streamable};
+
+pub struct DelaunayFilter;
+
+impl DelaunayFilter {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for DelaunayFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Filter for DelaunayFilter {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "filters.delaunay"
+    }
+
+    fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
+        let triangles = triangulate_xy(input);
+        let mut output = input.clone();
+        let Some(mesh) = output.create_named_mesh("delaunay2d") else {
+            return Err(StageError(
+                "Unable to create mesh 'delaunay2d'.".to_string(),
+            ));
+        };
+        for triangle in triangles.chunks_exact(3) {
+            mesh.add(triangle[2], triangle[1], triangle[0]);
+        }
+        Ok(vec![output])
+    }
+}
+
+impl Streamable for DelaunayFilter {
+    fn process_one(&mut self, _view: &mut PointView, _idx: PointId) -> bool {
+        false
+    }
+}
 
 /// Compute the 2D Delaunay triangulation of a point view's XY coordinates.
 ///
@@ -70,5 +116,16 @@ mod tests {
     fn unit_square_makes_two_triangles() {
         let tris = triangulate_xy(&view(&[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]));
         assert_eq!(tris.len(), 6);
+    }
+
+    #[test]
+    fn filter_attaches_named_mesh() {
+        let input = view(&[(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0), (1.0, 1.0)]);
+        let mut filter = DelaunayFilter::new();
+
+        let output = filter.run_one(&input).unwrap().pop().unwrap();
+
+        assert_eq!(output.len(), input.len());
+        assert!(output.mesh_named("delaunay2d").unwrap().len() > 0);
     }
 }

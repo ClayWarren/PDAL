@@ -53,6 +53,7 @@ pub const FILTER_DRIVERS: &[&str] = &[
     "filters.csf",
     "filters.dbscan",
     "filters.decimation",
+    "filters.delaunay",
     "filters.dem",
     "filters.divider",
     "filters.eigenvalues",

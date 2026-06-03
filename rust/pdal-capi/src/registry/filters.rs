@@ -22,6 +22,7 @@ use pdal_filters::crop::{CropCenter, CropFilter};
 use pdal_filters::csf::CsfFilter;
 use pdal_filters::dbscan::DbscanFilter;
 use pdal_filters::decimation::DecimationFilter;
+use pdal_filters::delaunay::DelaunayFilter;
 use pdal_filters::dem::DEMFilter;
 use pdal_filters::divider::{DividerFilter, DividerMode, DividerSizeMode};
 use pdal_filters::eigenvalues::EigenvaluesFilter;
@@ -117,6 +118,7 @@ pub fn create_filter(
             get_f64(options, "tolerance", 1.0)?,
             get_bool(options, "is3d", true)?,
         )))),
+        "filters.delaunay" => Ok(Box::new(FilterWrapper::new(DelaunayFilter::new()))),
         "filters.colorinterp" => {
             // Min/max default to NaN so the filter computes bounds from the
             // view (or from `k`/`mad`); the default ramp is the named
