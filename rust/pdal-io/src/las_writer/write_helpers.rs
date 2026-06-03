@@ -436,7 +436,11 @@ pub(super) fn write_extra_dim_vlr_record(
     Ok(())
 }
 
-pub(super) fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Option<&str>) {
+pub(super) fn add_srs_vlr(
+    builder: &mut Builder,
+    views: &[PointView],
+    a_srs: Option<&str>,
+) -> Result<(), StageError> {
     let srs_text = a_srs
         .filter(|srs| !srs.is_empty())
         .map(str::to_string)
@@ -448,11 +452,14 @@ pub(super) fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Opt
         });
 
     let Some(wkt) = srs_text else {
-        return;
+        return Ok(());
     };
 
     if builder.version < las::Version::new(1, 4) {
-        return;
+        let srs = pdal_native::srs::user_input_to_wkt(&wkt)
+            .map(|srs| srs.wkt)
+            .unwrap_or(wkt);
+        return add_geotiff_srs_vlrs(builder, &srs);
     }
     let wkt = pdal_native::srs::user_input_to_wkt(&wkt)
         .map(|srs| {
@@ -479,6 +486,38 @@ pub(super) fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Opt
         data: wkt_bytes,
     });
     builder.has_wkt_crs = true;
+    Ok(())
+}
+
+fn add_geotiff_srs_vlrs(builder: &mut Builder, wkt: &str) -> Result<(), StageError> {
+    let tags = pdal_native::geotiff::tags_from_wkt(wkt).ok_or_else(|| {
+        StageError("Invalid spatial reference for writing GeoTiff VLR.".to_string())
+    })?;
+    builder.vlrs.retain(|vlr| !vlr.is_crs());
+    builder.evlrs.retain(|vlr| !vlr.is_crs());
+    builder.vlrs.push(Vlr {
+        user_id: TRANSFORM_USER_ID.to_string(),
+        record_id: GEOTIFF_DIRECTORY_RECORD_ID,
+        description: "GeoTiff GeoKeyDirectoryTag".to_string(),
+        data: tags.directory,
+    });
+    if !tags.doubles.is_empty() {
+        builder.vlrs.push(Vlr {
+            user_id: TRANSFORM_USER_ID.to_string(),
+            record_id: GEOTIFF_DOUBLES_RECORD_ID,
+            description: "GeoTiff GeoDoubleParamsTag".to_string(),
+            data: tags.doubles,
+        });
+    }
+    if !tags.ascii.is_empty() {
+        builder.vlrs.push(Vlr {
+            user_id: TRANSFORM_USER_ID.to_string(),
+            record_id: GEOTIFF_ASCII_RECORD_ID,
+            description: "GeoTiff GeoAsciiParamsTag".to_string(),
+            data: tags.ascii,
+        });
+    }
+    Ok(())
 }
 
 pub(super) fn quantize_coord(value: f64, transform: &Transform) -> f64 {

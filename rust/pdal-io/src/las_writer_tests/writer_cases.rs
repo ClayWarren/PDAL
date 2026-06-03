@@ -167,6 +167,39 @@ use super::*;
     }
 
     #[test]
+    fn writer_generates_geotiff_srs_vlrs_for_las13() {
+        let path = temp_las("geotiff-srs-vlr.las");
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add("a_srs", "EPSG:4326");
+        options.add("minor_version", 3u64);
+        let mut writer = LasWriter::new(&options);
+
+        writer.write(&[synthetic_point_view()]).unwrap();
+
+        let reader = las::Reader::from_path(&path).unwrap();
+        let mut directory = Vec::new();
+        let mut doubles = Vec::new();
+        let mut ascii = Vec::new();
+        for vlr in reader.header().vlrs() {
+            if vlr.user_id == TRANSFORM_USER_ID {
+                match vlr.record_id {
+                    GEOTIFF_DIRECTORY_RECORD_ID => directory = vlr.data.clone(),
+                    GEOTIFF_DOUBLES_RECORD_ID => doubles = vlr.data.clone(),
+                    GEOTIFF_ASCII_RECORD_ID => ascii = vlr.data.clone(),
+                    WKT_RECORD_ID => panic!("LAS 1.3 should not use WKT SRS VLR"),
+                    _ => {}
+                }
+            }
+        }
+        let wkt =
+            pdal_native::geotiff::wkt_from_tags(&directory, &doubles, &ascii).expect("SRS WKT");
+        assert!(wkt.contains("WGS 84"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn writer_with_discard_high_return_numbers() {
         let path = temp_las("discard-returns.las");
         let mut options = Options::new();

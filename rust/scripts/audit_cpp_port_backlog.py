@@ -118,6 +118,8 @@ NATIVE_ADAPTER_FILES = {
     "io/private/ept/TileContents.cpp",
     "io/private/ept/TileContents.hpp",
     "io/private/las/ChunkInfo.hpp",
+    "io/private/las/Geotiff.cpp",
+    "io/private/las/Geotiff.hpp",
     "kernels/private/density/OGR.cpp",
     "kernels/private/density/OGR.hpp",
     "plugins/cpd/filters/CpdFilter.cpp",
@@ -215,10 +217,6 @@ HOLDOUTS = {
     # Rust CLI/kernel path has its own parser; this remains glue for the legacy
     # C++ API surface (rust/STATUS.md C++ app shell row).
     "pdal/util/ProgramArgs.hpp": "C++ compatibility CLI argument-binding glue (rust/STATUS.md)",
-    # GeoTIFF GeoKey <-> CRS encoding via libgeotiff. rust/STATUS.md: "GeoTIFF
-    # VLR encoding remains C++ libgeotiff-backed."
-    "io/private/las/Geotiff.cpp": "libgeotiff GeoKey encoding (rust/VENDOR.md, no Rust replacement chosen)",
-    "io/private/las/Geotiff.hpp": "libgeotiff GeoKey encoding (rust/VENDOR.md, no Rust replacement chosen)",
     # C++ compatibility callback over PointRef. PORTING.md / STATUS.md: routing
     # C++ callables across the C ABI needs a deliberate callback ABI design.
     "filters/StreamCallbackFilter.cpp": "C++ callback ABI holdout (rust/STATUS.md)",

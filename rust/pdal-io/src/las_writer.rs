@@ -29,6 +29,9 @@ const LIBLAS_USER_ID: &str = "liblas";
 const WKT_RECORD_ID: u16 = 2112;
 const WKT2_RECORD_ID: u16 = 4224;
 const PROJJSON_RECORD_ID: u16 = 4225;
+const GEOTIFF_DIRECTORY_RECORD_ID: u16 = 34735;
+const GEOTIFF_DOUBLES_RECORD_ID: u16 = 34736;
+const GEOTIFF_ASCII_RECORD_ID: u16 = 34737;
 const LEGACY_MAX_RETURN_COUNT: u8 = 5;
 const LAS14_MAX_RETURN_COUNT: u8 = 15;
 
@@ -316,7 +319,7 @@ impl LasWriter {
                     .filter(|b| !b.is_empty()),
             );
         } else {
-            add_srs_vlr(&mut builder, views, self.a_srs.as_deref());
+            add_srs_vlr(&mut builder, views, self.a_srs.as_deref())?;
         }
         builder.point_format.is_compressed = should_compress;
 

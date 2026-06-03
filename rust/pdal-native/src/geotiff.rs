@@ -2,6 +2,16 @@
 
 use std::ffi::{c_char, c_uchar, c_void, CStr};
 
+#[repr(C)]
+struct RawGeoTiffTags {
+    directory: *mut c_uchar,
+    directory_len: usize,
+    doubles: *mut c_uchar,
+    doubles_len: usize,
+    ascii: *mut c_uchar,
+    ascii_len: usize,
+}
+
 unsafe extern "C" {
     fn pdal_native_geotiff_wkt(
         directory: *const c_uchar,
@@ -11,7 +21,16 @@ unsafe extern "C" {
         ascii: *const c_uchar,
         ascii_len: usize,
     ) -> *mut c_char;
+    fn pdal_native_geotiff_tags_from_wkt(wkt: *const c_char, out: *mut RawGeoTiffTags) -> bool;
     fn pdal_native_geotiff_string_free(value: *mut c_char);
+    fn pdal_native_geotiff_tags_free(tags: *mut RawGeoTiffTags);
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GeoTiffTags {
+    pub directory: Vec<u8>,
+    pub doubles: Vec<u8>,
+    pub ascii: Vec<u8>,
 }
 
 /// Convert LAS GeoTIFF VLR payloads into WKT using libgeotiff.
@@ -34,6 +53,40 @@ pub fn wkt_from_tags(directory: &[u8], doubles: &[u8], ascii: &[u8]) -> Option<S
         let out = CStr::from_ptr(raw).to_string_lossy().into_owned();
         pdal_native_geotiff_string_free(raw);
         (!out.trim().is_empty()).then_some(out)
+    }
+}
+
+/// Convert WKT into LAS GeoTIFF VLR payloads using libgeotiff.
+pub fn tags_from_wkt(wkt: &str) -> Option<GeoTiffTags> {
+    let wkt = std::ffi::CString::new(wkt).ok()?;
+    unsafe {
+        let mut raw = RawGeoTiffTags {
+            directory: std::ptr::null_mut(),
+            directory_len: 0,
+            doubles: std::ptr::null_mut(),
+            doubles_len: 0,
+            ascii: std::ptr::null_mut(),
+            ascii_len: 0,
+        };
+        if !pdal_native_geotiff_tags_from_wkt(wkt.as_ptr(), &mut raw) {
+            pdal_native_geotiff_tags_free(&mut raw);
+            return None;
+        }
+        let tags = GeoTiffTags {
+            directory: copy_raw(raw.directory, raw.directory_len),
+            doubles: copy_raw(raw.doubles, raw.doubles_len),
+            ascii: copy_raw(raw.ascii, raw.ascii_len),
+        };
+        pdal_native_geotiff_tags_free(&mut raw);
+        (!tags.directory.is_empty()).then_some(tags)
+    }
+}
+
+unsafe fn copy_raw(ptr: *const c_uchar, len: usize) -> Vec<u8> {
+    if ptr.is_null() || len == 0 {
+        Vec::new()
+    } else {
+        std::slice::from_raw_parts(ptr, len).to_vec()
     }
 }
 
@@ -93,5 +146,16 @@ mod tests {
         assert!(wkt.contains("Lambert_Conformal_Conic"));
         assert!(wkt.contains("NAD_1983_HARN"));
         assert!(!wkt.contains("EPSG:32767"));
+    }
+
+    #[test]
+    fn converts_wkt_to_las_geotiff_keys() {
+        let srs = crate::srs::user_input_to_wkt("EPSG:4326").expect("wkt");
+        let tags = tags_from_wkt(&srs.wkt).expect("geotiff tags");
+        let wkt =
+            wkt_from_tags(&tags.directory, &tags.doubles, &tags.ascii).expect("roundtrip wkt");
+
+        assert!(!tags.directory.is_empty());
+        assert!(wkt.contains("WGS 84"));
     }
 }

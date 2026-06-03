@@ -9,6 +9,7 @@
 extern "C"
 {
     char* GTIFGetOGISDefn(GTIF*, GTIFDefn*);
+    int GTIFSetFromOGISDefn(GTIF*, const char*);
     void VSIFree(void* data);
 }
 
@@ -58,6 +59,16 @@ char* duplicate(const char* value)
 extern "C"
 {
 
+struct pdal_native_geotiff_tags
+{
+    std::uint8_t* directory;
+    std::size_t directory_len;
+    std::uint8_t* doubles;
+    std::size_t doubles_len;
+    std::uint8_t* ascii;
+    std::size_t ascii_len;
+};
+
 char* pdal_native_geotiff_wkt(const std::uint8_t* directory,
                               std::size_t directory_len,
                               const std::uint8_t* doubles,
@@ -101,9 +112,69 @@ char* pdal_native_geotiff_wkt(const std::uint8_t* directory,
     return out;
 }
 
+bool pdal_native_geotiff_tags_from_wkt(const char* wkt,
+                                       pdal_native_geotiff_tags* out)
+{
+    if (!wkt || !out)
+        return false;
+
+    *out = {};
+    GeotiffCtx ctx;
+    ctx.gtiff = GTIFNewSimpleTags(ctx.tiff);
+    if (!ctx.gtiff)
+        return false;
+    if (!GTIFSetFromOGISDefn(ctx.gtiff, wkt))
+        return false;
+    GTIFWriteKeys(ctx.gtiff);
+
+    auto copyKey = [&](int key, std::uint8_t** dst,
+                       std::size_t* dstLen) -> bool
+    {
+        int count = 0;
+        int type = 0;
+        char* data = nullptr;
+        if (!ST_GetKey(ctx.tiff, key, &count, &type,
+                       reinterpret_cast<void**>(&data)))
+            return true;
+
+        std::size_t size = 0;
+        if (type == STT_ASCII)
+            size = static_cast<std::size_t>(count);
+        else if (type == STT_SHORT)
+            size = static_cast<std::size_t>(count) * sizeof(std::uint16_t);
+        else if (type == STT_DOUBLE)
+            size = static_cast<std::size_t>(count) * sizeof(double);
+        else
+            return false;
+
+        auto* copied = static_cast<std::uint8_t*>(std::malloc(size));
+        if (!copied)
+            return false;
+        std::memcpy(copied, data, size);
+        *dst = copied;
+        *dstLen = size;
+        return true;
+    };
+
+    return copyKey(34735, &out->directory, &out->directory_len) &&
+           copyKey(34736, &out->doubles, &out->doubles_len) &&
+           copyKey(34737, &out->ascii, &out->ascii_len) && out->directory &&
+           out->directory_len;
+}
+
 void pdal_native_geotiff_string_free(char* value)
 {
     std::free(value);
+}
+
+void pdal_native_geotiff_tags_free(pdal_native_geotiff_tags* tags)
+{
+    if (!tags)
+        return;
+    std::free(tags->directory);
+    std::free(tags->doubles);
+    std::free(tags->ascii);
+    *tags = {};
 }
 
 }
