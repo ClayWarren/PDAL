@@ -95,9 +95,13 @@ impl Options {
             }
             match value {
                 Value::Array(items) => {
-                    if pipeline_array_option_repeats(stage_type, key) {
+                    let repeat_items = pipeline_array_option_repeats(stage_type, key)
+                        || items
+                            .iter()
+                            .any(|item| !is_scalar_pipeline_option_value(item));
+                    if repeat_items {
                         for item in items {
-                            options.add(key, scalar_option_value_to_string(key, item)?);
+                            options.add(key, json_option_value_to_string(key, item)?);
                         }
                     } else {
                         let joined = items
@@ -335,6 +339,10 @@ fn json_option_value_to_string(key: &str, value: &Value) -> Result<String, Strin
     }
 }
 
+fn is_scalar_pipeline_option_value(value: &Value) -> bool {
+    matches!(value, Value::String(_) | Value::Bool(_) | Value::Number(_))
+}
+
 fn scalar_option_value_to_string(key: &str, value: &Value) -> Result<String, String> {
     match value {
         Value::String(value) => Ok(value.clone()),
@@ -518,6 +526,20 @@ mod tests {
         assert_eq!(
             options.values("bounds"),
             &["([0,1],[0,1])".to_string(), "([2,3],[2,3])".to_string()]
+        );
+    }
+
+    #[test]
+    fn pipeline_stage_options_repeat_object_array_values() {
+        let object = serde_json::json!({
+            "type": "filters.example",
+            "option": [{"a": 1}, null, [2, 3]]
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+
+        assert_eq!(
+            options.values("option"),
+            &["{\"a\":1}".to_string(), "".to_string(), "[2,3]".to_string()]
         );
     }
 
