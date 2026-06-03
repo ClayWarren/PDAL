@@ -270,20 +270,21 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 0 | 0 |
-| c-abi-backed | 45,726 | 408 |
-| native-adapter | 32,431 | 212 |
-| holdout | 6,960 | 66 |
-| total | 85,117 | 686 |
+| c-abi-backed | 45,195 | 398 |
+| native-adapter | 6,195 | 59 |
+| holdout | 6,670 | 64 |
+| total | 58,060 | 521 |
 
 Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
 peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
-With `--include-plugins`, optional plugin port-candidate backlog is also 0:
-plugin tests are excluded, C ABI-backed checkpoints are tracked as backed, and
-dependency-bound plugin integrations are tracked as native adapters rather than
-line-by-line Rust rewrite work.
+With `--include-plugins`, optional plugin port-candidate backlog is also 0
+(`45,778` C ABI-backed LOC, `32,721` native-adapter LOC, `6,670` holdout LOC,
+`85,169` total LOC): plugin tests are excluded, C ABI-backed checkpoints are
+tracked as backed, and dependency-bound plugin integrations are tracked as
+native adapters rather than line-by-line Rust rewrite work.
 (The latest kernel sweeps moved direct C++ `DeltaKernel`/`EvalKernel`/
 `GroundKernel`/`MergeKernel`/`PipelineKernel`/`RandomKernel`/`SortKernel`/
 `SplitKernel`/`TIndexKernel`/`TileKernel`/`TranslateKernel`, and supported
