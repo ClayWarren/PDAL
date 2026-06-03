@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_xml_with_fallback_sentinel() {
+    fn routes_xml_pipeline_input_to_cpp_fallback() {
         let args = vec!["in.xml".to_string(), "out.geojson".to_string()];
         assert!(matches!(
             build_density_pipeline(&args),
