@@ -1,4 +1,4 @@
-use crate::error::string_to_c_ptr;
+use crate::error::{set_last_error, string_to_c_ptr};
 use pdal_core::options::{option_name_valid, Options};
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -11,6 +11,59 @@ use std::os::raw::c_char;
 #[no_mangle]
 pub extern "C" fn pdal_options_create() -> *mut Options {
     Box::into_raw(Box::new(Options::new()))
+}
+
+/// Parse a JSON object option-file body into an options set.
+///
+/// # Safety
+///
+/// `json` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_from_json_object_text(json: *const c_char) -> *mut Options {
+    if json.is_null() {
+        set_last_error("null JSON options text");
+        return std::ptr::null_mut();
+    }
+    let json = CStr::from_ptr(json).to_string_lossy();
+    let value: serde_json::Value = match serde_json::from_str(&json) {
+        Ok(value) => value,
+        Err(err) => {
+            set_last_error(err.to_string());
+            return std::ptr::null_mut();
+        }
+    };
+    let Some(object) = value.as_object() else {
+        set_last_error("Options JSON must be an object.");
+        return std::ptr::null_mut();
+    };
+    match Options::from_json_object(object) {
+        Ok(options) => Box::into_raw(Box::new(options)),
+        Err(err) => {
+            set_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Parse command-line option-file text into an options set.
+///
+/// # Safety
+///
+/// `text` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_from_command_line_text(text: *const c_char) -> *mut Options {
+    if text.is_null() {
+        set_last_error("null command-line options text");
+        return std::ptr::null_mut();
+    }
+    let text = CStr::from_ptr(text).to_string_lossy();
+    match Options::from_command_line_text(&text) {
+        Ok(options) => Box::into_raw(Box::new(options)),
+        Err(err) => {
+            set_last_error(err);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Add a floating-point option.

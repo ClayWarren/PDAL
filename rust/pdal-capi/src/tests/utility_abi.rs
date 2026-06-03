@@ -75,6 +75,41 @@ fn options_abi_exposes_sorted_entries_and_command_line() {
 }
 
 #[test]
+fn options_abi_parses_file_bodies() {
+    unsafe {
+        let json = cstring(r#"{"count": 7, "flag": true, "name": "autzen"}"#);
+        let options = pdal_options_from_json_object_text(json.as_ptr());
+        assert!(!options.is_null());
+        assert_eq!(
+            take_string(pdal_options_value(options, cstring("count").as_ptr())),
+            "7"
+        );
+        assert_eq!(
+            take_string(pdal_options_value(options, cstring("flag").as_ptr())),
+            "true"
+        );
+        pdal_options_destroy(options);
+
+        let text = cstring("--count=7 --name \"two words\"");
+        let options = pdal_options_from_command_line_text(text.as_ptr());
+        assert!(!options.is_null());
+        assert_eq!(
+            take_string(pdal_options_value(options, cstring("count").as_ptr())),
+            "7"
+        );
+        assert_eq!(
+            take_string(pdal_options_value(options, cstring("name").as_ptr())),
+            "two words"
+        );
+        pdal_options_destroy(options);
+
+        assert!(pdal_options_from_json_object_text(cstring("[1, 2]").as_ptr()).is_null());
+        let error = CStr::from_ptr(pdal_last_error()).to_string_lossy();
+        assert!(error.contains("object"));
+    }
+}
+
+#[test]
 fn utils_abi_roundtrips_strings_and_lists() {
     unsafe {
         let spaced = cstring("  Hello World  ");

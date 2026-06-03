@@ -32,7 +32,6 @@
  * OF SUCH DAMAGE.
  ****************************************************************************/
 
-#include <nlohmann/json.hpp>
 #include <pdal/Options.hpp>
 #include <pdal/PDALUtils.hpp>
 #include <pdal/util/FileUtils.hpp>
@@ -44,6 +43,39 @@
 
 namespace pdal
 {
+
+namespace
+{
+
+std::string lastRustError(const std::string& fallback)
+{
+    const char* error = pdal_last_error();
+    if (error && *error)
+        return error;
+    return fallback;
+}
+
+Options optionsFromRust(pdal_options_t* rustOptions)
+{
+    if (!rustOptions)
+        throw pdal_error(lastRustError("Unable to parse options."));
+
+    Options options;
+    uint64_t count = pdal_options_count(rustOptions);
+    for (uint64_t i = 0; i < count; ++i)
+    {
+        char* key = pdal_options_key(rustOptions, i);
+        char* value = pdal_options_entry_value(rustOptions, i);
+        if (key && value)
+            options.add(key, value);
+        pdal_string_free(key);
+        pdal_string_free(value);
+    }
+    pdal_options_destroy(rustOptions);
+    return options;
+}
+
+} // namespace
 
 std::string Option::toArg() const
 {
@@ -260,105 +292,23 @@ Options Options::fromFile(const std::string& filename, bool throwOnOpenError)
 
 Options Options::fromJsonFile(const std::string& filename, const std::string& s)
 {
-    Options options;
-
-    NL::json node;
-    try
-    {
-        std::ifstream in(filename);
-        in >> node;
-    }
-    catch (NL::json::parse_error& err)
-    {
+    pdal_options_t* parsed = pdal_options_from_json_object_text(s.c_str());
+    if (!parsed)
         throw pdal_error("Unable to parse options file '" + filename +
-                         "' as JSON: \n" + err.what());
-    }
-
-    for (auto& element : node.items())
-    {
-        const std::string& name = element.key();
-        const NL::json& n = element.value();
-
-        if (n.is_string())
-            options.add(name, n.get<std::string>());
-        else if (n.is_number_unsigned())
-            options.add(name, n.get<uint64_t>());
-        else if (n.is_number_integer())
-            options.add(name, n.get<int64_t>());
-        else if (n.is_number_float())
-            options.add(name, n.get<double>());
-        else if (n.is_boolean())
-            options.add(name, n.get<bool>());
-        else if (n.is_null())
-            options.add(name, "");
-        else if (n.is_array() || n.is_object())
-            options.add(name, n.get<std::string>());
-        else
-        {
-            std::string msg = "Value of stage option '";
-            msg += name;
-            msg += "' in options file '";
-            msg += filename;
-            msg += "' cannot be converted.";
-            throw pdal_error(msg);
-        }
-    }
-    return options;
+                         "' as JSON: \n" +
+                         lastRustError("Invalid JSON options."));
+    return optionsFromRust(parsed);
 }
 
 Options Options::fromCmdlineFile(const std::string& filename,
                                  const std::string& s)
 {
-    Options options;
-    StringList args = Utils::simpleWordexp(s);
-
-    for (size_t i = 0; i < args.size(); ++i)
-    {
-        const std::string& option = args[i];
-        std::string value;
-        if (i + 1 < args.size())
-            value = args[i + 1];
-
-        if (option.size() < 3)
-        {
-            std::string msg = "Invalid option '";
-            msg += option;
-            msg += "' in option file '";
-            msg += filename;
-            msg += "'.";
-            throw pdal_error(msg);
-        }
-        if (option[0] != '-' || option[1] != '-')
-        {
-            std::string msg = "Option '";
-            msg += option;
-            msg += "' missing leading \"--\" in option file '";
-            msg += filename;
-            msg += "'.";
-            throw pdal_error(msg);
-        }
-
-        std::string::size_type pos = 2;
-        std::string::size_type count = Option::parse(option, pos);
-        std::string optionName = option.substr(2, count);
-        pos += count;
-        if (option[pos++] == '=')
-            value = option.substr(pos);
-        else
-            i++;
-        if (value.empty())
-        {
-            std::string msg = "No value found for option '";
-            msg += option;
-            msg += "' in option file '";
-            msg += filename;
-            msg += "'.";
-            throw pdal_error(msg);
-        }
-        Option o(optionName, value);
-        options.add(o);
-    }
-    return options;
+    pdal_options_t* parsed = pdal_options_from_command_line_text(s.c_str());
+    if (!parsed)
+        throw pdal_error("Unable to parse options file '" + filename +
+                         "' as command line: " +
+                         lastRustError("Invalid command-line options."));
+    return optionsFromRust(parsed);
 }
 
 std::ostream& operator<<(std::ostream& out, const Option& op)

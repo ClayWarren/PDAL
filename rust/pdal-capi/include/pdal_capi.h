@@ -41,6 +41,8 @@ extern "C"
 
     // Options
     pdal_options_t* pdal_options_create();
+    pdal_options_t* pdal_options_from_json_object_text(const char* json);
+    pdal_options_t* pdal_options_from_command_line_text(const char* text);
     void pdal_options_add_f64(pdal_options_t* ops, const char* key,
                               double value);
     void pdal_options_add_u64(pdal_options_t* ops, const char* key,
