@@ -43,6 +43,7 @@
 #include <pdal_capi.h>
 
 #include <fstream>
+#include <sstream>
 
 using namespace pdal;
 
@@ -203,6 +204,39 @@ TEST(PipelineManagerTest, arrayPipeline)
 
     EXPECT_TRUE(!std::ifstream(outfile).fail());
     FileUtils::deleteFile(outfile);
+}
+
+TEST(PipelineManagerTest, jsonPipelineAllowsComments)
+{
+    std::string in = R"(
+        {
+            // comment before stage list
+            "pipeline": [
+                "in.las",
+                {"type": "filters.head", "count": 1},
+                "out.las"
+            ]
+        }
+    )";
+
+    PipelineManager mgr;
+    std::istringstream iss(in);
+    EXPECT_NO_THROW(mgr.readPipeline(iss));
+}
+
+TEST(PipelineManagerTest, jsonPipelineRejectsInvalidStageMetadata)
+{
+    std::string in = R"(
+        {
+            "pipeline": [
+                {"type": 42, "filename": "in.las"}
+            ]
+        }
+    )";
+
+    PipelineManager mgr;
+    std::istringstream iss(in);
+    EXPECT_THROW(mgr.readPipeline(iss), pdal_error);
 }
 
 TEST(PipelineManagerTest, replace)
