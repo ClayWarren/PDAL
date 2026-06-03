@@ -141,35 +141,7 @@ fn next_option_value<'a>(
 }
 
 pub fn validate_pipeline_json_shape(json: &str) -> Result<(), String> {
-    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
-    let value: serde_json::Value =
-        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
-    let stages = if let Some(stages) = value.as_array() {
-        stages
-    } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
-        stages
-    } else {
-        return Err("Pipeline JSON must be an array or an object with a 'pipeline' array.".into());
-    };
-
-    for (position, stage) in stages.iter().enumerate() {
-        if stage.is_string() {
-            continue;
-        }
-        let Some(object) = stage.as_object() else {
-            return Err(format!(
-                "Pipeline stage {position} must be a JSON object or filename string."
-            ));
-        };
-        if let Some(stage_type) = object.get("type") {
-            if !stage_type.is_string() {
-                return Err(format!(
-                    "Pipeline stage {position} has a non-string 'type'."
-                ));
-            }
-        }
-    }
-    Ok(())
+    pdal_core::pipeline_reader::parse_pipeline_descriptors(json).map(|_| ())
 }
 
 pub fn apply_stage_options_to_pipeline_json(
@@ -546,5 +518,19 @@ mod tests {
         let json = r#"[{"type":"readers.faux"}, 7]"#;
 
         assert!(validate_pipeline_json_shape(json).is_err());
+    }
+
+    #[test]
+    fn validate_shape_rejects_invalid_stage_metadata() {
+        for json in [
+            r#"[{"type":7,"filename":"in.las"}]"#,
+            r#"[{"type":"readers.faux","tag":7}]"#,
+            r#"[{"type":"readers.faux","tag":"1bad"}]"#,
+            r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","tag":"A"}]"#,
+            r#"[{"type":"readers.faux","tag":"A"},{"type":"readers.faux","inputs":["A"]}]"#,
+            r#"[{"type":"readers.faux"},{"type":"filters.merge","inputs":["missing"]}]"#,
+        ] {
+            assert!(validate_pipeline_json_shape(json).is_err(), "{json}");
+        }
     }
 }
