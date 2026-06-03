@@ -114,13 +114,32 @@ fn parse_density_arg<'a>(
         parsed.hexbin_stage["lyr_name"] = serde_json::json!(next_value("--lyr_name", iter)?);
     } else if let Some(value) = arg.strip_prefix("--lyr_name=") {
         parsed.hexbin_stage["lyr_name"] = serde_json::json!(value);
-    } else if arg == "--edge_length" || arg == "--threshold" {
+    } else if matches!(
+        arg,
+        "--edge_length"
+            | "--threshold"
+            | "--sample_size"
+            | "--hole_cull_area_tolerance"
+            | "--h3_resolution"
+    ) {
         let value = next_value(arg, iter)?;
         parsed.hexbin_stage[arg.trim_start_matches("--")] = parse_option_value(&value);
     } else if let Some(value) = arg.strip_prefix("--edge_length=") {
         parsed.hexbin_stage["edge_length"] = parse_option_value(value);
     } else if let Some(value) = arg.strip_prefix("--threshold=") {
         parsed.hexbin_stage["threshold"] = parse_option_value(value);
+    } else if let Some(value) = arg.strip_prefix("--sample_size=") {
+        parsed.hexbin_stage["sample_size"] = parse_option_value(value);
+    } else if let Some(value) = arg.strip_prefix("--hole_cull_area_tolerance=") {
+        parsed.hexbin_stage["hole_cull_area_tolerance"] = parse_option_value(value);
+    } else if let Some(value) = arg.strip_prefix("--h3_resolution=") {
+        parsed.hexbin_stage["h3_resolution"] = parse_option_value(value);
+    } else if arg == "--smooth" || arg == "--h3_grid" {
+        parsed.hexbin_stage[arg.trim_start_matches("--")] = serde_json::json!(true);
+    } else if let Some(value) = arg.strip_prefix("--smooth=") {
+        parsed.hexbin_stage["smooth"] = parse_option_value(value);
+    } else if let Some(value) = arg.strip_prefix("--h3_grid=") {
+        parsed.hexbin_stage["h3_grid"] = parse_option_value(value);
     } else if arg.starts_with("--") {
         let Some(option) = parse_cli_stage_option(arg) else {
             return Err(-1);
@@ -228,6 +247,25 @@ mod tests {
         assert_eq!(value[1]["sample_size"], 42);
         assert_eq!(value[1]["ogrdriver"], "GPKG");
         assert_eq!(value[1]["lyr_name"], "tiles");
+    }
+
+    #[test]
+    fn accepts_cpp_density_switch_names() {
+        let value = pipeline(&[
+            "--sample_size=123",
+            "--hole_cull_area_tolerance",
+            "4.5",
+            "--smooth=false",
+            "--h3_grid",
+            "--h3_resolution=8",
+            "in.las",
+            "out.geojson",
+        ]);
+        assert_eq!(value[1]["sample_size"], 123);
+        assert_eq!(value[1]["hole_cull_area_tolerance"], 4.5);
+        assert_eq!(value[1]["smooth"], false);
+        assert_eq!(value[1]["h3_grid"], true);
+        assert_eq!(value[1]["h3_resolution"], 8);
     }
 
     #[test]
