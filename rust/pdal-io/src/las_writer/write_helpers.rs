@@ -15,7 +15,13 @@ pub(super) fn generated_srs_vlrs(
                 (!srs.is_empty()).then(|| srs.wkt().to_string())
             })
         })?;
-    pdal_native::srs::user_input_to_wkt(&srs_text).ok()
+    let mut srs = pdal_native::srs::user_input_to_wkt(&srs_text).ok()?;
+    if let Ok(wkt1) = pdal_native::srs::wkt_to_wkt1(&srs.wkt2, srs.epoch) {
+        if !wkt1.is_empty() {
+            srs.wkt = wkt1;
+        }
+    }
+    Some(srs)
 }
 
 pub(super) fn min_xyz(views: &[PointView]) -> Option<[f64; 3]> {
@@ -449,7 +455,12 @@ pub(super) fn add_srs_vlr(builder: &mut Builder, views: &[PointView], a_srs: Opt
         return;
     }
     let wkt = pdal_native::srs::user_input_to_wkt(&wkt)
-        .map(|srs| srs.wkt)
+        .map(|srs| {
+            pdal_native::srs::wkt_to_wkt1(&srs.wkt2, srs.epoch)
+                .ok()
+                .filter(|wkt1| !wkt1.is_empty())
+                .unwrap_or(srs.wkt)
+        })
         .unwrap_or(wkt);
     builder.vlrs.retain(|vlr| !vlr.is_crs());
     builder.evlrs.retain(|vlr| !vlr.is_crs());

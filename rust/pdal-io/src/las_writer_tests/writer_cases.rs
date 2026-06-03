@@ -118,6 +118,31 @@ use super::*;
     }
 
     #[test]
+    fn writer_generates_wkt1_srs_vlr_for_las14() {
+        let path = temp_las("wkt1-srs-vlr.las");
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add("a_srs", "EPSG:26915");
+        options.add("minor_version", 4u64);
+        let mut writer = LasWriter::new(&options);
+        writer.write(&[synthetic_point_view()]).unwrap();
+
+        let reader = las::Reader::from_path(&path).unwrap();
+        let vlr = reader
+            .header()
+            .vlrs()
+            .iter()
+            .find(|vlr| {
+                vlr.user_id == TRANSFORM_USER_ID && vlr.record_id == WKT_RECORD_ID
+            })
+            .expect("expected LASF_Projection WKT1 VLR");
+        let text = String::from_utf8_lossy(&vlr.data);
+        assert!(text.starts_with("PROJCS[\"NAD83 / UTM zone 15N\""));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn writer_with_discard_high_return_numbers() {
         let path = temp_las("discard-returns.las");
         let mut options = Options::new();
