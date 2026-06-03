@@ -715,7 +715,7 @@ fn ogr_bounds_filter_reads_geojson_feature_by_sql_id() {
         )
         .unwrap();
     let ogr = format!(
-        r#"{{"type":"ogr","datasource":"{}","sql":"select * from ogr_boundary WHERE id = 2"}}"#,
+        r#"{{"type":"ogr","drivers":["GeoJSON"],"datasource":"{}","sql":"select * from ogr_boundary WHERE id = 2"}}"#,
         temp.path().display()
     );
     let bounds = parse_ogr_bounds(&ogr).unwrap().unwrap();
