@@ -147,7 +147,10 @@ void Options::addConditional(const Option& option)
     if (m_options.find(option.getName()) == m_options.end())
     {
         m_options.insert({option.getName(), option});
-        syncRustOption(option);
+        if (m_rustOptions)
+            pdal_options_add_conditional_str(m_rustOptions,
+                                             option.getName().c_str(),
+                                             option.getValue().c_str());
     }
 }
 
@@ -173,7 +176,8 @@ void Options::addConditional(const Options& other)
 void Options::remove(const Option& option)
 {
     m_options.erase(option.getName());
-    resetRustOptions();
+    if (m_rustOptions)
+        pdal_options_remove(m_rustOptions, option.getName().c_str());
 }
 
 void Options::toMetadata(MetadataNode& parent) const

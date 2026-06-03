@@ -40,15 +40,29 @@ fn options_abi_exposes_sorted_entries_and_command_line() {
         pdal_options_add_f64(options, z.as_ptr(), 1.5);
         pdal_options_add_u64(options, a.as_ptr(), 7);
         pdal_options_add_str(options, a.as_ptr(), value.as_ptr());
+        pdal_options_add_conditional_str(options, a.as_ptr(), cstring("ignored").as_ptr());
+        pdal_options_add_conditional_str(options, cstring("b").as_ptr(), cstring("new").as_ptr());
 
-        assert_eq!(pdal_options_count(options), 3);
+        assert_eq!(pdal_options_count(options), 4);
         assert!(pdal_options_has(options, a.as_ptr()));
         assert_eq!(take_string(pdal_options_key(options, 0)), "a");
         assert_eq!(take_string(pdal_options_entry_value(options, 0)), "7");
         assert_eq!(take_string(pdal_options_value(options, a.as_ptr())), "text");
         let args: serde_json::Value =
             serde_json::from_str(&take_string(pdal_options_command_line_json(options))).unwrap();
-        assert_eq!(args, serde_json::json!(["--a=7", "--a=text", "--z=1.5"]));
+        assert_eq!(
+            args,
+            serde_json::json!(["--a=7", "--a=text", "--b=new", "--z=1.5"])
+        );
+        pdal_options_replace_str(options, a.as_ptr(), cstring("replacement").as_ptr());
+        assert_eq!(pdal_options_count(options), 3);
+        assert_eq!(
+            take_string(pdal_options_value(options, a.as_ptr())),
+            "replacement"
+        );
+        pdal_options_remove(options, a.as_ptr());
+        assert_eq!(pdal_options_count(options), 2);
+        assert!(!pdal_options_has(options, a.as_ptr()));
         assert!(pdal_options_key(options, 99).is_null());
         assert!(pdal_options_entry_value(options, 99).is_null());
         assert!(pdal_options_value(options, std::ptr::null()).is_null());

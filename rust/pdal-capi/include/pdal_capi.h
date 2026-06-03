@@ -47,6 +47,11 @@ extern "C"
                               uint64_t value);
     void pdal_options_add_str(pdal_options_t* ops, const char* key,
                               const char* value);
+    void pdal_options_add_conditional_str(pdal_options_t* ops, const char* key,
+                                          const char* value);
+    void pdal_options_remove(pdal_options_t* ops, const char* key);
+    void pdal_options_replace_str(pdal_options_t* ops, const char* key,
+                                  const char* value);
     bool pdal_options_has(const pdal_options_t* ops, const char* key);
     uint64_t pdal_options_count(const pdal_options_t* ops);
     char* pdal_options_key(const pdal_options_t* ops, uint64_t index);

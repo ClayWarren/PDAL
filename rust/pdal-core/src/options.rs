@@ -27,6 +27,47 @@ impl Options {
         self
     }
 
+    /// Add an option only if no value with this key already exists.
+    pub fn add_conditional(&mut self, key: &str, value: impl ToString) -> &mut Self {
+        if !self.has(key) {
+            self.add(key, value);
+        }
+        self
+    }
+
+    /// Append all options from another set, preserving duplicate-key order.
+    pub fn extend(&mut self, other: &Options) -> &mut Self {
+        for (key, values) in &other.map {
+            for value in values {
+                self.add(key, value);
+            }
+        }
+        self
+    }
+
+    /// Append options from another set only for keys missing from this set.
+    pub fn extend_conditional(&mut self, other: &Options) -> &mut Self {
+        for (key, values) in &other.map {
+            if !self.has(key) {
+                for value in values {
+                    self.add(key, value);
+                }
+            }
+        }
+        self
+    }
+
+    /// Remove every value for an option key.
+    pub fn remove(&mut self, key: &str) -> &mut Self {
+        self.map.remove(key);
+        self
+    }
+
+    /// Replace every value for an option key with a single new value.
+    pub fn replace(&mut self, key: &str, value: impl ToString) -> &mut Self {
+        self.remove(key).add(key, value)
+    }
+
     /// Whether `key` was set.
     pub fn has(&self, key: &str) -> bool {
         self.map.contains_key(key)
@@ -246,6 +287,51 @@ mod tests {
         assert_eq!(options.entry(0), Some(("count", "1")));
         assert_eq!(options.entry(1), Some(("count", "2")));
         assert_eq!(options.get_u64("count", 0), 2);
+    }
+
+    #[test]
+    fn conditional_add_and_extend_match_pdal_key_semantics() {
+        let mut base = Options::new();
+        base.add("count", "1")
+            .add_conditional("count", "ignored")
+            .add_conditional("mode", "base");
+
+        let mut other = Options::new();
+        other.add("count", "2").add("other", "a").add("other", "b");
+        base.extend_conditional(&other);
+
+        assert_eq!(base.values("count"), &["1".to_string()]);
+        assert_eq!(base.values("mode"), &["base".to_string()]);
+        assert_eq!(base.values("other"), &["a".to_string(), "b".to_string()]);
+
+        base.extend(&other);
+        assert_eq!(base.values("count"), &["1".to_string(), "2".to_string()]);
+        assert_eq!(
+            base.values("other"),
+            &[
+                "a".to_string(),
+                "b".to_string(),
+                "a".to_string(),
+                "b".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn remove_and_replace_operate_on_all_values_for_key() {
+        let mut options = Options::new();
+        options
+            .add("count", "1")
+            .add("count", "2")
+            .add("mode", "before");
+
+        options.replace("count", "3");
+        assert_eq!(options.values("count"), &["3".to_string()]);
+        assert_eq!(options.get_u64("count", 0), 3);
+
+        options.remove("mode");
+        assert!(!options.has("mode"));
+        assert_eq!(options.len(), 1);
     }
 
     #[test]

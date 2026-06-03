@@ -60,6 +60,58 @@ pub unsafe extern "C" fn pdal_options_add_str(
     }
 }
 
+/// Add a string option only if the key is not already set.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` and `value` must be valid, NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_add_conditional_str(
+    ops: *mut Options,
+    key: *const c_char,
+    value: *const c_char,
+) {
+    if let (Some(ops), false, false) = (ops.as_mut(), key.is_null(), value.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        let v = CStr::from_ptr(value).to_string_lossy();
+        ops.add_conditional(&k, v.to_string());
+    }
+}
+
+/// Remove every value for an option key.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_remove(ops: *mut Options, key: *const c_char) {
+    if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        ops.remove(&k);
+    }
+}
+
+/// Replace every value for an option key with one string value.
+///
+/// # Safety
+///
+/// `ops` must be a valid pointer returned by `pdal_options_create`.
+/// `key` and `value` must be valid, NUL-terminated C strings.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_options_replace_str(
+    ops: *mut Options,
+    key: *const c_char,
+    value: *const c_char,
+) {
+    if let (Some(ops), false, false) = (ops.as_mut(), key.is_null(), value.is_null()) {
+        let k = CStr::from_ptr(key).to_string_lossy();
+        let v = CStr::from_ptr(value).to_string_lossy();
+        ops.replace(&k, v.to_string());
+    }
+}
+
 /// Return whether an option key exists.
 ///
 /// # Safety
