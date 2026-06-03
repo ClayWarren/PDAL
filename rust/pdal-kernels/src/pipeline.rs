@@ -175,7 +175,10 @@ pub fn apply_stage_options_to_pipeline_json(
 }
 
 pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
-    validate_pipeline_json_shape(json)?;
+    let descriptors = pdal_core::pipeline_reader::parse_pipeline_descriptors(json)?;
+    let descriptors = descriptors
+        .as_array()
+        .ok_or_else(|| "Pipeline descriptor parser returned a non-array value.".to_string())?;
 
     let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let value: serde_json::Value =
@@ -189,25 +192,61 @@ pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
     };
 
     let mut existing_tags = Vec::new();
+    let mut active_inputs: Vec<String> = Vec::new();
     let mut serialized = Vec::with_capacity(stages.len());
     for (position, stage) in stages.iter().enumerate() {
         let mut object = serialized_stage_object(stage, position, stages.len())?;
+        let descriptor = descriptors
+            .get(position)
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| format!("Pipeline descriptor {position} is not an object."))?;
+        let role = descriptor
+            .get("role")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("Pipeline descriptor {position} is missing a role."))?;
+        let explicit_inputs = descriptor
+            .get("explicit_inputs")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
         let stage_type = object
             .get("type")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?
             .to_string();
         decode_typed_json_options(&mut object);
-        if !object.contains_key("tag") {
+        let tag = if !object.contains_key("tag") {
             let tag = pdal_core::pipeline::generate_stage_tag(
                 &stage_type,
                 "",
                 &existing_tags.iter().map(String::as_str).collect::<Vec<_>>(),
             );
             existing_tags.push(tag.clone());
-            object.insert("tag".to_string(), serde_json::Value::String(tag));
+            object.insert("tag".to_string(), serde_json::Value::String(tag.clone()));
+            tag
         } else if let Some(tag) = object.get("tag").and_then(serde_json::Value::as_str) {
             existing_tags.push(tag.to_string());
+            tag.to_string()
+        } else {
+            return Err(format!("Pipeline stage {position} has a non-string 'tag'."));
+        };
+
+        if role != "reader" && !explicit_inputs && !active_inputs.is_empty() {
+            object.insert(
+                "inputs".to_string(),
+                serde_json::Value::Array(
+                    active_inputs
+                        .iter()
+                        .map(|input| serde_json::Value::String(input.clone()))
+                        .collect(),
+                ),
+            );
+        }
+
+        if role == "reader" {
+            active_inputs.push(tag);
+        } else {
+            active_inputs.clear();
+            active_inputs.push(tag);
         }
         serialized.push(serde_json::Value::Object(object));
     }
@@ -466,6 +505,8 @@ mod tests {
         assert_eq!(parsed["pipeline"][1]["tag"], "readers_las2");
         assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
         assert_eq!(parsed["pipeline"][2]["tag"], "writers_las1");
+        assert_eq!(parsed["pipeline"][2]["inputs"][0], "readers_las1");
+        assert_eq!(parsed["pipeline"][2]["inputs"][1], "readers_las2");
     }
 
     #[test]
@@ -483,7 +524,9 @@ mod tests {
 
         assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
         assert_eq!(parsed["pipeline"][1]["type"], "filters.decimation");
+        assert_eq!(parsed["pipeline"][1]["inputs"][0], "readers_las1");
         assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+        assert_eq!(parsed["pipeline"][2]["inputs"][0], "filters_decimation1");
     }
 
     #[test]
