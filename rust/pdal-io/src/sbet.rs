@@ -150,6 +150,10 @@ impl Reader for SbetReader {
         Ok(vec![view])
     }
 
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Self::file_dimensions().to_vec()
+    }
+
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("readers.sbet")
     }
@@ -238,6 +242,17 @@ mod tests {
         assert_near(view.get_f64(0, &DimId::X), -2.041_654_392_303_94);
         assert_near(view.get_f64(0, &DimId::Roll), -0.02813407149321339);
         assert_near(view.get_f64(0, &DimId::Azimuth), 3.046773230278662);
+    }
+
+    #[test]
+    fn declares_fixed_output_dimensions() {
+        let reader = SbetReader::new(&Options::new());
+        let dims = reader.output_dimensions();
+
+        assert_eq!(dims.len(), 17);
+        assert_eq!(dims[0], (DimId::GpsTime, DimType::F64));
+        assert_eq!(dims[7], (DimId::Roll, DimType::F32));
+        assert_eq!(dims[16], (DimId::ZBodyAngRate, DimType::F64));
     }
 
     #[test]

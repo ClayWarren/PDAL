@@ -59,17 +59,25 @@ impl OptechReader {
         }
     }
 
+    fn output_dimension_list() -> Vec<(DimId, DimType)> {
+        vec![
+            (DimId::X, DimType::F64),
+            (DimId::Y, DimType::F64),
+            (DimId::Z, DimType::F64),
+            (DimId::GpsTime, DimType::F64),
+            (DimId::ReturnNumber, DimType::U8),
+            (DimId::NumberOfReturns, DimType::U8),
+            (DimId::EchoRange, DimType::F32),
+            (DimId::Intensity, DimType::U16),
+            (DimId::ScanAngleRank, DimType::F32),
+        ]
+    }
+
     fn layout() -> Rc<PointLayout> {
         let mut layout = PointLayout::new();
-        layout.register(DimId::X, DimType::F64);
-        layout.register(DimId::Y, DimType::F64);
-        layout.register(DimId::Z, DimType::F64);
-        layout.register(DimId::GpsTime, DimType::F64);
-        layout.register(DimId::ReturnNumber, DimType::U8);
-        layout.register(DimId::NumberOfReturns, DimType::U8);
-        layout.register(DimId::EchoRange, DimType::F32);
-        layout.register(DimId::Intensity, DimType::U16);
-        layout.register(DimId::ScanAngleRank, DimType::F32);
+        for (dim, ty) in Self::output_dimension_list() {
+            layout.register(dim, ty);
+        }
         Rc::new(layout)
     }
 
@@ -176,6 +184,10 @@ impl Reader for OptechReader {
         }
 
         Ok(vec![view])
+    }
+
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Self::output_dimension_list()
     }
 
     fn metadata(&self) -> MetadataNode {
@@ -348,6 +360,17 @@ mod tests {
             second.get_f64(0, &DimId::Intensity),
             full.get_f64(first.len(), &DimId::Intensity)
         );
+    }
+
+    #[test]
+    fn declares_fixed_output_dimensions() {
+        let reader = OptechReader::new(&Options::new());
+        let dims = reader.output_dimensions();
+
+        assert_eq!(dims.len(), 9);
+        assert_eq!(dims[0], (DimId::X, DimType::F64));
+        assert_eq!(dims[5], (DimId::NumberOfReturns, DimType::U8));
+        assert_eq!(dims[8], (DimId::ScanAngleRank, DimType::F32));
     }
 
     #[test]

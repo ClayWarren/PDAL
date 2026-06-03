@@ -78,6 +78,22 @@ fn validate_pipeline_allows_unknown_reader_layouts() {
 }
 
 #[test]
+fn validate_pipeline_checks_fixed_reader_layouts() {
+    let invalid = r#"{"pipeline":[
+        {"type":"readers.sbet","filename":"missing.sbet"},
+        {"type":"filters.assign","assignment":"Classification[:]=2"},
+        {"type":"writers.null"}
+    ]}"#;
+
+    let validation = validate_pipeline_for_kernel(invalid);
+    assert_eq!(validation["valid"], false);
+    assert!(validation["error_detail"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid dimension name"));
+}
+
+#[test]
 fn progress_targets_are_writer_filenames() {
     let json = r#"{"pipeline":[
         "input.las",
