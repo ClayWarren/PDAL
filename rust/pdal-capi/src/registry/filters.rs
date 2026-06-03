@@ -6,6 +6,7 @@
 
 use pdal_core::bounds::{bounds2d_to_wkt, parse_bounds2d, parse_bounds3d};
 use pdal_core::gdal::Vector;
+use pdal_core::geometry::Geometry;
 use pdal_core::ogr_spec::{parse_ogr_spec_json, OgrSpecOptions};
 use pdal_core::options::Options;
 use pdal_core::pipeline::FilterWrapper;
@@ -107,13 +108,6 @@ fn geomdistance_geometry_wkt(options: &Options) -> Result<String, StageError> {
 }
 
 fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, StageError> {
-    if !spec.geometry.is_empty() {
-        return Err(StageError(
-            "filters.geomdistance: OGR SQL geometry filters are not supported in the Rust registry."
-                .to_string(),
-        ));
-    }
-
     let ds = Vector::open_with_options(&spec.datasource, &spec.drivers, &spec.open_options)
         .map_err(StageError)?;
     let wkts = if spec.sql.is_empty() {
@@ -124,7 +118,12 @@ fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, Stage
         } else {
             &spec.dialect
         };
-        ds.get_feature_wkts_by_sql(&spec.sql, dialect)
+        let filter_wkt = if spec.geometry.is_empty() {
+            String::new()
+        } else {
+            ogr_geometry_filter_wkt(&spec.geometry)?
+        };
+        ds.get_feature_wkts_by_sql_with_filter(&spec.sql, dialect, &filter_wkt)
     }
     .map_err(StageError)?;
 
@@ -134,6 +133,13 @@ fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, Stage
             spec.datasource
         ))
     })
+}
+
+fn ogr_geometry_filter_wkt(geometry: &str) -> Result<String, StageError> {
+    Geometry::from_wkt(geometry)
+        .or_else(|_| Geometry::from_geojson(geometry))
+        .and_then(|geometry| geometry.to_wkt())
+        .map_err(StageError)
 }
 
 pub fn create_filter(

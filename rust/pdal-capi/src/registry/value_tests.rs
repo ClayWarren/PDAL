@@ -228,7 +228,10 @@ fn registry_geomdistance_filter_supports_ogr_sql() {
         json!({
             "type": "OGR",
             "datasource": datasource,
-            "sql": "SELECT * FROM zones WHERE cls = 7",
+            "sql": "SELECT * FROM zones",
+            "options": {
+                "geometry": "POLYGON((18 -1,32 -1,32 11,18 11,18 -1))"
+            }
         })
         .to_string(),
     );

@@ -505,6 +505,15 @@ impl Vector {
     }
 
     pub fn get_feature_wkts_by_sql(&self, sql: &str, dialect: &str) -> Result<Vec<String>, String> {
+        self.get_feature_wkts_by_sql_with_filter(sql, dialect, "")
+    }
+
+    pub fn get_feature_wkts_by_sql_with_filter(
+        &self,
+        sql: &str,
+        dialect: &str,
+        filter_wkt: &str,
+    ) -> Result<Vec<String>, String> {
         let sql_c = CString::new(sql).map_err(|e| e.to_string())?;
         let dialect_c = CString::new(dialect).map_err(|e| e.to_string())?;
         let dialect_ptr = if dialect.is_empty() {
@@ -512,13 +521,27 @@ impl Vector {
         } else {
             dialect_c.as_ptr()
         };
+        let filter_wkt_c = CString::new(filter_wkt).map_err(|e| e.to_string())?;
         unsafe {
-            let layer = gdal_sys::OGR_DS_ExecuteSQL(
-                self.ds,
-                sql_c.as_ptr(),
-                std::ptr::null_mut(),
-                dialect_ptr,
-            );
+            let filter_geometry = if filter_wkt.is_empty() {
+                std::ptr::null_mut()
+            } else {
+                let mut geom = std::ptr::null_mut();
+                let mut wkt_ptr = filter_wkt_c.as_ptr() as *mut std::ffi::c_char;
+                if gdal_sys::OGR_G_CreateFromWkt(&mut wkt_ptr, std::ptr::null_mut(), &mut geom)
+                    != gdal_sys::OGRErr::OGRERR_NONE
+                {
+                    return Err(format!(
+                        "Failed to parse OGR SQL geometry filter: {filter_wkt}"
+                    ));
+                }
+                geom
+            };
+            let layer =
+                gdal_sys::OGR_DS_ExecuteSQL(self.ds, sql_c.as_ptr(), filter_geometry, dialect_ptr);
+            if !filter_geometry.is_null() {
+                gdal_sys::OGR_G_DestroyGeometry(filter_geometry);
+            }
             if layer.is_null() {
                 return Err(format!("Failed to execute OGR SQL '{}'.", sql));
             }
