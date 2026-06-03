@@ -267,16 +267,21 @@ fn write_xyz<W: Write>(
     view: &PointView,
     header: &FbiHeader,
 ) -> Result<(), StageError> {
-    let mul = 1.0 / header.units_xyz as f64;
+    // FBI stores each coordinate as an integer count of `units_xyz` units from
+    // the per-axis origin: `stored = (value - org) * units_xyz`. The reader
+    // inverts this with `value = stored / units_xyz + org`, so the writer must
+    // multiply (the original C++ writer divided here, producing files the
+    // reader could not round-trip).
+    let units = header.units_xyz as f64;
     for i in 0..view.len() {
         writer
-            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::X) - header.org_x) * mul) as u32)
+            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::X) - header.org_x) * units) as u32)
             .map_err(io_error)?;
         writer
-            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::Y) - header.org_y) * mul) as u32)
+            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::Y) - header.org_y) * units) as u32)
             .map_err(io_error)?;
         writer
-            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::Z) - header.org_z) * mul) as u32)
+            .write_u32::<LittleEndian>(((view.get_f64(i, &DimId::Z) - header.org_z) * units) as u32)
             .map_err(io_error)?;
     }
     Ok(())
@@ -527,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    fn writer_matches_legacy_stream_contract() {
+    fn writer_roundtrips_xyz_through_reader() {
         let temp = tempfile::NamedTempFile::new().unwrap();
         let mut options = Options::new();
         options.add("filename", temp.path().to_string_lossy().to_string());
@@ -537,9 +542,12 @@ mod tests {
         assert_eq!(views.len(), 1);
         let view = &views[0];
         assert_eq!(view.len(), 2);
-        assert!((view.get_f64(0, &DimId::X) - 99.0).abs() < 0.01);
-        assert!((view.get_f64(0, &DimId::Y) - 199.0).abs() < 0.01);
-        assert!((view.get_f64(0, &DimId::Z) - 299.0).abs() < 0.01);
+        // XYZ must survive the round-trip exactly (the writer scales by
+        // `units_xyz` and the reader inverts it); this is the behavioral
+        // contract asserted by the C++ `FbiWriterTest.RoundtripBasicDimensions`.
+        assert!((view.get_f64(0, &DimId::X) - 100.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Y) - 200.0).abs() < 0.01);
+        assert!((view.get_f64(0, &DimId::Z) - 300.0).abs() < 0.01);
         assert_eq!(view.get_f64(0, &DimId::Intensity), 42.0);
         assert_eq!(view.get_f64(1, &DimId::Classification), 8.0);
         assert_eq!(view.get_f64(1, &DimId::Red), 3001.0);

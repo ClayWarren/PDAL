@@ -249,11 +249,13 @@ fn tindex_applies_location_path_options() {
     let temp = make_temp_dir("tindex_path_options");
     let output = temp.join("index.geojson");
 
+    // `--write_absolute_path` and `--path_prefix` are mutually exclusive in
+    // C++ (`TIndexKernel::validateSwitches`). The input here is already an
+    // absolute path, so `--path_prefix` alone yields an absolute location.
     let result = run_tindex(&[
         "create",
         "--tindex",
         output.to_str().unwrap(),
-        "--write_absolute_path",
         "--path_prefix",
         "prefix:",
         input.to_str().unwrap(),

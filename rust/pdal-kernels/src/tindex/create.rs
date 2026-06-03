@@ -9,6 +9,9 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--tindex" => parsed.tindex_file = tindex_next_value(&mut iter, "--tindex")?.clone(),
+            _ if let Some(value) = arg.strip_prefix("--tindex=") => {
+                parsed.tindex_file = value.to_string();
+            }
             "--filelist" => {
                 parsed.input_methods += 1;
                 let path = tindex_next_value(&mut iter, "--filelist")?;
@@ -146,6 +149,11 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
     if parsed.input_methods > 1 {
         return Err(TindexParseResult::Error(
             "Can't specify more than one source of tindex input files.".to_string(),
+        ));
+    }
+    if parsed.path_prefix.is_some() && parsed.write_absolute_path {
+        return Err(TindexParseResult::Error(
+            "Can't specify both --write_absolute_path and --path_prefix options.".to_string(),
         ));
     }
     if parsed.unsupported_input {

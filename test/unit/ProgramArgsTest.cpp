@@ -108,7 +108,11 @@ Json baseSpecs()
 
 TEST(ProgramArgsTest, t1)
 {
-    Json specs = {shortArg("foo", "f", "string", "foo")};
+    // Json::array() is required for a single-element spec list: under libc++,
+    // copy-list-init `Json x = { jsonValue }` with one element that is already a
+    // Json prefers the copy constructor and collapses to that object (a map)
+    // instead of building a 1-element array. The C ABI expects an array.
+    Json specs = Json::array({shortArg("foo", "f", "string", "foo")});
 
     expectFail(specs, {"--foo"});
     EXPECT_EQ(values(parse(specs, {"--foo=TestFoo"}))["foo"], "TestFoo");
@@ -172,7 +176,8 @@ TEST(ProgramArgsTest, synonym)
 {
     Json spec = shortArg("foo", "f", "string", "foo");
     spec["aliases"] = {"bar"};
-    Json specs = {spec};
+    // Json::array(): single-element spec list, see t1 for why.
+    Json specs = Json::array({spec});
 
     expectFail(specs, {"--bar"});
     EXPECT_EQ(values(parse(specs, {"--bar=TestFoo"}))["foo"], "TestFoo");
@@ -363,7 +368,8 @@ TEST(ProgramArgsTest, invalidJson)
 
 TEST(ProgramArgsTest, issue_2155)
 {
-    Json specs = {arg("foo", "int_vec")};
+    // Json::array(): single-element spec list, see t1 for why.
+    Json specs = Json::array({arg("foo", "int_vec")});
 
     Json parsed = values(parse(specs, {"--foo=-1", "--foo", "2", "--foo=-3"}));
     EXPECT_EQ(parsed["foo"], Json({-1, 2, -3}));

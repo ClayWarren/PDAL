@@ -150,6 +150,20 @@ int TranslateKernel::execute()
         args.push_back(dims.str());
     }
 
+    // Forward extra stage options (e.g. --readers.las.spatialreference=...,
+    // --writers.las.compression=...) to the Rust kernel as
+    // "--<stage>.<option>=<value>" arguments. The base Kernel pulls these out
+    // of the command line into the manager's stage-option map before
+    // ProgramArgs parsing, so they aren't among the switches above; the Rust
+    // translate kernel re-parses them and applies them to the matching stages.
+    for (auto& stageEntry : m_manager.stageOptions())
+    {
+        const std::string& stageName = stageEntry.first;
+        for (const Option& op : stageEntry.second.getOptions())
+            args.push_back("--" + stageName + "." + op.getName() + "=" +
+                           op.getValue());
+    }
+
     std::vector<const char*> argv;
     argv.reserve(args.size());
     for (const std::string& arg : args)

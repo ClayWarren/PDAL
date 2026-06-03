@@ -53,6 +53,11 @@ pub struct LasReader {
     start_length: u64,
     configured_extra_dims: Vec<ConfiguredExtraDim>,
     srs_vlr_order: Vec<SrsVlrKind>,
+    /// `override_srs` (synonym `spatialreference`): force this SRS, ignoring
+    /// any SRS read from the file. Mirrors `pdal::Reader`.
+    override_srs: Option<String>,
+    /// `default_srs`: applied only when the file has no SRS of its own.
+    default_srs: Option<String>,
     metadata: MetadataNode,
     /// Streaming state for the chunked `stream_next` path (simple local-file
     /// reads only); `None` until the first chunk is pulled.
@@ -71,6 +76,8 @@ impl Clone for LasReader {
             start_length: self.start_length,
             configured_extra_dims: self.configured_extra_dims.clone(),
             srs_vlr_order: self.srs_vlr_order.clone(),
+            override_srs: self.override_srs.clone(),
+            default_srs: self.default_srs.clone(),
             metadata: self.metadata.clone(),
             // A clone is a fresh reader; in-progress streaming state is not shared.
             stream: None,
@@ -111,6 +118,9 @@ impl LasReader {
             start_length: options.get_u64("start_length", 0),
             configured_extra_dims: configured_extra_dims_from_options(options),
             srs_vlr_order: srs_vlr_order_from_options(options),
+            override_srs: non_empty_option(options, "override_srs")
+                .or_else(|| non_empty_option(options, "spatialreference")),
+            default_srs: non_empty_option(options, "default_srs"),
             metadata: MetadataNode::new("readers.las"),
             stream: None,
         }
@@ -267,6 +277,13 @@ impl LasReader {
             return Ok(());
         }
 
+        // `override_srs`/`spatialreference` forces the SRS regardless of what
+        // the file carries (mirrors `pdal::Reader::l_initialize`).
+        if let Some(srs) = &self.override_srs {
+            view.set_spatial_reference(pdal_core::srs::SpatialReference::new(srs));
+            return Ok(());
+        }
+
         if let Some(srs) = resolve_spatial_reference_from_vlrs(header, &self.srs_vlr_order)? {
             view.set_spatial_reference(srs);
             return Ok(());
@@ -275,12 +292,19 @@ impl LasReader {
         if let Some(wkt_bytes) = header.get_wkt_crs_bytes() {
             if let Ok(wkt) = String::from_utf8(wkt_bytes.to_vec()) {
                 view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&wkt));
+                return Ok(());
             }
         } else if let Ok(Some(crs)) = header.get_epsg_crs() {
             view.set_spatial_reference(pdal_core::srs::SpatialReference::new(&format!(
                 "EPSG:{}",
                 crs.get_horizontal()
             )));
+            return Ok(());
+        }
+
+        // No SRS in the file: fall back to `default_srs` when supplied.
+        if let Some(srs) = &self.default_srs {
+            view.set_spatial_reference(pdal_core::srs::SpatialReference::new(srs));
         }
         Ok(())
     }
@@ -428,6 +452,16 @@ fn is_vsi_path(filename: &str) -> bool {
     filename.starts_with("/vsi")
         || filename.starts_with("http://")
         || filename.starts_with("https://")
+}
+
+/// Read a string option, returning `None` when the key is absent or empty so an
+/// unset SRS override does not get treated as a blank reference.
+fn non_empty_option(options: &Options, key: &str) -> Option<String> {
+    if !options.has(key) {
+        return None;
+    }
+    let value = options.get_str(key, "");
+    (!value.is_empty()).then_some(value)
 }
 
 fn read_vsi_file(filename: &str) -> Result<Vec<u8>, StageError> {

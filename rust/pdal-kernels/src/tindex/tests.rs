@@ -73,6 +73,38 @@ fn create_rejects_multiple_input_methods() {
 }
 
 #[test]
+fn create_accepts_tindex_equals_form() {
+    // `--tindex=PATH` must be equivalent to `--tindex PATH` (TIndexTest test4/7/8).
+    let parsed = parse_tindex_create_args(&strings(&[
+        "--tindex=/vsistdout/",
+        "--filespec=a.las",
+    ]))
+    .unwrap();
+    assert_eq!(parsed.tindex_file, "/vsistdout/");
+    assert_eq!(parsed.files, vec!["a.las".to_string()]);
+}
+
+#[test]
+fn create_rejects_path_prefix_with_write_absolute_path() {
+    // C++ TIndexKernel::validateSwitches rejects this combination (TIndexTest test2).
+    let Err(err) = parse_tindex_create_args(&strings(&[
+        "--tindex",
+        "out.geojson",
+        "--path_prefix=a",
+        "--write_absolute_path=true",
+        "--filespec=a.las",
+    ])) else {
+        panic!("expected path_prefix + write_absolute_path conflict to fail");
+    };
+    assert_eq!(
+        err,
+        TindexParseResult::Error(
+            "Can't specify both --write_absolute_path and --path_prefix options.".to_string()
+        )
+    );
+}
+
+#[test]
 fn create_accepts_filelist_and_named_options() {
     let temp = scratch_dir("tindex-filelist");
     let filelist = temp.join("files.txt");
@@ -84,7 +116,6 @@ fn create_accepts_filelist_and_named_options() {
         filelist.to_str().unwrap(),
         "--path_prefix",
         "/data",
-        "--write_absolute_path",
         "--lyr_name",
         "tiles",
         "--tindex_name",
@@ -106,7 +137,6 @@ fn create_accepts_filelist_and_named_options() {
 
     assert_eq!(parsed.files, vec!["a.las", "b.laz"]);
     assert_eq!(parsed.path_prefix.as_deref(), Some("/data"));
-    assert!(parsed.write_absolute_path);
     assert_eq!(parsed.layer_name, "tiles");
     assert_eq!(parsed.location_field, "path");
     assert_eq!(parsed.driver_name, "GPKG");

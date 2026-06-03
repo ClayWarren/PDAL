@@ -144,23 +144,40 @@ fn normalize_longitude(longitude: f64) -> f64 {
 }
 
 /// A coordinate transformation between two SRSs (PDAL's `SrsTransform`).
+///
+/// Backed by GDAL's `OCTTransform` (via [`pdal_native::srs::GdalSrsTransform`]),
+/// matching C++ `pdal::SrsTransform`, which uses
+/// `OGRCreateCoordinateTransformation` + `Transform(1, &x, &y, &z)`. This is a
+/// full 3D transform: the earlier proj-crate `convert` path was 2D-only and
+/// silently passed Z through unchanged, which broke projected<->geocentric
+/// reprojection.
 pub struct SrsTransform {
-    inner: pdal_native::srs::SrsTransform,
+    inner: pdal_native::srs::GdalSrsTransform,
 }
 
 impl SrsTransform {
     pub fn new(src: &SpatialReference, dst: &SpatialReference) -> Result<Self, String> {
-        let inner = pdal_native::srs::SrsTransform::new(src.wkt(), dst.wkt())?;
-        Ok(Self { inner })
-    }
-
-    pub fn new_pipeline(coord_op: &str) -> Result<Self, String> {
-        let inner = pdal_native::srs::SrsTransform::new_pipeline(coord_op)?;
+        // `GdalSrsTransform` expects WKT (it imports via `OSRImportFromWkt`),
+        // but a `SpatialReference` may hold any user-input form (e.g. an EPSG
+        // code). Normalize to WKT first, matching C++ `SrsTransform`, which
+        // builds its `OGRSpatialReference` from `getWKT2()`.
+        let src_wkt = pdal_native::srs::user_input_to_wkt(src.wkt())?.wkt;
+        let dst_wkt = pdal_native::srs::user_input_to_wkt(dst.wkt())?.wkt;
+        // Empty axis-order slices => GDAL's OAMS_TRADITIONAL_GIS_ORDER on both
+        // ends, as in C++ `SrsTransform::set`.
+        let inner = pdal_native::srs::GdalSrsTransform::new(
+            &src_wkt,
+            src.epoch(),
+            &dst_wkt,
+            dst.epoch(),
+            &[],
+            &[],
+        )?;
         Ok(Self { inner })
     }
 
     pub fn transform(&self, x: &mut f64, y: &mut f64, z: &mut f64) -> bool {
-        self.inner.transform(x, y, z)
+        self.inner.transform_xyz(x, y, z)
     }
 }
 

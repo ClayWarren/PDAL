@@ -124,7 +124,15 @@ impl InfoArgs {
         let mut parsed = Self {
             filename: None,
             driver_override: None,
-            mode: InfoMode::Summary,
+            // C++ InfoKernel defaults to stats when no display function is
+            // requested (`m_showStats || functions == 0` in InfoKernel.cpp), and
+            // installed `pdal info <file>` emits the stats.statistic block. Match
+            // that: bare `pdal info` is stats, not summary.
+            mode: InfoMode::Stats {
+                dimensions: None,
+                enumerate: None,
+                breakout: None,
+            },
             pc_type: "lidar".to_string(),
             serialization_file: None,
             read_stdin: false,
@@ -340,7 +348,9 @@ mod tests {
     }
 
     #[test]
-    fn file_plan_infers_reader_and_defaults_summary_mode() {
+    fn file_plan_infers_reader_and_defaults_stats_mode() {
+        // Bare `pdal info <file>` defaults to stats, matching C++ InfoKernel
+        // (`functions == 0` -> showStats) and installed `pdal info`.
         match build_info_plan(&strings(&["in.las"])) {
             InfoKernelPlan::Run(InfoRunPlan::File {
                 filename,
@@ -351,7 +361,7 @@ mod tests {
             }) => {
                 assert_eq!(filename, "in.las");
                 assert_eq!(driver, "readers.las");
-                assert!(matches!(mode, InfoMode::Summary));
+                assert!(matches!(mode, InfoMode::Stats { .. }));
                 assert_eq!(pc_type, "lidar");
                 assert_eq!(serialization_file, None);
             }

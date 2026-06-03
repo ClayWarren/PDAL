@@ -80,7 +80,9 @@ fn translate_applies_a_named_filter_with_stage_options() {
 #[test]
 fn translate_supports_reader_writer_and_filter_options() {
     let input = data_path("test/data/ply/simple_text.ply");
-    let temp = make_temp_dir("pdal-rs-translate-options");
+    // Distinct temp-dir name from other tests: a shared name races under
+    // parallel execution (one test's `remove_dir_all` wipes the other's dir).
+    let temp = make_temp_dir("pdal-rs-translate-rw-filter-options");
     let extensionless_input = temp.join("input_without_extension");
     let output = temp.join("out_without_extension");
     fs::copy(&input, &extensionless_input).unwrap();

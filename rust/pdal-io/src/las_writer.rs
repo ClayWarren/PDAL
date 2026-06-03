@@ -284,18 +284,35 @@ impl LasWriter {
         add_user_vlrs(&mut builder, &self.user_vlrs)?;
         add_forward_vlrs(&mut builder, &self.forward_vlrs);
         if self.enhanced_srs_vlrs {
-            let generated_srs = generated_srs_vlrs(self, views);
+            // When the caller supplies the VLR bytes explicitly (the C++
+            // `writers.las` wrapper does this, computing each form via
+            // `SpatialReference::getWKT1/getWKT2/getPROJJSON` and *omitting*
+            // any form the CRS can't be expressed in -- e.g. a
+            // DerivedProjectedCRS has no WKT1), honor that decision exactly and
+            // don't regenerate the missing forms. Only the pure-Rust path,
+            // which passes `a_srs` instead of byte VLRs, regenerates them here.
+            let has_explicit_vlrs = self.srs_wkt2_vlr.is_some()
+                || self.srs_projjson_vlr.is_some()
+                || self.srs_wkt1_vlr.is_some();
+            let generated_srs = if has_explicit_vlrs {
+                None
+            } else {
+                generated_srs_vlrs(self, views)
+            };
             add_enhanced_srs_vlrs(
                 &mut builder,
                 self.srs_wkt2_vlr
                     .as_deref()
-                    .or(generated_srs.as_ref().map(|srs| srs.wkt2.as_bytes())),
+                    .or(generated_srs.as_ref().map(|srs| srs.wkt2.as_bytes()))
+                    .filter(|b| !b.is_empty()),
                 self.srs_projjson_vlr
                     .as_deref()
-                    .or(generated_srs.as_ref().map(|srs| srs.projjson.as_bytes())),
+                    .or(generated_srs.as_ref().map(|srs| srs.projjson.as_bytes()))
+                    .filter(|b| !b.is_empty()),
                 self.srs_wkt1_vlr
                     .as_deref()
-                    .or(generated_srs.as_ref().map(|srs| srs.wkt.as_bytes())),
+                    .or(generated_srs.as_ref().map(|srs| srs.wkt.as_bytes()))
+                    .filter(|b| !b.is_empty()),
             );
         } else {
             add_srs_vlr(&mut builder, views, self.a_srs.as_deref());

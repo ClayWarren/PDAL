@@ -19,8 +19,11 @@ fn make_temp_dir(name: &str) -> PathBuf {
 
 #[test]
 fn info_reports_a_summary_for_a_ply_file() {
+    // Bare `pdal info` now defaults to stats (C++ parity), so request the
+    // summary explicitly to exercise the summary output shape.
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("info")
+        .arg("--summary")
         .arg(data_path("test/data/ply/simple_text.ply"))
         .output()
         .unwrap();
@@ -56,8 +59,12 @@ fn info_supports_driver_override_and_input_option() {
     let input = temp.join("simple_text_without_extension");
     fs::copy(data_path("test/data/ply/simple_text.ply"), &input).unwrap();
 
+    // Bare `info` now defaults to stats (C++ parity); request the summary
+    // explicitly so we can assert the driver override and input option via the
+    // summary output shape.
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
         .arg("info")
+        .arg("--summary")
         .arg("--driver")
         .arg("readers.ply")
         .arg("--input")
