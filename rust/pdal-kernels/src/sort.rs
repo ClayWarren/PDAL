@@ -52,10 +52,21 @@ pub fn build_sort_pipeline(args: &[String]) -> KernelPipelinePlan {
         sort_stage["algorithm"] = serde_json::json!(algorithm);
     }
 
+    let mut writer_stage = serde_json::json!({
+        "type": writer,
+        "filename": output,
+    });
+    if parsed.compress {
+        writer_stage["compression"] = serde_json::json!(true);
+    }
+    if parsed.forward_metadata {
+        writer_stage["forward_metadata"] = serde_json::json!(true);
+    }
+
     KernelPipelinePlan::Pipeline(serde_json::json!([
         { "type": reader, "filename": input },
         sort_stage,
-        { "type": writer, "filename": output }
+        writer_stage
     ]))
 }
 
@@ -66,6 +77,8 @@ struct SortArgs {
     sort_dimension: String,
     sort_order: Option<String>,
     sort_algorithm: Option<String>,
+    compress: bool,
+    forward_metadata: bool,
 }
 
 impl Default for SortArgs {
@@ -77,6 +90,8 @@ impl Default for SortArgs {
             sort_dimension: String::from("X"),
             sort_order: None,
             sort_algorithm: None,
+            compress: false,
+            forward_metadata: false,
         }
     }
 }
@@ -102,6 +117,18 @@ fn parse_sort_arg<'a>(
         parsed.sort_order = Some(value.to_string());
     } else if let Some(value) = arg.strip_prefix("--filters.sort.algorithm=") {
         parsed.sort_algorithm = Some(value.to_string());
+    } else if arg == "--compress" || arg == "-z" {
+        parsed.compress = true;
+    } else if let Some(value) = arg.strip_prefix("--compress=") {
+        parsed.compress = parse_bool_option("--compress", value)?;
+    } else if let Some(value) = arg.strip_prefix("--writers.las.compression=") {
+        parsed.compress = parse_bool_option("--writers.las.compression", value)?;
+    } else if arg == "--metadata" || arg == "-m" {
+        parsed.forward_metadata = true;
+    } else if let Some(value) = arg.strip_prefix("--metadata=") {
+        parsed.forward_metadata = parse_bool_option("--metadata", value)?;
+    } else if let Some(value) = arg.strip_prefix("--writers.las.forward_metadata=") {
+        parsed.forward_metadata = parse_bool_option("--writers.las.forward_metadata", value)?;
     } else if arg.starts_with("--") {
         eprintln!("PDAL: kernels.sort: Unexpected argument '{arg}'.");
         return Err(1);
@@ -124,6 +151,17 @@ fn next_value<'a>(
         Some(value) => Ok(value.clone()),
         None => {
             eprintln!("PDAL: kernels.sort: Missing value for option '{option}'.");
+            Err(1)
+        }
+    }
+}
+
+fn parse_bool_option(option: &str, value: &str) -> Result<bool, i32> {
+    match value {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        _ => {
+            eprintln!("PDAL: kernels.sort: Invalid boolean value '{value}' for option '{option}'.");
             Err(1)
         }
     }
@@ -166,6 +204,38 @@ mod tests {
         assert_eq!(value[1]["order"], "DESC");
         assert_eq!(value[1]["algorithm"], "stable");
         assert_eq!(value[2]["type"], "writers.bpf");
+    }
+
+    #[test]
+    fn accepts_cpp_sort_writer_switches() {
+        let value = pipeline(&["--compress", "--metadata", "in.las", "out.laz"]);
+        assert_eq!(value[2]["compression"], true);
+        assert_eq!(value[2]["forward_metadata"], true);
+
+        let value = pipeline(&[
+            "-z",
+            "-m",
+            "--writers.las.compression=true",
+            "--writers.las.forward_metadata=true",
+            "in.las",
+            "out.laz",
+        ]);
+        assert_eq!(value[2]["compression"], true);
+        assert_eq!(value[2]["forward_metadata"], true);
+    }
+
+    #[test]
+    fn accepts_disabled_cpp_sort_writer_switches() {
+        let value = pipeline(&[
+            "--compress=false",
+            "--metadata=false",
+            "--writers.las.compression=false",
+            "--writers.las.forward_metadata=false",
+            "in.las",
+            "out.laz",
+        ]);
+        assert!(value[2].get("compression").is_none());
+        assert!(value[2].get("forward_metadata").is_none());
     }
 
     #[test]
