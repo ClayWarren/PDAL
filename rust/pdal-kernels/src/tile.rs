@@ -51,6 +51,12 @@ pub fn build_tile_plan(args: &[String]) -> TileKernelPlan {
         eprintln!("PDAL: kernels.tile: Path contains an interior NUL byte.");
         return TileKernelPlan::Return(1);
     }
+    if output.matches('#').count() != 1 {
+        eprintln!(
+            "PDAL: kernels.tile: Output filename must contain a single '#' template placeholder."
+        );
+        return TileKernelPlan::Return(1);
+    }
 
     TileKernelPlan::Run(TilePlan {
         input,
@@ -223,5 +229,14 @@ mod tests {
             "out#.las".to_string(),
         ];
         assert!(matches!(build_tile_plan(&args), TileKernelPlan::Return(-1)));
+    }
+
+    #[test]
+    fn rejects_output_without_single_hash_placeholder() {
+        let args = vec!["in.las".to_string(), "out.las".to_string()];
+        assert!(matches!(build_tile_plan(&args), TileKernelPlan::Return(1)));
+
+        let args = vec!["in.las".to_string(), "out##.las".to_string()];
+        assert!(matches!(build_tile_plan(&args), TileKernelPlan::Return(1)));
     }
 }
