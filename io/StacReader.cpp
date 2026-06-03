@@ -69,6 +69,15 @@ using namespace stac;
 namespace
 {
 
+const std::string DefaultCatalogSchemaUrl =
+    "https://schemas.stacspec.org/v1.0.0/catalog-spec/json-schema/"
+    "catalog.json";
+const std::string DefaultCollectionSchemaUrl =
+    "https://schemas.stacspec.org/v1.0.0/collection-spec/json-schema/"
+    "collection.json";
+const std::string DefaultFeatureSchemaUrl =
+    "https://schemas.stacspec.org/v1.0.0/item-spec/json-schema/item.json";
+
 void addOption(pdal_options_t* options, const std::string& key,
                const std::string& value)
 {
@@ -274,21 +283,15 @@ void StacReader::addArgs(ProgramArgs& args)
     args.add("catalog_schema_url",
              "URL of catalog schema you'd like to use for"
              " JSON schema validation.",
-             m_p->m_args->schemaUrls.catalog,
-             "https://schemas.stacspec.org/v1.0.0/catalog-spec/json-schema/"
-             "catalog.json");
+             m_p->m_args->schemaUrls.catalog, DefaultCatalogSchemaUrl);
     args.add("collection_schema_url",
              "URL of collection schema you'd like to use for"
              " JSON schema validation.",
-             m_p->m_args->schemaUrls.collection,
-             "https://schemas.stacspec.org/v1.0.0/collection-spec/json-schema/"
-             "collection.json");
-    args.add(
-        "feature_schema_url",
-        "URL of feature schema you'd like to use for"
-        " JSON schema validation.",
-        m_p->m_args->schemaUrls.item,
-        "https://schemas.stacspec.org/v1.0.0/item-spec/json-schema/item.json");
+             m_p->m_args->schemaUrls.collection, DefaultCollectionSchemaUrl);
+    args.add("feature_schema_url",
+             "URL of feature schema you'd like to use for"
+             " JSON schema validation.",
+             m_p->m_args->schemaUrls.item, DefaultFeatureSchemaUrl);
 }
 
 void StacReader::Private::addItem(Item& item)
@@ -416,7 +419,13 @@ void StacReader::Private::printErrors(Catalog& c)
 
 bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
-    return !Utils::isRemote(filename) && rustStacTypeSupported(filename);
+    const bool customSchemaUrls =
+        m_args->validateSchema &&
+        (m_args->schemaUrls.catalog != DefaultCatalogSchemaUrl ||
+         m_args->schemaUrls.collection != DefaultCollectionSchemaUrl ||
+         m_args->schemaUrls.item != DefaultFeatureSchemaUrl);
+    return !customSchemaUrls && !Utils::isRemote(filename) &&
+           rustStacTypeSupported(filename);
 }
 
 std::string listStr(std::string key, std::vector<RegEx> ids)
