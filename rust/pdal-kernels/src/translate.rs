@@ -149,18 +149,35 @@ fn parse_translate_arg<'a>(
 ) -> Result<(), i32> {
     if arg == "--input" || arg == "-i" {
         parsed.input = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--input=") {
+        parsed.input = Some(value.to_string());
     } else if arg == "--output" || arg == "-o" {
         parsed.output = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--output=") {
+        parsed.output = Some(value.to_string());
     } else if arg == "--reader" || arg == "-r" || arg == "--driver" {
         parsed.reader_override = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg
+        .strip_prefix("--reader=")
+        .or_else(|| arg.strip_prefix("--driver="))
+    {
+        parsed.reader_override = Some(value.to_string());
     } else if arg == "--writer" || arg == "-w" {
         parsed.writer_override = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--writer=") {
+        parsed.writer_override = Some(value.to_string());
     } else if arg == "--filter" || arg == "-f" {
         parsed.filters.push(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--filter=") {
+        parsed.filters.push(value.to_string());
     } else if arg == "--metadata" || arg == "-m" {
         parsed.metadata_file = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--metadata=") {
+        parsed.metadata_file = Some(value.to_string());
     } else if arg == "--pipeline" || arg == "-p" {
         parsed.serialization_file = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--pipeline=") {
+        parsed.serialization_file = Some(value.to_string());
     } else if arg == "--stream" {
         if !parsed.stream_allowed {
             eprintln!(
@@ -182,6 +199,7 @@ fn parse_translate_arg<'a>(
         parsed.overwrite = true;
     } else if arg == "--dims" {
         next_value("--dims", iter)?;
+    } else if arg.starts_with("--dims=") {
     } else if arg == "--json" {
         parsed.filter_json = Some(next_value("--json", iter)?.to_string());
     } else if let Some(value) = arg.strip_prefix("--json=") {
@@ -444,6 +462,28 @@ mod tests {
         assert_eq!(plan.serialization_file.as_deref(), Some("pipeline.json"));
         assert!(!plan.stream_allowed);
         assert!(!plan.stream_required);
+    }
+
+    #[test]
+    fn builds_translate_plan_with_equals_form_options() {
+        let plan = plan(&[
+            "--input=in.csv",
+            "--output=out.laz",
+            "--reader=readers.text",
+            "--writer=writers.las",
+            "--filter=filters.sort",
+            "--metadata=metadata.json",
+            "--pipeline=pipeline.json",
+            "--dims=X,Y",
+        ]);
+
+        assert_eq!(plan.stages[0]["type"], "readers.text");
+        assert_eq!(plan.stages[0]["filename"], "in.csv");
+        assert_eq!(plan.stages[1]["type"], "filters.sort");
+        assert_eq!(plan.stages[2]["type"], "writers.las");
+        assert_eq!(plan.stages[2]["filename"], "out.laz");
+        assert_eq!(plan.metadata_file.as_deref(), Some("metadata.json"));
+        assert_eq!(plan.serialization_file.as_deref(), Some("pipeline.json"));
     }
 
     #[test]
