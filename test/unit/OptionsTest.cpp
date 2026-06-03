@@ -42,6 +42,8 @@
 
 #include "Support.hpp"
 
+#include <fstream>
+
 namespace
 {
 const std::string xml_header = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
@@ -109,6 +111,24 @@ TEST(OptionsTest, valid)
     EXPECT_FALSE(Option::nameValid("Afoo_123_bar_baz", false));
     EXPECT_FALSE(Option::nameValid("1foo_123_bar_baz", false));
     EXPECT_FALSE(Option::nameValid("1foo_123_bar_baz", false));
+}
+
+TEST(OptionsTest, json_file_allows_leading_comments)
+{
+    Support::Tempfile file;
+    {
+        std::ofstream out(file.filename());
+        out << "// comment before root\n"
+               "/* and a block comment */\n"
+               "{\n"
+               "  \"count\": 7,\n"
+               "  \"name\": \"autzen\"\n"
+               "}\n";
+    }
+
+    Options ops = Options::fromFile(file.filename());
+    EXPECT_EQ(ops.getValues("count"), StringList({"7"}));
+    EXPECT_EQ(ops.getValues("name"), StringList({"autzen"}));
 }
 
 TEST(OptionsTest, programargs)

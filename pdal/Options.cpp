@@ -38,6 +38,8 @@
 #include <pdal/util/private/JsonSupport.hpp>
 #include <pdal_capi.h>
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 
@@ -73,6 +75,37 @@ Options optionsFromRust(pdal_options_t* rustOptions)
     }
     pdal_options_destroy(rustOptions);
     return options;
+}
+
+char firstOptionFileToken(const std::string& s)
+{
+    size_t pos = 0;
+    while (pos < s.size())
+    {
+        while (pos < s.size() &&
+               std::isspace(static_cast<unsigned char>(s[pos])))
+            ++pos;
+
+        if (pos + 1 < s.size() && s[pos] == '/' && s[pos + 1] == '/')
+        {
+            pos += 2;
+            while (pos < s.size() && s[pos] != '\n')
+                ++pos;
+            continue;
+        }
+
+        if (pos + 1 < s.size() && s[pos] == '/' && s[pos + 1] == '*')
+        {
+            pos += 2;
+            while (pos + 1 < s.size() && !(s[pos] == '*' && s[pos + 1] == '/'))
+                ++pos;
+            pos = std::min(pos + 2, s.size());
+            continue;
+        }
+
+        return s[pos];
+    }
+    return '\0';
 }
 
 } // namespace
@@ -282,10 +315,10 @@ Options Options::fromFile(const std::string& filename, bool throwOnOpenError)
 
     std::string s = FileUtils::readFileIntoString(filename);
 
-    size_t cnt = Utils::extractSpaces(s, 0);
-    if (s[cnt] == '{')
+    char token = firstOptionFileToken(s);
+    if (token == '{')
         return fromJsonFile(filename, s);
-    else if (s[cnt] == '-')
+    else if (token == '-')
         return fromCmdlineFile(filename, s);
     else
         throw pdal_error("Option file '" + filename +
