@@ -590,6 +590,55 @@ fn collect_assets_follows_catalog_links() {
 }
 
 #[test]
+fn preview_normalizes_visited_local_locations() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("catalog.json");
+    let child = temp.path().join("child.json");
+    std::fs::write(
+        &root,
+        br#"{
+  "type": "Catalog",
+  "id": "root",
+  "links": [
+    {"rel": "item", "href": "item.json"},
+    {"rel": "child", "href": "child.json"}
+  ]
+}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        &child,
+        format!(
+            r#"{{
+  "type": "Catalog",
+  "id": "child",
+  "links": [{{"rel": "catalog", "href": "{}"}}]
+}}"#,
+            root.display()
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("item.json"),
+        br#"{
+  "type": "Feature",
+  "id": "one",
+  "properties": {"pc:count": 7},
+  "assets": {"data": {"href": "x.laz", "type": "application/vnd.laszip"}}
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().join("./catalog.json").display());
+    let reader = StacReader::new(&options);
+    let preview = reader.preview().unwrap();
+
+    assert_eq!(preview.item_ids, vec!["one"]);
+    assert_eq!(preview.point_count, 7);
+}
+
+#[test]
 fn catalog_filter_selects_matching_nested_catalog() {
     let temp = tempfile::tempdir().unwrap();
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))

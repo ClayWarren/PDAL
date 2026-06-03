@@ -366,18 +366,19 @@ struct StacPreviewContext<'a> {
 }
 
 fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Result<(), StageError> {
+    let location = normalize_local_location(location);
     if !context.visited.insert(location.to_string()) {
         return Ok(());
     }
 
-    let (text, base) = read_stac_text(location)?;
+    let (text, base) = read_stac_text(&location)?;
     let json: Value = serde_json::from_str(&text).map_err(|err| {
         StageError(format!(
             "StacReader expected a STAC JSON object in '{location}': {err}"
         ))
     })?;
     if context.validate_schema {
-        validate_stac_object(&json, location)?;
+        validate_stac_object(&json, &location)?;
     }
     match json["type"].as_str() {
         Some("Feature") => {
