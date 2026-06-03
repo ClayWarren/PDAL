@@ -4,7 +4,7 @@
 //! tables and shared numeric option helpers stay in the parent `registry`
 //! module; the filter-only option-string parsers live in `filter_parse`.
 
-use pdal_core::bounds::{parse_bounds2d, parse_bounds3d};
+use pdal_core::bounds::{bounds2d_to_wkt, parse_bounds2d, parse_bounds3d};
 use pdal_core::options::Options;
 use pdal_core::pipeline::FilterWrapper;
 use pdal_core::point::DimId;
@@ -601,13 +601,13 @@ pub fn create_filter(
                     "filters.overlay: missing 'datasource' option.".to_string(),
                 ));
             }
-            if !options.get_str("bounds", "").trim().is_empty() {
-                return Err(StageError(
-                    "filters.overlay: the 'bounds' option is not supported in \
-                     the Rust pipeline registry (no OGR spatial filter)."
-                        .to_string(),
-                ));
-            }
+            let bounds = options.get_str("bounds", "");
+            let bounds_wkt = if bounds.trim().is_empty() {
+                String::new()
+            } else {
+                let parsed = parse_bounds2d(&bounds, 0).map_err(StageError)?;
+                bounds2d_to_wkt(&parsed.bounds, 16)
+            };
             let layer_name = {
                 let layer = options.get_str("layer", "");
                 if layer.is_empty() {
@@ -616,15 +616,14 @@ pub fn create_filter(
                     layer
                 }
             };
-            Ok(Box::new(FilterWrapper::new(
-                OverlayFilter::with_layer_or_query(
-                    &dimension,
-                    &datasource,
-                    &options.get_str("column", ""),
-                    &layer_name,
-                    &options.get_str("query", ""),
-                ),
-            )))
+            Ok(Box::new(FilterWrapper::new(OverlayFilter::with_options(
+                &dimension,
+                &datasource,
+                &options.get_str("column", ""),
+                &layer_name,
+                &options.get_str("query", ""),
+                &bounds_wkt,
+            )?)))
         }
         "filters.planefit" => Ok(Box::new(FilterWrapper::new(PlaneFitFilter::new(get_u64(
             options, "knn", 8,

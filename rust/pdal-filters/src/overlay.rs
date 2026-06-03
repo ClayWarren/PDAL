@@ -11,6 +11,7 @@ pub struct OverlayFilter {
     column: String,
     layer_name: String,
     query: String,
+    bounds_filter: Option<Geometry>,
     polygons: Vec<(Geometry, i32)>,
 }
 
@@ -32,8 +33,33 @@ impl OverlayFilter {
             column: column.to_string(),
             layer_name: layer_name.to_string(),
             query: query.to_string(),
+            bounds_filter: None,
             polygons: Vec::new(),
         }
+    }
+
+    pub fn with_options(
+        dim_name: &str,
+        datasource: &str,
+        column: &str,
+        layer_name: &str,
+        query: &str,
+        bounds_wkt: &str,
+    ) -> Result<Self, StageError> {
+        let bounds_filter = if bounds_wkt.trim().is_empty() {
+            None
+        } else {
+            Some(Geometry::from_wkt(bounds_wkt).map_err(StageError)?)
+        };
+        Ok(Self {
+            dim_name: dim_name.to_string(),
+            datasource: datasource.to_string(),
+            column: column.to_string(),
+            layer_name: layer_name.to_string(),
+            query: query.to_string(),
+            bounds_filter,
+            polygons: Vec::new(),
+        })
     }
 
     fn ensure_polygons(&mut self) -> Result<(), StageError> {
@@ -51,6 +77,11 @@ impl OverlayFilter {
             };
             for (wkt, val) in features {
                 let geom = Geometry::from_wkt(&wkt).map_err(StageError)?;
+                if let Some(bounds) = &self.bounds_filter {
+                    if !geom.intersects(bounds).map_err(StageError)? {
+                        continue;
+                    }
+                }
                 self.polygons.push((geom, val));
             }
         }

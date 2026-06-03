@@ -110,6 +110,23 @@ fn overlay_view(x: f64, y: f64) -> PointView {
     view
 }
 
+fn overlay_view_points(points: &[(f64, f64)]) -> PointView {
+    let mut layout = PointLayout::new();
+    layout.register(DimId::X, DimType::F64);
+    layout.register(DimId::Y, DimType::F64);
+    layout.register(DimId::Z, DimType::F64);
+    layout.register(DimId::Classification, DimType::U8);
+    let mut view = PointView::new(Rc::new(layout));
+    for &(x, y) in points {
+        let idx = view.add_point();
+        view.set_f64(idx, &DimId::X, x);
+        view.set_f64(idx, &DimId::Y, y);
+        view.set_f64(idx, &DimId::Z, 0.0);
+        view.set_f64(idx, &DimId::Classification, 0.0);
+    }
+    view
+}
+
 #[test]
 fn registry_overlay_filter_supports_named_layers() {
     let (_dir, datasource) = overlay_datasource();
@@ -154,4 +171,23 @@ fn registry_overlay_filter_prefers_layer_over_query() {
     let views = filter.run(&[overlay_view(5.0, 5.0)]).unwrap();
     assert_eq!(views.len(), 1);
     assert_eq!(views[0].get_f64(0, &DimId::Classification), 5.0);
+}
+
+#[test]
+fn registry_overlay_filter_supports_bounds() {
+    let (_dir, datasource) = overlay_datasource();
+    let mut options = Options::new();
+    options.add("dimension", "Classification");
+    options.add("datasource", datasource);
+    options.add("column", "cls");
+    options.add("lyr_name", "zones");
+    options.add("bounds", "([18, 32], [-1, 11])");
+    let mut filter = create_filter("filters.overlay", &options).unwrap();
+
+    let views = filter
+        .run(&[overlay_view_points(&[(5.0, 5.0), (25.0, 5.0)])])
+        .unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].get_f64(0, &DimId::Classification), 0.0);
+    assert_eq!(views[0].get_f64(1, &DimId::Classification), 7.0);
 }

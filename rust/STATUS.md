@@ -45,9 +45,8 @@ optional plugins are included.
 Those numbers are guardrails, not the finish line. The work left is to close
 or explicitly accept the named caveats below:
 
-- OGR/vector-source breadth: `filters.geomdistance` OGR sources,
-  `filters.overlay` spatial `bounds`, broad OGR datasource/update workflows,
-  and similar native vector edge cases.
+- OGR/vector-source breadth: `filters.geomdistance` OGR sources, broad OGR
+  datasource/update workflows, and similar native vector edge cases.
 - EPT/COPC/STAC/remote breadth: transformed preview bounds, origin/polygon/OGR
   preview fallbacks, broad remote traversal, schema validation, object-store
   option parity, and accepted addon limitations.
