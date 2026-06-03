@@ -421,18 +421,21 @@ fn preview_applies_same_srs_bounds_to_hierarchy_count_and_bounds() {
 }
 
 #[test]
-fn preview_rejects_transformed_bounds() {
+fn preview_applies_transformed_bounds_to_hierarchy_count() {
     let path = data_path("ept/lone-star-laszip/ept.json")
         .to_string_lossy()
         .into_owned();
     let mut options = Options::new();
     options.add("filename", path);
-    options.add("bounds", "([515380,515400],[4918350,4918370]) / EPSG:26915");
+    options.add("bounds", "([515380,515400],[4918350,4918370]) / EPSG:26912");
 
-    let err = read_ept_preview_with_reader_options(&options)
-        .err()
-        .expect("transformed bounds preview should fail");
-    assert!(err.0.contains("transformed bounds"));
+    let preview = read_ept_preview_with_reader_options(&options).unwrap();
+
+    assert_eq!(preview.point_count, 430376);
+    assert!(preview.bounds_conforming.minx < 515380.0);
+    assert!(preview.bounds_conforming.maxx > 515400.0);
+    assert!(preview.bounds_conforming.miny < 4918350.0);
+    assert!(preview.bounds_conforming.maxy > 4918370.0);
 }
 
 #[test]
