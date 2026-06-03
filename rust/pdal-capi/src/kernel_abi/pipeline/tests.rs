@@ -49,6 +49,35 @@ fn validate_pipeline_rejects_non_reader_roots_even_when_a_reader_exists() {
 }
 
 #[test]
+fn validate_pipeline_rejects_prepare_layout_errors() {
+    let invalid = r#"{"pipeline":[
+        {"type":"readers.faux","count":5,"mode":"ramp"},
+        {"type":"filters.assign","assignment":"Classification[:]=2"},
+        {"type":"writers.null"}
+    ]}"#;
+
+    let validation = validate_pipeline_for_kernel(invalid);
+    assert_eq!(validation["valid"], false);
+    assert_eq!(validation["streamable"], false);
+    assert!(validation["error_detail"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid dimension name"));
+}
+
+#[test]
+fn validate_pipeline_allows_unknown_reader_layouts() {
+    let unknown_layout = r#"{"pipeline":[
+        {"type":"readers.text","filename":"missing.txt","header":"X,Y,Z"},
+        {"type":"filters.assign","assignment":"Classification[:]=2"},
+        {"type":"writers.null"}
+    ]}"#;
+
+    let validation = validate_pipeline_for_kernel(unknown_layout);
+    assert_eq!(validation["valid"], true);
+}
+
+#[test]
 fn progress_targets_are_writer_filenames() {
     let json = r#"{"pipeline":[
         "input.las",

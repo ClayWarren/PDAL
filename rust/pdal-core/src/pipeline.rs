@@ -14,7 +14,7 @@ pub use traits::{Reader, StageKind, StageWrapper, Writer};
 
 use crate::metadata::MetadataNode;
 use crate::options::Options;
-use crate::point::{Bounds2D, Bounds3D, DimId, DimensionSummary, PointView};
+use crate::point::{Bounds2D, Bounds3D, DimId, DimType, DimensionSummary, PointLayout, PointView};
 use crate::stage::StageError;
 use adapters::{ReaderAdapter, WriterAdapter};
 use std::collections::{HashMap, HashSet};
@@ -54,6 +54,11 @@ enum WhereMergeMode {
     Auto,
     True,
     False,
+}
+
+enum ValidationLayouts {
+    Known(Vec<PointView>),
+    Unknown,
 }
 
 pub fn generate_stage_tag(stage_name: &str, explicit_tag: &str, existing_tags: &[&str]) -> String {
@@ -540,6 +545,48 @@ impl Pipeline {
         true
     }
 
+    pub fn validate_prepared_layouts(&mut self) -> Result<(), StageError> {
+        let order = self.topological_order()?;
+        let mut outputs: HashMap<usize, ValidationLayouts> = HashMap::new();
+
+        for &node_idx in &order {
+            let node = &mut self.nodes[node_idx];
+            match node.kind {
+                StageKind::Reader => {
+                    let dims = node.stage.output_dimensions();
+                    if dims.is_empty() {
+                        outputs.insert(node_idx, ValidationLayouts::Unknown);
+                    } else {
+                        outputs.insert(
+                            node_idx,
+                            ValidationLayouts::Known(vec![empty_view_with_dimensions(&dims)]),
+                        );
+                    }
+                }
+                StageKind::Filter => {
+                    if let Some(inputs) = validation_inputs(&node.inputs, &outputs) {
+                        let prepared =
+                            prepare_filter_inputs(inputs, &node.stage.output_dimensions());
+                        let prepared = validate_where(node, prepared)?;
+                        node.stage.validate_inputs(&prepared)?;
+                        outputs.insert(node_idx, ValidationLayouts::Known(prepared));
+                    } else {
+                        outputs.insert(node_idx, ValidationLayouts::Unknown);
+                    }
+                }
+                StageKind::Writer => {
+                    if let Some(inputs) = validation_inputs(&node.inputs, &outputs) {
+                        let prepared = validate_where(node, inputs)?;
+                        node.stage.validate_inputs(&prepared)?;
+                    }
+                    outputs.insert(node_idx, ValidationLayouts::Known(Vec::new()));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Execute the pipeline in chunked streaming mode when it is a fully
     /// streamable linear chain, keeping peak memory bounded by the chunk size
     /// instead of materializing every point. Returns `Ok(Some(point_count))`
@@ -667,6 +714,40 @@ fn apply_writer_where(
         outputs.push(keeps);
     }
     Ok(outputs)
+}
+
+fn validate_where(node: &StageNode, inputs: Vec<PointView>) -> Result<Vec<PointView>, StageError> {
+    let where_expr = node.options.get_str("where", "");
+    if where_expr.trim().is_empty() {
+        return Ok(inputs);
+    }
+    inputs
+        .into_iter()
+        .map(|input| split_where(&input, &where_expr).map(|(keeps, _)| keeps))
+        .collect()
+}
+
+fn validation_inputs(
+    node_inputs: &[usize],
+    outputs: &HashMap<usize, ValidationLayouts>,
+) -> Option<Vec<PointView>> {
+    let mut merged = Vec::new();
+    for &input_idx in node_inputs {
+        let views = match outputs.get(&input_idx) {
+            Some(ValidationLayouts::Known(views)) => views,
+            _ => return None,
+        };
+        merged.extend(views.iter().cloned());
+    }
+    Some(merged)
+}
+
+fn empty_view_with_dimensions(dims: &[(DimId, DimType)]) -> PointView {
+    let mut layout = PointLayout::new();
+    for (dim, ty) in dims {
+        layout.register(dim.clone(), *ty);
+    }
+    PointView::new(std::rc::Rc::new(layout))
 }
 
 fn select_allowed_dimensions(views: Vec<PointView>, allowed_dims: &[DimId]) -> Vec<PointView> {

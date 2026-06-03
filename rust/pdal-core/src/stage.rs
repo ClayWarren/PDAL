@@ -73,6 +73,11 @@ pub trait Filter {
         Vec::new()
     }
 
+    /// Validate prepared input layouts without processing points.
+    fn validate_inputs(&mut self, _inputs: &[PointView]) -> Result<(), StageError> {
+        Ok(())
+    }
+
     /// Export the stage's accumulated metadata, if any.
     fn metadata(&self) -> crate::metadata::MetadataNode {
         crate::metadata::MetadataNode::new("metadata")

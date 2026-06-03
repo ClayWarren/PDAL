@@ -186,6 +186,14 @@ impl Filter for AssignFilter {
             .collect()
     }
 
+    fn validate_inputs(&mut self, inputs: &[PointView]) -> Result<(), StageError> {
+        for view in inputs {
+            self.validate_assignment_dimensions(view)?;
+            self.prepare_value_assignments(view)?;
+        }
+        Ok(())
+    }
+
     fn streamable(&self) -> bool {
         true
     }

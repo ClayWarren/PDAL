@@ -214,10 +214,13 @@ pub(super) fn progress_file_targets(json: &str) -> Vec<String> {
 
 pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {
     match validate_pipeline_json_shape(json).and_then(|_| {
-        let pipeline = pipeline_from_json(json).map_err(|err| err.to_string())?;
+        let mut pipeline = pipeline_from_json(json).map_err(|err| err.to_string())?;
         if !pipeline.roots_are_readers() {
             return Err("Pipeline does not start with a reader.".to_string());
         }
+        pipeline
+            .validate_prepared_layouts()
+            .map_err(|err| err.to_string())?;
         Ok(pipeline.validation_streamable())
     }) {
         Ok(streamable) => serde_json::json!({

@@ -38,7 +38,7 @@ impl StageWrapper for ReaderAdapter {
         StageKind::Reader
     }
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
-        Vec::new()
+        self.0.output_dimensions()
     }
     fn streamable(&self) -> bool {
         self.0.streamable()
@@ -135,6 +135,9 @@ impl<T: Filter + Streamable> StageWrapper for FilterWrapper<T> {
     }
     fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
         self.0.output_dimensions()
+    }
+    fn validate_inputs(&mut self, inputs: &[PointView]) -> Result<(), StageError> {
+        self.0.validate_inputs(inputs)
     }
     fn streamable(&self) -> bool {
         self.0.streamable()

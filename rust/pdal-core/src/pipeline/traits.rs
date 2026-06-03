@@ -30,6 +30,9 @@ pub trait StageWrapper {
     fn name(&self) -> &str;
     fn kind(&self) -> StageKind;
     fn output_dimensions(&self) -> Vec<(DimId, DimType)>;
+    fn validate_inputs(&mut self, _inputs: &[PointView]) -> Result<(), StageError> {
+        Ok(())
+    }
 
     // --- Streaming (PDAL streaming mode). Default: unsupported, so the
     // executor's streaming gate excludes the stage and falls back to the
@@ -65,6 +68,9 @@ pub trait Reader {
     fn read(&mut self) -> Result<Vec<PointView>, StageError>;
     fn metadata(&self) -> MetadataNode {
         MetadataNode::new("metadata")
+    }
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        Vec::new()
     }
     /// Reset streaming cursor/state before a run. Default no-op.
     fn reset(&mut self) {}

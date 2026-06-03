@@ -267,6 +267,20 @@ impl Reader for FauxReader {
         Ok(vec![view])
     }
 
+    fn output_dimensions(&self) -> Vec<(DimId, DimType)> {
+        let mut dims = vec![
+            (DimId::X, DimType::F64),
+            (DimId::Y, DimType::F64),
+            (DimId::Z, DimType::F64),
+            (DimId::OffsetTime, DimType::F64),
+        ];
+        if self.number_of_returns > 0 {
+            dims.push((DimId::ReturnNumber, DimType::U8));
+            dims.push((DimId::NumberOfReturns, DimType::U8));
+        }
+        dims
+    }
+
     fn metadata(&self) -> MetadataNode {
         let mut node = MetadataNode::new("readers.faux");
         node.add_value("count", MetadataValue::U64(self.count));
