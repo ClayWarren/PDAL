@@ -1,9 +1,9 @@
 //! `writers.ogr` -- narrow local writer port.
 //!
 //! The C++ writer is a broad OGR/GDAL adapter. This Rust writer covers local
-//! GeoJSON output and plain Shapefile point output. GeoPackage, native OGR
-//! attributes, transactions, and measure dimensions stay deferred to the native
-//! OGR milestone.
+//! GeoJSON output plus native OGR-backed Shapefile and GeoPackage point output
+//! for the covered C++ test shapes. Transactions and broader creation options
+//! stay deferred to later native OGR milestones.
 
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
@@ -684,10 +684,26 @@ mod tests {
         let mut options = Options::new();
         options
             .add("filename", temp.path().display())
-            .add("ogrdriver", "GPKG");
+            .add("ogrdriver", "SQLite");
         let mut writer = OgrWriter::new(&options);
 
         assert!(writer.write(&[test_view()]).is_err());
+    }
+
+    #[test]
+    fn writes_plain_geopackage_points() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("points.gpkg");
+        let mut options = Options::new();
+        options
+            .add("filename", path.display())
+            .add("ogrdriver", "GPKG");
+        let mut writer = OgrWriter::new(&options);
+
+        writer.write(&[test_view()]).unwrap();
+
+        assert!(path.exists());
+        assert_eq!(writer.point_count, 2);
     }
 
     #[test]
