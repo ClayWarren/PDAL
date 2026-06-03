@@ -74,6 +74,8 @@ fn parse_pipeline_arg<'a>(
 ) -> Result<(), i32> {
     if arg == "--input" || arg == "-i" {
         parsed.input = Some(next_option_value(arg, iter)?.clone());
+    } else if let Some(value) = arg.strip_prefix("--input=") {
+        parsed.input = Some(value.to_string());
     } else if arg == "--stdin" || arg == "-s" {
         parsed.read_stdin = true;
     } else if arg == "--validate" {
@@ -95,15 +97,24 @@ fn parse_pipeline_arg<'a>(
         parsed.stream_allowed = false;
     } else if arg == "--dims" {
         next_option_value("--dims", iter)?;
+    } else if arg.starts_with("--dims=") {
     } else if arg == "--progress" {
         parsed.progress_file = Some(next_option_value(arg, iter)?.clone());
+    } else if let Some(value) = arg.strip_prefix("--progress=") {
+        parsed.progress_file = Some(value.to_string());
     } else if arg == "--pointcloudschema" {
         parsed.pointcloud_schema_file = Some(next_option_value(arg, iter)?.clone());
+    } else if let Some(value) = arg.strip_prefix("--pointcloudschema=") {
+        parsed.pointcloud_schema_file = Some(value.to_string());
     } else if arg == "--metadata" {
         parsed.metadata_file = Some(next_option_value("--metadata", iter)?.clone());
+    } else if let Some(value) = arg.strip_prefix("--metadata=") {
+        parsed.metadata_file = Some(value.to_string());
     } else if arg == "--pipeline-serialization" {
         parsed.serialization_file =
             Some(next_option_value("--pipeline-serialization", iter)?.clone());
+    } else if let Some(value) = arg.strip_prefix("--pipeline-serialization=") {
+        parsed.serialization_file = Some(value.to_string());
     } else if let Some(stage_option) = parse_cli_stage_option(arg) {
         parsed.stage_options.push(stage_option);
     } else if arg.starts_with("--") || arg.starts_with("-v") {
@@ -336,6 +347,27 @@ mod tests {
         };
 
         assert_eq!(parsed.input.as_deref(), Some("pipeline.json"));
+        assert_eq!(parsed.pointcloud_schema_file.as_deref(), Some("schema.xml"));
+    }
+
+    #[test]
+    fn parses_equals_forms_for_public_value_switches() {
+        let args = vec![
+            "--input=pipeline.json".to_string(),
+            "--metadata=meta.json".to_string(),
+            "--pipeline-serialization=serial.json".to_string(),
+            "--progress=progress.txt".to_string(),
+            "--pointcloudschema=schema.xml".to_string(),
+            "--dims=X,Y".to_string(),
+        ];
+        let PipelineArgsResult::Run(parsed) = parse_pipeline_args(&args) else {
+            panic!("expected runnable pipeline args");
+        };
+
+        assert_eq!(parsed.input.as_deref(), Some("pipeline.json"));
+        assert_eq!(parsed.metadata_file.as_deref(), Some("meta.json"));
+        assert_eq!(parsed.serialization_file.as_deref(), Some("serial.json"));
+        assert_eq!(parsed.progress_file.as_deref(), Some("progress.txt"));
         assert_eq!(parsed.pointcloud_schema_file.as_deref(), Some("schema.xml"));
     }
 
