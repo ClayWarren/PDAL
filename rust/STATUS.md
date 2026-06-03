@@ -813,7 +813,7 @@ Known mixed binaries:
   `unreadableTileFailure`, `unreadableTileFailureStreaming`,
   `badTilePointCountLaszip`, `badTilePointCountBinary`, `boundedCrop`,
   `polygonAndBoundsCrop`, `boundedCropReprojection`, `ogrCrop`, `bcbfToLonLat`,
-  `bcbfToLonLat2dBoundsThrows`, and `duplicateInputs` count.
+  `bcbfToLonLat2dBounds`, and `duplicateInputs` count.
   Local EPT point
   materialization, simple dataset-coordinate bounds, depth pruning by
   `resolution`, origin selection, zstandard decompression, missing-tile error

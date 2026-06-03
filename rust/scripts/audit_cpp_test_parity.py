@@ -657,7 +657,7 @@ COVERED: dict[str, object] = {
         "boundedCropReprojection",
         "ogrCrop",
         "bcbfToLonLat",
-        "bcbfToLonLat2dBoundsThrows",
+        "bcbfToLonLat2dBounds",
         "duplicateInputs",
         "binaryStream",
         "laszipStream",
