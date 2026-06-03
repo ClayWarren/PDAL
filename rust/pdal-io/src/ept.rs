@@ -7,8 +7,8 @@
 //! polygon/OGR filters, local addon metadata, GDAL VSI-backed remote paths, and
 //! C++ streaming-wrapper materialization are supported for the existing parity
 //! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
-//! Bounds/polygon/OGR spatial-filter preview remains outside this module's
-//! current contract.
+//! Same-SRS bounds preview is Rust-backed; transformed bounds, polygon, and OGR
+//! spatial-filter preview remain outside this module's current contract.
 
 use crate::source;
 use crate::tindex::append_view;
@@ -292,16 +292,28 @@ pub fn read_ept_preview_with_options(
     filename: &str,
     resolution: &str,
 ) -> Result<EptPreview, StageError> {
+    let mut options = Options::new();
+    options.add("filename", filename);
+    if !resolution.trim().is_empty() {
+        options.add("resolution", resolution);
+    }
+    read_ept_preview_with_reader_options(&options)
+}
+
+pub fn read_ept_preview_with_reader_options(options: &Options) -> Result<EptPreview, StageError> {
+    let filename = options.get_str("filename", "");
     if filename.is_empty() {
         return Err(StageError(
             "EptReader requires a filename option.".to_string(),
         ));
     }
-    let path = Path::new(filename);
+    let path = Path::new(&filename);
     let info = read_json(path)?;
 
     let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
-    let point_count = preview_point_count(filename, &info, resolution)?;
+    let reader = EptReader::new(options);
+    let (bounds_conforming, point_count) =
+        preview_bounds_and_point_count(&reader, &info, bounds_conforming)?;
     let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
 
     let data_type = info["dataType"].as_str().ok_or_else(|| {
@@ -346,27 +358,45 @@ pub fn read_ept_preview_with_options(
     })
 }
 
-fn preview_point_count(filename: &str, info: &Value, resolution: &str) -> Result<u64, StageError> {
-    if resolution.trim().is_empty() {
-        return info["points"].as_u64().ok_or_else(|| {
-            StageError(format!(
-                "EPT file '{}' is missing points.",
-                Path::new(filename).display()
-            ))
-        });
+fn preview_bounds_and_point_count(
+    reader: &EptReader,
+    info: &Value,
+    mut bounds_conforming: Bounds3D,
+) -> Result<(Bounds3D, u64), StageError> {
+    let bounds = reader.bounds_filter(info)?;
+    if bounds
+        .as_ref()
+        .is_some_and(|filter| filter.hierarchy_query_bounds().is_none())
+    {
+        return Err(StageError(
+            "EPT preview with transformed bounds is not supported by Rust.".to_string(),
+        ));
+    }
+    if let Some(bounds) = bounds.as_ref().and_then(BoundsFilter::preview_clip_bounds) {
+        bounds_conforming.clip(&bounds);
     }
 
-    let mut options = Options::new();
-    options.add("filename", filename);
-    options.add("resolution", resolution);
-    let reader = EptReader::new(&options);
-    let Some(max_depth) = reader.resolution_filter(info)? else {
-        return Ok(0);
-    };
-    let root = location_parent(filename);
+    if reader.resolution.trim().is_empty() && bounds.is_none() {
+        return info["points"]
+            .as_u64()
+            .ok_or_else(|| {
+                StageError(format!(
+                    "EPT file '{}' is missing points.",
+                    Path::new(&reader.filename).display()
+                ))
+            })
+            .map(|count| (bounds_conforming, count));
+    }
+
+    let max_depth = reader.resolution_filter(info)?;
+    let root = location_parent(&reader.filename);
     let root_bounds = ept_bounds(info)?;
-    let (tiles, _) = hierarchy_tiles(&root, Some(max_depth), None, root_bounds)?;
-    Ok(tiles.iter().map(|tile| tile.expected_points).sum())
+    let hierarchy_bounds = bounds
+        .as_ref()
+        .and_then(|filter| filter.hierarchy_query_bounds());
+    let (tiles, _) = hierarchy_tiles(&root, max_depth, hierarchy_bounds, root_bounds)?;
+    let count = tiles.iter().map(|tile| tile.expected_points).sum();
+    Ok((bounds_conforming, count))
 }
 
 /// Build the SRS WKT/user-input string from an EPT info `srs` object, matching

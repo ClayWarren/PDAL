@@ -245,6 +245,20 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_options(
     filename: *const c_char,
     resolution: *const c_char,
 ) -> *mut EptReaderPreviewHandle {
+    pdal_ept_reader_preview_create_with_bounds(filename, resolution, std::ptr::null())
+}
+
+/// Read EPT preview metadata with supported reader options.
+///
+/// # Safety
+/// `filename` must be a valid NUL-terminated C string pointer. `resolution`
+/// and `bounds` may be null or valid NUL-terminated C string pointers.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_bounds(
+    filename: *const c_char,
+    resolution: *const c_char,
+    bounds: *const c_char,
+) -> *mut EptReaderPreviewHandle {
     if filename.is_null() {
         set_last_error("null filename");
         return std::ptr::null_mut();
@@ -264,7 +278,26 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_options(
             }
         }
     };
-    match pdal_io::ept::read_ept_preview_with_options(filename, resolution) {
+    let bounds = if bounds.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(bounds).to_str() {
+            Ok(bounds) => bounds,
+            Err(_) => {
+                set_last_error("non-UTF8 bounds");
+                return std::ptr::null_mut();
+            }
+        }
+    };
+    let mut options = Options::new();
+    options.add("filename", filename);
+    if !resolution.trim().is_empty() {
+        options.add("resolution", resolution);
+    }
+    if !bounds.trim().is_empty() {
+        options.add("bounds", bounds);
+    }
+    match pdal_io::ept::read_ept_preview_with_reader_options(&options) {
         Ok(preview) => {
             clear_last_error();
             Box::into_raw(Box::new(EptReaderPreviewHandle { preview }))

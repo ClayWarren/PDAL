@@ -402,6 +402,40 @@ fn preview_applies_resolution_limit_to_hierarchy_count() {
 }
 
 #[test]
+fn preview_applies_same_srs_bounds_to_hierarchy_count_and_bounds() {
+    let path = data_path("ept/lone-star-laszip/ept.json")
+        .to_string_lossy()
+        .into_owned();
+    let mut options = Options::new();
+    options.add("filename", path);
+    options.add("bounds", "([515380,515400],[4918350,4918370])");
+    let preview = read_ept_preview_with_reader_options(&options).unwrap();
+
+    assert_eq!(preview.point_count, 430376);
+    assert_eq!(preview.bounds_conforming.minx, 515380.0);
+    assert_eq!(preview.bounds_conforming.maxx, 515400.0);
+    assert_eq!(preview.bounds_conforming.miny, 4918350.0);
+    assert_eq!(preview.bounds_conforming.maxy, 4918370.0);
+    assert_eq!(preview.bounds_conforming.minz, 2322.0);
+    assert_eq!(preview.bounds_conforming.maxz, 2339.0);
+}
+
+#[test]
+fn preview_rejects_transformed_bounds() {
+    let path = data_path("ept/lone-star-laszip/ept.json")
+        .to_string_lossy()
+        .into_owned();
+    let mut options = Options::new();
+    options.add("filename", path);
+    options.add("bounds", "([515380,515400],[4918350,4918370]) / EPSG:26915");
+
+    let err = read_ept_preview_with_reader_options(&options)
+        .err()
+        .expect("transformed bounds preview should fail");
+    assert!(err.0.contains("transformed bounds"));
+}
+
+#[test]
 fn preview_for_binary_does_not_inject_class_flags() {
     let path = data_path("ept/ellipsoid-binary/ept.json")
         .to_string_lossy()

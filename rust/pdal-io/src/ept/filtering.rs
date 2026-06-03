@@ -52,6 +52,13 @@ impl BoundsFilter {
     pub(super) fn hierarchy_query_bounds(&self) -> Option<&QueryBounds> {
         self.transform.is_none().then_some(&self.query)
     }
+
+    pub(super) fn preview_clip_bounds(&self) -> Option<Bounds3D> {
+        if self.transform.is_some() {
+            return None;
+        }
+        Some(self.query.to_bounds3d())
+    }
 }
 
 impl QueryBounds {
@@ -71,6 +78,20 @@ impl QueryBounds {
                 maxy: bounds.maxy,
             }),
             QueryBounds::Three(query) => query.overlaps(bounds),
+        }
+    }
+
+    fn to_bounds3d(&self) -> Bounds3D {
+        match self {
+            QueryBounds::Two(bounds) => Bounds3D {
+                minx: bounds.minx,
+                maxx: bounds.maxx,
+                miny: bounds.miny,
+                maxy: bounds.maxy,
+                minz: -f64::MAX,
+                maxz: f64::MAX,
+            },
+            QueryBounds::Three(bounds) => *bounds,
         }
     }
 }

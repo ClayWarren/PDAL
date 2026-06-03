@@ -144,6 +144,29 @@ TEST(EptReaderTest, inspect)
     EXPECT_EQ(wkt, expSrsWkt);
 }
 
+TEST(EptReaderTest, inspectBounds)
+{
+    BOX2D bounds(515380, 4918350, 515400, 4918370);
+
+    Options options;
+    options.add("filename", eptLaszipPath);
+    options.add("bounds", bounds);
+
+    EptReader reader;
+    reader.setOptions(options);
+
+    const QuickInfo qi(reader.preview());
+
+    EXPECT_TRUE(qi.valid());
+    EXPECT_EQ(qi.m_pointCount, 430376);
+    EXPECT_EQ(qi.m_bounds.minx, 515380);
+    EXPECT_EQ(qi.m_bounds.miny, 4918350);
+    EXPECT_EQ(qi.m_bounds.minz, expBoundsConforming.minz);
+    EXPECT_EQ(qi.m_bounds.maxx, 515400);
+    EXPECT_EQ(qi.m_bounds.maxy, 4918370);
+    EXPECT_EQ(qi.m_bounds.maxz, expBoundsConforming.maxz);
+}
+
 TEST(EptReaderTest, fullReadLaszip)
 {
     Options options;

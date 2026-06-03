@@ -629,10 +629,15 @@ QuickInfo EptReader::inspect()
 
     initialize();
 
-    // Without a spatial filter the preview is just the ept.json metadata.
-    // Route that path through Rust so the C++ EptInfo lookup is not the
-    // sole source of truth for boundsConforming/points/dim-name expansion.
-    if (!m_p->hasSpatialFilter() && !Utils::isRemote(m_filename))
+    const std::string queryBounds = boundsOption(m_args->m_bounds);
+    const bool rustPreviewSupported =
+        !Utils::isRemote(m_filename) && m_args->m_origin.empty() &&
+        m_args->m_polys.empty() && m_args->m_ogr.empty() &&
+        m_args->m_bounds.spatialReference().empty();
+
+    // Route the Rust-supported preview path through the C ABI so EPT metadata
+    // and same-SRS bounds previews aren't owned solely by the C++ EptInfo path.
+    if (rustPreviewSupported)
     {
         std::string resolution;
         if (m_args->m_resolution > 0)
@@ -643,9 +648,10 @@ QuickInfo EptReader::inspect()
             resolution = out.str();
         }
         pdal_ept_reader_preview_t* preview =
-            pdal_ept_reader_preview_create_with_options(
+            pdal_ept_reader_preview_create_with_bounds(
                 m_filename.c_str(),
-                resolution.empty() ? nullptr : resolution.c_str());
+                resolution.empty() ? nullptr : resolution.c_str(),
+                queryBounds.empty() ? nullptr : queryBounds.c_str());
         if (preview)
         {
             double minx, miny, minz, maxx, maxy, maxz;
