@@ -141,12 +141,15 @@ fn parse_tile_option<'a>(
         _ => {
             let option_text = format!("--{key}={value}");
             let stage_option = parse_stage_option(&option_text, true);
-            if stage_option.result == ParseStageResult::Ok && stage_option.stage == "writers.text" {
+            if stage_option.result == ParseStageResult::Ok
+                && stage_option.stage.starts_with("writers.")
+            {
                 parsed
                     .writer_options
                     .add(&stage_option.option, stage_option.value);
             } else {
-                return Err(-1);
+                eprintln!("PDAL: kernels.tile: Unknown option '--{key}'.");
+                return Err(1);
             }
         }
     }
@@ -233,13 +236,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_options_with_fallback_sentinel() {
+    fn accepts_generic_writer_options() {
+        let plan = plan(&["--writers.las.minor_version=4", "in.las", "out#.las"]);
+        assert_eq!(plan.writer_options.get_u64("minor_version", 0), 4);
+    }
+
+    #[test]
+    fn rejects_unknown_options_as_rust_errors() {
         let args = vec![
-            "--writers.las.minor_version=4".to_string(),
+            "--filters.sort.dimension=X".to_string(),
             "in.las".to_string(),
             "out#.las".to_string(),
         ];
-        assert!(matches!(build_tile_plan(&args), TileKernelPlan::Return(-1)));
+        assert!(matches!(build_tile_plan(&args), TileKernelPlan::Return(1)));
     }
 
     #[test]

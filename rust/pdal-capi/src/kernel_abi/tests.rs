@@ -367,6 +367,19 @@ fn rust_kernel_run_reports_tile_missing_input() {
 }
 
 #[test]
+fn rust_kernel_run_handles_tile_writer_options() {
+    let name = CString::new("tile").unwrap();
+    let writer_option = CString::new("--writers.las.minor_version=4").unwrap();
+    let input = CString::new("/no/such/input.las").unwrap();
+    let output = CString::new("/tmp/out#.las").unwrap();
+    let argv = [writer_option.as_ptr(), input.as_ptr(), output.as_ptr()];
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 1);
+}
+
+#[test]
 fn rust_kernel_run_reports_translate_missing_input() {
     let name = CString::new("translate").unwrap();
 
