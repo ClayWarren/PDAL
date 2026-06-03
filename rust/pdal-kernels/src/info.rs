@@ -117,6 +117,7 @@ struct InfoArgs {
     pc_type: String,
     serialization_file: Option<String>,
     read_stdin: bool,
+    requests: InfoRequests,
 }
 
 impl InfoArgs {
@@ -136,14 +137,31 @@ impl InfoArgs {
             pc_type: "lidar".to_string(),
             serialization_file: None,
             read_stdin: false,
+            requests: InfoRequests::default(),
         };
 
         let mut iter = args.iter();
         while let Some(arg) = iter.next() {
             parse_info_arg(arg, &mut iter, &mut parsed)?;
         }
+        validate_info_args(&parsed)?;
         Ok(parsed)
     }
+}
+
+#[derive(Default)]
+struct InfoRequests {
+    all: bool,
+    summary: bool,
+    stats: bool,
+    schema: bool,
+    metadata: bool,
+    boundary: bool,
+    stac: bool,
+    point: bool,
+    query: bool,
+    dimensions: bool,
+    enumerate: bool,
 }
 
 fn parse_info_arg<'a>(
@@ -152,55 +170,71 @@ fn parse_info_arg<'a>(
     parsed: &mut InfoArgs,
 ) -> Result<(), i32> {
     if arg == "--summary" {
+        parsed.requests.summary = true;
         parsed.mode = InfoMode::Summary;
     } else if arg == "--stats" {
+        parsed.requests.stats = true;
         parsed.mode = InfoMode::Stats {
             dimensions: None,
             enumerate: None,
             breakout: None,
         };
     } else if arg == "--schema" {
+        parsed.requests.schema = true;
         parsed.mode = InfoMode::Schema;
     } else if arg == "--metadata" {
+        parsed.requests.metadata = true;
         parsed.mode = InfoMode::Metadata;
     } else if arg == "--all" {
+        parsed.requests.all = true;
         parsed.mode = InfoMode::All;
     } else if arg == "--boundary" {
+        parsed.requests.boundary = true;
         parsed.mode = InfoMode::Boundary;
     } else if arg == "--stac" {
+        parsed.requests.stac = true;
         parsed.mode = InfoMode::Stac;
     } else if arg == "-p" || arg == "--point" {
         let Some(point_ids) = parse_point_spec(&next_value(iter, arg)?) else {
             return Err(-1);
         };
+        parsed.requests.point = true;
         parsed.mode = InfoMode::Points(point_ids);
     } else if let Some(value) = arg.strip_prefix("-p=") {
         let Some(point_ids) = parse_point_spec(value) else {
             return Err(-1);
         };
+        parsed.requests.point = true;
         parsed.mode = InfoMode::Points(point_ids);
     } else if let Some(value) = arg.strip_prefix("--point=") {
         let Some(point_ids) = parse_point_spec(value) else {
             return Err(-1);
         };
+        parsed.requests.point = true;
         parsed.mode = InfoMode::Points(point_ids);
     } else if arg == "--query" {
         let Some(query) = parse_query(&next_value(iter, "--query")?) else {
             return Err(-1);
         };
+        parsed.requests.query = true;
         parsed.mode = InfoMode::Query(query);
     } else if let Some(value) = arg.strip_prefix("--query=") {
         let Some(query) = parse_query(value) else {
             return Err(-1);
         };
+        parsed.requests.query = true;
         parsed.mode = InfoMode::Query(query);
     } else if arg == "--dimensions" {
+        parsed.requests.dimensions = true;
         apply_stats_dimensions(parsed, Some(parse_dimension_list(&next_value(iter, arg)?)));
     } else if let Some(value) = arg.strip_prefix("--dimensions=") {
+        parsed.requests.dimensions = true;
         apply_stats_dimensions(parsed, Some(parse_dimension_list(value)));
     } else if arg == "--enumerate" {
+        parsed.requests.enumerate = true;
         apply_stats_enumerate(parsed, Some(parse_dimension_list(&next_value(iter, arg)?)));
     } else if let Some(value) = arg.strip_prefix("--enumerate=") {
+        parsed.requests.enumerate = true;
         apply_stats_enumerate(parsed, Some(parse_dimension_list(value)));
     } else if arg == "--breakout" {
         apply_stats_breakout(parsed, Some(DimId::from_name(&next_value(iter, arg)?)));
@@ -231,6 +265,52 @@ fn parse_info_arg<'a>(
         eprintln!("PDAL: kernels.info: Expected exactly one input file.");
         return Err(1);
     }
+    Ok(())
+}
+
+fn validate_info_args(parsed: &InfoArgs) -> Result<(), i32> {
+    let requests = &parsed.requests;
+    let stac_requested = requests.stac || requests.all;
+    if stac_requested && requests.query {
+        eprintln!("PDAL: kernels.info: 'query' option incompatible with 'stac' option.");
+        return Err(1);
+    }
+    if stac_requested && requests.point {
+        eprintln!("PDAL: kernels.info: 'point' option incompatible with 'stac' option.");
+        return Err(1);
+    }
+    if requests.point && requests.query {
+        eprintln!("PDAL: kernels.info: 'point' option incompatible with 'query' option.");
+        return Err(1);
+    }
+
+    let other_summary_function = requests.all
+        || requests.stats
+        || requests.schema
+        || requests.metadata
+        || requests.boundary
+        || requests.stac
+        || requests.point
+        || requests.query
+        || parsed.serialization_file.is_some();
+    if requests.summary && other_summary_function {
+        eprintln!(
+            "PDAL: kernels.info: 'summary' option incompatible with other specified options."
+        );
+        return Err(1);
+    }
+
+    let stats_active =
+        requests.stats || requests.all || !other_summary_function && !requests.summary;
+    if !stats_active && requests.enumerate {
+        eprintln!("PDAL: kernels.info: 'enumerate' option requires 'stats' option.");
+        return Err(1);
+    }
+    if !stats_active && requests.dimensions {
+        eprintln!("PDAL: kernels.info: 'dimensions' option requires 'stats' option.");
+        return Err(1);
+    }
+
     Ok(())
 }
 
@@ -504,6 +584,14 @@ mod tests {
             vec!["a.las", "b.las"],
             vec!["in.unknown"],
             vec!["--unknown", "in.las"],
+            vec!["--summary", "--metadata", "in.las"],
+            vec!["--summary", "--pipeline-serialization=pipe.json", "in.las"],
+            vec!["--stac", "--query=1,2/3", "in.las"],
+            vec!["--stac", "--point=1", "in.las"],
+            vec!["--all", "--point=1", "in.las"],
+            vec!["--point=1", "--query=1,2/3", "in.las"],
+            vec!["--schema", "--dimensions=X", "in.las"],
+            vec!["--metadata", "--enumerate=Classification", "in.las"],
         ] {
             let args = strings(&args);
             assert!(
