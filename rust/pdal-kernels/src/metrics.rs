@@ -108,6 +108,12 @@ fn parse_delta_args(args: &[String]) -> Result<DeltaPlan, String> {
         match arg.as_str() {
             "--detail" => detail = true,
             "--alldims" => all_dims = true,
+            _ if arg.starts_with("--detail=") => {
+                detail = parse_bool_flag("detail", arg)?;
+            }
+            _ if arg.starts_with("--alldims=") => {
+                all_dims = parse_bool_flag("alldims", arg)?;
+            }
             "--source" => source = Some(next_value("--source", &mut iter)?.to_string()),
             "--candidate" => candidate = Some(next_value("--candidate", &mut iter)?.to_string()),
             _ if let Some(value) = arg.strip_prefix("--source=") => {
@@ -210,6 +216,18 @@ fn parse_source_candidate_args(command: &str, args: &[String]) -> Result<(String
     }
 }
 
+fn parse_bool_flag(name: &str, arg: &str) -> Result<bool, String> {
+    let value = arg
+        .split_once('=')
+        .map(|(_, value)| value)
+        .ok_or_else(|| format!("--{name} expects a boolean value"))?;
+    match value {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        _ => Err(format!("--{name} expects a boolean value")),
+    }
+}
+
 fn next_value<'a>(
     option: &str,
     iter: &mut impl Iterator<Item = &'a String>,
@@ -256,6 +274,29 @@ mod tests {
                 all_dims: true,
             })
         );
+    }
+
+    #[test]
+    fn delta_plan_accepts_boolean_flag_values() {
+        assert_eq!(
+            build_delta_plan(&strings(&[
+                "--detail=true",
+                "--alldims=false",
+                "a.las",
+                "b.las"
+            ])),
+            MetricPlan::Run(DeltaPlan {
+                source: "a.las".to_string(),
+                candidate: "b.las".to_string(),
+                detail: true,
+                all_dims: false,
+            })
+        );
+
+        assert!(matches!(
+            build_delta_plan(&strings(&["--detail=maybe", "a.las", "b.las"])),
+            MetricPlan::Return(1)
+        ));
     }
 
     #[test]
