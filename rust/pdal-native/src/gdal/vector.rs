@@ -19,6 +19,37 @@ impl Vector {
         }
     }
 
+    pub fn open_with_options(
+        path: &str,
+        drivers: &[String],
+        open_options: &[String],
+    ) -> Result<Self, String> {
+        if drivers.is_empty() && open_options.is_empty() {
+            return Self::open(path);
+        }
+        register_drivers();
+        let path_c = CString::new(path).map_err(|e| e.to_string())?;
+        unsafe {
+            let driver_list = csl_from_strings(drivers)?;
+            let open_option_list = csl_from_strings(open_options)?;
+            // GDAL_OF_READONLY (0) | GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR.
+            let open_flags = 0x44;
+            let ds = gdal_sys::GDALOpenEx(
+                path_c.as_ptr(),
+                open_flags,
+                driver_list as *const *const _,
+                open_option_list as *const *const _,
+                std::ptr::null(),
+            );
+            gdal_sys::CSLDestroy(driver_list);
+            gdal_sys::CSLDestroy(open_option_list);
+            if ds.is_null() {
+                return Err(format!("Failed to open OGR datasource: {}", path));
+            }
+            Ok(Self { ds })
+        }
+    }
+
     pub fn create(path: &str, driver_name: &str) -> Result<Self, String> {
         register_drivers();
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
@@ -546,6 +577,15 @@ fn drop_optional_string_column(
     rows.into_iter()
         .map(|(wkt, value, _)| (wkt, value))
         .collect()
+}
+
+unsafe fn csl_from_strings(values: &[String]) -> Result<*mut *mut std::ffi::c_char, String> {
+    let mut list = std::ptr::null_mut();
+    for value in values {
+        let value_c = CString::new(value.as_str()).map_err(|e| e.to_string())?;
+        list = gdal_sys::CSLAddString(list, value_c.as_ptr());
+    }
+    Ok(list)
 }
 
 unsafe fn push_feature_wkt(feature: gdal_sys::OGRFeatureH, result: &mut Vec<String>) {

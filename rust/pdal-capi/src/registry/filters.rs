@@ -107,12 +107,6 @@ fn geomdistance_geometry_wkt(options: &Options) -> Result<String, StageError> {
 }
 
 fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, StageError> {
-    if !spec.drivers.is_empty() || !spec.open_options.is_empty() {
-        return Err(StageError(
-            "filters.geomdistance: OGR drivers/openoptions are not supported in the Rust registry."
-                .to_string(),
-        ));
-    }
     if !spec.geometry.is_empty() {
         return Err(StageError(
             "filters.geomdistance: OGR SQL geometry filters are not supported in the Rust registry."
@@ -120,7 +114,8 @@ fn geomdistance_geometry_from_ogr(spec: &OgrSpecOptions) -> Result<String, Stage
         ));
     }
 
-    let ds = Vector::open(&spec.datasource).map_err(StageError)?;
+    let ds = Vector::open_with_options(&spec.datasource, &spec.drivers, &spec.open_options)
+        .map_err(StageError)?;
     let wkts = if spec.sql.is_empty() {
         ds.get_feature_wkts_by_layer(&spec.layer)
     } else {

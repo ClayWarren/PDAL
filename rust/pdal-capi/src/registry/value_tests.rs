@@ -203,6 +203,7 @@ fn registry_geomdistance_filter_supports_ogr_layers() {
         json!({
             "type": "OGR",
             "datasource": datasource,
+            "drivers": ["GPKG"],
             "layer": "zones",
         })
         .to_string(),
