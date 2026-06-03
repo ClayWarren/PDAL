@@ -105,6 +105,59 @@ fn pipeline_json_accepts_filename_string_stages() {
 }
 
 #[test]
+fn pipeline_json_accepts_multiple_filename_string_readers() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+
+    let json = format!(
+        r#"[
+                "{}",
+                "{}",
+                {{"type":"writers.null"}}
+            ]"#,
+        escape_json_path(&input),
+        escape_json_path(&input)
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let result = pipeline.execute_with_result(Vec::new()).unwrap();
+    assert_eq!(result.point_count, 20);
+    assert_eq!(result.view_count, 2);
+}
+
+#[test]
+fn pipeline_json_rejects_las_writer_with_mixed_input_srs() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let simple = repo.join("test/data/las/simple.las");
+    let autzen = repo.join("test/data/las/autzen_trim.las");
+    let output =
+        std::env::temp_dir().join(format!("pdal-rust-mixed-srs-{}.las", std::process::id()));
+    let _ = std::fs::remove_file(&output);
+
+    let json = format!(
+        r#"[
+                "{}",
+                "{}",
+                "{}"
+            ]"#,
+        escape_json_path(&simple),
+        escape_json_path(&autzen),
+        escape_json_path(&output)
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let err = match pipeline.execute_with_result(Vec::new()) {
+        Ok(_) => panic!("mixed-SRS LAS pipeline unexpectedly succeeded"),
+        Err(err) => err,
+    };
+
+    assert!(err
+        .to_string()
+        .contains("multiple point spatial references"));
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
 fn later_reader_stage_does_not_implicitly_depend_on_previous_stage() {
     let pipeline = pipeline_from_json(
         r#"[

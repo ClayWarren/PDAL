@@ -17,7 +17,11 @@ use std::os::raw::c_char;
 use crate::registry::{create_stage, CreatedStage};
 
 pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
-    pdal_core::pipeline_reader::parse_pipeline_descriptors(json).map_err(StageError)?;
+    let descriptors =
+        pdal_core::pipeline_reader::parse_pipeline_descriptors(json).map_err(StageError)?;
+    let descriptors = descriptors.as_array().ok_or_else(|| {
+        StageError("Pipeline descriptor parser returned a non-array value.".into())
+    })?;
 
     let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let value: Value = serde_json::from_str(&stripped)
@@ -26,9 +30,16 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
 
     let mut pipeline = Pipeline::new();
     let mut tags = HashMap::new();
-    let mut previous: Option<usize> = None;
+    let mut active_inputs: Vec<usize> = Vec::new();
 
     for (position, stage_val) in stages.iter().enumerate() {
+        let role = descriptors
+            .get(position)
+            .and_then(|descriptor| descriptor.get("role"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                StageError(format!("Pipeline descriptor {position} is missing a role."))
+            })?;
         let string_stage;
         let object = if let Some(object) = stage_val.as_object() {
             object
@@ -44,7 +55,7 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
         validate_type_field(object, position)?;
         let tag = tag_from_object(object)?;
         let options = options_from_object(object)?;
-        let driver_name = stage_name(object, position, stages.len(), &options)?;
+        let driver_name = stage_name(object, position, role, &options)?;
         if driver_name.starts_with("readers.") && object.contains_key("inputs") {
             return Err(StageError(
                 "JSON pipeline: Inputs not permitted for reader.".to_string(),
@@ -65,12 +76,19 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
         }
 
         let explicit_inputs = add_explicit_inputs(&mut pipeline, idx, object, &tags)?;
-        if !is_reader && !explicit_inputs && position > 0 {
-            if let Some(input) = previous {
-                pipeline.add_dependency(idx, input)?;
+        if !is_reader && !explicit_inputs {
+            for input in &active_inputs {
+                pipeline.add_dependency(idx, *input)?;
             }
         }
-        previous = Some(idx);
+        if is_reader {
+            active_inputs.push(idx);
+        } else if driver_name.starts_with("filters.") {
+            active_inputs.clear();
+            active_inputs.push(idx);
+        } else {
+            active_inputs.clear();
+        }
     }
 
     Ok(pipeline)
@@ -141,7 +159,7 @@ fn pipeline_stages(value: &Value) -> Result<&Vec<Value>, StageError> {
 fn stage_name(
     object: &serde_json::Map<String, Value>,
     position: usize,
-    len: usize,
+    role: &str,
     options: &Options,
 ) -> Result<String, StageError> {
     if let Some(name) = object.get("type").and_then(Value::as_str) {
@@ -153,11 +171,11 @@ fn stage_name(
             "Pipeline stage {position} is missing a 'type'."
         )));
     }
-    if position == 0 {
+    if role == "reader" {
         infer_reader_driver(&filename)
             .map(str::to_string)
             .ok_or_else(|| StageError(format!("Unable to infer reader for '{filename}'.")))
-    } else if position + 1 == len {
+    } else if role == "writer" {
         infer_writer_driver(&filename)
             .map(str::to_string)
             .ok_or_else(|| StageError(format!("Unable to infer writer for '{filename}'.")))

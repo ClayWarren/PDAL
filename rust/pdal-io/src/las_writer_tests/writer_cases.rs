@@ -79,6 +79,28 @@ use super::*;
     }
 
     #[test]
+    fn writer_rejects_multiple_spatial_references() {
+        let path = temp_las("mixed-srs.las");
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+
+        let wgs84 = pdal_native::srs::user_input_to_wkt("EPSG:4326").unwrap();
+        let utm17 = pdal_native::srs::user_input_to_wkt("EPSG:32617").unwrap();
+        let mut first = synthetic_point_view();
+        first.set_spatial_reference(SpatialReference::new(&wgs84.wkt));
+        let mut second = synthetic_point_view();
+        second.set_spatial_reference(SpatialReference::new(&utm17.wkt));
+
+        let mut writer = LasWriter::new(&options);
+        let err = writer.write(&[first, second]).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("multiple point spatial references"));
+        assert!(!path.exists());
+    }
+
+    #[test]
     fn writer_writes_laz_via_compression_option() {
         let path = temp_las("compressed.las");
         let mut options = Options::new();

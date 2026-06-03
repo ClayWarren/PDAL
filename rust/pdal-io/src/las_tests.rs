@@ -52,6 +52,36 @@ mod tests {
     }
 
     #[test]
+    fn reader_reports_mixed_fixture_spatial_references() {
+        let simple_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/simple.las"
+        );
+        let autzen_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/autzen_trim.las"
+        );
+
+        let mut simple_options = Options::new();
+        simple_options.add("filename", simple_path);
+        let mut autzen_options = Options::new();
+        autzen_options.add("filename", autzen_path);
+
+        let simple = LasReader::new(&simple_options)
+            .read()
+            .expect("read simple.las");
+        let autzen = LasReader::new(&autzen_options)
+            .read()
+            .expect("read autzen_trim.las");
+        let simple_srs = simple[0].spatial_reference();
+        let autzen_srs = autzen[0].spatial_reference();
+
+        assert!(simple_srs.is_empty());
+        assert!(!autzen_srs.is_empty());
+        assert_ne!(simple_srs.wkt(), autzen_srs.wkt());
+    }
+
+    #[test]
     fn reader_preserves_legacy_synthetic_flag() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),

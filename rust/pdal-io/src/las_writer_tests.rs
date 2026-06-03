@@ -4,6 +4,7 @@ mod tests {
     use crate::las::LasReader;
     use pdal_core::pipeline::Reader;
     use pdal_core::point::{DimId, DimType, PointLayout, PointView};
+    use pdal_core::srs::SpatialReference;
     use std::rc::Rc;
 
     fn unique_suffix() -> String {

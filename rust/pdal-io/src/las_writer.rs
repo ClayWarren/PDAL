@@ -266,6 +266,7 @@ impl LasWriter {
     /// and patch the min/max bounds at the end. Shared by `write` and the
     /// streaming `stream_write` to keep one source of truth for header bytes.
     fn build_header(&self, views: &[PointView]) -> Result<(Header, Vec<ExtraDim>), StageError> {
+        validate_unique_spatial_reference(views, &self.filename)?;
         let path = Path::new(&self.filename);
         let should_compress = self.should_compress(path);
         let mut builder = self.initial_builder(views)?;
@@ -457,6 +458,31 @@ impl Writer for LasWriter {
         }
         Ok(())
     }
+}
+
+fn validate_unique_spatial_reference(
+    views: &[PointView],
+    filename: &str,
+) -> Result<(), StageError> {
+    let Some(first) = views.first().map(PointView::spatial_reference) else {
+        return Ok(());
+    };
+
+    for srs in views.iter().skip(1).map(PointView::spatial_reference) {
+        if srs == first
+            || (!srs.is_empty()
+                && !first.is_empty()
+                && srs.epoch() == first.epoch()
+                && pdal_native::srs::is_same(first.wkt(), srs.wkt(), first.epoch()))
+        {
+            continue;
+        }
+        return Err(StageError(format!(
+            "writers.las: Attempting to write '{filename}' with multiple point spatial references."
+        )));
+    }
+
+    Ok(())
 }
 
 mod write_helpers;
