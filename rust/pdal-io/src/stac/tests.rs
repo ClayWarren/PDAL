@@ -233,6 +233,64 @@ fn preview_reports_empty_after_collection_or_property_filtering() {
 }
 
 #[test]
+fn preview_validate_schema_rejects_malformed_feature() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{
+  "type": "Feature",
+  "id": "item",
+  "stac_version": "1.0.0",
+  "geometry": null,
+  "properties": {"pc:count": 5},
+  "assets": {"data": {"href": "item.las"}}
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("validate_schema", "true");
+    let reader = StacReader::new(&options);
+
+    let err = reader.preview().err().unwrap();
+    assert!(err.0.contains("missing bbox"));
+}
+
+#[test]
+fn read_validate_schema_rejects_malformed_feature_before_asset_read() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test/data/ply/simple_text.ply"),
+        temp.path().join("simple_text.ply"),
+    )
+    .unwrap();
+    let item = temp.path().join("item.json");
+    std::fs::write(
+        &item,
+        br#"{
+  "type": "Feature",
+  "id": "item",
+  "stac_version": "1.0.0",
+  "geometry": null,
+  "properties": {},
+  "assets": {"data": {"href": "simple_text.ply"}}
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", item.to_string_lossy().into_owned());
+    options.add("validate_schema", "true");
+    let mut reader = StacReader::new(&options);
+
+    let err = reader.read().err().unwrap();
+    assert!(err.0.contains("missing bbox"));
+}
+
+#[test]
 fn preview_validates_property_filter_input() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
