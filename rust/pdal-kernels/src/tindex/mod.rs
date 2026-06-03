@@ -51,7 +51,6 @@ pub struct TindexCreateArgs {
     input_methods: u8,
     filelists: Vec<String>,
     pub skip_different_srs: bool,
-    unsupported_input: bool,
 }
 
 impl Default for TindexCreateArgs {
@@ -75,7 +74,6 @@ impl Default for TindexCreateArgs {
             input_methods: 0,
             filelists: Vec::new(),
             skip_different_srs: false,
-            unsupported_input: false,
         }
     }
 }
@@ -83,7 +81,6 @@ impl Default for TindexCreateArgs {
 #[derive(Debug, PartialEq, Eq)]
 pub enum TindexParseResult {
     Error(String),
-    Unsupported,
 }
 
 #[derive(Clone, Debug)]

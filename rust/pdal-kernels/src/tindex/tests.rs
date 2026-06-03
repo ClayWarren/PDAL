@@ -434,12 +434,14 @@ fn merge_rejects_bad_arguments() {
         );
     }
 
-    let Err(unsupported) =
+    let Err(unknown) =
         parse_tindex_merge_args(&strings(&["idx.geojson", "out.las", "--unsupported"]))
     else {
-        panic!("expected unsupported merge option");
+        panic!("expected unknown merge option");
     };
-    assert_eq!(unsupported, TindexParseResult::Unsupported);
+    assert!(
+        matches!(unknown, TindexParseResult::Error(message) if message.contains("unknown tindex merge option"))
+    );
 }
 
 #[test]

@@ -51,7 +51,9 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
             }
             _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--") => {
-                return Err(TindexParseResult::Unsupported);
+                return Err(TindexParseResult::Error(format!(
+                    "unknown tindex merge option '{arg}'"
+                )));
             }
             _ if tindex_file.is_none() => tindex_file = Some(arg.clone()),
             _ if output_file.is_none() => output_file = Some(arg.clone()),

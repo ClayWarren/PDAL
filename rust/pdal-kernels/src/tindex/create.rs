@@ -153,9 +153,6 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
             "Can't specify both --write_absolute_path and --path_prefix options.".to_string(),
         ));
     }
-    if parsed.unsupported_input {
-        return Err(TindexParseResult::Unsupported);
-    }
     for path in &parsed.filelists {
         parsed.files.extend(read_filelist(path)?);
     }
@@ -261,7 +258,11 @@ fn read_glob(pattern: &str) -> Result<Vec<String>, TindexParseResult> {
     for entry in entries {
         match entry {
             Ok(path) => files.push(path.to_string_lossy().into_owned()),
-            Err(_) => return Err(TindexParseResult::Unsupported),
+            Err(err) => {
+                return Err(TindexParseResult::Error(format!(
+                    "glob pattern '{pattern}' failed: {err}"
+                )));
+            }
         }
     }
     if files.is_empty() {

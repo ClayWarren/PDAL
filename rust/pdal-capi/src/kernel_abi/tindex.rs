@@ -60,7 +60,6 @@ fn run_create(args: &[String]) -> i32 {
             eprintln!("PDAL: kernels.tindex: {message}");
             return 1;
         }
-        Err(TindexParseResult::Unsupported) => return -1,
     };
 
     if args.tindex_file == "/vsistdout/" {

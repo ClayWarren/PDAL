@@ -13,7 +13,6 @@ pub(super) fn run_merge(args: &[String]) -> i32 {
             eprintln!("PDAL: kernels.tindex: {message}");
             return 1;
         }
-        Err(ParseResult::Unsupported) => return -1,
     };
 
     let index_json = match std::fs::read_to_string(&args.tindex_file) {
@@ -37,7 +36,6 @@ pub(super) fn run_merge(args: &[String]) -> i32 {
             eprintln!("PDAL: kernels.tindex: {message}");
             return 1;
         }
-        Err(ParseResult::Unsupported) => return -1,
     };
     println!("Merge filecount: {}", plan.file_count);
     execute_pipeline(plan.pipeline_json)
