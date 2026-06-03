@@ -2,7 +2,7 @@ use super::ReaderArgs;
 use crate::source;
 use crate::tindex::resolve_location;
 use chrono::{DateTime, FixedOffset};
-use pdal_core::ogr_spec::parse_ogr_spec_json;
+use pdal_core::ogr_spec::{parse_ogr_spec_json, OgrSpecOptions};
 use pdal_core::options::Options;
 use pdal_core::stage::StageError;
 use pdal_native::geometry::Geometry;
@@ -384,14 +384,25 @@ pub(super) fn parse_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> 
 pub(super) fn parse_ogr_bounds(value: &str) -> Result<Option<Bounds2D>, StageError> {
     let spec = parse_ogr_spec_json(value).map_err(StageError)?;
     let id_filter = ogr_sql_id_filter(&spec.sql);
+    if should_use_native_ogr_bounds(&spec, id_filter) {
+        return parse_native_ogr_bounds(&spec, id_filter);
+    }
     match source::read_to_string(&spec.datasource) {
         Ok(text) => match parse_geojson_ogr_bounds(&spec.datasource, &text, id_filter) {
             Ok(bounds) => Ok(bounds),
-            Err(json_err) => parse_native_ogr_bounds(&spec.datasource, id_filter).or(Err(json_err)),
+            Err(json_err) => parse_native_ogr_bounds(&spec, id_filter).or(Err(json_err)),
         },
-        Err(text_err) => parse_native_ogr_bounds(&spec.datasource, id_filter)
+        Err(text_err) => parse_native_ogr_bounds(&spec, id_filter)
             .map_err(|ogr_err| StageError(format!("{text_err}; {ogr_err}"))),
     }
+}
+
+fn should_use_native_ogr_bounds(spec: &OgrSpecOptions, id_filter: Option<i64>) -> bool {
+    !spec.layer.is_empty()
+        || !spec.drivers.is_empty()
+        || !spec.open_options.is_empty()
+        || !spec.dialect.is_empty()
+        || sql_needs_native_execution(&spec.sql, id_filter)
 }
 
 fn parse_geojson_ogr_bounds(
@@ -428,11 +439,29 @@ fn parse_geojson_ogr_bounds(
 }
 
 fn parse_native_ogr_bounds(
-    datasource: &str,
+    spec: &OgrSpecOptions,
     id_filter: Option<i64>,
 ) -> Result<Option<Bounds2D>, StageError> {
-    let vector = pdal_native::gdal::Vector::open(datasource).map_err(StageError)?;
-    let wkts = if let Some(id_filter) = id_filter {
+    let vector = pdal_native::gdal::Vector::open_with_options(
+        &spec.datasource,
+        &spec.drivers,
+        &spec.open_options,
+    )
+    .map_err(StageError)?;
+    let wkts = if sql_needs_native_execution(&spec.sql, id_filter) {
+        let dialect = if spec.dialect.is_empty() {
+            "OGRSQL"
+        } else {
+            &spec.dialect
+        };
+        vector
+            .get_feature_wkts_by_sql(&spec.sql, dialect)
+            .map_err(StageError)?
+    } else if !spec.layer.is_empty() {
+        vector
+            .get_feature_wkts_by_layer(&spec.layer)
+            .map_err(StageError)?
+    } else if let Some(id_filter) = id_filter {
         vector
             .get_features(0, "id")
             .map_err(StageError)?
@@ -458,6 +487,14 @@ fn parse_native_ogr_bounds(
         }
     }
     Ok(out)
+}
+
+fn sql_needs_native_execution(sql: &str, id_filter: Option<i64>) -> bool {
+    !sql.trim().is_empty()
+        && id_filter.is_none()
+        && Regex::new(r"(?i)\bwhere\b")
+            .expect("OGR SQL where regex")
+            .is_match(sql)
 }
 
 pub(super) fn ogr_sql_id_filter(sql: &str) -> Option<i64> {
