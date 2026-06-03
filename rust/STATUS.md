@@ -896,9 +896,8 @@ Known mixed binaries:
 Pipeline JSON can currently construct this command-ready filter subset:
 
 - `approximatecoplanar`
-- `assign` (simple `Dim[range]=value` assignments and the `condition` DimRange;
-  the expression-based `value` option is rejected explicitly, not silently
-  ignored — see the parity gap note below)
+- `assign` (simple `Dim[range]=value` assignments, the `condition` DimRange,
+  and the expression-based `value` option)
 - `chipper`
 - `cluster`
 - `covariancefeatures`
