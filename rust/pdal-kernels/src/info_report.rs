@@ -1,7 +1,9 @@
 use crate::QueryRequest;
 use chrono::NaiveDate;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
-use pdal_core::point::{DimId, DimType, PointId, PointView};
+use pdal_core::point::{Bounds3D, DimId, DimType, PointId, PointView};
+use pdal_core::srs::{SpatialReference, SrsTransform};
+use serde_json::json;
 use std::path::Path;
 
 pub struct InfoDimensionStats {
@@ -188,13 +190,206 @@ pub fn stac_report(
         return "{\n  \"stac\":\n  {\n    \"message\": \"Failed to create STAC Feature with missing key. 'EPSG:4326'\",\n    \"status\": \"error\"\n  }\n}\n".to_string();
     }
 
-    format!(
-        "{{\n  \"stac\":\n  {{\n    \"properties\":\n    {{\n      \"datetime\": \"{}\",\n      \"pc:count\": {},\n      \"pc:encoding\": \"{}\",\n      \"pc:type\": \"{}\"\n    }}\n  }}\n}}\n",
-        stac_datetime(metadata),
-        views.iter().map(PointView::len).sum::<u64>(),
-        stac_encoding(filename),
-        pc_type
-    )
+    let Some(bounds) = aggregate_bounds_3d(views) else {
+        return "{\n  \"stac\":\n  {\n    \"message\": \"Failed to create STAC Feature with missing key. 'bbox'\",\n    \"status\": \"error\"\n  }\n}\n".to_string();
+    };
+    let source_srs = views
+        .iter()
+        .map(PointView::spatial_reference)
+        .find(|srs| !srs.is_empty())
+        .map(|srs| srs.wkt())
+        .unwrap_or("");
+    let projected = stac_projected_geometry(&bounds, source_srs);
+    let (wkt2, projjson) = stac_projection_metadata(source_srs);
+    let mut properties = json!({
+        "datetime": stac_datetime(metadata),
+        "pc:count": views.iter().map(PointView::len).sum::<u64>(),
+        "pc:encoding": stac_encoding(filename),
+        "pc:type": pc_type,
+        "pc:schemas": stac_schema_json(views),
+        "pc:statistics": stac_statistics_json(views),
+        "proj:bbox": source_bbox_json(&bounds),
+        "proj:geometry": source_geometry_json(&bounds),
+        "proj:wkt2": wkt2,
+    });
+    if !projjson.is_null() {
+        properties["proj:projjson"] = projjson;
+    }
+    let value = json!({
+        "stac": {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "stac_extensions": [
+                "https://stac-extensions.github.io/pointcloud/v1.0.0/schema.json",
+                "https://stac-extensions.github.io/projection/v1.1.0/schema.json"
+            ],
+            "id": stac_id(filename),
+            "bbox": projected.bbox,
+            "geometry": projected.geometry,
+            "properties": properties,
+            "assets": {
+                "data": {
+                    "href": filename,
+                    "title": "Pointcloud data"
+                }
+            },
+            "links": [
+                {
+                    "href": filename,
+                    "rel": "derived_from"
+                }
+            ]
+        }
+    });
+    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+}
+
+struct StacProjectedGeometry {
+    bbox: serde_json::Value,
+    geometry: serde_json::Value,
+}
+
+fn aggregate_bounds_3d(views: &[PointView]) -> Option<Bounds3D> {
+    views
+        .iter()
+        .filter_map(PointView::calculate_bounds_3d)
+        .fold(None, |acc, bounds| {
+            Some(match acc {
+                Some(existing) => Bounds3D {
+                    minx: existing.minx.min(bounds.minx),
+                    maxx: existing.maxx.max(bounds.maxx),
+                    miny: existing.miny.min(bounds.miny),
+                    maxy: existing.maxy.max(bounds.maxy),
+                    minz: existing.minz.min(bounds.minz),
+                    maxz: existing.maxz.max(bounds.maxz),
+                },
+                None => bounds,
+            })
+        })
+}
+
+fn stac_projected_geometry(bounds: &Bounds3D, source_srs: &str) -> StacProjectedGeometry {
+    let source_corners = [
+        (bounds.minx, bounds.miny, bounds.minz),
+        (bounds.minx, bounds.maxy, bounds.minz),
+        (bounds.maxx, bounds.maxy, bounds.maxz),
+        (bounds.maxx, bounds.miny, bounds.maxz),
+        (bounds.minx, bounds.miny, bounds.minz),
+    ];
+    let mut projected = source_corners;
+    if let Ok(transform) = SrsTransform::new(
+        &SpatialReference::new(source_srs),
+        &SpatialReference::new("EPSG:4326"),
+    ) {
+        for (x, y, z) in &mut projected {
+            let _ = transform.transform(x, y, z);
+        }
+    }
+    let mut minx = f64::INFINITY;
+    let mut maxx = f64::NEG_INFINITY;
+    let mut miny = f64::INFINITY;
+    let mut maxy = f64::NEG_INFINITY;
+    let mut minz = f64::INFINITY;
+    let mut maxz = f64::NEG_INFINITY;
+    for (x, y, z) in &projected {
+        minx = minx.min(*x);
+        maxx = maxx.max(*x);
+        miny = miny.min(*y);
+        maxy = maxy.max(*y);
+        minz = minz.min(*z);
+        maxz = maxz.max(*z);
+    }
+    StacProjectedGeometry {
+        bbox: json!([minx, miny, minz, maxx, maxy, maxz]),
+        geometry: json!({
+            "type": "Polygon",
+            "coordinates": [projected.iter().map(|(x, y, z)| json!([x, y, z])).collect::<Vec<_>>()],
+        }),
+    }
+}
+
+fn source_bbox_json(bounds: &Bounds3D) -> serde_json::Value {
+    json!([
+        bounds.minx,
+        bounds.miny,
+        bounds.minz,
+        bounds.maxx,
+        bounds.maxy,
+        bounds.maxz
+    ])
+}
+
+fn source_geometry_json(bounds: &Bounds3D) -> serde_json::Value {
+    json!({
+        "type": "Polygon",
+        "coordinates": [[
+            [bounds.minx, bounds.miny, bounds.minz],
+            [bounds.minx, bounds.maxy, bounds.minz],
+            [bounds.maxx, bounds.maxy, bounds.maxz],
+            [bounds.maxx, bounds.miny, bounds.maxz],
+            [bounds.minx, bounds.miny, bounds.minz],
+        ]]
+    })
+}
+
+fn stac_schema_json(views: &[PointView]) -> serde_json::Value {
+    let Some(view) = views.first() else {
+        return json!([]);
+    };
+    let layout = view.layout();
+    json!((0..layout.dim_count())
+        .filter_map(|idx| {
+            layout.dim_at(idx).map(|(dim, ty)| {
+                json!({
+                    "name": dim.name(),
+                    "size": ty.size(),
+                    "type": dim_type_name(ty),
+                })
+            })
+        })
+        .collect::<Vec<_>>())
+}
+
+fn stac_statistics_json(views: &[PointView]) -> serde_json::Value {
+    json!(dimension_stats(views, None, None)
+        .into_iter()
+        .enumerate()
+        .map(|(position, stat)| {
+            json!({
+                "average": stat.average,
+                "count": stat.count,
+                "maximum": stat.maximum,
+                "minimum": stat.minimum,
+                "name": stat.name,
+                "position": position,
+                "stddev": stat.stddev,
+                "variance": stat.variance,
+            })
+        })
+        .collect::<Vec<_>>())
+}
+
+fn stac_projection_metadata(source_srs: &str) -> (String, serde_json::Value) {
+    if let Ok(input) = pdal_native::srs::user_input_to_wkt(source_srs) {
+        let projjson = serde_json::from_str(&input.projjson).unwrap_or(serde_json::Value::Null);
+        return (input.wkt2, projjson);
+    }
+    let wkt2 =
+        pdal_native::srs::wkt_to_wkt2(source_srs, 0.0).unwrap_or_else(|_| source_srs.to_string());
+    let projjson = pdal_native::srs::wkt_to_projjson(source_srs, 0.0)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or(serde_json::Value::Null);
+    (wkt2, projjson)
+}
+
+fn stac_id(filename: &str) -> String {
+    Path::new(filename)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or(filename)
+        .to_string()
 }
 
 fn dimension_stats(
@@ -597,27 +792,30 @@ mod tests {
 
     #[test]
     fn stac_report_defaults_datetime_and_unknown_extension() {
-        let layout = Rc::new(PointLayout::new());
-        let mut view = PointView::new(layout);
+        let mut view = sample_view();
         view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
-        view.add_point();
 
         let report = stac_report(&[view], &MetadataNode::new("root"), "sample", "lidar");
         let json: serde_json::Value = serde_json::from_str(&report).unwrap();
 
+        assert_eq!(json["stac"]["type"], "Feature");
+        assert_eq!(json["stac"]["geometry"]["type"], "Polygon");
+        assert_eq!(json["stac"]["bbox"].as_array().unwrap().len(), 6);
         assert_eq!(
             json["stac"]["properties"]["datetime"],
             "1970-01-01T00:00:00Z"
         );
         assert_eq!(json["stac"]["properties"]["pc:encoding"], "?");
+        assert_eq!(json["stac"]["properties"]["pc:schemas"][0]["name"], "X");
+        assert_eq!(json["stac"]["properties"]["pc:statistics"][0]["name"], "X");
+        assert_eq!(json["stac"]["properties"]["proj:bbox"][0], 1.0);
+        assert_eq!(json["stac"]["assets"]["data"]["href"], "sample");
     }
 
     #[test]
     fn stac_report_uses_requested_pointcloud_type() {
-        let layout = Rc::new(PointLayout::new());
-        let mut view = PointView::new(layout);
+        let mut view = sample_view();
         view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
-        view.add_point();
 
         let report = stac_report(&[view], &MetadataNode::new("root"), "sample.las", "sonar");
         let json: serde_json::Value = serde_json::from_str(&report).unwrap();
@@ -627,10 +825,8 @@ mod tests {
 
     #[test]
     fn stac_report_uses_las_creation_day() {
-        let layout = Rc::new(PointLayout::new());
-        let mut view = PointView::new(layout);
+        let mut view = sample_view();
         view.set_spatial_reference(SpatialReference::new("EPSG:4326"));
-        view.add_point();
         let mut metadata = MetadataNode::new("root");
         metadata.add_value("creation_year", MetadataValue::U64(2026));
         metadata.add_value("creation_doy", MetadataValue::U64(32));

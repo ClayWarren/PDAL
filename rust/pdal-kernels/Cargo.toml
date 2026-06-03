@@ -9,4 +9,5 @@ description = "CLI kernels for the PDAL Rust port."
 chrono = "0.4"
 glob = "0.3"
 pdal-core = { path = "../pdal-core" }
+pdal-native = { path = "../pdal-native" }
 serde_json = "1"

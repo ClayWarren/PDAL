@@ -1107,6 +1107,7 @@ dependencies = [
  "chrono",
  "glob",
  "pdal-core",
+ "pdal-native",
  "serde_json",
 ]
 
