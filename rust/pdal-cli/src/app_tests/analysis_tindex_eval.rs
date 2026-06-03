@@ -106,7 +106,8 @@ fn tile_errors_on_option_missing_value() {
 
 #[test]
 fn tile_accepts_options_with_equals() {
-    // Tile with bad input/output (still triggers parse path success then fails on pdal_tile)
+    // Bad input/output still proves the equals-form parse succeeds and reaches
+    // the Rust-backed tile runner, which reports the missing input as an error.
     let app = app_with_command(
         "tile",
         &[
@@ -118,8 +119,7 @@ fn tile_accepts_options_with_equals() {
             "/tmp/out#.las",
         ],
     );
-    // pdal_tile will return -1; we accept the error path
-    let _ = app.run_tile();
+    assert_eq!(app.run_tile(), 1);
 }
 
 #[test]

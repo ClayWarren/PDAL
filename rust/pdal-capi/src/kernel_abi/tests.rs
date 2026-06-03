@@ -278,8 +278,7 @@ fn rust_kernel_run_rejects_ground_unknown_option() {
 
     let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
 
-    // Unknown options now error in the Rust runner instead of returning the -1
-    // C++ fallback sentinel.
+    // Unknown options are reported by the Rust runner.
     assert_eq!(result, 1);
 }
 
@@ -527,9 +526,8 @@ fn rust_kernel_run_reports_tindex_missing_subcommand() {
     assert_eq!(result, 1);
 }
 
-/// Rich-boundary tindex options used to fall back to C++. The Rust hexer
-/// port now handles them, so we expect a real attempt (and a 1 from the
-/// missing input file) rather than the legacy -1 Unsupported sentinel.
+/// Rich-boundary tindex options are Rust-owned; the missing input file is the
+/// error source here, not option dispatch.
 #[test]
 fn rust_kernel_run_handles_tindex_rich_boundary_options() {
     let name = CString::new("tindex").unwrap();
