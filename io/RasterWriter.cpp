@@ -62,13 +62,6 @@ void addOption(pdal_options_t* options, const std::string& key,
     pdal_options_add_str(options, key.c_str(), value.c_str());
 }
 
-void addOption(pdal_options_t* options, const std::string& key,
-               Dimension::Type value)
-{
-    pdal_options_add_str(options, key.c_str(),
-                         Dimension::interpretationName(value).c_str());
-}
-
 void addOption(pdal_options_t* options, const std::string& key, double value)
 {
     pdal_options_add_f64(options, key.c_str(), value);
@@ -94,7 +87,7 @@ void RasterWriter::addArgs(ProgramArgs& args)
     args.add("data_type",
              "Data type for output grid ('int8', 'uint64', "
              "'float', etc.)",
-             m_dataType, Dimension::Type::Double);
+             m_dataType, "double");
     // Nan is a sentinal value to say that no value was set for nodata.
     args.add("nodata", "No data value", m_noData,
              std::numeric_limits<double>::quiet_NaN());

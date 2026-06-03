@@ -57,7 +57,7 @@ private:
     std::string m_drivername;
     StringList m_options;
     StringList m_rasterNames;
-    Dimension::Type m_dataType;
+    std::string m_dataType;
     double m_noData;
     std::vector<pdal_point_view_t*> m_rustViews;
 };

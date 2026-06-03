@@ -1,5 +1,6 @@
 //! `writers.raster` -- write raster attachments from point views.
 
+use pdal_core::gdal::RasterDataType;
 use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_core::options::Options;
 use pdal_core::pipeline::Writer;
@@ -11,15 +12,20 @@ pub struct RasterWriter {
     filename: String,
     driver_name: String,
     raster_names: Vec<String>,
+    data_type: RasterDataType,
+    data_type_error: Option<String>,
     no_data: f64,
 }
 
 impl RasterWriter {
     pub fn new(options: &Options) -> Self {
+        let (data_type, data_type_error) = parse_data_type(&options.get_str("data_type", "double"));
         Self {
             filename: options.get_str("filename", ""),
             driver_name: options.get_str("gdaldriver", "GTiff"),
             raster_names: raster_names(options),
+            data_type,
+            data_type_error,
             no_data: options.get_f64("nodata", f64::NAN),
         }
     }
@@ -35,6 +41,9 @@ impl Writer for RasterWriter {
             return Err(StageError(
                 "RasterWriter requires a filename option.".to_string(),
             ));
+        }
+        if let Some(error) = &self.data_type_error {
+            return Err(StageError(error.clone()));
         }
 
         let rasters = self.collect_rasters(views)?;
@@ -66,7 +75,7 @@ impl Writer for RasterWriter {
             .unwrap_or_default();
 
         pdal_core::gdal::register_drivers();
-        let mut output = pdal_core::gdal::Raster::create_float64(
+        let mut output = pdal_core::gdal::Raster::create_typed(
             &self.filename,
             &self.driver_name,
             limits.width as i32,
@@ -74,6 +83,7 @@ impl Writer for RasterWriter {
             rasters.len() as i32,
             geo_transform,
             &srs_wkt,
+            self.data_type,
         )
         .map_err(StageError)?;
 
@@ -161,6 +171,27 @@ fn raster_names(options: &Options) -> Vec<String> {
         .filter(|value| !value.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+fn parse_data_type(value: &str) -> (RasterDataType, Option<String>) {
+    match value.to_ascii_lowercase().as_str() {
+        "double" | "float64" => (RasterDataType::Float64, None),
+        "float" | "float32" => (RasterDataType::Float32, None),
+        "int8" | "signed8" => (RasterDataType::Int8, None),
+        "uint8" | "unsigned8" | "byte" => (RasterDataType::UInt8, None),
+        "int16" | "int16_t" | "signed16" => (RasterDataType::Int16, None),
+        "uint16" | "uint16_t" | "unsigned16" => (RasterDataType::UInt16, None),
+        "int32" | "int32_t" | "signed32" | "int" => (RasterDataType::Int32, None),
+        "uint32" | "uint32_t" | "unsigned32" => (RasterDataType::UInt32, None),
+        "int64" | "int64_t" | "signed64" => (RasterDataType::Int64, None),
+        "uint64" | "uint64_t" | "unsigned64" => (RasterDataType::UInt64, None),
+        other => (
+            RasterDataType::Float64,
+            Some(format!(
+                "Unsupported raster writer data_type '{other}' for the Rust-backed path."
+            )),
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -255,6 +286,37 @@ mod tests {
         let mut values = vec![0.0; 4];
         raster.read_band(2, 2, 2, &mut values).unwrap();
         assert_eq!(values, vec![5.0, 6.0, 7.0, 8.0]);
+    }
+
+    #[test]
+    fn writes_requested_raster_data_type() {
+        let output = temp_path("typed.tif");
+        let view = view_with_raster("", vec![1.0, 2.0, 3.0, 4.0]);
+        let mut options = Options::new();
+        options
+            .add("filename", output.display())
+            .add("data_type", "float");
+        let mut writer = RasterWriter::new(&options);
+
+        writer.write(&[view]).unwrap();
+
+        let raster = pdal_core::gdal::Raster::open(output.to_str().unwrap()).unwrap();
+        assert_eq!(raster.band_type_name(1).unwrap(), "Float32");
+    }
+
+    #[test]
+    fn rejects_unsupported_raster_data_type() {
+        let output = temp_path("bad-type.tif");
+        let view = view_with_raster("", vec![1.0, 2.0, 3.0, 4.0]);
+        let mut options = Options::new();
+        options
+            .add("filename", output.display())
+            .add("data_type", "mystery");
+        let mut writer = RasterWriter::new(&options);
+
+        let err = writer.write(&[view]).unwrap_err();
+
+        assert!(err.0.contains("Unsupported raster writer data_type"));
     }
 
     #[test]

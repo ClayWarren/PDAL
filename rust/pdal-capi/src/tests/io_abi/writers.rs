@@ -248,6 +248,7 @@ fn writer_write_views_passes_multiple_views_through_c_abi() {
             ("filename", filename_text.as_str()),
             ("gdaldriver", "GTiff"),
             ("rasters", "a,b"),
+            ("data_type", "float"),
         ] {
             let key = CString::new(key).unwrap();
             let value = CString::new(value).unwrap();
@@ -306,6 +307,7 @@ fn writer_write_views_passes_multiple_views_through_c_abi() {
 
         let raster = pdal_core::gdal::Raster::open(&filename_text).unwrap();
         assert_eq!(raster.band_count(), 2);
+        assert_eq!(raster.band_type_name(1).unwrap(), "Float32");
         let mut values = [0.0];
         raster.read_band(2, 1, 1, &mut values).unwrap();
         assert_eq!(values[0], 20.0);

@@ -37,6 +37,7 @@
 #include <pdal/StageFactory.hpp>
 #include <pdal/private/Raster.hpp>
 #include <pdal/private/gdal/Raster.hpp>
+#include <pdal/util/FileUtils.hpp>
 
 #include "Support.hpp"
 
@@ -69,6 +70,7 @@ TEST(FaceRasterTest, basic)
     f.setOptions(fo);
 
     const std::string output_file = Support::temppath("test.tif");
+    FileUtils::deleteFile(output_file);
 
     Options wo;
     wo.add("filename", output_file);
@@ -128,6 +130,7 @@ TEST(FaceRasterTest, numerical_imprecision)
     f.setOptions(fo);
 
     const std::string output_file = Support::temppath("test.tif");
+    FileUtils::deleteFile(output_file);
 
     Options wo;
     wo.add("filename", output_file);
