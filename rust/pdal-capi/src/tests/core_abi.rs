@@ -284,6 +284,15 @@ fn stage_extensions_custom_mappings_roundtrip_through_c_abi() {
 #[test]
 fn config_helpers_roundtrip_through_c_abi() {
     unsafe {
+        assert_eq!(pdal_capi_abi_version_major(), 0);
+        assert_eq!(pdal_capi_abi_version_minor(), 1);
+        assert_eq!(pdal_capi_abi_version_patch(), 0);
+        assert_eq!(
+            pdal_capi_abi_version(),
+            pdal_capi_abi_version_major() * 1_000_000
+                + pdal_capi_abi_version_minor() * 1_000
+                + pdal_capi_abi_version_patch()
+        );
         assert_eq!(pdal_config_version_integer(2, 10, 1), 21001);
 
         let version = CString::new("2.10.1").unwrap();

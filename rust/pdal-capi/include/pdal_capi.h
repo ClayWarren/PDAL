@@ -6,6 +6,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define PDAL_CAPI_ABI_VERSION_MAJOR 0u
+#define PDAL_CAPI_ABI_VERSION_MINOR 1u
+#define PDAL_CAPI_ABI_VERSION_PATCH 0u
+#define PDAL_CAPI_ABI_VERSION                                                \
+    ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                              \
+     (PDAL_CAPI_ABI_VERSION_MINOR * 1000u) + PDAL_CAPI_ABI_VERSION_PATCH)
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -150,6 +157,10 @@ extern "C"
     void pdal_stage_extensions_destroy(pdal_stage_extensions_t* extensions);
 
     // Config
+    uint32_t pdal_capi_abi_version_major(void);
+    uint32_t pdal_capi_abi_version_minor(void);
+    uint32_t pdal_capi_abi_version_patch(void);
+    uint32_t pdal_capi_abi_version(void);
     int32_t pdal_config_version_integer(int32_t major, int32_t minor,
                                         int32_t patch);
     char* pdal_config_full_version_string(const char* version, const char* sha);
