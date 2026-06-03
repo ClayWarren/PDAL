@@ -165,6 +165,24 @@ impl Filter for CropFilter {
 
         Ok(outputs)
     }
+
+    fn streamable(&self) -> bool {
+        true
+    }
+
+    fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
+        let mut write = 0;
+        for read in 0..chunk.len() {
+            if self.process_one(chunk, read) {
+                if write != read {
+                    chunk.copy_point_within(read, write);
+                }
+                write += 1;
+            }
+        }
+        chunk.truncate(write);
+        Ok(())
+    }
 }
 
 impl Streamable for CropFilter {
@@ -357,6 +375,57 @@ mod tests {
         assert!(!filter.process_one(&mut view, idx));
 
         filter.reset();
+    }
+
+    #[test]
+    fn stream_chunk_matches_single_region_run_one() {
+        let input = view(&[(2.0, 2.0, 0.0), (6.0, 2.0, 0.0)]);
+        let mut standard = CropFilter::new(
+            false,
+            vec![(1.0, 1.0, f64::NEG_INFINITY, 3.0, 3.0, f64::INFINITY)],
+            vec![],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+        let expected = standard.run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input;
+        let mut streamed = CropFilter::new(
+            false,
+            vec![(1.0, 1.0, f64::NEG_INFINITY, 3.0, 3.0, f64::INFINITY)],
+            vec![],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+        streamed.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), expected.len());
+        assert_eq!(chunk.get_f64(0, &DimId::X), expected.get_f64(0, &DimId::X));
+    }
+
+    #[test]
+    fn stream_chunk_uses_union_of_crop_regions() {
+        let input = view(&[(2.0, 2.0, 0.0), (6.0, 2.0, 0.0), (10.0, 10.0, 0.0)]);
+        let mut filter = CropFilter::new(
+            false,
+            vec![
+                (1.0, 1.0, f64::NEG_INFINITY, 3.0, 3.0, f64::INFINITY),
+                (5.0, 1.0, f64::NEG_INFINITY, 7.0, 3.0, f64::INFINITY),
+            ],
+            vec![],
+            vec![],
+            0.0,
+        )
+        .unwrap();
+
+        let mut chunk = input;
+        filter.stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), 2);
+        assert_eq!(chunk.get_f64(0, &DimId::X), 2.0);
+        assert_eq!(chunk.get_f64(1, &DimId::X), 6.0);
     }
 
     #[test]

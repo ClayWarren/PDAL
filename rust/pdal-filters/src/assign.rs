@@ -173,7 +173,7 @@ impl Filter for AssignFilter {
     }
 
     fn streamable(&self) -> bool {
-        self.value_assignments.is_empty()
+        true
     }
 
     fn stream_chunk(&mut self, chunk: &mut PointView) -> Result<(), StageError> {
@@ -309,6 +309,41 @@ mod tests {
         assert_eq!(output.get_f64(0, &DimId::Classification), 1.0);
         assert_eq!(output.get_f64(1, &DimId::Classification), 10.0);
         assert_eq!(output.get_f64(2, &DimId::Classification), 20.0);
+    }
+
+    #[test]
+    fn value_expression_stream_chunk_matches_run_one() {
+        let make_filter = || {
+            AssignFilter::with_value_expressions(
+                None,
+                Vec::new(),
+                &[
+                    "Y = X * 2".to_string(),
+                    "Classification = Y WHERE X >= 5".to_string(),
+                ],
+            )
+            .unwrap()
+        };
+
+        let input = view(&[1.0, 5.0, 10.0]).with_dimensions(&make_filter().output_dimensions());
+        assert!(make_filter().streamable());
+
+        let standard = make_filter().run_one(&input).unwrap().remove(0);
+
+        let mut chunk = input.clone();
+        make_filter().stream_chunk(&mut chunk).unwrap();
+
+        assert_eq!(chunk.len(), standard.len());
+        for idx in 0..chunk.len() {
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::Y),
+                standard.get_f64(idx, &DimId::Y)
+            );
+            assert_eq!(
+                chunk.get_f64(idx, &DimId::Classification),
+                standard.get_f64(idx, &DimId::Classification)
+            );
+        }
     }
 
     #[test]
