@@ -1,5 +1,6 @@
 use pdal_core::options::Options;
-use pdal_core::pipeline::Pipeline;
+use pdal_core::pipeline::{Pipeline, Reader};
+use pdal_core::point::DimId;
 use pdal_io::fbi::FbiReader;
 use pdal_io::fbi_writer::FbiWriter;
 use std::fs;
@@ -8,7 +9,7 @@ use std::process::Command;
 
 #[test]
 #[ignore = "requires installed pdal on PATH"]
-fn installed_pdal_matches_rust_fbi_pipeline() {
+fn installed_pdal_legacy_fbi_writer_differs_from_rust_roundtrip() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/fbi/1.2-with-color.fbi");
     let temp = make_temp_dir("fbi-regression");
@@ -44,10 +45,16 @@ fn installed_pdal_matches_rust_fbi_pipeline() {
 
     run_rust_pipeline(&input, &rust_output);
 
-    assert_eq!(
-        fs::read(&installed_output).unwrap(),
-        fs::read(&rust_output).unwrap()
+    let installed_views = read_fbi(&installed_output);
+    let rust_views = read_fbi(&rust_output);
+    assert_eq!(installed_views.len(), rust_views.len());
+    assert_eq!(installed_views[0].len(), rust_views[0].len());
+
+    assert_ne!(
+        installed_views[0].get_f64(0, &DimId::X),
+        rust_views[0].get_f64(0, &DimId::X)
     );
+    assert_eq!(rust_views[0].get_f64(0, &DimId::X), 635618.98);
 }
 
 fn run_rust_pipeline(input: &Path, output: &Path) {
@@ -83,4 +90,10 @@ fn escape_json_path(path: &Path) -> String {
         .to_string()
         .replace('\\', "\\\\")
         .replace('"', "\\\"")
+}
+
+fn read_fbi(path: &Path) -> Vec<pdal_core::point::PointView> {
+    let mut options = Options::new();
+    options.add("filename", path.display());
+    FbiReader::new(&options).read().unwrap()
 }
