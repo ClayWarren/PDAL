@@ -43,7 +43,7 @@ pub fn build_translate_plan(args: &[String]) -> TranslateKernelPlan {
         eprintln!("PDAL: kernels.translate: Cannot set both --filter options and --json options");
         return TranslateKernelPlan::Return(1);
     }
-    if input == output && !parsed.overwrite {
+    if input.eq_ignore_ascii_case(&output) && !parsed.overwrite {
         eprintln!(
             "PDAL: kernels.translate: Input and output filenames are equal and no --overwrite option was provided!"
         );
@@ -456,6 +456,12 @@ mod tests {
     #[test]
     fn rejects_same_input_output_without_overwrite() {
         let args = vec!["same.las".to_string(), "same.las".to_string()];
+        assert!(matches!(
+            build_translate_plan(&args),
+            TranslateKernelPlan::Return(1)
+        ));
+
+        let args = vec!["SAME.las".to_string(), "same.las".to_string()];
         assert!(matches!(
             build_translate_plan(&args),
             TranslateKernelPlan::Return(1)
