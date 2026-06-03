@@ -8,8 +8,7 @@
 //! C++ streaming-wrapper materialization are supported for the existing parity
 //! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
 //! Same-SRS, transformed-bounds, origin, local polygon, and local GeoJSON OGR
-//! point-count preview are Rust-backed; transformed preview bounds clipping
-//! remains outside this module's current contract.
+//! point-count preview are Rust-backed.
 
 use crate::source;
 use crate::tindex::append_view;
@@ -29,7 +28,9 @@ use std::io::Cursor;
 use std::path::Path;
 use std::rc::Rc;
 
+mod srs;
 mod support;
+pub use srs::ept_srs_wkt;
 use support::*;
 
 pub struct EptReader {
@@ -138,7 +139,7 @@ impl Reader for EptReader {
         // materialized. Serialized into metadata so the C++ wrapper can rebuild
         // an `ept::Artifact` for downstream stages like `writers.ept_addon`.
         let mut artifact_tiles: Vec<(u32, u32, u32, u32, u64, u32)> = Vec::new();
-        let srs = info["srs"]["wkt"].as_str().unwrap_or("");
+        let srs = ept_srs_wkt(&info)?.unwrap_or_default();
         let origin = self.origin_filter(Path::new(&root))?;
         let tile_count = tiles.len();
         for tile in tiles {
@@ -154,9 +155,9 @@ impl Reader for EptReader {
                 options.add("filename", path.as_str());
                 crate::las::LasReader::new(&options).read()
             } else if data_type == "zstandard" {
-                read_zstandard_tile(Path::new(&path), &schema, srs).map(|view| vec![view])
+                read_zstandard_tile(Path::new(&path), &schema, &srs).map(|view| vec![view])
             } else {
-                read_binary_tile(Path::new(&path), &schema, srs).map(|view| vec![view])
+                read_binary_tile(Path::new(&path), &schema, &srs).map(|view| vec![view])
             };
             let views = match views {
                 Ok(views) => views,
@@ -266,7 +267,7 @@ impl Reader for EptReader {
         // mis-treat a clean ignore_unreadable run as a reader failure.
         let merged = merged.unwrap_or_else(|| {
             let mut view = PointView::new(Rc::clone(&schema.layout));
-            view.set_spatial_reference(SpatialReference::new(srs));
+            view.set_spatial_reference(SpatialReference::new(&srs));
             view
         });
         Ok(vec![merged])
@@ -320,7 +321,7 @@ pub fn read_ept_preview_with_reader_options(options: &Options) -> Result<EptPrev
     let polygons = reader.polygon_filters()?;
     let (bounds_conforming, point_count) =
         preview_bounds_and_point_count(&reader, &info, bounds_conforming, &polygons)?;
-    let srs_wkt = info["srs"]["wkt"].as_str().unwrap_or("").to_string();
+    let srs_wkt = ept_srs_wkt(&info)?.unwrap_or_default();
 
     let data_type = info["dataType"].as_str().ok_or_else(|| {
         StageError(format!(
@@ -412,97 +413,6 @@ fn preview_bounds_and_point_count(
     )?;
     let count = tiles.iter().map(|tile| tile.expected_points).sum();
     Ok((bounds_conforming, count))
-}
-
-/// Build the SRS WKT/user-input string from an EPT info `srs` object, matching
-/// the C++ `EptInfo::initialize()` rules. Returns `Ok(None)` when no usable
-/// `srs` is present (missing, null, or an empty object), otherwise the string
-/// that should be handed to `SpatialReference::set`.
-pub fn ept_srs_wkt(info: &Value) -> Result<Option<String>, StageError> {
-    let srs = match info.get("srs") {
-        Some(srs) => srs,
-        None => return Ok(None),
-    };
-    // C++ treats a null or empty srs as "no srs" (`iSrs->size()` is falsy).
-    let is_empty = srs.is_null()
-        || srs.as_object().map(|o| o.is_empty()).unwrap_or(false)
-        || srs.as_array().map(|a| a.is_empty()).unwrap_or(false);
-    if is_empty {
-        return Ok(None);
-    }
-
-    if let Some(wkt) = srs.get("wkt") {
-        let wkt = wkt.as_str().ok_or_else(|| {
-            StageError(format!(
-                "srs.wkt must be specified as a string. Found '{}'.",
-                json_dump(wkt)
-            ))
-        })?;
-        return Ok(Some(wkt.to_string()));
-    }
-
-    let authority = srs.get("authority");
-    let horizontal = srs.get("horizontal");
-    if authority.is_none() || horizontal.is_none() {
-        return Err(StageError(
-            "srs must be defined with at least one of \
-             wkt or both authority and horizontal specifications."
-                .to_string(),
-        ));
-    }
-    let authority = authority.expect("checked above");
-    let horizontal = horizontal.expect("checked above");
-
-    let mut wkt = authority
-        .as_str()
-        .ok_or_else(|| {
-            StageError(format!(
-                "srs.authority must be specified as a string.  Found '{}'.",
-                json_dump(authority)
-            ))
-        })?
-        .to_string();
-
-    let horiz = json_unsigned_or_string(horizontal).ok_or_else(|| {
-        StageError(format!(
-            "srs.horizontal must be specified as a non-negative integer or \
-             equivalent string. Found '{}'.",
-            json_dump(horizontal)
-        ))
-    })?;
-    wkt.push(':');
-    wkt.push_str(&horiz);
-
-    if let Some(vertical) = srs.get("vertical") {
-        let vert = json_unsigned_or_string(vertical).ok_or_else(|| {
-            StageError(format!(
-                "srs.vertical must be specified as a non-negative integer or \
-                 equivalent string. Found '{}'.",
-                json_dump(vertical)
-            ))
-        })?;
-        wkt.push('+');
-        wkt.push_str(&vert);
-    }
-
-    Ok(Some(wkt))
-}
-
-/// Accept a non-negative integer (rendered as its decimal string) or an
-/// already-string value, mirroring the C++ `is_number_unsigned()`/`is_string()`
-/// branches.
-fn json_unsigned_or_string(value: &Value) -> Option<String> {
-    if let Some(n) = value.as_u64() {
-        Some(n.to_string())
-    } else {
-        value.as_str().map(|s| s.to_string())
-    }
-}
-
-/// Compact JSON rendering used in error messages, matching nlohmann `dump()`
-/// for the scalar/compound cases EPT srs validation reports.
-fn json_dump(value: &Value) -> String {
-    serde_json::to_string(value).unwrap_or_default()
 }
 
 fn ept_bounds_field(info: &Value, field: &str) -> Result<Bounds3D, StageError> {
@@ -1009,7 +919,7 @@ fn metadata_from_info(info: &Value) -> MetadataNode {
     if let Some(span) = info["span"].as_u64() {
         node.add_value("span", MetadataValue::U64(span));
     }
-    if let Some(wkt) = info["srs"]["wkt"].as_str() {
+    if let Some(wkt) = ept_srs_wkt(info).ok().flatten() {
         node.add_value("srs", MetadataValue::String(wkt.to_string()));
     }
     node

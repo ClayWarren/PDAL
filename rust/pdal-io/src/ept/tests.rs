@@ -18,6 +18,10 @@ struct VsiEptDataset {
 
 impl VsiEptDataset {
     fn new(data_type: &str, tile_bytes: Vec<u8>, extension: &str) -> Self {
+        Self::with_srs(data_type, tile_bytes, extension, "")
+    }
+
+    fn with_srs(data_type: &str, tile_bytes: Vec<u8>, extension: &str, srs_json: &str) -> Self {
         let root = format!("/vsimem/pdal-ept-{}-{data_type}", std::process::id());
         let ept = format!("{root}/ept.json");
         let hierarchy = format!("{root}/ept-hierarchy/0-0-0-0.json");
@@ -27,6 +31,7 @@ impl VsiEptDataset {
   "dataType": "{data_type}",
   "hierarchyType": "json",
   "span": 128,
+  {srs_json}
   "bounds": [0, 0, 0, 1, 1, 1],
   "boundsConforming": [0, 0, 0, 1, 1, 1],
   "points": 1,
@@ -130,6 +135,32 @@ fn reads_vsi_binary_ept() {
     assert_eq!(view.get_f64(0, &DimId::X), 1.0);
     assert_eq!(view.get_f64(0, &DimId::Y), 2.0);
     assert_eq!(view.get_f64(0, &DimId::Z), 3.0);
+}
+
+#[test]
+fn read_uses_authority_srs_when_wkt_is_absent() {
+    let dataset = VsiEptDataset::with_srs(
+        "binary",
+        ept_tile_bytes(),
+        "bin",
+        r#""srs": {"authority": "EPSG", "horizontal": 26915},"#,
+    );
+    let mut options = Options::new();
+    options.add("filename", dataset.ept_json());
+    let mut reader = EptReader::new(&options);
+    let view = reader.read().unwrap().remove(0);
+
+    assert_eq!(view.spatial_reference().wkt(), "EPSG:26915");
+    assert_eq!(
+        reader
+            .metadata()
+            .children()
+            .iter()
+            .find(|node| node.name() == "srs")
+            .and_then(|node| node.value())
+            .map(MetadataValue::as_string),
+        Some("EPSG:26915".to_string())
+    );
 }
 
 #[test]
