@@ -43,6 +43,14 @@ cat >"${CONSUMER_DIR}/main.cpp" <<'CPP'
 int main()
 {
     const char* version = pdal_version_string();
+    if (PDAL_CAPI_ABI_VERSION != pdal_capi_abi_version())
+        return 2;
+    if (PDAL_CAPI_ABI_VERSION_MAJOR != pdal_capi_abi_version_major())
+        return 3;
+    if (PDAL_CAPI_ABI_VERSION_MINOR != pdal_capi_abi_version_minor())
+        return 4;
+    if (PDAL_CAPI_ABI_VERSION_PATCH != pdal_capi_abi_version_patch())
+        return 5;
     pdal_capi_free(nullptr);
     return version ? 0 : 1;
 }
@@ -57,4 +65,19 @@ if [[ -f "${CONSUMER_EXE}.exe" ]]; then
     CONSUMER_EXE="${CONSUMER_EXE}.exe"
 fi
 
-PATH="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/lib:${PATH}" "${CONSUMER_EXE}"
+case "$(uname -s)" in
+    Darwin)
+        DYLD_LIBRARY_PATH="${INSTALL_PREFIX}/lib:${DYLD_LIBRARY_PATH:-}" \
+            PATH="${INSTALL_PREFIX}/bin:${PATH}" \
+            "${CONSUMER_EXE}"
+        ;;
+    Linux)
+        LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH:-}" \
+            PATH="${INSTALL_PREFIX}/bin:${PATH}" \
+            "${CONSUMER_EXE}"
+        ;;
+    *)
+        PATH="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/lib:${PATH}" \
+            "${CONSUMER_EXE}"
+        ;;
+esac
