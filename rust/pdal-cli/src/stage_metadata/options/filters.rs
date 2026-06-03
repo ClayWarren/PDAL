@@ -541,6 +541,22 @@ pub(super) fn options(stage_name: &str) -> Vec<serde_json::Value> {
             option("edge_size", "Deprecated synonym for edge_length.", None),
             option("edge_length", "Length of each hex edge.", None),
             option("density", "Density tessellation output filename.", None),
+            option("boundary", "Boundary polygon output filename.", None),
+            option("ogrdriver", "OGR output driver.", Some(json!("GeoJSON"))),
+            option("lyr_name", "OGR output layer name.", Some(json!("hexbins"))),
+            option(
+                "hole_cull_area_tolerance",
+                "Area tolerance for culling holes.",
+                None,
+            ),
+            option("smooth", "Smooth output polygons.", Some(json!(true))),
+            option("h3_grid", "Create an H3 grid.", Some(json!(false))),
+            option("h3_resolution", "H3 grid resolution.", None),
+            option(
+                "output_tesselation",
+                "Emit raw hex tessellation boundary metadata.",
+                Some(json!(false)),
+            ),
         ],
         "filters.iqr" => vec![
             option(

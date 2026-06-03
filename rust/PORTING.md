@@ -516,8 +516,9 @@ Required shape:
   divergence.
 - All first-party kernel names are Rust-dispatchable through the C ABI for
   scoped workflows. Remaining command work is exact parity breadth: option
-  edge cases, XML fallback boundaries, OGR/update workflows, STAC geometry
-  output, stdout/stderr byte shape, and installed-PDAL regression deltas.
+  edge cases, legacy file/content boundaries, OGR/update workflows, STAC
+  geometry output, stdout/stderr byte shape, and installed-PDAL regression
+  deltas.
 - `pdal-cli` should not grow separate command implementations. It should route
   through the same Rust C ABI kernel runner used by the C++ app/kernel shells.
 - CLI output, exit behavior, and artifacts must be regression-tested against

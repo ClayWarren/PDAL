@@ -42,7 +42,7 @@ pub fn build_density_pipeline(args: &[String]) -> KernelPipelinePlan {
         return append_density_stage(&json, parsed.hexbin_stage);
     }
 
-    if input.ends_with(".json") {
+    if input.ends_with(".json") || input.ends_with(".xml") {
         let json = match std::fs::read_to_string(&input) {
             Ok(json) => json,
             Err(err) => {
@@ -51,10 +51,6 @@ pub fn build_density_pipeline(args: &[String]) -> KernelPipelinePlan {
             }
         };
         return append_density_stage(&json, parsed.hexbin_stage);
-    }
-
-    if input.ends_with(".xml") {
-        return KernelPipelinePlan::Return(-1);
     }
 
     let Some(reader) = parsed
@@ -319,11 +315,19 @@ mod tests {
     }
 
     #[test]
-    fn routes_xml_pipeline_input_to_cpp_fallback() {
-        let args = vec!["in.xml".to_string(), "out.geojson".to_string()];
-        assert!(matches!(
-            build_density_pipeline(&args),
-            KernelPipelinePlan::Return(-1)
-        ));
+    fn treats_xml_extension_as_json_pipeline_input() {
+        let pipeline_file =
+            std::env::temp_dir().join(format!("pdal-density-{}.xml", std::process::id()));
+        std::fs::write(
+            &pipeline_file,
+            r#"{"pipeline":[{"type":"readers.faux","count":1}]}"#,
+        )
+        .unwrap();
+
+        let value = pipeline(&[pipeline_file.to_str().unwrap(), "out.geojson"]);
+        assert_eq!(value["pipeline"][0]["type"], "readers.faux");
+        assert_eq!(value["pipeline"][1]["type"], "filters.hexbin");
+        assert_eq!(value["pipeline"][1]["density"], "out.geojson");
+        let _ = std::fs::remove_file(pipeline_file);
     }
 }
