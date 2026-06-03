@@ -6,6 +6,7 @@ use std::os::raw::c_char;
 pub struct VectorPointWriter {
     ds: OGRDataSourceH,
     layer: OGRLayerH,
+    in_transaction: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -178,7 +179,50 @@ impl VectorPointWriter {
                 return Err("Can't create OGR layer".to_string());
             }
 
-            Ok(Self { ds, layer })
+            let in_transaction = Self::start_transaction(ds);
+
+            Ok(Self {
+                ds,
+                layer,
+                in_transaction,
+            })
+        }
+    }
+
+    pub fn close(mut self) -> Result<(), String> {
+        self.commit_transaction()?;
+        self.destroy();
+        Ok(())
+    }
+
+    fn start_transaction(ds: OGRDataSourceH) -> bool {
+        let capability = b"Transactions\0";
+        unsafe {
+            gdal_sys::OGR_DS_TestCapability(ds, capability.as_ptr().cast()) != 0
+                && gdal_sys::GDALDatasetStartTransaction(ds.cast(), 0)
+                    == gdal_sys::OGRErr::OGRERR_NONE
+        }
+    }
+
+    fn commit_transaction(&mut self) -> Result<(), String> {
+        if self.in_transaction {
+            if unsafe { gdal_sys::GDALDatasetCommitTransaction(self.ds.cast()) }
+                != gdal_sys::OGRErr::OGRERR_NONE
+            {
+                return Err("Failed to commit OGR transaction".to_string());
+            }
+            self.in_transaction = false;
+        }
+        Ok(())
+    }
+
+    fn destroy(&mut self) {
+        if !self.ds.is_null() {
+            unsafe {
+                gdal_sys::OGR_DS_Destroy(self.ds);
+            }
+            self.ds = std::ptr::null_mut();
+            self.layer = std::ptr::null_mut();
         }
     }
 
@@ -416,8 +460,9 @@ impl VectorPointWriter {
 
 impl Drop for VectorPointWriter {
     fn drop(&mut self) {
-        unsafe {
-            gdal_sys::OGR_DS_Destroy(self.ds);
+        if self.in_transaction {
+            let _ = self.commit_transaction();
         }
+        self.destroy();
     }
 }

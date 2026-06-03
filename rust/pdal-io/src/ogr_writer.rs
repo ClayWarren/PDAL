@@ -300,6 +300,7 @@ impl OgrWriter {
                 self.point_count += 1;
             }
         }
+        writer.close().map_err(StageError)?;
         Ok(())
     }
 
@@ -347,6 +348,7 @@ impl OgrWriter {
         if !points.is_empty() {
             writer.write_multipoint(&points).map_err(StageError)?;
         }
+        writer.close().map_err(StageError)?;
         Ok(())
     }
 }
