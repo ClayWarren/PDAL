@@ -139,6 +139,12 @@ fn parse_random_arg<'a>(
             return Err(1);
         }
         parsed.output = Some(value.clone());
+    } else if let Some(value) = arg.strip_prefix("--output=") {
+        if parsed.output.is_some() {
+            eprintln!("PDAL: kernels.random: Unexpected argument '{value}'.");
+            return Err(1);
+        }
+        parsed.output = Some(value.to_string());
     } else if arg.starts_with("--") {
         if !apply_writer_stage_option(arg, &mut parsed.writer_options) {
             eprintln!("PDAL: kernels.random: Unexpected argument '{arg}'.");
@@ -227,6 +233,12 @@ mod tests {
         assert_eq!(value[0]["bounds"], "([1,2],[3,4],[5,6])");
         assert_eq!(value[1]["compression"], true);
         assert_eq!(value[1]["minor_version"], 4);
+    }
+
+    #[test]
+    fn parses_output_equals_form() {
+        let value = pipeline(&["--output=out.laz"]);
+        assert_eq!(value[1]["filename"], "out.laz");
     }
 
     #[test]

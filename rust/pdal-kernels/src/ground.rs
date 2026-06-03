@@ -155,8 +155,12 @@ fn parse_ground_arg<'a>(
 ) -> Result<(), i32> {
     if arg == "--input" || arg == "-i" {
         parsed.input = Some(next_value("--input", iter)?);
+    } else if let Some(value) = arg.strip_prefix("--input=") {
+        parsed.input = Some(value.to_string());
     } else if arg == "--output" || arg == "-o" {
         parsed.output = Some(next_value("--output", iter)?);
+    } else if let Some(value) = arg.strip_prefix("--output=") {
+        parsed.output = Some(value.to_string());
     } else if arg == "--driver" || arg.starts_with("--driver=") {
         parsed.reader_override = Some(value_for(arg, "--driver", iter)?);
     } else if arg == "--label" || arg.starts_with("--label=") {
@@ -320,6 +324,13 @@ mod tests {
                 { "type": "writers.las", "filename": "out.las" },
             ])
         );
+    }
+
+    #[test]
+    fn accepts_input_output_equals_forms() {
+        let value = pipeline(&["--input=in.las", "--output=out.las"]);
+        assert_eq!(value[0]["filename"], "in.las");
+        assert_eq!(value[2]["filename"], "out.las");
     }
 
     #[test]

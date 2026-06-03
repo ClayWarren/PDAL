@@ -126,8 +126,12 @@ impl SplitArgs {
                 origin_y = Some(parse_f64_option("origin_y", next_value(arg, &mut iter)?)?);
             } else if arg == "--input" || arg == "-i" {
                 input = Some(next_value(arg, &mut iter)?.to_string());
+            } else if let Some(value) = arg.strip_prefix("--input=") {
+                input = Some(value.to_string());
             } else if arg == "--output" || arg == "-o" {
                 output = Some(next_value(arg, &mut iter)?.to_string());
+            } else if let Some(value) = arg.strip_prefix("--output=") {
+                output = Some(value.to_string());
             } else if arg == "--driver" {
                 reader_driver = Some(next_value("--driver", &mut iter)?.to_string());
             } else if let Some(value) = arg.strip_prefix("--driver=") {
@@ -251,6 +255,13 @@ mod tests {
         assert_eq!(plan.filter["length"], 100.0);
         assert_eq!(plan.filter["origin_x"], 1.5);
         assert_eq!(plan.filter["origin_y"], 2.5);
+    }
+
+    #[test]
+    fn accepts_input_output_equals_forms() {
+        let plan = plan(&["--input=in.las", "--output=out.las"]);
+        assert_eq!(plan.input, "in.las");
+        assert_eq!(plan.output, PathBuf::from("out.las"));
     }
 
     #[test]

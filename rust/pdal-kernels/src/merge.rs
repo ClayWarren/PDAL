@@ -85,6 +85,8 @@ fn parse_merge_arg<'a>(
         parsed.reader_override = Some(value.to_string());
     } else if arg == "--files" || arg == "-f" {
         parsed.positional.push(next_value(arg, iter)?);
+    } else if let Some(value) = arg.strip_prefix("--files=") {
+        parsed.positional.push(value.to_string());
     } else if arg.starts_with("--") {
         if !apply_writer_stage_option(arg, &mut parsed.writer_options) {
             eprintln!("PDAL: kernels.merge: Unexpected argument '{arg}'.");
@@ -147,6 +149,14 @@ mod tests {
         assert_eq!(value[0]["type"], "readers.text");
         assert_eq!(value[1]["type"], "readers.text");
         assert_eq!(value[3]["minor_version"], 4);
+    }
+
+    #[test]
+    fn accepts_files_equals_form() {
+        let value = pipeline(&["--files=a.las", "--files=b.las", "out.las"]);
+        assert_eq!(value[0]["filename"], "a.las");
+        assert_eq!(value[1]["filename"], "b.las");
+        assert_eq!(value[3]["filename"], "out.las");
     }
 
     #[test]

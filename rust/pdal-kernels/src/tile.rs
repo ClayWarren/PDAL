@@ -103,8 +103,12 @@ fn parse_tile_arg<'a>(
 ) -> Result<(), i32> {
     if arg == "--input" || arg == "-i" {
         parsed.input = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--input=") {
+        parsed.input = Some(value.to_string());
     } else if arg == "--output" || arg == "-o" {
         parsed.output = Some(next_value(arg, iter)?.to_string());
+    } else if let Some(value) = arg.strip_prefix("--output=") {
+        parsed.output = Some(value.to_string());
     } else if let Some(rest) = arg.strip_prefix("--") {
         parse_tile_option(rest, arg, iter, parsed)?;
     } else if parsed.input.is_none() {
@@ -213,6 +217,13 @@ mod tests {
         assert_eq!(plan.origin_y, 2.5);
         assert_eq!(plan.buffer, 3.5);
         assert_eq!(plan.out_srs.as_deref(), Some("EPSG:3857"));
+    }
+
+    #[test]
+    fn accepts_input_output_equals_forms() {
+        let plan = plan(&["--input=in.las", "--output=out#.las"]);
+        assert_eq!(plan.input, "in.las");
+        assert_eq!(plan.output, "out#.las");
     }
 
     #[test]
