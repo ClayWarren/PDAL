@@ -549,6 +549,14 @@ impl Pipeline {
         self.nodes.iter().any(|node| node.kind == StageKind::Reader)
     }
 
+    pub fn roots_are_readers(&self) -> bool {
+        let roots = self.roots();
+        !roots.is_empty()
+            && roots
+                .iter()
+                .all(|&idx| self.nodes[idx].kind == StageKind::Reader)
+    }
+
     pub fn stage(&self, idx: usize) -> Option<&StageNode> {
         self.nodes.get(idx)
     }

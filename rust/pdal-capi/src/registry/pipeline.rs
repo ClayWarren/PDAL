@@ -52,6 +52,7 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
         }
         let stage = create_stage(&driver_name, &options)?;
 
+        let is_reader = matches!(stage, CreatedStage::Reader(_));
         let idx = match stage {
             CreatedStage::Reader(r) => pipeline.add_reader(&driver_name, r, options),
             CreatedStage::Filter(f) => pipeline.add_stage(&driver_name, f, options),
@@ -64,7 +65,7 @@ pub fn pipeline_from_json(json: &str) -> Result<Pipeline, StageError> {
         }
 
         let explicit_inputs = add_explicit_inputs(&mut pipeline, idx, object, &tags)?;
-        if !explicit_inputs && position > 0 {
+        if !is_reader && !explicit_inputs && position > 0 {
             if let Some(input) = previous {
                 pipeline.add_dependency(idx, input)?;
             }

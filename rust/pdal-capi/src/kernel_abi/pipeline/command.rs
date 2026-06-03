@@ -172,7 +172,7 @@ fn write_progress(file: &mut Option<File>, event: &str, text: &str) {
 pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {
     match validate_pipeline_json_shape(json).and_then(|_| {
         let pipeline = pipeline_from_json(json).map_err(|err| err.to_string())?;
-        if !pipeline.has_reader() {
+        if !pipeline.roots_are_readers() {
             return Err("Pipeline does not start with a reader.".to_string());
         }
         Ok(pipeline.streamable())

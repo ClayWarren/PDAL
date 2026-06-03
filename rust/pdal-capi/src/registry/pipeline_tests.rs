@@ -105,6 +105,23 @@ fn pipeline_json_accepts_filename_string_stages() {
 }
 
 #[test]
+fn later_reader_stage_does_not_implicitly_depend_on_previous_stage() {
+    let pipeline = pipeline_from_json(
+        r#"[
+            {"type":"writers.null", "tag":"W"},
+            {"type":"readers.faux", "tag":"R", "count":1}
+        ]"#,
+    )
+    .unwrap();
+
+    let writer = pipeline.find_by_tag("W").unwrap();
+    let reader = pipeline.find_by_tag("R").unwrap();
+    assert_eq!(pipeline.input_count(writer).unwrap(), 0);
+    assert_eq!(pipeline.input_count(reader).unwrap(), 0);
+    assert!(!pipeline.roots_are_readers());
+}
+
+#[test]
 fn pipeline_json_runs_sort_filter() {
     let json = r#"[
             {"type":"readers.faux", "count":4, "mode":"ramp", "minx":1, "maxx":4},
