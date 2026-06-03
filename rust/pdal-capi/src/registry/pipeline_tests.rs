@@ -529,6 +529,19 @@ fn nndistance_rejects_unknown_mode() {
 fn pipeline_json_rejects_invalid_typed_options() {
     let err = match pipeline_from_json(
         r#"[
+                {"type":"readers.faux", "count":null},
+                {"type":"writers.null"}
+            ]"#,
+    ) {
+        Ok(_) => panic!("expected null count option to fail"),
+        Err(err) => err,
+    };
+    assert!(err
+        .to_string()
+        .contains("Option 'count' must be an unsigned integer"));
+
+    let err = match pipeline_from_json(
+        r#"[
                 {"type":"readers.faux", "count":4},
                 {"type":"filters.head", "count":"many"}
             ]"#,
@@ -565,6 +578,24 @@ fn pipeline_json_rejects_invalid_typed_options() {
     assert!(err
         .to_string()
         .contains("Option 'radius' must be a floating-point value"));
+}
+
+#[test]
+fn pipeline_json_rejects_unknown_assign_option() {
+    let err = match pipeline_from_json(
+        r#"[
+                {"type":"readers.faux", "count":4},
+                {"type":"filters.assign", "assignment":"Classification[:]=2", "ignore":true},
+                {"type":"writers.null"}
+            ]"#,
+    ) {
+        Ok(_) => panic!("expected unknown assign option to fail"),
+        Err(err) => err,
+    };
+
+    assert!(err
+        .to_string()
+        .contains("filters.assign: Unexpected argument 'ignore'"));
 }
 
 #[test]

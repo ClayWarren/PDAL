@@ -593,6 +593,16 @@ pub fn create_filter(
             ),
         ))),
         "filters.assign" => {
+            for idx in 0..options.len() {
+                let Some((key, _)) = options.entry(idx) else {
+                    continue;
+                };
+                if !matches!(key, "assignment" | "condition" | "value") {
+                    return Err(StageError(format!(
+                        "filters.assign: Unexpected argument '{key}'."
+                    )));
+                }
+            }
             let assignments = options
                 .values("assignment")
                 .iter()

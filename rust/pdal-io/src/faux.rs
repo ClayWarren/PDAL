@@ -152,7 +152,7 @@ impl FauxReader {
         }
         let mut bounds = Box3d::from_options(options);
         let mut grid_size = (0, 0, 0);
-        let mut count = options.get_u64("count", 10);
+        let mut count = options.try_get_u64("count", 10)?;
 
         if mode == FauxMode::Grid {
             bounds.minx = bounds.minx.ceil();
@@ -728,6 +728,17 @@ mod tests {
         opts.add("seed", "42");
         let result = FauxReader::new(&opts);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn faux_reader_rejects_empty_count_option() {
+        let mut opts = Options::new();
+        opts.add("count", "");
+
+        match FauxReader::new(&opts) {
+            Ok(_) => panic!("expected empty count option to fail"),
+            Err(err) => assert!(err.contains("Option 'count' must be an unsigned integer")),
+        }
     }
 
     #[test]
