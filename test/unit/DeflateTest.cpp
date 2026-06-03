@@ -37,6 +37,7 @@
 #include <random>
 
 #include <pdal/compression/DeflateCompression.hpp>
+#include <pdal/compression/GzipCompression.hpp>
 
 using namespace pdal;
 
@@ -76,4 +77,39 @@ TEST(Compression, deflate)
     DeflateDecompressor decompressor(verifier);
     decompressor.decompress(compressed.data(), compressed.size());
     decompressor.done();
+}
+
+TEST(Compression, gzipDecompressorAutoDetectsZlibAndGzip)
+{
+    const std::string zlibPayload("zlib payload through gzip wrapper");
+    std::vector<char> zlibCompressed;
+    auto compressCb = [&zlibCompressed](char* buf, size_t bufsize)
+    { zlibCompressed.insert(zlibCompressed.end(), buf, buf + bufsize); };
+
+    DeflateCompressor compressor(compressCb);
+    compressor.compress(zlibPayload.data(), zlibPayload.size());
+    compressor.done();
+
+    std::string zlibDecoded;
+    auto zlibCb = [&zlibDecoded](char* buf, size_t bufsize)
+    { zlibDecoded.append(buf, bufsize); };
+    GzipDecompressor zlibDecompressor(zlibCb);
+    zlibDecompressor.decompress(zlibCompressed.data(), zlibCompressed.size());
+    zlibDecompressor.done();
+    EXPECT_EQ(zlibDecoded, zlibPayload);
+
+    const std::string gzipPayload("gzip payload through rust");
+    const std::vector<unsigned char> gzipCompressed = {
+        31, 139, 8,   0,   0,   0,  0,  0,   2,   255, 75, 175, 202, 44, 80,
+        40, 72,  172, 204, 201, 79, 76, 81,  40,  201, 40, 202, 47,  77, 207,
+        80, 40,  42,  45,  46,  1,  0,  103, 199, 23,  93, 25,  0,   0,  0};
+    std::string gzipDecoded;
+    auto gzipCb = [&gzipDecoded](char* buf, size_t bufsize)
+    { gzipDecoded.append(buf, bufsize); };
+    GzipDecompressor gzipDecompressor(gzipCb);
+    gzipDecompressor.decompress(
+        reinterpret_cast<const char*>(gzipCompressed.data()),
+        gzipCompressed.size());
+    gzipDecompressor.done();
+    EXPECT_EQ(gzipDecoded, gzipPayload);
 }

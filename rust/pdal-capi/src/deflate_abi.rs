@@ -5,7 +5,7 @@
 //! C++ wrapper drives them and forwards produced bytes to its `BlockCb`.
 
 use crate::error::set_last_error;
-use pdal_core::deflate::{DeflateCompressor, DeflateDecompressor};
+use pdal_core::deflate::{AutoDecompressor, DeflateCompressor, DeflateDecompressor};
 use std::os::raw::c_char;
 use std::ptr;
 
@@ -16,7 +16,28 @@ pub struct DeflateCompressorHandle {
 
 /// Opaque Rust-owned zlib decompressor.
 pub struct DeflateDecompressorHandle {
-    inner: DeflateDecompressor,
+    inner: DecompressorKind,
+}
+
+enum DecompressorKind {
+    Zlib(DeflateDecompressor),
+    Auto(AutoDecompressor),
+}
+
+impl DecompressorKind {
+    fn update(&mut self, input: &[u8]) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Zlib(decompressor) => decompressor.update(input),
+            Self::Auto(decompressor) => decompressor.update(input),
+        }
+    }
+
+    fn finish(&mut self) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Zlib(decompressor) => decompressor.finish(),
+            Self::Auto(decompressor) => decompressor.finish(),
+        }
+    }
 }
 
 /// Move a byte vector into a raw buffer for the C caller.
@@ -134,7 +155,14 @@ pub unsafe extern "C" fn pdal_deflate_compressor_destroy(handle: *mut DeflateCom
 #[no_mangle]
 pub extern "C" fn pdal_deflate_decompressor_create() -> *mut DeflateDecompressorHandle {
     Box::into_raw(Box::new(DeflateDecompressorHandle {
-        inner: DeflateDecompressor::new(),
+        inner: DecompressorKind::Zlib(DeflateDecompressor::new()),
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn pdal_deflate_auto_decompressor_create() -> *mut DeflateDecompressorHandle {
+    Box::into_raw(Box::new(DeflateDecompressorHandle {
+        inner: DecompressorKind::Auto(AutoDecompressor::new()),
     }))
 }
 

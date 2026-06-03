@@ -1,11 +1,12 @@
 //! Streaming zlib (DEFLATE) compression, ported from `pdal/compression/`.
 //!
 //! Mirrors the streaming `DeflateCompressor` / `DeflateDecompressor` helpers in
-//! `pdal/compression/DeflateCompression.cpp`. Both produce and consume the
-//! zlib wire format (zlib header + Adler-32 trailer), matching zlib's
-//! `deflateInit`/`inflateInit2(15)` defaults.
+//! `pdal/compression/DeflateCompression.cpp`. The regular helpers produce and
+//! consume the zlib wire format (zlib header + Adler-32 trailer), matching
+//! zlib's `deflateInit`/`inflateInit2(15)` defaults. The auto decompressor
+//! mirrors `inflateInit2(47)` by accepting either zlib or gzip input.
 
-use flate2::write::{ZlibDecoder, ZlibEncoder};
+use flate2::write::{MultiGzDecoder, ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
 use std::io::Write;
 use std::mem;
@@ -90,6 +91,86 @@ impl Default for DeflateDecompressor {
     }
 }
 
+enum AutoDecoder {
+    Undecided(Vec<u8>),
+    Zlib(ZlibDecoder<Vec<u8>>),
+    Gzip(MultiGzDecoder<Vec<u8>>),
+    Finished,
+}
+
+/// Incremental decompressor that accepts zlib or gzip input.
+pub struct AutoDecompressor {
+    decoder: AutoDecoder,
+}
+
+impl AutoDecompressor {
+    pub fn new() -> Self {
+        Self {
+            decoder: AutoDecoder::Undecided(Vec::new()),
+        }
+    }
+
+    pub fn update(&mut self, input: &[u8]) -> Result<Vec<u8>, String> {
+        match &mut self.decoder {
+            AutoDecoder::Undecided(pending) => {
+                pending.extend_from_slice(input);
+                if pending.len() < 2 {
+                    return Ok(Vec::new());
+                }
+                let pending = mem::take(pending);
+                let mut next = if pending.starts_with(&[0x1f, 0x8b]) {
+                    AutoDecoder::Gzip(MultiGzDecoder::new(Vec::new()))
+                } else {
+                    AutoDecoder::Zlib(ZlibDecoder::new(Vec::new()))
+                };
+                let out = write_auto_decoder(&mut next, &pending)?;
+                self.decoder = next;
+                Ok(out)
+            }
+            AutoDecoder::Zlib(_) | AutoDecoder::Gzip(_) => {
+                write_auto_decoder(&mut self.decoder, input)
+            }
+            AutoDecoder::Finished => Err("auto decompressor already finished".to_string()),
+        }
+    }
+
+    pub fn finish(&mut self) -> Result<Vec<u8>, String> {
+        let decoder = mem::replace(&mut self.decoder, AutoDecoder::Finished);
+        match decoder {
+            AutoDecoder::Undecided(pending) if pending.is_empty() => Ok(Vec::new()),
+            AutoDecoder::Undecided(pending) => {
+                let mut decoder = ZlibDecoder::new(Vec::new());
+                decoder.write_all(&pending).map_err(|err| err.to_string())?;
+                decoder.finish().map_err(|err| err.to_string())
+            }
+            AutoDecoder::Zlib(decoder) => decoder.finish().map_err(|err| err.to_string()),
+            AutoDecoder::Gzip(decoder) => decoder.finish().map_err(|err| err.to_string()),
+            AutoDecoder::Finished => Err("auto decompressor already finished".to_string()),
+        }
+    }
+}
+
+impl Default for AutoDecompressor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn write_auto_decoder(decoder: &mut AutoDecoder, input: &[u8]) -> Result<Vec<u8>, String> {
+    match decoder {
+        AutoDecoder::Zlib(decoder) => {
+            decoder.write_all(input).map_err(|err| err.to_string())?;
+            Ok(mem::take(decoder.get_mut()))
+        }
+        AutoDecoder::Gzip(decoder) => {
+            decoder.write_all(input).map_err(|err| err.to_string())?;
+            Ok(mem::take(decoder.get_mut()))
+        }
+        AutoDecoder::Undecided(_) => Ok(Vec::new()),
+        AutoDecoder::Finished => Err("auto decompressor already finished".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +245,39 @@ mod tests {
         let mut decompressor = DeflateDecompressor::new();
         let err = decompressor.update(&[0xde, 0xad, 0xbe, 0xef, 0x00, 0x11]);
         assert!(err.is_err() || decompressor.finish().is_err());
+    }
+
+    #[test]
+    fn auto_decompressor_accepts_zlib_stream() {
+        let data = b"zlib payload";
+        let mut compressor = DeflateCompressor::new();
+        let mut compressed = compressor.update(data).unwrap();
+        compressed.extend(compressor.finish().unwrap());
+
+        let mut decompressor = AutoDecompressor::new();
+        let mut decoded = Vec::new();
+        for chunk in compressed.chunks(1) {
+            decoded.extend(decompressor.update(chunk).unwrap());
+        }
+        decoded.extend(decompressor.finish().unwrap());
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn auto_decompressor_accepts_gzip_stream() {
+        use flate2::write::GzEncoder;
+
+        let data = b"gzip payload";
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(data).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        let mut decompressor = AutoDecompressor::new();
+        let mut decoded = Vec::new();
+        for chunk in compressed.chunks(3) {
+            decoded.extend(decompressor.update(chunk).unwrap());
+        }
+        decoded.extend(decompressor.finish().unwrap());
+        assert_eq!(decoded, data);
     }
 }

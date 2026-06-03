@@ -277,8 +277,8 @@ format helper headers that only serve Rust-backed C++ reader/writer wrappers
 with their Rust-backed owners rather than as standalone portable
 implementation. The compression base and gzip headers count with the
 Rust-backed deflate implementation: `DeflateCompression.cpp` owns the exported
-`GzipDecompressor` methods, routes zlib-format deflate through Rust, and keeps
-only the gzip auto-detect zlib fallback in C++. Public C++ typedef, exception,
+`GzipDecompressor` methods and routes both zlib-format deflate and gzip/zlib
+auto-detect decompression through Rust. Public C++ typedef, exception,
 log-level, `std::istream`/`std::ostream`, endian extractor, endian inserter, and
 null ostream headers are compatibility holdouts: Rust owns equivalent domain
 logic where needed, but these exported C++ APIs must remain until the C++ SDK

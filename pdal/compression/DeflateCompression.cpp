@@ -35,8 +35,6 @@
 #include "DeflateCompression.hpp"
 #include "GzipCompression.hpp"
 
-#include <zlib.h>
-
 #include <pdal_capi.h>
 
 namespace pdal
@@ -123,125 +121,55 @@ void DeflateCompressor::done()
     m_impl->done();
 }
 
-// The plain deflate decompressor (windowBits 15) routes through the Rust C
-// ABI. The gzip auto-detect path (windowBits 47, used by GzipDecompressor)
-// keeps the zlib stream because the Rust path covers only the zlib format.
+// The plain deflate and gzip auto-detect decompressors route through the Rust C
+// ABI. `windowBits == 47` mirrors zlib's gzip-or-zlib auto-detect mode.
 class DeflateDecompressorImpl
 {
 public:
     DeflateDecompressorImpl(BlockCb cb, int windowBits = 15) : m_cb(cb)
     {
         if (windowBits == 15)
-        {
             m_decompressor = pdal_deflate_decompressor_create();
-            if (!m_decompressor)
-                throw compression_error(
-                    "Could not create deflate decompressor.");
-            return;
-        }
-
-        m_strm.zalloc = Z_NULL;
-        m_strm.zfree = Z_NULL;
-        m_strm.opaque = Z_NULL;
-        m_strm.avail_in = 0;
-        m_strm.next_in = Z_NULL;
-        switch (inflateInit2(&m_strm, windowBits))
+        else if (windowBits == 47)
+            m_decompressor = pdal_deflate_auto_decompressor_create();
+        else
         {
-        case Z_OK:
-            return;
-        case Z_MEM_ERROR:
-            throw compression_error("Memory allocation failure.");
-        case Z_STREAM_ERROR:
-            throw compression_error("Internal error.");
-        case Z_VERSION_ERROR:
-            throw compression_error("Incompatible version.");
-        default:
-            throw compression_error();
+            throw compression_error("Unsupported deflate window bits.");
         }
+        if (!m_decompressor)
+            throw compression_error("Could not create deflate decompressor.");
     }
 
     ~DeflateDecompressorImpl()
     {
         if (m_decompressor)
             pdal_deflate_decompressor_destroy(m_decompressor);
-        else
-            inflateEnd(&m_strm);
     }
 
     void decompress(const char* buf, size_t bufsize)
     {
-        if (m_decompressor)
-        {
-            uint8_t* out = nullptr;
-            size_t outlen = 0;
-            if (!pdal_deflate_decompressor_update(m_decompressor, buf, bufsize,
-                                                  &out, &outlen))
-                throw lastCompressionError(
-                    "Rust deflate decompressor update failed.");
-            emitRustBytes(m_cb, out, outlen);
-        }
-        else
-            run(buf, bufsize, Z_NO_FLUSH);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_deflate_decompressor_update(m_decompressor, buf, bufsize,
+                                              &out, &outlen))
+            throw lastCompressionError(
+                "Rust deflate decompressor update failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
 
     void done()
     {
-        if (m_decompressor)
-        {
-            uint8_t* out = nullptr;
-            size_t outlen = 0;
-            if (!pdal_deflate_decompressor_finish(m_decompressor, &out,
-                                                  &outlen))
-                throw lastCompressionError(
-                    "Rust deflate decompressor finish failed.");
-            emitRustBytes(m_cb, out, outlen);
-        }
-        else
-            run(nullptr, 0, Z_FINISH);
-    }
-
-private:
-    void run(const char* buf, size_t bufsize, int mode)
-    {
-        auto handleError = [](int ret) -> void
-        {
-            switch (ret)
-            {
-            case Z_OK:
-            case Z_STREAM_END:
-                return;
-            case Z_STREAM_ERROR:
-                throw compression_error("Internal error.");
-            case Z_DATA_ERROR:
-                throw compression_error("Corrupted data.");
-            case Z_MEM_ERROR:
-                throw compression_error("Memory allocation failure.");
-            default:
-                throw compression_error();
-            }
-        };
-
-        m_strm.next_in =
-            reinterpret_cast<unsigned char*>(const_cast<char*>(buf));
-        m_strm.avail_in = bufsize;
-        int ret = Z_OK;
-        do
-        {
-            m_strm.avail_out = CHUNKSIZE;
-            m_strm.next_out = m_tmpbuf;
-            ret = inflate(&m_strm, mode);
-            handleError(ret);
-            size_t written = CHUNKSIZE - m_strm.avail_out;
-            if (written)
-                m_cb(reinterpret_cast<char*>(m_tmpbuf), written);
-        } while (m_strm.avail_out == 0);
+        uint8_t* out = nullptr;
+        size_t outlen = 0;
+        if (!pdal_deflate_decompressor_finish(m_decompressor, &out, &outlen))
+            throw lastCompressionError(
+                "Rust deflate decompressor finish failed.");
+        emitRustBytes(m_cb, out, outlen);
     }
 
 private:
     BlockCb m_cb;
     pdal_deflate_decompressor_t* m_decompressor = nullptr;
-    z_stream m_strm;
-    unsigned char m_tmpbuf[CHUNKSIZE];
 };
 
 DeflateDecompressor::DeflateDecompressor(BlockCb cb)

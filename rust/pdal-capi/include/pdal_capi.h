@@ -281,6 +281,7 @@ extern "C"
                                         uint8_t** out_buf, size_t* out_len);
     void pdal_deflate_compressor_destroy(pdal_deflate_compressor_t* compressor);
     pdal_deflate_decompressor_t* pdal_deflate_decompressor_create();
+    pdal_deflate_decompressor_t* pdal_deflate_auto_decompressor_create();
     bool
     pdal_deflate_decompressor_update(pdal_deflate_decompressor_t* decompressor,
                                      const char* buf, size_t len,
