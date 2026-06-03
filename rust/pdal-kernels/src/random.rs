@@ -119,6 +119,8 @@ fn parse_random_arg<'a>(
         parsed.distribution = option_value(arg, "--distribution", iter)?;
     } else if arg == "--compress" || arg == "-z" {
         parsed.compress = true;
+    } else if let Some(value) = arg.strip_prefix("--compress=") {
+        parsed.compress = parse_bool_option("--compress", value)?;
     } else if arg == "--mean"
         || arg.starts_with("--mean=")
         || arg == "--stdev"
@@ -172,6 +174,19 @@ fn split_value(arg: &str) -> Option<String> {
     arg.split_once('=').map(|(_, value)| value.to_string())
 }
 
+fn parse_bool_option(option: &str, value: &str) -> Result<bool, i32> {
+    match value {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        _ => {
+            eprintln!(
+                "PDAL: kernels.random: Invalid boolean value '{value}' for option '{option}'."
+            );
+            Err(1)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +227,15 @@ mod tests {
         assert_eq!(value[0]["bounds"], "([1,2],[3,4],[5,6])");
         assert_eq!(value[1]["compression"], true);
         assert_eq!(value[1]["minor_version"], 4);
+    }
+
+    #[test]
+    fn parses_compress_boolean_forms() {
+        let value = pipeline(&["--compress=true", "out.laz"]);
+        assert_eq!(value[1]["compression"], true);
+
+        let value = pipeline(&["--compress=false", "out.laz"]);
+        assert!(value[1].get("compression").is_none());
     }
 
     #[test]
