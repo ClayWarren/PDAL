@@ -175,6 +175,8 @@ pub fn apply_stage_options_to_pipeline_json(
 }
 
 pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
+    validate_pipeline_json_shape(json)?;
+
     let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let value: serde_json::Value =
         serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
@@ -482,6 +484,18 @@ mod tests {
         assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
         assert_eq!(parsed["pipeline"][1]["type"], "filters.decimation");
         assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+    }
+
+    #[test]
+    fn serialization_rejects_invalid_stage_metadata() {
+        let json = r#"[
+            {"type":"readers.faux","tag":"A"},
+            {"type":"filters.merge","inputs":["missing"]}
+        ]"#;
+
+        assert!(serialize_pipeline_json(json)
+            .unwrap_err()
+            .contains("undefined stage tag"));
     }
 
     #[test]
