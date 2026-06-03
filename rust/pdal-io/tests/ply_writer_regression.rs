@@ -48,6 +48,57 @@ fn installed_pdal_matches_rust_ply_writer_pipeline() {
 
     let installed = read_ply(&installed_output);
     let rust = read_ply(&rust_output);
+    assert_point_views_match(&rust, &installed);
+}
+
+#[test]
+#[ignore = "requires installed pdal on PATH"]
+fn installed_pdal_matches_rust_binary_ply_writer_pipeline() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/ply/simple_text.ply");
+    let temp = make_temp_dir("ply-binary-writer-regression");
+    let installed_output = temp.join("installed.ply");
+    let rust_output = temp.join("rust.ply");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"[
+  {{"type":"readers.ply","filename":"{}"}},
+  {{"type":"filters.decimation","step":2}},
+  {{"type":"writers.ply","filename":"{}","storage_mode":"little endian"}}
+]
+"#,
+            escape_json_path(&input),
+            escape_json_path(&installed_output)
+        ),
+    )
+    .unwrap();
+
+    let output = Command::new("pdal")
+        .arg("pipeline")
+        .arg(&pipeline)
+        .output()
+        .expect("failed to execute installed pdal");
+    assert!(
+        output.status.success(),
+        "installed pdal failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    run_rust_pipeline_with_storage(&input, &rust_output, "little endian", None);
+
+    assert_contains_binary_little_endian_header(&installed_output);
+    assert_contains_binary_little_endian_header(&rust_output);
+    assert_point_views_match(&read_ply(&rust_output), &read_ply(&installed_output));
+}
+
+fn assert_point_views_match(
+    rust: &pdal_core::point::PointView,
+    installed: &pdal_core::point::PointView,
+) {
     assert_eq!(rust.len(), installed.len());
     for point in 0..rust.len() {
         for dim in [DimId::X, DimId::Y, DimId::Z] {
@@ -57,6 +108,15 @@ fn installed_pdal_matches_rust_ply_writer_pipeline() {
 }
 
 fn run_rust_pipeline(input: &Path, output: &Path) {
+    run_rust_pipeline_with_storage(input, output, "ascii", Some(6));
+}
+
+fn run_rust_pipeline_with_storage(
+    input: &Path,
+    output: &Path,
+    storage_mode: &str,
+    precision: Option<u64>,
+) {
     let mut reader_options = Options::new();
     reader_options.add("filename", input.display());
     let mut filter_options = Options::new();
@@ -64,8 +124,10 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     let mut writer_options = Options::new();
     writer_options
         .add("filename", output.display())
-        .add("storage_mode", "ascii")
-        .add("precision", 6);
+        .add("storage_mode", storage_mode);
+    if let Some(precision) = precision {
+        writer_options.add("precision", precision);
+    }
 
     let mut pipeline = Pipeline::new();
     let reader = pipeline.add_reader(
@@ -86,6 +148,13 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
     pipeline.add_dependency(filter, reader).unwrap();
     pipeline.add_dependency(writer, filter).unwrap();
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
+}
+
+fn assert_contains_binary_little_endian_header(path: &Path) {
+    let written = fs::read(path).unwrap();
+    assert!(written
+        .windows(b"format binary_little_endian 1.0".len())
+        .any(|window| window == b"format binary_little_endian 1.0"));
 }
 
 fn read_ply(path: &Path) -> pdal_core::point::PointView {
