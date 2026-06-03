@@ -784,8 +784,10 @@ Known mixed binaries:
   `mean`, `meanWindow`, `idw`, `idwWindow`, `count`, `percentile`, `stdev`,
   `stdevWindow`, `bounds`, `issue_2074`, `issue_2545`, and `alternate_grid`
   count. Standard-mode raster rendering routes through the Rust C ABI for
-  simple GDAL options. Streaming, typed output, metadata, SRS override/default
-  handling, and no-point error behavior remain C++ wrapper behavior.
+  simple GDAL options, typed output, dataset metadata, `gdalopts` creation
+  options, fixed-grid validation, SRS override/default conflict validation, and
+  no-point error behavior. Metadata on streaming tables remains C++ wrapper
+  behavior.
 - `pdal_io_copc_reader_test`: `inspect`, `fullRead`, `boundedRead2d`,
   `boundedRead3d`, `stream`, `boundedCrop`, `boundedCropGeoJSON`,
   `polygonAndBoundsCrop`, `boundedCropReprojection`, `ogrCrop`,
@@ -860,13 +862,15 @@ Known mixed binaries:
   filters remain C++.
 - `pdal_io_ogr_writer_test`: `json`, `creation_options`,
   `error_multicount_attrs`, `error_unknown_attr`, and `error_ogr` count.
-  GeoJSON point and MultiPoint output routes through the Rust C ABI when the
-  driver is GeoJSON without `measure_dim`, including the covered `WRITE_BBOX`
-  and `COORDINATE_PRECISION` options. The multicount/attr_dims combination
-  check, attr_dims missing-dimension error message, and RFC7946 unsupported-SRS
-  error are formatted by the Rust C ABI before the C++ wrapper rethrows them via
-  `Stage::throwError`. Shapefile, GeoPackage, measure dimensions, and native OGR
-  driver behavior remain C++/GDAL.
+  GeoJSON point and MultiPoint output routes through the Rust C ABI, including
+  the covered `WRITE_BBOX` and `COORDINATE_PRECISION` options. Plain Shapefile
+  and GeoPackage point output, attribute fields, Shapefile MultiPoint grouping,
+  and Shapefile measured point output also route through the Rust native
+  GDAL/OGR adapter. The multicount/attr_dims combination check, attr_dims
+  missing-dimension error message, and RFC7946 unsupported-SRS error are
+  formatted by the Rust C ABI before the C++ wrapper rethrows them via
+  `Stage::throwError`. Native OGR creation options beyond the covered subset
+  and transactions remain deferred.
 - `pdal_io_obj_reader_test`: `NoFace`, `NoVertex`, `Read`,
   `FourDimensionRead`, `TexturesAndNormals`, and `LargeFile` count. OBJ point
   and mesh extraction route through the Rust C ABI.
