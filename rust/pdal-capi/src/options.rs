@@ -25,7 +25,8 @@ pub unsafe extern "C" fn pdal_options_from_json_object_text(json: *const c_char)
         return std::ptr::null_mut();
     }
     let json = CStr::from_ptr(json).to_string_lossy();
-    let value: serde_json::Value = match serde_json::from_str(&json) {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(&json);
+    let value: serde_json::Value = match serde_json::from_str(&stripped) {
         Ok(value) => value,
         Err(err) => {
             set_last_error(err.to_string());

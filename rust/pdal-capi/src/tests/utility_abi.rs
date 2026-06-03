@@ -99,7 +99,14 @@ fn options_abi_exposes_sorted_entries_and_command_line() {
 #[test]
 fn options_abi_parses_file_bodies() {
     unsafe {
-        let json = cstring(r#"{"count": 7, "flag": true, "name": "autzen"}"#);
+        let json = cstring(
+            r#"{
+                // accepted by PDAL option files
+                "count": 7,
+                "flag": true,
+                "name": "autzen"
+            }"#,
+        );
         let options = pdal_options_from_json_object_text(json.as_ptr());
         assert!(!options.is_null());
         assert_eq!(
