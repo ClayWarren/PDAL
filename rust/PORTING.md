@@ -146,24 +146,24 @@ roadmap as permission to sweep a directory.
 
 Current active milestone:
 
-1. Treat `819 / 819` as complete checkpoint evidence, not as completion of the
-   port.
-2. Work down the compatibility-wrapper surface: where a C++ test now routes
-   through Rust, replace any remaining meaningful C++ implementation behind the
-   wrapper or record why it is an intentional holdout.
-   Exported C++ classes may remain as public API/ABI shells, but their behavior
-   should delegate to the Rust C ABI once the Rust implementation is ready.
-3. Keep hardening the Rust-backed local I/O and command surface that already
-   exists: regression coverage, option parity, metadata/bounds behavior, and
-   error/output shape.
-4. Prove reader -> filter -> writer pipeline behavior through the Rust core
-   boundary for each new format or command path.
-5. New I/O should still be narrow and fixture-scoped. Remote paths and broad
-   GDAL/PROJ coverage remain deferred until local pipeline and command behavior
-   is reliable. Plugin-backed readers/writers may be added only one at a time
-   when they reuse the existing Rust I/O/C ABI shape and come with fixture
-   coverage.
-6. If work reaches a native dependency, plugin, or public C++ compatibility
+1. Keep the two audits green, but do not mistake either for completion:
+   `audit_cpp_test_parity.py` is currently `819 / 819`, and
+   `audit_cpp_port_backlog.py --include-plugins` is currently `0`
+   port-candidate LOC. Those are guardrails, not the finish line.
+2. Work the named caveats in `rust/STATUS.md`, not old directory goals. The
+   current remaining work is specific: OGR/vector-source breadth, EPT preview
+   fallbacks, remote/STAC/schema breadth, optional plugin/native-adapter
+   policy, packaging/CI/release readiness, C ABI stability, and final
+   regression/performance evidence.
+3. When a caveat can be closed in code, close it with focused parity coverage.
+   Recent examples are registry support for `filters.radiusassign` value
+   expressions and `filters.overlay` layer/query options. When a caveat is an
+   intentional holdout or native-adapter boundary, record that decision instead
+   of porting around it.
+4. New I/O, command, vendor, and plugin work should be narrow and
+   fixture-backed. Broad sweeps are only appropriate after a named finish-line
+   caveat is converted into a concrete, regression-testable milestone.
+5. If work reaches a native dependency, plugin, or public C++ compatibility
    question, check `rust/DECISIONS.md`. A listed decision is not a TODO; it is
    the current shape unless a named parity gate fails.
 
@@ -430,10 +430,11 @@ Done when:
 - The shared Rust APIs are documented enough that new filters use them instead
   of duplicating local algorithms.
 
-### 4. Deferred Filter Families
+### 4. Former Deferred Filter Families
 
-Goal: handle the remaining filters only after their ABI or algorithm choice is
-explicit.
+Goal: preserve the discipline used for formerly deferred filter families. This
+is no longer the active filter worklist; see `Remaining Finish-Line Caveats`
+and `STATUS.md` for current gaps.
 
 Required shape:
 
@@ -475,11 +476,15 @@ Done when:
 
 Goal: prove readers/writers after the core and filter ABI are stable.
 
-This checkpoint is active and no longer limited to the first text path. Keep
-the same discipline: each reader/writer family should be narrow,
-fixture-scoped, option-aware, and regression-tested against installed PDAL
-where possible. LAS/LAZ and the first GDAL-backed reader path have started;
-remote I/O, plugin-backed I/O, and broad GDAL/PROJ coverage remain deferred.
+This checkpoint is mature but still has named caveats. Keep the same
+discipline: each reader/writer family should be narrow, fixture-scoped,
+option-aware, and regression-tested against installed PDAL where possible.
+Local deterministic I/O is broad, streaming coverage exists for many local
+paths, and the implementation-replacement audit has no unplanned I/O
+port-candidate files. Remaining I/O work is no longer "start I/O"; it is the
+specific caveat list in `STATUS.md`: LAS/LAZ edge options, COPC/EPT preview
+and addon breadth, GDAL/OGR/vector-source breadth, STAC remote/schema behavior,
+object-store parity, and packaging/regression evidence.
 
 Required shape:
 
@@ -495,31 +500,27 @@ Done when:
 - Existing filter/core tests still pass.
 
 Current reader/writer status and exact regression commands live in
-`rust/STATUS.md`. Keep this roadmap focused on what must be true before moving
-to broader I/O, command, vendor, or plugin work.
+`rust/STATUS.md`. Keep this roadmap focused on closing named caveats before
+moving to broader remote, command, vendor, or plugin work.
 
 ### 7. Apps, Tools, Then Kernels
 
-Goal: move top-layer command behavior only after the library surface is stable.
+Goal: finish top-layer command behavior as a compatibility surface, not as a
+new parallel CLI.
 
 Required shape:
 
-- `apps/`, `tools/`, and broad `kernels/` work remain above the library
-  surface. Simple `pdal-cli` command ports are allowed only when they are thin
-  wrappers over Rust-backed pipeline/I/O/filter behavior.
-- `apps/pdal.cpp` is treated as the CLI dispatch surface for command parity,
-  not as an independent early port.
-- `tools/lasdump` should stay narrow until LAS/LAZ behavior is explicit:
-  uncompressed LAS dumping can move ahead, while LAZ checksum parity waits on
-  compression. `tools/nitfwrap` may move ahead through the Nitro adapter for
-  byte-preserving LAS/BPF wrap and unwrap workflows, but that does not imply
-  full `readers.nitf` or `writers.nitf` parity.
-- New concrete command work does not start until the command readiness gates in
-  `Migration Order` are satisfied for that command.
-- `pdal pipeline` proved the library surface directly. `pdal info` and simple
-  pipeline-shaped commands are now present; keep more complex commands
-  deferred until their lower-layer behavior is Rust-backed.
-- CLI output and exit behavior are regression-tested against existing commands.
+- `apps/` and `tools/` are now compatibility shells over Rust C ABI paths.
+  Do not reopen them unless a command or format parity test shows a concrete
+  divergence.
+- All first-party kernel names are Rust-dispatchable through the C ABI for
+  scoped workflows. Remaining command work is exact parity breadth: option
+  edge cases, XML fallback boundaries, OGR/update workflows, STAC geometry
+  output, stdout/stderr byte shape, and installed-PDAL regression deltas.
+- `pdal-cli` should not grow separate command implementations. It should route
+  through the same Rust C ABI kernel runner used by the C++ app/kernel shells.
+- CLI output, exit behavior, and artifacts must be regression-tested against
+  installed PDAL before marking a command scope done.
 
 Current status:
 
@@ -555,25 +556,35 @@ remaining C++ filter families, and useful regression commands live in
   streaming, and multi-output behavior unless the migration explicitly replaces
   that contract with passing parity tests.
 
-## Deferred Filter Families
+## Remaining Finish-Line Caveats
 
-These should not be marked complete without dedicated ABI design and parity
-tests:
+Do not use old filter-family buckets as the worklist. The filter and
+implementation-replacement audits now have no unplanned port-candidate files.
+The remaining work is the explicit caveat set in `rust/STATUS.md`.
 
-- GDAL/PROJ/SRS filters: `Colorinterp`, `Colorization`, `Crop`, `DEM`,
-  `GeomDistance`, `H3`, `HagDem`, `Overlay`, `ProjPipeline`,
-  `Reprojection`.
-- Metadata-heavy filters beyond `ExpressionStats` that require richer
-  `MetadataNode` features or pipeline serialization parity.
-- Private-algorithm filters: `CS`, `Delaunay`, `FaceRaster`, `Georeference`,
-  `HagDelaunay`, `HexBin`, `LiTree`, `LloydKMeans`, `M3C2`, `Miniball`,
-  `Normal`, `PMF`, `Poisson`, `SMR`, `Straighten`, `Supervoxel`,
-  `GreedyProjection`, `IterativeClosestPoint`, `RelaxationDartThrowing`, and
-  similar specialized implementations.
-- Framework or shell filters that depend on process execution or PDAL pipeline
-  internals: `Info`, `Shell`, `StreamCallback`.
-- Expression/KD-tree hybrid filters that need a small dedicated design before
-  porting: `RadiusAssign`, `NeighborClassifier`, `CovarianceFeatures`.
+Current caveat classes:
+
+- OGR/vector-source breadth: for example `filters.geomdistance` OGR sources and
+  `filters.overlay` spatial `bounds` still need explicit native-adapter
+  plumbing and regression coverage before they can be claimed.
+- EPT/COPC/STAC preview and remote breadth: transformed preview bounds,
+  origin/polygon/OGR preview paths, broad remote traversal, schema validation,
+  and object-store option parity remain named work items.
+- Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
+  but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.
+- Packaging, CI, install/export, and release policy: these must prove the
+  Rust C ABI as an installed, upstreamable surface across supported platforms.
+- Optional plugins: `faux`, `nitf`, and `spz` are compatibility checkpoints;
+  other plugins are native adapters or deferred until a plugin SDK/versioning
+  policy exists.
+- Performance and quality gates: coverage, mutation testing, unsafe tracking,
+  memory/performance/binary/startup/compile-time comparisons are visibility
+  gates until the project decides which ones become hard release gates.
+
+If a caveat is closed, update `STATUS.md` in the same commit as the code or in
+an immediately adjacent docs commit. If a caveat is intentionally left in C++
+or native code, add or update the decision in `DECISIONS.md` instead of
+creating placeholder Rust code.
 
 ## Completion Criteria For Each Port
 

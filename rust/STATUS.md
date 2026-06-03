@@ -34,6 +34,40 @@ an unsupported option, parity gap, packaging uncertainty, missing test path, or
 intentionally kept behind a C/C++/vendor boundary. It is not hidden pure-port
 backlog unless a later milestone explicitly reopens that adapter.
 
+## Current North Star
+
+The old first target is complete: the pre-port C++ GoogleTest denominator is
+`819 / 819` Rust C ABI-backed, and newly added local guard tests are tracked
+separately. The implementation-replacement audit is also at `0`
+port-candidate LOC for the main first-party surface and remains `0` when
+optional plugins are included.
+
+Those numbers are guardrails, not the finish line. The work left is to close
+or explicitly accept the named caveats below:
+
+- OGR/vector-source breadth: `filters.geomdistance` OGR sources,
+  `filters.overlay` spatial `bounds`, broad OGR datasource/update workflows,
+  and similar native vector edge cases.
+- EPT/COPC/STAC/remote breadth: transformed preview bounds, origin/polygon/OGR
+  preview fallbacks, broad remote traversal, schema validation, object-store
+  option parity, and accepted addon limitations.
+- Metadata, pipeline, and command byte-shape parity: covered workflows route
+  through Rust, but full C++ `PipelineWriter`, XML, STAC feature geometry, and
+  some stdout/stderr/artifact shapes remain scoped rather than globally done.
+- Packaging and platform readiness: install/export, release packaging,
+  workflow/platform policy, license/vendor accounting, and downstream C ABI
+  consumption must be stable enough for upstream use.
+- Optional plugins: completed checkpoints are listed below; other plugins are
+  native adapters or deferred until a versioned plugin boundary exists.
+- Final quality gates: Rust/C++ test parity, coverage, mutation testing,
+  unsafe accounting, performance, memory, binary size, startup time, compile
+  time, and full-suite timing need recorded pass/fail criteria before final
+  replacement readiness.
+
+When continuing the port, choose one of those caveats and close it with focused
+parity coverage, or document why it is an intentional holdout/native adapter.
+Do not restart old directory sweeps or add placeholder Rust modules.
+
 ## Feature Status
 
 | Feature | Status | Notes |
@@ -235,10 +269,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 0 | 0 |
-| c-abi-backed | 45,200 | 398 |
-| native-adapter | 5,905 | 57 |
+| c-abi-backed | 45,726 | 408 |
+| native-adapter | 32,431 | 212 |
 | holdout | 6,960 | 66 |
-| total | 58,065 | 521 |
+| total | 85,117 | 686 |
 
 Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
@@ -468,34 +502,13 @@ native adapters remain intentionally native, and documented holdouts remain C++
 until the C++ SDK compatibility surface is no longer required or a specific
 replacement design is approved.
 
-Using the same simple nonblank/noncomment line counter, the current first-party
-C++ implementation ceilings by area are approximately:
-
-| Area | First-party C++ LOC | Wrapper/adapter LOC | Port-candidate ceiling |
-|---|---:|---:|---:|
-| `pdal/` | 24,072 | 8,736 | 15,336 |
-| `filters/` | 20,695 | 8,917 | 11,778 |
-| `io/` | 25,171 | 8,457 | 16,714 |
-| `kernels/` | 3,306 | 0 | 3,306 |
-| `apps/` | 340 | 340 | 0 |
-| `tools/` | 12 | 12 | 0 |
-| Mainline total | 73,596 | 26,462 | 47,134 |
-| `plugins/` optional | 36,738 | 262 | 36,476 |
-
-The numbers in this section are the older coarse manual estimate. The
-`rust/scripts/audit_cpp_port_backlog.py` audit (see "C++
-Implementation-Replacement Backlog" above) is now the authoritative,
-repeatable measurement; it folds interface headers into their backed `.cpp`
-and separates native adapters and documented holdouts, including optional
-plugins when `--include-plugins` is used. The legacy recompute recipe below is
-kept only for cross-checking that coarse ceiling:
-
-```sh
-tmp=$(mktemp)
-{ rg -l '#include <rust/pdal-capi/include/pdal_capi.h>|#include <pdal_capi.h>|#include "rust/pdal-capi/include/pdal_capi.h"|pdal_dimension_fix_name|extern "C"' pdal io filters kernels apps tools --glob '*.{cpp,hpp,h}'; rg --files filters/private | rg 'Rust.*\.(hpp|cpp|h)$'; } | sort -u > "$tmp"
-cloc --quiet --csv --by-file --list-file="$tmp"
-rm "$tmp"
-```
+Do not use the older coarse manual LOC estimate as a progress metric. The
+authoritative measurement is now
+`rust/scripts/audit_cpp_port_backlog.py --include-plugins`, which folds
+interface headers into their backed `.cpp`, separates native adapters and
+documented holdouts, excludes C++ tests, and reports `0` port-candidate LOC.
+If future work needs a different classification, update that script and this
+status note together.
 
 Counting rules:
 
