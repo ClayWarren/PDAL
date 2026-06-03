@@ -338,6 +338,7 @@ pub fn user_input_to_wkt(input: &str) -> Result<UserInput, String> {
                 }
             ));
         }
+        let _ = gdal_sys::OSRAutoIdentifyEPSG(srs);
         let epoch = gdal_sys::OSRGetCoordinateEpoch(srs);
         let wkt = export_to_wkt(srs, &[]);
         let wkt2 = export_to_wkt(srs, &[("FORMAT", "WKT2_2018")]);
@@ -478,7 +479,32 @@ pub fn axis_ordering(wkt: &str, epoch: f64) -> Vec<i32> {
 }
 
 fn export_imported_wkt(wkt: &str, epoch: f64, options: &[(&str, &str)]) -> Result<String, String> {
-    with_imported_srs(wkt, epoch, |srs| unsafe { export_to_wkt(srs, options) })?
+    with_imported_srs(wkt, epoch, |srs| unsafe {
+        let _ = gdal_sys::OSRAutoIdentifyEPSG(srs);
+        canonicalize_identified_epsg_srs(srs);
+        export_to_wkt(srs, options)
+    })?
+}
+
+unsafe fn canonicalize_identified_epsg_srs(srs: gdal_sys::OGRSpatialReferenceH) {
+    let authority = gdal_sys::OSRGetAuthorityName(srs, std::ptr::null());
+    if authority.is_null() {
+        return;
+    }
+    let authority = CStr::from_ptr(authority).to_string_lossy();
+    if authority != "EPSG" {
+        return;
+    }
+
+    let code = gdal_sys::OSRGetAuthorityCode(srs, std::ptr::null());
+    if code.is_null() {
+        return;
+    }
+    let code = CStr::from_ptr(code).to_string_lossy();
+    let Ok(code) = code.parse::<std::os::raw::c_int>() else {
+        return;
+    };
+    let _ = gdal_sys::OSRImportFromEPSG(srs, code);
 }
 
 /// Return true when GDAL `OSRIsSame` considers the two WKT strings equivalent

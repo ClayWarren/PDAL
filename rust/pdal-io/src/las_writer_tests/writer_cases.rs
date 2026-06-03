@@ -122,7 +122,7 @@ use super::*;
         let path = temp_las("wkt1-srs-vlr.las");
         let mut options = Options::new();
         options.add("filename", path.display().to_string());
-        options.add("a_srs", "EPSG:26915");
+        options.add("a_srs", "EPSG:4326");
         options.add("minor_version", 4u64);
         let mut writer = LasWriter::new(&options);
         writer.write(&[synthetic_point_view()]).unwrap();
@@ -137,7 +137,9 @@ use super::*;
             })
             .expect("expected LASF_Projection WKT1 VLR");
         let text = String::from_utf8_lossy(&vlr.data);
-        assert!(text.starts_with("PROJCS[\"NAD83 / UTM zone 15N\""));
+        assert!(text.starts_with(
+            r#"GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]]"#
+        ));
 
         let _ = std::fs::remove_file(path);
     }

@@ -1130,8 +1130,14 @@ TEST(LasWriterTest, fix1063_1064_1065)
     std::string cmd = "pdal translate --writers.las.forward=all "
                       "--writers.las.a_srs=\"EPSG:4326\" " +
                       infile + " " + outfile;
+#ifdef __APPLE__
+    cmd = "DYLD_LIBRARY_PATH=\"" + Support::binpath() +
+          "/../lib:${DYLD_LIBRARY_PATH}\" " + Support::binpath(cmd);
+#else
+    cmd = Support::binpath(cmd);
+#endif
     std::string output;
-    Utils::run_shell_command(Support::binpath(cmd), output);
+    Utils::run_shell_command(cmd, output);
 
     Options o;
     o.add("filename", outfile);

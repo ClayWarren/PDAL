@@ -46,6 +46,11 @@ fn user_input_resolves_epsg_to_wkt1_and_wkt2() {
     let result = user_input_to_wkt("EPSG:4326").unwrap();
     assert!(result.wkt.contains("GEOGCS["));
     assert!(result.wkt.contains("WGS 84"));
+    assert!(result
+        .wkt
+        .contains(r#"SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]]"#));
+    assert!(result.wkt.contains(r#"DATUM["WGS_1984","#));
+    assert!(result.wkt.contains(r#"AUTHORITY["EPSG","6326"]"#));
     assert!(result.wkt2.contains("GEOGCRS[") || result.wkt2.contains("GEOGCS["));
     assert!(result
         .projjson
@@ -83,6 +88,16 @@ fn wkt_export_helpers_match_expected_formats() {
     assert!(wkt_to_wkt1("", 0.0).is_err());
     assert!(wkt_to_wkt2("not wkt", 0.0).is_err());
     assert!(pretty_wkt("not wkt").is_err());
+}
+
+#[test]
+fn wkt2_to_wkt1_preserves_epsg_authority_nodes() {
+    let result = user_input_to_wkt("EPSG:4326").unwrap();
+    let wkt1 = wkt_to_wkt1(&result.wkt2, result.epoch).unwrap();
+
+    assert!(wkt1.starts_with(
+        r#"GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]]"#
+    ));
 }
 
 #[test]
