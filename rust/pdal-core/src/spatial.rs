@@ -58,11 +58,12 @@ impl<'a> SpatialIndex2d<'a> {
 pub struct SpatialIndex3d<'a> {
     view: &'a PointView,
     tree: RTree<IndexedPoint3d>,
+    tree2d: RTree<IndexedPoint2d>,
 }
 
 impl<'a> SpatialIndex3d<'a> {
     pub fn new(view: &'a PointView) -> Self {
-        let points = (0..view.len())
+        let points3d = (0..view.len())
             .map(|id| IndexedPoint3d {
                 id,
                 point: [
@@ -72,9 +73,16 @@ impl<'a> SpatialIndex3d<'a> {
                 ],
             })
             .collect();
+        let points2d = (0..view.len())
+            .map(|id| IndexedPoint2d {
+                id,
+                point: [view.get_f64(id, &DimId::X), view.get_f64(id, &DimId::Y)],
+            })
+            .collect();
         Self {
             view,
-            tree: RTree::bulk_load(points),
+            tree: RTree::bulk_load(points3d),
+            tree2d: RTree::bulk_load(points2d),
         }
     }
 
@@ -88,18 +96,13 @@ impl<'a> SpatialIndex3d<'a> {
     pub fn radius_2d_excluding(&self, idx: PointId, radius: f64) -> Vec<PointId> {
         let x = self.view.get_f64(idx, &DimId::X);
         let y = self.view.get_f64(idx, &DimId::Y);
-        let radius_sqr = radius * radius;
-        let mut ids = Vec::new();
-        for candidate in 0..self.view.len() {
-            if candidate == idx {
-                continue;
-            }
-            let dx = self.view.get_f64(candidate, &DimId::X) - x;
-            let dy = self.view.get_f64(candidate, &DimId::Y) - y;
-            if dx * dx + dy * dy <= radius_sqr {
-                ids.push(candidate);
-            }
-        }
+        let query = [x, y];
+        let mut ids: Vec<PointId> = self
+            .tree2d
+            .locate_within_distance(query, radius * radius)
+            .filter_map(|point| (point.id != idx).then_some(point.id))
+            .collect();
+        ids.sort_unstable();
         ids
     }
 
@@ -115,6 +118,22 @@ impl<'a> SpatialIndex3d<'a> {
     }
 
     pub fn radius_dims(&self, idx: PointId, radius: f64, dims: &[DimId]) -> Vec<PointId> {
+        if dims == [DimId::X, DimId::Y] {
+            let x = self.view.get_f64(idx, &DimId::X);
+            let y = self.view.get_f64(idx, &DimId::Y);
+            let query = [x, y];
+            let mut ids: Vec<PointId> = self
+                .tree2d
+                .locate_within_distance(query, radius * radius)
+                .map(|point| point.id)
+                .collect();
+            ids.sort_unstable();
+            return ids;
+        }
+        if dims == [DimId::X, DimId::Y, DimId::Z] {
+            return self.radius(idx, radius);
+        }
+
         let radius_sqr = radius * radius;
         let mut ids = Vec::new();
         for candidate in 0..self.view.len() {
