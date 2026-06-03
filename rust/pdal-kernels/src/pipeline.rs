@@ -1,4 +1,6 @@
-use crate::stage_options::{apply_cli_stage_options, parse_cli_stage_option, CliStageOption};
+use crate::stage_options::{
+    apply_cli_stage_options, parse_cli_stage_option, parse_option_value, CliStageOption,
+};
 
 pub struct ParsedPipelineArgs {
     pub input: Option<String>,
@@ -365,6 +367,28 @@ fn decode_typed_json_options(object: &mut serde_json::Map<String, serde_json::Va
             *value = parsed;
         }
     }
+
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "type"
+                | "tag"
+                | "inputs"
+                | "filename"
+                | "spatialreference"
+                | "default_srs"
+                | "override_srs"
+                | "in_srs"
+                | "out_srs"
+                | "a_srs"
+        ) {
+            continue;
+        }
+        let Some(text) = value.as_str() else {
+            continue;
+        };
+        *value = parse_option_value(text);
+    }
 }
 
 #[cfg(test)]
@@ -595,6 +619,24 @@ mod tests {
         assert_eq!(parsed["pipeline"][2]["inputs"][0], "B");
         assert!(parsed["pipeline"][1]["inputs"].is_array());
         assert!(parsed["pipeline"][2]["inputs"].is_array());
+    }
+
+    #[test]
+    fn serializes_numeric_string_options_as_numbers() {
+        let serialized = serialize_pipeline_json(
+            r#"{
+                "pipeline": [
+                    {"type":"readers.faux", "count":"10"},
+                    {"type":"filters.decimation", "step":"2"},
+                    {"type":"writers.null"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][0]["count"], 10);
+        assert_eq!(parsed["pipeline"][1]["step"], 2);
     }
 
     #[test]
