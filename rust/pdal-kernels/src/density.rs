@@ -190,8 +190,9 @@ fn append_stage_to_pipeline_json(
     json: &str,
     stage: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let mut value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     match &mut value {
         serde_json::Value::Array(stages) => {
             stages.push(stage);
@@ -296,6 +297,25 @@ mod tests {
         };
         assert_eq!(value.as_array().unwrap().len(), 2);
         assert_eq!(value[1]["density"], "out.geojson");
+    }
+
+    #[test]
+    fn appends_hexbin_stage_to_commented_pipeline_json() {
+        let value = match append_density_stage(
+            r#"{
+                "pipeline": [
+                    // source pipeline
+                    {"type":"readers.faux","count":1}
+                ]
+            }"#,
+            serde_json::json!({"type":"filters.hexbin", "density":"out.geojson"}),
+        ) {
+            KernelPipelinePlan::Pipeline(value) => value,
+            KernelPipelinePlan::Return(code) => panic!("unexpected return: {code}"),
+        };
+
+        assert_eq!(value["pipeline"].as_array().unwrap().len(), 2);
+        assert_eq!(value["pipeline"][1]["density"], "out.geojson");
     }
 
     #[test]

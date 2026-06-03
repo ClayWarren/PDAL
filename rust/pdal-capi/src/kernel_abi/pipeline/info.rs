@@ -209,8 +209,9 @@ fn append_info_stage_to_pipeline_json(
     json: &str,
     stage: serde_json::Value,
 ) -> Result<String, String> {
+    let stripped = pdal_core::pipeline_reader::strip_json_comments(json);
     let mut value: serde_json::Value =
-        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+        serde_json::from_str(&stripped).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
     if let Some(stages) = value.as_array_mut() {
         stages.push(stage);
     } else if let Some(stages) = value
@@ -350,4 +351,26 @@ fn metadata_report(metadata: &MetadataNode) -> String {
         "metadata": metadata_node_to_json_flat(metadata),
     });
     serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appends_info_stage_to_commented_pipeline_json() {
+        let json = r#"{
+            "pipeline": [
+                // source pipeline
+                {"type":"readers.faux","count":1}
+            ]
+        }"#;
+        let updated =
+            append_info_stage_to_pipeline_json(json, serde_json::json!({"type":"filters.hexbin"}))
+                .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&updated).unwrap();
+
+        assert_eq!(parsed["pipeline"].as_array().unwrap().len(), 2);
+        assert_eq!(parsed["pipeline"][1]["type"], "filters.hexbin");
+    }
 }
