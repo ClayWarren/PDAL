@@ -632,11 +632,10 @@ QuickInfo EptReader::inspect()
     const std::string queryBounds = boundsOption(m_args->m_bounds);
     const bool rustPreviewSupported =
         !Utils::isRemote(m_filename) && m_args->m_origin.empty() &&
-        m_args->m_polys.empty() && m_args->m_ogr.empty() &&
-        m_args->m_bounds.spatialReference().empty();
+        m_args->m_polys.empty() && m_args->m_ogr.empty();
 
     // Route the Rust-supported preview path through the C ABI so EPT metadata
-    // and same-SRS bounds previews aren't owned solely by the C++ EptInfo path.
+    // and bounds previews aren't owned solely by the C++ EptInfo path.
     if (rustPreviewSupported)
     {
         std::string resolution;

@@ -7,8 +7,9 @@
 //! polygon/OGR filters, local addon metadata, GDAL VSI-backed remote paths, and
 //! C++ streaming-wrapper materialization are supported for the existing parity
 //! cases. Resolution-limited preview uses the same hierarchy pruning as reads.
-//! Same-SRS bounds preview is Rust-backed; transformed bounds, polygon, and OGR
-//! spatial-filter preview remain outside this module's current contract.
+//! Same-SRS and transformed-bounds point-count preview are Rust-backed;
+//! transformed preview bounds clipping plus polygon and OGR spatial-filter
+//! preview remain outside this module's current contract.
 
 use crate::source;
 use crate::tindex::append_view;

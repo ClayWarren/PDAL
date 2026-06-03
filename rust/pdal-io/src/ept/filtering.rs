@@ -8,6 +8,7 @@ pub(super) enum QueryBounds {
 pub(super) struct BoundsFilter {
     pub(super) query: QueryBounds,
     pub(super) transform: Option<GdalSrsTransform>,
+    conservative_hierarchy_overlap: bool,
 }
 
 impl BoundsFilter {
@@ -16,12 +17,16 @@ impl BoundsFilter {
         target_srs: &str,
         info: &Value,
     ) -> Result<Self, StageError> {
+        let mut conservative_hierarchy_overlap = false;
         let transform = if target_srs.is_empty() {
             None
         } else {
             let source_srs = info["srs"]["wkt"].as_str().unwrap_or("");
             let source = user_input_to_wkt(source_srs).map_err(StageError)?;
             let target = user_input_to_wkt(target_srs).map_err(StageError)?;
+            conservative_hierarchy_overlap =
+                pdal_native::srs::is_geocentric(&source.wkt, source.epoch)
+                    && pdal_native::srs::is_geographic(&target.wkt, target.epoch);
             Some(
                 GdalSrsTransform::new(
                     &source.wkt2,
@@ -34,7 +39,11 @@ impl BoundsFilter {
                 .map_err(StageError)?,
             )
         };
-        Ok(Self { query, transform })
+        Ok(Self {
+            query,
+            transform,
+            conservative_hierarchy_overlap,
+        })
     }
 
     fn contains(&self, view: &PointView, idx: PointId) -> bool {
@@ -50,6 +59,9 @@ impl BoundsFilter {
     }
 
     pub(super) fn overlaps_box(&self, bounds: &Bounds3D) -> bool {
+        if self.conservative_hierarchy_overlap {
+            return true;
+        }
         match &self.transform {
             None => self.query.overlaps_box(bounds),
             Some(transform) => transform_bounds_via_corners(bounds, transform)
