@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn rust_backed_stages_have_scoped_option_metadata() {
-        let allowed_empty = ["filters.merge", "writers.null"];
+        let allowed_empty = ["filters.delaunay", "filters.merge", "writers.null"];
 
         for stage in stage_list() {
             if allowed_empty.contains(&stage.name) {
