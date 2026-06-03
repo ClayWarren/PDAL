@@ -236,7 +236,7 @@ impl Reader for QfitReader {
             }
         }
 
-        if view.len() == 0 {
+        if view.is_empty() {
             Ok(None)
         } else {
             Ok(Some(view))

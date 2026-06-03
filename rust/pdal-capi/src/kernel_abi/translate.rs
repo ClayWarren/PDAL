@@ -1,6 +1,6 @@
 use super::argv_to_vec;
 use crate::registry::pipeline_from_json;
-use pdal_kernels::{build_translate_plan, TranslateKernelPlan};
+use pdal_kernels::{build_translate_plan, serialize_pipeline_json, TranslateKernelPlan};
 use std::os::raw::c_char;
 
 pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char) -> i32 {
@@ -32,11 +32,19 @@ fn execute_translate_pipeline(
     let stage_types = translate_stage_types(&stages);
     let pipeline_json = serde_json::Value::Array(stages);
     if let Some(path) = serialization_file {
-        if let Err(err) = std::fs::write(&path, pipeline_json.to_string()) {
-            eprintln!(
-                "PDAL: kernels.translate: Unable to write pipeline serialization '{path}': {err}"
-            );
-            return 1;
+        match serialize_pipeline_json(&pipeline_json.to_string()) {
+            Ok(serialized) => {
+                if let Err(err) = std::fs::write(&path, serialized) {
+                    eprintln!(
+                        "PDAL: kernels.translate: Unable to write pipeline serialization '{path}': {err}"
+                    );
+                    return 1;
+                }
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.translate: {err}");
+                return 1;
+            }
         }
         return 0;
     }

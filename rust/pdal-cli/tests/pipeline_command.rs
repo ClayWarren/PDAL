@@ -274,10 +274,14 @@ fn pipeline_command_writes_metadata_and_serialization_files() {
         serde_json::from_str(&fs::read_to_string(&metadata).unwrap()).unwrap();
     assert!(metadata_json["point_count"].is_number());
     assert!(metadata_json["metadata"].is_object());
-    assert_eq!(
-        fs::read_to_string(&serialization).unwrap(),
-        fs::read_to_string(&pipeline).unwrap()
-    );
+    let serialized_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&serialization).unwrap()).unwrap();
+    assert_eq!(serialized_json["pipeline"][0]["type"], "readers.text");
+    assert_eq!(serialized_json["pipeline"][0]["tag"], "readers_text1");
+    assert_eq!(serialized_json["pipeline"][1]["type"], "filters.decimation");
+    assert_eq!(serialized_json["pipeline"][1]["tag"], "filters_decimation1");
+    assert_eq!(serialized_json["pipeline"][2]["type"], "writers.text");
+    assert_eq!(serialized_json["pipeline"][2]["tag"], "writers_text1");
     assert!(fs::read_to_string(output).unwrap().starts_with("X,Y,Z\n"));
 }
 

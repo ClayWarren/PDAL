@@ -35,8 +35,8 @@ pub use metrics::{
     EvalPlan, MetricPairPlan, MetricPlan,
 };
 pub use pipeline::{
-    apply_stage_options_to_pipeline_json, parse_pipeline_args, validate_pipeline_json_shape,
-    ParsedPipelineArgs, PipelineArgsResult,
+    apply_stage_options_to_pipeline_json, parse_pipeline_args, serialize_pipeline_json,
+    validate_pipeline_json_shape, ParsedPipelineArgs, PipelineArgsResult,
 };
 pub use random::build_random_pipeline;
 pub use registry::{Kernel, KernelArgs, KernelError, KernelRegistry, KernelSpec, KERNEL_LIST_JSON};

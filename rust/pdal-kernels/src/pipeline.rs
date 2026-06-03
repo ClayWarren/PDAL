@@ -185,6 +185,122 @@ pub fn apply_stage_options_to_pipeline_json(
     serde_json::to_string(&value).map_err(|err| format!("Unable to serialize pipeline JSON: {err}"))
 }
 
+pub fn serialize_pipeline_json(json: &str) -> Result<String, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(json).map_err(|err| format!("Invalid pipeline JSON: {err}"))?;
+    let stages = if let Some(stages) = value.as_array() {
+        stages
+    } else if let Some(stages) = value.get("pipeline").and_then(serde_json::Value::as_array) {
+        stages
+    } else {
+        return Err("Pipeline JSON must be an array or an object with a 'pipeline' array.".into());
+    };
+
+    let mut existing_tags = Vec::new();
+    let mut serialized = Vec::with_capacity(stages.len());
+    for (position, stage) in stages.iter().enumerate() {
+        let mut object = serialized_stage_object(stage, position, stages.len())?;
+        let stage_type = object
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?
+            .to_string();
+        decode_typed_json_options(&mut object);
+        if !object.contains_key("tag") {
+            let tag = pdal_core::pipeline::generate_stage_tag(
+                &stage_type,
+                "",
+                &existing_tags.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+            existing_tags.push(tag.clone());
+            object.insert("tag".to_string(), serde_json::Value::String(tag));
+        } else if let Some(tag) = object.get("tag").and_then(serde_json::Value::as_str) {
+            existing_tags.push(tag.to_string());
+        }
+        serialized.push(serde_json::Value::Object(object));
+    }
+
+    let root = serde_json::json!({ "pipeline": serialized });
+    serde_json::to_string_pretty(&root)
+        .map(|text| text + "\n")
+        .map_err(|err| format!("Unable to serialize pipeline JSON: {err}"))
+}
+
+fn serialized_stage_object(
+    stage: &serde_json::Value,
+    position: usize,
+    len: usize,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    if let Some(object) = stage.as_object() {
+        let mut object = object.clone();
+        if !object.contains_key("type") {
+            let filename = object
+                .get("filename")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?;
+            object.insert(
+                "type".to_string(),
+                serde_json::Value::String(infer_stage_name(filename, position, len)?),
+            );
+        }
+        return Ok(object);
+    }
+
+    let Some(filename) = stage.as_str() else {
+        return Err(format!(
+            "Pipeline stage {position} must be a JSON object or filename string."
+        ));
+    };
+    let mut object = serde_json::Map::new();
+    object.insert(
+        "type".to_string(),
+        serde_json::Value::String(infer_stage_name(filename, position, len)?),
+    );
+    object.insert(
+        "filename".to_string(),
+        serde_json::Value::String(filename.to_string()),
+    );
+    Ok(object)
+}
+
+fn infer_stage_name(filename: &str, position: usize, len: usize) -> Result<String, String> {
+    if position + 1 == len {
+        pdal_core::driver::infer_writer_driver(filename)
+            .map(str::to_string)
+            .ok_or_else(|| format!("Unable to infer writer for '{filename}'."))
+    } else {
+        pdal_core::driver::infer_reader_driver(filename)
+            .map(str::to_string)
+            .ok_or_else(|| format!("Unable to infer reader for '{filename}'."))
+    }
+}
+
+fn decode_typed_json_options(object: &mut serde_json::Map<String, serde_json::Value>) {
+    for key in [
+        "filename",
+        "spatialreference",
+        "default_srs",
+        "override_srs",
+        "in_srs",
+        "out_srs",
+        "a_srs",
+    ] {
+        let Some(value) = object.get_mut(key) else {
+            continue;
+        };
+        let Some(text) = value.as_str() else {
+            continue;
+        };
+        let trimmed = text.trim_start();
+        if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
+            continue;
+        }
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
+            *value = parsed;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,6 +363,47 @@ mod tests {
 
         assert_eq!(parsed[1]["dimension"][0], "X");
         assert_eq!(parsed[1]["dimension"][1], "Y");
+    }
+
+    #[test]
+    fn serializes_filename_stages_with_inferred_types_and_generated_tags() {
+        let serialized = serialize_pipeline_json(r#"["in.las","in2.las","out.las"]"#).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
+        assert_eq!(parsed["pipeline"][0]["tag"], "readers_las1");
+        assert_eq!(parsed["pipeline"][1]["tag"], "readers_las2");
+        assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+        assert_eq!(parsed["pipeline"][2]["tag"], "writers_las1");
+    }
+
+    #[test]
+    fn serializes_typed_json_option_strings_as_objects() {
+        let json = r#"{
+            "pipeline": [
+                {
+                    "type": "readers.las",
+                    "filename": "{\"path\":\"/tmp/in.las\",\"headers\":{\"k\":\"v\"}}"
+                },
+                {
+                    "type": "filters.reprojection",
+                    "out_srs": "{\"$schema\":\"https://proj.org/schemas/v0.7/projjson.schema.json\",\"type\":\"GeographicCRS\"}"
+                },
+                {
+                    "type": "writers.las",
+                    "filename": "/tmp/out.las"
+                }
+            ]
+        }"#;
+
+        let serialized = serialize_pipeline_json(json).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(parsed["pipeline"][0]["filename"]["path"], "/tmp/in.las");
+        assert_eq!(
+            parsed["pipeline"][1]["out_srs"]["$schema"],
+            "https://proj.org/schemas/v0.7/projjson.schema.json"
+        );
+        assert_eq!(parsed["pipeline"][2]["filename"], "/tmp/out.las");
     }
 
     #[test]

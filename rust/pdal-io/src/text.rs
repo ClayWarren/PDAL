@@ -361,7 +361,7 @@ impl Reader for TextReader {
             }
         }
 
-        if view.len() == 0 && state.eof {
+        if view.is_empty() && state.eof {
             Ok(None)
         } else {
             Ok(Some(view))

@@ -2,8 +2,8 @@ use super::argv_to_vec;
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
 use pdal_kernels::{
-    apply_stage_options_to_pipeline_json, parse_pipeline_args, validate_pipeline_json_shape,
-    PipelineArgsResult,
+    apply_stage_options_to_pipeline_json, parse_pipeline_args, serialize_pipeline_json,
+    validate_pipeline_json_shape, PipelineArgsResult,
 };
 use std::fs::File;
 use std::io::{Read, Write};
@@ -58,11 +58,19 @@ pub(in crate::kernel_abi) unsafe fn run_pipeline_kernel(
     }
 
     if let Some(path) = parsed.serialization_file {
-        if let Err(err) = std::fs::write(&path, &json) {
-            eprintln!(
-                "PDAL: kernels.pipeline: Unable to write pipeline serialization '{path}': {err}"
-            );
-            return 1;
+        match serialize_pipeline_json(&json) {
+            Ok(serialized) => {
+                if let Err(err) = std::fs::write(&path, serialized) {
+                    eprintln!(
+                        "PDAL: kernels.pipeline: Unable to write pipeline serialization '{path}': {err}"
+                    );
+                    return 1;
+                }
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.pipeline: {err}");
+                return 1;
+            }
         }
     }
 

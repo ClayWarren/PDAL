@@ -4,8 +4,9 @@ use crate::registry::pipeline_from_json;
 use pdal_core::metadata::{metadata_node_to_json_flat, MetadataNode, MetadataValue};
 use pdal_core::point::PointView;
 use pdal_kernels::{
-    build_info_plan, point_report, query_report, schema_body, schema_report, stac_report,
-    stats_body, stats_report, InfoKernelPlan, InfoMode, InfoRunPlan,
+    build_info_plan, point_report, query_report, schema_body, schema_report,
+    serialize_pipeline_json, stac_report, stats_body, stats_report, InfoKernelPlan, InfoMode,
+    InfoRunPlan,
 };
 use std::os::raw::c_char;
 
@@ -37,7 +38,7 @@ pub(in crate::kernel_abi) unsafe fn run_info_kernel(argc: i32, argv: *const *con
     };
 
     if let Some(path) = serialization_file {
-        let serialized = serde_json::json!({
+        let pipeline_json = serde_json::json!({
             "pipeline": [
                 {
                     "type": driver,
@@ -45,11 +46,14 @@ pub(in crate::kernel_abi) unsafe fn run_info_kernel(argc: i32, argv: *const *con
                 }
             ]
         });
-        let Ok(text) = serde_json::to_string_pretty(&serialized) else {
-            eprintln!("PDAL: kernels.info: Unable to serialize pipeline.");
-            return 1;
+        let text = match serialize_pipeline_json(&pipeline_json.to_string()) {
+            Ok(text) => text,
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                return 1;
+            }
         };
-        if let Err(err) = std::fs::write(&path, text + "\n") {
+        if let Err(err) = std::fs::write(&path, text) {
             eprintln!("PDAL: kernels.info: Unable to write pipeline serialization '{path}': {err}");
             return 1;
         }
@@ -128,9 +132,19 @@ fn run_info_pipeline_json(
     };
 
     if let Some(path) = serialization_file {
-        if let Err(err) = std::fs::write(&path, &json) {
-            eprintln!("PDAL: kernels.info: Unable to write pipeline serialization '{path}': {err}");
-            return 1;
+        match serialize_pipeline_json(&json) {
+            Ok(serialized) => {
+                if let Err(err) = std::fs::write(&path, serialized) {
+                    eprintln!(
+                        "PDAL: kernels.info: Unable to write pipeline serialization '{path}': {err}"
+                    );
+                    return 1;
+                }
+            }
+            Err(err) => {
+                eprintln!("PDAL: kernels.info: {err}");
+                return 1;
+            }
         }
     }
 

@@ -224,7 +224,7 @@ impl Reader for PcdReader {
             )));
         }
 
-        if view.len() == 0 && (state.eof || state.remaining == 0) {
+        if view.is_empty() && (state.eof || state.remaining == 0) {
             Ok(None)
         } else {
             Ok(Some(view))

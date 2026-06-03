@@ -232,9 +232,11 @@ mod tests {
 
     #[test]
     fn appends_hexbin_stage_to_pipeline_json() {
-        let mut parsed = DensityArgs::default();
-        parsed.input = Some("pipeline.json".to_string());
-        parsed.output = Some("out.geojson".to_string());
+        let mut parsed = DensityArgs {
+            input: Some("pipeline.json".to_string()),
+            output: Some("out.geojson".to_string()),
+            ..Default::default()
+        };
         parsed.hexbin_stage["density"] = serde_json::json!("out.geojson");
         let value = match append_density_stage(
             r#"[{"type":"readers.faux","count":1}]"#,

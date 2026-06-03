@@ -75,11 +75,8 @@ fn create_rejects_multiple_input_methods() {
 #[test]
 fn create_accepts_tindex_equals_form() {
     // `--tindex=PATH` must be equivalent to `--tindex PATH` (TIndexTest test4/7/8).
-    let parsed = parse_tindex_create_args(&strings(&[
-        "--tindex=/vsistdout/",
-        "--filespec=a.las",
-    ]))
-    .unwrap();
+    let parsed =
+        parse_tindex_create_args(&strings(&["--tindex=/vsistdout/", "--filespec=a.las"])).unwrap();
     assert_eq!(parsed.tindex_file, "/vsistdout/");
     assert_eq!(parsed.files, vec!["a.las".to_string()]);
 }
