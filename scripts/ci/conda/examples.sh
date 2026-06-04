@@ -2,6 +2,7 @@
 set -euo pipefail
 
 export BASE="$(pwd)"
+export _CONDA_SET_PDAL_DRIVER_PATH="${_CONDA_SET_PDAL_DRIVER_PATH:-}"
 
 conda activate test
 conda install cmake ninja compilers -y
