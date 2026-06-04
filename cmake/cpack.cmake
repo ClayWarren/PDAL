@@ -51,7 +51,7 @@ set(CPACK_SOURCE_IGNORE_FILES
     "/doc/_static/logo/dongle/"
     "/cmake/examples/"
     "pdal_features.hpp$"
-    "package.sh"
+    "/package[.]sh$"
     "[.]gz2"
     "[.]bz2")
 

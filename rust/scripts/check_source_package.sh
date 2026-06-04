@@ -13,11 +13,20 @@ fi
 required=(
     "rust/Cargo.toml"
     "rust/Cargo.lock"
+    "rust/DECISIONS.md"
+    "rust/PORTING.md"
+    "rust/STATUS.md"
+    "rust/VENDOR.md"
     "rust/pdal-capi/include/pdal_capi.h"
     "rust/pdal-core/Cargo.toml"
     "rust/pdal-filters/Cargo.toml"
     "rust/pdal-io/Cargo.toml"
+    "rust/pdal-kernels/Cargo.toml"
+    "rust/pdal-cli/Cargo.toml"
     "rust/pdal-native/Cargo.toml"
+    "rust/pdal-plugins/Cargo.toml"
+    "rust/scripts/check_installed_capi_consumer.sh"
+    "rust/scripts/check_source_package.sh"
 )
 
 for archive in "${archives[@]}"; do
