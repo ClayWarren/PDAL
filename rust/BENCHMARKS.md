@@ -33,6 +33,20 @@ reference binary. For the build-tree Rust-backed binary, the scripts prepend
 `.build/lib` (or `build/lib`) to the dynamic library path so they benchmark the
 matching build-tree `libpdalcpp`.
 
+Before reading timing numbers, run the workflow comparison harness:
+
+```sh
+pixi run -e dev rust-workflow-parity
+```
+
+It compares the installed/reference PDAL binary with the Rust-backed build on
+representative CLI surfaces and workflows. Current checks cover semantic
+`--version`, exact unknown-command exit/stderr, semantic `--list-commands`
+command names, byte-for-byte deterministic text output, and semantic PCD/LAS/
+`info --stats` payloads. PCD/LAS/info use semantic comparison because binary
+headers, metadata timestamps, point-format defaults, and floating-point
+formatting are not always byte-stable contracts.
+
 ### Results (macOS arm64, both `pdal 2.10.1`, 21 iterations, median)
 
 | workload | C++ (ms) | Rust-backed (ms) | ratio | ratio, startup-subtracted |

@@ -104,16 +104,23 @@ it unless a concrete parity failure proves the decision wrong.
 
 ## Holdout Decisions
 
-| Holdout family | Decision |
-|---|---|
-| Exported C++ base classes and typedefs | Keep as compatibility/API shell. |
-| `ProgramArgs` C++ argument binding | Keep as C++ app/kernel compatibility glue until Rust CLI fully replaces installed `pdal`. |
-| `PipelineManager` / `PipelineExecutor` | Keep as compatibility facade over existing C++ SDK expectations. |
-| `PointRef`, `PointTable`, `Reader`, `Writer`, `FlexWriter`, DB base classes | Keep as exported C++ compatibility surfaces. |
-| Public endian streams/extractor/inserter/null ostream helpers | Keep as C++ compatibility helpers. |
-| Deprecated LAS/BPF header/VLR compatibility APIs | Keep exported C++ compatibility APIs. |
-| `StreamCallbackFilter` | Keep as C++ callback ABI holdout until a deliberate callback ABI is designed. |
-| `dimbuilder` Rust-free Utils fallback | Keep permanently for standalone generator build behavior. |
+Holdouts are not "forgotten C++." They are the C++ surface area that keeps the
+port behavior-compatible while Rust owns the replaceable implementation behind
+the C ABI. Reopen a holdout only with a concrete replacement API, exported-symbol
+audit, and parity coverage for the C++ behavior being retired.
+
+| Holdout family | Decision | Reopen only if |
+|---|---|---|
+| Export macros, umbrella/internal headers, typedefs, exceptions, log-levels, plugin metadata/registration helpers | Keep as C++ API/ABI compatibility surface. These headers are how downstream C++ code compiles against PDAL. | The supported C++ SDK is intentionally removed or replaced by a versioned Rust/C ABI binding story. |
+| `ProgramArgs` C++ argument binding | Keep as C++ app/kernel compatibility glue. The Rust CLI/kernel parser covers Rust command dispatch, but exported C++ kernels still use the C++ binding API. | The installed `pdal` executable and exported C++ kernel classes no longer use `ProgramArgs`, or a C ABI argument-binding replacement is designed and parity-tested. |
+| `PipelineManager` / `PipelineExecutor` | Keep as exported C++ SDK facades. Rust owns its own pipeline graph/executor, but these classes expose mutable `Stage*`, `PointTable`, `PointViewSet`, logging, and manager-reference behavior to existing C++ callers. | A deliberate C++ SDK migration removes or reimplements the mutable C++ stage graph without passing C++ objects through the C ABI. |
+| `PointRef`, `PointTable`, `Reader`, `Writer`, `FlexWriter`, DB base classes, `QuickInfo`, `Mesh`, artifact helpers, stage runner/wrapper helpers | Keep as C++ compatibility surfaces and shells. They preserve existing headers, inheritance, and test/SDK access patterns while Rust-backed stages own the portable behavior. | A specific class gets a Rust-owned replacement that preserves the public C++ contract through a wrapper and passes its existing C++ tests. |
+| Public endian streams, extractor/inserter, null ostream, public algorithm helpers, `Utils::Random` | Keep as C++ public helper APIs. Rust owns equivalent internal behavior where needed, but these templates/streams expose C++ types such as `std::istream`, `std::ostream`, and `std::mt19937&`. | There is a compatibility wrapper that preserves those exact C++ type contracts, or the C++ SDK drops them. |
+| Deprecated LAS/BPF header/VLR compatibility APIs | Keep exported C++ compatibility APIs. The Rust LAS/BPF implementations own active read/write behavior, while these classes preserve deprecated/public header and VLR access. | The exported deprecated APIs are formally removed or hollowed further without exported-symbol loss and with LAS/BPF tests still green. |
+| EPT addon/table/layout/artifact compatibility helpers | Keep as C++ compatibility adapters around EPT addon metadata/layout and C++ `PointLayout` ordering behavior. | EPT addon and layout behavior moves to a Rust-facing API without losing current addon writer/reader parity. |
+| `StreamCallbackFilter` | Keep as a C++ callback ABI holdout. It accepts C++ callables over `PointRef`; routing that through Rust would require a deliberate callback ABI design. | A safe callback ABI exists and is covered by streaming callback parity tests. |
+| Empty/guard compatibility headers (`PointContainer`, `OptechRotationMatrix`, PCL point types) | Keep as compatibility headers, including intentional compile-time behavior where applicable. | Downstream compatibility policy says those includes can be removed. |
+| `dimbuilder` Rust-free Utils fallback | Keep permanently for standalone generator build behavior. It compiles `Utils.cpp` directly without linking `pdalcpp`. | The generator build architecture changes so linking the Rust C ABI is supported and package-safe. |
 
 ## What To Work On Next
 

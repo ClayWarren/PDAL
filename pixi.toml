@@ -158,6 +158,7 @@ rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test
 rust-release-gate = { depends-on = ["rust-guard", "rust-cpp-port-audit", "rust-cpp-test-parity", "rust-capi-install-smoke", "rust-source-package-smoke", "test"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }
+rust-workflow-parity = { cmd = "python3 rust/scripts/compare_pdal_workflows.py --rust .build/bin/pdal", depends-on = ["build"] }
 rust-bench = { cmd = "python3 rust/scripts/benchmark_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
 rust-bench-memory = { cmd = "python3 rust/scripts/benchmark_memory_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
 

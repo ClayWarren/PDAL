@@ -267,8 +267,12 @@ files by `cloc` code LOC into:
   remote I/O adapter (e.g. `pdal/private/gdal/`, GDAL VSI, GDAL grid/density OGR
   adapters, lazperf compatibility, Arbiter-backed STAC traversal, dynamic
   library loading, and backtrace adapters), not a from-scratch port.
-- `holdout`: a documented intentional C++ holdout (the `StreamCallback`
-  callback ABI and the `ProgramArgs` compatibility glue).
+- `holdout`: a documented intentional C++ holdout. These are exported C++ SDK
+  compatibility surfaces, callback/debug boundaries, public stream/endian
+  helper APIs, deprecated public compatibility classes, or narrow build-tool
+  exceptions. They are not unplanned implementation backlog; reopen one only
+  when the Rust port has an explicit replacement API plus parity coverage for
+  the C++ surface it would retire.
   Keep this list small and cited in the script.
 - `port-candidate`: pure C++ with no C ABI reference — the actionable backlog.
 
