@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -814,7 +815,11 @@ COVERED: dict[str, object] = {
         "issue4261",
         "filenameTemplate",
     },
-    "pdal_pipeline_writer_test": {"issue_2458", "serialize"},
+    "pdal_pipeline_writer_test": {
+        "issue_2458",
+        "serialize",
+        "serializeTerminalBranches",
+    },
     "pdal_pipeline_manager_test": {
         "basic",
         "OptionOrder",
@@ -834,11 +839,12 @@ COVERED: dict[str, object] = {
 }
 
 
-def list_tests(binary: Path) -> list[str]:
+def list_tests(binary: Path, env: dict[str, str]) -> list[str]:
     result = subprocess.run(
         [str(binary), "--gtest_list_tests"],
         check=True,
         capture_output=True,
+        env=env,
         text=True,
     )
     tests: list[str] = []
@@ -892,6 +898,19 @@ def default_build_dir() -> str:
     return "build"
 
 
+def test_env(build_dir: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    lib_dirs = [build_dir / "lib", Path.cwd() / ".pixi" / "envs" / "dev" / "lib"]
+    for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"):
+        existing = env.get(name, "")
+        parts = [str(path) for path in lib_dirs if path.is_dir()]
+        if existing:
+            parts.append(existing)
+        if parts:
+            env[name] = os.pathsep.join(parts)
+    return env
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -911,7 +930,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    bin_dir = Path(args.build_dir) / "bin"
+    build_dir = Path(args.build_dir)
+    bin_dir = build_dir / "bin"
     binaries = sorted(bin_dir.glob("*_test"))
     if not binaries:
         raise SystemExit(f"no built test binaries found under {bin_dir}")
@@ -925,8 +945,9 @@ def main() -> int:
     missing_tests: dict[str, list[str]] = {}
     rows: list[tuple[str, int, int]] = []
 
+    env = test_env(build_dir)
     for binary in binaries:
-        all_tests = list_tests(binary)
+        all_tests = list_tests(binary, env)
         current_total += len(all_tests)
         tests = all_tests
         if baseline is not None:

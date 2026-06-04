@@ -34,17 +34,34 @@
 
 #include <pdal/pdal_test_main.hpp>
 
-#include <sstream>
-
 #include "Support.hpp"
 
-#include <pdal/PipelineManager.hpp>
-#include <pdal/PipelineWriter.hpp>
 #include <pdal/util/FileUtils.hpp>
+#include <pdal_capi.h>
 
 #include <nlohmann/json.hpp>
 
 using namespace pdal;
+
+namespace
+{
+
+std::string takeString(char* raw)
+{
+    EXPECT_NE(raw, nullptr) << (pdal_last_error() ? pdal_last_error() : "");
+    if (!raw)
+        return std::string();
+    std::string out(raw);
+    pdal_string_free(raw);
+    return out;
+}
+
+std::string serializePipelineJson(const std::string& json)
+{
+    return takeString(pdal_pipeline_serialize_json(json.c_str()));
+}
+
+} // namespace
 
 // Make sure we handle duplicate stages properly.
 TEST(PipelineManagerTest, issue_2458)
@@ -57,14 +74,7 @@ TEST(PipelineManagerTest, issue_2458)
         ]
     )";
 
-    PipelineManager mgr;
-    std::istringstream iss(in);
-    mgr.readPipeline(iss);
-
-    std::ostringstream oss;
-    PipelineWriter::writePipeline(mgr.getStage(), oss);
-
-    std::string out = oss.str();
+    std::string out = serializePipelineJson(in);
     EXPECT_TRUE(out.find("readers_las1") != std::string::npos);
     EXPECT_TRUE(out.find("readers_las2") != std::string::npos);
     EXPECT_TRUE(out.find("writers_las1") != std::string::npos);
@@ -75,16 +85,10 @@ TEST(PipelineManagerTest, issue_2458)
 TEST(PipelineManagerTest, serialize)
 {
     std::string inPipeline(Support::configuredpath("pipeline/serialize.json"));
-    std::string outPipeline(Support::temppath("serialized_output.json"));
 
-    // We need to read the pipeline, then serialize it before executing
-    PipelineManager mgr;
-    mgr.readPipeline(inPipeline);
-    Stage* stage = mgr.getStage();
-
-    std::ostringstream oss;
-    PipelineWriter::writePipeline(stage, oss);
-    NL::json root = NL::json::parse(oss.str());
+    std::string pipeline = FileUtils::readFileIntoString(inPipeline);
+    std::string serialized = serializePipelineJson(pipeline);
+    NL::json root = NL::json::parse(serialized);
 
     // reader stage should be at idx 0
     NL::json readerStage = root["pipeline"][0];
@@ -104,12 +108,34 @@ TEST(PipelineManagerTest, serialize)
     EXPECT_EQ(projJson.at("$schema").get<std::string>(),
               "https://proj.org/schemas/v0.7/projjson.schema.json");
 
-    EXPECT_EQ(mgr.execute(), 4775);
-
     // Make sure the serialized pipeline is valid JSON & creates an identical
     // result
-    PipelineManager mgr2;
-    std::istringstream iss(oss.str());
-    mgr2.readPipeline(iss);
-    EXPECT_EQ(mgr2.execute(), 4775);
+    pdal_pipeline_t* pipelineHandle =
+        pdal_pipeline_create_json(serialized.c_str());
+    ASSERT_NE(pipelineHandle, nullptr)
+        << (pdal_last_error() ? pdal_last_error() : "");
+    EXPECT_EQ(pdal_pipeline_execute_count(pipelineHandle, nullptr), 4775);
+    pdal_pipeline_destroy(pipelineHandle);
+}
+
+TEST(PipelineManagerTest, serializeTerminalBranches)
+{
+    std::string in = R"(
+        [
+            {"type":"readers.faux", "tag":"A", "count":2},
+            {"type":"writers.text", "tag":"B", "filename":"summary.txt",
+                "inputs":"A"},
+            {"type":"writers.null", "tag":"C", "inputs":"A"}
+        ]
+    )";
+
+    std::string serialized = serializePipelineJson(in);
+    NL::json root = NL::json::parse(serialized);
+    NL::json stages = root["pipeline"];
+
+    ASSERT_EQ(stages.size(), 4u);
+    EXPECT_EQ(stages[0].at("tag").get<std::string>(), "A");
+    EXPECT_EQ(stages[1].at("tag").get<std::string>(), "B");
+    EXPECT_EQ(stages[2].at("tag").get<std::string>(), "A");
+    EXPECT_EQ(stages[3].at("tag").get<std::string>(), "C");
 }

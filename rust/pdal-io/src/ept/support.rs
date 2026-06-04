@@ -5,9 +5,12 @@
 
 use super::*;
 
-pub(super) fn read_json(path: &Path) -> Result<Value, StageError> {
+pub(super) fn read_json_with_headers(
+    path: &Path,
+    headers: &[(String, String)],
+) -> Result<Value, StageError> {
     let location = path.to_string_lossy();
-    let text = crate::source::read_to_string(&location)
+    let text = crate::source::read_to_string_with_headers(&location, headers)
         .map_err(|err| StageError(format!("Can't open EPT file '{}': {err}", path.display())))?;
     serde_json::from_str(&text).map_err(|err| {
         StageError(format!(
@@ -17,8 +20,11 @@ pub(super) fn read_json(path: &Path) -> Result<Value, StageError> {
     })
 }
 
-pub(super) fn read_json_location(location: &str) -> Result<Value, StageError> {
-    let text = crate::source::read_to_string(location)
+pub(super) fn read_json_location_with_headers(
+    location: &str,
+    headers: &[(String, String)],
+) -> Result<Value, StageError> {
+    let text = crate::source::read_to_string_with_headers(location, headers)
         .map_err(|err| StageError(format!("Can't open EPT file '{location}': {err}")))?;
     serde_json::from_str(&text)
         .map_err(|err| StageError(format!("EPT file '{location}' is not valid JSON: {err}")))
@@ -135,24 +141,26 @@ pub(super) fn dim_type(kind: &str, size: usize) -> Result<DimType, StageError> {
     }
 }
 
-pub(super) fn read_binary_tile(
+pub(super) fn read_binary_tile_with_headers(
     path: &Path,
     schema: &EptSchema,
     srs: &str,
+    headers: &[(String, String)],
 ) -> Result<PointView, StageError> {
     let location = path.to_string_lossy();
-    let bytes = crate::source::read_bytes(&location)
+    let bytes = crate::source::read_bytes_with_headers(&location, headers)
         .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
     view_from_binary_tile(path, bytes, schema, srs)
 }
 
-pub(super) fn read_zstandard_tile(
+pub(super) fn read_zstandard_tile_with_headers(
     path: &Path,
     schema: &EptSchema,
     srs: &str,
+    headers: &[(String, String)],
 ) -> Result<PointView, StageError> {
     let location = path.to_string_lossy();
-    let bytes = crate::source::read_bytes(&location)
+    let bytes = crate::source::read_bytes_with_headers(&location, headers)
         .map_err(|err| StageError(format!("Can't open EPT tile '{}': {err}", path.display())))?;
     let decoded = zstd::stream::decode_all(Cursor::new(bytes)).map_err(|err| {
         StageError(format!(
@@ -245,12 +253,13 @@ pub(super) fn apply_addons(
     view: &mut PointView,
     addons: &[EptAddon],
     key: &str,
+    headers: &[(String, String)],
 ) -> Result<(), StageError> {
     for addon in addons {
         let path = addon.data_path(key);
-        let bytes = match std::fs::read(&path) {
+        let bytes = match crate::source::read_bytes_with_headers(&path, headers) {
             Ok(bytes) => bytes,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) if err.contains("No such file") || err.contains("not found") => continue,
             Err(err) => {
                 return Err(StageError(format!(
                     "Can't open EPT addon data '{}': {err}",

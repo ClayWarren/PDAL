@@ -109,8 +109,8 @@ Json baseSpecs()
 TEST(ProgramArgsTest, t1)
 {
     // Json::array() is required for a single-element spec list: under libc++,
-    // copy-list-init `Json x = { jsonValue }` with one element that is already a
-    // Json prefers the copy constructor and collapses to that object (a map)
+    // copy-list-init `Json x = { jsonValue }` with one element that is already
+    // a Json prefers the copy constructor and collapses to that object (a map)
     // instead of building a 1-element array. The C ABI expects an array.
     Json specs = Json::array({shortArg("foo", "f", "string", "foo")});
 
@@ -146,6 +146,13 @@ TEST(ProgramArgsTest, t2)
     expectFail(specs, {"-fz", "FooTest"});
     EXPECT_EQ(values(parse(specs, {"--foo=This is a test"}))["foo"],
               "This is a test");
+
+    Json truth = shortArg("truth", "t", "bool", true);
+    Json truthSpecs = Json::array({truth});
+    EXPECT_EQ(values(parse(truthSpecs, {"--truth"}))["truth"], false);
+    EXPECT_EQ(values(parse(truthSpecs, {"--truth=true"}))["truth"], true);
+    EXPECT_EQ(values(parse(truthSpecs, {"--truth=false"}))["truth"], false);
+    expectFail(truthSpecs, {"--truth=flub"});
 }
 
 TEST(ProgramArgsTest, t3)
@@ -364,6 +371,19 @@ TEST(ProgramArgsTest, invalidJson)
 
     expectFail(specs, {"--json", "{ invalid JSON here }"});
     expectFail(specs, {"--json"});
+}
+
+TEST(ProgramArgsTest, doubleValues)
+{
+    Json specs = Json::array({arg("value", "double")});
+
+    Json parsed = values(parse(specs, {"--value=1.23456789012345"}));
+    EXPECT_DOUBLE_EQ(parsed["value"].get<double>(), 1.23456789012345);
+
+    parsed = values(parse(specs, {"--value=NaN"}));
+    EXPECT_EQ(parsed["value"], "NaN");
+
+    expectFail(specs, {"--value=not-a-number"});
 }
 
 TEST(ProgramArgsTest, issue_2155)

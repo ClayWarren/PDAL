@@ -35,6 +35,7 @@ use support::*;
 
 pub struct EptReader {
     filename: String,
+    headers: Vec<(String, String)>,
     bounds: String,
     origin: String,
     resolution: String,
@@ -51,6 +52,7 @@ impl EptReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            headers: options.filename_headers().into_iter().collect(),
             bounds: options.get_str("bounds", ""),
             origin: options.get_str("origin", ""),
             resolution: options.get_str("resolution", ""),
@@ -76,7 +78,7 @@ impl EptReader {
                 "EptReader requires a filename option.".to_string(),
             ));
         }
-        let info = read_json_location(&self.filename)?;
+        let info = read_json_location_with_headers(&self.filename, &self.headers)?;
         self.bounds_filter(&info).map(|_| ())
     }
 }
@@ -94,7 +96,7 @@ impl Reader for EptReader {
         }
 
         let root = location_parent(&self.filename);
-        let info = read_json_location(&self.filename)?;
+        let info = read_json_location_with_headers(&self.filename, &self.headers)?;
         let data_type = info["dataType"].as_str().ok_or_else(|| {
             StageError(format!("EPT file '{}' is missing dataType.", self.filename))
         })?;
@@ -112,6 +114,7 @@ impl Reader for EptReader {
         let root_bounds = ept_bounds(&info)?;
         let (tiles, hierarchy_step) = hierarchy_tiles(
             &root,
+            &self.headers,
             max_depth,
             bounds.as_ref(),
             origin_bounds.as_ref(),
@@ -121,7 +124,7 @@ impl Reader for EptReader {
         let mut merged: Option<PointView> = None;
         let mut point_count = 0;
         let mut schema = EptSchema::parse(&info)?;
-        let addons = EptAddon::parse_specs(&self.addons)?;
+        let addons = EptAddon::parse_specs(&self.addons, &self.headers)?;
         // Register EptNodeId/EptPointId tracking dims. These are set by the C++
         // reader in processPoint() and used by streamTest to sort points by
         // (nodeId, pointId) before comparing dimension values.
@@ -153,11 +156,14 @@ impl Reader for EptReader {
             let views = if data_type == "laszip" {
                 let mut options = Options::new();
                 options.add("filename", path.as_str());
+                options.set_filename_headers(self.headers.iter().cloned().collect());
                 crate::las::LasReader::new(&options).read()
             } else if data_type == "zstandard" {
-                read_zstandard_tile(Path::new(&path), &schema, &srs).map(|view| vec![view])
+                read_zstandard_tile_with_headers(Path::new(&path), &schema, &srs, &self.headers)
+                    .map(|view| vec![view])
             } else {
-                read_binary_tile(Path::new(&path), &schema, &srs).map(|view| vec![view])
+                read_binary_tile_with_headers(Path::new(&path), &schema, &srs, &self.headers)
+                    .map(|view| vec![view])
             };
             let views = match views {
                 Ok(views) => views,
@@ -194,7 +200,7 @@ impl Reader for EptReader {
             };
             for view in views {
                 let mut view = view;
-                apply_addons(&mut view, &addons, &tile.key)?;
+                apply_addons(&mut view, &addons, &tile.key, &self.headers)?;
                 // Assign full-tile EptNodeId/EptPointId values BEFORE filtering
                 // so surviving points retain their original tile-local indices.
                 // The addon writer's buffer is sized by the full tile count and
@@ -314,7 +320,8 @@ pub fn read_ept_preview_with_reader_options(options: &Options) -> Result<EptPrev
         ));
     }
     let path = Path::new(&filename);
-    let info = read_json(path)?;
+    let headers = options.filename_headers().into_iter().collect::<Vec<_>>();
+    let info = read_json_with_headers(path, &headers)?;
 
     let bounds_conforming = ept_bounds_field(&info, "boundsConforming")?;
     let reader = EptReader::new(options);
@@ -405,6 +412,7 @@ fn preview_bounds_and_point_count(
     let root_bounds = ept_bounds(info)?;
     let (tiles, _) = hierarchy_tiles(
         &root,
+        &reader.headers,
         max_depth,
         bounds.as_ref(),
         origin_bounds.as_ref(),
@@ -464,7 +472,7 @@ impl EptReader {
         if self.origin.is_empty() {
             return Ok(None);
         }
-        let sources = source_origins(root)?;
+        let sources = source_origins(root, &self.headers)?;
         if let Ok(origin) = self.origin.parse::<u64>() {
             if !sources.is_empty() && !sources.iter().any(|source| source.id == origin) {
                 return Err(StageError(format!("Invalid EPT origin '{}'.", self.origin)));
@@ -482,11 +490,13 @@ impl EptReader {
         let Some(origin) = self.origin_filter(root)? else {
             return Ok(None);
         };
-        let mut bounds = source_origins(root)?
+        let Some(mut bounds) = source_origins(root, &self.headers)?
             .into_iter()
             .find(|source| source.id == origin)
             .and_then(|source| source.bounds)
-            .ok_or_else(|| StageError(format!("Invalid EPT origin '{}'.", self.origin)))?;
+        else {
+            return Ok(None);
+        };
         bounds.grow_distance(ept_xy_scale(info));
         Ok(Some(bounds))
     }
@@ -596,7 +606,7 @@ struct EptAddon {
 }
 
 impl EptAddon {
-    fn parse_specs(spec: &str) -> Result<Vec<Self>, StageError> {
+    fn parse_specs(spec: &str, headers: &[(String, String)]) -> Result<Vec<Self>, StageError> {
         if spec.trim().is_empty() {
             return Ok(Vec::new());
         }
@@ -613,14 +623,18 @@ impl EptAddon {
                         "EPT addon mapping for '{dim_name}' must be a string path."
                     ))
                 })?;
-                Self::from_metadata(dim_name, path)
+                Self::from_metadata(dim_name, path, headers)
             })
             .collect()
     }
 
-    fn from_metadata(dim_name: &str, path: &str) -> Result<Self, StageError> {
+    fn from_metadata(
+        dim_name: &str,
+        path: &str,
+        headers: &[(String, String)],
+    ) -> Result<Self, StageError> {
         let metadata_path = addon_metadata_path(path);
-        let metadata = read_json_location(&metadata_path)?;
+        let metadata = read_json_location_with_headers(&metadata_path, headers)?;
         let kind = metadata["type"]
             .as_str()
             .ok_or_else(|| StageError(format!("EPT addon '{}' is missing type.", metadata_path)))?;
@@ -660,6 +674,7 @@ impl SourceOrigin {
 /// `writers.ept_addon` can split hierarchy JSON correctly.
 fn hierarchy_tiles(
     root: &str,
+    headers: &[(String, String)],
     max_depth: Option<u64>,
     query: Option<&BoundsFilter>,
     origin_bounds: Option<&Bounds3D>,
@@ -675,7 +690,7 @@ fn hierarchy_tiles(
             continue;
         }
         let path = join_location(root, &format!("ept-hierarchy/{key}.json"));
-        let hierarchy = read_json_location(&path)?;
+        let hierarchy = read_json_location_with_headers(&path, headers)?;
         let object = hierarchy
             .as_object()
             .ok_or_else(|| StageError(format!("EPT hierarchy '{path}' must be a JSON object.")))?;
@@ -849,15 +864,18 @@ fn ept_xy_scale(info: &Value) -> f64 {
     scale
 }
 
-fn source_origins(root: &Path) -> Result<Vec<SourceOrigin>, StageError> {
+fn source_origins(
+    root: &Path,
+    headers: &[(String, String)],
+) -> Result<Vec<SourceOrigin>, StageError> {
     let sources = root.join("ept-sources");
     let manifest = sources.join("manifest.json");
     if manifest.exists() {
-        return source_origins_from_array(&read_json(&manifest)?);
+        return source_origins_from_array(&read_json_with_headers(&manifest, headers)?);
     }
     let list = sources.join("list.json");
     if list.exists() {
-        return source_origins_from_array(&read_json(&list)?);
+        return source_origins_from_array(&read_json_with_headers(&list, headers)?);
     }
     Ok(Vec::new())
 }

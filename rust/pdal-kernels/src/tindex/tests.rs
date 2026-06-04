@@ -180,6 +180,9 @@ fn create_accepts_equals_options_and_glob_inputs() {
         &format!("--glob={glob}"),
         "--write_absolute_path=false",
         "--path_prefix=/prefix",
+        "--lyr_name=tiles",
+        "--tindex_name=path",
+        "--ogrdriver=GeoJSON",
         "--a_srs=EPSG:26915",
         "--skip_different_srs=off",
         "--lco=DESCRIPTION=glob index",
@@ -200,6 +203,9 @@ fn create_accepts_equals_options_and_glob_inputs() {
     assert_eq!(parsed.files.len(), 2);
     assert!(!parsed.write_absolute_path);
     assert_eq!(parsed.path_prefix.as_deref(), Some("/prefix"));
+    assert_eq!(parsed.layer_name, "tiles");
+    assert_eq!(parsed.location_field, "path");
+    assert_eq!(parsed.driver_name, "GeoJSON");
     assert_eq!(parsed.assign_srs, "EPSG:26915");
     assert!(parsed.override_source_srs);
     assert!(!parsed.skip_different_srs);
@@ -413,10 +419,19 @@ fn merge_accepts_separate_clip_and_ignored_driver_options() {
 
 #[test]
 fn merge_accepts_equals_layer_option() {
-    let parsed =
-        parse_tindex_merge_args(&strings(&["idx.gpkg", "out.las", "--lyr_name=tiles"])).unwrap();
+    let parsed = parse_tindex_merge_args(&strings(&[
+        "--tindex=idx.gpkg",
+        "--filespec=out.las",
+        "--lyr_name=tiles",
+        "--tindex_name=path",
+        "--ogrdriver=GeoJSON",
+    ]))
+    .unwrap();
 
+    assert_eq!(parsed.tindex_file, "idx.gpkg");
+    assert_eq!(parsed.output_file, "out.las");
     assert_eq!(parsed.layer_name, "tiles");
+    assert_eq!(parsed.location_field, "path");
 }
 
 #[test]

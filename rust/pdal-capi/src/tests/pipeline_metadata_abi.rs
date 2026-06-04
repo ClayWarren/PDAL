@@ -204,6 +204,26 @@ fn pipeline_management_c_abi_covers_tags_and_empty_execution() {
 }
 
 #[test]
+fn pipeline_serialization_roundtrips_through_c_abi() {
+    unsafe {
+        let json = CString::new(r#"["in.las","in2.las","out.las"]"#).unwrap();
+        let serialized: serde_json::Value =
+            serde_json::from_str(&take_string(pdal_pipeline_serialize_json(json.as_ptr())))
+                .unwrap();
+
+        assert_eq!(serialized["pipeline"][0]["type"], "readers.las");
+        assert_eq!(serialized["pipeline"][0]["tag"], "readers_las1");
+        assert_eq!(serialized["pipeline"][1]["tag"], "readers_las2");
+        assert_eq!(serialized["pipeline"][2]["type"], "writers.las");
+        assert_eq!(serialized["pipeline"][2]["tag"], "writers_las1");
+        assert_eq!(serialized["pipeline"][2]["inputs"][0], "readers_las1");
+        assert_eq!(serialized["pipeline"][2]["inputs"][1], "readers_las2");
+
+        assert!(pdal_pipeline_serialize_json(std::ptr::null()).is_null());
+    }
+}
+
+#[test]
 fn pipeline_replace_stage_preserves_dependencies_through_c_abi() {
     unsafe {
         let pipeline = pdal_pipeline_create();

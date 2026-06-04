@@ -22,6 +22,7 @@ pub struct ArgSpec {
 #[serde(rename_all = "snake_case")]
 pub enum ArgKind {
     Bool,
+    Double,
     Int,
     String,
     IntVec,
@@ -128,6 +129,7 @@ fn initial_states(specs: &[ArgSpec]) -> BTreeMap<String, ArgState> {
                 ArgKind::Bool => Value::Bool(false),
                 ArgKind::IntVec | ArgKind::StringVec | ArgKind::RegexVec => json!([]),
                 ArgKind::Json => Value::Null,
+                ArgKind::Double => json!(0.0),
                 ArgKind::Int => json!(0),
                 ArgKind::String => Value::String(String::new()),
             });
@@ -198,12 +200,19 @@ fn parse_long(
     let state = states.get_mut(name).expect("indexed arg exists");
     if state.spec.kind == ArgKind::Bool {
         if let Some(value) = explicit {
-            return Err(format!(
-                "Value '{}' provided for argument '{}' when none is expected.",
-                value, state.spec.name
-            ));
+            match value.as_str() {
+                "true" => state.value = Value::Bool(true),
+                "false" => state.value = Value::Bool(false),
+                _ => {
+                    return Err(format!(
+                        "Value '{}' provided for argument '{}' when 'true' or 'false' is expected.",
+                        value, state.spec.name
+                    ));
+                }
+            }
+        } else {
+            state.value = Value::Bool(!bool_default(&state.spec));
         }
-        state.value = Value::Bool(true);
         state.explicit = true;
     } else {
         let value = match explicit {
@@ -214,6 +223,13 @@ fn parse_long(
     }
     mark_positional_satisfied(positionals, name);
     Ok(())
+}
+
+fn bool_default(spec: &ArgSpec) -> bool {
+    spec.default
+        .as_ref()
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn parse_short(
@@ -358,6 +374,12 @@ fn apply_value(state: &mut ArgState, value: &str) -> Result<(), String> {
     state.explicit = true;
     match state.spec.kind {
         ArgKind::Bool => state.value = Value::Bool(true),
+        ArgKind::Double => {
+            let parsed = value
+                .parse::<f64>()
+                .map_err(|_| format!("Invalid value for argument '{}'.", state.spec.name))?;
+            state.value = json_f64(parsed);
+        }
         ArgKind::Int => {
             state.value = json!(value
                 .parse::<i64>()
@@ -382,6 +404,14 @@ fn apply_value(state: &mut ArgState, value: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn json_f64(value: f64) -> Value {
+    if value.is_finite() {
+        json!(value)
+    } else {
+        Value::String(value.to_string())
+    }
 }
 
 fn mark_positional_satisfied(positionals: &mut Vec<String>, name: &str) {
@@ -462,5 +492,71 @@ mod tests {
         let parsed = parse_program_args(&[spec], &input, true).unwrap();
         assert_eq!(parsed.values["foo"], json!("Foo"));
         assert_eq!(parsed.remaining, vec!["--holy=Holy", "--cow=Moo"]);
+    }
+
+    #[test]
+    fn long_bool_options_accept_explicit_values_and_invert_defaults() {
+        let specs = vec![
+            ArgSpec {
+                name: "enabled".to_string(),
+                short: None,
+                kind: ArgKind::Bool,
+                default: None,
+                positional: false,
+                optional_positional: false,
+                aliases: Vec::new(),
+            },
+            ArgSpec {
+                name: "disabled".to_string(),
+                short: None,
+                kind: ArgKind::Bool,
+                default: Some(json!(true)),
+                positional: false,
+                optional_positional: false,
+                aliases: Vec::new(),
+            },
+        ];
+
+        let parsed = parse_program_args(
+            &specs,
+            &["--enabled=true".to_string(), "--disabled=false".to_string()],
+            false,
+        )
+        .unwrap();
+        assert_eq!(parsed.values["enabled"], json!(true));
+        assert_eq!(parsed.values["disabled"], json!(false));
+
+        let parsed = parse_program_args(
+            &specs,
+            &["--enabled".to_string(), "--disabled".to_string()],
+            false,
+        )
+        .unwrap();
+        assert_eq!(parsed.values["enabled"], json!(true));
+        assert_eq!(parsed.values["disabled"], json!(false));
+
+        assert!(parse_program_args(&specs, &["--enabled=maybe".to_string()], false).is_err());
+    }
+
+    #[test]
+    fn parses_double_values_and_nonfinite_values() {
+        let specs = vec![ArgSpec {
+            name: "value".to_string(),
+            short: None,
+            kind: ArgKind::Double,
+            default: None,
+            positional: false,
+            optional_positional: false,
+            aliases: Vec::new(),
+        }];
+
+        let parsed =
+            parse_program_args(&specs, &["--value=1.23456789012345".to_string()], false).unwrap();
+        assert_eq!(parsed.values["value"], json!(1.23456789012345_f64));
+
+        let parsed = parse_program_args(&specs, &["--value=NaN".to_string()], false).unwrap();
+        assert_eq!(parsed.values["value"], json!("NaN"));
+
+        assert!(parse_program_args(&specs, &["--value=not-a-number".to_string()], false).is_err());
     }
 }

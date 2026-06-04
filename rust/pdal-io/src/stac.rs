@@ -20,6 +20,7 @@ use std::path::Path;
 
 pub struct StacReader {
     filename: String,
+    headers: Vec<(String, String)>,
     asset_names: Vec<String>,
     items: Vec<String>,
     catalogs: Vec<String>,
@@ -43,6 +44,7 @@ impl StacReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            headers: options.filename_headers().into_iter().collect(),
             asset_names: asset_names(options),
             items: option_values_with_synonym(options, "items", "item_ids"),
             catalogs: comma_values_with_synonym(options, "catalogs", "catalog_ids"),
@@ -88,6 +90,7 @@ impl StacReader {
             date_ranges: &date_ranges,
             bounds: bounds.as_ref(),
             validate_schema: self.validate_schema,
+            headers: &self.headers,
             visited: &mut visited,
             preview: &mut preview,
             root: true,
@@ -143,6 +146,7 @@ impl Reader for StacReader {
             collections: &collections,
             property_filters: &property_filters,
             validate_schema: self.validate_schema,
+            headers: &self.headers,
             visited: &mut visited,
             assets: &mut assets,
             root: true,
@@ -164,12 +168,14 @@ impl Reader for StacReader {
 
         let mut merged: Option<PointView> = None;
         for asset in assets {
-            let options = reader_args
+            let mut options = reader_args
                 .iter()
                 .find(|args| args.driver == asset.driver)
                 .map(|args| &args.options)
-                .unwrap_or_else(|| empty_options());
-            let views = read_point_location(&asset.location, Some(&asset.driver), options)?;
+                .cloned()
+                .unwrap_or_default();
+            options.set_filename_headers(self.headers.iter().cloned().collect());
+            let views = read_point_location(&asset.location, Some(&asset.driver), &options)?;
             for view in views {
                 append_view(&mut merged, &view, Path::new(&asset.location))?;
             }
@@ -235,18 +241,13 @@ struct ReaderArgs {
     options: Options,
 }
 
-fn empty_options() -> &'static Options {
-    static EMPTY: std::sync::OnceLock<Options> = std::sync::OnceLock::new();
-    EMPTY.get_or_init(Options::new)
-}
-
 fn collect_assets(location: &str, context: &mut StacAssetContext<'_>) -> Result<(), StageError> {
     let location = normalize_local_location(location);
     if !context.visited.insert(location.clone()) {
         return Ok(());
     }
 
-    let (text, base) = read_stac_text(&location)?;
+    let (text, base) = read_stac_text_with_headers(&location, context.headers)?;
     let json: Value = serde_json::from_str(&text).map_err(|err| {
         StageError(format!(
             "StacReader expected a STAC JSON object in '{location}': {err}"
@@ -293,6 +294,7 @@ struct StacAssetContext<'a> {
     collections: &'a [Regex],
     property_filters: &'a [PropertyFilter],
     validate_schema: bool,
+    headers: &'a [(String, String)],
     visited: &'a mut BTreeSet<String>,
     assets: &'a mut Vec<StacAsset>,
     root: bool,
@@ -372,6 +374,7 @@ struct StacPreviewContext<'a> {
     date_ranges: &'a [DateRange],
     bounds: Option<&'a Bounds2D>,
     validate_schema: bool,
+    headers: &'a [(String, String)],
     visited: &'a mut BTreeSet<String>,
     preview: &'a mut StacPreview,
     root: bool,
@@ -383,7 +386,7 @@ fn collect_preview(location: &str, context: &mut StacPreviewContext<'_>) -> Resu
         return Ok(());
     }
 
-    let (text, base) = read_stac_text(&location)?;
+    let (text, base) = read_stac_text_with_headers(&location, context.headers)?;
     let json: Value = serde_json::from_str(&text).map_err(|err| {
         StageError(format!(
             "StacReader expected a STAC JSON object in '{location}': {err}"

@@ -105,6 +105,18 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
             _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
                 parsed.path_prefix = Some(value.to_string());
             }
+            _ if let Some(value) = arg.strip_prefix("--lyr_name=") => {
+                parsed.layer_name = value.to_string();
+            }
+            _ if let Some(value) = arg.strip_prefix("--tindex_name=") => {
+                parsed.location_field = value.to_string();
+            }
+            _ if let Some(value) = arg.strip_prefix("--ogrdriver=") => {
+                parsed.driver_name = value.to_string();
+            }
+            _ if let Some(value) = arg.strip_prefix("-f=") => {
+                parsed.driver_name = value.to_string();
+            }
             _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
                 parsed.target_srs = value.to_string();
             }

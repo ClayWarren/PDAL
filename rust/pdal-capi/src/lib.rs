@@ -84,6 +84,7 @@ pub use obb_abi::*;
 pub use ogr_spec_abi::*;
 pub use options::*;
 pub use pipeline_abi::*;
+pub use pipeline_reader_abi::*;
 pub use plugin_abi::*;
 pub use point_abi::*;
 pub use program_args_abi::*;

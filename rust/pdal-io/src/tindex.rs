@@ -13,6 +13,7 @@ use std::rc::Rc;
 /// Tile-index reader for GeoJSON indexes produced by `pdal tindex create`.
 pub struct TindexReader {
     filename: String,
+    headers: Vec<(String, String)>,
     layer_name: String,
     location_field: String,
     srs_field: String,
@@ -30,6 +31,7 @@ impl TindexReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            headers: options.filename_headers().into_iter().collect(),
             layer_name: options.get_str("lyr_name", ""),
             location_field: options.get_str("tindex_name", "location"),
             srs_field: options.get_str("srs_column", ""),
@@ -61,6 +63,7 @@ impl Reader for TindexReader {
         let polygon = parse_tindex_polygon(&self.polygon, &self.filter_srs, &self.target_srs)?;
         let query = TindexFeatureQuery {
             filename: &self.filename,
+            headers: &self.headers,
             layer_name: &self.layer_name,
             location_field: &self.location_field,
             srs_field: &self.srs_field,
@@ -78,7 +81,8 @@ impl Reader for TindexReader {
         for feature in features {
             let location = resolve_location_text(&base, &feature.location);
             let driver = pdal_core::driver::infer_reader_driver(&location);
-            let options = reader_options_for(driver, &reader_args);
+            let mut options = reader_options_for(driver, &reader_args);
+            options.set_filename_headers(self.headers.iter().cloned().collect());
             let mut views = read_point_location(&location, driver, &options)?;
             for mut view in views.drain(..) {
                 apply_feature_srs(&mut view, feature.srs.as_deref());
@@ -140,6 +144,7 @@ struct ReaderArgs {
 
 struct TindexFeatureQuery<'a> {
     filename: &'a str,
+    headers: &'a [(String, String)],
     layer_name: &'a str,
     location_field: &'a str,
     srs_field: &'a str,
@@ -155,7 +160,7 @@ fn read_index_features(query: &TindexFeatureQuery<'_>) -> Result<Vec<IndexFeatur
         return read_ogr_index_features(query);
     }
 
-    match source::read_to_string(query.filename) {
+    match source::read_to_string_with_headers(query.filename, query.headers) {
         Ok(text) => {
             match read_geojson_index_features(
                 &text,

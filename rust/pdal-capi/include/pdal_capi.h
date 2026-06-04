@@ -1640,6 +1640,7 @@ extern "C"
     // JSON descriptor array (free with pdal_string_free) on success, or null
     // with pdal_last_error() set on a parse/validation error.
     char* pdal_pipeline_reader_parse_json(const char* json);
+    char* pdal_pipeline_serialize_json(const char* json);
 
     // CLI / Kernel dispatch
     const char* pdal_version_string(void);

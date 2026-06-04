@@ -54,6 +54,19 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
             _ if let Some(value) = arg.strip_prefix("--lyr_name=") => {
                 layer_name = value.to_string();
             }
+            _ if let Some(value) = arg.strip_prefix("--tindex_name=") => {
+                location_field = value.to_string();
+            }
+            _ if arg
+                .strip_prefix("--ogrdriver=")
+                .or_else(|| arg.strip_prefix("-f="))
+                .is_some() => {}
+            _ if let Some(value) = arg.strip_prefix("--tindex=") => {
+                tindex_file = Some(value.to_string());
+            }
+            _ if let Some(value) = arg.strip_prefix("--filespec=") => {
+                output_file = Some(value.to_string());
+            }
             _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--") => {
                 return Err(TindexParseResult::Error(format!(

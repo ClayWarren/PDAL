@@ -217,8 +217,11 @@ pub(super) fn parse_reader_args(input: &str) -> Result<Vec<ReaderArgs>, StageErr
         return Ok(Vec::new());
     }
     let stripped = pdal_core::pipeline_reader::strip_json_comments(input);
-    let json: Value = serde_json::from_str(&stripped)
+    let mut json: Value = serde_json::from_str(&stripped)
         .map_err(|err| StageError(format!("reader_args must be valid JSON: {err}")))?;
+    if json.is_object() {
+        json = Value::Array(vec![json]);
+    }
     let entries = json
         .as_array()
         .ok_or_else(|| StageError("reader_args must be a JSON array.".to_string()))?;
@@ -677,15 +680,18 @@ pub(super) fn item_matches_bounds(item: &Value, bounds: &Bounds2D) -> bool {
         && item_maxy >= bounds.miny
 }
 
-pub(super) fn read_stac_text(location: &str) -> Result<(String, String), StageError> {
+pub(super) fn read_stac_text_with_headers(
+    location: &str,
+    headers: &[(String, String)],
+) -> Result<(String, String), StageError> {
     if is_remote(location) || location.starts_with("/vsi") {
-        let text = source::read_to_string(location)
+        let text = source::read_to_string_with_headers(location, headers)
             .map_err(|err| StageError(format!("Can't open STAC file '{location}': {err}")))?;
         Ok((text, remote_base(location)))
     } else {
         let path = canonical_or_original(Path::new(location));
         let path_text = path.to_string_lossy();
-        let text = source::read_to_string(&path_text).map_err(|err| {
+        let text = source::read_to_string_with_headers(&path_text, headers).map_err(|err| {
             StageError(format!("Can't open STAC file '{}': {err}", path.display()))
         })?;
         let base = path.parent().unwrap_or(Path::new("")).display().to_string();

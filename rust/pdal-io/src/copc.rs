@@ -28,6 +28,7 @@ use serde_json::Value;
 pub struct CopcReader {
     inner: LasReader,
     filename: String,
+    headers: Vec<(String, String)>,
     bounds: String,
     polygons: Vec<String>,
     polygon_srs: Vec<String>,
@@ -42,6 +43,7 @@ impl CopcReader {
         Self {
             inner: LasReader::new(options),
             filename: options.get_str("filename", ""),
+            headers: options.filename_headers().into_iter().collect(),
             bounds: options.get_str("bounds", ""),
             polygons: option_values(options, "polygon"),
             polygon_srs: option_values(options, "polygon_srs"),
@@ -64,7 +66,7 @@ impl CopcReader {
                 QueryBounds::Three(b) => HierarchyBounds::Three(b),
             });
         let resolution = self.resolution;
-        with_byte_source(&self.filename, |reader| {
+        with_byte_source(&self.filename, &self.headers, |reader| {
             let (info, full_bounds) = copc_hierarchy::read_copc_info(reader)?;
             copc_hierarchy::walk_preview(reader, &info, full_bounds, query.as_ref(), resolution)
         })
@@ -72,7 +74,7 @@ impl CopcReader {
     }
 
     pub fn copc_info(&self) -> Result<(CopcInfo, LasBounds), StageError> {
-        with_byte_source(&self.filename, |reader| {
+        with_byte_source(&self.filename, &self.headers, |reader| {
             copc_hierarchy::read_copc_info(reader)
         })
         .map_err(StageError)
@@ -120,7 +122,7 @@ impl CopcReader {
             QueryBounds::Three(b) => HierarchyBounds::Three(*b),
         });
         let entries = {
-            let mut source = open_byte_source(&self.filename).map_err(StageError)?;
+            let mut source = open_byte_source(&self.filename, &self.headers).map_err(StageError)?;
             let (info, _) = copc_hierarchy::read_copc_info(&mut *source).map_err(StageError)?;
             copc_hierarchy::walk_entries(
                 &mut *source,
@@ -137,7 +139,8 @@ impl CopcReader {
 
         // Read the LAZ chunk table to map each entry's file offset to a
         // (start_point_idx, count) range we can hand to `LasReader::read_ranges`.
-        let locators = read_chunk_locators_for_filename(&self.filename).map_err(StageError)?;
+        let locators =
+            read_chunk_locators_for_filename(&self.filename, &self.headers).map_err(StageError)?;
         let by_offset: std::collections::HashMap<u64, copc_hierarchy::ChunkLocator> =
             locators.iter().map(|loc| (loc.file_offset, *loc)).collect();
         let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(entries.len());
@@ -299,27 +302,16 @@ impl QueryBounds {
     }
 }
 
-fn is_vsi_path(filename: &str) -> bool {
-    filename.starts_with("/vsi")
-        || filename.starts_with("http://")
-        || filename.starts_with("https://")
-}
-
-fn vsi_path(filename: &str) -> String {
-    if filename.starts_with("http://") || filename.starts_with("https://") {
-        format!("/vsicurl/{filename}")
-    } else {
-        filename.to_string()
-    }
-}
-
-fn open_byte_source(filename: &str) -> Result<Box<dyn ReadSeek>, String> {
+fn open_byte_source(
+    filename: &str,
+    headers: &[(String, String)],
+) -> Result<Box<dyn ReadSeek>, String> {
     if filename.is_empty() {
         return Err("COPC: missing filename option".to_string());
     }
-    if is_vsi_path(filename) {
-        let vsi_path = vsi_path(filename);
-        let vsi = pdal_native::vsi::VsiFile::open(&vsi_path)
+    if source::is_vsi_path(filename) {
+        let vsi_path = source::vsi_path(filename);
+        let vsi = pdal_native::vsi::VsiFile::open_with_headers(&vsi_path, headers)
             .map_err(|e| format!("COPC: failed to open VSI path {vsi_path}: {e}"))?;
         Ok(Box::new(vsi))
     } else {
@@ -331,12 +323,13 @@ fn open_byte_source(filename: &str) -> Result<Box<dyn ReadSeek>, String> {
 
 fn read_chunk_locators_for_filename(
     filename: &str,
+    headers: &[(String, String)],
 ) -> Result<Vec<copc_hierarchy::ChunkLocator>, String> {
-    if is_vsi_path(filename) {
-        let path = vsi_path(filename);
-        let mut first = pdal_native::vsi::VsiFile::open(&path)
+    if source::is_vsi_path(filename) {
+        let path = source::vsi_path(filename);
+        let mut first = pdal_native::vsi::VsiFile::open_with_headers(&path, headers)
             .map_err(|e| format!("COPC: failed to open VSI path {path}: {e}"))?;
-        let mut second = pdal_native::vsi::VsiFile::open(&path)
+        let mut second = pdal_native::vsi::VsiFile::open_with_headers(&path, headers)
             .map_err(|e| format!("COPC: failed to open VSI path {path}: {e}"))?;
         let len = second
             .len()
@@ -352,9 +345,10 @@ fn read_chunk_locators_for_filename(
 
 fn with_byte_source<T>(
     filename: &str,
+    headers: &[(String, String)],
     mut f: impl FnMut(&mut dyn ReadSeek) -> Result<T, String>,
 ) -> Result<T, String> {
-    let mut source = open_byte_source(filename)?;
+    let mut source = open_byte_source(filename, headers)?;
     f(&mut *source)
 }
 

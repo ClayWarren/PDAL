@@ -53,6 +53,7 @@ pub(super) struct IgnoreVlrSpec {
 
 pub struct LasReader {
     filename: String,
+    headers: Vec<(String, String)>,
     start: u64,
     count: Option<u64>,
     nosrs: bool,
@@ -77,6 +78,7 @@ impl Clone for LasReader {
     fn clone(&self) -> Self {
         Self {
             filename: self.filename.clone(),
+            headers: self.headers.clone(),
             start: self.start,
             count: self.count,
             nosrs: self.nosrs,
@@ -118,6 +120,7 @@ impl LasReader {
     pub fn new(options: &Options) -> Self {
         Self {
             filename: options.get_str("filename", ""),
+            headers: options.filename_headers().into_iter().collect(),
             start: options.get_u64("start", 0),
             count: options.has("count").then(|| options.get_u64("count", 0)),
             nosrs: options.get_bool("nosrs", false),
@@ -356,8 +359,8 @@ impl LasReader {
     /// assumes uniform chunk sizes. We side-step it by streaming the LAZ
     /// points sequentially and dropping records outside the kept ranges.
     pub fn read_ranges(&mut self, ranges: &[(u64, u64)]) -> Result<PointView, StageError> {
-        let mut reader = if is_vsi_path(&self.filename) {
-            let data = read_vsi_file(&self.filename)?;
+        let mut reader = if source::is_vsi_path(&self.filename) {
+            let data = read_vsi_file(&self.filename, &self.headers)?;
             las::Reader::new(Cursor::new(data))
                 .map_err(|e| StageError(format!("Failed to open LAS/LAZ VSI data: {}", e)))?
         } else {
@@ -463,12 +466,6 @@ pub fn detect_copc(path: &Path) -> bool {
     file.read_exact(&mut signature).is_ok() && signature == *b"copc"
 }
 
-fn is_vsi_path(filename: &str) -> bool {
-    filename.starts_with("/vsi")
-        || filename.starts_with("http://")
-        || filename.starts_with("https://")
-}
-
 /// Read a string option, returning `None` when the key is absent or empty so an
 /// unset SRS override does not get treated as a blank reference.
 fn non_empty_option(options: &Options, key: &str) -> Option<String> {
@@ -479,13 +476,9 @@ fn non_empty_option(options: &Options, key: &str) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
-fn read_vsi_file(filename: &str) -> Result<Vec<u8>, StageError> {
-    let vsi_path = if filename.starts_with("http://") || filename.starts_with("https://") {
-        format!("/vsicurl/{filename}")
-    } else {
-        filename.to_string()
-    };
-    let mut file = pdal_native::vsi::VsiFile::open(&vsi_path)
+fn read_vsi_file(filename: &str, headers: &[(String, String)]) -> Result<Vec<u8>, StageError> {
+    let vsi_path = source::vsi_path(filename);
+    let mut file = pdal_native::vsi::VsiFile::open_with_headers(&vsi_path, headers)
         .map_err(|err| StageError(format!("Failed to open LAS VSI path: {err}")))?;
     let len = file
         .len()
@@ -510,8 +503,8 @@ impl Reader for LasReader {
         }
 
         let path = Path::new(&self.filename);
-        let view = if is_vsi_path(&self.filename) {
-            let data = read_vsi_file(&self.filename)?;
+        let view = if source::is_vsi_path(&self.filename) {
+            let data = read_vsi_file(&self.filename, &self.headers)?;
             let cursor = Cursor::new(data);
             let mut reader = las::Reader::new(cursor)
                 .map_err(|e| StageError(format!("Failed to open LAS VSI path: {e}")))?;
@@ -556,7 +549,7 @@ impl Reader for LasReader {
             )?;
             view
         } else if self.ignore_missing_vlrs {
-            let file = source::open_seek(&self.filename)
+            let file = source::open_seek_with_headers(&self.filename, &self.headers)
                 .map_err(|e| StageError(format!("Failed to open LAS file: {}", e)))?;
             let mut read = BufReader::new(file);
             let raw_header = las::raw::Header::read_from(&mut read)
@@ -602,7 +595,7 @@ impl Reader for LasReader {
         // fall back to the materializing `read()`.
         !self.filename.is_empty()
             && !filename_has_glob(&self.filename)
-            && !is_vsi_path(&self.filename)
+            && !source::is_vsi_path(&self.filename)
             && self.start_offset == 0
             && self.start_length == 0
             && !self.ignore_missing_vlrs

@@ -278,6 +278,7 @@ fn serialize_stage_graph(stages: Vec<serde_json::Value>) -> Result<Vec<serde_jso
         return Ok(stages);
     }
     let mut by_tag = std::collections::HashMap::new();
+    let mut consumers = vec![0usize; stages.len()];
     for (idx, stage) in stages.iter().enumerate() {
         let tag = stage
             .get("tag")
@@ -285,9 +286,26 @@ fn serialize_stage_graph(stages: Vec<serde_json::Value>) -> Result<Vec<serde_jso
             .ok_or_else(|| format!("Serialized pipeline stage {idx} is missing a tag."))?;
         by_tag.insert(tag.to_string(), idx);
     }
+    for (idx, stage) in stages.iter().enumerate() {
+        if let Some(inputs) = stage.get("inputs").and_then(serde_json::Value::as_array) {
+            for input in inputs {
+                let tag = input.as_str().ok_or_else(|| {
+                    format!("Serialized pipeline stage {idx} has a non-string input.")
+                })?;
+                let input_idx = by_tag.get(tag).copied().ok_or_else(|| {
+                    format!("Serialized pipeline stage {idx} references '{tag}'.")
+                })?;
+                consumers[input_idx] += 1;
+            }
+        }
+    }
 
     let mut output = Vec::new();
-    emit_serialized_stage(stages.len() - 1, &stages, &by_tag, &mut output)?;
+    for (idx, count) in consumers.iter().enumerate() {
+        if *count == 0 {
+            emit_serialized_stage(idx, &stages, &by_tag, &mut output)?;
+        }
+    }
     Ok(output)
 }
 
@@ -753,6 +771,26 @@ mod tests {
         assert_eq!(stages[3]["tag"], "C");
         assert_eq!(stages[4]["type"], "filters.merge");
         assert_eq!(stages[5]["type"], "writers.null");
+    }
+
+    #[test]
+    fn serializes_all_terminal_writer_branches() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                {"type":"readers.faux", "tag":"A", "count":2},
+                {"type":"writers.text", "tag":"B", "filename":"summary.txt", "inputs":"A"},
+                {"type":"writers.null", "tag":"C", "inputs":"A"}
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        let stages = parsed["pipeline"].as_array().unwrap();
+
+        assert_eq!(stages.len(), 4);
+        assert_eq!(stages[0]["tag"], "A");
+        assert_eq!(stages[1]["tag"], "B");
+        assert_eq!(stages[2]["tag"], "A");
+        assert_eq!(stages[3]["tag"], "C");
     }
 
     #[test]

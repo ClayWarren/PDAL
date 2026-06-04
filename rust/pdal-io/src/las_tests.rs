@@ -169,10 +169,10 @@ mod tests {
 
     #[test]
     fn reader_detects_vsi_paths() {
-        assert!(is_vsi_path("/vsicurl/https://example.com/file.laz"));
-        assert!(is_vsi_path("https://example.com/file.laz"));
-        assert!(is_vsi_path("http://example.com/file.laz"));
-        assert!(!is_vsi_path("/tmp/file.laz"));
+        assert!(source::is_vsi_path("/vsicurl/https://example.com/file.laz"));
+        assert!(source::is_vsi_path("https://example.com/file.laz"));
+        assert!(source::is_vsi_path("http://example.com/file.laz"));
+        assert!(!source::is_vsi_path("/tmp/file.laz"));
     }
 
     #[test]

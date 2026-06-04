@@ -41,10 +41,20 @@ pub fn unlink(path: &str) -> Result<(), String> {
 #[derive(Debug)]
 pub struct VsiFile {
     handle: *mut gdal_sys::VSILFILE,
+    _path_options: Option<PathSpecificOptions>,
 }
 
 impl VsiFile {
     pub fn open(path: &str) -> Result<Self, String> {
+        Self::open_with_headers(path, &[])
+    }
+
+    pub fn open_with_headers(path: &str, headers: &[(String, String)]) -> Result<Self, String> {
+        let path_options = if headers.is_empty() {
+            None
+        } else {
+            Some(PathSpecificOptions::set_headers(path, headers)?)
+        };
         let path_c = CString::new(path).map_err(|e| e.to_string())?;
         let mode_c = CString::new("rb").expect("static mode has no interior NUL");
         unsafe {
@@ -52,7 +62,10 @@ impl VsiFile {
             if handle.is_null() {
                 return Err(format!("Failed to open VSI path: {path}"));
             }
-            Ok(Self { handle })
+            Ok(Self {
+                handle,
+                _path_options: path_options,
+            })
         }
     }
 
@@ -96,6 +109,56 @@ impl VsiFile {
             Err(format!("VSI seek failed at offset {offset}"))
         }
     }
+}
+
+#[derive(Debug)]
+struct PathSpecificOptions {
+    path: CString,
+}
+
+impl PathSpecificOptions {
+    fn set_headers(path: &str, headers: &[(String, String)]) -> Result<Self, String> {
+        let path = CString::new(path).map_err(|e| e.to_string())?;
+        let header_value = header_option_value(headers)?;
+        let header_value = CString::new(header_value).map_err(|e| e.to_string())?;
+        let http_headers = CString::new("GDAL_HTTP_HEADERS").expect("static key");
+        let headers_key = CString::new("HEADERS").expect("static key");
+        unsafe {
+            gdal_sys::VSISetPathSpecificOption(
+                path.as_ptr(),
+                http_headers.as_ptr(),
+                header_value.as_ptr(),
+            );
+            gdal_sys::VSISetPathSpecificOption(
+                path.as_ptr(),
+                headers_key.as_ptr(),
+                header_value.as_ptr(),
+            );
+        }
+        Ok(Self { path })
+    }
+}
+
+impl Drop for PathSpecificOptions {
+    fn drop(&mut self) {
+        unsafe {
+            gdal_sys::VSIClearPathSpecificOptions(self.path.as_ptr());
+        }
+    }
+}
+
+fn header_option_value(headers: &[(String, String)]) -> Result<String, String> {
+    headers
+        .iter()
+        .map(|(key, value)| {
+            if key.trim().is_empty() {
+                Err("VSI header names must not be empty.".to_string())
+            } else {
+                Ok(format!("{key}: {value}"))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|values| values.join(","))
 }
 
 impl io::Read for VsiFile {
@@ -166,6 +229,37 @@ mod tests {
         let mut vsi = VsiFile::open(&path).unwrap();
         assert_eq!(vsi.len().unwrap(), 26);
         assert_eq!(vsi.read_exact_at(2, 4).unwrap(), b"cdef");
+
+        unlink(&path).unwrap();
+    }
+
+    #[test]
+    fn vsi_path_options_are_scoped_to_file_lifetime() {
+        let path = format!("/vsimem/pdal-vsi-headers-{}.bin", std::process::id());
+        write_mem_file(&path, b"abc").unwrap();
+
+        let key = CString::new("GDAL_HTTP_HEADERS").unwrap();
+        let default = CString::new("").unwrap();
+        {
+            let _vsi = VsiFile::open_with_headers(
+                &path,
+                &[("Authorization".to_string(), "Bearer token".to_string())],
+            )
+            .unwrap();
+            let path_c = CString::new(path.as_str()).unwrap();
+            let value = unsafe {
+                gdal_sys::VSIGetPathSpecificOption(path_c.as_ptr(), key.as_ptr(), default.as_ptr())
+            };
+            let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_string_lossy();
+            assert_eq!(value, "Authorization: Bearer token");
+        }
+
+        let path_c = CString::new(path.as_str()).unwrap();
+        let value = unsafe {
+            gdal_sys::VSIGetPathSpecificOption(path_c.as_ptr(), key.as_ptr(), default.as_ptr())
+        };
+        let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_string_lossy();
+        assert!(value.is_empty());
 
         unlink(&path).unwrap();
     }

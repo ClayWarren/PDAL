@@ -9,6 +9,8 @@ use serde_json::{Map, Value};
 
 use crate::utils::simple_wordexp;
 
+const FILENAME_HEADERS_KEY: &str = "__pdal_filename_headers";
+
 /// A set of named option values for a stage.
 #[derive(Debug, Default, Clone)]
 pub struct Options {
@@ -95,7 +97,7 @@ impl Options {
             }
             match value {
                 Value::String(text) if key == "filename" => {
-                    options.add(key, filename_option_string(text));
+                    add_filename_option(&mut options, value, text)
                 }
                 Value::Array(items) => {
                     let repeat_items = pipeline_array_option_repeats(stage_type, key)
@@ -117,7 +119,7 @@ impl Options {
                 }
                 Value::Object(_) => {
                     if key == "filename" {
-                        options.add(key, filename_option_value(value));
+                        add_filename_option(&mut options, value, &value.to_string());
                     } else {
                         options.add(key, value.to_string());
                     }
@@ -267,6 +269,24 @@ impl Options {
             .unwrap_or_else(|| default.to_string())
     }
 
+    /// HTTP/object-store headers from a pipeline FileSpec filename object.
+    pub fn filename_headers(&self) -> BTreeMap<String, String> {
+        self.last_value(FILENAME_HEADERS_KEY)
+            .and_then(|value| serde_json::from_str(value).ok())
+            .unwrap_or_default()
+    }
+
+    /// Preserve FileSpec headers when one stage constructs another in Rust.
+    pub fn set_filename_headers(&mut self, headers: BTreeMap<String, String>) -> &mut Self {
+        self.remove(FILENAME_HEADERS_KEY);
+        if !headers.is_empty() {
+            if let Ok(value) = serde_json::to_string(&headers) {
+                self.add(FILENAME_HEADERS_KEY, value);
+            }
+        }
+        self
+    }
+
     /// Option as string, or `None` if unset.
     pub fn value(&self, key: &str) -> Option<&str> {
         self.last_value(key)
@@ -307,23 +327,74 @@ impl Options {
     }
 }
 
-fn filename_option_string(text: &str) -> String {
-    let trimmed = text.trim_start();
-    if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
-        return text.to_string();
-    }
-    match serde_json::from_str::<Value>(text) {
-        Ok(value) => filename_option_value(&value),
-        Err(_) => text.to_string(),
+fn add_filename_option(options: &mut Options, value: &Value, original: &str) {
+    match parsed_filename_spec(value) {
+        Some(spec) => {
+            options.add("filename", filename_option_from_spec(&spec));
+            if !spec.headers.is_empty() {
+                if let Ok(headers) = serde_json::to_string(&spec.headers) {
+                    options.add(FILENAME_HEADERS_KEY, headers);
+                }
+            }
+        }
+        None => {
+            options.add("filename", original);
+        }
     }
 }
 
-fn filename_option_value(value: &Value) -> String {
-    value
-        .get("path")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| value.to_string())
+fn parsed_filename_spec(value: &Value) -> Option<crate::file_spec::ParsedFileSpec> {
+    if let Value::String(text) = value {
+        let trimmed = text.trim_start();
+        if trimmed.starts_with('{') || trimmed.starts_with('[') {
+            return crate::file_spec::parse_file_spec_json(text).ok();
+        }
+    }
+    crate::file_spec::parse_file_spec_json(&value.to_string()).ok()
+}
+
+fn filename_option_from_spec(spec: &crate::file_spec::ParsedFileSpec) -> String {
+    if spec.query.is_empty() || !is_remote_filespec_path(&spec.path) {
+        return spec.path.clone();
+    }
+
+    let separator = if spec.path.contains('?') { '&' } else { '?' };
+    let query = spec
+        .query
+        .iter()
+        .map(|(key, value)| {
+            format!(
+                "{}={}",
+                percent_encode_query_component(key),
+                percent_encode_query_component(value)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("{}{}{}", spec.path, separator, query)
+}
+
+fn is_remote_filespec_path(path: &str) -> bool {
+    path.starts_with("http://")
+        || path.starts_with("https://")
+        || path.starts_with("/vsi")
+        || path.starts_with("s3://")
+        || path.starts_with("gs://")
+        || path.starts_with("az://")
+}
+
+fn percent_encode_query_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                encoded.push(byte as char)
+            }
+            b' ' => encoded.push_str("%20"),
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 fn pipeline_array_option_repeats(stage_type: Option<&str>, key: &str) -> bool {
@@ -545,6 +616,10 @@ mod tests {
         let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
 
         assert_eq!(options.value("filename"), Some("/tmp/input.las"));
+        assert_eq!(
+            options.filename_headers().get("Authorization"),
+            Some(&"token".to_string())
+        );
         assert_eq!(options.value("polygon"), Some("{\"type\":\"Polygon\"}"));
 
         let object = serde_json::json!({
@@ -553,6 +628,43 @@ mod tests {
         });
         let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
         assert_eq!(options.value("filename"), Some("/tmp/string.las"));
+        assert_eq!(options.filename_headers().get("k"), Some(&"v".to_string()));
+
+        let object = serde_json::json!({
+            "type": "readers.las",
+            "filename": {
+                "path": "https://example.com/input.las?existing=1",
+                "query": {"token": "abc 123", "mode": "preview"}
+            }
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(
+            options.value("filename"),
+            Some("https://example.com/input.las?existing=1&mode=preview&token=abc%20123")
+        );
+
+        let object = serde_json::json!({
+            "type": "readers.las",
+            "filename": {
+                "path": "s3://bucket/input.las",
+                "query": {"versionId": "abc+123"}
+            }
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(
+            options.value("filename"),
+            Some("s3://bucket/input.las?versionId=abc%2B123")
+        );
+
+        let object = serde_json::json!({
+            "type": "readers.las",
+            "filename": {
+                "path": "/tmp/local.las",
+                "query": {"token": "ignored"}
+            }
+        });
+        let options = Options::from_pipeline_stage_object(object.as_object().unwrap()).unwrap();
+        assert_eq!(options.value("filename"), Some("/tmp/local.las"));
     }
 
     #[test]

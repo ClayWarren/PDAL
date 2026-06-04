@@ -575,16 +575,21 @@ Current caveat classes:
   datasource/update workflows still need explicit native-adapter plumbing and
   regression coverage before they can be claimed.
 - EPT/COPC/STAC preview and remote breadth: covered EPT preview filters, local
-  EPT/COPC/STAC workflows, and selected remote/VSI paths are Rust-backed, but
-  broad remote traversal, schema validation, and object-store option parity
-  remain named work items.
+  EPT/COPC/STAC workflows, and selected remote/VSI/object-store path forms are
+  Rust-backed, including `FileSpec` query propagation and scoped GDAL VSI
+  header forwarding through LAS/COPC, EPT root/hierarchy/tile reads, EPT
+  addon/source-origin sidecars, STAC traversal/asset dispatch, and TIndex
+  GeoJSON/asset dispatch. Broad remote traversal, object-store credential
+  workflows, schema validation, and native-connector parity remain named work
+  items.
 - Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
   but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.
 - Packaging, CI, install/export, and release policy: these must prove the
   Rust C ABI as an installed, upstreamable surface across supported platforms.
-- Optional plugins: `faux`, `nitf`, and `spz` are compatibility checkpoints;
-  other plugins are native adapters or deferred until a plugin SDK/versioning
-  policy exists.
+- Optional plugins: the broad triage is closed for the current first-party port.
+  `faux`, `nitf`, and `spz` are compatibility checkpoints; other plugins are
+  native adapters or deferred by decision until a plugin SDK/versioning policy
+  exists. Do not treat them as active port-candidate backlog.
 - Performance and quality gates: coverage, mutation testing, unsafe tracking,
   memory/performance/binary/startup/compile-time comparisons are visibility
   gates until the project decides which ones become hard release gates.
