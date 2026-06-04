@@ -64,6 +64,35 @@ use super::*;
         let _ = std::fs::remove_file(path);
     }
 
+    fn assert_header_option_error(key: &str, value: u64, expected: &str) {
+        let path = temp_las(&format!("{key}-{value}.las"));
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add(key, value);
+        let mut writer = LasWriter::new(&options);
+
+        let err = writer.write(&[synthetic_point_view()]).unwrap_err();
+
+        assert!(err.to_string().contains(expected));
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn writer_validates_las_header_option_ranges() {
+        assert_header_option_error("major_version", 2, "major_version must be 1");
+        assert_header_option_error("minor_version", 5, "minor_version must be between 1 and 4");
+        assert_header_option_error(
+            "global_encoding",
+            32,
+            "global_encoding must be between 0 and 31",
+        );
+        assert_header_option_error(
+            "creation_doy",
+            367,
+            "creation_doy must be between 0 and 366",
+        );
+    }
+
     #[test]
     fn writer_writes_with_pdal_metadata_and_pipeline_vlrs() {
         let path = temp_las("pdal-meta.las");

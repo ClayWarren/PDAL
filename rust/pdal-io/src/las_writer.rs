@@ -39,6 +39,7 @@ const LAS14_MAX_RETURN_COUNT: u8 = 15;
 pub struct LasWriter {
     filename: String,
     compression: bool,
+    major_version: Option<u8>,
     minor_version: Option<u8>,
     point_format: u8,
     scale_x: Option<f64>,
@@ -151,6 +152,7 @@ impl LasWriter {
         Self {
             filename: options.get_str("filename", ""),
             compression: driver_requests_compression || options.get_bool("compression", false),
+            major_version: numeric_option_u8(options, "major_version"),
             minor_version: numeric_option_u8(options, "minor_version"),
             point_format,
             scale_x: numeric_option_f64(options, "scale_x"),
@@ -187,6 +189,35 @@ impl LasWriter {
 
     fn initial_builder(&self, views: &[PointView]) -> Result<Builder, StageError> {
         let mut builder = Builder::from(Header::default());
+        if let Some(major) = self.major_version {
+            if major != 1 {
+                return Err(StageError(format!(
+                    "LAS major_version must be 1, got {major}."
+                )));
+            }
+            builder.version.major = major;
+        }
+        if let Some(minor) = self.minor_version {
+            if !(1..=4).contains(&minor) {
+                return Err(StageError(format!(
+                    "LAS minor_version must be between 1 and 4, got {minor}."
+                )));
+            }
+        }
+        if let Some(global_encoding) = self.global_encoding {
+            if global_encoding > 31 {
+                return Err(StageError(format!(
+                    "LAS global_encoding must be between 0 and 31, got {global_encoding}."
+                )));
+            }
+        }
+        if let Some(doy) = self.creation_doy {
+            if doy > 366 {
+                return Err(StageError(format!(
+                    "LAS creation_doy must be between 0 and 366, got {doy}."
+                )));
+            }
+        }
         builder.point_format = Format::new(self.point_format)
             .map_err(|e| StageError(format!("Invalid point format: {}", e)))?;
         if let Some(minor) = self.minor_version {
