@@ -23,7 +23,6 @@ dependencies:
   - ninja
   - cmake
   - rust
-  - cargo
   - pkg-config
   - make  # [not win]
   - re2  # [linux]

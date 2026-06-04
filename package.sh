@@ -30,7 +30,7 @@ fi
 
 
 mamba update --all -y -n base
-mamba install -c conda-forge -y -n base cmake make ninja gdal compilers rust cargo
+mamba install -c conda-forge -y -n base cmake make ninja gdal compilers rust
 
 git clone https://github.com/PDAL/PDAL.git;
 cd /PDAL;
