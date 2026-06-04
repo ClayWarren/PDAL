@@ -17,6 +17,17 @@ it unless a concrete parity failure proves the decision wrong.
 | Unsafe Rust | Keep unsafe at C ABI, native FFI, and tests for those boundaries. | Unsafe spread into ordinary stage logic would defeat the purpose of the port. |
 | Formatting-only churn | Keep formatting out of port commits except where touched code needs local formatting. | The port diff is already large; formatting belongs in its own branch/PR. |
 
+## Release Gate Decisions
+
+| Gate | Decision | Reason |
+|---|---|---|
+| Rust default guard | Release-blocking. `rust-guard` must pass. | This covers formatting, type checking, clippy, Rust tests, coverage threshold, license audit, unsafe accounting, and C ABI header sync. |
+| C++ compatibility audits | Release-blocking. `rust-cpp-test-parity` and `rust-cpp-port-audit` must pass before upstreaming. | The port is only valid if the pre-port C++ behavioral contract remains Rust C ABI-backed and the implementation backlog stays classified. |
+| Install/export/package smoke | Release-blocking. `rust-capi-install-smoke` and `rust-source-package-smoke` must pass. | Downstream consumers need `find_package(PDAL)` / `PDAL::CAPI` and source releases to work, not just the build tree. |
+| Rust mutation testing | Visibility gate, not release-blocking yet. | Run deliberately on mature buckets; require investigation of meaningful survivors before promoting to a threshold. |
+| Performance, memory, binary size, startup, compile time, and full-suite timing | Visibility gates. Record comparable data and explain major regressions; do not block on fixed ratios yet. | Current harnesses are useful but still platform/build-config-sensitive. Hard thresholds need a controlled same-config baseline. |
+| C++ coverage | Not a Rust-port release gate. | The pre-existing C++ tests are the compatibility contract; raising legacy C++ coverage is lower value than finishing and guarding the Rust-backed replacement. |
+
 ## Mainline Source Areas
 
 | Area | Decision | What remains |

@@ -67,10 +67,10 @@ readiness and policy for the accepted boundaries below:
   consumption must be stable enough for upstream use.
 - Optional plugins: completed checkpoints are listed below; other plugins are
   native adapters or deferred until a versioned plugin boundary exists.
-- Final quality gates: Rust/C++ test parity, coverage, mutation testing,
-  unsafe accounting, performance, memory, binary size, startup time, compile
-  time, and full-suite timing are recorded or runnable visibility gates. Decide
-  which become release-blocking policy before upstreaming.
+- Final quality gates: `rust/DECISIONS.md` records which gates are
+  release-blocking and which remain visibility gates. Keep release-blocking
+  gates green and refresh visibility evidence when behavior or build shape
+  changes.
 
 When continuing from here, do not restart old directory sweeps or add
 placeholder Rust modules. Work only on a concrete regression, upstream-readiness

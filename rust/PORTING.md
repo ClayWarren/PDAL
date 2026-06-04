@@ -159,10 +159,9 @@ Current active milestone:
    and vendor-heavy behavior are accepted native-adapter/deferred boundaries
    unless a concrete parity failure proves otherwise.
 3. Current useful work is upstream-readiness work: package/install/export
-   verification, C ABI stability policy, CI/platform hardening, final
-   regression/performance evidence, and release-blocking policy for coverage,
-   mutation testing, unsafe footprint, memory, binary size, startup time,
-   compile time, and full-suite timing.
+   verification, C ABI stability maintenance, CI/platform hardening, final
+   regression/performance evidence, and keeping the release-blocking gates in
+   `rust/DECISIONS.md` green.
 4. New I/O, command, vendor, and plugin work should be narrow and
    fixture-backed. Broad sweeps are appropriate only after a closed boundary is
    deliberately reopened as a concrete, regression-testable milestone.
@@ -593,10 +592,11 @@ Accepted boundary classes:
   `faux`, `nitf`, and `spz` are compatibility checkpoints; other plugins are
   native adapters or deferred by decision until a plugin SDK/versioning policy
   exists. Do not treat them as active port-candidate backlog.
-- Performance and quality gates: coverage, mutation testing, unsafe tracking,
-  memory/performance/binary/startup/compile-time comparisons are runnable or
-  recorded visibility gates until the project decides which ones become hard
-  release gates.
+- Performance and quality gates: coverage, unsafe tracking, C++ parity,
+  C++ implementation-backlog classification, install/export, and source
+  packaging are release-blocking gates per `rust/DECISIONS.md`; mutation
+  testing and performance/memory/binary/startup/compile-time comparisons remain
+  visibility gates until a controlled threshold policy is chosen.
 
 If an accepted boundary is deliberately reopened, update `STATUS.md` and
 `DECISIONS.md` with the concrete parity failure or policy change that justifies
