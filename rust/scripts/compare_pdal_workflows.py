@@ -103,6 +103,10 @@ def write_pipeline(path: Path, stages: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps({"pipeline": stages}, indent=2))
 
 
+def write_pipeline_array(path: Path, stages: list[Any]) -> None:
+    path.write_text(json.dumps(stages, indent=2))
+
+
 def compare_bytes(left: Path, right: Path) -> None:
     left_bytes = left.read_bytes()
     right_bytes = right.read_bytes()
@@ -260,6 +264,24 @@ def canonical_las_points(pdal: str, source: Path, output: Path) -> None:
                 "type": "writers.text",
                 "filename": str(output),
                 "order": "X,Y,Z,Intensity,ReturnNumber,NumberOfReturns",
+                "quote_header": False,
+                "precision": 8,
+            },
+        ],
+    )
+    run(pdal, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
+
+
+def canonical_xyz_text(pdal: str, source: Path, output: Path) -> None:
+    pipeline = output.with_suffix(".json")
+    write_pipeline_array(
+        pipeline,
+        [
+            str(source),
+            {
+                "type": "writers.text",
+                "filename": str(output),
+                "order": "X,Y,Z",
                 "quote_header": False,
                 "precision": 8,
             },
@@ -522,6 +544,30 @@ def case_text_decimation_exact(ref: str, rust: str, tmp: Path) -> None:
     compare_bytes(ref_out, rust_out)
 
 
+def case_pipeline_array_text_exact(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/text/utm17_1.txt"
+    ref_out = tmp / "pipeline-array-ref.txt"
+    rust_out = tmp / "pipeline-array-rust.txt"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        pipeline = output.with_suffix(".json")
+        write_pipeline_array(
+            pipeline,
+            [
+                {"type": "readers.text", "filename": str(input_path)},
+                {"type": "filters.decimation", "step": 2},
+                {
+                    "type": "writers.text",
+                    "filename": str(output),
+                    "order": "X,Y,Z",
+                    "quote_header": False,
+                    "precision": 2,
+                },
+            ],
+        )
+        run(binary, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
+    compare_bytes(ref_out, rust_out)
+
+
 def case_pcd_decimation_semantic(ref: str, rust: str, tmp: Path) -> None:
     input_path = REPO / "test/data/pcd/utm17_space.pcd"
     ref_out = tmp / "pcd-ref.pcd"
@@ -543,6 +589,65 @@ def case_pcd_decimation_semantic(ref: str, rust: str, tmp: Path) -> None:
         )
         run(binary, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
     compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_pipeline_filename_strings_pcd_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "pipeline-string-ref.pcd"
+    rust_out = tmp / "pipeline-string-rust.pcd"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        pipeline = output.with_suffix(".json")
+        write_pipeline_array(
+            pipeline,
+            [str(input_path), {"type": "filters.decimation", "step": 2}, str(output)],
+        )
+        run(binary, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
+    compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_pipeline_pcd_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/pcd/utm17_space.pcd"
+    ref_out = tmp / "pipeline-pcd-ref.pcd"
+    rust_out = tmp / "pipeline-pcd-rust.pcd"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        pipeline = output.with_suffix(".json")
+        write_pipeline_array(
+            pipeline,
+            [
+                {"type": "readers.pcd", "filename": str(input_path)},
+                {"type": "filters.decimation", "step": 2},
+                {"type": "writers.pcd", "filename": str(output), "order": "X,Y,Z", "precision": 2},
+            ],
+        )
+        run(binary, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
+    compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_pipeline_ply_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "pipeline-ply-ref.ply"
+    rust_out = tmp / "pipeline-ply-rust.ply"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        pipeline = output.with_suffix(".json")
+        write_pipeline_array(
+            pipeline,
+            [
+                {"type": "readers.ply", "filename": str(input_path)},
+                {"type": "filters.decimation", "step": 2},
+                {
+                    "type": "writers.ply",
+                    "filename": str(output),
+                    "storage_mode": "ascii",
+                    "precision": 6,
+                },
+            ],
+        )
+        run(binary, ["pipeline", str(pipeline)], stdout=subprocess.DEVNULL)
+    ref_txt = tmp / "pipeline-ply-ref.txt"
+    rust_txt = tmp / "pipeline-ply-rust.txt"
+    canonical_xyz_text(rust, ref_out, ref_txt)
+    canonical_xyz_text(rust, rust_out, rust_txt)
+    compare_csv_common_numeric(ref_txt, rust_txt, {})
 
 
 def case_las_head_points_semantic(ref: str, rust: str, tmp: Path) -> None:
@@ -713,7 +818,11 @@ def main() -> int:
         ("unknown command exit/stderr", "exact", case_unknown_command_exact),
         ("pdal --list-commands command set", "semantic", case_list_commands_semantic),
         ("text decimation artifact bytes", "exact", case_text_decimation_exact),
+        ("pipeline array text artifact bytes", "exact", case_pipeline_array_text_exact),
         ("PCD decimation point payload", "semantic", case_pcd_decimation_semantic),
+        ("pipeline filename string PCD payload", "semantic", case_pipeline_filename_strings_pcd_semantic),
+        ("pipeline PCD payload", "semantic", case_pipeline_pcd_semantic),
+        ("pipeline PLY payload", "semantic", case_pipeline_ply_semantic),
         ("LAS head point payload", "semantic", case_las_head_points_semantic),
         ("translate command PLY to PCD", "semantic", case_translate_command_pcd_semantic),
         ("merge command PLY to PCD", "semantic", case_merge_command_pcd_semantic),
