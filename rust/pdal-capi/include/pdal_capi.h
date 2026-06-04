@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define PDAL_CAPI_ABI_VERSION_MAJOR 0u
-#define PDAL_CAPI_ABI_VERSION_MINOR 1u
+#define PDAL_CAPI_ABI_VERSION_MINOR 2u
 #define PDAL_CAPI_ABI_VERSION_PATCH 0u
 #define PDAL_CAPI_ABI_VERSION                                                \
     ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                              \
@@ -1376,6 +1376,9 @@ extern "C"
     pdal_stage_t* pdal_stage_create_overlay(const char* dim_name,
                                             const char* datasource,
                                             const char* column);
+    pdal_stage_t* pdal_stage_create_overlay_with_options(
+        const char* dim_name, const char* datasource, const char* column,
+        const char* layer_name, const char* query, const char* bounds_wkt);
     pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
     char*
     pdal_georeference_validate_coordinate_system(const char* coordinate_system);

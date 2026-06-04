@@ -4,7 +4,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 pub const PDAL_CAPI_ABI_VERSION_MAJOR: u32 = 0;
-pub const PDAL_CAPI_ABI_VERSION_MINOR: u32 = 1;
+pub const PDAL_CAPI_ABI_VERSION_MINOR: u32 = 2;
 pub const PDAL_CAPI_ABI_VERSION_PATCH: u32 = 0;
 pub const PDAL_CAPI_ABI_VERSION: u32 = (PDAL_CAPI_ABI_VERSION_MAJOR * 1_000_000)
     + (PDAL_CAPI_ABI_VERSION_MINOR * 1_000)

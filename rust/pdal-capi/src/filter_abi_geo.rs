@@ -101,6 +101,30 @@ pub unsafe extern "C" fn pdal_stage_create_overlay(
     datasource: *const c_char,
     column: *const c_char,
 ) -> *mut StageWrapper {
+    pdal_stage_create_overlay_with_options(
+        dim_name,
+        datasource,
+        column,
+        std::ptr::null(),
+        std::ptr::null(),
+        std::ptr::null(),
+    )
+}
+
+/// Create an overlay filter stage with optional layer/query/bounds settings.
+///
+/// # Safety
+///
+/// String pointers must be null-terminated.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stage_create_overlay_with_options(
+    dim_name: *const c_char,
+    datasource: *const c_char,
+    column: *const c_char,
+    layer_name: *const c_char,
+    query: *const c_char,
+    bounds_wkt: *const c_char,
+) -> *mut StageWrapper {
     if dim_name.is_null() || datasource.is_null() {
         set_last_error("null argument to pdal_stage_create_overlay");
         return std::ptr::null_mut();
@@ -113,10 +137,38 @@ pub unsafe extern "C" fn pdal_stage_create_overlay(
     } else {
         CStr::from_ptr(column).to_string_lossy()
     };
+    let layer_name = if layer_name.is_null() {
+        "".into()
+    } else {
+        CStr::from_ptr(layer_name).to_string_lossy()
+    };
+    let query = if query.is_null() {
+        "".into()
+    } else {
+        CStr::from_ptr(query).to_string_lossy()
+    };
+    let bounds_wkt = if bounds_wkt.is_null() {
+        "".into()
+    } else {
+        CStr::from_ptr(bounds_wkt).to_string_lossy()
+    };
 
-    Box::into_raw(Box::new(StageWrapper {
-        filter: Box::new(OverlayFilter::new(&dim_name, &datasource, &column)),
-    }))
+    match OverlayFilter::with_options(
+        &dim_name,
+        &datasource,
+        &column,
+        &layer_name,
+        &query,
+        &bounds_wkt,
+    ) {
+        Ok(filter) => Box::into_raw(Box::new(StageWrapper {
+            filter: Box::new(filter),
+        })),
+        Err(err) => {
+            set_last_error(err.0);
+            std::ptr::null_mut()
+        }
+    }
 }
 
 /// Create a color interpolation filter stage.

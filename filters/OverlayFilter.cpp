@@ -113,9 +113,15 @@ void OverlayFilter::ready(PointTableRef table)
 {
     if (m_rustStage)
         pdal_stage_destroy(m_rustStage);
-    m_rustStage = pdal_stage_create_overlay(
+    std::string boundsWkt;
+    if (!m_bounds.empty())
+        boundsWkt = m_bounds.toWKT();
+    m_rustStage = pdal_stage_create_overlay_with_options(
         m_dimName.c_str(), m_datasource.c_str(),
-        m_column.empty() ? nullptr : m_column.c_str());
+        m_column.empty() ? nullptr : m_column.c_str(),
+        m_layer.empty() ? nullptr : m_layer.c_str(),
+        m_query.empty() ? nullptr : m_query.c_str(),
+        boundsWkt.empty() ? nullptr : boundsWkt.c_str());
     if (!m_rustStage)
     {
         const char* message = pdal_last_error();

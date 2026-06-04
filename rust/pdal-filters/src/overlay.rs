@@ -13,6 +13,7 @@ pub struct OverlayFilter {
     query: String,
     bounds_filter: Option<Geometry>,
     polygons: Vec<(Geometry, i32)>,
+    polygons_loaded: bool,
 }
 
 impl OverlayFilter {
@@ -35,6 +36,7 @@ impl OverlayFilter {
             query: query.to_string(),
             bounds_filter: None,
             polygons: Vec::new(),
+            polygons_loaded: false,
         }
     }
 
@@ -59,11 +61,12 @@ impl OverlayFilter {
             query: query.to_string(),
             bounds_filter,
             polygons: Vec::new(),
+            polygons_loaded: false,
         })
     }
 
     fn ensure_polygons(&mut self) -> Result<(), StageError> {
-        if self.polygons.is_empty() {
+        if !self.polygons_loaded {
             gdal::register_drivers();
             let ds = Vector::open(&self.datasource).map_err(StageError)?;
             let features = if !self.layer_name.is_empty() {
@@ -84,6 +87,7 @@ impl OverlayFilter {
                 }
                 self.polygons.push((geom, val));
             }
+            self.polygons_loaded = true;
         }
         Ok(())
     }
@@ -130,5 +134,6 @@ impl Streamable for OverlayFilter {
 
     fn reset(&mut self) {
         self.polygons.clear();
+        self.polygons_loaded = false;
     }
 }

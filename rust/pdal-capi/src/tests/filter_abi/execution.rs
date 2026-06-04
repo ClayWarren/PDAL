@@ -259,6 +259,12 @@ fn test_geo_filters_execution() {
         pdal_stage_destroy(overlay);
         pdal_point_view_destroy(view2);
 
+        check_overlay_bounds_filter_excludes_point(
+            class_dim.as_ptr(),
+            overlay_ds.as_ptr(),
+            cls_col.as_ptr(),
+        );
+
         // --- 3. HagDemFilter ---
         // Setup point layout registering X, Y, Z, HeightAboveGround
         let layout3 = pdal_point_layout_create();
@@ -336,4 +342,39 @@ fn test_geo_filters_execution() {
         pdal_point_view_destroy(view5);
         pdal_stage_destroy(hag_dem_bad);
     }
+}
+
+unsafe fn check_overlay_bounds_filter_excludes_point(
+    class_dim: *const std::os::raw::c_char,
+    overlay_ds: *const std::os::raw::c_char,
+    cls_col: *const std::os::raw::c_char,
+) {
+    let bounded_layout = pdal_point_layout_create();
+    for dim in ["X", "Y", "Z", "Classification"] {
+        let name = cstring(dim);
+        pdal_point_layout_register_dim(bounded_layout, name.as_ptr(), 9);
+    }
+    let bounded_view = pdal_point_view_create(bounded_layout);
+    let idx = pdal_point_view_add_point(bounded_view);
+    pdal_point_view_set_f64(bounded_view, idx, cstring("X").as_ptr(), -123.065);
+    pdal_point_view_set_f64(bounded_view, idx, cstring("Y").as_ptr(), 44.058);
+    pdal_point_view_set_f64(bounded_view, idx, cstring("Z").as_ptr(), 0.0);
+    pdal_point_view_set_f64(bounded_view, idx, cstring("Classification").as_ptr(), 0.0);
+
+    let far_bounds = cstring("POLYGON((0 0,0 1,1 1,1 0,0 0))");
+    let bounded_overlay = pdal_stage_create_overlay_with_options(
+        class_dim,
+        overlay_ds,
+        cls_col,
+        std::ptr::null(),
+        std::ptr::null(),
+        far_bounds.as_ptr(),
+    );
+    assert!(!bounded_overlay.is_null());
+    let out = pdal_stage_run(bounded_overlay, bounded_view);
+    assert!(!out.is_null());
+    assert_eq!(get(out, 0, "Classification"), 0.0);
+    pdal_point_view_destroy(out);
+    pdal_stage_destroy(bounded_overlay);
+    pdal_point_view_destroy(bounded_view);
 }
