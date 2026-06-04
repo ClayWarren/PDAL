@@ -87,7 +87,10 @@ void EptInfo::initialize()
     const std::string infoStr = m_info.dump();
     char* srsWkt = nullptr;
     if (!pdal_ept_srs_wkt_from_info(infoStr.c_str(), &srsWkt))
-        throw pdal_error(pdal_last_error());
+    {
+        const char* err = pdal_last_error();
+        throw pdal_error(err ? err : "Unable to parse EPT SRS metadata.");
+    }
     if (srsWkt)
     {
         std::string wkt(srsWkt);
