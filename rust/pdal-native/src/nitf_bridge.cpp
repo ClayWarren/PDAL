@@ -1,4 +1,4 @@
-#include <import/nitf.hpp>
+#include <nitro/c++/import/nitf.hpp>
 
 #include <algorithm>
 #include <cctype>

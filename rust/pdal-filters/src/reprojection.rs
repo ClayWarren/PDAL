@@ -71,6 +71,10 @@ impl Streamable for ReprojectionFilter {
         let mut y = view.get_f64(idx, &DimId::Y);
         let mut z = view.get_f64(idx, &DimId::Z);
 
+        if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+            return !self.error_on_failure;
+        }
+
         if let Some(ref xform) = self.transform {
             if xform.transform(&mut x, &mut y, &mut z) {
                 view.set_f64(idx, &DimId::X, x);

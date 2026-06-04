@@ -24,6 +24,7 @@ fn main() {
             .std("c++17")
             .define("_REENTRANT", None)
             .define("__POSIX", None)
+            .include(&include)
             .include(include.join("nitro/c++"))
             .include(include.join("nitro/c"))
             .file("src/nitf_bridge.cpp")

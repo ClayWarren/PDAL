@@ -80,8 +80,8 @@ fn test_reprojection_with_error_on_failure() {
     layout.register(DimId::Z, pdal_core::point::DimType::F64);
     let mut view = PointView::new(std::rc::Rc::new(layout));
     let idx = view.add_point();
-    view.set_f64(idx, &DimId::X, 1e9);
-    view.set_f64(idx, &DimId::Y, 1e9);
+    view.set_f64(idx, &DimId::X, f64::NAN);
+    view.set_f64(idx, &DimId::Y, 47.6097);
     view.set_f64(idx, &DimId::Z, 0.0);
     view.set_spatial_reference(pdal_core::srs::SpatialReference::new("EPSG:4326"));
 
