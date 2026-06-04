@@ -1,6 +1,16 @@
 #!/bin/bash
 
-conda install -c conda-forge conda-build conda-index -y
+for attempt in 1 2 3; do
+    if conda install -c conda-forge conda-build conda-index -y; then
+        break
+    fi
+
+    if [ "$attempt" -eq 3 ]; then
+        exit 1
+    fi
+
+    sleep $((attempt * 10))
+done
 pwd
 ls
 git clone https://github.com/conda-forge/libpdal-feedstock.git
