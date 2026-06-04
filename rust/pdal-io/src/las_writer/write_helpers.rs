@@ -784,36 +784,6 @@ pub(super) fn pdrf_dims(pdrf: u8) -> Vec<DimId> {
     dims
 }
 
-pub(super) fn numeric_option_f64(options: &Options, key: &str) -> Option<f64> {
-    options
-        .value(key)
-        .and_then(|value| value.trim().parse::<f64>().ok())
-}
-
-pub(super) fn numeric_option_u8(options: &Options, key: &str) -> Option<u8> {
-    options
-        .value(key)
-        .and_then(|value| value.trim().parse::<u8>().ok())
-}
-
-pub(super) fn numeric_option_u16(options: &Options, key: &str) -> Option<u16> {
-    options
-        .value(key)
-        .and_then(|value| value.trim().parse::<u16>().ok())
-}
-
-pub(super) fn numeric_option_u32(options: &Options, key: &str) -> Option<u32> {
-    options
-        .value(key)
-        .and_then(|value| value.trim().parse::<u32>().ok())
-}
-
-pub(super) fn numeric_option_i32(options: &Options, key: &str) -> Option<i32> {
-    options
-        .value(key)
-        .and_then(|value| value.trim().parse::<i32>().ok())
-}
-
 pub(super) fn string_option(options: &Options, key: &str) -> Option<String> {
     options.value(key).map(ToString::to_string)
 }

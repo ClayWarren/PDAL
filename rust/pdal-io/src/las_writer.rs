@@ -15,6 +15,7 @@ use pdal_core::utils::base64_decode;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom};
 use std::path::Path;
+use std::str::FromStr;
 
 const HEADER_MAX_X_OFFSET: u64 = 179;
 const LEGACY_POINT_COUNT_OFFSET: u64 = 107;
@@ -39,6 +40,7 @@ const LAS14_MAX_RETURN_COUNT: u8 = 15;
 pub struct LasWriter {
     filename: String,
     compression: bool,
+    validation_errors: Vec<String>,
     major_version: Option<u8>,
     minor_version: Option<u8>,
     point_format: u8,
@@ -144,32 +146,33 @@ impl LasWriter {
     }
 
     fn new_with_compression(options: &Options, driver_requests_compression: bool) -> Self {
-        let point_format = ["dataformat_id", "format", "point_format"]
-            .into_iter()
-            .find_map(|key| numeric_option_u8(options, key))
-            .unwrap_or(3);
+        let mut validation_errors = Vec::new();
+        let point_format = las_point_format_option(options, &mut validation_errors).unwrap_or(3);
+        let project_id = uuid_option(options, "project_id", &mut validation_errors);
 
         Self {
             filename: options.get_str("filename", ""),
             compression: driver_requests_compression || options.get_bool("compression", false),
-            major_version: numeric_option_u8(options, "major_version"),
-            minor_version: numeric_option_u8(options, "minor_version"),
+            major_version: strict_numeric_option(options, "major_version", &mut validation_errors),
+            minor_version: strict_numeric_option(options, "minor_version", &mut validation_errors),
             point_format,
-            scale_x: numeric_option_f64(options, "scale_x"),
-            scale_y: numeric_option_f64(options, "scale_y"),
-            scale_z: numeric_option_f64(options, "scale_z"),
-            offset_x: numeric_option_f64(options, "offset_x"),
-            offset_y: numeric_option_f64(options, "offset_y"),
-            offset_z: numeric_option_f64(options, "offset_z"),
-            file_source_id: numeric_option_u16(options, "filesource_id"),
+            scale_x: strict_numeric_option(options, "scale_x", &mut validation_errors),
+            scale_y: strict_numeric_option(options, "scale_y", &mut validation_errors),
+            scale_z: strict_numeric_option(options, "scale_z", &mut validation_errors),
+            offset_x: strict_numeric_option(options, "offset_x", &mut validation_errors),
+            offset_y: strict_numeric_option(options, "offset_y", &mut validation_errors),
+            offset_z: strict_numeric_option(options, "offset_z", &mut validation_errors),
+            file_source_id: strict_numeric_option(options, "filesource_id", &mut validation_errors),
             system_id: string_option(options, "system_id"),
             software_id: string_option(options, "software_id"),
-            creation_doy: numeric_option_u32(options, "creation_doy"),
-            creation_year: numeric_option_i32(options, "creation_year"),
-            project_id: options
-                .value("project_id")
-                .and_then(|value| uuid::Uuid::parse_str(value.trim()).ok()),
-            global_encoding: numeric_option_u16(options, "global_encoding"),
+            creation_doy: strict_numeric_option(options, "creation_doy", &mut validation_errors),
+            creation_year: strict_numeric_option(options, "creation_year", &mut validation_errors),
+            project_id,
+            global_encoding: strict_numeric_option(
+                options,
+                "global_encoding",
+                &mut validation_errors,
+            ),
             forward: options.get_str("forward", ""),
             a_srs: string_option(options, "a_srs"),
             pdal_metadata_json: string_option(options, "pdal_metadata_json"),
@@ -183,11 +186,15 @@ impl LasWriter {
             discard_high_return_numbers: options.get_bool("discard_high_return_numbers", false),
             forward_vlrs: forward_vlrs_from_options(options),
             reject_standard_extra_dims: false,
+            validation_errors,
             stream: StreamSlot(None),
         }
     }
 
     fn initial_builder(&self, views: &[PointView]) -> Result<Builder, StageError> {
+        if let Some(err) = self.validation_errors.first() {
+            return Err(StageError(err.clone()));
+        }
         let mut builder = Builder::from(Header::default());
         if let Some(major) = self.major_version {
             if major != 1 {
@@ -517,6 +524,54 @@ fn validate_unique_spatial_reference(
     }
 
     Ok(())
+}
+
+fn las_point_format_option(options: &Options, errors: &mut Vec<String>) -> Option<u8> {
+    ["dataformat_id", "format", "point_format"]
+        .into_iter()
+        .find_map(|key| {
+            options
+                .value(key)
+                .map(|_| strict_numeric_option(options, key, errors))
+        })
+        .flatten()
+}
+
+fn strict_numeric_option<T>(options: &Options, key: &str, errors: &mut Vec<String>) -> Option<T>
+where
+    T: FromStr,
+{
+    let value = options.value(key)?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    match trimmed.parse::<T>() {
+        Ok(parsed) => Some(parsed),
+        Err(_) => {
+            errors.push(format!(
+                "LAS option '{key}' has invalid numeric value '{value}'."
+            ));
+            None
+        }
+    }
+}
+
+fn uuid_option(options: &Options, key: &str, errors: &mut Vec<String>) -> Option<uuid::Uuid> {
+    let value = options.value(key)?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    match uuid::Uuid::parse_str(trimmed) {
+        Ok(uuid) => Some(uuid),
+        Err(_) => {
+            errors.push(format!(
+                "LAS option '{key}' has invalid UUID value '{value}'."
+            ));
+            None
+        }
+    }
 }
 
 mod write_helpers;

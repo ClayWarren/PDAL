@@ -428,41 +428,6 @@ mod tests {
     }
 
     #[test]
-    fn numeric_option_f64_reads_value() {
-        let mut opts = Options::new();
-        opts.add("scale_x", "0.001");
-        assert!((numeric_option_f64(&opts, "scale_x").unwrap() - 0.001).abs() < 1e-9);
-    }
-
-    #[test]
-    fn numeric_option_u8_reads_value() {
-        let mut opts = Options::new();
-        opts.add("test_opt", "42");
-        assert_eq!(numeric_option_u8(&opts, "test_opt").unwrap(), 42);
-    }
-
-    #[test]
-    fn numeric_option_u16_reads_value() {
-        let mut opts = Options::new();
-        opts.add("test_opt", "1000");
-        assert_eq!(numeric_option_u16(&opts, "test_opt").unwrap(), 1000);
-    }
-
-    #[test]
-    fn numeric_option_u32_reads_value() {
-        let mut opts = Options::new();
-        opts.add("test_opt", "100000");
-        assert_eq!(numeric_option_u32(&opts, "test_opt").unwrap(), 100000);
-    }
-
-    #[test]
-    fn numeric_option_i32_reads_value() {
-        let mut opts = Options::new();
-        opts.add("test_opt", "-42");
-        assert_eq!(numeric_option_i32(&opts, "test_opt").unwrap(), -42);
-    }
-
-    #[test]
     fn string_option_reads_value() {
         let mut opts = Options::new();
         opts.add("test_opt", "hello");

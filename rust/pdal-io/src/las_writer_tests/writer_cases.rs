@@ -77,6 +77,19 @@ use super::*;
         assert!(!path.exists());
     }
 
+    fn assert_invalid_header_option_error(key: &str, value: &str, expected: &str) {
+        let path = temp_las(&format!("{key}-invalid.las"));
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add(key, value);
+        let mut writer = LasWriter::new(&options);
+
+        let err = writer.write(&[synthetic_point_view()]).unwrap_err();
+
+        assert!(err.to_string().contains(expected));
+        assert!(!path.exists());
+    }
+
     #[test]
     fn writer_validates_las_header_option_ranges() {
         assert_header_option_error("major_version", 2, "major_version must be 1");
@@ -91,6 +104,13 @@ use super::*;
             367,
             "creation_doy must be between 0 and 366",
         );
+    }
+
+    #[test]
+    fn writer_rejects_malformed_las_header_options() {
+        assert_invalid_header_option_error("minor_version", "bogus", "invalid numeric value");
+        assert_invalid_header_option_error("scale_x", "bogus", "invalid numeric value");
+        assert_invalid_header_option_error("project_id", "bogus", "invalid UUID value");
     }
 
     #[test]
