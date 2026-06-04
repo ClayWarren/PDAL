@@ -51,14 +51,14 @@ command workflows use semantic comparison because binary headers, metadata
 timestamps, point-format defaults, randomized samples, classification
 tie-breaks, and floating-point formatting are not always byte-stable contracts.
 
-### Results (macOS arm64, both `pdal 2.10.1`, 21 iterations, median)
+### Results (macOS arm64, both `pdal 2.10.1`, 15 iterations, median)
 
 | workload | C++ (ms) | Rust-backed (ms) | ratio | ratio, startup-subtracted |
 |---|---:|---:|---:|---:|
-| startup (`--version`) | 85.4 | 19.7 | 0.23 | — |
-| faux 3M → `filters.sort` → null | 1383.7 | 731.6 | 0.53 | 0.55 |
-| LAS read → `filters.decimation` → LAS write | 179.8 | 61.3 | 0.34 | 0.45 |
-| `info --stats` (autzen_trim.las) | 346.6 | 56.4 | 0.16 | 0.15 |
+| startup (`--version`) | 95.5 | 23.5 | 0.25 | — |
+| faux 3M → `filters.sort` → null | 1643.0 | 1217.0 | 0.74 | 0.77 |
+| LAS read → `filters.decimation` → LAS write | 188.9 | 84.9 | 0.45 | 0.66 |
+| `info --stats` (autzen_trim.las) | 373.8 | 88.3 | 0.24 | 0.23 |
 
 "startup-subtracted" removes each binary's own `--version` startup median to
 approximate the compute-only ratio.
@@ -69,10 +69,10 @@ pipeline yields 55,000 points on both.
 
 ### Reading the numbers
 
-The Rust-backed build is at least as fast as, and on these workloads faster
-than, the stock C++ build. The compute-bound `info --stats` and the LAS I/O
-pipeline show the largest gains; `filters.sort` over 3M synthetic points is
-~2x. There is **no major regression** on any measured path.
+The Rust-backed build is faster than the stock C++ build on these workloads,
+with the clearest gains in startup and `info --stats`. The `filters.sort` path
+still wins, but by a smaller margin than previous local runs. There is **no
+major regression** on any measured path.
 
 Honest caveats (do not over-read the ratios):
 
@@ -110,10 +110,10 @@ benchmark apply here.
 
 | workload | C++ (MiB) | Rust-backed (MiB) | ratio |
 |---|---:|---:|---:|
-| baseline (`--version`) | 31.9 | 20.3 | 0.64 |
-| faux 3M → `filters.sort` → null | 157.4 | 210.0 | 1.33 |
+| baseline (`--version`) | 31.8 | 20.3 | 0.64 |
+| faux 3M → `filters.sort` → null | 157.4 | 210.1 | 1.34 |
 | LAS read → `filters.decimation` → LAS write | 51.3 | 39.4 | 0.77 |
-| `info --stats` (autzen_trim.las) | 74.2 | 30.3 | 0.41 |
+| `info --stats` (autzen_trim.las) | 74.1 | 30.3 | 0.41 |
 
 Reading the numbers: three of the four workloads use **less** peak RSS than C++,
 and the streaming-eligible compute paths (`info --stats`, LAS decimation) are the
