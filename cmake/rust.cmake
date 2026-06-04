@@ -56,9 +56,6 @@ macro(pdal_build_rust_capi _pdal_target)
 endmacro()
 
 find_library(GEOS_C_LIBRARY NAMES geos_c)
-if(APPLE)
-    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
-endif()
 
 # When Nitro is available, the Rust pdal-native crate builds a NITF bridge
 # (used by tools.nitfwrap, readers.nitf, and writers.nitf). pdalcpp embeds
@@ -93,8 +90,10 @@ macro(pdal_link_rust_capi _target)
         PRIVATE
             ${RUST_CAPI_LIB}
             ${GEOS_C_LIBRARY}
-            ${COREFOUNDATION_FRAMEWORK}
     )
+    if (APPLE)
+        target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
+    endif()
     if (NITRO_FOUND AND NITRO_LIBRARIES)
         target_link_libraries(${_target}
             PRIVATE
