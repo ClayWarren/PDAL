@@ -37,7 +37,7 @@ it unless a concrete parity failure proves the decision wrong.
 | `kernels/` | Keep exported C++ kernel classes as API shells; Rust owns command dispatch for first-party commands through the C ABI. | Broaden command parity by workflow/output shape, not by deleting C++ classes. XML pipeline fallback remains explicit until Rust XML pipeline support is chosen. |
 | `filters/` | Pure first-party filter implementation backlog is closed. | Remaining C++ is wrapper/compatibility surface plus documented native/private adapters. New filter work should be parity-gap-driven only. |
 | `pdal/` core | Keep C++ compatibility shells; Rust owns behavior where a C ABI-backed replacement exists. | Expand Rust core only when a stage/I/O/command needs it. Do not rewrite by C++ source file. |
-| `io/` | Continue one deterministic reader/writer family at a time. | Local deterministic I/O is first. Remote/object-store and vendor-heavy readers stay explicit adapter/deferred decisions. |
+| `io/` | First-party I/O implementation backlog is closed for the current scope. | Local deterministic readers/writers, covered remote/VSI paths, and C ABI-backed wrappers are complete; broader OGR/cloud/vendor-heavy behavior remains native-adapter or parity-gap-driven work. |
 | `examples/` | Keep examples as downstream install/export checks. | Plugin-authoring examples wait for plugin SDK/export decisions. |
 | `doc/` | Keep Rust docs developer-facing until the port is upstreamable. | Public user docs wait for final build/install/plugin policy. |
 | `scripts/` | Treat scripts as QA and migration support, not product surface. | Add scripts only when they guard a named milestone. |
@@ -119,10 +119,15 @@ it unless a concrete parity failure proves the decision wrong.
 After these decisions, do not hunt for generic "remaining C++." The useful next
 work is:
 
-1. split oversized Rust test files where mechanical and low risk;
-2. strengthen parity/regression coverage for existing Rust-backed I/O and
-   command workflows;
-3. close concrete C++ implementation hidden inside C ABI-backed wrappers when it
-   is first-party behavior and not one of the holdouts above;
-4. improve platform/package/export gates;
-5. only then select a native-adapter/plugin family for a dedicated milestone.
+1. keep the release-blocking gates green: `rust-guard`,
+   `rust-cpp-test-parity`, `rust-cpp-port-audit`,
+   `rust-capi-install-smoke`, and `rust-source-package-smoke`;
+2. broaden upstream/platform confidence, especially Linux and Windows CI
+   behavior for Rust build, install/export, package, and C ABI consumer checks;
+3. refresh visibility evidence when behavior or build shape changes:
+   performance, memory, binary size, startup time, compile time, full-suite
+   timing, and targeted mutation testing;
+4. strengthen parity/regression coverage only for concrete user-visible deltas
+   in existing Rust-backed workflows;
+5. select a native-adapter/plugin family only as a dedicated milestone with
+   fixtures, dependency policy, and a regression target.

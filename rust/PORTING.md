@@ -108,15 +108,15 @@ roadmap as permission to sweep a directory.
    generic C++ sweep unless a concrete parity failure identifies new
    implementation work.
 3. Complete first-party filters by family.
-   Pure filters, spatial filters, and many linear/statistical filters are
-   represented. Remaining filters must start with the missing decision: Rust
-   implementation, native/FFI adapter, or intentional C++ holdout. Do not
-   revive broad pointer-sharing attempts across the C ABI.
+   **Complete for the current scope.** Pure filters, spatial filters,
+   linear/statistical filters, FFI-backed filters, and private-algorithm
+   filters are classified in `STATUS.md`. Do not reopen filter-family work
+   unless a concrete parity failure identifies new implementation work.
 4. Complete deterministic first-party local I/O.
-   Continue one reader/writer family at a time. Each family needs fixture
-   coverage, installed-PDAL regression where possible, option parity, metadata
-   and bounds behavior, and an explicit compression/native-dependency story.
-   Local deterministic behavior closes before broad remote/object-store claims.
+   **Complete for the current scope.** Local deterministic I/O, LAS/LAZ,
+   covered GDAL/OGR paths, and selected remote/VSI workflows are classified in
+   `STATUS.md`. New I/O work should be parity-gap-driven or an accepted
+   native-adapter milestone, not a broad reader/writer sweep.
 5. Close the core behaviors exposed by real pipelines.
    Expand `pdal-core` only as needed by stages, I/O, and commands: pipeline
    JSON, stage registry, layout mutation, dimensions, metadata, SRS, options,
@@ -265,10 +265,11 @@ foundations are not permission to skip ahead to broad top-layer ports.
 2. Expand `pdal/` core as filters require it. Do not attempt a standalone
    directory-wide core rewrite; each new core capability should be justified by
    a stage parity need.
-3. `io/` after the filter/core loop is stable. This checkpoint is now active:
-   local text/ASCII/binary formats, LAS/LAZ, and the first GDAL reader path
-   exist. Continue one narrow reader/writer family at a time, with option,
-   metadata, and installed-PDAL regression coverage.
+3. `io/` after the filter/core loop is stable. This checkpoint is complete for
+   the current scope: local text/ASCII/binary formats, LAS/LAZ, GDAL/OGR
+   families, and covered remote/VSI paths are classified in `STATUS.md`. Future
+   I/O work should start from a concrete parity failure or native-adapter
+   milestone.
 4. `apps/` and `tools/` after the library surface is stable enough to run real
    pipelines through the C ABI. This is small by LOC but high in dependency
    density: `apps/pdal.cpp` owns CLI dispatch and driver/option introspection,
@@ -478,15 +479,14 @@ Done when:
 
 Goal: prove readers/writers after the core and filter ABI are stable.
 
-This checkpoint is mature but still has named caveats. Keep the same
-discipline: each reader/writer family should be narrow, fixture-scoped,
+This checkpoint is complete for the current scope. Keep the same discipline if
+it is reopened: each reader/writer family should be narrow, fixture-scoped,
 option-aware, and regression-tested against installed PDAL where possible.
 Local deterministic I/O is broad, streaming coverage exists for many local
 paths, and the implementation-replacement audit has no unplanned I/O
-port-candidate files. Remaining I/O work is no longer "start I/O"; it is the
-specific caveat list in `STATUS.md`: LAS/LAZ edge options, COPC/EPT preview
-and addon breadth, GDAL/OGR/vector-source breadth, STAC remote/schema behavior,
-object-store parity, and packaging/regression evidence.
+port-candidate files. Remaining I/O-related work is accepted-boundary work from
+`STATUS.md`: broader GDAL/OGR/vector-source behavior, remote/schema/cloud
+behavior, vendor-heavy adapters, and packaging/regression evidence.
 
 Required shape:
 
