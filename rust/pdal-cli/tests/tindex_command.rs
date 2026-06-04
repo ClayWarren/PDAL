@@ -320,6 +320,37 @@ fn tindex_uses_custom_location_field_name() {
 }
 
 #[test]
+fn tindex_exact_boundary_auto_resolution_produces_rich_geometry() {
+    let input = data_path("test/data/tindex/t1.txt");
+
+    let result = run_tindex(&[
+        "create",
+        "--tindex",
+        "/vsistdout/",
+        input.to_str().unwrap(),
+        "--ogrdriver",
+        "GeoJSON",
+        "--threshold=1",
+        "--simplify=false",
+    ]);
+
+    assert!(
+        result.status.success(),
+        "tindex create failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    let geojson: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let coordinates = &geojson["features"][0]["geometry"]["coordinates"];
+    assert_eq!(geojson["features"][0]["geometry"]["type"], "MultiPolygon");
+    assert!(
+        coordinates.to_string().matches('[').count() > 10,
+        "expected exact boundary geometry, got {coordinates}"
+    );
+}
+
+#[test]
 fn tindex_merge_combines_geojson_index_sources() {
     let input = data_path("test/data/ply/simple_text.ply");
 

@@ -1,10 +1,8 @@
 use crate::pipeline_abi::{pipeline_result_to_json_for_kernel, PipelineHandle};
 use crate::registry::pipeline_from_json;
 use pdal_core::driver::infer_reader_driver;
-use pdal_core::expr::ConditionalExpression;
 use pdal_core::gdal::{LayerHandle, Vector};
-use pdal_core::point::DimId;
-use pdal_filters::hexer::HexGrid;
+use pdal_core::metadata::{MetadataNode, MetadataValue};
 use pdal_kernels::{
     parse_tindex_create_args, print_tindex_usage, BoundaryOptions, TindexCreateArgs as CreateArgs,
     TindexParseResult, INVALID_TINDEX_FILTER_STAGE_MESSAGE,
@@ -212,8 +210,24 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
         eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{file}'.");
         return Err(());
     };
+    let mut hexbin_stage = serde_json::json!({
+        "type": "filters.hexbin",
+        "threshold": opts.density,
+        "sample_size": opts.sample_size,
+    });
+    if opts.edge_length > 0.0 {
+        hexbin_stage["edge_length"] = serde_json::json!(opts.edge_length);
+    }
+    if let Some(where_expr) = &opts.where_expr {
+        hexbin_stage["where"] = serde_json::json!(where_expr);
+    }
+
     let mut pipeline = match pipeline_from_json(
-        &serde_json::json!([{ "type": driver, "filename": file }]).to_string(),
+        &serde_json::json!([
+            { "type": driver, "filename": file },
+            hexbin_stage
+        ])
+        .to_string(),
     ) {
         Ok(p) => p,
         Err(err) => {
@@ -221,105 +235,48 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
             return Err(());
         }
     };
-    let views = match pipeline.execute(Vec::new()) {
-        Ok(v) => v,
-        Err(err) => {
-            eprintln!("PDAL: kernels.tindex: {err}");
-            return Err(());
-        }
-    };
-
-    let mut grid = if opts.edge_length > 0.0 {
-        HexGrid::with_height(opts.edge_length * 3.0_f64.sqrt(), opts.density)
-    } else {
-        // Auto-edge-length sampling isn't ported yet; fall back to a small
-        // edge derived from the leading-point spacing so we still produce a
-        // boundary instead of throwing. The result will differ from
-        // installed PDAL when edge_length is left unset.
-        match estimate_edge_length(&views, opts.sample_size, opts.density) {
-            Some(h) => HexGrid::with_height(h, opts.density),
-            None => return Ok(None),
-        }
-    };
-    let mut where_expr = match &opts.where_expr {
-        Some(source) => match ConditionalExpression::parse(source) {
-            Ok(expr) => Some(expr),
-            Err(err) => {
-                eprintln!("PDAL: kernels.tindex: Invalid where expression '{source}': {err}");
-                return Err(());
-            }
-        },
-        None => None,
-    };
-
-    for view in &views {
-        if let Some(expr) = where_expr.as_mut() {
-            if let Err(err) = expr.prepare(view.layout().as_ref()) {
-                eprintln!("PDAL: kernels.tindex: Invalid where expression: {err}");
-                return Err(());
-            }
-        }
-        for idx in 0..view.len() {
-            if let Some(expr) = &where_expr {
-                if !expr.eval(view, idx) {
-                    continue;
-                }
-            }
-            let x = view.get_f64(idx, &DimId::X);
-            let y = view.get_f64(idx, &DimId::Y);
-            grid.add_xy(x, y);
-        }
+    if let Err(err) = pipeline.execute(Vec::new()) {
+        eprintln!("PDAL: kernels.tindex: {err}");
+        return Err(());
     }
-    if grid.find_shapes().is_err() {
+    boundary_from_hexbin_metadata(file, opts, &pipeline.metadata())
+}
+
+fn boundary_from_hexbin_metadata(
+    file: &str,
+    opts: &BoundaryOptions,
+    metadata: &MetadataNode,
+) -> Result<Option<String>, ()> {
+    let Some(hexbin) = metadata.find_child("stage_1") else {
+        return Ok(None);
+    };
+    let raw = hexbin
+        .find_child("hex_boundary_raw")
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_string)
+        .unwrap_or_else(|| "MULTIPOLYGON EMPTY".to_string());
+    if raw == "MULTIPOLYGON EMPTY" {
         return Ok(None);
     }
-    grid.find_parent_paths();
-    let wkt = grid.to_wkt(8);
     if !opts.smooth {
-        return Ok(Some(wkt));
+        return Ok(Some(raw));
     }
-    let tolerance = 1.1 * grid.height() / 2.0;
-    match Geometry::from_wkt(&wkt)
+    let estimated_edge = hexbin
+        .find_child("estimated_edge")
+        .and_then(MetadataNode::value)
+        .map(MetadataValue::as_f64)
+        .unwrap_or(0.0);
+    let tolerance = 1.1 * estimated_edge / 2.0;
+    match Geometry::from_wkt(&raw)
         .and_then(|g| g.simplify(tolerance, true))
         .and_then(|g| g.to_wkt())
     {
         Ok(simplified) => Ok(Some(ensure_multipolygon(&simplified))),
         Err(err) => {
             eprintln!("PDAL: kernels.tindex: GEOS simplify failed for '{file}': {err}");
-            Ok(Some(wkt))
+            Ok(Some(raw))
         }
     }
-}
-
-fn estimate_edge_length(
-    views: &[pdal_core::point::PointView],
-    sample_size: u32,
-    density: i32,
-) -> Option<f64> {
-    let mut last: Option<(f64, f64)> = None;
-    let mut total = 0.0_f64;
-    let mut count = 0u64;
-    let limit = sample_size.max(1) as u64;
-    'outer: for view in views {
-        for idx in 0..view.len() {
-            let x = view.get_f64(idx, &DimId::X);
-            let y = view.get_f64(idx, &DimId::Y);
-            if let Some((px, py)) = last {
-                let dx = x - px;
-                let dy = y - py;
-                total += (dx * dx + dy * dy).sqrt();
-                count += 1;
-                if count >= limit {
-                    break 'outer;
-                }
-            }
-            last = Some((x, y));
-        }
-    }
-    if count == 0 {
-        return None;
-    }
-    Some((density as f64 * total) / (count + 1) as f64)
 }
 
 fn ensure_multipolygon(wkt: &str) -> String {
