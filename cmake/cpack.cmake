@@ -39,6 +39,8 @@ set(CPACK_SOURCE_IGNORE_FILES
     "/[.]mull-build/"
     "/[.]pixi/"
     "/rust/target/"
+    "/__pycache__/"
+    "[.]pyc$"
     "Makefile"
     "CMakeFiles"
     "CTestTestfile.cmake"

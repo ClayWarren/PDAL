@@ -44,6 +44,8 @@ for archive in "${archives[@]}"; do
         "/.build/"
         "/.pixi/"
         "/.mull-build/"
+        "/__pycache__/"
+        ".pyc"
     )
     for path in "${forbidden[@]}"; do
         if grep -Fq "${path}" <<<"${listing}"; then
