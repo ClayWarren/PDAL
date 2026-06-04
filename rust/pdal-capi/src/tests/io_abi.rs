@@ -956,6 +956,27 @@ fn stac_reader_returns_local_asset_through_c_abi() {
     }
 }
 
+#[test]
+fn stac_type_probe_reads_vsi_sources() {
+    unsafe {
+        let path = format!("/vsimem/pdal-capi-stac-type-{}.json", std::process::id());
+        pdal_native::vsi::write_mem_file(
+            &path,
+            br#"{"type":"Feature","stac_version":"1.0.0","id":"vsi"}"#,
+        )
+        .unwrap();
+
+        let c_path = CString::new(path.clone()).unwrap();
+        assert!(pdal_stac_type_supported(c_path.as_ptr()));
+
+        pdal_native::vsi::unlink(&path).unwrap();
+        pdal_native::vsi::write_mem_file(&path, br#"{"type":"NotStac"}"#).unwrap();
+        assert!(!pdal_stac_type_supported(c_path.as_ptr()));
+
+        pdal_native::vsi::unlink(&path).unwrap();
+    }
+}
+
 mod ept_preview;
 mod errors;
 mod gaps;

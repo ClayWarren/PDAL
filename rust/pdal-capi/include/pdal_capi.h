@@ -1475,6 +1475,7 @@ extern "C"
     bool pdal_las_detect_copc(const char* path);
     pdal_reader_t* pdal_reader_create_spz(const pdal_options_t* ops);
     pdal_reader_t* pdal_reader_create_stac(const pdal_options_t* ops);
+    bool pdal_stac_type_supported(const char* filename);
     pdal_reader_t* pdal_reader_create_copc(const pdal_options_t* ops);
     /// Walk the COPC hierarchy applying `bounds` and `resolution` options.
     /// Writes the resulting point count and dataset-coordinate bbox into

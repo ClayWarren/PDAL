@@ -413,6 +413,42 @@ pub unsafe extern "C" fn pdal_reader_create_stac(ops: *const Options) -> *mut Re
     }
 }
 
+/// Return true when `filename` can be parsed as a supported STAC JSON object.
+///
+/// # Safety
+/// `filename` must be null or a valid NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn pdal_stac_type_supported(filename: *const c_char) -> bool {
+    clear_last_error();
+    let filename = if filename.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(filename).to_str() {
+            Ok(value) => value,
+            Err(err) => {
+                set_last_error(err.to_string());
+                return false;
+            }
+        }
+    };
+    match pdal_io::source::read_to_string(filename)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|json| {
+            json.get("type")
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        }) {
+        Some(stac_type) => {
+            matches!(
+                stac_type.as_str(),
+                "Feature" | "Catalog" | "Collection" | "FeatureCollection"
+            )
+        }
+        None => false,
+    }
+}
+
 /// Create a CopcReader full-file read slice from options.
 ///
 /// # Safety

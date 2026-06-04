@@ -115,18 +115,7 @@ Dimension::Type cppType(int type)
 
 bool rustStacTypeSupported(const std::string& filename)
 {
-    try
-    {
-        NL::json stacJson =
-            NL::json::parse(FileUtils::readFileIntoString(filename));
-        std::string stacType = Utils::jsonValue<std::string>(stacJson, "type");
-        return stacType == "Feature" || stacType == "Catalog" ||
-               stacType == "Collection" || stacType == "FeatureCollection";
-    }
-    catch (...)
-    {
-        return false;
-    }
+    return pdal_stac_type_supported(filename.c_str());
 }
 
 struct Args
@@ -424,8 +413,7 @@ bool StacReader::Private::canUseRustReader(const std::string& filename)
         (m_args->schemaUrls.catalog != DefaultCatalogSchemaUrl ||
          m_args->schemaUrls.collection != DefaultCollectionSchemaUrl ||
          m_args->schemaUrls.item != DefaultFeatureSchemaUrl);
-    return !customSchemaUrls && !Utils::isRemote(filename) &&
-           rustStacTypeSupported(filename);
+    return !customSchemaUrls && rustStacTypeSupported(filename);
 }
 
 std::string listStr(std::string key, std::vector<RegEx> ids)
