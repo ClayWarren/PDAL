@@ -175,6 +175,17 @@ def assert_unit_cube_pcd(path: Path) -> None:
                 raise AssertionError(f"{path} row {row_idx} {name}={value} outside unit cube")
 
 
+def pcd_field_values(path: Path, field: str) -> list[float]:
+    header, rows = parse_ascii_pcd(path)
+    fields = header.get("FIELDS", "").split()
+    field_names = [name.lower() for name in fields]
+    needle = field.lower()
+    if needle not in field_names:
+        raise AssertionError(f"{path} missing PCD field {field}")
+    index = field_names.index(needle)
+    return [row[index] for row in rows]
+
+
 def pcd_counts_by_prefix(directory: Path, prefix: str) -> list[int]:
     return sorted(pcd_point_count(path) for path in directory.glob(f"{prefix}_*.pcd"))
 
@@ -357,6 +368,84 @@ def compare_eval_command(ref: str, rust: str, path: Path) -> None:
     for idx, (ref_label, rust_label) in enumerate(zip(ref_labels, rust_labels)):
         if int(ref_label["support"]) != int(rust_label["support"]):
             raise AssertionError(f"eval label {idx} support differs")
+
+
+def geojson_feature_counts(path: Path) -> list[int]:
+    value = json.loads(path.read_text())
+    features = value.get("features")
+    if not isinstance(features, list) or not features:
+        raise AssertionError(f"{path} has no GeoJSON features")
+    counts = [int(feature["properties"]["COUNT"]) for feature in features]
+    return sorted(counts)
+
+
+def compare_density_command(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/las/interesting.las"
+    ref_out = tmp / "density-ref.geojson"
+    rust_out = tmp / "density-rust.geojson"
+    run(ref, ["density", str(input_path), str(ref_out), "-f", "GeoJSON", "--edge_length=25", "--threshold=2"])
+    run(
+        rust,
+        [
+            "density",
+            str(input_path),
+            str(rust_out),
+            "--filters.hexbin.edge_length=25",
+            "--filters.hexbin.threshold=2",
+        ],
+    )
+    ref_counts = geojson_feature_counts(ref_out)
+    rust_counts = geojson_feature_counts(rust_out)
+    if ref_counts != rust_counts:
+        raise AssertionError(f"density feature counts differ: {ref_counts} != {rust_counts}")
+
+
+def compare_ground_command(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/las/interesting.las"
+    ref_out = tmp / "ground-ref.pcd"
+    rust_out = tmp / "ground-rust.pcd"
+    run(ref, ["ground", str(input_path), str(ref_out), "--filters.smrf.cell=10"])
+    run(rust, ["ground", str(input_path), str(rust_out), "--filters.smrf.cell=10"])
+    ref_classification = pcd_field_values(ref_out, "classification")
+    rust_classification = pcd_field_values(rust_out, "classification")
+    if len(ref_classification) != len(rust_classification):
+        raise AssertionError("ground point count differs")
+    matches = sum(1 for a, b in zip(ref_classification, rust_classification) if a == b)
+    agreement = matches / len(ref_classification)
+    if agreement < 0.998:
+        raise AssertionError(
+            f"ground classification agreement too low: {matches}/{len(ref_classification)} ({agreement:.4f})"
+        )
+
+
+def compare_tindex_command(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/las/interesting.las"
+    ref_out = tmp / "tindex-ref.geojson"
+    rust_out = tmp / "tindex-rust.geojson"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        run(
+            binary,
+            [
+                "tindex",
+                "create",
+                "--tindex",
+                str(output),
+                "--ogrdriver",
+                "GeoJSON",
+                "--fast_boundary",
+                str(input_path),
+            ],
+        )
+    ref_json = json.loads(ref_out.read_text())
+    rust_json = json.loads(rust_out.read_text())
+    if ref_json.get("type") != "FeatureCollection" or rust_json.get("type") != "FeatureCollection":
+        raise AssertionError("tindex output is not a FeatureCollection")
+    ref_features = ref_json.get("features", [])
+    rust_features = rust_json.get("features", [])
+    if len(ref_features) != 1 or len(rust_features) != 1:
+        raise AssertionError("tindex feature count differs")
+    if ref_features[0]["properties"]["location"] != rust_features[0]["properties"]["location"]:
+        raise AssertionError("tindex location property differs")
 
 
 def summary_point_count(pdal: str, path: Path) -> int:
@@ -590,6 +679,18 @@ def case_eval_command_semantic(ref: str, rust: str, _tmp: Path) -> None:
     compare_eval_command(ref, rust, REPO / "test/data/las/interesting.las")
 
 
+def case_density_command_semantic(ref: str, rust: str, tmp: Path) -> None:
+    compare_density_command(ref, rust, tmp)
+
+
+def case_ground_command_semantic(ref: str, rust: str, tmp: Path) -> None:
+    compare_ground_command(ref, rust, tmp)
+
+
+def case_tindex_command_semantic(ref: str, rust: str, tmp: Path) -> None:
+    compare_tindex_command(ref, rust, tmp)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=find_default_reference_pdal())
@@ -625,6 +726,9 @@ def main() -> int:
         ("chamfer command numeric payload", "semantic", case_chamfer_command_semantic),
         ("hausdorff command numeric payload", "semantic", case_hausdorff_command_semantic),
         ("eval command metrics", "semantic", case_eval_command_semantic),
+        ("density command GeoJSON counts", "semantic", case_density_command_semantic),
+        ("ground command classification", "semantic", case_ground_command_semantic),
+        ("tindex command location index", "semantic", case_tindex_command_semantic),
         (
             "info --stats numeric payload",
             "semantic",
