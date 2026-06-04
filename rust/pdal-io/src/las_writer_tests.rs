@@ -245,6 +245,80 @@ mod tests {
         let _ = std::fs::remove_file(output);
     }
 
+    #[test]
+    fn streaming_laz_roundtrip_preserves_first_point_fields() {
+        let source = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test/data/las/autzen_trim_7.las"
+        );
+        let output = std::env::temp_dir().join(format!(
+            "pdal-stream-laz-{}-{}.laz",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        let mut read_options = Options::new();
+        read_options.add("filename", source);
+        let input = LasReader::new(&read_options)
+            .read()
+            .expect("read source las");
+        let mut stream_reader = LasReader::new(&read_options);
+
+        let mut write_options = Options::new();
+        write_options.add("filename", output.display().to_string());
+        write_options.add("dataformat_id", "7");
+        write_options.add("minor_version", "4");
+        write_options.add("compression", "true");
+        let mut writer = LasWriter::new_laz(&write_options);
+        assert!(writer.streamable());
+        while let Some(chunk) = stream_reader.stream_next(30_000).unwrap() {
+            writer.stream_write(&chunk).unwrap();
+        }
+        writer.stream_finish().expect("finish streaming laz");
+
+        let mut roundtrip_options = Options::new();
+        roundtrip_options.add("filename", output.display().to_string());
+        let output_views = LasReader::new(&roundtrip_options)
+            .read()
+            .expect("read streamed laz");
+
+        let source_view = &input[0];
+        let written_view = &output_views[0];
+        assert_eq!(source_view.len(), written_view.len());
+
+        let scan_channel = DimId::from_name("ScanChannel");
+        for idx in 0..source_view.len().min(10) {
+            for dim in [
+                DimId::X,
+                DimId::Y,
+                DimId::Z,
+                DimId::Intensity,
+                DimId::ReturnNumber,
+                DimId::NumberOfReturns,
+                DimId::Classification,
+                DimId::ScanAngleRank,
+                DimId::GpsTime,
+                DimId::Red,
+                DimId::Green,
+                DimId::Blue,
+                scan_channel.clone(),
+            ] {
+                let left = source_view.get_f64(idx, &dim);
+                let right = written_view.get_f64(idx, &dim);
+                assert!(
+                    (left - right).abs() <= 1e-9,
+                    "point {idx} dim {:?}: {left} vs {right}",
+                    dim
+                );
+            }
+        }
+
+        let _ = std::fs::remove_file(output);
+    }
+
     fn header_bbox_view() -> PointView {
         let mut layout = PointLayout::new();
         layout.register(DimId::X, DimType::F64);

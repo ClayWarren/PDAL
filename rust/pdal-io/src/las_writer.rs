@@ -431,11 +431,9 @@ impl Writer for LasWriter {
     }
 
     fn streamable(&self) -> bool {
-        // Uncompressed single-file writes only. Compression (laz) and `#`
-        // multi-file templating fall back to the materializing `write`.
-        !self.filename.is_empty()
-            && !self.filename.contains('#')
-            && !self.should_compress(Path::new(&self.filename))
+        // Single-file writes only. `#` multi-file templating depends on
+        // materialized input views to preserve PDAL's per-view output split.
+        !self.filename.is_empty() && !self.filename.contains('#')
     }
 
     fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
