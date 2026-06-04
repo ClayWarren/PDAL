@@ -141,10 +141,16 @@ impl Vector {
     ) -> Result<(), String> {
         let name_c = CString::new(name).map_err(|e| e.to_string())?;
         unsafe {
+            if gdal_sys::OGR_L_FindFieldIndex(layer, name_c.as_ptr(), 1) >= 0 {
+                return Ok(());
+            }
             let field =
                 gdal_sys::OGR_Fld_Create(name_c.as_ptr(), gdal_sys::OGRFieldType::OFTString);
-            gdal_sys::OGR_L_CreateField(layer, field, 1);
+            let result = gdal_sys::OGR_L_CreateField(layer, field, 1);
             gdal_sys::OGR_Fld_Destroy(field);
+            if result != gdal_sys::OGRErr::OGRERR_NONE {
+                return Err(format!("Can't create OGR field: {name}"));
+            }
         }
         Ok(())
     }
@@ -157,10 +163,16 @@ impl Vector {
     ) -> Result<(), String> {
         let name_c = CString::new(name).map_err(|e| e.to_string())?;
         unsafe {
+            if gdal_sys::OGR_L_FindFieldIndex(layer, name_c.as_ptr(), 1) >= 0 {
+                return Ok(());
+            }
             let field =
                 gdal_sys::OGR_Fld_Create(name_c.as_ptr(), gdal_sys::OGRFieldType::OFTDateTime);
-            gdal_sys::OGR_L_CreateField(layer, field, 1);
+            let result = gdal_sys::OGR_L_CreateField(layer, field, 1);
             gdal_sys::OGR_Fld_Destroy(field);
+            if result != gdal_sys::OGRErr::OGRERR_NONE {
+                return Err(format!("Can't create OGR field: {name}"));
+            }
         }
         Ok(())
     }

@@ -313,6 +313,8 @@ fn test_vector_creation_and_fields() {
         assert!(Vector::create_datetime_field(layer, "bad\0timestamp").is_err());
         Vector::create_string_field(layer, "name").unwrap();
         Vector::create_datetime_field(layer, "timestamp").unwrap();
+        Vector::create_string_field(layer, "name").unwrap();
+        Vector::create_datetime_field(layer, "timestamp").unwrap();
 
         // Add feature
         assert!(Vector::add_feature(layer, "POLYGON EMPTY", &[("bad\0field", "value")]).is_err());
