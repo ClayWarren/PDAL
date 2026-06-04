@@ -105,6 +105,32 @@ fn pipeline_json_accepts_filename_string_stages() {
 }
 
 #[test]
+fn pipeline_json_accepts_filespec_endpoint_stages() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let input = repo.join("test/data/text/utm17_1.txt");
+    let output = std::env::temp_dir().join(format!(
+        "pdal-rust-filespec-stage-{}.pcd",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&output);
+
+    let json = format!(
+        r#"[{{"filename":{{"path":"{}"}}}},
+                {{"type":"filters.decimation", "step":2}},
+                {{"filename":{{"path":"{}"}}}}]"#,
+        escape_json_path(&input),
+        escape_json_path(&output)
+    );
+
+    let mut pipeline = pipeline_from_json(&json).unwrap();
+    let result = pipeline.execute_with_result(Vec::new()).unwrap();
+    assert_eq!(result.point_count, 5);
+    assert_eq!(result.view_count, 1);
+    assert!(output.exists());
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
 fn pipeline_json_accepts_multiple_filename_string_readers() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");

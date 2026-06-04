@@ -165,12 +165,13 @@ fn stage_name(
     if let Some(name) = object.get("type").and_then(Value::as_str) {
         return Ok(name.to_string());
     }
-    let filename = options.get_str("filename", "");
-    if filename.is_empty() {
-        return Err(StageError(format!(
-            "Pipeline stage {position} is missing a 'type'."
-        )));
-    }
+    let filename = infer_filename(object)
+        .map(str::to_string)
+        .or_else(|| {
+            let filename = options.get_str("filename", "");
+            (!filename.is_empty()).then_some(filename)
+        })
+        .ok_or_else(|| StageError(format!("Pipeline stage {position} is missing a 'type'.")))?;
     if role == "reader" {
         infer_reader_driver(&filename)
             .map(str::to_string)
@@ -184,6 +185,14 @@ fn stage_name(
             "Pipeline stage {position} needs an explicit 'type'."
         )))
     }
+}
+
+fn infer_filename(object: &serde_json::Map<String, Value>) -> Option<&str> {
+    let filename = object.get("filename")?;
+    if let Some(text) = filename.as_str() {
+        return Some(text);
+    }
+    filename.get("path").and_then(Value::as_str)
 }
 
 pub(crate) fn options_from_object(
