@@ -395,6 +395,34 @@ fn vector_attribute_filter_is_cleared_after_read_error() {
     assert_eq!(rows.len(), 2);
 }
 
+#[test]
+fn vector_sql_geometry_filter_limits_result_set() {
+    register_drivers();
+    let path = temp_tif("vector-sql-filter").with_extension("geojson");
+    let _ = fs::remove_file(&path);
+
+    let vector = Vector::create(path.to_str().unwrap(), "GeoJSON").unwrap();
+    let layer = vector.open_or_create_layer("tiles", "").unwrap();
+    unsafe {
+        Vector::add_feature(layer, "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", &[]).unwrap();
+        Vector::add_feature(layer, "POLYGON ((10 10, 11 10, 11 11, 10 11, 10 10))", &[]).unwrap();
+    }
+    drop(vector);
+
+    let vector = Vector::open(path.to_str().unwrap()).unwrap();
+    let rows = vector
+        .get_feature_wkts_by_sql_with_filter(
+            "select * from tiles",
+            "OGRSQL",
+            "POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))",
+        )
+        .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].contains("0"));
+    assert!(!rows[0].contains("10"));
+}
+
 fn temp_geojson(name: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("pdal-native-{name}-{}.json", std::process::id()));
     let _ = fs::remove_file(&path);
