@@ -1,5 +1,6 @@
 use super::argv_to_vec;
 use crate::registry::pipeline_from_json;
+use pdal_core::point::DimId;
 use pdal_kernels::{build_translate_plan, serialize_pipeline_json, TranslateKernelPlan};
 use std::os::raw::c_char;
 
@@ -15,6 +16,7 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
     };
     execute_translate_pipeline(
         plan.stages,
+        plan.allowed_dims,
         plan.metadata_file,
         plan.serialization_file,
         plan.stream_allowed,
@@ -24,6 +26,7 @@ pub(super) unsafe fn run_translate_kernel(argc: i32, argv: *const *const c_char)
 
 fn execute_translate_pipeline(
     stages: Vec<serde_json::Value>,
+    allowed_dims: Vec<String>,
     metadata_file: Option<String>,
     serialization_file: Option<String>,
     stream_allowed: bool,
@@ -56,6 +59,12 @@ fn execute_translate_pipeline(
             return 1;
         }
     };
+    pipeline.set_allowed_dims(
+        allowed_dims
+            .iter()
+            .map(|name| DimId::from_name(name))
+            .collect(),
+    );
 
     if stream_allowed && metadata_file.is_none() {
         match pipeline.execute_streaming() {

@@ -9,6 +9,7 @@ pub enum TranslateKernelPlan {
 
 pub struct TranslatePlan {
     pub stages: Vec<serde_json::Value>,
+    pub allowed_dims: Vec<String>,
     pub metadata_file: Option<String>,
     pub serialization_file: Option<String>,
     pub stream_allowed: bool,
@@ -98,6 +99,7 @@ pub fn build_translate_plan(args: &[String]) -> TranslateKernelPlan {
 
     TranslateKernelPlan::Run(TranslatePlan {
         stages,
+        allowed_dims: parsed.allowed_dims,
         metadata_file: parsed.metadata_file,
         serialization_file: parsed.serialization_file,
         stream_allowed: parsed.stream_allowed,
@@ -115,6 +117,7 @@ struct ParsedTranslateArgs {
     metadata_file: Option<String>,
     serialization_file: Option<String>,
     filter_json: Option<String>,
+    allowed_dims: Vec<String>,
     stream_allowed: bool,
     stream_required: bool,
     overwrite: bool,
@@ -131,6 +134,7 @@ fn parse_translate_args(args: &[String]) -> Result<ParsedTranslateArgs, i32> {
         metadata_file: None,
         serialization_file: None,
         filter_json: None,
+        allowed_dims: Vec::new(),
         stream_allowed: true,
         stream_required: false,
         overwrite: false,
@@ -199,8 +203,9 @@ fn parse_translate_arg<'a>(
     } else if arg == "--overwrite" {
         parsed.overwrite = true;
     } else if arg == "--dims" {
-        next_value("--dims", iter)?;
-    } else if arg.starts_with("--dims=") {
+        parsed.allowed_dims = parse_dim_names(next_value("--dims", iter)?);
+    } else if let Some(value) = arg.strip_prefix("--dims=") {
+        parsed.allowed_dims = parse_dim_names(value);
     } else if arg == "--json" {
         parsed.filter_json = Some(next_value("--json", iter)?.to_string());
     } else if let Some(value) = arg.strip_prefix("--json=") {
@@ -221,6 +226,15 @@ fn parse_translate_arg<'a>(
         parsed.filters.push(arg.to_string());
     }
     Ok(())
+}
+
+fn parse_dim_names(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 fn next_value<'a>(
@@ -500,6 +514,7 @@ mod tests {
         assert_eq!(plan.stages[2]["filename"], "out.laz");
         assert_eq!(plan.metadata_file.as_deref(), Some("metadata.json"));
         assert_eq!(plan.serialization_file.as_deref(), Some("pipeline.json"));
+        assert_eq!(plan.allowed_dims, vec!["X", "Y"]);
     }
 
     #[test]

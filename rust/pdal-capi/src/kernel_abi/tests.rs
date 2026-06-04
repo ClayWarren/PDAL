@@ -440,6 +440,50 @@ fn rust_kernel_run_enforces_translate_stream_and_overwrite_options() {
 }
 
 #[test]
+fn rust_kernel_run_applies_translate_allowed_dims() {
+    let dir = std::env::temp_dir().join(format!(
+        "pdal-rs-kernel-translate-dims-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let metadata = dir.join("metadata.json");
+
+    let name = CString::new("translate").unwrap();
+    let args = [
+        "input.las",
+        "output.null",
+        "--reader",
+        "readers.faux",
+        "--writer",
+        "writers.null",
+        "--metadata",
+        metadata.to_str().unwrap(),
+        "--dims",
+        "Z,X",
+        "--readers.faux.count=3",
+        "--readers.faux.mode=ramp",
+    ];
+    let owned = args
+        .iter()
+        .map(|arg| CString::new(*arg).unwrap())
+        .collect::<Vec<_>>();
+    let argv = owned.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
+
+    let result = unsafe { pdal_rust_kernel_run(name.as_ptr(), argv.len() as i32, argv.as_ptr()) };
+
+    assert_eq!(result, 0);
+    let metadata = std::fs::read_to_string(metadata).unwrap();
+    let metadata: serde_json::Value = serde_json::from_str(&metadata).unwrap();
+    let summaries = metadata["dimension_summaries"].as_array().unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries[0]["name"], "Z");
+    assert_eq!(summaries[1]["name"], "X");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn translate_json_replaces_pipeline_reader_and_writer() {
     let json = r#"{
         "pipeline": [
