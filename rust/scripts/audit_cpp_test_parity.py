@@ -604,6 +604,7 @@ COVERED: dict[str, object] = {
         "testMetadata",
         "srs",
         "btint",
+        "floatDataType",
     },
     "pdal_io_copc_reader_test": {
         "inspect",
@@ -645,6 +646,7 @@ COVERED: dict[str, object] = {
     },
     "pdal_io_ept_reader_test": {
         "inspect",
+        "inspectBounds",
         "fullReadLaszip",
         "fullReadBinary",
         "fullReadZstandard",
