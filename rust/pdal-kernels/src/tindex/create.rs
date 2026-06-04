@@ -7,153 +7,7 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
     let mut parsed = TindexCreateArgs::default();
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--tindex" => parsed.tindex_file = tindex_next_value(&mut iter, "--tindex")?.clone(),
-            _ if let Some(value) = arg.strip_prefix("--tindex=") => {
-                parsed.tindex_file = value.to_string();
-            }
-            "--filelist" => {
-                parsed.input_methods += 1;
-                let path = tindex_next_value(&mut iter, "--filelist")?;
-                parsed.filelists.push(path.clone());
-            }
-            "--glob" | "--filespec" => {
-                parsed.input_methods += 1;
-                let pattern = tindex_next_value(&mut iter, arg)?;
-                parsed.files.extend(read_glob(pattern)?);
-            }
-            "--path_prefix" => {
-                parsed.path_prefix = Some(tindex_next_value(&mut iter, arg)?.clone())
-            }
-            "--write_absolute_path" => parsed.write_absolute_path = true,
-            "--lyr_name" => parsed.layer_name = tindex_next_value(&mut iter, arg)?.clone(),
-            "--tindex_name" => parsed.location_field = tindex_next_value(&mut iter, arg)?.clone(),
-            "-f" | "--ogrdriver" => parsed.driver_name = tindex_next_value(&mut iter, arg)?.clone(),
-            "--threads" | "--requests" => {
-                let _ = tindex_next_value(&mut iter, arg)?;
-            }
-            "--t_srs" => parsed.target_srs = tindex_next_value(&mut iter, arg)?.clone(),
-            "--a_srs" => {
-                parsed.assign_srs = tindex_next_value(&mut iter, arg)?.clone();
-                parsed.override_source_srs = true;
-            }
-            "--lco" => {
-                apply_layer_creation_option(&mut parsed, tindex_next_value(&mut iter, arg)?)?
-            }
-            "--log" => {
-                let _ = tindex_next_value(&mut iter, "--log")?;
-            }
-            "--stdin" | "-s" => {
-                parsed.input_methods += 1;
-                parsed.stdin_requested = true;
-            }
-            "--threshold" => {
-                parsed.rich_boundary_options = true;
-                let value = tindex_next_value(&mut iter, arg)?;
-                parsed.boundary.density = parse_int(value, arg)?;
-            }
-            "--resolution" | "--edge_length" => {
-                parsed.rich_boundary_options = true;
-                let value = tindex_next_value(&mut iter, arg)?;
-                parsed.boundary.edge_length = parse_float(value, arg)?;
-            }
-            "--sample_size" => {
-                parsed.rich_boundary_options = true;
-                let value = tindex_next_value(&mut iter, arg)?;
-                parsed.boundary.sample_size = parse_uint(value, arg)?;
-            }
-            "--simplify" | "--smooth" => {
-                parsed.rich_boundary_options = true;
-                let value = tindex_next_value(&mut iter, arg)?;
-                parsed.boundary.smooth = parse_bool(value, arg)?;
-            }
-            "--fast_boundary" => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.fast_boundary = true;
-            }
-            "--skip_different_srs" => parsed.skip_different_srs = true,
-            "--where" => {
-                parsed.rich_boundary_options = true;
-                parsed.boundary.where_expr = Some(tindex_next_value(&mut iter, arg)?.clone());
-            }
-            _ if let Some(value) = arg.strip_prefix("--filespec=") => {
-                parsed.input_methods += 1;
-                if is_glob_pattern(value) {
-                    parsed.files.extend(read_glob(value)?);
-                } else {
-                    parsed.files.push(value.to_string());
-                }
-            }
-            _ if let Some(pattern) = arg.strip_prefix("--glob=") => {
-                parsed.input_methods += 1;
-                parsed.files.extend(read_glob(pattern)?);
-            }
-            _ if let Some(path) = arg.strip_prefix("--filelist=") => {
-                parsed.input_methods += 1;
-                parsed.filelists.push(path.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--write_absolute_path=") => {
-                parsed.write_absolute_path = matches!(
-                    value.to_ascii_lowercase().as_str(),
-                    "true" | "1" | "yes" | "on"
-                );
-            }
-            _ if arg
-                .strip_prefix("--threads=")
-                .or_else(|| arg.strip_prefix("--requests="))
-                .is_some() => {}
-            _ if let Some(value) = arg.strip_prefix("--path_prefix=") => {
-                parsed.path_prefix = Some(value.to_string());
-            }
-            _ if let Some(value) = arg.strip_prefix("--lyr_name=") => {
-                parsed.layer_name = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("--tindex_name=") => {
-                parsed.location_field = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("--ogrdriver=") => {
-                parsed.driver_name = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("-f=") => {
-                parsed.driver_name = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
-                parsed.target_srs = value.to_string();
-            }
-            _ if let Some(value) = arg.strip_prefix("--a_srs=") => {
-                parsed.assign_srs = value.to_string();
-                parsed.override_source_srs = true;
-            }
-            _ if arg.starts_with("--log=") => {}
-            _ if let Some(value) = arg.strip_prefix("--lco=") => {
-                apply_layer_creation_option(&mut parsed, value)?;
-            }
-            _ if try_parse_boundary_eq_arg(&mut parsed, arg)? => {}
-            _ if let Some(value) = arg.strip_prefix("--skip_different_srs=") => {
-                parsed.skip_different_srs = parse_bool(value, "--skip_different_srs")?;
-            }
-            _ if arg.starts_with("--filters.hexbin.smooth") => {
-                return Err(TindexParseResult::Error(
-                    INVALID_TINDEX_FILTER_STAGE_MESSAGE.to_string(),
-                ));
-            }
-            _ if arg.starts_with("--filters.") => {
-                return Err(TindexParseResult::Error(
-                    INVALID_TINDEX_FILTER_STAGE_MESSAGE.to_string(),
-                ));
-            }
-            _ if arg.starts_with('-') => {
-                return Err(TindexParseResult::Error(format!(
-                    "unknown tindex option '{arg}'"
-                )));
-            }
-            _ if parsed.tindex_file.is_empty() => parsed.tindex_file = arg.clone(),
-            _ if is_glob_pattern(arg) => {
-                parsed.input_methods += 1;
-                parsed.files.extend(read_glob(arg)?);
-            }
-            _ => parsed.files.push(arg.clone()),
-        }
+        parse_tindex_create_arg(arg, &mut iter, &mut parsed)?;
     }
     if parsed.input_methods > 1 {
         return Err(TindexParseResult::Error(
@@ -182,6 +36,163 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
         ));
     }
     Ok(parsed)
+}
+
+fn parse_tindex_create_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut TindexCreateArgs,
+) -> Result<(), TindexParseResult> {
+    if parse_value_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_equals_arg(arg, parsed)? {
+        return Ok(());
+    }
+    parse_filter_or_positional_arg(arg, parsed)
+}
+
+fn parse_value_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut TindexCreateArgs,
+) -> Result<bool, TindexParseResult> {
+    match arg {
+        "--tindex" => parsed.tindex_file = tindex_next_value(iter, "--tindex")?.clone(),
+        "--filelist" => {
+            parsed.input_methods += 1;
+            let path = tindex_next_value(iter, "--filelist")?;
+            parsed.filelists.push(path.clone());
+        }
+        "--glob" | "--filespec" => {
+            parsed.input_methods += 1;
+            let pattern = tindex_next_value(iter, arg)?;
+            parsed.files.extend(read_glob(pattern)?);
+        }
+        "--path_prefix" => parsed.path_prefix = Some(tindex_next_value(iter, arg)?.clone()),
+        "--write_absolute_path" => parsed.write_absolute_path = true,
+        "--lyr_name" => parsed.layer_name = tindex_next_value(iter, arg)?.clone(),
+        "--tindex_name" => parsed.location_field = tindex_next_value(iter, arg)?.clone(),
+        "-f" | "--ogrdriver" => parsed.driver_name = tindex_next_value(iter, arg)?.clone(),
+        "--threads" | "--requests" | "--log" => {
+            let _ = tindex_next_value(iter, arg)?;
+        }
+        "--t_srs" => parsed.target_srs = tindex_next_value(iter, arg)?.clone(),
+        "--a_srs" => {
+            parsed.assign_srs = tindex_next_value(iter, arg)?.clone();
+            parsed.override_source_srs = true;
+        }
+        "--lco" => apply_layer_creation_option(parsed, tindex_next_value(iter, arg)?)?,
+        "--stdin" | "-s" => {
+            parsed.input_methods += 1;
+            parsed.stdin_requested = true;
+        }
+        "--fast_boundary" => {
+            parsed.rich_boundary_options = true;
+            parsed.boundary.fast_boundary = true;
+        }
+        "--skip_different_srs" => parsed.skip_different_srs = true,
+        "--threshold" | "--resolution" | "--edge_length" | "--sample_size" | "--simplify"
+        | "--smooth" | "--where" => {
+            let value = tindex_next_value(iter, arg)?;
+            apply_boundary_value(parsed, arg, value)?;
+        }
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
+fn parse_equals_arg(arg: &str, parsed: &mut TindexCreateArgs) -> Result<bool, TindexParseResult> {
+    if let Some(value) = arg.strip_prefix("--tindex=") {
+        parsed.tindex_file = value.to_string();
+    } else if let Some(value) = arg.strip_prefix("--filespec=") {
+        parsed.input_methods += 1;
+        if is_glob_pattern(value) {
+            parsed.files.extend(read_glob(value)?);
+        } else {
+            parsed.files.push(value.to_string());
+        }
+    } else if let Some(pattern) = arg.strip_prefix("--glob=") {
+        parsed.input_methods += 1;
+        parsed.files.extend(read_glob(pattern)?);
+    } else if let Some(path) = arg.strip_prefix("--filelist=") {
+        parsed.input_methods += 1;
+        parsed.filelists.push(path.to_string());
+    } else if let Some(value) = arg.strip_prefix("--write_absolute_path=") {
+        parsed.write_absolute_path = parse_bool(value, "--write_absolute_path")?;
+    } else if arg
+        .strip_prefix("--threads=")
+        .or_else(|| arg.strip_prefix("--requests="))
+        .or_else(|| arg.strip_prefix("--log="))
+        .is_some()
+    {
+    } else if let Some(value) = arg.strip_prefix("--path_prefix=") {
+        parsed.path_prefix = Some(value.to_string());
+    } else if let Some(value) = arg.strip_prefix("--lyr_name=") {
+        parsed.layer_name = value.to_string();
+    } else if let Some(value) = arg.strip_prefix("--tindex_name=") {
+        parsed.location_field = value.to_string();
+    } else if let Some(value) = arg
+        .strip_prefix("--ogrdriver=")
+        .or_else(|| arg.strip_prefix("-f="))
+    {
+        parsed.driver_name = value.to_string();
+    } else if let Some(value) = arg.strip_prefix("--t_srs=") {
+        parsed.target_srs = value.to_string();
+    } else if let Some(value) = arg.strip_prefix("--a_srs=") {
+        parsed.assign_srs = value.to_string();
+        parsed.override_source_srs = true;
+    } else if let Some(value) = arg.strip_prefix("--lco=") {
+        apply_layer_creation_option(parsed, value)?;
+    } else if try_parse_boundary_eq_arg(parsed, arg)? {
+    } else if let Some(value) = arg.strip_prefix("--skip_different_srs=") {
+        parsed.skip_different_srs = parse_bool(value, "--skip_different_srs")?;
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn parse_filter_or_positional_arg(
+    arg: &str,
+    parsed: &mut TindexCreateArgs,
+) -> Result<(), TindexParseResult> {
+    if arg.starts_with("--filters.") {
+        return Err(TindexParseResult::Error(
+            INVALID_TINDEX_FILTER_STAGE_MESSAGE.to_string(),
+        ));
+    }
+    if arg.starts_with('-') {
+        return Err(TindexParseResult::Error(format!(
+            "unknown tindex option '{arg}'"
+        )));
+    }
+    if parsed.tindex_file.is_empty() {
+        parsed.tindex_file = arg.to_string();
+    } else if is_glob_pattern(arg) {
+        parsed.input_methods += 1;
+        parsed.files.extend(read_glob(arg)?);
+    } else {
+        parsed.files.push(arg.to_string());
+    }
+    Ok(())
+}
+
+fn apply_boundary_value(
+    parsed: &mut TindexCreateArgs,
+    arg: &str,
+    value: &str,
+) -> Result<(), TindexParseResult> {
+    parsed.rich_boundary_options = true;
+    match arg {
+        "--threshold" => parsed.boundary.density = parse_int(value, arg)?,
+        "--resolution" | "--edge_length" => parsed.boundary.edge_length = parse_float(value, arg)?,
+        "--sample_size" => parsed.boundary.sample_size = parse_uint(value, arg)?,
+        "--simplify" | "--smooth" => parsed.boundary.smooth = parse_bool(value, arg)?,
+        "--where" => parsed.boundary.where_expr = Some(value.to_string()),
+        _ => unreachable!("boundary option checked before dispatch"),
+    }
+    Ok(())
 }
 
 fn try_parse_boundary_eq_arg(

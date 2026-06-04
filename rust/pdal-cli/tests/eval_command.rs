@@ -144,9 +144,7 @@ fn installed_pdal_eval_matches_rust_eval() {
     let installed_json: serde_json::Value = serde_json::from_slice(&installed.stdout).unwrap();
     let rust_json: serde_json::Value = serde_json::from_slice(&rust.stdout).unwrap();
 
-    // PDAL emits the confusion matrix as a (still valid JSON) string.
-    let installed_matrix: serde_json::Value =
-        serde_json::from_str(installed_json["confusion_matrix"].as_str().unwrap()).unwrap();
+    let installed_matrix = confusion_matrix(&installed_json);
     assert_eq!(rust_json["confusion_matrix"], installed_matrix);
 
     for key in [
@@ -169,5 +167,14 @@ fn installed_pdal_eval_matches_rust_eval() {
             rust_label["support"].as_u64(),
             installed_label["support"].as_u64()
         );
+    }
+}
+
+fn confusion_matrix(value: &serde_json::Value) -> serde_json::Value {
+    let matrix = &value["confusion_matrix"];
+    if let Some(text) = matrix.as_str() {
+        serde_json::from_str(text).unwrap()
+    } else {
+        matrix.clone()
     }
 }

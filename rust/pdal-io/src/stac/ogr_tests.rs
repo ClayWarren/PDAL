@@ -283,7 +283,7 @@ fn stac_filter_helpers_cover_validation_and_matching_edges() {
 }
 
 #[test]
-fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
+fn stac_reader_args_cover_edge_cases() {
     let single = parse_reader_args(r#"{"type":"readers.las","nosrs":true}"#).unwrap();
     assert_eq!(single.len(), 1);
     assert_eq!(single[0].driver, "readers.las");
@@ -303,7 +303,10 @@ fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
     assert!(args[0].options.get_str("bounds", "").contains("\"x\""));
     assert!(parse_reader_args("{}").is_err());
     assert!(parse_reader_args(r#"[{"count":2}]"#).is_err());
+}
 
+#[test]
+fn stac_dates_and_bounds_cover_edge_cases() {
     assert_eq!(normalize_stac_time("2024-1-2T3:4:5Z"), "2024-1-2T03:04:05Z");
     assert_eq!(normalize_stac_time("2024-01-02"), "2024-01-02");
     let ranges = parse_date_ranges(&[String::from(
@@ -350,7 +353,10 @@ fn stac_reader_args_dates_bounds_and_paths_cover_edge_cases() {
         &serde_json::json!({"bbox":[0.0]}),
         &bounds
     ));
+}
 
+#[test]
+fn stac_path_helpers_cover_edge_cases() {
     assert_eq!(
         remote_base("https://example.com/a/b/item.json"),
         "https://example.com/a/b"

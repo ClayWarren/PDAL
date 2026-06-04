@@ -164,13 +164,10 @@ fn installed_pdal_info_matches_rust_info() {
     let rust_json: serde_json::Value = serde_json::from_slice(&rust.stdout).unwrap();
 
     // Point count matches PDAL's summary.
-    assert_eq!(
-        rust_json["point_count"].as_u64(),
-        installed_json["summary"]["num_points"].as_u64()
-    );
+    assert_eq!(point_count(&rust_json), point_count(&installed_json));
 
     // 3D bounds match (compared as f64; PDAL emits whole numbers as integers).
-    let installed_bounds = &installed_json["summary"]["bounds"];
+    let installed_bounds = bounds_3d(&installed_json);
     let rust_bounds = &rust_json["bounds_3d"];
     for key in ["minx", "maxx", "miny", "maxy", "minz", "maxz"] {
         assert_eq!(
@@ -178,5 +175,19 @@ fn installed_pdal_info_matches_rust_info() {
             installed_bounds[key].as_f64(),
             "bound '{key}' differs"
         );
+    }
+}
+
+fn point_count(value: &serde_json::Value) -> Option<u64> {
+    value["point_count"]
+        .as_u64()
+        .or_else(|| value["summary"]["num_points"].as_u64())
+}
+
+fn bounds_3d(value: &serde_json::Value) -> &serde_json::Value {
+    if value["bounds_3d"].is_object() {
+        &value["bounds_3d"]
+    } else {
+        &value["summary"]["bounds"]
     }
 }

@@ -163,4 +163,36 @@ mod tests {
         assert_eq!(summary["test"], "TEST");
         assert_eq!(summary["digits"], "12345");
     }
+
+    #[test]
+    fn runs_tell_scenario() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let summary = local_io_scenario(temp.path(), "tells", 1024).unwrap();
+        assert_eq!(summary["tell_after_test"], 4);
+        assert_eq!(summary["tell_after_digits"], 9);
+        assert_eq!(summary["file_size"], 9);
+        assert_eq!(summary["tell_after_one"], 1);
+        assert_eq!(summary["tell_after_est"], 4);
+        assert_eq!(summary["est"], "EST");
+        assert_eq!(summary["digits"], "12345");
+    }
+
+    #[test]
+    fn runs_small_seek_scenario() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let summary = local_io_scenario(temp.path(), "seeks_small_buffer", 1024).unwrap();
+        assert_eq!(summary["tell_after_test"], 14);
+        assert_eq!(summary["tell_after_digits"], 6);
+        assert_eq!(summary["file_size"], 14);
+        assert_eq!(summary["tail"], "TEST");
+        assert_eq!(summary["tell_after_digits_read"], 6);
+        assert_eq!(summary["digits"], "12345");
+    }
+
+    #[test]
+    fn rejects_unknown_scenario() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let err = local_io_scenario(temp.path(), "nope", 1024).unwrap_err();
+        assert_eq!(err, "unknown VSI scenario 'nope'");
+    }
 }

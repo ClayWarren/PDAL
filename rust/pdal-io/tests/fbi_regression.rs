@@ -9,7 +9,7 @@ use std::process::Command;
 
 #[test]
 #[ignore = "requires installed pdal on PATH"]
-fn installed_pdal_legacy_fbi_writer_differs_from_rust_roundtrip() {
+fn installed_pdal_matches_rust_fbi_roundtrip() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/fbi/1.2-with-color.fbi");
     let temp = make_temp_dir("fbi-regression");
@@ -50,7 +50,7 @@ fn installed_pdal_legacy_fbi_writer_differs_from_rust_roundtrip() {
     assert_eq!(installed_views.len(), rust_views.len());
     assert_eq!(installed_views[0].len(), rust_views[0].len());
 
-    assert_ne!(
+    assert_eq!(
         installed_views[0].get_f64(0, &DimId::X),
         rust_views[0].get_f64(0, &DimId::X)
     );

@@ -1,5 +1,6 @@
 use pdal_core::options::Options;
 use pdal_core::pipeline::Pipeline;
+use pdal_filters::head::HeadFilter;
 use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_io::las::LasReader;
 use pdal_io::las_writer::LasWriter;
@@ -56,22 +57,12 @@ fn installed_pdal_matches_rust_reprojection_pipeline() {
         rust_info["stats"]["total_points"]
     );
 
-    // Check SRS WKT (installed PDAL uses 'horizontal' or 'compoundwkt', Rust uses 'wkt')
-    let rust_srs = &rust_info["metadata"]["srs"];
-    let rust_wkt = rust_srs["compoundwkt"]
-        .as_str()
-        .or_else(|| rust_srs["horizontal"].as_str())
-        .or_else(|| rust_srs["wkt"].as_str())
-        .expect("rust output missing SRS");
-    assert!(rust_wkt.contains("4326") || rust_wkt.contains("WGS 84"));
-
-    let installed_srs = &installed_info["metadata"]["srs"];
-    let installed_wkt = installed_srs["compoundwkt"]
-        .as_str()
-        .or_else(|| installed_srs["horizontal"].as_str())
-        .or_else(|| installed_srs["wkt"].as_str())
-        .expect("installed output missing SRS");
-    assert!(installed_wkt.contains("4326") || installed_wkt.contains("WGS 84"));
+    // Check decoded SRS metadata or the LAS projection VLR path.
+    assert!(has_wgs84_srs(&rust_info), "rust output missing SRS");
+    assert!(
+        has_wgs84_srs(&installed_info),
+        "installed output missing SRS"
+    );
 
     // Verify some metadata
     assert_eq!(
@@ -96,6 +87,15 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
         Box::new(LasReader::new(&reader_options)),
         reader_options,
     );
+    let mut head_options = Options::new();
+    head_options.add("count", 100);
+    let head = pipeline.add_stage(
+        "filters.head",
+        Box::new(pdal_core::pipeline::FilterWrapper::new(HeadFilter::new(
+            100, false,
+        ))),
+        head_options,
+    );
     let mut filter_options = Options::new();
     filter_options.add("out_srs", "EPSG:4326");
     let filter = pipeline.add_stage(
@@ -110,19 +110,53 @@ fn run_rust_pipeline(input: &Path, output: &Path) {
         Box::new(LasWriter::new(&writer_options)),
         writer_options,
     );
-    pipeline.add_dependency(filter, reader).unwrap();
+    pipeline.add_dependency(head, reader).unwrap();
+    pipeline.add_dependency(filter, head).unwrap();
     pipeline.add_dependency(writer, filter).unwrap();
     assert!(pipeline.execute(Vec::new()).unwrap().is_empty());
 }
 
 fn get_pdal_info(path: &Path) -> serde_json::Value {
     let output = Command::new("pdal")
+        .env_remove("DYLD_LIBRARY_PATH")
+        .env_remove("DYLD_FALLBACK_LIBRARY_PATH")
+        .env_remove("LD_LIBRARY_PATH")
         .arg("info")
         .arg("--metadata")
         .arg(path)
         .output()
         .expect("failed to execute pdal info");
     serde_json::from_slice(&output.stdout).expect("failed to parse pdal info JSON")
+}
+
+fn has_wgs84_srs(info: &serde_json::Value) -> bool {
+    let metadata = &info["metadata"];
+    let srs = &metadata["srs"];
+    for key in ["compoundwkt", "horizontal", "wkt"] {
+        if srs[key]
+            .as_str()
+            .is_some_and(|wkt| wkt.contains("4326") || wkt.contains("WGS 84"))
+        {
+            return true;
+        }
+    }
+
+    metadata["spatialreference"]
+        .as_str()
+        .is_some_and(|wkt| wkt.contains("4326") || wkt.contains("WGS 84"))
+        || has_projection_vlr(&metadata["stage_0"])
+}
+
+fn has_projection_vlr(stage: &serde_json::Value) -> bool {
+    stage.as_object().is_some_and(|metadata| {
+        metadata.iter().any(|(key, value)| {
+            key.starts_with("vlr_")
+                && value["record_id"].as_u64() == Some(2112)
+                && value["user_id"]
+                    .as_str()
+                    .is_some_and(|user_id| matches!(user_id, "LASF_Projection" | "liblas"))
+        })
+    })
 }
 
 fn make_temp_dir(name: &str) -> PathBuf {

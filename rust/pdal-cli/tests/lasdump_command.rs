@@ -34,10 +34,11 @@ fn lasdump_writes_cpp_compatible_output_to_stdout() {
 #[test]
 #[ignore = "requires installed lasdump on PATH"]
 fn installed_lasdump_matches_rust_lasdump() {
-    let installed = Command::new("lasdump")
-        .arg(simple_las())
-        .output()
-        .expect("failed to execute installed lasdump");
+    let installed = match Command::new("lasdump").arg(simple_las()).output() {
+        Ok(output) => output,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return,
+        Err(err) => panic!("failed to execute installed lasdump: {err}"),
+    };
     assert!(
         installed.status.success(),
         "installed lasdump failed\nstdout:\n{}\nstderr:\n{}",
