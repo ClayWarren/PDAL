@@ -26,6 +26,13 @@ python3 rust/scripts/benchmark_cpp_vs_rust.py --iters 21
 python3 rust/scripts/benchmark_cpp_vs_rust.py --ref /opt/homebrew/bin/pdal --rust .build/bin/pdal
 ```
 
+When run from the Pixi environment, the benchmark scripts still prefer the
+external Homebrew `/opt/homebrew/bin/pdal` reference if it exists; this avoids
+accidentally comparing against Pixi's environment `pdal` instead of the installed
+reference binary. For the build-tree Rust-backed binary, the scripts prepend
+`.build/lib` (or `build/lib`) to the dynamic library path so they benchmark the
+matching build-tree `libpdalcpp`.
+
 ### Results (macOS arm64, both `pdal 2.10.1`, 21 iterations, median)
 
 | workload | C++ (ms) | Rust-backed (ms) | ratio | ratio, startup-subtracted |
@@ -77,6 +84,9 @@ Reproduce:
 python3 rust/scripts/benchmark_memory_cpp_vs_rust.py --rust .build/bin/pdal --iters 7
 # or via pixi: pixi run -e dev rust-bench-memory
 ```
+
+The same reference-binary and build-tree dynamic-library rules as the wall-clock
+benchmark apply here.
 
 ### Results (macOS arm64, both `pdal 2.10.1`, 7 iterations, median)
 

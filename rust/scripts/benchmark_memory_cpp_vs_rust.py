@@ -14,13 +14,15 @@ allocations a Rust allocator hook would see:
 Usage:
   benchmark_memory_cpp_vs_rust.py [--ref <pdal>] [--rust <pdal>] [--iters N]
 
-Defaults: --ref = `pdal` on PATH (Homebrew/pure C++), --rust = build/bin/pdal.
+Defaults: --ref = Homebrew `pdal` when present, otherwise `pdal` on PATH;
+--rust = build/bin/pdal.
 Prints a CSV-style table of median peak RSS (MiB) and the rust/reference ratio
 for each workload.
 """
 
 import argparse
 import json
+import os
 import platform
 import re
 import shutil
@@ -40,6 +42,13 @@ def find_default_rust_pdal() -> str:
     return ""
 
 
+def find_default_reference_pdal() -> str:
+    for candidate in ("/opt/homebrew/bin/pdal", "/usr/local/bin/pdal"):
+        if Path(candidate).exists():
+            return candidate
+    return shutil.which("pdal") or ""
+
+
 def resolve_binary(value: str) -> str:
     if not value:
         return ""
@@ -47,6 +56,29 @@ def resolve_binary(value: str) -> str:
     if path.exists():
         return str(path)
     return shutil.which(value) or ""
+
+
+def env_for(binary: str) -> dict[str, str]:
+    """Prefer the build-tree libpdalcpp when running a build-tree binary."""
+    env = os.environ.copy()
+    try:
+        binary_path = Path(binary).resolve()
+    except OSError:
+        return env
+
+    for build_dir in (REPO / ".build", REPO / "build"):
+        bin_dir = (build_dir / "bin").resolve()
+        lib_dir = (build_dir / "lib").resolve()
+        try:
+            if binary_path.is_relative_to(bin_dir) and lib_dir.exists():
+                lib = str(lib_dir)
+                for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"):
+                    current = env.get(name, "")
+                    env[name] = lib if not current else f"{lib}:{current}"
+                break
+        except ValueError:
+            continue
+    return env
 
 
 def _macos_time_argv(binary: str, args: list[str]) -> list[str]:
@@ -70,6 +102,7 @@ def peak_rss_bytes(binary: str, args: list[str]) -> int:
         argv,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        env=env_for(binary),
         text=True,
     )
     if result.returncode != 0:
@@ -103,7 +136,7 @@ def write_pipeline(path: Path, stages: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ref", default=shutil.which("pdal") or "")
+    parser.add_argument("--ref", default=find_default_reference_pdal())
     parser.add_argument("--rust", default=find_default_rust_pdal())
     parser.add_argument("--iters", type=int, default=7)
     args = parser.parse_args()
@@ -122,7 +155,12 @@ def main() -> int:
         return 2
 
     def version(binary: str) -> str:
-        out = subprocess.run([binary, "--version"], capture_output=True, text=True)
+        out = subprocess.run(
+            [binary, "--version"],
+            capture_output=True,
+            env=env_for(binary),
+            text=True,
+        )
         for line in out.stdout.splitlines():
             if line.strip().startswith("pdal "):
                 return line.strip()
