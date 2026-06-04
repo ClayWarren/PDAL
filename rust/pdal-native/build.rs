@@ -8,8 +8,14 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("../../.pixi/envs/dev"));
     let prefix = prefix.canonicalize().unwrap_or(prefix);
-    let include = prefix.join("include");
-    let lib = prefix.join("lib");
+    let (include, lib) = if cfg!(target_os = "windows") {
+        (
+            prefix.join("Library").join("include"),
+            prefix.join("Library").join("lib"),
+        )
+    } else {
+        (prefix.join("include"), prefix.join("lib"))
+    };
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
 
     if nitf_enabled {
@@ -105,6 +111,13 @@ fn link_library(lib: &Path, out_dir: &Path, name: &str, unversioned_names: &[&st
 }
 
 fn versioned_library_candidates(lib: &Path, name: &str) -> Vec<PathBuf> {
+    if cfg!(target_os = "linux") && name == "xml2" {
+        let candidate = lib.join("libxml2.so.2");
+        if candidate.exists() {
+            return vec![candidate];
+        }
+    }
+
     let Ok(entries) = fs::read_dir(lib) else {
         return Vec::new();
     };
