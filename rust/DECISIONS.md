@@ -21,9 +21,10 @@ it unless a concrete parity failure proves the decision wrong.
 
 | Gate | Decision | Reason |
 |---|---|---|
-| Aggregate release gate | Release-blocking. `rust-release-gate` must pass before upstreaming. | This is the single Pixi entrypoint for the Rust guard, C++ parity/implementation audits, installed C ABI consumer smoke, source-package smoke, and full C++ CTest suite. |
+| Aggregate release gate | Release-blocking. `rust-release-gate` must pass before upstreaming. | This is the single Pixi entrypoint for the Rust guard, C++ parity/implementation audits, installed-PDAL workflow parity, installed C ABI consumer smoke, source-package smoke, and full C++ CTest suite. |
 | Rust default guard | Release-blocking. `rust-guard` must pass. | This covers formatting, type checking, clippy, Rust tests, coverage threshold, license audit, unsafe accounting, and C ABI header sync. |
 | C++ compatibility audits | Release-blocking. `rust-cpp-test-parity` and `rust-cpp-port-audit` must pass before upstreaming. | The port is only valid if the pre-port C++ behavioral contract remains Rust C ABI-backed and the implementation backlog stays classified. |
+| Installed-PDAL workflow parity | Release-blocking. `rust-workflow-parity` must pass before upstreaming. | C++ tests prove compatibility APIs; workflow parity proves the built CLI still matches the installed PDAL 2.10.1 behavior for representative user-visible command and artifact paths. |
 | Install/export/package smoke | Release-blocking. `rust-capi-install-smoke` and `rust-source-package-smoke` must pass. | Downstream consumers need `find_package(PDAL)` / `PDAL::CAPI` and source releases to work, not just the build tree. |
 | Rust mutation testing | Visibility gate, not release-blocking yet. | Run deliberately on mature buckets; require investigation of meaningful survivors before promoting to a threshold. |
 | Performance, memory, binary size, startup, compile time, and full-suite timing | Visibility gates. Record comparable data and explain major regressions; do not block on fixed ratios yet. | Current harnesses are useful but still platform/build-config-sensitive. Hard thresholds need a controlled same-config baseline. |
