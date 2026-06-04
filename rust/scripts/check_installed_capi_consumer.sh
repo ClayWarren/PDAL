@@ -71,6 +71,34 @@ int main()
         return 6;
     if (pdal_stac_type_supported("/definitely/missing/stac.json"))
         return 7;
+
+    pdal_pipeline_t* pipeline = pdal_pipeline_create_json(R"([
+        {
+            "type":"readers.faux",
+            "count":3,
+            "mode":"ramp",
+            "minx":-10,
+            "maxx":20,
+            "miny":-15,
+            "maxy":7,
+            "minz":-50,
+            "maxz":100
+        }
+    ])");
+    if (!pipeline)
+        return 8;
+    pdal_pipeline_result_t result{};
+    if (pdal_pipeline_execute_result(pipeline, nullptr, &result) != 0)
+        return 9;
+    if (result.point_count != 3 || result.view_count != 1 ||
+        !result.has_bounds_2d || !result.has_bounds_3d)
+        return 10;
+    if (result.bounds_3d.minx != -10.0 || result.bounds_3d.maxx != 20.0 ||
+        result.bounds_3d.miny != -15.0 || result.bounds_3d.maxy != 7.0 ||
+        result.bounds_3d.minz != -50.0 || result.bounds_3d.maxz != 100.0)
+        return 11;
+    pdal_pipeline_destroy(pipeline);
+
     pdal_capi_free(nullptr);
     return version ? 0 : 1;
 }
