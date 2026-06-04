@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 ninja -v
 ninja install
