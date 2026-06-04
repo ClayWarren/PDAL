@@ -42,8 +42,9 @@ separately. The implementation-replacement audit is also at `0`
 port-candidate LOC for the main first-party surface and remains `0` when
 optional plugins are included.
 
-Those numbers are guardrails, not the finish line. The work left is to close
-or explicitly accept the named caveats below:
+Those numbers are guardrails, not the finish line. The implementation backlog
+for the current first-party scope is closed; the work left is upstream
+readiness and policy for the accepted boundaries below:
 
 - OGR/vector-source breadth: covered local vector reads/writes, tindex
   create append/dedup with idempotent OGR field setup, and tindex merge reads
@@ -71,9 +72,10 @@ or explicitly accept the named caveats below:
   time, and full-suite timing are recorded or runnable visibility gates. Decide
   which become release-blocking policy before upstreaming.
 
-When continuing the port, choose one of those caveats and close it with focused
-parity coverage, or document why it is an intentional holdout/native adapter.
-Do not restart old directory sweeps or add placeholder Rust modules.
+When continuing from here, do not restart old directory sweeps or add
+placeholder Rust modules. Work only on a concrete regression, upstream-readiness
+gate, packaging/platform failure, policy decision, or accepted native-adapter
+milestone.
 
 ## Feature Status
 
@@ -123,7 +125,7 @@ Do not restart old directory sweeps or add placeholder Rust modules.
 | Performance visibility | done | Ignored reporting harnesses exist for local I/O performance, binary size, startup time, memory, build cost, and opt-in full C++ vs Rust test-suite timing. Recorded results live in `rust/BENCHMARKS.md` for macOS arm64, version-matched 2.10.1. The earlier high-RSS pipeline regression was traced to redundant Rust executor copies, fixed with move/drop execution, in-place sort, and conservative streaming execution for linear streamable pipelines. The large LAS -> range -> LAS memory case now uses bounded memory through the Rust CLI path. The harnesses remain visibility tools, not hard release gates, until project policy says otherwise. |
 | Rust coverage reporting | done | `pixi run -e dev rust-coverage` runs `cargo-llvm-cov` over the Rust workspace. The line-coverage threshold is enforced by `rust-coverage-check` inside `rust-guard`; keep the percentage in `pixi.toml` synced with the latest measured coverage. |
 | Rust mutation testing | done | `pixi run -e dev rust-mutants` runs `cargo-mutants` when it is installed locally. This is an audit tool for mature buckets, not part of `rust-guard` until the project chooses a mutation-score release policy. |
-| Unsafe Rust footprint | done | `pixi run -e dev rust-unsafe-audit` tracks source-only unsafe Rust accounting. Current first-party Rust count, excluding `rust/target`, is 360 `unsafe { ... }` blocks, 569 `unsafe extern "C" fn` exports, 88 total `unsafe fn` helpers, 2 unsafe extern callback type aliases, 0 unsafe extern blocks, and 1 `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
+| Unsafe Rust footprint | done | `pixi run -e dev rust-unsafe-audit` tracks source-only unsafe Rust accounting. Current first-party Rust count, excluding `rust/target`, is 371 `unsafe { ... }` blocks, 570 `unsafe extern "C" fn` exports, 88 total `unsafe fn` helpers, 2 unsafe extern callback type aliases, 0 unsafe extern blocks, and 1 `unsafe impl`. Unsafe remains concentrated in `pdal-capi`, `pdal-native`, and Rust callers of the C ABI; keep new unsafe at C/native boundaries or tests that exercise those boundaries. |
 | Vendor/native strategy | done | `vendor/` has 11 top-level third-party dependency directories. `rust/VENDOR.md` describes the vendor boundary and `rust/DECISIONS.md` records the closed choices. Current decisions: `h3` -> `h3o`, `lazperf` -> `las`/`laz`, `eigen`/`gtest`/`nanoflann`/`nlohmann` are not direct Rust port targets, and `arbiter`/`kazhdan`/`lepcc`/`schema-validator`/`utfcpp` are adapter-bound or deferred to named milestones. Native GDAL/OGR/GEOS/PROJ/Nitro adapters belong in `pdal-native`; pure Rust replacements such as LAS/LAZ do not need to move through it. Reopen only for a concrete parity failure or a new native boundary decision. |
 | Plugins | done | There are 18 top-level plugin directories. `rust/DECISIONS.md` records each plugin's current status. The optional plugin audit reports 0 port-candidate LOC: `faux`, `nitf`, and `spz` are completed C ABI-backed compatibility checkpoints, while all other optional plugins are native adapters/deferred by decision instead of unplanned pure-port backlog. A Rust plugin SDK and broad optional plugin sweep are intentionally later work, not remaining first-party port backlog. |
 | Remote/object-store I/O | done | `pdal-native::vsi::VsiFile` opens local, URL, `/vsicurl/`, and documented object-store URL schemes through GDAL VSI (`s3://` -> `/vsis3/`, `gs://` -> `/vsigs/`, `az://` -> `/vsiaz/`) and implements `std::io::Read + Seek` so byte-range readers can stream over it. The Rust COPC hierarchy walker consumes the adapter end-to-end: `pdal_io_copc_remote_reader_test.vsi` (autzen-classified.copc.laz over both https and `/vsicurl/`) counts as Rust C ABI-backed. STAC remote JSON traversal, remote LASzip EPT reads, and `pdal info` remote pointless-LAS header/VLR/EVLR extraction consume the same adapter. Pipeline `FileSpec` filename objects propagate `query` maps into covered Rust HTTP/VSI/object-store paths by appending stable query parameters to the source URL. `FileSpec` `headers` are preserved by Rust options and applied as scoped GDAL VSI path-specific headers for LAS/COPC byte-source paths, EPT root/hierarchy/binary/zstd/LASzip tile reads, EPT addon/source-origin sidecars, STAC traversal plus asset-reader dispatch, and TIndex GeoJSON index/asset-reader dispatch. Broader Arbiter-style connector option parity and cloud credential workflows are deferred/native-adapter decisions, not unplanned Rust implementation backlog. |
@@ -236,9 +238,9 @@ This proves the current C++ compatibility layer can satisfy the pre-port
 behavioral contract; it is not the finish line. The implementation-replacement
 audit below is also green: remaining first-party C++ is classified as
 glue/wrappers, native adapters, or documented holdouts. The active goal is now
-to close the named caveats in the north-star list above and make
-install/export/CI/regression/performance evidence strong enough for an
-upstreamable port.
+to keep those audits green while making install/export/CI/regression,
+performance, and release-policy evidence strong enough for an upstreamable
+port.
 
 ## C++ Implementation-Replacement Backlog
 

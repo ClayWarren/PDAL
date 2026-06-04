@@ -154,20 +154,18 @@ Current active milestone:
    `audit_cpp_test_parity.py` is currently `819 / 819`, and
    `audit_cpp_port_backlog.py --include-plugins` is currently `0`
    port-candidate LOC. Those are guardrails, not the finish line.
-2. Work the named caveats in `rust/STATUS.md`, not old directory goals. The
-   current remaining work is specific: OGR/vector-source breadth,
-   remote/STAC/schema breadth, optional plugin/native-adapter
-   policy, packaging/CI/release readiness, C ABI stability, and final
-   regression/performance evidence.
-3. When a caveat can be closed in code, close it with focused parity coverage.
-   Recent examples are registry support for `filters.radiusassign` value
-   expressions, `filters.overlay` layer/query/bounds options, and
-   `filters.geomdistance` OGR layer/SQL sources. When a caveat is an
-   intentional holdout or native-adapter boundary, record that decision instead
-   of porting around it.
+2. Do not reopen closed caveats in `rust/STATUS.md` as generic porting work.
+   OGR/vector-source breadth, remote/STAC/schema breadth, optional plugins,
+   and vendor-heavy behavior are accepted native-adapter/deferred boundaries
+   unless a concrete parity failure proves otherwise.
+3. Current useful work is upstream-readiness work: package/install/export
+   verification, C ABI stability policy, CI/platform hardening, final
+   regression/performance evidence, and release-blocking policy for coverage,
+   mutation testing, unsafe footprint, memory, binary size, startup time,
+   compile time, and full-suite timing.
 4. New I/O, command, vendor, and plugin work should be narrow and
-   fixture-backed. Broad sweeps are only appropriate after a named finish-line
-   caveat is converted into a concrete, regression-testable milestone.
+   fixture-backed. Broad sweeps are appropriate only after a closed boundary is
+   deliberately reopened as a concrete, regression-testable milestone.
 5. If work reaches a native dependency, plugin, or public C++ compatibility
    question, check `rust/DECISIONS.md`. A listed decision is not a TODO; it is
    the current shape unless a named parity gate fails.
@@ -438,7 +436,7 @@ Done when:
 ### 4. Former Deferred Filter Families
 
 Goal: preserve the discipline used for formerly deferred filter families. This
-is no longer the active filter worklist; see `Remaining Finish-Line Caveats`
+is no longer the active filter worklist; see `Remaining Finish-Line Work`
 and `STATUS.md` for current gaps.
 
 Required shape:
@@ -562,13 +560,14 @@ remaining C++ filter families, and useful regression commands live in
   streaming, and multi-output behavior unless the migration explicitly replaces
   that contract with passing parity tests.
 
-## Remaining Finish-Line Caveats
+## Remaining Finish-Line Work
 
 Do not use old filter-family buckets as the worklist. The filter and
 implementation-replacement audits now have no unplanned port-candidate files.
-The remaining work is the explicit caveat set in `rust/STATUS.md`.
+The remaining work is upstream-readiness and release policy for the explicit
+boundaries in `rust/STATUS.md`.
 
-Current caveat classes:
+Accepted boundary classes:
 
 - OGR/vector-source breadth: covered local vector reads/writes, tindex
   create append/dedup, and tindex merge reads are Rust-backed. Broad exotic
@@ -599,10 +598,10 @@ Current caveat classes:
   recorded visibility gates until the project decides which ones become hard
   release gates.
 
-If a caveat is closed, update `STATUS.md` in the same commit as the code or in
-an immediately adjacent docs commit. If a caveat is intentionally left in C++
-or native code, add or update the decision in `DECISIONS.md` instead of
-creating placeholder Rust code.
+If an accepted boundary is deliberately reopened, update `STATUS.md` and
+`DECISIONS.md` with the concrete parity failure or policy change that justifies
+the new milestone. Do not create placeholder Rust code for accepted native
+adapters.
 
 ## Completion Criteria For Each Port
 
