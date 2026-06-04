@@ -44,12 +44,12 @@ impl StacReader {
         Self {
             filename: options.get_str("filename", ""),
             asset_names: asset_names(options),
-            items: option_values(options, "items"),
-            catalogs: comma_values(options, "catalogs"),
+            items: option_values_with_synonym(options, "items", "item_ids"),
+            catalogs: comma_values_with_synonym(options, "catalogs", "catalog_ids"),
             date_ranges: option_values(options, "date_ranges"),
             bounds: options.get_str("bounds", ""),
             ogr: options.get_str("ogr", ""),
-            collections: comma_values(options, "collections"),
+            collections: comma_values_with_synonym(options, "collections", "collection_ids"),
             validate_schema: options.get_bool("validate_schema", false),
             properties: options.get_str("properties", ""),
             reader_args: options.get_str("reader_args", ""),
@@ -202,6 +202,12 @@ fn comma_values(options: &Options, key: &str) -> Vec<String> {
         .collect()
 }
 
+fn comma_values_with_synonym(options: &Options, key: &str, synonym: &str) -> Vec<String> {
+    let mut values = comma_values(options, key);
+    values.extend(comma_values(options, synonym));
+    values
+}
+
 fn option_values(options: &Options, key: &str) -> Vec<String> {
     options
         .values(key)
@@ -210,6 +216,12 @@ fn option_values(options: &Options, key: &str) -> Vec<String> {
         .filter(|value| !value.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+fn option_values_with_synonym(options: &Options, key: &str, synonym: &str) -> Vec<String> {
+    let mut values = option_values(options, key);
+    values.extend(option_values(options, synonym));
+    values
 }
 
 #[derive(Clone)]

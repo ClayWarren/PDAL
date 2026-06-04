@@ -571,13 +571,12 @@ The remaining work is the explicit caveat set in `rust/STATUS.md`.
 Current caveat classes:
 
 - OGR/vector-source breadth: covered local vector reads/writes, tindex
-  create append/dedup, and tindex merge reads are Rust-backed, but broad OGR datasource/update workflows still
-  need explicit native-adapter plumbing and regression coverage before they can
-  be claimed.
-- EPT/COPC/STAC preview and remote breadth: transformed EPT preview point
-  counts, semantically same-SRS and true cross-SRS transformed preview bounds
-  clipping, and local origin/polygon/OGR preview point counts are Rust-pruned,
-  but broad remote traversal, schema validation, and object-store option parity
+  create append/dedup, and tindex merge reads are Rust-backed, but broad OGR
+  datasource/update workflows still need explicit native-adapter plumbing and
+  regression coverage before they can be claimed.
+- EPT/COPC/STAC preview and remote breadth: covered EPT preview filters, local
+  EPT/COPC/STAC workflows, and selected remote/VSI paths are Rust-backed, but
+  broad remote traversal, schema validation, and object-store option parity
   remain named work items.
 - Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
   but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.

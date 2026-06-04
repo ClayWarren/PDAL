@@ -158,6 +158,77 @@ fn collection_filter_rejects_invalid_regex() {
 }
 
 #[test]
+fn read_accepts_cpp_filter_synonyms() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data/ply/simple_text.ply");
+    std::fs::copy(&source, temp.path().join("accepted.ply")).unwrap();
+    std::fs::copy(&source, temp.path().join("rejected.ply")).unwrap();
+    std::fs::write(
+        temp.path().join("catalog.json"),
+        br#"{
+  "type": "Catalog",
+  "id": "root",
+  "links": [
+    {"rel": "catalog", "href": "accepted.json"},
+    {"rel": "catalog", "href": "rejected.json"}
+  ]
+}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("accepted.json"),
+        br#"{
+  "type": "Catalog",
+  "id": "keep",
+  "links": [{"rel": "item", "href": "accepted-item.json"}]
+}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("rejected.json"),
+        br#"{
+  "type": "Catalog",
+  "id": "drop",
+  "links": [{"rel": "item", "href": "rejected-item.json"}]
+}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("accepted-item.json"),
+        br#"{
+  "type": "Feature",
+  "id": "accepted-item",
+  "collection": "accepted-collection",
+  "assets": {"data": {"href": "accepted.ply"}}
+}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("rejected-item.json"),
+        br#"{
+  "type": "Feature",
+  "id": "rejected-item",
+  "collection": "rejected-collection",
+  "assets": {"data": {"href": "rejected.ply"}}
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().join("catalog.json").display());
+    options.add("catalog_ids", "keep");
+    options.add("item_ids", "accepted-.*");
+    options.add("collection_ids", "accepted-collection");
+    let mut reader = StacReader::new(&options);
+
+    let views = reader.read().unwrap();
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 3);
+}
+
+#[test]
 fn preview_applies_collection_and_property_filters_like_read() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
@@ -195,6 +266,44 @@ fn preview_applies_collection_and_property_filters_like_read() {
     options.add("filename", temp.path().to_string_lossy().into_owned());
     options.add("collections", "collection-a");
     options.add("properties", r#"{"quality":"good"}"#);
+    let reader = StacReader::new(&options);
+
+    let preview = reader.preview().unwrap();
+    assert_eq!(preview.item_ids, vec!["accepted"]);
+    assert_eq!(preview.point_count, 7);
+}
+
+#[test]
+fn preview_accepts_cpp_filter_synonyms() {
+    let temp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp.path(),
+        br#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "accepted",
+      "collection": "collection-a",
+      "properties": {"pc:count": 7},
+      "assets": {"data": {"href": "accepted.las"}}
+    },
+    {
+      "type": "Feature",
+      "id": "rejected",
+      "collection": "collection-b",
+      "properties": {"pc:count": 11},
+      "assets": {"data": {"href": "rejected.las"}}
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", temp.path().to_string_lossy().into_owned());
+    options.add("item_ids", "accepted");
+    options.add("collection_ids", "collection-a");
     let reader = StacReader::new(&options);
 
     let preview = reader.preview().unwrap();
