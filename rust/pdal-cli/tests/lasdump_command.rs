@@ -32,6 +32,37 @@ fn lasdump_writes_cpp_compatible_output_to_stdout() {
 }
 
 #[test]
+#[ignore = "requires installed lasdump on PATH"]
+fn installed_lasdump_matches_rust_lasdump() {
+    let installed = Command::new("lasdump")
+        .arg(simple_las())
+        .output()
+        .expect("failed to execute installed lasdump");
+    assert!(
+        installed.status.success(),
+        "installed lasdump failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&installed.stdout),
+        String::from_utf8_lossy(&installed.stderr)
+    );
+
+    let rust = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .args(["lasdump", simple_las()])
+        .output()
+        .expect("failed to execute pdal-rs");
+    assert!(
+        rust.status.success(),
+        "pdal-rs lasdump failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&rust.stdout),
+        String::from_utf8_lossy(&rust.stderr)
+    );
+
+    assert_eq!(
+        String::from_utf8_lossy(&rust.stdout),
+        String::from_utf8_lossy(&installed.stdout)
+    );
+}
+
+#[test]
 fn lasdump_writes_output_file() {
     let output = temp_file("pdal-rs-lasdump");
     let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
