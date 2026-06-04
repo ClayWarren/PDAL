@@ -34,8 +34,24 @@ project(pdal_capi_consumer CXX)
 find_package(PDAL CONFIG REQUIRED)
 
 add_executable(consumer main.cpp)
+target_compile_definitions(consumer PRIVATE
+    STAC_ITEM_PATH="${CMAKE_CURRENT_SOURCE_DIR}/stac-item.json")
 target_link_libraries(consumer PRIVATE PDAL::CAPI)
 CMAKE
+
+cat >"${CONSUMER_DIR}/stac-item.json" <<'JSON'
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "install-smoke",
+  "geometry": null,
+  "properties": {
+    "datetime": "2026-01-01T00:00:00Z"
+  },
+  "links": [],
+  "assets": {}
+}
+JSON
 
 cat >"${CONSUMER_DIR}/main.cpp" <<'CPP'
 #include <pdal_capi.h>
@@ -51,6 +67,10 @@ int main()
         return 4;
     if (PDAL_CAPI_ABI_VERSION_PATCH != pdal_capi_abi_version_patch())
         return 5;
+    if (!pdal_stac_type_supported(STAC_ITEM_PATH))
+        return 6;
+    if (pdal_stac_type_supported("/definitely/missing/stac.json"))
+        return 7;
     pdal_capi_free(nullptr);
     return version ? 0 : 1;
 }
