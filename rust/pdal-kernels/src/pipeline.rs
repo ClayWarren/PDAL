@@ -346,9 +346,7 @@ fn serialized_stage_object(
     if let Some(object) = stage.as_object() {
         let mut object = object.clone();
         if !object.contains_key("type") {
-            let filename = object
-                .get("filename")
-                .and_then(serde_json::Value::as_str)
+            let filename = stage_filename_for_inference(&object)
                 .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?;
             object.insert(
                 "type".to_string(),
@@ -373,6 +371,16 @@ fn serialized_stage_object(
         serde_json::Value::String(filename.to_string()),
     );
     Ok(object)
+}
+
+fn stage_filename_for_inference(
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&str> {
+    let filename = object.get("filename")?;
+    if let Some(text) = filename.as_str() {
+        return Some(text);
+    }
+    filename.get("path").and_then(serde_json::Value::as_str)
 }
 
 fn infer_stage_name(filename: &str, position: usize, len: usize) -> Result<String, String> {
@@ -627,6 +635,27 @@ mod tests {
         assert_eq!(parsed["pipeline"][2]["tag"], "writers_las1");
         assert_eq!(parsed["pipeline"][2]["inputs"][0], "readers_las1");
         assert_eq!(parsed["pipeline"][2]["inputs"][1], "readers_las2");
+    }
+
+    #[test]
+    fn serializes_filespec_endpoint_stages_with_inferred_types() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                {"filename":{"path":"/tmp/in.las","headers":{"k":"v"}}},
+                {"type":"filters.head","count":1},
+                {"filename":{"path":"/tmp/out.las"}}
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
+        assert_eq!(parsed["pipeline"][0]["filename"]["path"], "/tmp/in.las");
+        assert_eq!(parsed["pipeline"][0]["filename"]["headers"]["k"], "v");
+        assert_eq!(parsed["pipeline"][1]["inputs"][0], "readers_las1");
+        assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+        assert_eq!(parsed["pipeline"][2]["filename"]["path"], "/tmp/out.las");
+        assert_eq!(parsed["pipeline"][2]["inputs"][0], "filters_head1");
     }
 
     #[test]
