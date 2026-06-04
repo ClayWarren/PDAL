@@ -278,10 +278,10 @@ Current snapshot (mainline, excluding `test/`, `vendor/`, and optional
 | category | LOC | files |
 |---|---:|---:|
 | port-candidate | 0 | 0 |
-| c-abi-backed | 45,187 | 398 |
+| c-abi-backed | 45,190 | 398 |
 | native-adapter | 6,195 | 59 |
 | holdout | 6,670 | 64 |
-| total | 58,052 | 521 |
+| total | 58,055 | 521 |
 
 Port-candidate backlog by area: `pdal`, `io`, `filters`,
 `kernels`, `apps` and `tools` are now at 0 (apps is a thin entry-point
@@ -289,8 +289,8 @@ peer; the only `tools` entry the audit had been counting was the in-tree
 GoogleTest `tools/nitfwrap/NitfWrapTest.cpp`, which is behavioral contract, not
 implementation — the audit now excludes files including `pdal_test_main.hpp`).
 With `--include-plugins`, optional plugin port-candidate backlog is also 0
-(`45,770` C ABI-backed LOC, `32,721` native-adapter LOC, `6,670` holdout LOC,
-`85,161` total LOC): plugin tests are excluded, C ABI-backed checkpoints are
+(`45,773` C ABI-backed LOC, `32,721` native-adapter LOC, `6,670` holdout LOC,
+`85,164` total LOC): plugin tests are excluded, C ABI-backed checkpoints are
 tracked as backed, and dependency-bound plugin integrations are tracked as
 native adapters rather than line-by-line Rust rewrite work.
 (The latest kernel sweeps moved direct C++ `DeltaKernel`/`EvalKernel`/
@@ -492,7 +492,7 @@ the behavioral contract and should not be counted as unported implementation.
 
 Current C++ compatibility wrapper/adapter surface, using the same
 `audit_cpp_port_backlog.py` classification as the implementation backlog, is
-`45,187` c-abi-backed code LOC across `398` first-party files, plus `6,195`
+`45,190` c-abi-backed code LOC across `398` first-party files, plus `6,195`
 native-adapter LOC and `6,670` documented holdout LOC. This is a coarse ceiling
 because several files still mix compatibility shells, native-adapter work, and
 Rust C ABI calls; the number should shrink only when wrappers are split from
