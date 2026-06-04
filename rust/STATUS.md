@@ -479,15 +479,16 @@ filter types (csf, pmf, skewnessbalancing, smrf).
 `927 / 927` claim was withdrawn because it mixed a hand-maintained numerator with a
 different denominator.
 
-Current test-suite size: `28,793` C++ code LOC under `test/`. These tests remain
+Current test-suite size: `29,965` C++/header code LOC under `test/`. These tests remain
 the behavioral contract and should not be counted as unported implementation.
 
-Current C++ compatibility wrapper/adapter surface: `19,792` code LOC across
-`125` first-party C++ files that include or directly declare Rust C ABI entry
-points, split approximately as `pdal/` 7,387 LOC, `filters/` 5,917 LOC, and
-`io/` 6,107 LOC. This is a coarse ceiling because several files still mix real
-legacy implementation with wrapper calls; the number should shrink as wrappers
-are split from implementation.
+Current C++ compatibility wrapper/adapter surface, using the same
+`audit_cpp_port_backlog.py` classification as the implementation backlog, is
+`45,195` c-abi-backed code LOC across `398` first-party files, plus `6,195`
+native-adapter LOC and `6,670` documented holdout LOC. This is a coarse ceiling
+because several files still mix compatibility shells, native-adapter work, and
+Rust C ABI calls; the number should shrink only when wrappers are split from
+implementation or a holdout/native-adapter decision changes.
 
 Next implementation-replacement checkpoint: all portable first-party C++
 implementation has moved behind the Rust C ABI, leaving only compatibility
