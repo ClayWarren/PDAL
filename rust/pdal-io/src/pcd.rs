@@ -48,6 +48,8 @@ struct PcdReaderStreamState {
     reader: BufReader<Box<dyn source::ReadSeek>>,
     header: Header,
     layout: Rc<PointLayout>,
+    compressed_payload: Option<Vec<u8>>,
+    next_point: u64,
     remaining: u64,
     eof: bool,
 }
@@ -109,14 +111,29 @@ impl PcdReader {
         }
 
         let header = parse_header(&header_bytes)?;
-        if header.storage != "ascii" && header.storage != "binary" {
+        if !matches!(
+            header.storage.as_str(),
+            "ascii" | "binary" | "binary_compressed"
+        ) {
             return Err(StageError(
-                "PCD streaming is only supported for ASCII and binary input.".to_string(),
+                "PCD streaming is only supported for ASCII, binary, and binary-compressed input."
+                    .to_string(),
             ));
         }
+        let compressed_payload = if header.storage == "binary_compressed" {
+            let mut payload = Vec::new();
+            reader
+                .read_to_end(&mut payload)
+                .map_err(|err| StageError(err.to_string()))?;
+            Some(read_compressed_payload(&header, &payload)?)
+        } else {
+            None
+        };
         let layout = Self::layout_for(&header);
         self.stream = Some(PcdReaderStreamState {
             reader,
+            compressed_payload,
+            next_point: 0,
             remaining: header.points,
             header,
             layout,
@@ -215,6 +232,22 @@ impl Reader for PcdReader {
             let target = capacity.max(1) as u64;
             while view.len() < target && state.remaining > 0 {
                 append_binary_point(&mut view, &state.header, &mut state.reader)?;
+                state.remaining -= 1;
+            }
+        } else if state.header.storage == "binary_compressed" {
+            let target = capacity.max(1) as u64;
+            let payload = state
+                .compressed_payload
+                .as_ref()
+                .expect("compressed payload initialized above");
+            while view.len() < target && state.remaining > 0 {
+                append_transposed_binary_point(
+                    &mut view,
+                    &state.header,
+                    payload,
+                    state.next_point,
+                )?;
+                state.next_point += 1;
                 state.remaining -= 1;
             }
         } else {

@@ -469,7 +469,7 @@ mod tests {
         let mut read_options = Options::new();
         read_options.add("filename", &output);
         let mut reader = PcdReader::new(&read_options);
-        assert!(!reader.streamable());
+        assert!(reader.streamable());
         let roundtrip = reader.read().unwrap().pop().unwrap();
 
         assert_eq!(roundtrip.len(), 3);
@@ -478,6 +478,17 @@ mod tests {
         assert!((roundtrip.get_f64(2, &DimId::Z) - 9.25).abs() < 0.0001);
         assert_eq!(roundtrip.get_f64(0, &DimId::Intensity), 42.0);
         assert_eq!(roundtrip.get_f64(2, &DimId::Intensity), 44.0);
+
+        let mut stream_reader = PcdReader::new(&read_options);
+        let first = stream_reader.stream_next(2).unwrap().unwrap();
+        let second = stream_reader.stream_next(2).unwrap().unwrap();
+        assert!(stream_reader.stream_next(2).unwrap().is_none());
+        assert_eq!(first.len(), 2);
+        assert_eq!(second.len(), 1);
+        assert_eq!(first.get_f64(0, &DimId::Intensity), 42.0);
+        assert!((first.get_f64(1, &DimId::Y) - 5.5).abs() < 0.0001);
+        assert!((second.get_f64(0, &DimId::Z) - 9.25).abs() < 0.0001);
+        let _ = fs::remove_file(output);
     }
 
     #[test]

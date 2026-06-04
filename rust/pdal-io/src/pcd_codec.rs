@@ -140,7 +140,12 @@ pub(super) fn pcd_input_is_streamable(filename: &str) -> bool {
     }
 
     parse_header(&header_bytes)
-        .map(|header| matches!(header.storage.as_str(), "ascii" | "binary"))
+        .map(|header| {
+            matches!(
+                header.storage.as_str(),
+                "ascii" | "binary" | "binary_compressed"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -258,6 +263,52 @@ pub(super) fn read_transposed_binary_points(
                 }
             }
         }
+    }
+    Ok(())
+}
+
+pub(super) fn append_transposed_binary_point(
+    view: &mut PointView,
+    header: &Header,
+    bytes: &[u8],
+    point_id: u64,
+) -> Result<(), StageError> {
+    let expected = binary_payload_size(header)?;
+    if bytes.len() != expected {
+        return Err(StageError(
+            "Unexpected binary-compressed PCD size.".to_string(),
+        ));
+    }
+    if point_id >= header.points {
+        return Err(StageError(
+            "Binary-compressed PCD point index is out of bounds.".to_string(),
+        ));
+    }
+
+    let point = view.add_point();
+    let mut field_offset = 0u64;
+    for field in &header.fields {
+        let field_size = u64::from(field.size) * u64::from(field.count);
+        let start = field_offset
+            .checked_add(point_id.checked_mul(field_size).ok_or_else(|| {
+                StageError("PCD binary-compressed payload is too large.".to_string())
+            })?)
+            .ok_or_else(|| StageError("PCD binary-compressed payload is too large.".to_string()))?;
+        let mut offset = usize::try_from(start)
+            .map_err(|_| StageError("PCD binary-compressed payload is too large.".to_string()))?;
+        for count in 0..field.count {
+            let value = read_binary_value(bytes, &mut offset, field)?;
+            if count == 0 {
+                view.set_f64(point, &field.id, value);
+            }
+        }
+        field_offset = field_offset
+            .checked_add(
+                field_size
+                    .checked_mul(header.points)
+                    .ok_or_else(|| StageError("PCD payload is too large.".to_string()))?,
+            )
+            .ok_or_else(|| StageError("PCD payload is too large.".to_string()))?;
     }
     Ok(())
 }
