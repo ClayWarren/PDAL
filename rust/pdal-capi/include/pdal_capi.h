@@ -9,8 +9,8 @@
 #define PDAL_CAPI_ABI_VERSION_MAJOR 0u
 #define PDAL_CAPI_ABI_VERSION_MINOR 2u
 #define PDAL_CAPI_ABI_VERSION_PATCH 0u
-#define PDAL_CAPI_ABI_VERSION                                                \
-    ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                              \
+#define PDAL_CAPI_ABI_VERSION                                                  \
+    ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                                \
      (PDAL_CAPI_ABI_VERSION_MINOR * 1000u) + PDAL_CAPI_ABI_VERSION_PATCH)
 
 #ifdef __cplusplus
@@ -164,6 +164,7 @@ extern "C"
     int32_t pdal_config_version_integer(int32_t major, int32_t minor,
                                         int32_t patch);
     char* pdal_config_full_version_string(const char* version, const char* sha);
+    char* pdal_native_dependencies_json(void);
 
     // Log
     const char* pdal_log_level_string(int32_t level);
@@ -406,6 +407,10 @@ extern "C"
     int pdal_rust_kernel_run(const char* kernel_name, int argc,
                              const char* const* argv);
     const char* pdal_rust_kernel_list_json(void);
+    int pdal_tile(const char* input_json, const char* output_pattern,
+                  const char* length_text, const char* origin_x_text,
+                  const char* origin_y_text, bool buffer, bool out_srs,
+                  const char* writer_options_json);
 
     // Pipeline
     char* pdal_pipeline_generate_stage_tag(const char* stage_name,
@@ -996,8 +1001,9 @@ extern "C"
                                            pdal_metadata_node_t* child);
     void pdal_metadata_node_add_child_clone(pdal_metadata_node_t* node,
                                             const pdal_metadata_node_t* child);
-    void pdal_metadata_node_add_list_child_clone(
-        pdal_metadata_node_t* node, const pdal_metadata_node_t* child);
+    void
+    pdal_metadata_node_add_list_child_clone(pdal_metadata_node_t* node,
+                                            const pdal_metadata_node_t* child);
     void pdal_metadata_node_add_or_update_child(pdal_metadata_node_t* node,
                                                 pdal_metadata_node_t* child);
     void pdal_metadata_node_add_or_update_child_clone(
@@ -1014,6 +1020,7 @@ extern "C"
     pdal_metadata_node_t*
     pdal_metadata_node_find_child_path(const pdal_metadata_node_t* node,
                                        const char* path);
+    char* pdal_metadata_node_to_json(const pdal_metadata_node_t* node);
     void pdal_metadata_node_destroy(pdal_metadata_node_t* node);
 
     // Stage
@@ -1379,7 +1386,6 @@ extern "C"
     pdal_stage_t* pdal_stage_create_overlay_with_options(
         const char* dim_name, const char* datasource, const char* column,
         const char* layer_name, const char* query, const char* bounds_wkt);
-    pdal_stage_t* pdal_stage_create_georeference(const char* out_srs);
     char*
     pdal_georeference_validate_coordinate_system(const char* coordinate_system);
     char*
@@ -1396,11 +1402,9 @@ extern "C"
         double scale;
     } pdal_band_info_t;
 
-    pdal_stage_t* pdal_stage_create_colorinterp(const char* dim_name,
-                                                const char* ramp, double min,
-                                                double max, bool clamp,
-                                                bool invert, bool mad,
-                                                double mad_multiplier, double k);
+    pdal_stage_t* pdal_stage_create_colorinterp(
+        const char* dim_name, const char* ramp, double min, double max,
+        bool clamp, bool invert, bool mad, double mad_multiplier, double k);
     char* pdal_colorinterp_validate_prepared(const pdal_point_layout_t* layout,
                                              const char* dim_name, double min,
                                              double max);
@@ -1508,12 +1512,6 @@ extern "C"
                                       uint64_t* out_rows,
                                       uint64_t* out_columns);
 
-    // Stage registry: construct implemented stages from PDAL driver names.
-    pdal_reader_t* pdal_create_reader(const char* name,
-                                      const pdal_options_t* ops);
-    pdal_writer_t* pdal_create_writer(const char* name,
-                                      const pdal_options_t* ops);
-
     // Metrics: compare two point cloud files.
     int pdal_hausdorff(const char* path_a, const char* path_b,
                        double* hausdorff, double* modified_hausdorff);
@@ -1546,8 +1544,9 @@ extern "C"
     typedef struct pdal_ept_reader_preview_t pdal_ept_reader_preview_t;
     pdal_ept_reader_preview_t*
     pdal_ept_reader_preview_create(const char* filename);
-    pdal_ept_reader_preview_t* pdal_ept_reader_preview_create_with_options(
-        const char* filename, const char* resolution);
+    pdal_ept_reader_preview_t*
+    pdal_ept_reader_preview_create_with_options(const char* filename,
+                                                const char* resolution);
     pdal_ept_reader_preview_t* pdal_ept_reader_preview_create_with_bounds(
         const char* filename, const char* resolution, const char* bounds);
     pdal_ept_reader_preview_t*

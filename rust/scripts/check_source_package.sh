@@ -25,6 +25,7 @@ required=(
     "rust/pdal-cli/Cargo.toml"
     "rust/pdal-native/Cargo.toml"
     "rust/pdal-plugins/Cargo.toml"
+    "rust/scripts/audit_capi_header.py"
     "rust/scripts/check_installed_capi_consumer.sh"
     "rust/scripts/check_source_package.sh"
 )
