@@ -49,7 +49,7 @@ endmacro()
 
 find_library(GEOS_C_LIBRARY NAMES geos_c)
 if(APPLE)
-    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    set(COREFOUNDATION_FRAMEWORK "-framework" "CoreFoundation")
 endif()
 
 # The Rust pdal-native crate unconditionally builds a Nitro-backed NITF
