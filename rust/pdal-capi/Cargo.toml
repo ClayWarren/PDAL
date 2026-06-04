@@ -8,15 +8,17 @@ description = "C ABI for PDAL Rust port spike."
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
-
+[features]
+default = ["nitf"]
+nitf = ["pdal-io/nitf", "pdal-native/nitf"]
 
 [dependencies]
 chrono = "0.4.44"
 pdal-core = { path = "../pdal-core" }
 pdal-filters = { path = "../pdal-filters" }
-pdal-io = { path = "../pdal-io" }
+pdal-io = { path = "../pdal-io", default-features = false }
 pdal-kernels = { path = "../pdal-kernels" }
-pdal-native = { path = "../pdal-native" }
+pdal-native = { path = "../pdal-native", default-features = false }
 pdal-plugins = { path = "../pdal-plugins" }
 serde_json = "1"
 glob = "0.3"

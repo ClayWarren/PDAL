@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn main() {
+    let nitf_enabled = env::var_os("CARGO_FEATURE_NITF").is_some();
     let prefix = env::var("CONDA_PREFIX")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("../../.pixi/envs/dev"));
@@ -11,15 +12,17 @@ fn main() {
     let lib = prefix.join("lib");
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
 
-    cc::Build::new()
-        .cpp(true)
-        .std("c++17")
-        .define("_REENTRANT", None)
-        .define("__POSIX", None)
-        .include(include.join("nitro/c++"))
-        .include(include.join("nitro/c"))
-        .file("src/nitf_bridge.cpp")
-        .compile("pdal_native_nitf_bridge");
+    if nitf_enabled {
+        cc::Build::new()
+            .cpp(true)
+            .std("c++17")
+            .define("_REENTRANT", None)
+            .define("__POSIX", None)
+            .include(include.join("nitro/c++"))
+            .include(include.join("nitro/c"))
+            .file("src/nitf_bridge.cpp")
+            .compile("pdal_native_nitf_bridge");
+    }
 
     cc::Build::new()
         .cpp(true)
@@ -30,8 +33,6 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib.display());
     println!("cargo:rustc-link-lib=geotiff");
-    println!("cargo:rustc-link-lib=nitf-cpp");
-    println!("cargo:rustc-link-lib=nitf-c");
     copy_runtime_library(&lib, &out_dir, "libgeos.3.14.1.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.1.dylib");
@@ -46,16 +47,22 @@ fn main() {
     copy_runtime_library(&lib, &out_dir, "libproj.so.25");
     copy_runtime_library(&lib, &out_dir, "libgeos.so");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.so");
-    copy_runtime_library(&lib, &out_dir, "libnitf-cpp.dylib");
-    copy_runtime_library(&lib, &out_dir, "libnitf-c.dylib");
-    copy_runtime_library(&lib, &out_dir, "libnitf-cpp.so");
-    copy_runtime_library(&lib, &out_dir, "libnitf-c.so");
+    if nitf_enabled {
+        println!("cargo:rustc-link-lib=nitf-cpp");
+        println!("cargo:rustc-link-lib=nitf-c");
+        copy_runtime_library(&lib, &out_dir, "libnitf-cpp.dylib");
+        copy_runtime_library(&lib, &out_dir, "libnitf-c.dylib");
+        copy_runtime_library(&lib, &out_dir, "libnitf-cpp.so");
+        copy_runtime_library(&lib, &out_dir, "libnitf-c.so");
+    }
     if cfg!(any(target_os = "macos", target_os = "linux")) {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib.display());
     }
     println!("cargo:rerun-if-env-changed=CONDA_PREFIX");
     println!("cargo:rerun-if-changed=src/geotiff_bridge.cpp");
-    println!("cargo:rerun-if-changed=src/nitf_bridge.cpp");
+    if nitf_enabled {
+        println!("cargo:rerun-if-changed=src/nitf_bridge.cpp");
+    }
 }
 
 fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {

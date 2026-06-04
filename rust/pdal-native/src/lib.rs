@@ -15,6 +15,7 @@ pub mod vsi;
 pub enum NativeCapability {
     Gdal,
     Geos,
+    #[cfg(feature = "nitf")]
     Nitro,
     Proj,
 }
@@ -30,6 +31,7 @@ pub fn built_capabilities() -> &'static [NativeCapability] {
     &[
         NativeCapability::Gdal,
         NativeCapability::Geos,
+        #[cfg(feature = "nitf")]
         NativeCapability::Nitro,
         NativeCapability::Proj,
     ]
@@ -47,6 +49,7 @@ pub fn built_dependencies() -> Vec<NativeDependency> {
             name: "GEOS",
             version: geometry::version(),
         },
+        #[cfg(feature = "nitf")]
         NativeDependency {
             capability: NativeCapability::Nitro,
             name: "NITRO",

@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "Native library adapters for the PDAL Rust port."
 
+[features]
+default = ["nitf"]
+nitf = []
+
 [dependencies]
 gdal-sys = { version = "0.12", features = ["bindgen"] }
 geos = { version = "11.1", features = ["v3_10_0", "json"] }

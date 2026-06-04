@@ -38,7 +38,7 @@ macro(pdal_build_rust_capi _pdal_target)
         OUTPUT ${RUST_CAPI_LIB}
         COMMAND ${CMAKE_COMMAND} -E env
             MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
-            ${CARGO_EXECUTABLE} build --release
+            ${CARGO_EXECUTABLE} build --release -p pdal-capi ${RUST_CAPI_FEATURE_ARGS}
         DEPENDS ${RUST_CAPI_SOURCES}
         WORKING_DIRECTORY ${RUST_CAPI_DIR}
         COMMENT "Building Rust C ABI (pdal-capi) with cargo"
@@ -52,15 +52,17 @@ if(APPLE)
     set(COREFOUNDATION_FRAMEWORK "-framework" "CoreFoundation")
 endif()
 
-# The Rust pdal-native crate unconditionally builds a Nitro-backed NITF
-# bridge (used by tools.nitfwrap, readers.nitf, and writers.nitf). pdalcpp
-# embeds libpdal_capi.a so it inherits those Nitro symbol references and
-# must link the same native libraries. Locate them without polluting the
-# global include path (nitro.cmake calls include_directories which would
-# shadow vendor/nlohmann/json.hpp with a stale copy from the pixi env).
+# When Nitro is available, the Rust pdal-native crate builds a NITF bridge
+# (used by tools.nitfwrap, readers.nitf, and writers.nitf). pdalcpp embeds
+# libpdal_capi.a so it inherits those Nitro symbol references and must link the
+# same native libraries. Locate them without polluting the global include path
+# (nitro.cmake calls include_directories which would shadow
+# vendor/nlohmann/json.hpp with a stale copy from the pixi env).
 find_package(Nitro 2.6 QUIET MODULE)
-if (NOT NITRO_FOUND)
-    message(FATAL_ERROR "Rust pdal-native requires Nitro >= 2.6 (set NITRO_INCLUDE_DIR / NITRO_C_LIBRARY / NITRO_CPP_LIBRARY).")
+if (NITRO_FOUND)
+    set(RUST_CAPI_FEATURE_ARGS "--features" "nitf")
+else()
+    set(RUST_CAPI_FEATURE_ARGS "--no-default-features")
 endif()
 add_definitions("-D_REENTRANT")
 if (WIN32)
