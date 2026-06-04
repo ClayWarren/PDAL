@@ -481,6 +481,62 @@ mod tests {
     }
 
     #[test]
+    fn streaming_compressed_writer_matches_materialized_write() {
+        let mut layout = PointLayout::new();
+        layout.register(DimId::X, DimType::F64);
+        layout.register(DimId::Y, DimType::F64);
+        layout.register(DimId::Z, DimType::F64);
+        layout.register(DimId::Intensity, DimType::F64);
+        let mut view = PointView::new(Rc::new(layout));
+
+        for values in [
+            [1.0, 2.0, 3.0, 42.0],
+            [4.5, 5.5, 6.5, 43.0],
+            [7.25, 8.25, 9.25, 44.0],
+            [10.0, 11.0, 12.0, 45.0],
+        ] {
+            let point = view.add_point();
+            view.set_f64(point, &DimId::X, values[0]);
+            view.set_f64(point, &DimId::Y, values[1]);
+            view.set_f64(point, &DimId::Z, values[2]);
+            view.set_f64(point, &DimId::Intensity, values[3]);
+        }
+
+        let mut first = view.make_new();
+        first.append_point(&view, 0);
+        first.append_point(&view, 1);
+        let mut second = view.make_new();
+        second.append_point(&view, 2);
+        second.append_point(&view, 3);
+        let materialized = temp_path("materialized-compressed-stream-compare.pcd");
+        let streamed = temp_path("streamed-compressed-stream-compare.pcd");
+        let mut materialized_options = Options::new();
+        materialized_options
+            .add("filename", &materialized)
+            .add("order", "X=Float,Y=Float,Z=Float,Intensity=Unsigned16")
+            .add("compression", "compressed");
+        let mut stream_options = Options::new();
+        stream_options
+            .add("filename", &streamed)
+            .add("order", "X=Float,Y=Float,Z=Float,Intensity=Unsigned16")
+            .add("compression", "compressed");
+
+        let mut materialized_writer = PcdWriter::new(&materialized_options);
+        materialized_writer
+            .write(std::slice::from_ref(&view))
+            .unwrap();
+        let mut stream_writer = PcdWriter::new(&stream_options);
+        assert!(stream_writer.streamable());
+        stream_writer.stream_write(&first).unwrap();
+        stream_writer.stream_write(&second).unwrap();
+        stream_writer.stream_finish().unwrap();
+
+        assert_eq!(fs::read(&streamed).unwrap(), fs::read(&materialized).unwrap());
+        let _ = fs::remove_file(materialized);
+        let _ = fs::remove_file(streamed);
+    }
+
+    #[test]
     fn reader_filter_writer_pipeline_writes_ascii_pcd() {
         let input = data_path("pcd/utm17_space.pcd");
         let output = temp_path("pipeline.pcd");
@@ -566,6 +622,45 @@ mod tests {
         assert!(written.contains("POINTS 6\nDATA ascii\n"));
         assert!(written.contains("0 0 0 "));
         assert!(written.contains("5 5 5 "));
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn pipeline_streams_to_compressed_pcd_writer() {
+        let output = temp_path("stream-compressed-pipeline.pcd");
+
+        let mut reader_options = Options::new();
+        reader_options
+            .add("count", "12")
+            .add("mode", "ramp")
+            .add("bounds", "([0,11],[0,11],[0,11])");
+        let mut writer_options = Options::new();
+        writer_options
+            .add("filename", &output)
+            .add("order", "X=Float,Y=Float,Z=Float")
+            .add("compression", "compressed");
+
+        let mut pipeline = Pipeline::new();
+        let reader = pipeline.add_reader(
+            "readers.faux",
+            Box::new(FauxReader::new(&reader_options).unwrap()),
+            reader_options,
+        );
+        let writer = pipeline.add_writer(
+            "writers.pcd",
+            Box::new(PcdWriter::new(&writer_options)),
+            writer_options,
+        );
+        pipeline.add_dependency(writer, reader).unwrap();
+
+        assert_eq!(pipeline.execute_streaming().unwrap(), Some(12));
+        let mut read_options = Options::new();
+        read_options.add("filename", &output);
+        let mut reader = PcdReader::new(&read_options);
+        let view = reader.read().unwrap().pop().unwrap();
+
+        assert_eq!(view.len(), 12);
+        assert!((view.get_f64(11, &DimId::Z) - 11.0).abs() < 0.0001);
         let _ = fs::remove_file(output);
     }
 

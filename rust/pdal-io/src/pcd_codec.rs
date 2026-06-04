@@ -355,6 +355,62 @@ pub(super) fn compressed_payload(
         }
     }
 
+    compress_transposed_payload(uncompressed)
+}
+
+pub(super) fn compressed_payload_from_interleaved<R: Read + Seek>(
+    reader: &mut R,
+    points: u64,
+    specs: &[Field],
+) -> Result<Vec<u8>, StageError> {
+    let point_size = point_record_size(specs)?;
+    let payload_size = point_size
+        .checked_mul(points)
+        .ok_or_else(|| StageError("PCD payload is too large to compress.".to_string()))?;
+    let mut uncompressed = Vec::with_capacity(
+        usize::try_from(payload_size)
+            .map_err(|_| StageError("PCD payload is too large to compress.".to_string()))?,
+    );
+
+    let mut field_offset = 0u64;
+    for field in specs {
+        let field_size = u64::from(field.size) * u64::from(field.count);
+        for point in 0..points {
+            reader
+                .seek(SeekFrom::Start(
+                    point
+                        .checked_mul(point_size)
+                        .and_then(|offset| offset.checked_add(field_offset))
+                        .ok_or_else(|| {
+                            StageError("PCD payload is too large to compress.".to_string())
+                        })?,
+                ))
+                .map_err(|err| StageError(format!("Failed reading PCD row stream: {err}")))?;
+            let chunk_len = usize::try_from(field_size)
+                .map_err(|_| StageError("PCD payload is too large to compress.".to_string()))?;
+            let start = uncompressed.len();
+            uncompressed.resize(start + chunk_len, 0);
+            reader
+                .read_exact(&mut uncompressed[start..])
+                .map_err(|_| StageError("Unexpected end of PCD row stream.".to_string()))?;
+        }
+        field_offset = field_offset
+            .checked_add(field_size)
+            .ok_or_else(|| StageError("PCD payload is too large to compress.".to_string()))?;
+    }
+
+    compress_transposed_payload(uncompressed)
+}
+
+fn point_record_size(specs: &[Field]) -> Result<u64, StageError> {
+    specs.iter().try_fold(0u64, |total, field| {
+        total
+            .checked_add(u64::from(field.size) * u64::from(field.count))
+            .ok_or_else(|| StageError("PCD payload is too large to compress.".to_string()))
+    })
+}
+
+fn compress_transposed_payload(uncompressed: Vec<u8>) -> Result<Vec<u8>, StageError> {
     let uncompressed_size = u32::try_from(uncompressed.len())
         .map_err(|_| StageError("PCD payload is too large to compress.".to_string()))?;
     let mut compressed = vec![0; lzf_rust::max_compressed_size(uncompressed.len())];

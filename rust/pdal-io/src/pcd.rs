@@ -5,7 +5,7 @@ use pdal_core::pipeline::{Reader, Writer};
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -469,7 +469,11 @@ impl Writer for PcdWriter {
     }
 
     fn streamable(&self) -> bool {
-        !self.filename.is_empty() && matches!(self.compression.as_str(), "ascii" | "binary")
+        !self.filename.is_empty()
+            && matches!(
+                self.compression.as_str(),
+                "ascii" | "binary" | "compressed" | "binary_compressed"
+            )
     }
 
     fn stream_write(&mut self, chunk: &PointView) -> Result<(), StageError> {
@@ -479,11 +483,6 @@ impl Writer for PcdWriter {
             ));
         }
         self.validate()?;
-        if self.compression != "ascii" && self.compression != "binary" {
-            return Err(StageError(
-                "PCD streaming is only supported for ASCII and binary output.".to_string(),
-            ));
-        }
         if self.stream.is_none() {
             let specs = self.dimension_specs(chunk.layout())?;
             let rows_path = self.stream_rows_path();
@@ -529,11 +528,22 @@ impl Writer for PcdWriter {
         output
             .write_all(&self.header_bytes(&state.specs, self.point_count))
             .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
-        let mut rows = File::open(&state.rows_path)
-            .map(BufReader::new)
-            .map_err(|e| StageError(format!("Failed reopening PCD row stream: {e}")))?;
-        std::io::copy(&mut rows, &mut output)
-            .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        if self.compression == "ascii" || self.compression == "binary" {
+            let mut rows = File::open(&state.rows_path)
+                .map(BufReader::new)
+                .map_err(|e| StageError(format!("Failed reopening PCD row stream: {e}")))?;
+            std::io::copy(&mut rows, &mut output)
+                .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        } else {
+            let mut rows = File::open(&state.rows_path)
+                .map(BufReader::new)
+                .map_err(|e| StageError(format!("Failed reopening PCD row stream: {e}")))?;
+            let payload =
+                compressed_payload_from_interleaved(&mut rows, self.point_count, &state.specs)?;
+            output
+                .write_all(&payload)
+                .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
+        }
         output
             .flush()
             .map_err(|e| StageError(format!("Failed writing '{}': {e}", self.filename)))?;
