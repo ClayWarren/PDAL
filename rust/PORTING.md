@@ -571,19 +571,23 @@ The remaining work is the explicit caveat set in `rust/STATUS.md`.
 Current caveat classes:
 
 - OGR/vector-source breadth: covered local vector reads/writes, tindex
-  create append/dedup, and tindex merge reads are Rust-backed, but broad OGR
-  datasource/update workflows still need explicit native-adapter plumbing and
-  regression coverage before they can be claimed.
+  create append/dedup, and tindex merge reads are Rust-backed. Broad exotic
+  OGR datasource/update workflows are a native-adapter boundary unless a
+  concrete parity failure reopens them.
 - EPT/COPC/STAC preview and remote breadth: covered EPT preview filters, local
   EPT/COPC/STAC workflows, and selected remote/VSI/object-store path forms are
   Rust-backed, including `FileSpec` query propagation and scoped GDAL VSI
   header forwarding through LAS/COPC, EPT root/hierarchy/tile reads, EPT
   addon/source-origin sidecars, STAC traversal/asset dispatch, and TIndex
   GeoJSON/asset dispatch. Broad remote traversal, object-store credential
-  workflows, schema validation, and native-connector parity remain named work
-  items.
-- Metadata/pipeline byte-shape parity: Rust owns covered structural behavior,
-  but full C++ `PipelineWriter` byte-for-byte shape is not the contract yet.
+  workflows, custom schema URL resolution, and native-connector parity are
+  deferred/native-adapter boundaries unless a concrete parity failure reopens
+  them.
+- Metadata/pipeline structural parity: Rust owns covered structural behavior,
+  and covered pipeline JSON serialization is semantically aligned with
+  installed PDAL. Byte-for-byte JSON object key order is not the contract.
+  Remaining artifact-shape work belongs to command stdout/stderr/XML/report
+  outputs, not to `PipelineWriter` reimplementation.
 - Packaging, CI, install/export, and release policy: these must prove the
   Rust C ABI as an installed, upstreamable surface across supported platforms.
 - Optional plugins: the broad triage is closed for the current first-party port.
@@ -591,8 +595,9 @@ Current caveat classes:
   native adapters or deferred by decision until a plugin SDK/versioning policy
   exists. Do not treat them as active port-candidate backlog.
 - Performance and quality gates: coverage, mutation testing, unsafe tracking,
-  memory/performance/binary/startup/compile-time comparisons are visibility
-  gates until the project decides which ones become hard release gates.
+  memory/performance/binary/startup/compile-time comparisons are runnable or
+  recorded visibility gates until the project decides which ones become hard
+  release gates.
 
 If a caveat is closed, update `STATUS.md` in the same commit as the code or in
 an immediately adjacent docs commit. If a caveat is intentionally left in C++
