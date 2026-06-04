@@ -403,7 +403,7 @@ deliberately conservative. Drive the number down by porting the ranked
 entry when that is the honest answer).
 
 The branch-wide visibility metric, including guard tests added before and during
-the port, is `964 / 1069` currently built C++ GoogleTest cases, or `90.18%`;
+the port, is `970 / 1069` currently built C++ GoogleTest cases, or `90.74%`;
 compute that with `--include-added-tests`. That number is informational because
 many added guard tests intentionally still exercise C++ compatibility seams,
 native-adapter optional plugins, or non-port holdouts; do not use it as the
