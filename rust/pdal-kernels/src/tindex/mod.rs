@@ -87,6 +87,7 @@ pub enum TindexParseResult {
 pub struct TindexMergeArgs {
     pub tindex_file: String,
     pub output_file: String,
+    pub layer_name: String,
     pub location_field: String,
     pub target_srs: String,
     pub clip: Option<TindexMergeClip>,

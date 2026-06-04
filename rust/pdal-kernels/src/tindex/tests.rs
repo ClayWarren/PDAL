@@ -398,6 +398,7 @@ fn merge_accepts_separate_clip_and_ignored_driver_options() {
     .unwrap();
 
     assert_eq!(parsed.output_file, "out.laz");
+    assert_eq!(parsed.layer_name, "tiles");
     match parsed.clip.unwrap() {
         TindexMergeClip::Bounds { bounds, value } => {
             assert_eq!(value, "([10,20],[30,40])");
@@ -408,6 +409,14 @@ fn merge_accepts_separate_clip_and_ignored_driver_options() {
         }
         TindexMergeClip::Polygon { .. } => panic!("expected bounds clip"),
     }
+}
+
+#[test]
+fn merge_accepts_equals_layer_option() {
+    let parsed =
+        parse_tindex_merge_args(&strings(&["idx.gpkg", "out.las", "--lyr_name=tiles"])).unwrap();
+
+    assert_eq!(parsed.layer_name, "tiles");
 }
 
 #[test]

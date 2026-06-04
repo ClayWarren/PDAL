@@ -8,6 +8,7 @@ use pdal_core::driver::{infer_reader_driver, infer_writer_driver};
 pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, TindexParseResult> {
     let mut tindex_file = None;
     let mut output_file = None;
+    let mut layer_name = "pdal".to_string();
     let mut location_field = "location".to_string();
     let mut target_srs = "EPSG:4326".to_string();
     let mut clip = None;
@@ -20,6 +21,7 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
             "--tindex_name" => {
                 location_field = tindex_next_value(&mut iter, "--tindex_name")?.clone()
             }
+            "--lyr_name" => layer_name = tindex_next_value(&mut iter, "--lyr_name")?.clone(),
             "--bounds" => {
                 let value = tindex_next_value(&mut iter, "--bounds")?;
                 clip = Some(parse_merge_bounds(value)?);
@@ -35,7 +37,7 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
             "--log" => {
                 let _ = tindex_next_value(&mut iter, "--log")?;
             }
-            "--lyr_name" | "--ogrdriver" | "-f" => {
+            "--ogrdriver" | "-f" => {
                 let _ = tindex_next_value(&mut iter, arg)?;
             }
             _ if let Some(value) = arg.strip_prefix("--bounds=") => {
@@ -48,6 +50,9 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
             }
             _ if let Some(value) = arg.strip_prefix("--t_srs=") => {
                 target_srs = value.to_string();
+            }
+            _ if let Some(value) = arg.strip_prefix("--lyr_name=") => {
+                layer_name = value.to_string();
             }
             _ if arg.starts_with("--log=") => {}
             _ if arg.starts_with("--") => {
@@ -78,6 +83,7 @@ pub fn parse_tindex_merge_args(args: &[String]) -> Result<TindexMergeArgs, Tinde
     Ok(TindexMergeArgs {
         tindex_file,
         output_file,
+        layer_name,
         location_field,
         target_srs,
         clip,
