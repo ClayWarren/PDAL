@@ -1,15 +1,14 @@
-#include <except/Throwable.h>
 #include <nitf/BandInfo.hpp>
 #include <nitf/DESegment.hpp>
 #include <nitf/Defines.h>
 #include <nitf/Extensions.hpp>
 #include <nitf/FileHeader.hpp>
-#include <nitf/PluginRegistry.hpp>
 #include <nitf/FileSecurity.hpp>
 #include <nitf/IOHandle.hpp>
 #include <nitf/ImageSource.hpp>
 #include <nitf/ImageSubheader.hpp>
 #include <nitf/LookupTable.hpp>
+#include <nitf/PluginRegistry.hpp>
 #include <nitf/Reader.hpp>
 #include <nitf/Record.hpp>
 #include <nitf/SegmentSource.hpp>
@@ -35,7 +34,7 @@ NITF_TRE_STATIC_HANDLER_REF(AIMIDB)
 namespace
 {
 
-void set_error(char *err, size_t err_len, const std::string& message)
+void set_error(char* err, size_t err_len, const std::string& message)
 {
     if (!err || err_len == 0)
         return;
@@ -47,10 +46,14 @@ void set_error(char *err, size_t err_len, const std::string& message)
 void register_required_tres()
 {
     static std::once_flag flag;
-    std::call_once(flag, []() {
-        nitf::PluginRegistry::registerTREHandler(ACFTB_init, ACFTB_handler);
-        nitf::PluginRegistry::registerTREHandler(AIMIDB_init, AIMIDB_handler);
-    });
+    std::call_once(flag,
+                   []()
+                   {
+                       nitf::PluginRegistry::registerTREHandler(ACFTB_init,
+                                                                ACFTB_handler);
+                       nitf::PluginRegistry::registerTREHandler(AIMIDB_init,
+                                                                AIMIDB_handler);
+                   });
 }
 
 bool has_lidar_image(nitf::Record& record)
@@ -69,7 +72,7 @@ bool has_lidar_image(nitf::Record& record)
     return false;
 }
 
-bool find_lidar_data(nitf::Record& record, uint64_t *offset, uint64_t *length)
+bool find_lidar_data(nitf::Record& record, uint64_t* offset, uint64_t* length)
 {
     nitf::ListIterator iter = record.getDataExtensions().begin();
     const nitf::Uint32 count = record.getNumDataExtensions();
@@ -91,7 +94,7 @@ bool find_lidar_data(nitf::Record& record, uint64_t *offset, uint64_t *length)
     return false;
 }
 
-void set_header(nitf::FileHeader& header, const char *title)
+void set_header(nitf::FileHeader& header, const char* title)
 {
     header.getFileHeader().set("NITF");
     header.getComplianceLevel().set("03");
@@ -123,7 +126,7 @@ void set_data_extension(nitf::Record& record)
     subheader.setSubheaderFields(user_header);
 }
 
-void set_image(nitf::Record& record, const double *bounds)
+void set_image(nitf::Record& record, const double* bounds)
 {
     nitf::ImageSegment image = record.newImageSegment();
     nitf::ImageSubheader subheader = image.getSubheader();
@@ -148,8 +151,8 @@ void set_image(nitf::Record& record, const double *bounds)
     info.init(" ", " ", "N", "   ", 0, 0, table);
     std::vector<nitf::BandInfo> bands;
     bands.push_back(info);
-    subheader.setPixelInformation(
-        "INT", 8, 8, "R", "NODISPLY", "VIS", 1, bands);
+    subheader.setPixelInformation("INT", 8, 8, "R", "NODISPLY", "VIS", 1,
+                                  bands);
     subheader.setBlocking(8, 8, 8, 8, "B");
     subheader.getImageId().set("None");
 }
@@ -162,17 +165,17 @@ std::string trim_trailing(const std::string& s)
     return s.substr(0, end + 1);
 }
 
-using MetaCb = int (*)(const char *key, const char *value, void *userdata);
+using MetaCb = int (*)(const char* key, const char* value, void* userdata);
 
 void emit_field(const std::string& parent, const std::string& tag,
-                nitf::Field field, MetaCb cb, void *userdata, bool *stop)
+                nitf::Field field, MetaCb cb, void* userdata, bool* stop)
 {
     if (*stop)
         return;
     std::string value;
     auto type = field.getType();
-    if (type == (nitf::Field::FieldType)NITF_BCS_A
-        || type == (nitf::Field::FieldType)NITF_BCS_N)
+    if (type == (nitf::Field::FieldType)NITF_BCS_A ||
+        type == (nitf::Field::FieldType)NITF_BCS_N)
     {
         value = field.toString();
     }
@@ -186,7 +189,8 @@ void emit_field(const std::string& parent, const std::string& tag,
             {
                 if (i > 0)
                     oss << ", ";
-                oss << static_cast<unsigned int>(static_cast<unsigned char>(raw[i]));
+                oss << static_cast<unsigned int>(
+                    static_cast<unsigned char>(raw[i]));
             }
             value = oss.str();
         }
@@ -202,7 +206,7 @@ void emit_field(const std::string& parent, const std::string& tag,
 }
 
 void emit_int(const std::string& parent, const std::string& tag, int value,
-              MetaCb cb, void *userdata, bool *stop)
+              MetaCb cb, void* userdata, bool* stop)
 {
     if (*stop)
         return;
@@ -213,28 +217,43 @@ void emit_int(const std::string& parent, const std::string& tag, int value,
 }
 
 void emit_security(const std::string& parent, const std::string& prefix,
-                   nitf::FileSecurity security, MetaCb cb, void *userdata,
-                   bool *stop)
+                   nitf::FileSecurity security, MetaCb cb, void* userdata,
+                   bool* stop)
 {
-    emit_field(parent, prefix + "SCLSY", security.getClassificationSystem(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCODE", security.getCodewords(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCTLH", security.getControlAndHandling(), cb, userdata, stop);
-    emit_field(parent, prefix + "SREL", security.getReleasingInstructions(), cb, userdata, stop);
-    emit_field(parent, prefix + "SDCTP", security.getDeclassificationType(), cb, userdata, stop);
-    emit_field(parent, prefix + "SDCDT", security.getDeclassificationDate(), cb, userdata, stop);
-    emit_field(parent, prefix + "SDCXM", security.getDeclassificationExemption(), cb, userdata, stop);
-    emit_field(parent, prefix + "SDG", security.getDowngrade(), cb, userdata, stop);
-    emit_field(parent, prefix + "SDGDT", security.getDowngradeDateTime(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCLTX", security.getClassificationText(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCATP", security.getClassificationAuthorityType(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCAUT", security.getClassificationAuthority(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCRSN", security.getClassificationReason(), cb, userdata, stop);
-    emit_field(parent, prefix + "SSRDT", security.getSecuritySourceDate(), cb, userdata, stop);
-    emit_field(parent, prefix + "SCTLN", security.getSecurityControlNumber(), cb, userdata, stop);
+    emit_field(parent, prefix + "SCLSY", security.getClassificationSystem(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SCODE", security.getCodewords(), cb, userdata,
+               stop);
+    emit_field(parent, prefix + "SCTLH", security.getControlAndHandling(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SREL", security.getReleasingInstructions(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SDCTP", security.getDeclassificationType(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SDCDT", security.getDeclassificationDate(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SDCXM",
+               security.getDeclassificationExemption(), cb, userdata, stop);
+    emit_field(parent, prefix + "SDG", security.getDowngrade(), cb, userdata,
+               stop);
+    emit_field(parent, prefix + "SDGDT", security.getDowngradeDateTime(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SCLTX", security.getClassificationText(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SCATP",
+               security.getClassificationAuthorityType(), cb, userdata, stop);
+    emit_field(parent, prefix + "SCAUT", security.getClassificationAuthority(),
+               cb, userdata, stop);
+    emit_field(parent, prefix + "SCRSN", security.getClassificationReason(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SSRDT", security.getSecuritySourceDate(), cb,
+               userdata, stop);
+    emit_field(parent, prefix + "SCTLN", security.getSecurityControlNumber(),
+               cb, userdata, stop);
 }
 
 void emit_tre(const std::string& parent, nitf::TRE tre, MetaCb cb,
-              void *userdata, bool *stop)
+              void* userdata, bool* stop)
 {
     const std::string tag = parent + "." + tre.getTag();
     auto iter = tre.begin();
@@ -243,22 +262,22 @@ void emit_tre(const std::string& parent, nitf::TRE tre, MetaCb cb,
         try
         {
             nitf::Pair pair = *iter;
-            const char *key = pair.first();
+            const char* key = pair.first();
             if (key && std::strcmp(key, "raw_data") != 0)
             {
                 nitf::Field field = tre.getField(key);
                 emit_field(tag, key, field, cb, userdata, stop);
             }
         }
-        catch (const except::NullPointerReference&)
+        catch (...)
         {
         }
         ++iter;
     }
 }
 
-void emit_extensions(const std::string& parent, nitf::Extensions ext,
-                     MetaCb cb, void *userdata, bool *stop)
+void emit_extensions(const std::string& parent, nitf::Extensions ext, MetaCb cb,
+                     void* userdata, bool* stop)
 {
     auto iter = ext.begin();
     while (iter != ext.end() && !*stop)
@@ -269,8 +288,8 @@ void emit_extensions(const std::string& parent, nitf::Extensions ext,
     }
 }
 
-void emit_file_header(nitf::FileHeader header, MetaCb cb, void *userdata,
-                      bool *stop)
+void emit_file_header(nitf::FileHeader header, MetaCb cb, void* userdata,
+                      bool* stop)
 {
     emit_field("FH", "FHDR", header.getFileHeader(), cb, userdata, stop);
     emit_field("FH", "FVER", header.getFileVersion(), cb, userdata, stop);
@@ -281,7 +300,8 @@ void emit_file_header(nitf::FileHeader header, MetaCb cb, void *userdata,
     emit_field("FH", "FTITLE", header.getFileTitle(), cb, userdata, stop);
     emit_field("FH", "FSCLAS", header.getClassification(), cb, userdata, stop);
     emit_field("FH", "FSCOP", header.getMessageCopyNum(), cb, userdata, stop);
-    emit_field("FH", "FSCPYS", header.getMessageNumCopies(), cb, userdata, stop);
+    emit_field("FH", "FSCPYS", header.getMessageNumCopies(), cb, userdata,
+               stop);
     emit_field("FH", "ENCRYP", header.getEncrypted(), cb, userdata, stop);
     emit_field("FH", "FBKGC", header.getBackgroundColor(), cb, userdata, stop);
     emit_field("FH", "ONAME", header.getOriginatorName(), cb, userdata, stop);
@@ -291,12 +311,14 @@ void emit_file_header(nitf::FileHeader header, MetaCb cb, void *userdata,
     emit_field("FH", "NUMI", header.getNumImages(), cb, userdata, stop);
     emit_field("FH", "NUMS", header.getNumGraphics(), cb, userdata, stop);
     emit_field("FH", "NUMT", header.getNumTexts(), cb, userdata, stop);
-    emit_field("FH", "NUMDES", header.getNumDataExtensions(), cb, userdata, stop);
-    emit_field("FH", "NUMRES", header.getNumReservedExtensions(), cb, userdata, stop);
+    emit_field("FH", "NUMDES", header.getNumDataExtensions(), cb, userdata,
+               stop);
+    emit_field("FH", "NUMRES", header.getNumReservedExtensions(), cb, userdata,
+               stop);
 }
 
 void emit_band(const std::string& key, nitf::BandInfo band, MetaCb cb,
-               void *userdata, bool *stop)
+               void* userdata, bool* stop)
 {
     emit_field(key, "IREPBAND", band.getRepresentation(), cb, userdata, stop);
     emit_field(key, "ISUBCAT", band.getSubcategory(), cb, userdata, stop);
@@ -310,7 +332,7 @@ void emit_band(const std::string& key, nitf::BandInfo band, MetaCb cb,
 }
 
 void emit_image_subheader(const std::string& key, nitf::ImageSubheader sub,
-                          MetaCb cb, void *userdata, bool *stop)
+                          MetaCb cb, void* userdata, bool* stop)
 {
     emit_field(key, "IID1", sub.getImageId(), cb, userdata, stop);
     emit_field(key, "IDATIM", sub.getImageDateAndTime(), cb, userdata, stop);
@@ -328,7 +350,8 @@ void emit_image_subheader(const std::string& key, nitf::ImageSubheader sub,
     emit_field(key, "ICAT", sub.getImageCategory(), cb, userdata, stop);
     emit_field(key, "ABPP", sub.getActualBitsPerPixel(), cb, userdata, stop);
     emit_field(key, "PJUST", sub.getPixelJustification(), cb, userdata, stop);
-    emit_field(key, "ICORDS", sub.getImageCoordinateSystem(), cb, userdata, stop);
+    emit_field(key, "ICORDS", sub.getImageCoordinateSystem(), cb, userdata,
+               stop);
     emit_field(key, "IGEOLO", sub.getCornerCoordinates(), cb, userdata, stop);
     emit_field(key, "NICOM", sub.getNumImageComments(), cb, userdata, stop);
     nitf::List comments = sub.getImageComments();
@@ -336,13 +359,15 @@ void emit_image_subheader(const std::string& key, nitf::ImageSubheader sub,
     for (auto cit = comments.begin(); cit != comments.end() && !*stop; ++cit)
     {
         nitf::Field field = *cit;
-        emit_field(key, "ICOM:" + std::to_string(comment_index), field, cb, userdata, stop);
+        emit_field(key, "ICOM:" + std::to_string(comment_index), field, cb,
+                   userdata, stop);
         ++comment_index;
     }
     emit_field(key, "IC", sub.getImageCompression(), cb, userdata, stop);
     emit_field(key, "COMRAT", sub.getCompressionRate(), cb, userdata, stop);
     emit_field(key, "NBANDS", sub.getNumImageBands(), cb, userdata, stop);
-    emit_field(key, "XBANDS", sub.getNumMultispectralImageBands(), cb, userdata, stop);
+    emit_field(key, "XBANDS", sub.getNumMultispectralImageBands(), cb, userdata,
+               stop);
     const int nbands = static_cast<int>(sub.getNumImageBands());
     for (int i = 0; i < nbands && !*stop; ++i)
     {
@@ -354,8 +379,10 @@ void emit_image_subheader(const std::string& key, nitf::ImageSubheader sub,
     emit_field(key, "IMODE", sub.getImageMode(), cb, userdata, stop);
     emit_field(key, "NBPR", sub.getNumBlocksPerRow(), cb, userdata, stop);
     emit_field(key, "NBPC", sub.getNumBlocksPerCol(), cb, userdata, stop);
-    emit_field(key, "NPPBH", sub.getNumPixelsPerHorizBlock(), cb, userdata, stop);
-    emit_field(key, "NPPVB", sub.getNumPixelsPerVertBlock(), cb, userdata, stop);
+    emit_field(key, "NPPBH", sub.getNumPixelsPerHorizBlock(), cb, userdata,
+               stop);
+    emit_field(key, "NPPVB", sub.getNumPixelsPerVertBlock(), cb, userdata,
+               stop);
     emit_field(key, "NBPP", sub.getNumBitsPerPixel(), cb, userdata, stop);
     emit_field(key, "IDLVL", sub.getImageDisplayLevel(), cb, userdata, stop);
     emit_field(key, "IALVL", sub.getImageAttachmentLevel(), cb, userdata, stop);
@@ -363,8 +390,8 @@ void emit_image_subheader(const std::string& key, nitf::ImageSubheader sub,
     emit_field(key, "IMAG", sub.getImageMagnification(), cb, userdata, stop);
 }
 
-void emit_de_subheader(const std::string& key, nitf::DESubheader sub,
-                       MetaCb cb, void *userdata, bool *stop)
+void emit_de_subheader(const std::string& key, nitf::DESubheader sub, MetaCb cb,
+                       void* userdata, bool* stop)
 {
     emit_field(key, "DESID", sub.getTypeID(), cb, userdata, stop);
     emit_field(key, "DESVER", sub.getVersion(), cb, userdata, stop);
@@ -373,26 +400,30 @@ void emit_de_subheader(const std::string& key, nitf::DESubheader sub,
     emit_security(key, "DE", security, cb, userdata, stop);
 }
 
-void apply_aimidb_acftb(nitf::TRE& tre, const char *const *fields)
+void apply_aimidb_acftb(nitf::TRE& tre, const char* const* fields)
 {
     if (!fields)
         return;
-    for (const char *const *it = fields; *it != nullptr; ++it)
+    for (const char* const* it = fields; *it != nullptr; ++it)
     {
         std::string entry(*it);
         size_t colon = entry.find(':');
         if (colon == std::string::npos)
-            throw std::runtime_error("Invalid AIMIDB/ACFTB entry '"
-                                     + entry + "'. Expected name:value.");
+            throw std::runtime_error("Invalid AIMIDB/ACFTB entry '" + entry +
+                                     "'. Expected name:value.");
         std::string name = entry.substr(0, colon);
         std::string value = entry.substr(colon + 1);
-        while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back())))
+        while (!name.empty() &&
+               std::isspace(static_cast<unsigned char>(name.back())))
             name.pop_back();
-        while (!name.empty() && std::isspace(static_cast<unsigned char>(name.front())))
+        while (!name.empty() &&
+               std::isspace(static_cast<unsigned char>(name.front())))
             name.erase(name.begin());
-        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())))
+        while (!value.empty() &&
+               std::isspace(static_cast<unsigned char>(value.back())))
             value.pop_back();
-        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())))
+        while (!value.empty() &&
+               std::isspace(static_cast<unsigned char>(value.front())))
             value.erase(value.begin());
         tre.setField(name, value);
     }
@@ -402,30 +433,31 @@ void apply_aimidb_acftb(nitf::TRE& tre, const char *const *fields)
 
 struct pdal_native_nitf_write_options
 {
-    const char *file_title;
-    const char *complexity_level;
-    const char *system_type;
-    const char *origin_station_id;
-    const char *file_class;
-    const char *origin_name;
-    const char *origin_phone;
-    const char *fsclsy;
-    const char *fsctlh;
-    const char *fscltx;
-    const char *image_security_class;
-    const char *image_date_time;
-    const char *image_id2;
-    const char *const *aimidb;
-    const char *const *acftb;
+    const char* file_title;
+    const char* complexity_level;
+    const char* system_type;
+    const char* origin_station_id;
+    const char* file_class;
+    const char* origin_name;
+    const char* origin_phone;
+    const char* fsclsy;
+    const char* fsctlh;
+    const char* fscltx;
+    const char* image_security_class;
+    const char* image_date_time;
+    const char* image_id2;
+    const char* const* aimidb;
+    const char* const* acftb;
     double minx;
     double miny;
     double maxx;
     double maxy;
 };
 
-extern "C" int pdal_native_nitf_lidar_segment(
-    const char *input, uint64_t *offset, uint64_t *length, char *err,
-    size_t err_len)
+extern "C" int pdal_native_nitf_lidar_segment(const char* input,
+                                              uint64_t* offset,
+                                              uint64_t* length, char* err,
+                                              size_t err_len)
 {
     try
     {
@@ -444,22 +476,19 @@ extern "C" int pdal_native_nitf_lidar_segment(
         nitf::Record record = reader.read(io);
         if (!has_lidar_image(record))
         {
-            set_error(err, err_len,
-                      "Unable to find lidar-compatible image segment in NITF file");
+            set_error(
+                err, err_len,
+                "Unable to find lidar-compatible image segment in NITF file");
             return 0;
         }
         if (!find_lidar_data(record, offset, length))
         {
-            set_error(err, err_len,
-                      "Unable to find LIDARA data extension segment in NITF file");
+            set_error(
+                err, err_len,
+                "Unable to find LIDARA data extension segment in NITF file");
             return 0;
         }
         return 1;
-    }
-    catch (const except::Throwable& ex)
-    {
-        set_error(err, err_len, ex.getMessage());
-        return 0;
     }
     catch (const std::exception& ex)
     {
@@ -473,9 +502,9 @@ extern "C" int pdal_native_nitf_lidar_segment(
     }
 }
 
-extern "C" int pdal_native_nitf_wrap(
-    const char *input, const char *output, const char *title,
-    const double *bounds, char *err, size_t err_len)
+extern "C" int pdal_native_nitf_wrap(const char* input, const char* output,
+                                     const char* title, const double* bounds,
+                                     char* err, size_t err_len)
 {
     try
     {
@@ -500,8 +529,8 @@ extern "C" int pdal_native_nitf_wrap(
         segment_writer.attachSource(source);
 
         std::string zeros(64, '0');
-        nitf::MemorySource band(
-            const_cast<char*>(zeros.c_str()), zeros.size(), 0, 1, 0);
+        nitf::MemorySource band(const_cast<char*>(zeros.c_str()), zeros.size(),
+                                0, 1, 0);
         nitf::ImageSource image_source;
         image_source.addBand(band);
         nitf::ImageWriter image_writer = writer.newImageWriter(0);
@@ -510,11 +539,6 @@ extern "C" int pdal_native_nitf_wrap(
         writer.write();
         output_io.close();
         return 1;
-    }
-    catch (const except::Throwable& ex)
-    {
-        set_error(err, err_len, ex.getMessage());
-        return 0;
     }
     catch (const std::exception& ex)
     {
@@ -529,10 +553,9 @@ extern "C" int pdal_native_nitf_wrap(
 }
 
 extern "C" int pdal_native_nitf_read_metadata(
-    const char *input,
-    int (*cb)(const char *key, const char *value, void *userdata),
-    void *userdata,
-    char *err, size_t err_len)
+    const char* input,
+    int (*cb)(const char* key, const char* value, void* userdata),
+    void* userdata, char* err, size_t err_len)
 {
     try
     {
@@ -588,11 +611,6 @@ extern "C" int pdal_native_nitf_read_metadata(
 
         return 1;
     }
-    catch (const except::Throwable& ex)
-    {
-        set_error(err, err_len, ex.getMessage());
-        return 0;
-    }
     catch (const std::exception& ex)
     {
         set_error(err, err_len, ex.what());
@@ -605,10 +623,10 @@ extern "C" int pdal_native_nitf_read_metadata(
     }
 }
 
-extern "C" int pdal_native_nitf_write(
-    const char *input, const char *output,
-    const struct pdal_native_nitf_write_options *opts,
-    char *err, size_t err_len)
+extern "C" int
+pdal_native_nitf_write(const char* input, const char* output,
+                       const struct pdal_native_nitf_write_options* opts,
+                       char* err, size_t err_len)
 {
     try
     {
@@ -623,22 +641,22 @@ extern "C" int pdal_native_nitf_write(
         nitf::Record record(NITF_VER_21);
         nitf::FileHeader header = record.getHeader();
 
-        const char *complexity = opts->complexity_level && *opts->complexity_level
-                                     ? opts->complexity_level
-                                     : "03";
-        const char *system_type = opts->system_type && *opts->system_type
+        const char* complexity =
+            opts->complexity_level && *opts->complexity_level
+                ? opts->complexity_level
+                : "03";
+        const char* system_type = opts->system_type && *opts->system_type
                                       ? opts->system_type
                                       : "BF01";
-        const char *ostaid = opts->origin_station_id && *opts->origin_station_id
+        const char* ostaid = opts->origin_station_id && *opts->origin_station_id
                                  ? opts->origin_station_id
                                  : "PDAL";
-        const char *file_class = opts->file_class && *opts->file_class
-                                     ? opts->file_class
-                                     : "U";
-        const char *isclas = opts->image_security_class
-                                         && *opts->image_security_class
-                                     ? opts->image_security_class
-                                     : "U";
+        const char* file_class =
+            opts->file_class && *opts->file_class ? opts->file_class : "U";
+        const char* isclas =
+            opts->image_security_class && *opts->image_security_class
+                ? opts->image_security_class
+                : "U";
         std::string file_title = opts->file_title ? opts->file_title : "";
 
         header.getFileHeader().set("NITF");
@@ -647,10 +665,11 @@ extern "C" int pdal_native_nitf_write(
         header.getOriginStationID().set(ostaid);
         if (file_title.size() > header.getFileTitle().getLength())
         {
-            std::string msg = "Can't write file.  FTITLE field (usually "
-                              "filename) can't be longer than "
-                + std::to_string(header.getFileTitle().getLength())
-                + ".  Use 'ftitle' option to set appropriately sized FTITLE.";
+            std::string msg =
+                "Can't write file.  FTITLE field (usually "
+                "filename) can't be longer than " +
+                std::to_string(header.getFileTitle().getLength()) +
+                ".  Use 'ftitle' option to set appropriately sized FTITLE.";
             set_error(err, err_len, msg);
             return 0;
         }
@@ -665,7 +684,8 @@ extern "C" int pdal_native_nitf_write(
         if (opts->origin_phone)
             header.getOriginatorPhone().set(opts->origin_phone);
         if (opts->fsclsy)
-            header.getSecurityGroup().getClassificationSystem().set(opts->fsclsy);
+            header.getSecurityGroup().getClassificationSystem().set(
+                opts->fsclsy);
         if (opts->fsctlh)
             header.getSecurityGroup().getControlAndHandling().set(opts->fsctlh);
         if (opts->fscltx)
@@ -676,7 +696,8 @@ extern "C" int pdal_native_nitf_write(
         des.getSubheader().getTypeID().set("LIDARA DES");
         des.getSubheader().getVersion().set("01");
         des.getSubheader().getSecurityClass().set(file_class);
-        nitf::FileSecurity record_security = record.getHeader().getSecurityGroup();
+        nitf::FileSecurity record_security =
+            record.getHeader().getSecurityGroup();
         des.getSubheader().setSecurityGroup(record_security.clone());
 
         nitf::TRE user_header("LIDARA DES", "raw_data");
@@ -703,7 +724,8 @@ extern "C" int pdal_native_nitf_write(
         sub.getImageSecurityClass().set(isclas);
         sub.setSecurityGroup(record_security.clone());
 
-        std::string image_date = opts->image_date_time ? opts->image_date_time : "";
+        std::string image_date =
+            opts->image_date_time ? opts->image_date_time : "";
         if (!image_date.empty())
             sub.getImageDateAndTime().set(image_date);
 
@@ -735,7 +757,8 @@ extern "C" int pdal_native_nitf_write(
 
         if (image_date.empty())
         {
-            std::string acq = aimidb_tre.getField("ACQUISITION_DATE").toString();
+            std::string acq =
+                aimidb_tre.getField("ACQUISITION_DATE").toString();
             if (!acq.empty())
             {
                 image_date = acq;
@@ -768,8 +791,8 @@ extern "C" int pdal_native_nitf_write(
         segment_writer.attachSource(source);
 
         std::string zeros(64, '0');
-        nitf::MemorySource band(
-            const_cast<char*>(zeros.c_str()), zeros.size(), 0, 1, 0);
+        nitf::MemorySource band(const_cast<char*>(zeros.c_str()), zeros.size(),
+                                0, 1, 0);
         nitf::ImageSource image_source;
         image_source.addBand(band);
         nitf::ImageWriter image_writer = writer.newImageWriter(0);
@@ -778,11 +801,6 @@ extern "C" int pdal_native_nitf_write(
         writer.write();
         output_io.close();
         return 1;
-    }
-    catch (const except::Throwable& ex)
-    {
-        set_error(err, err_len, ex.getMessage());
-        return 0;
     }
     catch (const std::exception& ex)
     {

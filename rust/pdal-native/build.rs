@@ -90,6 +90,10 @@ fn link_library(lib: &Path, out_dir: &Path, name: &str, unversioned_names: &[&st
     }
 
     if let Some(candidate) = versioned_library_candidates(lib, name).into_iter().next() {
+        if cfg!(target_os = "linux") {
+            println!("cargo:rustc-link-arg={}", candidate.display());
+            return;
+        }
         let link_name = out_dir.join(format!("lib{name}.so"));
         let _ = fs::copy(candidate, &link_name);
         println!("cargo:rustc-link-search=native={}", out_dir.display());
