@@ -278,6 +278,87 @@ def compare_info_stats(ref: str, rust: str, las: Path) -> None:
                 raise AssertionError(f"info --stats {dim}.{key} differs: {a} != {b}")
 
 
+def compare_info_summary(ref: str, rust: str, path: Path) -> None:
+    ref_json = json.loads(run(ref, ["info", "--summary", str(path)]).stdout)
+    rust_json = json.loads(run(rust, ["info", "--summary", str(path)]).stdout)
+    if summary_count(ref_json) != summary_count(rust_json):
+        raise AssertionError("info --summary point count differs")
+    ref_bounds = summary_bounds(ref_json)
+    rust_bounds = summary_bounds(rust_json)
+    for key in ("minx", "maxx", "miny", "maxy", "minz", "maxz"):
+        a = float(ref_bounds[key])
+        b = float(rust_bounds[key])
+        if not math.isclose(a, b, rel_tol=0.0, abs_tol=1e-9):
+            raise AssertionError(f"info --summary {key} differs: {a} != {b}")
+
+
+def summary_count(value: dict[str, Any]) -> int:
+    for node in (value, value.get("summary", {})):
+        if isinstance(node, dict):
+            for key in ("point_count", "num_points"):
+                count = node.get(key)
+                if count is not None:
+                    return int(count)
+    raise AssertionError("unable to find summary point count")
+
+
+def summary_bounds(value: dict[str, Any]) -> dict[str, Any]:
+    bounds = value.get("bounds_3d")
+    if isinstance(bounds, dict):
+        return bounds
+    summary = value.get("summary", {})
+    bounds = summary.get("bounds") if isinstance(summary, dict) else None
+    if isinstance(bounds, dict):
+        return bounds
+    raise AssertionError("unable to find summary bounds")
+
+
+def assert_json_number_close(left: Any, right: Any, path: str, tolerance: float = 1e-6) -> None:
+    a = float(left)
+    b = float(right)
+    if not math.isclose(a, b, rel_tol=0.0, abs_tol=tolerance):
+        raise AssertionError(f"{path} differs: {a} != {b}")
+
+
+def compare_delta_command(ref: str, rust: str, source: Path, candidate: Path) -> None:
+    ref_json = json.loads(run(ref, ["delta", str(source), str(candidate)]).stdout)
+    rust_json = json.loads(run(rust, ["delta", str(source), str(candidate)]).stdout)
+    for dim in ("X", "Y", "Z"):
+        for stat in ("min", "mean", "max"):
+            assert_json_number_close(ref_json[dim][stat], rust_json[dim][stat], f"delta {dim}.{stat}")
+
+
+def compare_metric_command(ref: str, rust: str, command: str, source: Path, candidate: Path, keys: tuple[str, ...]) -> None:
+    ref_json = json.loads(run(ref, [command, str(source), str(candidate)]).stdout)
+    rust_json = json.loads(run(rust, [command, str(source), str(candidate)]).stdout)
+    for key in keys:
+        assert_json_number_close(ref_json[key], rust_json[key], f"{command} {key}")
+
+
+def parse_confusion_matrix(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value)
+    return value
+
+
+def compare_eval_command(ref: str, rust: str, path: Path) -> None:
+    ref_json = json.loads(
+        run(ref, ["eval", f"--predicted={path}", f"--truth={path}", "--labels=1,2"]).stdout
+    )
+    rust_json = json.loads(run(rust, ["eval", str(path), str(path), "--labels=1,2"]).stdout)
+    if parse_confusion_matrix(ref_json["confusion_matrix"]) != parse_confusion_matrix(rust_json["confusion_matrix"]):
+        raise AssertionError("eval confusion matrix differs")
+    for key in ("overall_accuracy", "mean_intersection_over_union", "f1_score"):
+        assert_json_number_close(ref_json[key], rust_json[key], f"eval {key}")
+    ref_labels = ref_json["labels"]
+    rust_labels = rust_json["labels"]
+    if len(ref_labels) != len(rust_labels):
+        raise AssertionError("eval label count differs")
+    for idx, (ref_label, rust_label) in enumerate(zip(ref_labels, rust_labels)):
+        if int(ref_label["support"]) != int(rust_label["support"]):
+            raise AssertionError(f"eval label {idx} support differs")
+
+
 def summary_point_count(pdal: str, path: Path) -> int:
     value = json.loads(run(pdal, ["info", "--summary", str(path)]).stdout)
     for node in (value, value.get("summary", {})):
@@ -470,6 +551,45 @@ def case_tile_command_counts_semantic(ref: str, rust: str, tmp: Path) -> None:
         raise AssertionError(f"tile total point count differs from fixture: {sum(ref_counts.values())}")
 
 
+def case_info_summary_semantic(ref: str, rust: str, _tmp: Path) -> None:
+    compare_info_summary(ref, rust, REPO / "test/data/ply/simple_text.ply")
+
+
+def case_delta_command_semantic(ref: str, rust: str, _tmp: Path) -> None:
+    compare_delta_command(
+        ref,
+        rust,
+        REPO / "test/data/ply/simple_text.ply",
+        REPO / "test/data/ply/text_extradim.ply",
+    )
+
+
+def case_chamfer_command_semantic(ref: str, rust: str, _tmp: Path) -> None:
+    compare_metric_command(
+        ref,
+        rust,
+        "chamfer",
+        REPO / "test/data/ply/simple_text.ply",
+        REPO / "test/data/ply/text_extradim.ply",
+        ("chamfer",),
+    )
+
+
+def case_hausdorff_command_semantic(ref: str, rust: str, _tmp: Path) -> None:
+    compare_metric_command(
+        ref,
+        rust,
+        "hausdorff",
+        REPO / "test/data/ply/simple_text.ply",
+        REPO / "test/data/ply/text_extradim.ply",
+        ("hausdorff", "modified_hausdorff"),
+    )
+
+
+def case_eval_command_semantic(ref: str, rust: str, _tmp: Path) -> None:
+    compare_eval_command(ref, rust, REPO / "test/data/las/interesting.las")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=find_default_reference_pdal())
@@ -500,6 +620,11 @@ def main() -> int:
         ("split command capacity counts", "semantic", case_split_command_counts_semantic),
         ("random command count and bounds", "semantic", case_random_command_count_semantic),
         ("tile command LAS counts", "semantic", case_tile_command_counts_semantic),
+        ("info --summary bounds/count", "semantic", case_info_summary_semantic),
+        ("delta command numeric payload", "semantic", case_delta_command_semantic),
+        ("chamfer command numeric payload", "semantic", case_chamfer_command_semantic),
+        ("hausdorff command numeric payload", "semantic", case_hausdorff_command_semantic),
+        ("eval command metrics", "semantic", case_eval_command_semantic),
         (
             "info --stats numeric payload",
             "semantic",
