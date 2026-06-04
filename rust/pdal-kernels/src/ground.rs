@@ -153,6 +153,42 @@ fn parse_ground_arg<'a>(
     iter: &mut impl Iterator<Item = &'a String>,
     parsed: &mut GroundArgs,
 ) -> Result<(), i32> {
+    if parse_ground_io_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_ground_numeric_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_ground_selection_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_ground_flag_arg(arg, parsed) {
+        return Ok(());
+    }
+    if let Some(override_option) = parse_smrf_override(arg) {
+        parsed.smrf_overrides.push(override_option);
+        return Ok(());
+    }
+    if arg.starts_with("--") {
+        eprintln!("PDAL: kernels.ground: Unknown option '{arg}'.");
+        return Err(1);
+    }
+    if parsed.input.is_none() {
+        parsed.input = Some(arg.to_string());
+    } else if parsed.output.is_none() {
+        parsed.output = Some(arg.to_string());
+    } else {
+        eprintln!("PDAL: kernels.ground: Unexpected argument '{arg}'.");
+        return Err(1);
+    }
+    Ok(())
+}
+
+fn parse_ground_io_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut GroundArgs,
+) -> Result<bool, i32> {
     if arg == "--input" || arg == "-i" {
         parsed.input = Some(next_value("--input", iter)?);
     } else if let Some(value) = arg.strip_prefix("--input=") {
@@ -169,6 +205,19 @@ fn parse_ground_arg<'a>(
         || arg == "--developer-debug=true"
         || arg == "--developer-debug=false"
     {
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn parse_ground_numeric_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut GroundArgs,
+) -> Result<bool, i32> {
+    if option_matches(arg, "--max_distance") || option_matches(arg, "--initial_distance") {
+        let _ = value_for(arg, arg.split_once('=').map_or(arg, |(name, _)| name), iter)?;
     } else if option_matches(arg, "--max_window_size") {
         parsed.max_window_size = parse_f64(
             "max_window_size",
@@ -184,8 +233,19 @@ fn parse_ground_arg<'a>(
         parsed.threshold = parse_f64("threshold", &value_for(arg, "--threshold", iter)?)?;
     } else if option_matches(arg, "--cut") {
         parsed.cut = parse_f64("cut", &value_for(arg, "--cut", iter)?)?;
-    } else if option_matches(arg, "--max_distance") || option_matches(arg, "--initial_distance") {
-        let _ = value_for(arg, arg.split_once('=').map_or(arg, |(name, _)| name), iter)?;
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn parse_ground_selection_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut GroundArgs,
+) -> Result<bool, i32> {
+    if option_matches(arg, "--ignore") {
+        parsed.ignore.push(value_for(arg, "--ignore", iter)?);
     } else if option_matches(arg, "--returns") {
         let returns = value_for(arg, "--returns", iter)?;
         let returns = returns
@@ -198,9 +258,14 @@ fn parse_ground_arg<'a>(
             parsed.returns_set = true;
         }
         parsed.returns.extend(returns);
-    } else if option_matches(arg, "--ignore") {
-        parsed.ignore.push(value_for(arg, "--ignore", iter)?);
-    } else if arg == "--reset" || arg == "--reset=true" {
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn parse_ground_flag_arg(arg: &str, parsed: &mut GroundArgs) -> bool {
+    if arg == "--reset" || arg == "--reset=true" {
         parsed.reset = true;
     } else if arg == "--reset=false" {
         parsed.reset = false;
@@ -212,20 +277,10 @@ fn parse_ground_arg<'a>(
         parsed.extract = true;
     } else if arg == "--extract=false" {
         parsed.extract = false;
-    } else if let Some(override_option) = parse_smrf_override(arg) {
-        parsed.smrf_overrides.push(override_option);
-    } else if arg.starts_with("--") {
-        eprintln!("PDAL: kernels.ground: Unknown option '{arg}'.");
-        return Err(1);
-    } else if parsed.input.is_none() {
-        parsed.input = Some(arg.to_string());
-    } else if parsed.output.is_none() {
-        parsed.output = Some(arg.to_string());
     } else {
-        eprintln!("PDAL: kernels.ground: Unexpected argument '{arg}'.");
-        return Err(1);
+        return false;
     }
-    Ok(())
+    true
 }
 
 fn value_for<'a>(

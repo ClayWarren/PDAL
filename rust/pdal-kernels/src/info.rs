@@ -173,6 +173,25 @@ fn parse_info_arg<'a>(
     iter: &mut impl Iterator<Item = &'a String>,
     parsed: &mut InfoArgs,
 ) -> Result<(), i32> {
+    if parse_info_mode_arg(arg, parsed) {
+        return Ok(());
+    }
+    if parse_info_point_query_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_info_stats_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if parse_info_io_arg(arg, iter, parsed)? {
+        return Ok(());
+    }
+    if arg.starts_with("--") {
+        return Err(-1);
+    }
+    set_info_filename(parsed, arg.to_string())
+}
+
+fn parse_info_mode_arg(arg: &str, parsed: &mut InfoArgs) -> bool {
     if arg == "--summary" {
         parsed.requests.summary = true;
         if !parsed.requests.all {
@@ -215,37 +234,59 @@ fn parse_info_arg<'a>(
         if !parsed.requests.all {
             parsed.mode = InfoMode::Stac;
         }
-    } else if arg == "-p" || arg == "--point" {
-        let Some(point_ids) = parse_point_spec(&next_value(iter, arg)?) else {
-            return Err(-1);
-        };
-        parsed.requests.point = true;
-        parsed.mode = InfoMode::Points(point_ids);
+    } else {
+        return false;
+    }
+    true
+}
+
+fn parse_info_point_query_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut InfoArgs,
+) -> Result<bool, i32> {
+    if arg == "-p" || arg == "--point" {
+        let value = next_value(iter, arg)?;
+        apply_info_point(parsed, &value)?;
     } else if let Some(value) = arg.strip_prefix("-p=") {
-        let Some(point_ids) = parse_point_spec(value) else {
-            return Err(-1);
-        };
-        parsed.requests.point = true;
-        parsed.mode = InfoMode::Points(point_ids);
+        apply_info_point(parsed, value)?;
     } else if let Some(value) = arg.strip_prefix("--point=") {
-        let Some(point_ids) = parse_point_spec(value) else {
-            return Err(-1);
-        };
-        parsed.requests.point = true;
-        parsed.mode = InfoMode::Points(point_ids);
+        apply_info_point(parsed, value)?;
     } else if arg == "--query" {
-        let Some(query) = parse_query(&next_value(iter, "--query")?) else {
-            return Err(-1);
-        };
-        parsed.requests.query = true;
-        parsed.mode = InfoMode::Query(query);
+        let value = next_value(iter, "--query")?;
+        apply_info_query(parsed, &value)?;
     } else if let Some(value) = arg.strip_prefix("--query=") {
-        let Some(query) = parse_query(value) else {
-            return Err(-1);
-        };
-        parsed.requests.query = true;
-        parsed.mode = InfoMode::Query(query);
-    } else if arg == "--dimensions" {
+        apply_info_query(parsed, value)?;
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn apply_info_point(parsed: &mut InfoArgs, value: &str) -> Result<(), i32> {
+    let Some(point_ids) = parse_point_spec(value) else {
+        return Err(-1);
+    };
+    parsed.requests.point = true;
+    parsed.mode = InfoMode::Points(point_ids);
+    Ok(())
+}
+
+fn apply_info_query(parsed: &mut InfoArgs, value: &str) -> Result<(), i32> {
+    let Some(query) = parse_query(value) else {
+        return Err(-1);
+    };
+    parsed.requests.query = true;
+    parsed.mode = InfoMode::Query(query);
+    Ok(())
+}
+
+fn parse_info_stats_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut InfoArgs,
+) -> Result<bool, i32> {
+    if arg == "--dimensions" {
         parsed.requests.dimensions = true;
         apply_stats_dimensions(parsed, Some(parse_dimension_list(&next_value(iter, arg)?)));
     } else if let Some(value) = arg.strip_prefix("--dimensions=") {
@@ -261,7 +302,18 @@ fn parse_info_arg<'a>(
         apply_stats_breakout(parsed, Some(DimId::from_name(&next_value(iter, arg)?)));
     } else if let Some(value) = arg.strip_prefix("--breakout=") {
         apply_stats_breakout(parsed, Some(DimId::from_name(value)));
-    } else if arg == "--pc_type" {
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn parse_info_io_arg<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    parsed: &mut InfoArgs,
+) -> Result<bool, i32> {
+    if arg == "--pc_type" {
         parsed.pc_type = next_value(iter, "--pc_type")?;
     } else if let Some(value) = arg.strip_prefix("--pc_type=") {
         parsed.pc_type = value.to_string();
@@ -276,13 +328,15 @@ fn parse_info_arg<'a>(
     } else if arg == "--stdin" || arg == "-s" {
         parsed.read_stdin = true;
     } else if arg == "--input" || arg == "-i" {
-        if parsed.filename.replace(next_value(iter, arg)?).is_some() {
-            eprintln!("PDAL: kernels.info: Expected exactly one input file.");
-            return Err(1);
-        }
-    } else if arg.starts_with("--") {
-        return Err(-1);
-    } else if parsed.filename.replace(arg.to_string()).is_some() {
+        set_info_filename(parsed, next_value(iter, arg)?)?;
+    } else {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn set_info_filename(parsed: &mut InfoArgs, filename: String) -> Result<(), i32> {
+    if parsed.filename.replace(filename).is_some() {
         eprintln!("PDAL: kernels.info: Expected exactly one input file.");
         return Err(1);
     }

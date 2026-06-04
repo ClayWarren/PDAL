@@ -142,10 +142,15 @@ fn parse_density_arg<'a>(
         parsed.hexbin_stage["h3_grid"] = parse_option_value(value);
     } else if arg.starts_with("--") {
         let Some(option) = parse_cli_stage_option(arg) else {
-            return Err(-1);
+            eprintln!("PDAL: kernels.density: Unexpected argument '{arg}'.");
+            return Err(1);
         };
         if option.stage != "filters.hexbin" && option.stage != "hexbin" {
-            return Err(-1);
+            eprintln!(
+                "PDAL: kernels.density: Unsupported stage option '{}'.",
+                option.stage
+            );
+            return Err(1);
         }
         parsed.hexbin_stage[option.key.as_str()] = parse_option_value(&option.value);
     } else if parsed.input.is_none() {
@@ -329,5 +334,33 @@ mod tests {
         assert_eq!(value["pipeline"][1]["type"], "filters.hexbin");
         assert_eq!(value["pipeline"][1]["density"], "out.geojson");
         let _ = std::fs::remove_file(pipeline_file);
+    }
+
+    #[test]
+    fn rejects_unknown_option_without_fallback_sentinel() {
+        let args = ["--bogus", "in.las", "out.geojson"]
+            .iter()
+            .map(|arg| arg.to_string())
+            .collect::<Vec<_>>();
+        match build_density_pipeline(&args) {
+            KernelPipelinePlan::Return(code) => assert_eq!(code, 1),
+            KernelPipelinePlan::Pipeline(_) => panic!("expected unknown option to fail"),
+        }
+    }
+
+    #[test]
+    fn rejects_foreign_stage_option_without_fallback_sentinel() {
+        let args = [
+            "--filters.range.limits=Classification[2:2]",
+            "in.las",
+            "out.geojson",
+        ]
+        .iter()
+        .map(|arg| arg.to_string())
+        .collect::<Vec<_>>();
+        match build_density_pipeline(&args) {
+            KernelPipelinePlan::Return(code) => assert_eq!(code, 1),
+            KernelPipelinePlan::Pipeline(_) => panic!("expected foreign stage option to fail"),
+        }
     }
 }
