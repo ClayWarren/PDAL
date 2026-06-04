@@ -33,7 +33,12 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib.display());
     println!("cargo:rustc-link-lib=geotiff");
-    link_library_or_path(&lib, "xml2", &["libxml2.so", "libxml2.dylib", "xml2.lib"]);
+    link_library(
+        &lib,
+        &out_dir,
+        "xml2",
+        &["libxml2.so", "libxml2.dylib", "xml2.lib"],
+    );
     copy_runtime_library(&lib, &out_dir, "libgeos.3.14.1.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.1.dylib");
@@ -75,14 +80,17 @@ fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
     }
 }
 
-fn link_library_or_path(lib: &Path, name: &str, unversioned_names: &[&str]) {
+fn link_library(lib: &Path, out_dir: &Path, name: &str, unversioned_names: &[&str]) {
     if unversioned_names.iter().any(|name| lib.join(name).exists()) {
         println!("cargo:rustc-link-lib={name}");
         return;
     }
 
     if let Some(candidate) = versioned_library_candidates(lib, name).into_iter().next() {
-        println!("cargo:rustc-link-arg={}", candidate.display());
+        let link_name = out_dir.join(format!("lib{name}.so"));
+        let _ = fs::copy(candidate, &link_name);
+        println!("cargo:rustc-link-search=native={}", out_dir.display());
+        println!("cargo:rustc-link-lib={name}");
         return;
     }
 
