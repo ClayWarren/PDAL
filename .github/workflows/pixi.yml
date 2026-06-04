@@ -30,30 +30,6 @@ jobs:
         environments: >-
           dev
 
-    - name: Rust guard
+    - name: Rust release gate
       run: |
-          pixi run -e dev rust-guard
-
-    - name: Rust C++ port audit
-      run: |
-          pixi run -e dev rust-cpp-port-audit
-
-    - name: Build
-      run: |
-          pixi run -e dev build
-
-    - name: Rust C ABI install smoke
-      run: |
-          pixi run -e dev rust-capi-install-smoke
-
-    - name: Rust source package smoke
-      run: |
-          pixi run -e dev rust-source-package-smoke
-
-    - name: Rust C++ test parity audit
-      run: |
-          pixi run -e dev rust-cpp-test-parity
-
-    - name: Test
-      run: |
-          pixi run -e dev test
+          pixi run -e dev rust-release-gate
