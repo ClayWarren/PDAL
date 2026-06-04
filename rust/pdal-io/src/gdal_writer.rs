@@ -1,5 +1,7 @@
 //! `writers.gdal` -- Write point clouds as GDAL rasters.
 
+use std::collections::HashMap;
+
 use pdal_core::gdal::RasterDataType;
 use pdal_core::metadata::MetadataNode;
 use pdal_core::options::Options;
@@ -256,14 +258,42 @@ impl OutputDataType {
 
 impl GdalWriter {
     fn render_bands(&self, grid: FixedGrid, samples: &[Sample]) -> Vec<(String, Vec<f64>)> {
+        let values_by_cell = build_cell_values(grid, samples, self);
+        if self.window_size == 0 {
+            return values_by_cell
+                .as_ref()
+                .and_then(|values| render_bands_sparse(&self.output_types, grid, values, self))
+                .unwrap_or_else(|| self.empty_bands(grid));
+        }
+
         self.output_types
             .iter()
             .map(|stat| {
                 (
                     stat_name(stat),
-                    render_stat(stat, grid, samples, self).unwrap_or_else(|| {
-                        vec![self.no_data; grid.width.saturating_mul(grid.height)]
-                    }),
+                    values_by_cell
+                        .as_ref()
+                        .and_then(|values| render_stat(stat, grid, values, self))
+                        .unwrap_or_else(|| {
+                            vec![self.no_data; grid.width.saturating_mul(grid.height)]
+                        }),
+                )
+            })
+            .collect()
+    }
+
+    fn empty_bands(&self, grid: FixedGrid) -> Vec<(String, Vec<f64>)> {
+        self.output_types
+            .iter()
+            .map(|stat| {
+                let default_value = if matches!(stat, OutputStat::Count) {
+                    0.0
+                } else {
+                    self.no_data
+                };
+                (
+                    stat_name(stat),
+                    vec![default_value; grid.width.saturating_mul(grid.height)],
                 )
             })
             .collect()
@@ -421,22 +451,85 @@ fn output_types(options: &Options) -> (Vec<OutputStat>, Option<String>) {
 fn render_stat(
     stat: &OutputStat,
     grid: FixedGrid,
-    samples: &[Sample],
+    values_by_cell: &HashMap<usize, Vec<(f64, f64)>>,
     writer: &GdalWriter,
 ) -> Option<Vec<f64>> {
-    let mut out = vec![writer.no_data; grid.width.checked_mul(grid.height)?];
-    let mut populated = vec![false; out.len()];
-    for row in 0..grid.height {
-        for col in 0..grid.width {
-            let values = cell_values(grid, row, col, samples, writer);
-            if values.is_empty() {
-                if matches!(stat, OutputStat::Count) {
-                    out[row * grid.width + col] = 0.0;
-                }
-                continue;
+    let cell_count = grid.width.checked_mul(grid.height)?;
+    let default_value = if matches!(stat, OutputStat::Count) {
+        0.0
+    } else {
+        writer.no_data
+    };
+    let mut out = vec![default_value; cell_count];
+    let mut populated = (writer.window_size > 0).then(|| vec![false; out.len()]);
+    for (&cell, values) in values_by_cell {
+        if cell >= out.len() || values.is_empty() {
+            continue;
+        }
+        if let Some(populated) = populated.as_mut() {
+            populated[cell] = true;
+        }
+        out[cell] = match stat {
+            OutputStat::Min => values
+                .iter()
+                .map(|(_, value)| *value)
+                .fold(f64::INFINITY, f64::min),
+            OutputStat::Max => values
+                .iter()
+                .map(|(_, value)| *value)
+                .fold(f64::NEG_INFINITY, f64::max),
+            OutputStat::Mean => {
+                values.iter().map(|(_, value)| *value).sum::<f64>() / values.len() as f64
             }
-            populated[row * grid.width + col] = true;
-            out[row * grid.width + col] = match stat {
+            OutputStat::Idw => idw(values, writer.power),
+            OutputStat::Count => values.len() as f64,
+            OutputStat::Stdev => stdev(values),
+            OutputStat::Percentile(percentile) => percentile_value(values, *percentile),
+        };
+    }
+    if supports_window_fill(stat) {
+        if let Some(populated) = populated {
+            window_fill(
+                &mut out,
+                &populated,
+                grid,
+                writer.window_size,
+                writer.no_data,
+            );
+        }
+    }
+    Some(out)
+}
+
+fn render_bands_sparse(
+    stats: &[OutputStat],
+    grid: FixedGrid,
+    values_by_cell: &HashMap<usize, Vec<(f64, f64)>>,
+    writer: &GdalWriter,
+) -> Option<Vec<(String, Vec<f64>)>> {
+    let cell_count = grid.width.checked_mul(grid.height)?;
+    let mut bands: Vec<(OutputStat, String, Vec<f64>)> = stats
+        .iter()
+        .map(|stat| {
+            let default_value = if matches!(stat, OutputStat::Count) {
+                0.0
+            } else {
+                writer.no_data
+            };
+            (
+                stat.clone(),
+                stat_name(stat),
+                vec![default_value; cell_count],
+            )
+        })
+        .collect();
+
+    for (&cell, values) in values_by_cell {
+        if cell >= cell_count || values.is_empty() {
+            continue;
+        }
+        for (stat, _, out) in &mut bands {
+            out[cell] = match stat {
                 OutputStat::Min => values
                     .iter()
                     .map(|(_, value)| *value)
@@ -448,23 +541,80 @@ fn render_stat(
                 OutputStat::Mean => {
                     values.iter().map(|(_, value)| *value).sum::<f64>() / values.len() as f64
                 }
-                OutputStat::Idw => idw(&values, writer.power),
+                OutputStat::Idw => idw(values, writer.power),
                 OutputStat::Count => values.len() as f64,
-                OutputStat::Stdev => stdev(&values),
-                OutputStat::Percentile(percentile) => percentile_value(&values, *percentile),
+                OutputStat::Stdev => stdev(values),
+                OutputStat::Percentile(percentile) => percentile_value(values, *percentile),
             };
         }
     }
-    if writer.window_size > 0 && supports_window_fill(stat) {
-        window_fill(
-            &mut out,
-            &populated,
-            grid,
-            writer.window_size,
-            writer.no_data,
-        );
+
+    Some(
+        bands
+            .into_iter()
+            .map(|(_, name, values)| (name, values))
+            .collect(),
+    )
+}
+
+fn build_cell_values(
+    grid: FixedGrid,
+    samples: &[Sample],
+    writer: &GdalWriter,
+) -> Option<HashMap<usize, Vec<(f64, f64)>>> {
+    grid.width.checked_mul(grid.height)?;
+    let mut values = HashMap::new();
+    if writer.binmode {
+        for sample in samples {
+            if let Some((row, col)) = sample_cell(grid, sample, writer.resolution) {
+                values
+                    .entry(row * grid.width + col)
+                    .or_insert_with(Vec::new)
+                    .push((0.0, sample.value));
+            }
+        }
+        return Some(values);
     }
-    Some(out)
+
+    let radius = writer.radius.unwrap_or(writer.resolution * 2.0_f64.sqrt());
+    let radius_cells = (radius / writer.resolution).ceil() as isize + 1;
+    for sample in samples {
+        let center_col = ((sample.x - grid.origin_x) / writer.resolution).floor() as isize;
+        let center_row_from_bottom =
+            ((sample.y - grid.origin_y) / writer.resolution).floor() as isize;
+        let center_row = grid.height as isize - 1 - center_row_from_bottom;
+        let max_row = grid.height as isize - 1;
+        let max_col = grid.width as isize - 1;
+        if center_row + radius_cells < 0
+            || center_row - radius_cells > max_row
+            || center_col + radius_cells < 0
+            || center_col - radius_cells > max_col
+        {
+            continue;
+        }
+
+        let row_start = (center_row - radius_cells).max(0) as usize;
+        let row_end = (center_row + radius_cells).min(max_row) as usize;
+        let col_start = (center_col - radius_cells).max(0) as usize;
+        let col_end = (center_col + radius_cells).min(max_col) as usize;
+
+        for row in row_start..=row_end {
+            for col in col_start..=col_end {
+                let center_x = grid.origin_x + (col as f64 + 0.5) * writer.resolution;
+                let center_y = grid.origin_y + (grid.height - row) as f64 * writer.resolution
+                    - writer.resolution / 2.0;
+                let distance =
+                    ((sample.x - center_x).powi(2) + (sample.y - center_y).powi(2)).sqrt();
+                if distance <= radius {
+                    values
+                        .entry(row * grid.width + col)
+                        .or_insert_with(Vec::new)
+                        .push((distance, sample.value));
+                }
+            }
+        }
+    }
+    Some(values)
 }
 
 fn supports_window_fill(stat: &OutputStat) -> bool {
@@ -517,37 +667,6 @@ fn window_fill(
     }
 }
 
-fn cell_values(
-    grid: FixedGrid,
-    row: usize,
-    col: usize,
-    samples: &[Sample],
-    writer: &GdalWriter,
-) -> Vec<(f64, f64)> {
-    if writer.binmode {
-        return samples
-            .iter()
-            .filter_map(|sample| {
-                sample_cell(grid, sample, writer.resolution)
-                    .filter(|(sample_row, sample_col)| *sample_row == row && *sample_col == col)
-                    .map(|_| (0.0, sample.value))
-            })
-            .collect();
-    }
-
-    let center_x = grid.origin_x + (col as f64 + 0.5) * writer.resolution;
-    let center_y =
-        grid.origin_y + (grid.height - row) as f64 * writer.resolution - writer.resolution / 2.0;
-    let radius = writer.radius.unwrap_or(writer.resolution * 2.0_f64.sqrt());
-    samples
-        .iter()
-        .filter_map(|sample| {
-            let distance = ((sample.x - center_x).powi(2) + (sample.y - center_y).powi(2)).sqrt();
-            (distance <= radius).then_some((distance, sample.value))
-        })
-        .collect()
-}
-
 fn sample_cell(grid: FixedGrid, sample: &Sample, resolution: f64) -> Option<(usize, usize)> {
     let col = ((sample.x - grid.origin_x) / resolution).floor() as isize;
     let row_from_bottom = ((sample.y - grid.origin_y) / resolution).floor() as isize;
@@ -563,13 +682,16 @@ fn sample_cell(grid: FixedGrid, sample: &Sample, resolution: f64) -> Option<(usi
 }
 
 fn idw(values: &[(f64, f64)], power: f64) -> f64 {
-    let zero_distance: Vec<f64> = values
-        .iter()
-        .filter(|(distance, _)| *distance == 0.0)
-        .map(|(_, value)| *value)
-        .collect();
-    if !zero_distance.is_empty() {
-        return zero_distance.iter().sum::<f64>() / zero_distance.len() as f64;
+    let mut zero_sum = 0.0;
+    let mut zero_count = 0;
+    for (distance, value) in values {
+        if *distance == 0.0 {
+            zero_sum += value;
+            zero_count += 1;
+        }
+    }
+    if zero_count > 0 {
+        return zero_sum / zero_count as f64;
     }
 
     let mut weighted_sum = 0.0;

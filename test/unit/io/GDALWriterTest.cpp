@@ -918,6 +918,7 @@ TEST(GDALWriterTest, srs)
         wo.add("width", 1000);
         wo.add("height", 1000);
         wo.add("resolution", 10);
+        wo.add("output_type", "count");
         if (defaultSrs.size())
             wo.add("default_srs", defaultSrs);
         if (overrideSrs.size())

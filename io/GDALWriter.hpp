@@ -52,7 +52,7 @@ class PDAL_EXPORT GDALWriter : public FlexWriter, public Streamable
 public:
     std::string getName() const override;
 
-    GDALWriter() : m_outputTypes(0), m_expandByPoint(true) {}
+    GDALWriter() : m_windowSize(0), m_outputTypes(0), m_expandByPoint(true) {}
     ~GDALWriter() override;
 
 private:

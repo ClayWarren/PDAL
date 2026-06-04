@@ -475,7 +475,8 @@ void GDALWriter::writeRustOutput()
     addOption(options, "data_type", Dimension::interpretationName(m_dataType));
     addOption(options, "binmode", m_binMode);
     addOption(options, "allow_empty", m_allowEmpty);
-    addOption(options, "window_size", m_windowSize);
+    if (m_windowSize > 0)
+        addOption(options, "window_size", m_windowSize);
     for (const std::string& option : m_options)
         addOption(options, "gdalopts", option);
     if (!m_GDAL_metadata.empty())
