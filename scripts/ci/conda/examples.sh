@@ -7,8 +7,8 @@ export _CONDA_SET_PDAL_DRIVER_PATH="${_CONDA_SET_PDAL_DRIVER_PATH:-}"
 
 set +u
 conda activate test
-set -u
 conda install cmake ninja compilers -y
+set -u
 
 ./rust/scripts/check_installed_capi_consumer.sh --prefix "$CONDA_PREFIX"
 
