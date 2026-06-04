@@ -20,6 +20,21 @@ impl Vector {
         }
     }
 
+    pub fn open_update(path: &str) -> Result<Self, String> {
+        register_drivers();
+        let path_c = CString::new(path).map_err(|e| e.to_string())?;
+        unsafe {
+            let ds = gdal_sys::OGROpen(path_c.as_ptr(), 1, std::ptr::null_mut());
+            if ds.is_null() {
+                return Err(format!(
+                    "Failed to open OGR datasource for update: {}",
+                    path
+                ));
+            }
+            Ok(Self { ds })
+        }
+    }
+
     pub fn open_with_options(
         path: &str,
         drivers: &[String],

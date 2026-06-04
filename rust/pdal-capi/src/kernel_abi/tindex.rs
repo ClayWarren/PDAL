@@ -10,6 +10,7 @@ use pdal_kernels::{
     TindexParseResult, INVALID_TINDEX_FILTER_STAGE_MESSAGE,
 };
 use pdal_native::geometry::Geometry;
+use std::collections::HashSet;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::path::Path;
@@ -72,10 +73,10 @@ fn run_create(args: &[String]) -> i32 {
     }
 
     pdal_core::gdal::register_drivers();
-    let dataset = match Vector::create(&args.tindex_file, &args.driver_name) {
+    let dataset = match open_or_create_tindex_dataset(&args.tindex_file, &args.driver_name) {
         Ok(dataset) => dataset,
         Err(err) => {
-            eprintln!("PDAL: kernels.tindex: Error creating tindex dataset: {err}");
+            eprintln!("PDAL: kernels.tindex: Error opening tindex dataset: {err}");
             return 1;
         }
     };
@@ -103,7 +104,45 @@ fn run_create(args: &[String]) -> i32 {
     if create_fields(layer, &args.location_field).is_err() {
         return 1;
     }
+    let entries = match filter_existing_entries(&dataset, &args, entries) {
+        Ok(entries) => entries,
+        Err(()) => return 1,
+    };
+    if entries.is_empty() {
+        eprintln!("PDAL: Couldn't index any files.");
+        return 1;
+    }
     add_features(layer, &args.location_field, entries)
+}
+
+fn open_or_create_tindex_dataset(path: &str, driver_name: &str) -> Result<Vector, String> {
+    if Path::new(path).exists() {
+        Vector::open_update(path)
+    } else {
+        Vector::create(path, driver_name)
+    }
+}
+
+fn filter_existing_entries(
+    dataset: &Vector,
+    args: &CreateArgs,
+    entries: Vec<Entry>,
+) -> Result<Vec<Entry>, ()> {
+    let existing =
+        match dataset.get_string_features_by_layer(&args.layer_name, &args.location_field, "") {
+            Ok(values) => values
+                .into_iter()
+                .map(|(_, location)| location)
+                .collect::<HashSet<_>>(),
+            Err(err) => {
+                eprintln!("PDAL: kernels.tindex: Error reading existing tindex entries: {err}");
+                return Err(());
+            }
+        };
+    Ok(entries
+        .into_iter()
+        .filter(|entry| !existing.contains(&entry.location))
+        .collect())
 }
 
 fn collect_entries(args: &CreateArgs) -> Result<(String, Vec<Entry>), ()> {

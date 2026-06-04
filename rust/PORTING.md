@@ -570,8 +570,8 @@ The remaining work is the explicit caveat set in `rust/STATUS.md`.
 
 Current caveat classes:
 
-- OGR/vector-source breadth: covered local vector reads/writes and tindex
-  merge reads are Rust-backed, but broad OGR datasource/update workflows still
+- OGR/vector-source breadth: covered local vector reads/writes, tindex
+  create append/dedup, and tindex merge reads are Rust-backed, but broad OGR datasource/update workflows still
   need explicit native-adapter plumbing and regression coverage before they can
   be claimed.
 - EPT/COPC/STAC preview and remote breadth: transformed EPT preview point

@@ -408,6 +408,105 @@ fn tindex_merge_combines_gpkg_index_sources() {
 }
 
 #[test]
+fn tindex_create_appends_to_existing_gpkg_index() {
+    let input = data_path("test/data/ply/simple_text.ply");
+
+    let temp = make_temp_dir("tindex_create_append_gpkg");
+    let input2 = temp.join("simple_text_copy.ply");
+    std::fs::copy(&input, &input2).unwrap();
+    let index = temp.join("index.gpkg");
+    let output = temp.join("merged.pcd");
+
+    for path in [input.as_path(), input2.as_path()] {
+        let create = run_tindex(&[
+            "create",
+            "--tindex",
+            index.to_str().unwrap(),
+            path.to_str().unwrap(),
+            "--ogrdriver",
+            "GPKG",
+            "--lyr_name",
+            "tiles",
+            "--fast_boundary",
+        ]);
+        assert!(
+            create.status.success(),
+            "tindex create failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&create.stdout),
+            String::from_utf8_lossy(&create.stderr)
+        );
+    }
+
+    let merge = run_tindex(&[
+        "merge",
+        "--tindex",
+        index.to_str().unwrap(),
+        "--filespec",
+        output.to_str().unwrap(),
+        "--lyr_name",
+        "tiles",
+    ]);
+    assert!(
+        merge.status.success(),
+        "tindex merge failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&merge.stdout),
+        String::from_utf8_lossy(&merge.stderr)
+    );
+
+    assert_eq!(pcd_len(&output), 6);
+}
+
+#[test]
+fn tindex_create_rejects_duplicate_gpkg_entries() {
+    let input = data_path("test/data/ply/simple_text.ply");
+
+    let temp = make_temp_dir("tindex_create_duplicate_gpkg");
+    let index = temp.join("index.gpkg");
+    let output = temp.join("merged.pcd");
+
+    let args = [
+        "create",
+        "--tindex",
+        index.to_str().unwrap(),
+        input.to_str().unwrap(),
+        "--ogrdriver",
+        "GPKG",
+        "--lyr_name",
+        "tiles",
+        "--fast_boundary",
+    ];
+    let first = run_tindex(&args);
+    assert!(
+        first.status.success(),
+        "tindex create failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&first.stdout),
+        String::from_utf8_lossy(&first.stderr)
+    );
+
+    let second = run_tindex(&args);
+    assert!(!second.status.success());
+    assert!(String::from_utf8_lossy(&second.stderr).contains("Couldn't index any files"));
+
+    let merge = run_tindex(&[
+        "merge",
+        "--tindex",
+        index.to_str().unwrap(),
+        "--filespec",
+        output.to_str().unwrap(),
+        "--lyr_name",
+        "tiles",
+    ]);
+    assert!(
+        merge.status.success(),
+        "tindex merge failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&merge.stdout),
+        String::from_utf8_lossy(&merge.stderr)
+    );
+
+    assert_eq!(pcd_len(&output), 3);
+}
+
+#[test]
 #[ignore = "requires installed pdal on PATH"]
 fn installed_pdal_tindex_matches_rust_tindex_location_index() {
     let input = data_path("test/data/las/interesting.las");
