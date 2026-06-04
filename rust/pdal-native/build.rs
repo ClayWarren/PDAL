@@ -19,13 +19,14 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
 
     if nitf_enabled {
+        let nitro_cpp_include = nitro_cpp_include(&include, &out_dir);
         cc::Build::new()
             .cpp(true)
             .std("c++17")
             .define("_REENTRANT", None)
             .define("__POSIX", None)
             .include(&include)
-            .include(include.join("nitro/c++"))
+            .include(nitro_cpp_include)
             .include(include.join("nitro/c"))
             .file("src/nitf_bridge.cpp")
             .compile("pdal_native_nitf_bridge");
@@ -88,6 +89,33 @@ fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
     if src.exists() {
         let _ = fs::copy(src, out_dir.join(name));
     }
+}
+
+fn nitro_cpp_include(include: &Path, out_dir: &Path) -> PathBuf {
+    let source = include.join("nitro/c++");
+    if cfg!(target_os = "windows") && source.exists() {
+        let mirror = out_dir.join("nitro_cpp_include");
+        let _ = fs::remove_dir_all(&mirror);
+        if copy_dir_all(&source, &mirror).is_ok() {
+            return mirror;
+        }
+    }
+    source
+}
+
+fn copy_dir_all(source: &Path, target: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(target)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let dest = target.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dest)?;
+        } else if ty.is_file() {
+            fs::copy(entry.path(), dest)?;
+        }
+    }
+    Ok(())
 }
 
 fn link_library(lib: &Path, out_dir: &Path, name: &str, unversioned_names: &[&str]) {

@@ -1,8 +1,4 @@
-#if __has_include(<nitro/c++/import/nitf.hpp>)
-#include <nitro/c++/import/nitf.hpp>
-#else
 #include <import/nitf.hpp>
-#endif
 
 #include <algorithm>
 #include <cctype>
