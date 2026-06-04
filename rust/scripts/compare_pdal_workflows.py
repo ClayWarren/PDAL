@@ -800,6 +800,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=find_default_reference_pdal())
     parser.add_argument("--rust", default=find_default_rust_pdal())
+    parser.add_argument(
+        "--json-report",
+        type=Path,
+        help="Optional path to write a machine-readable summary after all checks pass.",
+    )
     parser.add_argument("--keep-temp", action="store_true")
     args = parser.parse_args()
 
@@ -850,10 +855,34 @@ def main() -> int:
     print(f"# reference:   {ref}")
     print(f"# rust-backed: {rust}")
     print(f"# temp:        {tmp}\n")
+    results: list[dict[str, str]] = []
     try:
         for name, contract, func in cases:
             func(ref, rust, tmp)
+            results.append({"name": name, "contract": contract, "status": "ok"})
             print(f"ok,{contract},{name}")
+        if args.json_report:
+            exact = sum(1 for item in results if item["contract"] == "exact")
+            semantic = sum(1 for item in results if item["contract"] == "semantic")
+            report = {
+                "reference": {
+                    "path": str(Path(ref).resolve()),
+                    "version": parse_pdal_version(run_raw(ref, ["--version"]).stdout),
+                },
+                "rust_backed": {
+                    "path": str(Path(rust).resolve()),
+                    "version": parse_pdal_version(run_raw(rust, ["--version"]).stdout),
+                },
+                "summary": {
+                    "total": len(results),
+                    "exact": exact,
+                    "semantic": semantic,
+                },
+                "cases": results,
+            }
+            args.json_report.parent.mkdir(parents=True, exist_ok=True)
+            args.json_report.write_text(json.dumps(report, indent=2) + "\n")
+            print(f"\n# wrote JSON report: {args.json_report}")
     finally:
         if args.keep_temp:
             print(f"\n# kept temp directory: {tmp}")

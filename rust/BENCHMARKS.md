@@ -37,6 +37,8 @@ Before reading timing numbers, run the workflow comparison harness:
 
 ```sh
 pixi run -e dev rust-workflow-parity
+# handoff artifact:
+python3 rust/scripts/compare_pdal_workflows.py --rust .build/bin/pdal --json-report /tmp/pdal-workflow-parity.json
 ```
 
 It compares the installed/reference PDAL binary with the Rust-backed build on
