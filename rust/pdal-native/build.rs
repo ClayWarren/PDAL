@@ -33,7 +33,7 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib.display());
     println!("cargo:rustc-link-lib=geotiff");
-    println!("cargo:rustc-link-lib=xml2");
+    link_library_or_path(&lib, "xml2", &["libxml2.so", "libxml2.dylib", "xml2.lib"]);
     copy_runtime_library(&lib, &out_dir, "libgeos.3.14.1.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.1.dylib");
@@ -73,4 +73,36 @@ fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
     if src.exists() {
         let _ = fs::copy(src, out_dir.join(name));
     }
+}
+
+fn link_library_or_path(lib: &Path, name: &str, unversioned_names: &[&str]) {
+    if unversioned_names.iter().any(|name| lib.join(name).exists()) {
+        println!("cargo:rustc-link-lib={name}");
+        return;
+    }
+
+    if let Some(candidate) = versioned_library_candidates(lib, name).into_iter().next() {
+        println!("cargo:rustc-link-arg={}", candidate.display());
+        return;
+    }
+
+    println!("cargo:rustc-link-lib={name}");
+}
+
+fn versioned_library_candidates(lib: &Path, name: &str) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(lib) else {
+        return Vec::new();
+    };
+    let prefix = format!("lib{name}.so.");
+    let mut candidates: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(&prefix))
+        })
+        .collect();
+    candidates.sort();
+    candidates
 }
