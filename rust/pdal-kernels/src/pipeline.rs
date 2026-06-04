@@ -350,7 +350,7 @@ fn serialized_stage_object(
                 .ok_or_else(|| format!("Pipeline stage {position} is missing a 'type'."))?;
             object.insert(
                 "type".to_string(),
-                serde_json::Value::String(infer_stage_name(filename, position, len)?),
+                serde_json::Value::String(infer_stage_name(&filename, position, len)?),
             );
         }
         return Ok(object);
@@ -375,12 +375,27 @@ fn serialized_stage_object(
 
 fn stage_filename_for_inference(
     object: &serde_json::Map<String, serde_json::Value>,
-) -> Option<&str> {
+) -> Option<String> {
     let filename = object.get("filename")?;
     if let Some(text) = filename.as_str() {
-        return Some(text);
+        return Some(filespec_path_from_json_string(text).unwrap_or_else(|| text.to_string()));
     }
-    filename.get("path").and_then(serde_json::Value::as_str)
+    filename
+        .get("path")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+fn filespec_path_from_json_string(text: &str) -> Option<String> {
+    let trimmed = text.trim_start();
+    if !trimmed.starts_with('{') {
+        return None;
+    }
+    let parsed: serde_json::Value = serde_json::from_str(text).ok()?;
+    parsed
+        .get("path")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 fn infer_stage_name(filename: &str, position: usize, len: usize) -> Result<String, String> {
@@ -653,6 +668,26 @@ mod tests {
         assert_eq!(parsed["pipeline"][0]["filename"]["path"], "/tmp/in.las");
         assert_eq!(parsed["pipeline"][0]["filename"]["headers"]["k"], "v");
         assert_eq!(parsed["pipeline"][1]["inputs"][0], "readers_las1");
+        assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
+        assert_eq!(parsed["pipeline"][2]["filename"]["path"], "/tmp/out.las");
+        assert_eq!(parsed["pipeline"][2]["inputs"][0], "filters_head1");
+    }
+
+    #[test]
+    fn serializes_json_string_filespec_endpoint_stages_with_inferred_types() {
+        let serialized = serialize_pipeline_json(
+            r#"[
+                {"filename":"{\"path\":\"/tmp/in.las\",\"headers\":{\"k\":\"v\"}}"},
+                {"type":"filters.head","count":1},
+                {"filename":"{\"path\":\"/tmp/out.las\"}"}
+            ]"#,
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(parsed["pipeline"][0]["type"], "readers.las");
+        assert_eq!(parsed["pipeline"][0]["filename"]["path"], "/tmp/in.las");
+        assert_eq!(parsed["pipeline"][0]["filename"]["headers"]["k"], "v");
         assert_eq!(parsed["pipeline"][2]["type"], "writers.las");
         assert_eq!(parsed["pipeline"][2]["filename"]["path"], "/tmp/out.las");
         assert_eq!(parsed["pipeline"][2]["inputs"][0], "filters_head1");
