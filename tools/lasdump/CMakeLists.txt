@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(lasdump
     Dumper.cpp
-    ${ROOT_DIR}/plugins/nitf/io/tre_plugins.cpp
 )
 
 target_link_libraries(lasdump PRIVATE
@@ -25,9 +24,6 @@ target_include_directories(lasdump PRIVATE
     ${RUST_CAPI_HEADER_DIR}
     ${PROJECT_BINARY_DIR}/include
     ${ROOT_DIR}
-    ${NITRO_INCLUDE_DIR}
-    ${NITRO_INCLUDE_DIR}/nitro/c++
-    ${NITRO_INCLUDE_DIR}/nitro/c
 )
 
 PDAL_TARGET_COMPILE_SETTINGS(lasdump)
