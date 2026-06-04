@@ -139,6 +139,10 @@ workspace build. Add `--test-suites` for the full C++ and Rust suite timing, or
 `--cold-build` to `cargo clean` first and time a cold Rust workspace build. The
 ctest run auto-detects the configured C++ build tree (`.build` or `build`, or
 `PDAL_BUILD_DIR`).
+The script prefers the external Homebrew PDAL reference on macOS, accepts
+`PDAL_REFERENCE_PDAL=<path>` for other installed references, and prepends the
+detected build-tree `lib/` directory when timing the C++ CTest suite so it does
+not accidentally load an environment `libpdalcpp`.
 
 Reproduce:
 

@@ -19,6 +19,27 @@ if [[ -z "${BUILD_DIR}" ]]; then
         fi
     done
 fi
+BUILD_LIB_DIR=""
+if [[ -n "${BUILD_DIR}" && -d "${BUILD_DIR}/lib" ]]; then
+    BUILD_LIB_DIR="${BUILD_DIR}/lib"
+fi
+
+REFERENCE_PDAL="${PDAL_REFERENCE_PDAL:-}"
+if [[ -z "${REFERENCE_PDAL}" ]]; then
+    for candidate in /opt/homebrew/bin/pdal /usr/local/bin/pdal; do
+        if [[ -x "${candidate}" ]]; then
+            REFERENCE_PDAL="${candidate}"
+            break
+        fi
+    done
+fi
+if [[ -z "${REFERENCE_PDAL}" ]]; then
+    REFERENCE_PDAL="$(command -v pdal || true)"
+fi
+if [[ -z "${REFERENCE_PDAL}" ]]; then
+    echo "error: installed/reference pdal not found; set PDAL_REFERENCE_PDAL." >&2
+    exit 2
+fi
 
 if [[ -n "${CONDA_PREFIX:-}" ]]; then
     export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-/usr/lib}"
@@ -35,6 +56,7 @@ Reports opt-in Rust port guardrail measurements:
   - Rust workspace incremental build wall time and peak RSS
   - full C++ and Rust test-suite wall time and peak RSS when --test-suites is set
 
+Set PDAL_REFERENCE_PDAL=<path> to choose the installed/reference pdal binary.
 Set PDAL_RUST_PERF_ITERS=<n> to control perf harness iterations.
 Use --cold-build only when you intentionally want to run cargo clean first.
 Use --test-suites only when you intentionally want the slower full-suite timing.
@@ -189,7 +211,7 @@ run_installed_case() {
     local output="${case_dir}/installed.out"
     local pipeline="${case_dir}/pipeline.json"
     write_pipeline "${reader}" "${input}" "${writer}" "${output}" "${precision}" "${pipeline}"
-    time_command "installed-${name}" pdal pipeline "${pipeline}"
+    time_command "installed-${name}" "${REFERENCE_PDAL}" pipeline "${pipeline}"
 }
 
 echo "metric,wall_seconds,peak_rss_mib"
@@ -214,6 +236,13 @@ if [[ "${TEST_SUITES}" == "1" ]]; then
         echo "       set PDAL_BUILD_DIR or build into .build/ or build/ first." >&2
         exit 2
     fi
-    time_command "cpp-full-test-suite" ctest --test-dir "${BUILD_DIR}" --output-on-failure
+    if [[ -n "${BUILD_LIB_DIR}" ]]; then
+        time_command "cpp-full-test-suite" env \
+            "DYLD_LIBRARY_PATH=${BUILD_LIB_DIR}:${DYLD_LIBRARY_PATH:-}" \
+            "LD_LIBRARY_PATH=${BUILD_LIB_DIR}:${LD_LIBRARY_PATH:-}" \
+            ctest --test-dir "${BUILD_DIR}" --output-on-failure
+    else
+        time_command "cpp-full-test-suite" ctest --test-dir "${BUILD_DIR}" --output-on-failure
+    fi
     time_command "rust-full-test-suite" cargo test --manifest-path "${RUST_DIR}/Cargo.toml" --workspace -- --test-threads=1
 fi
