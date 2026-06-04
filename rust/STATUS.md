@@ -227,10 +227,10 @@ port, so newly added guard tests do not move the headline denominator. Keep this
 audit green as a regression gate, but it no longer measures remaining work.
 
 This proves the current C++ compatibility layer can satisfy the pre-port
-behavioral contract; it is not the finish line. The active goal is now the
-**implementation-replacement backlog** below: reduce the real implementation
-still living in C++ to glue/wrappers plus documented holdouts, broaden
-first-party I/O/filter/core replacement, and make
+behavioral contract; it is not the finish line. The implementation-replacement
+audit below is also green: remaining first-party C++ is classified as
+glue/wrappers, native adapters, or documented holdouts. The active goal is now
+to close the named caveats in the north-star list above and make
 install/export/CI/regression/performance evidence strong enough for an
 upstreamable port.
 

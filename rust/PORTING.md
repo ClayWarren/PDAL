@@ -96,13 +96,17 @@ roadmap as permission to sweep a directory.
    tests were added. It currently reports `819 / 819` Rust C ABI-backed cases.
    This proves the compatibility wrapper can satisfy the existing tests, but it
    is not the port finish line.
-2. Convert the parity win into real implementation replacement. **Active.**
+2. Convert the parity win into real implementation replacement.
+   **Complete as an audit category for the current build.**
    For each area that already counts, identify whether Rust owns the actual
    behavior or merely owns a compatibility guard around C++ work. Replace the
    remaining substantial C++ implementation behind counted tests with Rust,
    or document an intentional C++ holdout when the boundary is external,
    vendor-heavy, or not worth porting yet. Track wrapper LOC so it shrinks
-   instead of silently becoming the new permanent implementation.
+   instead of silently becoming the new permanent implementation. The current
+   audit reports `0` unplanned port-candidate LOC, so do not reopen this as a
+   generic C++ sweep unless a concrete parity failure identifies new
+   implementation work.
 3. Complete first-party filters by family.
    Pure filters, spatial filters, and many linear/statistical filters are
    represented. Remaining filters must start with the missing decision: Rust
