@@ -117,7 +117,7 @@ pub unsafe extern "C" fn pdal_utils_starts_with(
 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_utils_split_char(value: *const c_char, split: c_char) -> *mut c_char {
-    let split = split as u8 as char;
+    let split = split.to_ne_bytes()[0] as char;
     string_list_to_c(split_char(&c_string(value), split))
 }
 
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn pdal_utils_split2_char(
     value: *const c_char,
     split: c_char,
 ) -> *mut c_char {
-    let split = split as u8 as char;
+    let split = split.to_ne_bytes()[0] as char;
     string_list_to_c(split2_char(&c_string(value), split))
 }
 

@@ -252,7 +252,7 @@ fn fixed_c_string<const N: usize>(bytes: &[u8]) -> [c_char; N] {
 
 fn write_fixed_c_string(src: &[c_char], dst: &mut [u8]) {
     for (out, ch) in dst.iter_mut().zip(src.iter()) {
-        let byte = *ch as u8;
+        let byte = ch.to_ne_bytes()[0];
         if byte == 0 {
             break;
         }

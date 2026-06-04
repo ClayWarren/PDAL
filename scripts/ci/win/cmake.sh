@@ -2,6 +2,8 @@
 
 pwd
 where cl.exe
+export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
+where link.exe
 export CC=cl.exe
 export CXX=cl.exe
 cmake .. -G "Ninja" \

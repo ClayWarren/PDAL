@@ -65,7 +65,7 @@ unsafe fn input_slice<'a>(buf: *const c_char, len: usize) -> &'a [u8] {
     if buf.is_null() || len == 0 {
         &[]
     } else {
-        std::slice::from_raw_parts(buf as *const u8, len)
+        std::slice::from_raw_parts(buf.cast::<u8>(), len)
     }
 }
 

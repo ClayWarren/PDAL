@@ -161,17 +161,17 @@ fn las_vlr_text_abi_truncates_at_first_nul() {
     }
 }
 
-fn write_c_chars<const N: usize>(dst: &mut [i8; N], value: &str) {
+fn write_c_chars<const N: usize>(dst: &mut [std::os::raw::c_char; N], value: &str) {
     for (out, byte) in dst.iter_mut().zip(value.bytes()) {
-        *out = byte as i8;
+        *out = std::os::raw::c_char::from_ne_bytes([byte]);
     }
 }
 
-fn read_c_chars<const N: usize>(src: &[i8; N]) -> String {
+fn read_c_chars<const N: usize>(src: &[std::os::raw::c_char; N]) -> String {
     let bytes: Vec<u8> = src
         .iter()
         .take_while(|&&ch| ch != 0)
-        .map(|&ch| ch as u8)
+        .map(|&ch| ch.to_ne_bytes()[0])
         .collect();
     String::from_utf8(bytes).unwrap()
 }
