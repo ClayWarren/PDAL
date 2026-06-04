@@ -43,6 +43,7 @@ import argparse
 from collections import defaultdict
 import csv
 import io
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -360,6 +361,11 @@ def main() -> int:
         help="Which category to rank in the file list (default port-candidate)",
     )
     parser.add_argument("--include-plugins", action="store_true", help="Also scan plugins/ (deferred area)")
+    parser.add_argument(
+        "--json-report",
+        type=Path,
+        help="Optional path to write a machine-readable summary.",
+    )
     args = parser.parse_args()
 
     areas = list(MAINLINE_AREAS)
@@ -449,6 +455,57 @@ def main() -> int:
     for code, path in ranked[: args.top]:
         note = f"   # {HOLDOUTS[path]}" if path in HOLDOUTS else ""
         print(f"  {code:>6}  {path}{note}")
+
+    if args.json_report:
+        category_totals = {}
+        for cat in categories:
+            category_totals[cat] = {
+                "loc": sum(v[0] for v in summary.get(cat, {}).values()),
+                "files": sum(v[1] for v in summary.get(cat, {}).values()),
+            }
+        area_totals = {}
+        for cat, areas_for_cat in summary.items():
+            for area, values in areas_for_cat.items():
+                area_totals.setdefault(area, {})[cat] = {
+                    "loc": values[0],
+                    "files": values[1],
+                }
+        plugin_totals = {}
+        if args.include_plugins:
+            for path in files:
+                plugin = plugin_of(path)
+                if not plugin:
+                    continue
+                cat = file_category[path]
+                entry = plugin_totals.setdefault(plugin, {}).setdefault(
+                    cat, {"loc": 0, "files": 0}
+                )
+                entry["loc"] += loc.get(path, 0)
+                entry["files"] += 1
+
+        report = {
+            "areas": areas,
+            "categories": category_totals,
+            "total": {"loc": grand_loc, "files": grand_files},
+            "port_candidate_by_area": {
+                area: {"loc": values[0], "files": values[1]}
+                for area, values in sorted(pc.items())
+            },
+            "area_totals": area_totals,
+            "plugin_totals": plugin_totals,
+            "ranked": [
+                {
+                    "path": path,
+                    "loc": code,
+                    "category": label,
+                    "note": HOLDOUTS.get(path, ""),
+                }
+                for code, path in ranked[: args.top]
+            ],
+        }
+        args.json_report.parent.mkdir(parents=True, exist_ok=True)
+        args.json_report.write_text(json.dumps(report, indent=2) + "\n")
+        print(f"\nWrote JSON report: {args.json_report}")
 
     return 0
 

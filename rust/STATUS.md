@@ -253,6 +253,7 @@ python3 rust/scripts/audit_cpp_port_backlog.py
 python3 rust/scripts/audit_cpp_port_backlog.py --area io --top 40
 python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --top 40
 python3 rust/scripts/audit_cpp_port_backlog.py --show holdout
+python3 rust/scripts/audit_cpp_port_backlog.py --include-plugins --json-report /tmp/pdal-cpp-backlog.json
 ```
 
 The script classifies each mainline C++ file (`pdal/`, `filters/`, `io/`,
