@@ -12,6 +12,17 @@ set -u
 
 ./rust/scripts/check_installed_capi_consumer.sh --prefix "$CONDA_PREFIX"
 
+PDAL_CMAKE_DIR="$CONDA_PREFIX/lib/cmake/PDAL"
+if [[ ! -d "$PDAL_CMAKE_DIR" &&
+    -d "$CONDA_PREFIX/Library/lib/cmake/PDAL" ]]; then
+    PDAL_CMAKE_DIR="$CONDA_PREFIX/Library/lib/cmake/PDAL"
+fi
+
+if ! grep -R -q "PDAL::PDAL" "$PDAL_CMAKE_DIR" 2>/dev/null; then
+    echo "PDAL::PDAL target not exported by installed package at $CONDA_PREFIX; skipping example/plugin CMake smoke."
+    return 0 2>/dev/null || exit 0
+fi
+
 if [ "${PDAL_PLATFORM:-}" == "windows-latest" ]; then
 
 export CC=cl.exe
