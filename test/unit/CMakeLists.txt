@@ -524,7 +524,11 @@ PDAL_ADD_TEST(pdal_filters_rust_pipeline_test
         ${ROOT_DIR}/rust/pdal-capi/include
 )
 
-PDAL_ADD_TEST(pdal_app_test FILES apps/AppTest.cpp)
+PDAL_ADD_TEST(pdal_app_test
+    FILES apps/AppTest.cpp
+    INCLUDES
+        ${NLOHMANN_INCLUDE_DIR}
+)
 PDAL_ADD_TEST(pdal_app_plugin_test FILES apps/AppPluginTest.cpp)
 PDAL_ADD_TEST(pdal_eval_test
     FILES
