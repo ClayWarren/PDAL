@@ -34,10 +34,18 @@ endif()
 # in alongside the other C++ dependencies). Keeping the cargo invocation here
 # groups it with the cargo discovery and source globbing above.
 macro(pdal_build_rust_capi _pdal_target)
+    set(RUST_CAPI_BUILD_ENV
+        MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
+    )
+    if (MSVC)
+        list(APPEND RUST_CAPI_BUILD_ENV
+            CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=${CMAKE_LINKER}
+        )
+    endif()
     add_custom_command(
         OUTPUT ${RUST_CAPI_LIB}
         COMMAND ${CMAKE_COMMAND} -E env
-            MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
+            ${RUST_CAPI_BUILD_ENV}
             ${CARGO_EXECUTABLE} build --release -p pdal-capi ${RUST_CAPI_FEATURE_ARGS}
         DEPENDS ${RUST_CAPI_SOURCES}
         WORKING_DIRECTORY ${RUST_CAPI_DIR}

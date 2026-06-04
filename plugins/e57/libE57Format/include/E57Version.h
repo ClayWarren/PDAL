@@ -4,6 +4,7 @@
 
 /// @file E57Version.h ASTM & libE57Format version information.
 
+#include <cstdint>
 #include <string>
 
 #include "E57Export.h"

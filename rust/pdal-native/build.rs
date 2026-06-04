@@ -33,6 +33,7 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", lib.display());
     println!("cargo:rustc-link-lib=geotiff");
+    println!("cargo:rustc-link-lib=xml2");
     copy_runtime_library(&lib, &out_dir, "libgeos.3.14.1.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.1.dylib");
@@ -43,6 +44,8 @@ fn main() {
     copy_runtime_library(&lib, &out_dir, "libproj.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeotiff.so");
     copy_runtime_library(&lib, &out_dir, "libgeotiff.so.5");
+    copy_runtime_library(&lib, &out_dir, "libxml2.so");
+    copy_runtime_library(&lib, &out_dir, "libxml2.so.2");
     copy_runtime_library(&lib, &out_dir, "libproj.so");
     copy_runtime_library(&lib, &out_dir, "libproj.so.25");
     copy_runtime_library(&lib, &out_dir, "libgeos.so");
