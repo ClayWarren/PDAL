@@ -633,7 +633,7 @@ QuickInfo EptReader::inspect()
     const bool rustOwnsOgr = m_args->m_ogr.size() == 0 ||
                              (m_args->m_addons.empty() &&
                               m_args->m_bounds.spatialReference().empty());
-    const bool rustPreviewSupported = !Utils::isRemote(m_filename) && rustOwnsOgr;
+    const bool rustPreviewSupported = rustOwnsOgr;
 
     // Route the Rust-supported preview path through the C ABI so EPT metadata
     // and bounds previews aren't owned solely by the C++ EptInfo path.

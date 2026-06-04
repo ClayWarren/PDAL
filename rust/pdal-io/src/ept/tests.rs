@@ -3,6 +3,9 @@
 use super::*;
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static VSI_DATASET_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn data_path(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -22,7 +25,8 @@ impl VsiEptDataset {
     }
 
     fn with_srs(data_type: &str, tile_bytes: Vec<u8>, extension: &str, srs_json: &str) -> Self {
-        let root = format!("/vsimem/pdal-ept-{}-{data_type}", std::process::id());
+        let id = VSI_DATASET_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = format!("/vsimem/pdal-ept-{}-{id}-{data_type}", std::process::id());
         let ept = format!("{root}/ept.json");
         let hierarchy = format!("{root}/ept-hierarchy/0-0-0-0.json");
         let tile = format!("{root}/ept-data/0-0-0-0.{extension}");
@@ -420,6 +424,17 @@ fn preview_returns_bounds_conforming_and_expanded_flags_for_laszip() {
     expected.sort();
     assert_eq!(names, expected);
     assert!(preview.srs_wkt.contains("NAD83 / UTM zone 12N"));
+}
+
+#[test]
+fn preview_reads_vsi_ept_json() {
+    let dataset = VsiEptDataset::new("binary", vec![0; 24], "bin");
+    let preview = read_ept_preview(&dataset.ept_json()).unwrap();
+
+    assert_eq!(preview.point_count, 1);
+    assert_eq!(preview.bounds_conforming.minx, 0.0);
+    assert_eq!(preview.bounds_conforming.maxz, 1.0);
+    assert_eq!(preview.dim_names, vec!["X", "Y", "Z"]);
 }
 
 #[test]
