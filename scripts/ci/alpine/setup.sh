@@ -3,6 +3,6 @@
 gdal-config --version
 gcc --version
 g++ --version
-apk add tiff-dev
+apk add --no-cache cargo rust tiff-dev
 
 mkdir build
