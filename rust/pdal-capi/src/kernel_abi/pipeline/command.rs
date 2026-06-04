@@ -206,6 +206,7 @@ pub(super) fn progress_file_targets(json: &str) -> Vec<String> {
     stages
         .iter()
         .filter(|stage| stage["role"] == "writer")
+        .filter(|stage| stage["string_node"] == false)
         .filter_map(writer_filename)
         .filter(|filename| !filename.is_empty())
         .collect()

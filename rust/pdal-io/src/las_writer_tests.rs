@@ -699,6 +699,22 @@ mod tests {
     }
 
     #[test]
+    fn user_vlrs_from_options_parses_pipeline_object_vlr() {
+        let mut opts = Options::new();
+        opts.add(
+            "vlrs",
+            r#"{"user_id":"pdal","record_id":42,"description":"pipeline","data":"AQID","evlr":true}"#,
+        );
+        let vlrs = user_vlrs_from_options(&opts);
+        assert_eq!(vlrs.len(), 1);
+        assert_eq!(vlrs[0].user_id, "pdal");
+        assert_eq!(vlrs[0].record_id, 42);
+        assert_eq!(vlrs[0].description, "pipeline");
+        assert_eq!(vlrs[0].data, vec![1, 2, 3]);
+        assert!(vlrs[0].write_as_evlr);
+    }
+
+    #[test]
     fn user_vlrs_from_options_evlr_truthy_values() {
         let mut opts = Options::new();
         opts.add("user_vlr_user_id", "u");

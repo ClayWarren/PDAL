@@ -475,6 +475,12 @@ pub fn create_filter(
                     .transpose()?;
                 filter.set_h3(resolution);
             }
+            if options.has("origin_x") || options.has("origin_y") {
+                filter.set_origin(
+                    get_f64(options, "origin_x", 0.0)?,
+                    get_f64(options, "origin_y", 0.0)?,
+                );
+            }
             Ok(Box::new(FilterWrapper::new(filter)))
         }
         "filters.iqr" => Ok(Box::new(FilterWrapper::new(IqrFilter::new(

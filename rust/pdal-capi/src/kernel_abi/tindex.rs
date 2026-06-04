@@ -214,6 +214,8 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
         "type": "filters.hexbin",
         "threshold": opts.density,
         "sample_size": opts.sample_size,
+        "origin_x": 0.0,
+        "origin_y": 0.0,
     });
     if opts.edge_length > 0.0 {
         hexbin_stage["edge_length"] = serde_json::json!(opts.edge_length);

@@ -241,7 +241,30 @@ pub fn stac_report(
             ]
         }
     });
-    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()) + "\n"
+    legacy_object_brace_style(
+        &serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()),
+    ) + "\n"
+}
+
+fn legacy_object_brace_style(text: &str) -> String {
+    text.lines()
+        .flat_map(|line| {
+            if let Some(prefix) = line.strip_suffix(": {") {
+                vec![prefix.to_string() + ":", format!("{}{{", line_indent(line))]
+            } else {
+                vec![line.to_string()]
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn line_indent(line: &str) -> &str {
+    let end = line
+        .char_indices()
+        .find_map(|(idx, ch)| (!ch.is_whitespace()).then_some(idx))
+        .unwrap_or(line.len());
+    &line[..end]
 }
 
 struct StacProjectedGeometry {

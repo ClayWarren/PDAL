@@ -76,6 +76,12 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
                 .then(|| options.get_u64("h3_resolution", 0) as u8);
             filter.set_h3(resolution);
         }
+        if options.has("origin_x") || options.has("origin_y") {
+            filter.set_origin(
+                options.get_f64("origin_x", 0.0),
+                options.get_f64("origin_y", 0.0),
+            );
+        }
         Box::into_raw(Box::new(StageWrapper {
             filter: Box::new(filter),
         }))

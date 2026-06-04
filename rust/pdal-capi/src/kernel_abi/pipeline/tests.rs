@@ -95,12 +95,12 @@ fn validate_pipeline_checks_fixed_reader_layouts() {
 
 #[test]
 fn progress_targets_are_writer_filenames() {
-    let json = r#"{"pipeline":[
+    let implicit_filename_writer = r#"{"pipeline":[
         "input.las",
         {"type":"filters.sort", "dimension":"X"},
         "output.laz"
     ]}"#;
-    assert_eq!(progress_file_targets(json), vec!["output.laz".to_string()]);
+    assert!(progress_file_targets(implicit_filename_writer).is_empty());
 
     let typed_writers = r#"{"pipeline":[
         {"type":"readers.faux", "count":1},

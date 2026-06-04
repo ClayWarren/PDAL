@@ -267,7 +267,7 @@ TEST(Info, stac)
     test("--stac", r);
 
     std::string pcType = R"foo(
-      "pc:type": "sonar"
+      "pc:type": "sonar",
 )foo";
     SCOPED_TRACE("stac_pc_type");
     test("--stac --pc_type sonar", pcType);

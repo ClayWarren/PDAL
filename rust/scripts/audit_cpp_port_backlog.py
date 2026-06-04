@@ -27,8 +27,9 @@ Each first-party C++ file under the mainline areas (`pdal/`, `filters/`, `io/`,
   - port-candidate: pure C++ with no C ABI reference and not otherwise
     categorized. This is the actionable backlog.
 
-LOC is non-blank/non-comment code, measured with `cloc` to match the wrapper-LOC
-methodology in `rust/STATUS.md`.
+LOC is non-blank/non-comment code, measured with `cloc` when available to match
+the wrapper-LOC methodology in `rust/STATUS.md`; otherwise a conservative local
+counter keeps the audit runnable on platforms where `cloc` is not packaged.
 
 Usage:
   rust/scripts/audit_cpp_port_backlog.py
@@ -44,6 +45,7 @@ from collections import defaultdict
 import csv
 import io
 import json
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -316,6 +318,8 @@ def cloc_loc(files: list[str]) -> dict[str, int]:
     """Return a {path: code_loc} map using cloc's by-file CSV output."""
     if not files:
         return {}
+    if shutil.which("cloc") is None:
+        return fallback_loc(files)
     loc: dict[str, int] = {}
     with tempfile.NamedTemporaryFile("w", suffix=".lst", delete=False) as fh:
         fh.write("\n".join(files))
@@ -338,6 +342,51 @@ def cloc_loc(files: list[str]) -> dict[str, int]:
         # cloc prefixes with "./" sometimes; normalize to the path we passed.
         norm = filename[2:] if filename.startswith("./") else filename
         loc[norm] = int(code)
+    return loc
+
+
+def fallback_loc(files: list[str]) -> dict[str, int]:
+    """Count non-blank, non-comment source lines when cloc is unavailable."""
+    return {path: count_code_lines(path) for path in files}
+
+
+def count_code_lines(path: str) -> int:
+    try:
+        text = Path(path).read_text(errors="replace")
+    except OSError:
+        return 0
+
+    loc = 0
+    in_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        code_seen = False
+        i = 0
+        while i < len(stripped):
+            if in_block:
+                end = stripped.find("*/", i)
+                if end == -1:
+                    i = len(stripped)
+                else:
+                    in_block = False
+                    i = end + 2
+                continue
+
+            if stripped.startswith("//", i):
+                break
+            if stripped.startswith("/*", i):
+                in_block = True
+                i += 2
+                continue
+
+            code_seen = True
+            break
+
+        if code_seen:
+            loc += 1
     return loc
 
 

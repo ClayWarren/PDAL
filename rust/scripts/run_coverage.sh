@@ -49,9 +49,19 @@ cargo llvm-cov \
     --no-report \
     -- "${test_args[@]}"
 
-# Pass 2: Run ignored tests and report combined metrics. Ignored tests include
-# installed-PDAL and network parity checks, so failures here must not make the
-# local Rust coverage gate depend on external runtime state.
+# Pass 2: Run ignored installed-PDAL parity tests only when the baseline binary
+# exists. CI coverage must remain self-contained, while local/Homebrew parity
+# runs can still include the extra ignored tests.
+if ! command -v pdal >/dev/null 2>&1; then
+    exec cargo llvm-cov \
+        --manifest-path rust/Cargo.toml \
+        --workspace \
+        --all-targets \
+        --exclude-from-report pdal-capi \
+        --no-clean \
+        "${cov_args[@]}"
+fi
+
 exec cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \

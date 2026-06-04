@@ -7,7 +7,11 @@ fn main() {
     let prefix = env::var("CONDA_PREFIX")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("../../.pixi/envs/dev"));
-    let prefix = prefix.canonicalize().unwrap_or(prefix);
+    let prefix = if cfg!(target_os = "windows") {
+        prefix
+    } else {
+        prefix.canonicalize().unwrap_or(prefix)
+    };
     let (include, lib) = if cfg!(target_os = "windows") {
         (
             prefix.join("Library").join("include"),

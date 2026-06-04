@@ -39,6 +39,7 @@ pub struct HexBinFilter {
     /// resolution auto-estimated from a sample. `Some(Some(res))` = H3 at a
     /// fixed resolution. Mirrors HexBinFilter's `h3_grid`/`h3_resolution`.
     h3: Option<Option<u8>>,
+    fixed_origin: Option<(f64, f64)>,
     /// Built grid + outputs. Populated by `run_one`; consumed by
     /// `metadata()`.
     state: Option<HexBinState>,
@@ -98,6 +99,7 @@ impl HexBinFilter {
             layer_name: "hexbins".to_string(),
             output_tesselation,
             h3: None,
+            fixed_origin: None,
             state: None,
         }
     }
@@ -119,6 +121,10 @@ impl HexBinFilter {
     /// `Some(res)` for a fixed H3 resolution.
     pub fn set_h3(&mut self, resolution: Option<u8>) {
         self.h3 = Some(resolution);
+    }
+
+    pub fn set_origin(&mut self, x: f64, y: f64) {
+        self.fixed_origin = Some((x, y));
     }
 
     /// `sample_size` to report: clamped to the point count when the size was
@@ -145,6 +151,9 @@ impl HexBinFilter {
         }
 
         let mut grid = HexGrid::with_height(height, self.threshold as i32);
+        if let Some((x, y)) = self.fixed_origin {
+            grid.set_origin(x, y);
+        }
         for &(x, y) in xy {
             grid.add_xy(x, y);
         }

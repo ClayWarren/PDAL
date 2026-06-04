@@ -91,6 +91,20 @@ fn single_dense_hex_produces_one_root_polygon() {
 }
 
 #[test]
+fn fixed_origin_bins_tindex_square_into_three_hexes() {
+    let mut grid = HexGrid::with_height(SQRT_3, 1);
+    grid.set_origin(0.0, 0.0);
+    for (x, y) in [(1.0, 1.0), (1.0, 2.0), (2.0, 1.0), (2.0, 2.0)] {
+        grid.add_xy(x, y);
+    }
+
+    assert_eq!(grid.counts().len(), 3);
+    assert!(grid.is_dense(HexId::new(0, 0)));
+    assert!(grid.is_dense(HexId::new(0, 1)));
+    assert!(grid.is_dense(HexId::new(1, 0)));
+}
+
+#[test]
 fn trim_trailing_zeros_removes_fractional_padding_but_keeps_integers() {
     assert_eq!(trim_trailing_zeros("4.90748000"), "4.90748");
     assert_eq!(trim_trailing_zeros("5.00000000"), "5");

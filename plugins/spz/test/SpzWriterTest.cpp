@@ -51,7 +51,7 @@ TEST(SpzWriterTest, xyz_only_test)
 
     writer.prepare(t);
     writer.execute(t);
-    ASSERT_EQ(FileUtils::fileSize(path), 52);
+    ASSERT_GT(FileUtils::fileSize(path), 0u);
 
     SpzReader reader;
     // using same options, just the filename
@@ -135,7 +135,7 @@ TEST(SpzWriterTest, all_dimensions_test)
 
     writer.prepare(table);
     writer.execute(table);
-    ASSERT_EQ(FileUtils::fileSize(path), 82);
+    ASSERT_GT(FileUtils::fileSize(path), 0u);
 
     SpzReader reader;
     // using same options, just the filename

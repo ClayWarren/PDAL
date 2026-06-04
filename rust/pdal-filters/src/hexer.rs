@@ -122,6 +122,7 @@ pub struct HexGrid {
     width: f64,
     offsets: [Point; 6],
     origin: Point,
+    origin_initialized: bool,
     counts: HashMap<HexId, i32>,
     dense_limit: i32,
     /// Cells with non-dense neighbors at edge 0, sorted for deterministic
@@ -162,6 +163,7 @@ impl HexGrid {
             width: -1.0,
             offsets: [Point::new(0.0, 0.0); 6],
             origin: Point::new(0.0, 0.0),
+            origin_initialized: false,
             counts: HashMap::new(),
             dense_limit,
             possible_roots: BTreeSet::new(),
@@ -202,6 +204,11 @@ impl HexGrid {
             }
             self.possible_roots.remove(&below);
         }
+    }
+
+    pub fn set_origin(&mut self, x: f64, y: f64) {
+        self.origin = Point::new(x, y);
+        self.origin_initialized = true;
     }
 
     /// Force-load hexes for tests; matches `BaseGrid::setHexes`.
@@ -256,8 +263,9 @@ impl HexGrid {
     /// `hexer::HexGrid::findHexagon`. The first point added defines the
     /// grid origin and lands at hex (0, 0).
     fn find_hexagon(&mut self, p: Point) -> HexId {
-        if self.counts.is_empty() {
+        if !self.origin_initialized {
             self.origin = p;
+            self.origin_initialized = true;
             return HexId::new(0, 0);
         }
 

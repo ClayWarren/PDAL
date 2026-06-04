@@ -208,6 +208,7 @@ pub(super) fn extra_dims_from_views(views: &[PointView], point_format: u8) -> Ve
 }
 
 pub(super) fn user_vlrs_from_options(options: &Options) -> Vec<UserVlr> {
+    let mut vlrs = user_vlr_objects_from_options(options);
     let user_ids = options.values("user_vlr_user_id");
     let record_ids = options.values("user_vlr_record_id");
     let descriptions = options.values("user_vlr_description");
@@ -220,18 +221,49 @@ pub(super) fn user_vlrs_from_options(options: &Options) -> Vec<UserVlr> {
         .min(data_values.len())
         .min(evlr_flags.len());
 
-    (0..count)
-        .filter_map(|idx| {
-            let record_id = record_ids[idx].trim().parse::<u16>().ok()?;
+    vlrs.extend((0..count).filter_map(|idx| {
+        let record_id = record_ids[idx].trim().parse::<u16>().ok()?;
+        Some(UserVlr {
+            user_id: user_ids[idx].clone(),
+            record_id,
+            description: descriptions[idx].clone(),
+            data: base64_decode(data_values[idx].trim()),
+            write_as_evlr: matches!(
+                evlr_flags[idx].trim().to_lowercase().as_str(),
+                "true" | "1" | "yes" | "on"
+            ),
+        })
+    }));
+    vlrs
+}
+
+fn user_vlr_objects_from_options(options: &Options) -> Vec<UserVlr> {
+    options
+        .values("vlrs")
+        .iter()
+        .filter_map(|value| {
+            let object = serde_json::from_str::<serde_json::Value>(value).ok()?;
+            let user_id = object.get("user_id")?.as_str()?.to_string();
+            let record_id = object.get("record_id")?.as_u64()?.try_into().ok()?;
+            let description = object
+                .get("description")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let data = object
+                .get("data")
+                .and_then(serde_json::Value::as_str)
+                .map(base64_decode)
+                .unwrap_or_default();
             Some(UserVlr {
-                user_id: user_ids[idx].clone(),
+                user_id,
                 record_id,
-                description: descriptions[idx].clone(),
-                data: base64_decode(data_values[idx].trim()),
-                write_as_evlr: matches!(
-                    evlr_flags[idx].trim().to_lowercase().as_str(),
-                    "true" | "1" | "yes" | "on"
-                ),
+                description,
+                data,
+                write_as_evlr: object
+                    .get("evlr")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
             })
         })
         .collect()
