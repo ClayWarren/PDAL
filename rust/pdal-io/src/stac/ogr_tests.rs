@@ -216,12 +216,38 @@ fn stac_filter_helpers_cover_validation_and_matching_edges() {
             "quality": "good",
             "count": 2
         },
+        "links": [{"rel": "self", "href": "item.json"}],
         "assets": {
             "data": {"href": "points.las"},
             "thumbnail": {"href": "thumb.png"}
         }
     });
     assert!(validate_stac_object(&feature, "item.json").is_ok());
+    assert!(validate_stac_object(
+        &serde_json::json!({
+            "type": "Catalog",
+            "id": "bad-catalog",
+            "stac_version": "1.0.0",
+            "links": [{"rel": "item"}]
+        }),
+        "catalog.json"
+    )
+    .err()
+    .unwrap()
+    .0
+    .contains("missing string field 'href'"));
+    assert!(validate_stac_object(
+        &serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [],
+            "links": ["bad-link"]
+        }),
+        "collection.json"
+    )
+    .err()
+    .unwrap()
+    .0
+    .contains("must be an object"));
     assert!(item_has_requested_asset(
         &feature,
         &[String::from("thumbnail")]

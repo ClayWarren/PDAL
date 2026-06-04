@@ -32,14 +32,13 @@ pub(super) fn validate_stac_object(json: &Value, location: &str) -> Result<(), S
             for feature in features {
                 validate_stac_feature(feature, location)?;
             }
+            validate_optional_links(json, location)?;
             Ok(())
         }
         "Catalog" | "Collection" => {
             require_string(json, "id", location)?;
             require_string(json, "stac_version", location)?;
-            json["links"].as_array().ok_or_else(|| {
-                StageError(format!("STAC {type_name} '{location}' is missing links."))
-            })?;
+            validate_required_links(json, location, type_name)?;
             Ok(())
         }
         other => Err(StageError(format!(
@@ -74,6 +73,7 @@ pub(super) fn validate_stac_feature(feature: &Value, location: &str) -> Result<(
             )));
         }
     }
+    validate_optional_links(feature, location)?;
     Ok(())
 }
 
@@ -85,6 +85,48 @@ pub(super) fn require_string(json: &Value, field: &str, location: &str) -> Resul
             "STAC object '{location}' is missing string field '{field}'."
         )))
     }
+}
+
+fn validate_required_links(
+    json: &Value,
+    location: &str,
+    type_name: &str,
+) -> Result<(), StageError> {
+    let links = json["links"]
+        .as_array()
+        .ok_or_else(|| StageError(format!("STAC {type_name} '{location}' is missing links.")))?;
+    validate_links(links, location)
+}
+
+fn validate_optional_links(json: &Value, location: &str) -> Result<(), StageError> {
+    if json.get("links").is_none() {
+        return Ok(());
+    }
+    let links = json["links"]
+        .as_array()
+        .ok_or_else(|| StageError(format!("STAC object '{location}' has invalid links.")))?;
+    validate_links(links, location)
+}
+
+fn validate_links(links: &[Value], location: &str) -> Result<(), StageError> {
+    for (idx, link) in links.iter().enumerate() {
+        let Some(object) = link.as_object() else {
+            return Err(StageError(format!(
+                "STAC link {idx} in '{location}' must be an object."
+            )));
+        };
+        if object.get("rel").and_then(Value::as_str).is_none() {
+            return Err(StageError(format!(
+                "STAC link {idx} in '{location}' is missing string field 'rel'."
+            )));
+        }
+        if object.get("href").and_then(Value::as_str).is_none() {
+            return Err(StageError(format!(
+                "STAC link {idx} in '{location}' is missing string field 'href'."
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn item_has_requested_asset(item: &Value, asset_names: &[String]) -> bool {

@@ -400,6 +400,30 @@ fn read_validate_schema_rejects_malformed_feature_before_asset_read() {
 }
 
 #[test]
+fn read_validate_schema_rejects_malformed_catalog_link_before_traversal() {
+    let temp = tempfile::tempdir().unwrap();
+    let catalog = temp.path().join("catalog.json");
+    std::fs::write(
+        &catalog,
+        br#"{
+  "type": "Catalog",
+  "id": "root",
+  "stac_version": "1.0.0",
+  "links": [{"rel": "item"}]
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", catalog.to_string_lossy().into_owned());
+    options.add("validate_schema", "true");
+    let mut reader = StacReader::new(&options);
+
+    let err = reader.read().err().unwrap();
+    assert!(err.0.contains("missing string field 'href'"));
+}
+
+#[test]
 fn preview_validates_property_filter_input() {
     let temp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
