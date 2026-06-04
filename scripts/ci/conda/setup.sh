@@ -6,6 +6,8 @@ ls
 git clone https://github.com/conda-forge/libpdal-feedstock.git
 
 cd libpdal-feedstock
+sed -i.bak 's/"$PDAL_DRIVER_PATH"/"${PDAL_DRIVER_PATH:-}"/' recipe/scripts/activate.sh
+sed -i.bak 's/"$_CONDA_SET_PDAL_DRIVER_PATH"/"${_CONDA_SET_PDAL_DRIVER_PATH:-}"/' recipe/scripts/deactivate.sh
 
 cat > recipe/recipe_clobber.yaml <<EOL
 source:
