@@ -151,6 +151,34 @@ def compare_pcd_ascii(left: Path, right: Path) -> None:
                 raise AssertionError(f"PCD row {row_idx} col {col_idx} differs: {a} != {b}")
 
 
+def pcd_point_count(path: Path) -> int:
+    header, rows = parse_ascii_pcd(path)
+    points = int(header.get("POINTS", len(rows)))
+    if points != len(rows):
+        raise AssertionError(f"{path} POINTS header differs from row count")
+    return points
+
+
+def assert_unit_cube_pcd(path: Path) -> None:
+    header, rows = parse_ascii_pcd(path)
+    fields = header.get("FIELDS", "").split()
+    required = ["x", "y", "z"]
+    indexes = []
+    for name in required:
+        if name not in fields:
+            raise AssertionError(f"{path} missing PCD field {name}")
+        indexes.append(fields.index(name))
+    for row_idx, row in enumerate(rows):
+        for name, col_idx in zip(required, indexes):
+            value = row[col_idx]
+            if not 0.0 <= value <= 1.0:
+                raise AssertionError(f"{path} row {row_idx} {name}={value} outside unit cube")
+
+
+def pcd_counts_by_prefix(directory: Path, prefix: str) -> list[int]:
+    return sorted(pcd_point_count(path) for path in directory.glob(f"{prefix}_*.pcd"))
+
+
 def parse_csv_numbers(path: Path) -> tuple[list[str], list[dict[str, float]]]:
     lines = path.read_text().splitlines()
     if not lines:
@@ -248,6 +276,24 @@ def compare_info_stats(ref: str, rust: str, las: Path) -> None:
             b = float(rust_item[key])
             if not math.isclose(a, b, rel_tol=0.0, abs_tol=1e-7):
                 raise AssertionError(f"info --stats {dim}.{key} differs: {a} != {b}")
+
+
+def summary_point_count(pdal: str, path: Path) -> int:
+    value = json.loads(run(pdal, ["info", "--summary", str(path)]).stdout)
+    for node in (value, value.get("summary", {})):
+        if isinstance(node, dict):
+            for key in ("point_count", "num_points"):
+                count = node.get(key)
+                if count is not None:
+                    return int(count)
+    raise AssertionError(f"unable to find point count in summary for {path}")
+
+
+def las_counts_by_name(pdal: str, directory: Path) -> dict[str, int]:
+    return {
+        path.name: summary_point_count(pdal, path)
+        for path in sorted(directory.glob("*.las"))
+    }
 
 
 def case_version_exact(ref: str, rust: str, _tmp: Path) -> None:
@@ -352,6 +398,78 @@ def case_las_head_points_semantic(ref: str, rust: str, tmp: Path) -> None:
     compare_csv_common_numeric(ref_txt, rust_txt, {"ScanAngleRank": 0.0021})
 
 
+def case_translate_command_pcd_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "translate-ref.pcd"
+    rust_out = tmp / "translate-rust.pcd"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        run(binary, ["translate", str(input_path), str(output)])
+    compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_merge_command_pcd_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "merge-ref.pcd"
+    rust_out = tmp / "merge-rust.pcd"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        run(binary, ["merge", str(input_path), str(input_path), str(output)])
+    compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_sort_command_pcd_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "sort-ref.pcd"
+    rust_out = tmp / "sort-rust.pcd"
+    for binary, output in ((ref, ref_out), (rust, rust_out)):
+        run(binary, ["sort", str(input_path), str(output)])
+    compare_pcd_ascii(ref_out, rust_out)
+
+
+def case_split_command_counts_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/ply/simple_text.ply"
+    ref_out = tmp / "split-ref.pcd"
+    rust_out = tmp / "split-rust.pcd"
+    run(ref, ["split", str(input_path), str(ref_out), "--capacity=2"])
+    run(rust, ["split", str(input_path), str(rust_out), "--capacity=2"])
+    ref_counts = pcd_counts_by_prefix(tmp, "split-ref")
+    rust_counts = pcd_counts_by_prefix(tmp, "split-rust")
+    if not ref_counts or not rust_counts:
+        raise AssertionError(f"split produced no PCD outputs: {ref_counts} / {rust_counts}")
+    if ref_counts != rust_counts:
+        raise AssertionError(f"split PCD counts differ: {ref_counts} != {rust_counts}")
+    if sum(ref_counts) != 3:
+        raise AssertionError(f"split total point count differs from fixture: {sum(ref_counts)}")
+
+
+def case_random_command_count_semantic(ref: str, rust: str, tmp: Path) -> None:
+    ref_out = tmp / "random-ref.pcd"
+    rust_out = tmp / "random-rust.pcd"
+    run(ref, ["random", str(ref_out), "--count=50"])
+    run(rust, ["random", str(rust_out), "--count=50"])
+    if pcd_point_count(ref_out) != pcd_point_count(rust_out):
+        raise AssertionError("random point count differs")
+    assert_unit_cube_pcd(ref_out)
+    assert_unit_cube_pcd(rust_out)
+
+
+def case_tile_command_counts_semantic(ref: str, rust: str, tmp: Path) -> None:
+    input_path = REPO / "test/data/las/interesting.las"
+    ref_dir = tmp / "tile-ref"
+    rust_dir = tmp / "tile-rust"
+    ref_dir.mkdir()
+    rust_dir.mkdir()
+    run(ref, ["tile", str(input_path), str(ref_dir / "t#.las"), "--length=1000"])
+    run(rust, ["tile", str(input_path), str(rust_dir / "t#.las"), "--length=1000"])
+    ref_counts = las_counts_by_name(rust, ref_dir)
+    rust_counts = las_counts_by_name(rust, rust_dir)
+    if not ref_counts or not rust_counts:
+        raise AssertionError(f"tile produced no LAS outputs: {ref_counts} / {rust_counts}")
+    if ref_counts != rust_counts:
+        raise AssertionError(f"tile LAS counts differ: {ref_counts} != {rust_counts}")
+    if sum(ref_counts.values()) != 1065:
+        raise AssertionError(f"tile total point count differs from fixture: {sum(ref_counts.values())}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=find_default_reference_pdal())
@@ -376,6 +494,12 @@ def main() -> int:
         ("text decimation artifact bytes", "exact", case_text_decimation_exact),
         ("PCD decimation point payload", "semantic", case_pcd_decimation_semantic),
         ("LAS head point payload", "semantic", case_las_head_points_semantic),
+        ("translate command PLY to PCD", "semantic", case_translate_command_pcd_semantic),
+        ("merge command PLY to PCD", "semantic", case_merge_command_pcd_semantic),
+        ("sort command PLY to PCD", "semantic", case_sort_command_pcd_semantic),
+        ("split command capacity counts", "semantic", case_split_command_counts_semantic),
+        ("random command count and bounds", "semantic", case_random_command_count_semantic),
+        ("tile command LAS counts", "semantic", case_tile_command_counts_semantic),
         (
             "info --stats numeric payload",
             "semantic",
