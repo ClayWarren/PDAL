@@ -32,9 +32,6 @@ fn main() {
         .compile("pdal_native_geotiff_bridge");
 
     println!("cargo:rustc-link-search=native={}", lib.display());
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-link-arg=-Wl,--no-as-needed");
-    }
     println!("cargo:rustc-link-lib=geotiff");
     link_library(
         &lib,
@@ -42,9 +39,6 @@ fn main() {
         "xml2",
         &["libxml2.so", "libxml2.dylib", "xml2.lib"],
     );
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-link-arg=-Wl,--as-needed");
-    }
     copy_runtime_library(&lib, &out_dir, "libgeos.3.14.1.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos.dylib");
     copy_runtime_library(&lib, &out_dir, "libgeos_c.1.dylib");
@@ -71,6 +65,9 @@ fn main() {
     }
     if cfg!(any(target_os = "macos", target_os = "linux")) {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib.display());
+    }
+    if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-arg=-Wl,-rpath-link,{}", lib.display());
     }
     println!("cargo:rerun-if-env-changed=CONDA_PREFIX");
     println!("cargo:rerun-if-changed=src/geotiff_bridge.cpp");
