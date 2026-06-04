@@ -20,7 +20,8 @@ fi
 
 conda config --set conda_build.pkg_format 2
 python -m conda_build.cli.main_build recipe --clobber-file recipe/recipe_clobber.yaml --output-folder packages -m ".ci_support/${CI_PLAT}_${ARCH}_.yaml"
-conda create -y -n test -c ./packages/${CI_PLAT}-${ARCH} python pdal
+python -m conda_build.cli.main_index packages
+conda create -y -n test -c ./packages python pdal
 conda deactivate
 
 conda activate test

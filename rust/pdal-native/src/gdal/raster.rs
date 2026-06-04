@@ -4,6 +4,8 @@ use gdal_sys::{
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+const GDAL_UINT8_TYPE: gdal_sys::GDALDataType::Type = 1;
+
 pub struct Raster {
     ds: GDALDatasetH,
 }
@@ -28,7 +30,7 @@ impl RasterDataType {
             RasterDataType::Float64 => GDALDataType::GDT_Float64,
             RasterDataType::Float32 => GDALDataType::GDT_Float32,
             RasterDataType::Int8 => GDALDataType::GDT_Int8,
-            RasterDataType::UInt8 => GDALDataType::GDT_UInt8,
+            RasterDataType::UInt8 => GDAL_UINT8_TYPE,
             RasterDataType::Int16 => GDALDataType::GDT_Int16,
             RasterDataType::UInt16 => GDALDataType::GDT_UInt16,
             RasterDataType::Int32 => GDALDataType::GDT_Int32,
