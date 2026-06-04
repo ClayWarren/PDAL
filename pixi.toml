@@ -27,7 +27,9 @@ rust = "*"
 cargo-llvm-cov = "*"
 clang-tools = ">=19.1.7,<23"
 geotiff = ">=1.7.4,<2"
-libxml2-devel = "*"
+
+[feature.dev.target.linux-aarch64.dependencies]
+libxml2 = ">=2.13,<2.14"
 
 [feature.doc.dependencies]
 jupyter-book = ">=1.0.3,<2"
