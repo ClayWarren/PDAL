@@ -51,10 +51,10 @@ impl Filter for DEMFilter {
 
     fn run_one(&mut self, input: &PointView) -> Result<Vec<PointView>, StageError> {
         self.ensure_raster()?;
+        let mut scratch = input.clone();
         let mut output = input.make_new();
         for idx in 0..input.len() {
-            if self.process_one(&mut input.clone(), idx) {
-                // Hack to avoid mutable borrow on input
+            if self.process_one(&mut scratch, idx) {
                 output.append_point(input, idx);
             }
         }

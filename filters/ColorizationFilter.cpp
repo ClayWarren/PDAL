@@ -226,7 +226,6 @@ bool ColorizationFilter::processOne(PointRef& point)
     pdal_point_view_destroy(rustView);
     if (rust_view_converter::hasLastError())
         rust_view_converter::throwLastError("Rust colorization stage failed.");
-    pdal_stage_reset(m_rustStage);
 
     return true;
 }

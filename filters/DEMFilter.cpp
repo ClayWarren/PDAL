@@ -113,7 +113,6 @@ bool DEMFilter::processOne(PointRef& point)
     pdal_point_view_destroy(rustView);
     if (rust_view_converter::hasLastError())
         rust_view_converter::throwLastError("Rust DEM stage failed.");
-    pdal_stage_reset(m_rustStage);
     return keep;
 }
 
