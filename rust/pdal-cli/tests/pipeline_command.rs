@@ -286,6 +286,49 @@ fn pipeline_command_writes_metadata_and_serialization_files() {
 }
 
 #[test]
+fn pipeline_command_progress_uses_filespec_writer_path() {
+    let temp = make_temp_dir("pdal-rs-pipeline-filespec-progress");
+    let output = temp.join("out.txt");
+    let progress = temp.join("progress.txt");
+    let pipeline = temp.join("pipeline.json");
+
+    fs::write(
+        &pipeline,
+        format!(
+            r#"{{
+  "pipeline": [
+    {{"type":"readers.faux","count":1}},
+    {{"type":"writers.text","filename":{{"path":"{}"}}}}
+  ]
+}}"#,
+            escape_json_path(&output)
+        ),
+    )
+    .unwrap();
+    fs::write(&progress, "").unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_pdal-rs"))
+        .arg("pipeline")
+        .arg(&pipeline)
+        .arg("--progress")
+        .arg(&progress)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "pdal-rs pipeline failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let progress_text = fs::read_to_string(progress).unwrap();
+    assert!(progress_text.contains(&format!("READYFILE:{}", output.display())));
+    assert!(progress_text.contains(&format!("DONEFILE:{}", output.display())));
+    assert!(!progress_text.contains("READYPIPELINE"));
+    assert!(!progress_text.contains("DONEPIPELINE"));
+}
+
+#[test]
 fn pipeline_command_accepts_filename_string_stages() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let input = repo.join("test/data/text/utm17_1.txt");

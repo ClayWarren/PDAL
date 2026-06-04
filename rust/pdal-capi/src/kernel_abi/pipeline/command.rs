@@ -206,10 +206,20 @@ pub(super) fn progress_file_targets(json: &str) -> Vec<String> {
     stages
         .iter()
         .filter(|stage| stage["role"] == "writer")
-        .filter_map(|stage| stage["filename"].as_str())
+        .filter_map(writer_filename)
         .filter(|filename| !filename.is_empty())
-        .map(str::to_string)
         .collect()
+}
+
+fn writer_filename(stage: &serde_json::Value) -> Option<String> {
+    if let Some(filename) = stage["filename"].as_str() {
+        return Some(filename.to_string());
+    }
+    stage["filename"]
+        .as_object()
+        .and_then(|object| object.get("path"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 pub(super) fn validate_pipeline_for_kernel(json: &str) -> serde_json::Value {

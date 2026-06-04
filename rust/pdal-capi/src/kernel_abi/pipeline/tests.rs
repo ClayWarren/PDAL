@@ -114,6 +114,16 @@ fn progress_targets_are_writer_filenames() {
 }
 
 #[test]
+fn progress_targets_accept_filespec_path_objects() {
+    let json = r#"{"pipeline":[
+        {"type":"readers.faux", "count":1},
+        {"type":"writers.las", "filename":{"path":"output.laz", "headers":{"x":"y"}}}
+    ]}"#;
+
+    assert_eq!(progress_file_targets(json), vec!["output.laz".to_string()]);
+}
+
+#[test]
 fn progress_targets_ignore_writerless_pipelines() {
     let json = r#"{"pipeline":[
         {"type":"readers.faux", "count":1},
