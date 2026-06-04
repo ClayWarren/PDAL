@@ -358,6 +358,43 @@ fn vector_layer_creation_options_are_forwarded() {
     assert_eq!(vector.geometry_column(0).unwrap(), "tile_geom");
 }
 
+#[test]
+fn vector_attribute_filter_is_cleared_after_read_error() {
+    register_drivers();
+    let path = temp_tif("vector-filter-reset").with_extension("geojson");
+    let _ = fs::remove_file(&path);
+
+    let vector = Vector::create(path.to_str().unwrap(), "GeoJSON").unwrap();
+    let layer = vector.open_or_create_layer("tiles", "").unwrap();
+    unsafe {
+        Vector::create_string_field(layer, "location").unwrap();
+        Vector::add_feature(
+            layer,
+            "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+            &[("location", "keep")],
+        )
+        .unwrap();
+        Vector::add_feature(
+            layer,
+            "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))",
+            &[("location", "drop")],
+        )
+        .unwrap();
+    }
+    drop(vector);
+
+    let vector = Vector::open(path.to_str().unwrap()).unwrap();
+    let err = vector
+        .get_string_pair_features_by_layer("", "missing", "", "location = 'keep'")
+        .unwrap_err();
+    assert!(err.contains("No column name 'missing'"));
+
+    let rows = vector
+        .get_string_pair_features_by_layer("", "location", "", "")
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+}
+
 fn temp_geojson(name: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("pdal-native-{name}-{}.json", std::process::id()));
     let _ = fs::remove_file(&path);

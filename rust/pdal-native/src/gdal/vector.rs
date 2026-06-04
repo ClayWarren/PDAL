@@ -467,6 +467,8 @@ impl Vector {
                     attribute_filter
                 ));
             }
+            let _filter_guard =
+                (!attribute_filter.is_empty()).then_some(AttributeFilterGuard { layer });
 
             loop {
                 let feature = gdal_sys::OGR_L_GetNextFeature(layer);
@@ -522,9 +524,6 @@ impl Vector {
                     }
                 }
                 gdal_sys::OGR_F_Destroy(feature);
-            }
-            if !attribute_filter.is_empty() {
-                gdal_sys::OGR_L_SetAttributeFilter(layer, std::ptr::null());
             }
             Ok(result)
         }
@@ -636,6 +635,18 @@ impl Drop for Vector {
     fn drop(&mut self) {
         unsafe {
             gdal_sys::OGR_DS_Destroy(self.ds);
+        }
+    }
+}
+
+struct AttributeFilterGuard {
+    layer: gdal_sys::OGRLayerH,
+}
+
+impl Drop for AttributeFilterGuard {
+    fn drop(&mut self) {
+        unsafe {
+            gdal_sys::OGR_L_SetAttributeFilter(self.layer, std::ptr::null());
         }
     }
 }
