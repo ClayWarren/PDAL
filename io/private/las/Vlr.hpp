@@ -35,6 +35,7 @@
 #pragma once
 
 #include <limits>
+#include <mutex>
 #include <string>
 #include <vector>
 

@@ -270,7 +270,7 @@ fn take_error(err: &[c_char]) -> String {
     let bytes: Vec<u8> = err
         .iter()
         .take_while(|&&ch| ch != 0)
-        .map(|&ch| ch as u8)
+        .map(|&ch| ch.to_ne_bytes()[0])
         .collect();
     if bytes.is_empty() {
         "NITF operation failed".to_string()

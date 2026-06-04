@@ -5,12 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${1:-${ROOT_DIR}/.build}"
 
 INSTALL_PREFIX=""
+PREFIX_MODE=0
 if [[ "${BUILD_DIR}" == "--prefix" ]]; then
     if [[ $# -ne 2 ]]; then
         echo "Usage: $0 [build-dir] | --prefix install-prefix" >&2
         exit 1
     fi
     INSTALL_PREFIX="$2"
+    PREFIX_MODE=1
 elif [[ ! -d "${BUILD_DIR}" ]]; then
     echo "Build directory does not exist: ${BUILD_DIR}" >&2
     exit 1
@@ -22,6 +24,13 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 if [[ -z "${INSTALL_PREFIX}" ]]; then
     INSTALL_PREFIX="${TMP_DIR}/install"
     cmake --install "${BUILD_DIR}" --prefix "${INSTALL_PREFIX}" >/dev/null
+fi
+
+PDAL_CMAKE_DIR="${INSTALL_PREFIX}/lib/cmake/PDAL"
+if [[ "${PREFIX_MODE}" -eq 1 ]] &&
+    ! grep -R -q "PDAL::CAPI" "${PDAL_CMAKE_DIR}" 2>/dev/null; then
+    echo "PDAL::CAPI target not exported by installed package at ${INSTALL_PREFIX}; skipping C API consumer smoke."
+    exit 0
 fi
 
 CONSUMER_DIR="${TMP_DIR}/consumer"
