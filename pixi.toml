@@ -161,6 +161,7 @@ rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }
 rust-workflow-parity = { cmd = "python3 rust/scripts/compare_pdal_workflows.py --rust .build/bin/pdal", depends-on = ["build"] }
 rust-bench = { cmd = "python3 rust/scripts/benchmark_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
 rust-bench-memory = { cmd = "python3 rust/scripts/benchmark_memory_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }
+rust-bench-size = { cmd = "python3 rust/scripts/benchmark_binary_footprint.py --rust .build/bin/pdal", depends-on = ["build"] }
 
 [feature.doc.tasks]
 configure = { cmd = [ "cmake",

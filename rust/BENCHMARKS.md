@@ -129,25 +129,38 @@ The same build-config confound as the wall-clock table applies: the Homebrew
 reference links a heavier optional-plugin closure, which inflates its baseline
 RSS somewhat. Treat as directional, not a controlled same-flags A/B.
 
-## Binary size and startup (existing Rust harnesses)
+## Binary footprint
 
-`cargo test -p pdal-cli --test binary_size -- --ignored --nocapture` compares
-the Rust-native `pdal-rs` CLI against installed `pdal`. Current numbers are not
-apples-to-apples: `pdal-rs` is measured as a **debug** build (~21 MiB, mostly
-unstripped debug info) that statically links its dependencies, while the
-installed `pdal` binary is a thin CLI (~0.28 MiB) that links `libpdalcpp` and
-GDAL/PROJ/etc. as external shared libraries not counted in that number. A
-meaningful size comparison needs a release+stripped `pdal-rs` measured against
-the C++ CLI **plus** its shared-library closure; that is future work.
+`rust/scripts/benchmark_binary_footprint.py` measures each `pdal` executable
+plus the non-system shared-library closure reachable from it. This is more
+useful than comparing only the tiny C++ CLI executable against a Rust binary,
+because most of PDAL's footprint lives in `libpdalcpp`, plugins, GDAL/PROJ, and
+other shared dependencies.
 
-Startup (median of `--version`, same harness): `pdal-rs` **18.3 ms** vs
-installed Homebrew `pdal` **89.9 ms** (0.20×). The statically-linked Rust CLI
-loads far fewer shared libraries at launch than the thin C++ CLI plus its
-GDAL/PROJ/plugin closure, so it starts faster here despite the larger on-disk
-size. (Run the size sub-test with `DYLD_FALLBACK_LIBRARY_PATH=$CONDA_PREFIX/lib`
-set so `pdal-rs` resolves its PROJ/GDAL dylibs; `pixi run -e dev` provides it.)
-The CLI-vs-CLI table above instead measures this repo's Rust-backed C++ `pdal`,
-which also starts faster than Homebrew's (leaner build).
+Reproduce:
+
+```sh
+python3 rust/scripts/benchmark_binary_footprint.py --rust .build/bin/pdal
+# or via pixi: pixi run -e dev rust-bench-size
+```
+
+### Results (macOS arm64, both `pdal 2.10.1`)
+
+| binary | executable (MiB) | non-system closure (MiB) | closure files |
+|---|---:|---:|---:|
+| C++ Homebrew reference | 0.28 | 176.85 | 195 |
+| Rust-backed build-tree `pdal` | 0.31 | 131.65 | 64 |
+
+The Rust-backed build-tree CLI is roughly the same executable size as the
+Homebrew CLI, and its measured non-system shared-library closure is **0.74×**
+the Homebrew reference. This mostly reflects the leaner build/plugin closure,
+not just Rust implementation choices. It is still the right operational number
+for "what does this executable load on this machine?"
+
+The Rust-native `pdal-rs` debug binary-size test still exists as a local
+visibility check, but it is not the apples-to-apples footprint comparison: a
+debug Rust binary with static debug info is not comparable to a thin C++ CLI
+unless the shared-library closure is counted.
 
 ## Build cost and guardrail harnesses
 
@@ -214,6 +227,5 @@ pure-C++ build) is not yet recorded — the harness can time a cold Rust build
 (`measure_guardrails.sh --cold-build`), but the matching pure-C++ cold build is
 not isolatable because the Rust C ABI is a mandatory part of this build (see the
 `pdal_features.hpp.in` row in `rust/STATUS.md`). All workloads here remain
-small/local and macOS-only; Linux/Windows numbers and a release+stripped
-`pdal-rs` size comparison against the C++ CLI's full shared-library closure are
-still future work.
+small/local and macOS-only; Linux/Windows numbers and a controlled same-config
+pure-C++ baseline are still future work.
