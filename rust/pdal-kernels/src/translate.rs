@@ -306,24 +306,31 @@ fn is_reader_stage(stage: &serde_json::Value, position: usize, len: usize) -> bo
     if let Some(driver) = stage.get("type").and_then(serde_json::Value::as_str) {
         return driver.starts_with("readers.");
     }
-    let has_filename = stage.as_str().is_some()
-        || stage
-            .get("filename")
-            .and_then(serde_json::Value::as_str)
-            .is_some();
-    has_filename && position == 0 && len > 1
+    has_stage_filename(stage) && position == 0 && len > 1
 }
 
 fn is_writer_stage(stage: &serde_json::Value, position: usize, len: usize) -> bool {
     if let Some(driver) = stage.get("type").and_then(serde_json::Value::as_str) {
         return driver.starts_with("writers.");
     }
-    let has_filename = stage.as_str().is_some()
+    has_stage_filename(stage) && position + 1 == len
+}
+
+fn has_stage_filename(stage: &serde_json::Value) -> bool {
+    if stage.as_str().is_some()
         || stage
             .get("filename")
             .and_then(serde_json::Value::as_str)
-            .is_some();
-    has_filename && position + 1 == len
+            .is_some()
+    {
+        return true;
+    }
+    stage
+        .get("filename")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|object| object.get("path"))
+        .and_then(serde_json::Value::as_str)
+        .is_some()
 }
 
 pub fn expand_translate_option_files(
@@ -601,6 +608,24 @@ mod tests {
 
         assert_eq!(stages[0]["type"], "readers.las");
         assert_eq!(stages[0]["filename"], "in.laz");
+        assert_eq!(stages[2]["type"], "writers.bpf");
+        assert_eq!(stages[2]["filename"], "out.bpf");
+    }
+
+    #[test]
+    fn translate_json_replaces_filespec_endpoint_stages() {
+        let json = r#"[
+            {"filename":{"path":"old-input.las","driver":"readers.las"}},
+            {"type":"filters.head"},
+            {"filename":{"path":"old-output.bpf","driver":"writers.bpf"}}
+        ]"#;
+        let stages =
+            translate_json_stages(json, "in.laz", "out.bpf", "readers.las", "writers.bpf").unwrap();
+
+        assert_eq!(stages.len(), 3);
+        assert_eq!(stages[0]["type"], "readers.las");
+        assert_eq!(stages[0]["filename"], "in.laz");
+        assert_eq!(stages[1]["type"], "filters.head");
         assert_eq!(stages[2]["type"], "writers.bpf");
         assert_eq!(stages[2]["filename"], "out.bpf");
     }
