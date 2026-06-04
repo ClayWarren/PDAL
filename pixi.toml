@@ -155,6 +155,7 @@ rust-cpp-test-parity = { cmd = "python3 rust/scripts/audit_cpp_test_parity.py --
 rust-capi-install-smoke = { cmd = "rust/scripts/check_installed_capi_consumer.sh .build", depends-on = ["build"] }
 rust-source-package-smoke = { cmd = "cd .build && ninja package_source >/dev/null && cd .. && rust/scripts/check_source_package.sh .build", depends-on = ["build"] }
 rust-guard = { depends-on = ["rust-fmt", "rust-check", "rust-clippy", "rust-test", "rust-coverage-check", "rust-license-audit", "rust-unsafe-audit", "rust-capi-header-audit"] }
+rust-release-gate = { depends-on = ["rust-guard", "rust-cpp-port-audit", "rust-cpp-test-parity", "rust-capi-install-smoke", "rust-source-package-smoke"] }
 rust-coverage = { cmd = "rust/scripts/run_coverage.sh" }
 rust-mutants = { cmd = "rust/scripts/run_mutants.sh --workspace" }
 rust-bench = { cmd = "python3 rust/scripts/benchmark_cpp_vs_rust.py --rust .build/bin/pdal", depends-on = ["build"] }

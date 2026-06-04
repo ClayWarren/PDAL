@@ -646,10 +646,13 @@ fn rust_kernel_run_handles_tindex_srs_options() {
 
 #[test]
 fn rust_kernel_run_handles_tindex_layer_creation_options() {
+    let dir = tempfile::tempdir().unwrap();
+    let output_path = dir.path().join("out.gpkg");
+
     let name = CString::new("tindex").unwrap();
     let create = CString::new("create").unwrap();
     let tindex = CString::new("--tindex").unwrap();
-    let output = CString::new("out.gpkg").unwrap();
+    let output = CString::new(output_path.display().to_string()).unwrap();
     let driver = CString::new("--ogrdriver=GPKG").unwrap();
     let lco = CString::new("--lco=GEOMETRY_NAME=tile_geom").unwrap();
     let file = CString::new("input.las").unwrap();

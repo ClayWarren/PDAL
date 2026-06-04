@@ -21,6 +21,7 @@ it unless a concrete parity failure proves the decision wrong.
 
 | Gate | Decision | Reason |
 |---|---|---|
+| Aggregate release gate | Release-blocking. `rust-release-gate` must pass before upstreaming. | This is the single Pixi entrypoint for the Rust guard, C++ parity/implementation audits, installed C ABI consumer smoke, and source-package smoke. |
 | Rust default guard | Release-blocking. `rust-guard` must pass. | This covers formatting, type checking, clippy, Rust tests, coverage threshold, license audit, unsafe accounting, and C ABI header sync. |
 | C++ compatibility audits | Release-blocking. `rust-cpp-test-parity` and `rust-cpp-port-audit` must pass before upstreaming. | The port is only valid if the pre-port C++ behavioral contract remains Rust C ABI-backed and the implementation backlog stays classified. |
 | Install/export/package smoke | Release-blocking. `rust-capi-install-smoke` and `rust-source-package-smoke` must pass. | Downstream consumers need `find_package(PDAL)` / `PDAL::CAPI` and source releases to work, not just the build tree. |
@@ -119,9 +120,7 @@ it unless a concrete parity failure proves the decision wrong.
 After these decisions, do not hunt for generic "remaining C++." The useful next
 work is:
 
-1. keep the release-blocking gates green: `rust-guard`,
-   `rust-cpp-test-parity`, `rust-cpp-port-audit`,
-   `rust-capi-install-smoke`, and `rust-source-package-smoke`;
+1. keep the release-blocking gate green: `rust-release-gate`;
 2. broaden upstream/platform confidence, especially Linux and Windows CI
    behavior for Rust build, install/export, package, and C ABI consumer checks;
 3. refresh visibility evidence when behavior or build shape changes:
