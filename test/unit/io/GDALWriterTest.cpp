@@ -953,6 +953,7 @@ TEST(GDALWriterTest, testMetadata)
     wo.add("output_type", "max");
     wo.add("resolution", 1);
     wo.add("radius", .7071);
+    wo.add("gdalopts", "COMPRESS=LZW");
     wo.add("metadata", "AREA_OR_PIXEL=Pixel,empty=,equals=some_more_equals===");
     wo.add("pdal_metadata", true);
     wo.add("filename", outfile);
@@ -989,6 +990,10 @@ TEST(GDALWriterTest, testMetadata)
     l = raster.getMetadata().findChild("pdal_pipeline");
     if (l.empty())
         FAIL() << "Couldn't find raster metadata pdal_pipeline";
+
+    l = raster.getMetadata("IMAGE_STRUCTURE").findChild("COMPRESSION");
+    ASSERT_FALSE(l.empty());
+    EXPECT_EQ(l.value(), "LZW");
 }
 
 } // namespace pdal

@@ -449,7 +449,7 @@ bool GDALWriter::useRustWriter() const
     case Dimension::Type::Unsigned32:
     case Dimension::Type::Float:
     case Dimension::Type::Double:
-        return m_supportsView && m_options.empty();
+        return m_supportsView;
     default:
         return false;
     }
@@ -476,6 +476,8 @@ void GDALWriter::writeRustOutput()
     addOption(options, "binmode", m_binMode);
     addOption(options, "allow_empty", m_allowEmpty);
     addOption(options, "window_size", m_windowSize);
+    for (const std::string& option : m_options)
+        addOption(options, "gdalopts", option);
     if (!m_GDAL_metadata.empty())
         addOption(options, "metadata", m_GDAL_metadata);
     if (m_overrideSrs.valid())
