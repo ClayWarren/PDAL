@@ -15,7 +15,7 @@ ARG GITHUB_SERVER_URL="https://github.com"
 SHELL ["conda", "run", "-n", "pdal", "/bin/bash", "-c"]
 
 RUN mamba install -y \
-    git compilers cmake ninja make rust cargo \
+    git compilers cmake ninja make rust \
     conda-pack \
     python=${PYTHON_VERSION} pip numpy scikit-build-core pybind11 \
     && \
