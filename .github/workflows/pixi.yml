@@ -46,6 +46,10 @@ jobs:
       run: |
           pixi run -e dev rust-capi-install-smoke
 
+    - name: Rust source package smoke
+      run: |
+          pixi run -e dev rust-source-package-smoke
+
     - name: Rust C++ test parity audit
       run: |
           pixi run -e dev rust-cpp-test-parity
