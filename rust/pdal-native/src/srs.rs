@@ -424,6 +424,7 @@ pub fn wkt_to_wkt1(wkt: &str, epoch: f64) -> Result<String, String> {
         epoch,
         &[
             ("FORMAT", "WKT1_GDAL"),
+            ("OUTPUT_AXIS", "NO"),
             ("ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS", "YES"),
         ],
     )

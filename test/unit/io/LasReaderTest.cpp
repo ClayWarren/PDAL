@@ -262,8 +262,6 @@ TEST(LasReaderTest, inspect)
     // completely, this can be fixed.
     std::string testWkt{R"(GEOGCS)"};
 
-    std::cout << "qi.m_srs.getWKT(): " << qi.m_srs.getWKT() << '\n';
-    std::cout << "testWkt: " << testWkt << '\n';
     EXPECT_TRUE(Utils::startsWith(qi.m_srs.getWKT(), testWkt));
     EXPECT_EQ(qi.m_pointCount, 5380u);
 

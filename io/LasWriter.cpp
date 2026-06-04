@@ -90,8 +90,7 @@ bool isForwardedSpatialRefVlr(const std::string& userId, uint16_t recordId)
     if (userId == las::TransformUserId &&
         (recordId == las::GeotiffDirectoryRecordId ||
          recordId == las::GeotiffDoublesRecordId ||
-         recordId == las::GeotiffAsciiRecordId ||
-         recordId == las::WktRecordId))
+         recordId == las::GeotiffAsciiRecordId || recordId == las::WktRecordId))
         return true;
     return userId == las::LiblasUserId && recordId == las::WktRecordId;
 }
@@ -122,8 +121,7 @@ void addForwardVlrsToOptions(pdal_options_t* options, MetadataNode& forward,
             continue;
 
         addOption(options, "forward_vlr_user_id", userId);
-        addOption(options, "forward_vlr_record_id",
-                  Utils::toString(recordId));
+        addOption(options, "forward_vlr_record_id", Utils::toString(recordId));
         addOption(options, "forward_vlr_description", n.description());
         addOption(options, "forward_vlr_data", dataNode.value());
     }
@@ -175,7 +173,8 @@ void addNullTerminatedVlrOption(pdal_options_t* options, const std::string& key,
 
     std::vector<char> bytes(text.begin(), text.end());
     bytes.resize(bytes.size() + 1, 0);
-    const unsigned char* data(reinterpret_cast<const unsigned char*>(bytes.data()));
+    const unsigned char* data(
+        reinterpret_cast<const unsigned char*>(bytes.data()));
     addOption(options, key, Utils::base64_encode(data, bytes.size()));
 }
 
@@ -947,9 +946,14 @@ bool LasWriter::processOne(PointRef& point)
     {
         if (m_firstPoint)
         {
-            auto doScale =
-                [this](const XForm::XFormComponent& scale,
-                       const std::string& name)
+            if (!getSpatialReference().empty())
+            {
+                m_srs = getSpatialReference();
+                rust_view_converter::setSpatialReference(m_rustView, m_srs);
+            }
+
+            auto doScale = [this](const XForm::XFormComponent& scale,
+                                  const std::string& name)
             {
                 if (scale.m_auto)
                     log()->get(LogLevel::Warning)
@@ -1064,8 +1068,9 @@ void LasWriter::writeView(const PointViewPtr view)
         Utils::writeProgress(m_progressFd, "READYVIEW",
                              std::to_string(view->size()));
         appendRustView(view);
-        rust_view_converter::setSpatialReference(m_rustView,
-                                                 view->spatialReference());
+        m_srs = getSpatialReference().empty() ? view->spatialReference()
+                                              : getSpatialReference();
+        rust_view_converter::setSpatialReference(m_rustView, m_srs);
         Utils::writeProgress(m_progressFd, "DONEVIEW",
                              std::to_string(view->size()));
         return;
@@ -1474,10 +1479,15 @@ void LasWriter::writeRustOutput()
     if (!m_rustView)
         throwError("Rust LAS writer has no output view.");
 
+    if (!getSpatialReference().empty())
+        m_srs = getSpatialReference();
+
     pdal_options_t* options = pdal_options_create();
     addOption(options, "filename", d->curFilename);
-    addOption(options, "minor_version", Utils::toString(d->opts.minorVersion.val()));
-    addOption(options, "dataformat_id", Utils::toString(d->opts.dataformatId.val()));
+    addOption(options, "minor_version",
+              Utils::toString(d->opts.minorVersion.val()));
+    addOption(options, "dataformat_id",
+              Utils::toString(d->opts.dataformatId.val()));
     addOption(options, "major_version",
               Utils::toString(d->opts.majorVersion.val()));
     addOption(options, "global_encoding",
@@ -1519,7 +1529,8 @@ void LasWriter::writeRustOutput()
     }
     if (d->opts.writePDALMetadata)
     {
-        addOption(options, "pdal_metadata_json", Utils::toJSON(m_tableMetadata));
+        addOption(options, "pdal_metadata_json",
+                  Utils::toJSON(m_tableMetadata));
         std::ostringstream ostr;
         PipelineWriter::writePipeline(this, ostr);
         addOption(options, "pdal_pipeline_json", ostr.str());
@@ -1542,7 +1553,8 @@ void LasWriter::writeRustOutput()
     if (!writer)
     {
         pdal_options_destroy(options);
-        rust_view_converter::throwLastError("Failed to create Rust LAS writer.");
+        rust_view_converter::throwLastError(
+            "Failed to create Rust LAS writer.");
     }
 
     rust_view_converter::setSpatialReference(m_rustView, m_srs);

@@ -216,6 +216,32 @@ use super::*;
     }
 
     #[test]
+    fn writer_preserves_supplied_wkt1_srs_vlr_for_las14() {
+        let path = temp_las("supplied-wkt1-srs-vlr.las");
+        let wkt = r#"GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]"#;
+        let mut options = Options::new();
+        options.add("filename", path.display().to_string());
+        options.add("a_srs", wkt);
+        options.add("minor_version", 4u64);
+        let mut writer = LasWriter::new(&options);
+        writer.write(&[synthetic_point_view()]).unwrap();
+
+        let reader = las::Reader::from_path(&path).unwrap();
+        let vlr = reader
+            .header()
+            .vlrs()
+            .iter()
+            .find(|vlr| {
+                vlr.user_id == TRANSFORM_USER_ID && vlr.record_id == WKT_RECORD_ID
+            })
+            .expect("expected LASF_Projection WKT1 VLR");
+        let text = String::from_utf8_lossy(&vlr.data);
+        assert!(text.starts_with(wkt));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn writer_generates_geotiff_srs_vlrs_for_las13() {
         let path = temp_las("geotiff-srs-vlr.las");
         let mut options = Options::new();

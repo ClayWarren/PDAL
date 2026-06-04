@@ -461,14 +461,18 @@ pub(super) fn add_srs_vlr(
             .unwrap_or(wkt);
         return add_geotiff_srs_vlrs(builder, &srs);
     }
-    let wkt = pdal_native::srs::user_input_to_wkt(&wkt)
-        .map(|srs| {
-            pdal_native::srs::wkt_to_wkt1(&srs.wkt2, srs.epoch)
-                .ok()
-                .filter(|wkt1| !wkt1.is_empty())
-                .unwrap_or(srs.wkt)
-        })
-        .unwrap_or(wkt);
+    let wkt = if is_wkt1_text(&wkt) {
+        wkt
+    } else {
+        pdal_native::srs::user_input_to_wkt(&wkt)
+            .map(|srs| {
+                pdal_native::srs::wkt_to_wkt1(&srs.wkt2, srs.epoch)
+                    .ok()
+                    .filter(|wkt1| !wkt1.is_empty())
+                    .unwrap_or(srs.wkt)
+            })
+            .unwrap_or(wkt)
+    };
     builder.vlrs.retain(|vlr| !vlr.is_crs());
     builder.evlrs.retain(|vlr| !vlr.is_crs());
     let mut wkt_bytes = wkt.into_bytes();
@@ -487,6 +491,20 @@ pub(super) fn add_srs_vlr(
     });
     builder.has_wkt_crs = true;
     Ok(())
+}
+
+fn is_wkt1_text(srs: &str) -> bool {
+    let trimmed = srs.trim_start();
+    [
+        "PROJCS[",
+        "GEOGCS[",
+        "COMPD_CS[",
+        "GEOCCS[",
+        "VERT_CS[",
+        "LOCAL_CS[",
+    ]
+    .iter()
+    .any(|prefix| trimmed.starts_with(prefix))
 }
 
 fn add_geotiff_srs_vlrs(builder: &mut Builder, wkt: &str) -> Result<(), StageError> {
