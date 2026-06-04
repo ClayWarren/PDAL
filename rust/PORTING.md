@@ -546,6 +546,8 @@ Done when:
 The live implementation inventory, status definitions, command-ready filters,
 remaining C++ filter families, and useful regression commands live in
 `rust/STATUS.md`. Keep this file as the roadmap and rules document.
+For draft-PR review, start with `rust/HANDOFF.md`; it is the compact evidence
+packet and points back to the detailed ledgers.
 
 ## Boundary Rules
 

@@ -9,6 +9,9 @@ bucket is a native adapter, compatibility shell, or holdout, that ledger is the
 source of truth for whether it should be ported, FFI-bound, left in C++, or
 deferred.
 
+For draft-PR review, `rust/HANDOFF.md` is the concise evidence packet. This file
+remains the detailed status ledger.
+
 Status definitions:
 
 - `done`: believed done for the stated scope. No known major deficits in that
