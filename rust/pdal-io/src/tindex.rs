@@ -151,6 +151,10 @@ struct TindexFeatureQuery<'a> {
 }
 
 fn read_index_features(query: &TindexFeatureQuery<'_>) -> Result<Vec<IndexFeature>, StageError> {
+    if !query.attribute_filter.is_empty() || !query.sql.is_empty() {
+        return read_ogr_index_features(query);
+    }
+
     match source::read_to_string(query.filename) {
         Ok(text) => {
             match read_geojson_index_features(

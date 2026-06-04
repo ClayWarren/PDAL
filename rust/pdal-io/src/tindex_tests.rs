@@ -213,6 +213,80 @@ fn reads_ogr_index_with_sql() {
 }
 
 #[test]
+fn reads_geojson_index_with_attribute_filter_through_ogr() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data/ply/simple_text.ply");
+    let source_copy = temp.path().join("simple_text.ply");
+    std::fs::copy(&source, &source_copy).unwrap();
+    let index = temp.path().join("index.geojson");
+    std::fs::write(
+        &index,
+        r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply","bucket":"keep"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    },
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply","bucket":"skip"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", index.display());
+    options.add("where", "bucket = 'keep'");
+    let mut reader = TindexReader::new(&options);
+
+    assert_eq!(reader.read().unwrap()[0].len(), 3);
+}
+
+#[test]
+fn reads_geojson_index_with_sql_through_ogr() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data/ply/simple_text.ply");
+    let source_copy = temp.path().join("simple_text.ply");
+    std::fs::copy(&source, &source_copy).unwrap();
+    let index = temp.path().join("index.geojson");
+    std::fs::write(
+        &index,
+        r#"{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply","bucket":"keep"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    },
+    {
+      "type":"Feature",
+      "properties":{"location":"simple_text.ply","bucket":"skip"},
+      "geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let mut options = Options::new();
+    options.add("filename", index.display());
+    options.add("sql", "SELECT * FROM index WHERE bucket = 'keep'");
+    let mut reader = TindexReader::new(&options);
+
+    assert_eq!(reader.read().unwrap()[0].len(), 3);
+}
+
+#[test]
 fn bounds_filter_skips_non_overlapping_features() {
     let temp = tempfile::tempdir().unwrap();
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
