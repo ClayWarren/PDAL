@@ -1,19 +1,4 @@
-#include <nitf/BandInfo.hpp>
-#include <nitf/DESegment.hpp>
-#include <nitf/Defines.h>
-#include <nitf/Extensions.hpp>
-#include <nitf/FileHeader.hpp>
-#include <nitf/FileSecurity.hpp>
-#include <nitf/IOHandle.hpp>
-#include <nitf/ImageSource.hpp>
-#include <nitf/ImageSubheader.hpp>
-#include <nitf/LookupTable.hpp>
-#include <nitf/PluginRegistry.hpp>
-#include <nitf/Reader.hpp>
-#include <nitf/Record.hpp>
-#include <nitf/SegmentSource.hpp>
-#include <nitf/TRE.hpp>
-#include <nitf/Writer.hpp>
+#include <nitro/c++/import/nitf.hpp>
 
 #include <algorithm>
 #include <cctype>

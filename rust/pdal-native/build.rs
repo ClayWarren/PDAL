@@ -97,14 +97,17 @@ fn link_library(lib: &Path, out_dir: &Path, name: &str, unversioned_names: &[&st
 
     if let Some(candidate) = versioned_library_candidates(lib, name).into_iter().next() {
         if cfg!(target_os = "linux") {
-            println!("cargo:rustc-link-arg={}", candidate.display());
+            if name != "xml2" {
+                println!("cargo:rustc-link-arg={}", candidate.display());
+                return;
+            }
+        } else {
+            let link_name = out_dir.join(format!("lib{name}.so"));
+            let _ = fs::copy(candidate, &link_name);
+            println!("cargo:rustc-link-search=native={}", out_dir.display());
+            println!("cargo:rustc-link-lib={name}");
             return;
         }
-        let link_name = out_dir.join(format!("lib{name}.so"));
-        let _ = fs::copy(candidate, &link_name);
-        println!("cargo:rustc-link-search=native={}", out_dir.display());
-        println!("cargo:rustc-link-lib={name}");
-        return;
     }
 
     println!("cargo:rustc-link-lib={name}");
@@ -116,6 +119,7 @@ fn versioned_library_candidates(lib: &Path, name: &str) -> Vec<PathBuf> {
         if candidate.exists() {
             return vec![candidate];
         }
+        return Vec::new();
     }
 
     let Ok(entries) = fs::read_dir(lib) else {
