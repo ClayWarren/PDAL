@@ -42,6 +42,13 @@ macro(pdal_build_rust_capi _pdal_target)
             CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=${CMAKE_LINKER}
             CXXSTDLIB=
         )
+        if(DEFINED ENV{CONDA_PREFIX})
+            file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" RUST_CONDA_PREFIX)
+            list(APPEND RUST_CAPI_BUILD_ENV
+                PKG_CONFIG_PATH=${RUST_CONDA_PREFIX}/Library/lib/pkgconfig
+                GDAL_DYNAMIC=1
+            )
+        endif()
     endif()
     add_custom_command(
         OUTPUT ${RUST_CAPI_LIB}
