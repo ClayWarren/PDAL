@@ -132,6 +132,13 @@ macro(pdal_link_rust_capi _target)
     if (APPLE)
         target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
     endif()
+    if (MSVC)
+        target_link_libraries(${_target}
+            PRIVATE
+                userenv
+                ntdll
+        )
+    endif()
     if (NITRO_FOUND AND NOT MSVC AND NITRO_LIBRARIES)
         target_link_libraries(${_target}
             PRIVATE
