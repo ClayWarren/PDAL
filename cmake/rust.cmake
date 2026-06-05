@@ -4,7 +4,11 @@
 
 set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
-set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
+if(MSVC)
+    set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/pdal_capi.lib")
+else()
+    set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
+endif()
 
 file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
     "${RUST_CAPI_DIR}/Cargo.toml"
@@ -29,10 +33,10 @@ if(NOT CARGO_EXECUTABLE)
     message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
 endif()
 
-# Build libpdal_capi.a with cargo and make the given PDAL library target depend
-# on it. Call once, after the library target exists (the archive is then linked
-# in alongside the other C++ dependencies). Keeping the cargo invocation here
-# groups it with the cargo discovery and source globbing above.
+# Build the pdal-capi static library with cargo and make the given PDAL library
+# target depend on it. Call once, after the library target exists (the archive is
+# then linked in alongside the other C++ dependencies). Keeping the cargo
+# invocation here groups it with the cargo discovery and source globbing above.
 macro(pdal_build_rust_capi _pdal_target)
     set(RUST_CAPI_BUILD_ENV
         MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
@@ -96,7 +100,7 @@ endif()
 # Link a target against the Rust C ABI archive and the native libraries that
 # archive embeds: GEOS (via the `geos` crate), the Nitro NITF bridge, and
 # CoreFoundation on Apple. Use this for every target that links
-# libpdal_capi.a directly -- the main pdalcpp library and the standalone
+# pdal-capi archive directly -- the main pdalcpp library and the standalone
 # Rust-backed tools (lasdump, nitfwrap) -- so the Nitro/GEOS link details live
 # here instead of being repeated at each call site. The archive is listed
 # first so its references resolve against the native libraries that follow.
