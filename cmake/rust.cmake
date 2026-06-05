@@ -240,6 +240,16 @@ if(MSVC)
         "/EXPORT:pdal_writer_destroy"
         "/EXPORT:pdal_writer_write_view"
     )
+    set(RUST_CAPI_MSVC_DEF_FILE
+        "${CMAKE_CURRENT_BINARY_DIR}/pdal_rust_capi_exports.def")
+    file(WRITE "${RUST_CAPI_MSVC_DEF_FILE}" "EXPORTS\n")
+    foreach(_rust_capi_export IN LISTS RUST_CAPI_MSVC_EXPORTS)
+        string(REGEX REPLACE "^/EXPORT:" "" _rust_capi_export_name
+            "${_rust_capi_export}")
+        file(APPEND "${RUST_CAPI_MSVC_DEF_FILE}"
+            "    ${_rust_capi_export_name}\n")
+    endforeach()
+    set(RUST_CAPI_MSVC_EXPORT_OPTIONS "/DEF:${RUST_CAPI_MSVC_DEF_FILE}")
 else()
     set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
 endif()
@@ -378,7 +388,7 @@ macro(pdal_link_rust_capi _target)
         if (_target_type STREQUAL "SHARED_LIBRARY")
             target_link_options(${_target}
                 PRIVATE
-                    ${RUST_CAPI_MSVC_EXPORTS}
+                    ${RUST_CAPI_MSVC_EXPORT_OPTIONS}
             )
         endif()
         target_link_libraries(${_target}
