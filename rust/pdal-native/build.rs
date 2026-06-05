@@ -51,6 +51,7 @@ fn main() {
         .compile("pdal_native_geotiff_bridge");
 
     println!("cargo:rustc-link-search=native={}", lib.display());
+    link_gdal(&lib);
     link_geotiff(&lib);
     link_library(
         &lib,
@@ -88,6 +89,10 @@ fn main() {
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-arg=-Wl,-rpath-link,{}", lib.display());
     }
+    if cfg!(target_env = "msvc") {
+        println!("cargo:rustc-link-lib=ole32");
+        println!("cargo:rustc-link-lib=shell32");
+    }
     println!("cargo:rerun-if-env-changed=CONDA_PREFIX");
     println!("cargo:rerun-if-changed=src/geotiff_bridge.cpp");
     if nitf_enabled {
@@ -103,10 +108,24 @@ fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
 }
 
 fn link_geotiff(lib: &Path) {
-    if cfg!(target_os = "windows") && lib.join("geotiff_i.lib").exists() {
-        println!("cargo:rustc-link-lib=geotiff_i");
+    if cfg!(target_os = "windows") {
+        link_existing_windows_libraries(lib, &["geotiff_i", "geotiff"]);
     } else {
         println!("cargo:rustc-link-lib=geotiff");
+    }
+}
+
+fn link_gdal(lib: &Path) {
+    if cfg!(target_os = "windows") {
+        link_existing_windows_libraries(lib, &["gdal_i", "gdal"]);
+    }
+}
+
+fn link_existing_windows_libraries(lib: &Path, names: &[&str]) {
+    for name in names {
+        if lib.join(format!("{name}.lib")).exists() {
+            println!("cargo:rustc-link-lib={name}");
+        }
     }
 }
 
