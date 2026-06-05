@@ -1118,6 +1118,7 @@ dependencies = [
  "cc",
  "gdal-sys",
  "geos",
+ "link-cplusplus",
  "proj",
  "proj-sys",
  "serde_json",

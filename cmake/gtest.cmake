@@ -4,8 +4,10 @@ if (MSVC)
     option(gtest_force_shared_crt "Always use shared Visual C++ run-time DLL" ON)
 endif()
 
-     include_directories(${ROOT_DIR}/vendor/gtest/include
-      ${ROOT_DIR}/vendor/gtest)
+include_directories(BEFORE
+    ${ROOT_DIR}/vendor/gtest/include
+    ${ROOT_DIR}/vendor/gtest
+)
 
 set(GOOGLETEST_VERSION 1.12.1)
 add_subdirectory(vendor/gtest)
