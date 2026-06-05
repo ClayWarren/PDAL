@@ -6,6 +6,27 @@ set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
 if(MSVC)
     set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/pdal_capi.lib")
+    set(RUST_CAPI_MSVC_EXPORTS
+        "/EXPORT:pdal_clear_error"
+        "/EXPORT:pdal_dimension_fix_name"
+        "/EXPORT:pdal_dimension_interpretation_name"
+        "/EXPORT:pdal_dimension_resolve_type"
+        "/EXPORT:pdal_dimension_type_from_base_and_size"
+        "/EXPORT:pdal_dimension_type_from_name"
+        "/EXPORT:pdal_last_error"
+        "/EXPORT:pdal_metadata_json_value"
+        "/EXPORT:pdal_runtime_plugin_description"
+        "/EXPORT:pdal_runtime_plugin_has"
+        "/EXPORT:pdal_runtime_plugin_link"
+        "/EXPORT:pdal_runtime_plugin_lookup_creator"
+        "/EXPORT:pdal_runtime_plugin_names_json"
+        "/EXPORT:pdal_runtime_plugin_register"
+        "/EXPORT:pdal_string_free"
+        "/EXPORT:pdal_uuid_is_null"
+        "/EXPORT:pdal_uuid_parse"
+        "/EXPORT:pdal_uuid_random"
+        "/EXPORT:pdal_uuid_unparse"
+    )
 else()
     set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
 endif()
@@ -135,11 +156,11 @@ macro(pdal_link_rust_capi _target)
     if (MSVC)
         get_target_property(_target_type ${_target} TYPE)
         if (_target_type STREQUAL "SHARED_LIBRARY")
-            set_target_properties(${_target}
-                PROPERTIES
-                    WINDOWS_EXPORT_ALL_SYMBOLS ON
+            target_link_options(${_target}
+                PRIVATE
+                    "/WHOLEARCHIVE:${RUST_CAPI_LIB}"
+                    ${RUST_CAPI_MSVC_EXPORTS}
             )
-            target_link_options(${_target} PRIVATE "/WHOLEARCHIVE:${RUST_CAPI_LIB}")
         endif()
         target_link_libraries(${_target}
             PRIVATE

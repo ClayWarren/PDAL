@@ -238,6 +238,7 @@ fn reader_and_writer_constructors_cover_supported_driver_handles() {
             pdal_reader_create_gdal(options),
             pdal_reader_create_las(options),
             pdal_reader_create_laz(options),
+            #[cfg(feature = "spz")]
             pdal_reader_create_spz(options),
             pdal_reader_create_stac(options),
             pdal_reader_create_copc(options),
@@ -259,6 +260,7 @@ fn reader_and_writer_constructors_cover_supported_driver_handles() {
             pdal_writer_create_sbet(options),
             pdal_writer_create_las(options),
             pdal_writer_create_laz(options),
+            #[cfg(feature = "spz")]
             pdal_writer_create_spz(options),
             pdal_writer_create_ogr(options),
             pdal_writer_create_gdal(options),
@@ -860,6 +862,7 @@ fn las_reader_preserves_extrabytes_through_c_abi() {
     }
 }
 
+#[cfg(feature = "spz")]
 #[test]
 fn spz_reader_returns_points_through_c_abi() {
     unsafe {

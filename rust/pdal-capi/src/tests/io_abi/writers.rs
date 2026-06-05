@@ -412,6 +412,7 @@ fn las_detect_copc_matches_fixture_signature() {
     }
 }
 
+#[cfg(feature = "spz")]
 #[test]
 fn spz_writer_writes_view_through_c_abi() {
     unsafe {
