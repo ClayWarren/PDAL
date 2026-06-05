@@ -75,6 +75,8 @@ macro(pdal_build_rust_capi _pdal_target)
 endmacro()
 
 find_library(GEOS_C_LIBRARY NAMES geos_c)
+find_library(SQLITE3_LIBRARY NAMES sqlite3)
+find_package(SQLite3 QUIET)
 
 # When Nitro is available, the Rust pdal-native crate builds a NITF bridge
 # (used by tools.nitfwrap, readers.nitf, and writers.nitf). The conda-forge
@@ -111,6 +113,22 @@ macro(pdal_link_rust_capi _target)
             ${RUST_CAPI_LIB}
             ${GEOS_C_LIBRARY}
     )
+    if (TARGET SQLite3::SQLite3)
+        target_link_libraries(${_target}
+            PRIVATE
+                SQLite3::SQLite3
+        )
+    elseif (TARGET SQLite::SQLite3)
+        target_link_libraries(${_target}
+            PRIVATE
+                SQLite::SQLite3
+        )
+    elseif (SQLITE3_LIBRARY)
+        target_link_libraries(${_target}
+            PRIVATE
+                ${SQLITE3_LIBRARY}
+        )
+    endif()
     if (APPLE)
         target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
     endif()
