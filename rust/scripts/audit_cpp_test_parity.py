@@ -871,10 +871,47 @@ def git(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[s
     )
 
 
+def fetch_ref_for_shallow_checkout(ref: str) -> None:
+    fetch_ref = ref
+    depth = "1"
+    if ref.endswith("^"):
+        fetch_ref = ref[:-1]
+        depth = "2"
+    elif "^" in ref:
+        fetch_ref = ref.split("^", 1)[0]
+        depth = "2"
+
+    if not fetch_ref:
+        return
+    git(["fetch", "--quiet", f"--depth={depth}", "origin", fetch_ref], check=False)
+    exists = git(["rev-parse", "--verify", "--quiet", ref], check=False)
+    if exists.returncode == 0:
+        return
+
+    branch_candidates = [
+        os.environ.get("GITHUB_HEAD_REF", ""),
+        os.environ.get("GITHUB_REF_NAME", ""),
+        git(["rev-parse", "--abbrev-ref", "HEAD"], check=False).stdout.strip(),
+    ]
+    for branch in branch_candidates:
+        if not branch or branch == "HEAD" or branch.startswith("refs/"):
+            continue
+        git(["fetch", "--quiet", "--depth=3000", "origin", branch], check=False)
+        exists = git(["rev-parse", "--verify", "--quiet", ref], check=False)
+        if exists.returncode == 0:
+            return
+
+
 def baseline_tests(ref: str) -> set[str]:
     exists = git(["rev-parse", "--verify", "--quiet", ref], check=False)
     if exists.returncode != 0:
-        raise SystemExit(f"baseline ref not found: {ref}")
+        fetch_ref_for_shallow_checkout(ref)
+        exists = git(["rev-parse", "--verify", "--quiet", ref], check=False)
+    if exists.returncode != 0:
+        raise SystemExit(
+            f"baseline ref not found: {ref}. Pass --include-added-tests to "
+            "audit every currently built C++ GoogleTest case instead."
+        )
 
     listed = git(["ls-tree", "-r", "--name-only", ref, "test"]).stdout
     tests: set[str] = set()
