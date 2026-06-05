@@ -153,12 +153,18 @@ macro(pdal_link_rust_capi _target)
     if (APPLE)
         target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
     endif()
+    if (UNIX AND NOT APPLE)
+        target_link_libraries(${_target}
+            PRIVATE
+                pthread
+        )
+        target_link_options(${_target} PRIVATE "-pthread")
+    endif()
     if (MSVC)
         get_target_property(_target_type ${_target} TYPE)
         if (_target_type STREQUAL "SHARED_LIBRARY")
             target_link_options(${_target}
                 PRIVATE
-                    "/WHOLEARCHIVE:${RUST_CAPI_LIB}"
                     ${RUST_CAPI_MSVC_EXPORTS}
             )
         endif()
