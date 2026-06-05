@@ -11,6 +11,10 @@ include_directories(BEFORE
 
 set(GOOGLETEST_VERSION 1.12.1)
 add_subdirectory(vendor/gtest)
+target_include_directories(gtest BEFORE PUBLIC
+    ${ROOT_DIR}/vendor/gtest/include
+    ${ROOT_DIR}/vendor/gtest
+)
 
 set(FPHSA_NAME_MISMATCHED 1) # Suppress warnings, see https://cmake.org/cmake/help/v3.17/module/FindPackageHandleStandardArgs.html
 

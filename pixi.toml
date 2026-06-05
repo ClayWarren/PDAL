@@ -31,6 +31,35 @@ geotiff = ">=1.7.4,<2"
 [feature.dev.target.linux-aarch64.dependencies]
 libxml2 = ">=2.13,<2.14"
 
+[feature.dev.target.linux-aarch64.tasks]
+configure = { cmd = [ "cmake",
+    "-G", "Ninja",
+    "-S", ".",
+    "-B", ".build",
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+    "-DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX",
+    "-DWITH_TESTS=ON",
+    "-DCMAKE_VERBOSE_MAKEFILE=OFF",
+    "-DCMAKE_LIBRARY_PATH:FILEPATH=$CONDA_PREFIX/Library/lib",
+    "-DCMAKE_INCLUDE_PATH:FILEPATH=$CONDA_PREFIX/Library/include",
+    "-DOPENSSL_ROOT_DIR=$CONDA_PREFIX/Library",
+    "-DBUILD_PLUGIN_CPD=OFF",
+    "-DBUILD_PLUGIN_ICEBRIDGE=ON",
+    "-DBUILD_PLUGIN_HDF=ON",
+    "-DBUILD_PLUGIN_ARROW=ON",
+    "-DBUILD_PLUGIN_TILEDB=OFF",
+    "-DBUILD_PLUGIN_NITF=ON",
+    "-DBUILD_PLUGIN_TRAJECTORY=ON",
+    "-DBUILD_PLUGIN_PGPOINTCLOUD=ON",
+    "-DBUILD_PLUGIN_DRACO=ON",
+    "-DBUILD_PLUGIN_RIVLIB=OFF",
+    "-DENABLE_CTEST=OFF",
+    "-DWITH_LZMA=OFF",
+    "-DHDF5_DIR:FILEPATH=$CONDA_PREFIX/Library/cmake",
+    "-DWITH_ZLIB=ON",
+    "-Dgtest_force_shared_crt=ON",
+    "-DBUILD_PGPOINTCLOUD_TESTS=OFF" ] }
+
 [feature.doc.dependencies]
 jupyter-book = ">=1.0.3,<2"
 sphinx-notfound-page = ">=1.0.4,<2"
