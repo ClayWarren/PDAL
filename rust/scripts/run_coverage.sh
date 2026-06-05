@@ -40,12 +40,23 @@ if ((${#cov_args[@]} == 0)); then
 fi
 test_args+=(--test-threads=1)
 
+# The native adapter crate exercises GDAL/PROJ/libgeotiff directly. It is
+# already covered by the regular Rust test gate; running it under llvm-cov can
+# crash at native-library teardown on CI. Keep it tested, but out of coverage.
+cargo test \
+    --manifest-path rust/Cargo.toml \
+    -p pdal-native \
+    --no-default-features \
+    -- "${test_args[@]}"
+
 # Pass 1: Run standard tests
 cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \
     --all-targets \
+    --no-default-features \
     --exclude-from-report pdal-capi \
+    --exclude pdal-native \
     --no-report \
     -- "${test_args[@]}"
 
@@ -57,7 +68,9 @@ if ! command -v pdal >/dev/null 2>&1; then
         --manifest-path rust/Cargo.toml \
         --workspace \
         --all-targets \
+        --no-default-features \
         --exclude-from-report pdal-capi \
+        --exclude pdal-native \
         --no-clean \
         "${cov_args[@]}"
 fi
@@ -66,7 +79,9 @@ exec cargo llvm-cov \
     --manifest-path rust/Cargo.toml \
     --workspace \
     --all-targets \
+    --no-default-features \
     --exclude-from-report pdal-capi \
+    --exclude pdal-native \
     --no-clean \
     --ignore-run-fail \
     "${cov_args[@]}" \

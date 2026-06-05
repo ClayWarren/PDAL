@@ -44,7 +44,7 @@ fn main() {
         .compile("pdal_native_geotiff_bridge");
 
     println!("cargo:rustc-link-search=native={}", lib.display());
-    println!("cargo:rustc-link-lib=geotiff");
+    link_geotiff(&lib);
     link_library(
         &lib,
         &out_dir,
@@ -92,6 +92,14 @@ fn copy_runtime_library(lib: &Path, out_dir: &Path, name: &str) {
     let src = lib.join(name);
     if src.exists() {
         let _ = fs::copy(src, out_dir.join(name));
+    }
+}
+
+fn link_geotiff(lib: &Path) {
+    if cfg!(target_os = "windows") && lib.join("geotiff_i.lib").exists() {
+        println!("cargo:rustc-link-lib=geotiff_i");
+    } else {
+        println!("cargo:rustc-link-lib=geotiff");
     }
 }
 

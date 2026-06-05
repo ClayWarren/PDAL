@@ -4,11 +4,13 @@ fn bin() -> String {
     env!("CARGO_BIN_EXE_pdal-rs").to_string()
 }
 
+#[cfg(feature = "nitf")]
 fn repo() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
 #[test]
+#[cfg(feature = "nitf")]
 fn nitfwrap_wraps_and_unwraps_las() {
     let temp = tempfile::tempdir().unwrap();
     let input = repo().join("test/data/las/simple.las");
@@ -35,6 +37,7 @@ fn nitfwrap_wraps_and_unwraps_las() {
 }
 
 #[test]
+#[cfg(feature = "nitf")]
 fn nitfwrap_unwraps_existing_fixture() {
     let temp = tempfile::tempdir().unwrap();
     let input = repo().join("test/data/nitf/autzen-utm10.ntf");
@@ -57,6 +60,7 @@ fn nitfwrap_unwraps_existing_fixture() {
 }
 
 #[test]
+#[cfg(feature = "nitf")]
 fn nitfwrap_supports_output_option() {
     let temp = tempfile::tempdir().unwrap();
     let input = repo().join("test/data/las/simple.las");

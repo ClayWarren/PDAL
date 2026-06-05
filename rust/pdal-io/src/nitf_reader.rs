@@ -96,7 +96,7 @@ impl Reader for NitfReader {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "nitf"))]
 mod tests {
     use super::*;
     use pdal_core::point::DimId;

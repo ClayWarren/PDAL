@@ -275,7 +275,7 @@ impl Writer for NitfWriter {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "nitf"))]
 mod tests {
     use super::*;
     use crate::las::LasReader;

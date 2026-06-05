@@ -4,17 +4,21 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = ["nitf"]
+nitf = ["pdal-capi/nitf", "pdal-io/nitf", "pdal-native/nitf"]
+
 [[bin]]
 name = "pdal-rs"
 path = "src/main.rs"
 
 [dependencies]
-pdal-capi = { path = "../pdal-capi" }
+pdal-capi = { path = "../pdal-capi", default-features = false }
 pdal-core = { path = "../pdal-core" }
 pdal-filters = { path = "../pdal-filters" }
-pdal-io = { path = "../pdal-io" }
+pdal-io = { path = "../pdal-io", default-features = false }
 pdal-kernels = { path = "../pdal-kernels" }
-pdal-native = { path = "../pdal-native" }
+pdal-native = { path = "../pdal-native", default-features = false }
 glob = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -216,6 +216,11 @@ void addOption(pdal_options_t* options, const std::string& key,
     pdal_options_add_str(options, key.c_str(), value.c_str());
 }
 
+void addOption(pdal_options_t* options, const std::string& key, double value)
+{
+    pdal_options_add_f64(options, key.c_str(), value);
+}
+
 std::string boundsOption(const SrsBounds& bounds)
 {
     if (bounds.to3d().valid())
@@ -698,8 +703,7 @@ QuickInfo CopcReader::inspect()
         if (!bounds.empty())
             addOption(options, "bounds", bounds);
         if (m_args->resolution > 0)
-            addOption(options, "resolution",
-                      std::to_string(m_args->resolution));
+            addOption(options, "resolution", m_args->resolution);
 
         uint64_t count = 0;
         double bbox[6] = {0, 0, 0, 0, 0, 0};
@@ -799,8 +803,7 @@ void CopcReader::ready(PointTableRef table)
         if (!bounds.empty())
             addOption(options, "bounds", bounds);
         if (m_args->resolution > 0)
-            addOption(options, "resolution",
-                      std::to_string(m_args->resolution));
+            addOption(options, "resolution", m_args->resolution);
         for (const Polygon& poly : m_args->polys)
         {
             addOption(options, "polygon", poly.wkt(20));

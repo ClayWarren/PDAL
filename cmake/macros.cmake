@@ -205,6 +205,8 @@ macro(PDAL_ADD_TEST _name)
         $<TARGET_OBJECTS:${PDAL_TEST_SUPPORT_OBJS}>)
     pdal_target_compile_settings(${_name})
     target_include_directories(${_name} PRIVATE
+        ${ROOT_DIR}/vendor/gtest/include
+        ${ROOT_DIR}/vendor/gtest
         ${ROOT_DIR}
         ${PDAL_INCLUDE_DIR}
         ${PDAL_ADD_TEST_INCLUDES}

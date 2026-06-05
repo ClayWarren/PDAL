@@ -181,11 +181,13 @@ impl WrappedKind {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "nitf")]
     fn repo() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
     }
 
     #[test]
+    #[cfg(feature = "nitf")]
     fn unwraps_existing_nitf_fixture() {
         let temp = tempfile::tempdir().unwrap();
         let output = temp.path().join("autzen.las");
@@ -202,6 +204,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "nitf")]
     fn wraps_and_unwraps_las() {
         let temp = tempfile::tempdir().unwrap();
         let input = repo().join("test/data/las/simple.las");
@@ -215,6 +218,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "nitf")]
     fn uses_default_output_names() {
         let temp = tempfile::tempdir().unwrap();
         let input = temp.path().join("simple.las");
@@ -234,6 +238,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "nitf")]
     fn wraps_and_unwraps_bpf() {
         let temp = tempfile::tempdir().unwrap();
         let input = repo().join("test/data/bpf/autzen-dd.bpf");
