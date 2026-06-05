@@ -53,6 +53,8 @@ if(MSVC)
         "/EXPORT:pdal_spatial_reference_create_with_epoch"
         "/EXPORT:pdal_spatial_reference_destroy"
         "/EXPORT:pdal_string_free"
+        "/EXPORT:pdal_support_diff_files"
+        "/EXPORT:pdal_support_diff_text_files"
         "/EXPORT:pdal_uuid_is_null"
         "/EXPORT:pdal_uuid_parse"
         "/EXPORT:pdal_uuid_random"
