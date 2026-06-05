@@ -9,7 +9,9 @@ byte-for-byte contracts from semantic contracts:
     point payloads after both outputs are read by the same binary.
 
 Defaults:
-  --ref  = Homebrew /opt/homebrew/bin/pdal when available, otherwise PATH pdal
+  --ref  = Homebrew /opt/homebrew/bin/pdal when available, otherwise PATH pdal.
+           If no reference binary is found, the check is skipped unless
+           --ref or --require-ref is passed.
   --rust = .build/bin/pdal, otherwise build/bin/pdal
 """
 
@@ -798,8 +800,13 @@ def case_tindex_command_semantic(ref: str, rust: str, tmp: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ref", default=find_default_reference_pdal())
+    parser.add_argument("--ref")
     parser.add_argument("--rust", default=find_default_rust_pdal())
+    parser.add_argument(
+        "--require-ref",
+        action="store_true",
+        help="Fail when no reference PDAL binary is available.",
+    )
     parser.add_argument(
         "--json-report",
         type=Path,
@@ -808,9 +815,13 @@ def main() -> int:
     parser.add_argument("--keep-temp", action="store_true")
     args = parser.parse_args()
 
-    ref = resolve_binary(args.ref)
+    ref_source = args.ref if args.ref is not None else find_default_reference_pdal()
+    ref = resolve_binary(ref_source)
     rust = resolve_binary(args.rust)
     if not ref:
+        if args.ref is None and not args.require_ref:
+            print("reference pdal not found; skipping workflow parity (pass --ref or --require-ref to enforce)")
+            return 0
         print("error: reference pdal not found (pass --ref)", file=sys.stderr)
         return 2
     if not rust:
