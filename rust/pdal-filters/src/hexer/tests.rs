@@ -91,17 +91,24 @@ fn single_dense_hex_produces_one_root_polygon() {
 }
 
 #[test]
-fn fixed_origin_bins_tindex_square_into_three_hexes() {
-    let mut grid = HexGrid::with_height(SQRT_3, 1);
-    grid.set_origin(0.0, 0.0);
-    for (x, y) in [(1.0, 1.0), (1.0, 2.0), (2.0, 1.0), (2.0, 2.0)] {
-        grid.add_xy(x, y);
-    }
+fn fixed_origin_bins_shifted_tindex_squares_into_three_hexes() {
+    for shift in [1.0, 2.0, 3.0] {
+        let mut grid = HexGrid::with_height(SQRT_3, 1);
+        grid.set_origin(shift - 1.0, shift - 1.0);
+        for (x, y) in [
+            (shift, shift),
+            (shift, shift + 1.0),
+            (shift + 1.0, shift),
+            (shift + 1.0, shift + 1.0),
+        ] {
+            grid.add_xy(x, y);
+        }
 
-    assert_eq!(grid.counts().len(), 3);
-    assert!(grid.is_dense(HexId::new(0, 0)));
-    assert!(grid.is_dense(HexId::new(0, 1)));
-    assert!(grid.is_dense(HexId::new(1, 0)));
+        assert_eq!(grid.counts().len(), 3);
+        assert!(grid.is_dense(HexId::new(0, 0)));
+        assert!(grid.is_dense(HexId::new(0, 1)));
+        assert!(grid.is_dense(HexId::new(1, 0)));
+    }
 }
 
 #[test]

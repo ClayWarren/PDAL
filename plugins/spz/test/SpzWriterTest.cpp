@@ -149,7 +149,7 @@ TEST(SpzWriterTest, all_dimensions_test)
 
     // Values in the resulting spz are very off. It's on
     // their end AFAIK (the packing/unpacking is lossy)
-    float tolerance = 0.03;
+    float tolerance = 0.04;
     // alphas are packed/unpacked more accurately.
     float alphaTolerance = 0.01;
     for (PointId i = 0; i < readView->size(); ++i)

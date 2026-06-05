@@ -185,7 +185,7 @@ fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
     let location = tindex_location(file, args.write_absolute_path)?;
 
     let boundary_wkt = if args.rich_boundary_options && args.boundary.exact() {
-        compute_exact_boundary(file, &args.boundary)?
+        compute_exact_boundary(file, &args.boundary, minx, miny)?
     } else {
         None
     };
@@ -205,7 +205,12 @@ fn create_entry(file: &str, args: &CreateArgs) -> Result<Entry, ()> {
 /// then run it through GEOS topology-preserving simplification when smoothing
 /// is enabled (matching `pdal::Polygon::simplify`). Returns `Ok(None)` if the
 /// file has too few points to populate at least one dense hex cell.
-fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<String>, ()> {
+fn compute_exact_boundary(
+    file: &str,
+    opts: &BoundaryOptions,
+    minx: f64,
+    miny: f64,
+) -> Result<Option<String>, ()> {
     let Some(driver) = infer_reader_driver(file) else {
         eprintln!("PDAL: kernels.tindex: unable to infer reader driver for '{file}'.");
         return Err(());
@@ -214,11 +219,11 @@ fn compute_exact_boundary(file: &str, opts: &BoundaryOptions) -> Result<Option<S
         "type": "filters.hexbin",
         "threshold": opts.density,
         "sample_size": opts.sample_size,
-        "origin_x": 0.0,
-        "origin_y": 0.0,
     });
     if opts.edge_length > 0.0 {
         hexbin_stage["edge_length"] = serde_json::json!(opts.edge_length);
+        hexbin_stage["origin_x"] = serde_json::json!(minx - opts.edge_length);
+        hexbin_stage["origin_y"] = serde_json::json!(miny - opts.edge_length);
     }
     if let Some(where_expr) = &opts.where_expr {
         hexbin_stage["where"] = serde_json::json!(where_expr);

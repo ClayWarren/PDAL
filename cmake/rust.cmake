@@ -58,13 +58,14 @@ endmacro()
 find_library(GEOS_C_LIBRARY NAMES geos_c)
 
 # When Nitro is available, the Rust pdal-native crate builds a NITF bridge
-# (used by tools.nitfwrap, readers.nitf, and writers.nitf). pdalcpp embeds
-# libpdal_capi.a so it inherits those Nitro symbol references and must link the
-# same native libraries. Locate them without polluting the global include path
-# (nitro.cmake calls include_directories which would shadow
-# vendor/nlohmann/json.hpp with a stale copy from the pixi env).
+# (used by tools.nitfwrap, readers.nitf, and writers.nitf). The conda-forge
+# Nitro headers still include POSIX headers on MSVC, so keep that bridge off for
+# the MSVC build until the native shim has a Windows-compatible include path.
+# Locate Nitro without polluting the global include path (nitro.cmake calls
+# include_directories which would shadow vendor/nlohmann/json.hpp with a stale
+# copy from the pixi env).
 find_package(Nitro 2.6 QUIET MODULE)
-if (NITRO_FOUND)
+if (NITRO_FOUND AND NOT MSVC)
     set(RUST_CAPI_FEATURE_ARGS "--features" "nitf")
 else()
     set(RUST_CAPI_FEATURE_ARGS "--no-default-features")
@@ -94,7 +95,7 @@ macro(pdal_link_rust_capi _target)
     if (APPLE)
         target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
     endif()
-    if (NITRO_FOUND AND NITRO_LIBRARIES)
+    if (NITRO_FOUND AND NOT MSVC AND NITRO_LIBRARIES)
         target_link_libraries(${_target}
             PRIVATE
                 ${NITRO_LIBRARIES}
