@@ -42,6 +42,7 @@ pub mod shift_reader;
 pub mod slpk;
 pub mod smrmsg;
 pub mod source;
+#[cfg(feature = "spz")]
 pub mod spz;
 pub mod stac;
 pub mod terrasolid;

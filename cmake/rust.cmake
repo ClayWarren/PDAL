@@ -133,6 +133,14 @@ macro(pdal_link_rust_capi _target)
         target_link_options(${_target} PRIVATE "SHELL:-framework CoreFoundation")
     endif()
     if (MSVC)
+        get_target_property(_target_type ${_target} TYPE)
+        if (_target_type STREQUAL "SHARED_LIBRARY")
+            set_target_properties(${_target}
+                PROPERTIES
+                    WINDOWS_EXPORT_ALL_SYMBOLS ON
+            )
+            target_link_options(${_target} PRIVATE "/WHOLEARCHIVE:${RUST_CAPI_LIB}")
+        endif()
         target_link_libraries(${_target}
             PRIVATE
                 userenv

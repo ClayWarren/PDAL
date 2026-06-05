@@ -184,10 +184,17 @@ pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut Wr
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_writer_create_spz(ops: *const Options) -> *mut WriterHandle {
+    #[cfg(feature = "spz")]
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::spz::SpzWriter::new(options));
         Box::into_raw(Box::new(WriterHandle { writer }))
     } else {
+        std::ptr::null_mut()
+    }
+    #[cfg(not(feature = "spz"))]
+    {
+        let _ = ops;
+        crate::error::set_last_error("writers.spz is not enabled in this Rust C ABI build.");
         std::ptr::null_mut()
     }
 }

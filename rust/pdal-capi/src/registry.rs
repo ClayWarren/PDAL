@@ -36,6 +36,7 @@ pub const READER_DRIVERS: &[&str] = &[
     "readers.laz",
     "readers.nitf",
     "readers.ply",
+    #[cfg(feature = "spz")]
     "readers.spz",
     "readers.stac",
     "readers.tindex",
@@ -136,6 +137,7 @@ pub const WRITER_DRIVERS: &[&str] = &[
     "writers.ogr",
     "writers.gdal",
     "writers.raster",
+    #[cfg(feature = "spz")]
     "writers.spz",
 ];
 
@@ -171,6 +173,7 @@ pub fn create_reader(name: &str, options: &Options) -> Result<Box<dyn Reader>, S
         "readers.nitf" => Ok(Box::new(pdal_io::nitf_reader::NitfReader::new(options))),
         "readers.ept" => Ok(Box::new(pdal_io::ept::EptReader::new(options))),
         "readers.ply" => Ok(Box::new(pdal_io::ply::PlyReader::new(options))),
+        #[cfg(feature = "spz")]
         "readers.spz" => Ok(Box::new(pdal_io::spz::SpzReader::new(options))),
         "readers.stac" => Ok(Box::new(pdal_io::stac::StacReader::new(options))),
         "readers.tindex" => Ok(Box::new(pdal_io::tindex::TindexReader::new(options))),
@@ -218,6 +221,7 @@ pub fn create_writer(name: &str, options: &Options) -> Result<Box<dyn Writer>, S
         "writers.ogr" => Ok(Box::new(pdal_io::ogr_writer::OgrWriter::new(options))),
         "writers.gdal" => Ok(Box::new(pdal_io::gdal_writer::GdalWriter::new(options))),
         "writers.raster" => Ok(Box::new(pdal_io::raster_writer::RasterWriter::new(options))),
+        #[cfg(feature = "spz")]
         "writers.spz" => Ok(Box::new(pdal_io::spz::SpzWriter::new(options))),
         _ => Err(StageError(format!(
             "Writer driver '{name}' is not available in the Rust port."

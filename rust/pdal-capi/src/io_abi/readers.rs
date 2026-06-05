@@ -391,10 +391,17 @@ pub unsafe extern "C" fn pdal_reader_create_laz(ops: *const Options) -> *mut Rea
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 #[no_mangle]
 pub unsafe extern "C" fn pdal_reader_create_spz(ops: *const Options) -> *mut ReaderHandle {
+    #[cfg(feature = "spz")]
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::spz::SpzReader::new(options));
         Box::into_raw(Box::new(ReaderHandle { reader }))
     } else {
+        std::ptr::null_mut()
+    }
+    #[cfg(not(feature = "spz"))]
+    {
+        let _ = ops;
+        crate::error::set_last_error("readers.spz is not enabled in this Rust C ABI build.");
         std::ptr::null_mut()
     }
 }

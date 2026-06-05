@@ -9,8 +9,9 @@ description = "C ABI for PDAL Rust port spike."
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
-default = ["nitf"]
+default = ["nitf", "spz"]
 nitf = ["pdal-io/nitf", "pdal-native/nitf"]
+spz = ["pdal-io/spz"]
 
 [dependencies]
 chrono = "0.4.44"
