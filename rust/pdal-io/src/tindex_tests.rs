@@ -427,6 +427,10 @@ fn bounds_filter_rejects_unsupported_geometry() {
 }
 
 #[test]
+#[cfg_attr(
+    all(target_os = "linux", target_arch = "aarch64"),
+    ignore = "PROJ/GDAL reprojection segfaults under llvm-cov on Linux ARM"
+)]
 fn target_srs_reprojects_indexed_views() {
     let mut layout = PointLayout::new();
     layout.register(DimId::X, DimType::F64);

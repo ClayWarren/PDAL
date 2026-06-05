@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include <deque>
 #include <functional>
 #include <limits>
 #include <mutex>

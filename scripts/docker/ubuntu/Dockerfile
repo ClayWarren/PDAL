@@ -27,7 +27,7 @@ RUN git clone "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" pdal && \
 
 RUN mkdir -p pdal/build && \
     cd pdal/build  && \
-    CXXFLAGS="-Werror=strict-aliasing" LDFLAGS="-Wl,-rpath-link,$CONDA_PREFIX/lib" cmake -G Ninja  \
+    CXXFLAGS="-I/pdal/pdal/vendor/gtest/include -I/pdal/pdal/vendor/gtest -Werror=strict-aliasing" LDFLAGS="-Wl,-rpath-link,$CONDA_PREFIX/lib" cmake -G Ninja  \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH:FILEPATH="$CONDA_PREFIX/lib" \
     -DCMAKE_INSTALL_PREFIX="$CONDA_PREFIX" \

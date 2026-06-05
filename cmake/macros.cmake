@@ -163,7 +163,7 @@ macro(PDAL_ADD_PLUGIN _name _type _shortname)
         if(TARGET ${_include})
             target_include_directories(${${_name}} PRIVATE $<TARGET_PROPERTY:${_include},INTERFACE_INCLUDE_DIRECTORIES>)
         else()
-            target_include_directories(${${_name}} PRIVATE "${include}")
+            target_include_directories(${${_name}} PRIVATE "${_include}")
         endif()
     endforeach()
 
