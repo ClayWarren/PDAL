@@ -23,6 +23,11 @@ target_link_libraries(${PDAL_TEST_SUPPORT_OBJS}
         GTest::gtest
 )
 target_include_directories(${PDAL_TEST_SUPPORT_OBJS}
+    BEFORE PRIVATE
+        ${ROOT_DIR}/vendor/gtest/include
+        ${ROOT_DIR}/vendor/gtest
+)
+target_include_directories(${PDAL_TEST_SUPPORT_OBJS}
     PRIVATE
         ${ROOT_DIR}
         ${PROJECT_BINARY_DIR}/include

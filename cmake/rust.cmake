@@ -40,6 +40,7 @@ macro(pdal_build_rust_capi _pdal_target)
     if (MSVC)
         list(APPEND RUST_CAPI_BUILD_ENV
             CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=${CMAKE_LINKER}
+            CXXSTDLIB=
         )
     endif()
     add_custom_command(
