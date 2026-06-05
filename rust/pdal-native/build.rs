@@ -22,6 +22,13 @@ fn main() {
     };
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
 
+    if cfg!(target_env = "msvc") {
+        // Some geospatial dependency metadata still names the GNU C++ runtime
+        // even though the MSVC target links the MSVC runtime. Provide an empty
+        // import library so the explicit linker input resolves.
+        cc::Build::new().file("src/msvc_empty.c").compile("stdc++");
+    }
+
     if nitf_enabled {
         let nitro_cpp_include = nitro_cpp_include(&include, &out_dir);
         cc::Build::new()
