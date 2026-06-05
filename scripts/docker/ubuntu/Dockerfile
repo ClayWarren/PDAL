@@ -19,7 +19,8 @@ RUN mamba install -y \
     conda-pack \
     python=${PYTHON_VERSION} pip numpy scikit-build-core pybind11 \
     && \
-    mamba install -y libpdal --only-deps
+    mamba install -y libpdal --only-deps && \
+    rm -rf "$CONDA_PREFIX/include/gtest" "$CONDA_PREFIX/include/gmock"
 
 RUN git clone "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" pdal && \
     cd pdal ; \

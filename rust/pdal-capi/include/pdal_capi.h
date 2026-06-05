@@ -13,6 +13,18 @@
     ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                                \
      (PDAL_CAPI_ABI_VERSION_MINOR * 1000u) + PDAL_CAPI_ABI_VERSION_PATCH)
 
+#ifndef PDAL_CAPI_EXPORT
+#if defined(_WIN32)
+#if defined(PDAL_DLL_EXPORT)
+#define PDAL_CAPI_EXPORT __declspec(dllexport)
+#else
+#define PDAL_CAPI_EXPORT __declspec(dllimport)
+#endif
+#else
+#define PDAL_CAPI_EXPORT __attribute__((visibility("default")))
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -1642,15 +1654,16 @@ extern "C"
     char* pdal_pipeline_serialize_json(const char* json);
 
     // CLI / Kernel dispatch
-    const char* pdal_version_string(void);
-    char* pdal_kernel_list_json(void);
-    char* pdal_stage_list_json(void);
-    char* pdal_stage_options_json(const char* stage_name);
-    char* pdal_stage_options_text(const char* stage_name);
-    int pdal_kernel_run(const char* kernel_name, int argc,
-                        const char* const* argv, const char* log_name,
-                        int log_level, bool log_timing);
-    void pdal_capi_free(void* ptr);
+    PDAL_CAPI_EXPORT const char* pdal_version_string(void);
+    PDAL_CAPI_EXPORT char* pdal_kernel_list_json(void);
+    PDAL_CAPI_EXPORT char* pdal_stage_list_json(void);
+    PDAL_CAPI_EXPORT char* pdal_stage_options_json(const char* stage_name);
+    PDAL_CAPI_EXPORT char* pdal_stage_options_text(const char* stage_name);
+    PDAL_CAPI_EXPORT int pdal_kernel_run(const char* kernel_name, int argc,
+                                         const char* const* argv,
+                                         const char* log_name, int log_level,
+                                         bool log_timing);
+    PDAL_CAPI_EXPORT void pdal_capi_free(void* ptr);
 
     // Standalone tools
     int pdal_tool_lasdump_run(int argc, const char* const* argv);

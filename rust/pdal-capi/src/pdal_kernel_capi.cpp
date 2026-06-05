@@ -40,6 +40,8 @@
 #include <pdal/util/ProgramArgs.hpp>
 #include <pdal/util/Utils.hpp>
 
+#include <pdal_capi.h>
+
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -48,12 +50,6 @@
 #include <sstream>
 
 using namespace pdal;
-
-#if defined(_WIN32)
-#define PDAL_CAPI_EXPORT __declspec(dllexport)
-#else
-#define PDAL_CAPI_EXPORT __attribute__((visibility("default")))
-#endif
 
 static std::once_flag s_pluginsLoaded;
 
