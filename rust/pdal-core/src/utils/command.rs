@@ -64,42 +64,16 @@ fn run_shell_command_unix(cmd: &str) -> (i32, String) {
 
 #[cfg(windows)]
 fn run_shell_command_windows(cmd: &str) -> (i32, String) {
-    use std::ffi::{c_char, c_int, c_void, CString};
-
-    unsafe extern "C" {
-        fn _popen(command: *const c_char, mode: *const c_char) -> *mut c_void;
-        fn _pclose(stream: *mut c_void) -> c_int;
-        fn fread(ptr: *mut c_void, size: usize, nmemb: usize, stream: *mut c_void) -> usize;
+    match std::process::Command::new("cmd.exe")
+        .arg("/S")
+        .arg("/C")
+        .arg(cmd)
+        .output()
+    {
+        Ok(output) => (
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+        ),
+        Err(_) => (1, String::new()),
     }
-
-    let command = match CString::new(cmd) {
-        Ok(command) => command,
-        Err(_) => return (1, String::new()),
-    };
-    let mode = c"r";
-    let stream = unsafe { _popen(command.as_ptr(), mode.as_ptr()) };
-    if stream.is_null() {
-        return (1, String::new());
-    }
-
-    let mut output = Vec::new();
-    let mut buffer = [0_u8; 4096];
-    loop {
-        let read = unsafe {
-            fread(
-                buffer.as_mut_ptr().cast::<c_void>(),
-                1,
-                buffer.len(),
-                stream,
-            )
-        };
-        if read == 0 {
-            break;
-        }
-        output.extend_from_slice(&buffer[..read]);
-    }
-
-    let status = unsafe { _pclose(stream) };
-    let code = if status == -1 { 1 } else { status };
-    (code, String::from_utf8_lossy(&output).into_owned())
 }
