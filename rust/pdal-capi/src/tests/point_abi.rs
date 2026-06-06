@@ -48,6 +48,54 @@ fn point_view_exposes_layout_dimensions() {
 }
 
 #[test]
+fn point_view_get_point_f64s_copies_registered_dimensions() {
+    unsafe {
+        let layout = pdal_point_layout_create();
+        let x = CString::new("X").unwrap();
+        let y = CString::new("Y").unwrap();
+        let classification = CString::new("Classification").unwrap();
+        pdal_point_layout_register_dim(layout, x.as_ptr(), 9);
+        pdal_point_layout_register_dim(layout, y.as_ptr(), 9);
+        pdal_point_layout_register_dim(layout, classification.as_ptr(), 0);
+        let view = pdal_point_view_create(layout);
+
+        let point = pdal_point_view_add_point(view);
+        pdal_point_view_set_f64(view, point, x.as_ptr(), 10.5);
+        pdal_point_view_set_f64(view, point, y.as_ptr(), -2.25);
+        pdal_point_view_set_f64(view, point, classification.as_ptr(), 7.0);
+
+        let mut values = [0.0; 3];
+        assert_eq!(
+            pdal_point_view_get_point_f64s(view, point, values.as_mut_ptr(), values.len() as u64),
+            3
+        );
+        assert_eq!(values, [10.5, -2.25, 7.0]);
+
+        let mut partial = [0.0; 2];
+        assert_eq!(
+            pdal_point_view_get_point_f64s(view, point, partial.as_mut_ptr(), partial.len() as u64),
+            2
+        );
+        assert_eq!(partial, [10.5, -2.25]);
+        assert_eq!(
+            pdal_point_view_get_point_f64s(
+                view,
+                point + 1,
+                values.as_mut_ptr(),
+                values.len() as u64
+            ),
+            0
+        );
+        assert_eq!(
+            pdal_point_view_get_point_f64s(view, point, std::ptr::null_mut(), values.len() as u64),
+            0
+        );
+
+        pdal_point_view_destroy(view);
+    }
+}
+
+#[test]
 fn point_view_ids_are_monotonic_through_c_abi() {
     unsafe {
         let first = pdal_point_view_create(pdal_point_layout_create());

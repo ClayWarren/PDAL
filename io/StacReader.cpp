@@ -160,6 +160,7 @@ public:
     PointId m_rustIndex = 0;
     std::vector<Dimension::Id> m_dims;
     std::vector<std::string> m_dimNames;
+    std::vector<double> m_dimValues;
 
     // book keeping
     std::vector<std::string> m_itemList;
@@ -581,6 +582,7 @@ void StacReader::initialize()
     m_p->m_rustIndex = 0;
     m_p->m_dims.clear();
     m_p->m_dimNames.clear();
+    m_p->m_dimValues.clear();
 
     if (m_p->canUseRustReader(m_filename))
     {
@@ -832,13 +834,13 @@ bool StacReader::processOne(PointRef& point)
     {
         if (m_p->m_rustIndex >= pdal_point_view_length(m_p->m_rustView))
             return false;
-        for (size_t dimIdx = 0; dimIdx < m_p->m_dims.size(); ++dimIdx)
-        {
-            point.setField(
-                m_p->m_dims[dimIdx],
-                pdal_point_view_get_f64(m_p->m_rustView, m_p->m_rustIndex,
-                                        m_p->m_dimNames[dimIdx].c_str()));
-        }
+        if (m_p->m_dimValues.size() < m_p->m_dims.size())
+            m_p->m_dimValues.resize(m_p->m_dims.size());
+        uint64_t copied = pdal_point_view_get_point_f64s(
+            m_p->m_rustView, m_p->m_rustIndex, m_p->m_dimValues.data(),
+            m_p->m_dimValues.size());
+        for (size_t dimIdx = 0; dimIdx < copied; ++dimIdx)
+            point.setField(m_p->m_dims[dimIdx], m_p->m_dimValues[dimIdx]);
         ++m_p->m_rustIndex;
         return true;
     }

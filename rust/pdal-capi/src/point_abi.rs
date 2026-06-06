@@ -314,6 +314,35 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn pdal_point_view_get_point_f64s(
+    view: *const PointView,
+    idx: u64,
+    out_values: *mut f64,
+    max_values: u64,
+) -> u64 {
+    if out_values.is_null() || max_values == 0 {
+        return 0;
+    }
+    let Some(view) = view.as_ref() else {
+        return 0;
+    };
+    if idx >= view.len() {
+        return 0;
+    }
+
+    let count = view.layout().dim_count().min(max_values as usize);
+    let out = std::slice::from_raw_parts_mut(out_values, count);
+    for (dim_idx, value) in out.iter_mut().enumerate() {
+        *value = view
+            .layout()
+            .dim_at(dim_idx)
+            .map(|(dim, _)| view.get_f64(idx, dim))
+            .unwrap_or(0.0);
+    }
+    count as u64
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn pdal_point_view_get_u8(
     view: *mut PointView,
     idx: u64,
