@@ -219,6 +219,9 @@ macro(PDAL_ADD_TEST _name)
         target_include_directories(${_name} SYSTEM PRIVATE
             ${PDAL_ADD_TEST_SYSTEM_INCLUDES})
     endif()
+    if(MSVC)
+        target_link_options(${_name} PRIVATE /STACK:8388608)
+    endif()
     set_property(TARGET ${_name} PROPERTY FOLDER "Tests")
     target_link_libraries(${_name}
         PRIVATE

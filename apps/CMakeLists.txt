@@ -30,7 +30,7 @@ target_include_directories(${PDAL_APP} PRIVATE
     ${RUST_CAPI_HEADER_DIR})
 
 IF(MSVC)
-    target_link_options(${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
+    target_link_options(${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup /STACK:8388608)
 endif(MSVC)
 
 if (BUILD_RUST_CLI)

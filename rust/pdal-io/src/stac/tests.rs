@@ -32,6 +32,22 @@ fn reads_local_item_asset() {
 }
 
 #[test]
+fn reads_cpp_autzen_stac_fixture() {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("test/data/stac/autzen_trim.json");
+
+    let mut options = Options::new();
+    options.add("filename", source.display());
+    options.add("asset_names", "data");
+    let mut reader = StacReader::new(&options);
+    let views = reader.read().unwrap();
+
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].len(), 110000);
+}
+
+#[test]
 fn follows_local_collection_item_links() {
     let temp = tempfile::tempdir().unwrap();
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))

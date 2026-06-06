@@ -871,6 +871,12 @@ void EptReader::ready(PointTableRef table)
                 "Failed to create Rust EPT reader.");
         }
         m_p->rustView = pdal_reader_read_first(reader);
+        if (!m_p->rustView)
+        {
+            pdal_reader_destroy(reader);
+            pdal_options_destroy(options);
+            rust_view_converter::throwLastError("Rust EPT reader failed.");
+        }
         // Pull `__ept_artifact` from the Rust reader's metadata before
         // releasing the handle so downstream stages like `writers.ept_addon`
         // can consume an `ept::Artifact` that mirrors what the C++ path
@@ -880,8 +886,6 @@ void EptReader::ready(PointTableRef table)
         publishRustEptArtifact(reader, table, m_filename);
         pdal_reader_destroy(reader);
         pdal_options_destroy(options);
-        if (!m_p->rustView)
-            rust_view_converter::throwLastError("Rust EPT reader failed.");
         return;
     }
 
