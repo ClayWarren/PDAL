@@ -619,6 +619,9 @@ pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) 
 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_file_utils_glob(pattern: *const c_char) -> *mut c_char {
+    if pattern.is_null() {
+        return string_to_c(String::new());
+    }
     let pat = c_string(pattern);
     match expand_local_glob(&pat) {
         Ok(entries) => {
