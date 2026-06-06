@@ -409,12 +409,17 @@ void StacReader::Private::printErrors(Catalog& c)
 
 bool StacReader::Private::canUseRustReader(const std::string& filename)
 {
+#ifdef _WIN32
+    (void)filename;
+    return false;
+#else
     const bool customSchemaUrls =
         m_args->validateSchema &&
         (m_args->schemaUrls.catalog != DefaultCatalogSchemaUrl ||
          m_args->schemaUrls.collection != DefaultCollectionSchemaUrl ||
          m_args->schemaUrls.item != DefaultFeatureSchemaUrl);
     return !customSchemaUrls && rustStacTypeSupported(filename);
+#endif
 }
 
 std::string listStr(std::string key, std::vector<RegEx> ids)
