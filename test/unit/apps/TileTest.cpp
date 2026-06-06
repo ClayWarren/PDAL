@@ -43,6 +43,14 @@
 
 using namespace pdal;
 
+namespace
+{
+std::string appName()
+{
+    return Support::shellQuote(Support::binpath(Support::exename("pdal")));
+}
+} // namespace
+
 void checkFile(int i, int j, int lines, double xoff = 0, double yoff = 0)
 {
     std::string header;
@@ -74,8 +82,8 @@ TEST(Tile, test1)
     std::string inSpec(Support::datapath("text/file*.txt"));
     std::string outSpec(Support::temppath("tile/out#.txt"));
 
-    std::string baseCmd = Support::binpath("pdal") + " tile \"" + inSpec +
-                          "\" \"" + outSpec + "\" ";
+    std::string baseCmd =
+        appName() + " tile \"" + inSpec + "\" \"" + outSpec + "\" ";
 
     FileUtils::deleteDirectory(Support::temppath("tile"));
     FileUtils::createDirectory(Support::temppath("tile"));
@@ -101,20 +109,20 @@ TEST(Tile, test2)
     FileUtils::deleteDirectory(Support::temppath("tile"));
     FileUtils::createDirectory(Support::temppath("tile"));
 
-    std::string tx1_cmd = Support::binpath("pdal") + " translate \"" + infile +
-                          "\" \"" + file1 +
+    std::string tx1_cmd = appName() + " translate \"" + infile + "\" \"" +
+                          file1 +
                           "\" --readers.text.override_srs=\"EPSG:2029\"";
     Utils::run_shell_command(tx1_cmd, output);
 
-    std::string tx2_cmd = Support::binpath("pdal") + " translate \"" + infile +
-                          "\" \"" + file2 +
+    std::string tx2_cmd = appName() + " translate \"" + infile + "\" \"" +
+                          file2 +
                           "\" -f reprojection "
                           "--filters.reprojection.in_srs=\"EPSG:2029\" "
                           "--filters.reprojection.out_srs=\"EPSG:2031\"";
     Utils::run_shell_command(tx2_cmd, output);
 
-    std::string tx3_cmd = Support::binpath("pdal") + " translate \"" + infile +
-                          "\" \"" + file3 +
+    std::string tx3_cmd = appName() + " translate \"" + infile + "\" \"" +
+                          file3 +
                           "\" -f reprojection "
                           "--filters.reprojection.in_srs=\"EPSG:2029\" "
                           "--filters.reprojection.out_srs=\"EPSG:2958\"";
@@ -123,8 +131,8 @@ TEST(Tile, test2)
     std::string inSpec(Support::temppath("tile/file*.las"));
     std::string outSpec(Support::temppath("tile/out#.txt"));
 
-    std::string baseCmd = Support::binpath("pdal") + " tile \"" + inSpec +
-                          "\" \"" + outSpec + "\" ";
+    std::string baseCmd =
+        appName() + " tile \"" + inSpec + "\" \"" + outSpec + "\" ";
 
     std::string cmd =
         baseCmd + " --origin_x=500000 --origin_y=5000000 "
@@ -181,7 +189,7 @@ TEST(Tile, test3)
 
     // Run tile on the test output.
     std::string outSpec(Support::temppath("tile/out#.las"));
-    std::string baseCmd = Support::binpath("pdal") + " tile \"" +
+    std::string baseCmd = appName() + " tile \"" +
                           Support::temppath("tile/tile*.txt") + "\" \"" +
                           outSpec + "\" ";
 

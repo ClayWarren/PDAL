@@ -110,6 +110,19 @@ std::string exename(const std::string& name)
 #endif
 }
 
+std::string shellQuote(const std::string& arg)
+{
+    std::string quoted("\"");
+    for (char c : arg)
+    {
+        if (c == '"')
+            quoted += '\\';
+        quoted += c;
+    }
+    quoted += '"';
+    return quoted;
+}
+
 // do a comparison by line of two (text) files, ignoring CRLF differences
 uint32_t diff_text_files(const std::string& file1, const std::string& file2,
                          int32_t ignoreLine1)

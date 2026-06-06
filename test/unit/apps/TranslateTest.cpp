@@ -48,7 +48,8 @@ using namespace pdal;
 static int runTranslate(std::string const& cmdline, std::string& output)
 {
     const std::string cmd =
-        Support::binpath(Support::exename("pdal")) + " translate";
+        Support::shellQuote(Support::binpath(Support::exename("pdal"))) +
+        " translate";
     return Utils::run_shell_command(cmd + " " + cmdline, output);
 }
 

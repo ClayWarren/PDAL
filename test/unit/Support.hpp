@@ -74,6 +74,9 @@ std::string binpath(const std::string& file);
 // returns "name" on unix and "name + .exe" on windows
 std::string exename(const std::string& name);
 
+// quote a command argument for tests that execute through the system shell
+std::string shellQuote(const std::string& arg);
+
 // returns number of bytes different for two binary files (or maxint
 // if a file doesn't exist)
 uint32_t diff_files(const std::string& file1, const std::string& file2);

@@ -46,7 +46,8 @@ namespace
 {
 std::string appName()
 {
-    return Support::binpath("pdal info");
+    return Support::shellQuote(Support::binpath(Support::exename("pdal"))) +
+           " info";
 }
 } // namespace
 
