@@ -7,6 +7,7 @@ set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
 if(MSVC)
     set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/pdal_capi.lib")
     set(RUST_CAPI_MSVC_EXPORTS
+        "/EXPORT:pdal_app_unknown_command_message"
         "/EXPORT:pdal_artifact_manager_create"
         "/EXPORT:pdal_artifact_manager_destroy"
         "/EXPORT:pdal_artifact_manager_erase"
@@ -17,6 +18,7 @@ if(MSVC)
         "/EXPORT:pdal_artifact_manager_replace"
         "/EXPORT:pdal_artifact_manager_replace_or_put"
         "/EXPORT:pdal_bounds3d_parse"
+        "/EXPORT:pdal_capi_free"
         "/EXPORT:pdal_chamfer"
         "/EXPORT:pdal_clear_error"
         "/EXPORT:pdal_copc_info_parse"
@@ -54,6 +56,8 @@ if(MSVC)
         "/EXPORT:pdal_hausdorff"
         "/EXPORT:pdal_hexgrid_wkt"
         "/EXPORT:pdal_info_summary_json"
+        "/EXPORT:pdal_kernel_list_json"
+        "/EXPORT:pdal_kernel_run"
         "/EXPORT:pdal_las_point_format_supported"
         "/EXPORT:pdal_las_tile_advance"
         "/EXPORT:pdal_las_tile_chunk"
@@ -238,6 +242,9 @@ if(MSVC)
         "/EXPORT:pdal_stage_extensions_default_writer"
         "/EXPORT:pdal_stage_extensions_destroy"
         "/EXPORT:pdal_stage_extensions_set"
+        "/EXPORT:pdal_stage_list_json"
+        "/EXPORT:pdal_stage_options_json"
+        "/EXPORT:pdal_stage_options_text"
         "/EXPORT:pdal_stage_process_one_at"
         "/EXPORT:pdal_stage_registry_has"
         "/EXPORT:pdal_stage_run"
@@ -257,6 +264,8 @@ if(MSVC)
         "/EXPORT:pdal_thread_pool_num_threads"
         "/EXPORT:pdal_thread_pool_resize"
         "/EXPORT:pdal_thread_pool_stop"
+        "/EXPORT:pdal_tool_lasdump_run"
+        "/EXPORT:pdal_tool_nitfwrap_run"
         "/EXPORT:pdal_segmentation_extract_clusters"
         "/EXPORT:pdal_u64_array_free"
         "/EXPORT:pdal_utils_base64_encode"
@@ -271,6 +280,7 @@ if(MSVC)
         "/EXPORT:pdal_uuid_random"
         "/EXPORT:pdal_uuid_unparse"
         "/EXPORT:pdal_vsi_local_io_scenario_json"
+        "/EXPORT:pdal_version_string"
         "/EXPORT:pdal_writer_create_copc"
         "/EXPORT:pdal_writer_create_null"
         "/EXPORT:pdal_writer_create_spz"
@@ -432,6 +442,8 @@ macro(pdal_link_rust_capi _target)
             PRIVATE
                 userenv
                 ntdll
+                bcrypt
+                ${GEOTIFF_LIBRARY}
         )
     endif()
     if (NITRO_FOUND AND NOT MSVC AND NITRO_LIBRARIES)
