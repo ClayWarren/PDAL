@@ -64,18 +64,12 @@ impl GdalSrsTransform {
         if xs.len() != ys.len() || ys.len() != zs.len() {
             return false;
         }
-        if xs.is_empty() {
-            return true;
+        for idx in 0..xs.len() {
+            if !self.transform_xyz(&mut xs[idx], &mut ys[idx], &mut zs[idx]) {
+                return false;
+            }
         }
-        unsafe {
-            gdal_sys::OCTTransform(
-                self.handle,
-                xs.len() as std::os::raw::c_int,
-                xs.as_mut_ptr(),
-                ys.as_mut_ptr(),
-                zs.as_mut_ptr(),
-            ) != 0
-        }
+        true
     }
 }
 
