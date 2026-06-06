@@ -259,7 +259,13 @@ pub(super) fn apply_addons(
         let path = addon.data_path(key);
         let bytes = match crate::source::read_bytes_with_headers(&path, headers) {
             Ok(bytes) => bytes,
-            Err(err) if err.contains("No such file") || err.contains("not found") => continue,
+            Err(err)
+                if err.contains("No such file")
+                    || err.contains("not found")
+                    || err.contains("cannot find the file") =>
+            {
+                continue
+            }
             Err(err) => {
                 return Err(StageError(format!(
                     "Can't open EPT addon data '{}': {err}",
