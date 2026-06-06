@@ -35,6 +35,8 @@ fi
 
 CONSUMER_DIR="${TMP_DIR}/consumer"
 
+echo "Checking installed PDAL C API consumer against ${INSTALL_PREFIX}"
+
 mkdir -p "${CONSUMER_DIR}"
 cat >"${CONSUMER_DIR}/CMakeLists.txt" <<'CMAKE'
 cmake_minimum_required(VERSION 3.13)
@@ -114,13 +116,15 @@ int main()
 CPP
 
 cmake -S "${CONSUMER_DIR}" -B "${CONSUMER_DIR}/build" -G Ninja \
-    -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" >/dev/null
-cmake --build "${CONSUMER_DIR}/build" >/dev/null
+    -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
+cmake --build "${CONSUMER_DIR}/build"
 
 CONSUMER_EXE="${CONSUMER_DIR}/build/consumer"
 if [[ -f "${CONSUMER_EXE}.exe" ]]; then
     CONSUMER_EXE="${CONSUMER_EXE}.exe"
 fi
+
+echo "Running installed PDAL C API consumer smoke: ${CONSUMER_EXE}"
 
 case "$(uname -s)" in
     Darwin)
@@ -134,7 +138,7 @@ case "$(uname -s)" in
             "${CONSUMER_EXE}"
         ;;
     *)
-        PATH="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/lib:${PATH}" \
+        PATH="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/lib:${INSTALL_PREFIX}/Library/bin:${PATH}" \
             "${CONSUMER_EXE}"
         ;;
 esac
