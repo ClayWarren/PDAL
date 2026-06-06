@@ -114,6 +114,7 @@ if(MSVC)
         "/EXPORT:pdal_nitf_lidar_segment"
         "/EXPORT:pdal_nitf_read_metadata"
         "/EXPORT:pdal_nitf_write"
+        "/EXPORT:pdal_obb_intersect"
         "/EXPORT:pdal_options_add_str"
         "/EXPORT:pdal_options_add_f64"
         "/EXPORT:pdal_options_add_u64"
