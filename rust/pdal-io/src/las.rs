@@ -13,6 +13,7 @@ use pdal_core::options::Options;
 use pdal_core::pipeline::Reader;
 use pdal_core::point::{DimId, DimType, PointLayout, PointView};
 use pdal_core::stage::StageError;
+use pdal_core::utils::{expand_local_glob, has_glob_pattern};
 use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
@@ -498,7 +499,7 @@ impl Reader for LasReader {
                 "LasReader requires a filename option.".to_string(),
             ));
         }
-        if filename_has_glob(&self.filename) {
+        if has_glob_pattern(&self.filename) {
             return self.read_glob();
         }
 
@@ -594,7 +595,7 @@ impl Reader for LasReader {
         // NITF-embedded (start_offset), and lenient (ignore_missing_vlrs) reads
         // fall back to the materializing `read()`.
         !self.filename.is_empty()
-            && !filename_has_glob(&self.filename)
+            && !has_glob_pattern(&self.filename)
             && !source::is_vsi_path(&self.filename)
             && self.start_offset == 0
             && self.start_length == 0
@@ -642,17 +643,8 @@ impl LasReader {
             ));
         }
 
-        let mut paths = glob::glob(&self.filename)
-            .map_err(|err| StageError(format!("Invalid LAS filename glob: {err}")))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| StageError(format!("Failed to expand LAS filename glob: {err}")))?;
+        let mut paths = expand_local_glob(&self.filename).map_err(StageError)?;
         paths.sort();
-        if paths.is_empty() {
-            return Err(StageError(format!(
-                "LAS filename glob '{}' matched no files.",
-                self.filename
-            )));
-        }
 
         let mut merged: Option<PointView> = None;
         for path in paths {
@@ -669,10 +661,6 @@ impl LasReader {
 
         Ok(merged.into_iter().collect())
     }
-}
-
-fn filename_has_glob(filename: &str) -> bool {
-    filename.contains('*') || filename.contains('?') || filename.contains('[')
 }
 
 fn append_glob_view(

@@ -3,6 +3,7 @@ mod charbuf;
 mod command;
 mod diff;
 mod env;
+mod glob;
 mod numeric;
 mod shell;
 mod strings;
@@ -13,6 +14,7 @@ pub use charbuf::{charbuf_seekoff, charbuf_seekpos, extract_c_string};
 pub use command::run_shell_command;
 pub use diff::{diff_files, diff_text_files};
 pub use env::{get_env, random, random_seed, set_env, unset_env};
+pub use glob::{expand_local_glob, has_glob_pattern};
 pub use numeric::{
     compare_approx, format_f64, format_i32, normalize_longitude, numeric_cast_f32_to_f64,
     numeric_cast_f64_to_f32, parse_f64, parse_i32,

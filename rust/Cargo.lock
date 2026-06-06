@@ -1055,6 +1055,7 @@ version = "0.0.0"
 dependencies = [
  "flate2",
  "getrandom 0.2.17",
+ "glob",
  "pdal-native",
  "rstar 0.12.2",
  "serde",

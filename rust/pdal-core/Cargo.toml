@@ -8,6 +8,7 @@ description = "Minimal PDAL core (point model, stages, options) -- Rust port spi
 [dependencies]
 flate2 = "1.0"
 getrandom = "0.2"
+glob = "0.3"
 pdal-native = { path = "../pdal-native", default-features = false }
 rstar = "0.12"
 serde = { version = "1", features = ["derive"] }

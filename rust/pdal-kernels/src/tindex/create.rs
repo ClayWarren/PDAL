@@ -1,6 +1,7 @@
 use super::{
     tindex_next_value, TindexCreateArgs, TindexParseResult, INVALID_TINDEX_FILTER_STAGE_MESSAGE,
 };
+use pdal_core::utils::{expand_local_glob, has_glob_pattern};
 use std::io::Read;
 
 pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, TindexParseResult> {
@@ -21,6 +22,9 @@ pub fn parse_tindex_create_args(args: &[String]) -> Result<TindexCreateArgs, Tin
     }
     for path in &parsed.filelists {
         parsed.files.extend(read_filelist(path)?);
+    }
+    for pattern in &parsed.glob_patterns {
+        parsed.files.extend(read_glob(pattern)?);
     }
     if parsed.stdin_requested {
         parsed.files.extend(read_stdin_files()?);
@@ -67,7 +71,7 @@ fn parse_value_arg<'a>(
         "--glob" | "--filespec" => {
             parsed.input_methods += 1;
             let pattern = tindex_next_value(iter, arg)?;
-            parsed.files.extend(read_glob(pattern)?);
+            parsed.glob_patterns.push(pattern.clone());
         }
         "--path_prefix" => parsed.path_prefix = Some(tindex_next_value(iter, arg)?.clone()),
         "--write_absolute_path" => parsed.write_absolute_path = true,
@@ -107,14 +111,14 @@ fn parse_equals_arg(arg: &str, parsed: &mut TindexCreateArgs) -> Result<bool, Ti
         parsed.tindex_file = value.to_string();
     } else if let Some(value) = arg.strip_prefix("--filespec=") {
         parsed.input_methods += 1;
-        if is_glob_pattern(value) {
-            parsed.files.extend(read_glob(value)?);
+        if has_glob_pattern(value) {
+            parsed.glob_patterns.push(value.to_string());
         } else {
             parsed.files.push(value.to_string());
         }
     } else if let Some(pattern) = arg.strip_prefix("--glob=") {
         parsed.input_methods += 1;
-        parsed.files.extend(read_glob(pattern)?);
+        parsed.glob_patterns.push(pattern.to_string());
     } else if let Some(path) = arg.strip_prefix("--filelist=") {
         parsed.input_methods += 1;
         parsed.filelists.push(path.to_string());
@@ -169,9 +173,9 @@ fn parse_filter_or_positional_arg(
     }
     if parsed.tindex_file.is_empty() {
         parsed.tindex_file = arg.to_string();
-    } else if is_glob_pattern(arg) {
+    } else if has_glob_pattern(arg) {
         parsed.input_methods += 1;
-        parsed.files.extend(read_glob(arg)?);
+        parsed.glob_patterns.push(arg.to_string());
     } else {
         parsed.files.push(arg.to_string());
     }
@@ -276,28 +280,14 @@ fn parse_bool(value: &str, arg: &str) -> Result<bool, TindexParseResult> {
 }
 
 fn read_glob(pattern: &str) -> Result<Vec<String>, TindexParseResult> {
-    let entries = glob::glob(pattern).map_err(|err| TindexParseResult::Error(format!("{err}")))?;
-    let mut files = Vec::new();
-    for entry in entries {
-        match entry {
-            Ok(path) => files.push(path.to_string_lossy().into_owned()),
-            Err(err) => {
-                return Err(TindexParseResult::Error(format!(
-                    "glob pattern '{pattern}' failed: {err}"
-                )));
-            }
-        }
-    }
-    if files.is_empty() {
-        return Err(TindexParseResult::Error(format!(
-            "glob pattern '{pattern}' did not match any files"
-        )));
-    }
-    Ok(files)
-}
-
-fn is_glob_pattern(value: &str) -> bool {
-    value.contains('*') || value.contains('?') || value.contains('[')
+    expand_local_glob(pattern)
+        .map(|paths| {
+            paths
+                .into_iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect()
+        })
+        .map_err(TindexParseResult::Error)
 }
 
 fn read_stdin_files() -> Result<Vec<String>, TindexParseResult> {

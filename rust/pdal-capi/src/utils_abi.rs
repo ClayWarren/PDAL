@@ -1,10 +1,10 @@
 use pdal_core::utils::{
     base64_decode, base64_encode, charbuf_seekoff, charbuf_seekpos, compare_approx, diff_files,
-    diff_text_files, escape_json, escape_nonprinting_bytes, extract_c_string, format_f64,
-    format_i32, get_env, iequals, looks_like_json, normalize_longitude, parse_f64, parse_i32,
-    random, random_seed, replace_all, run_shell_command, set_env, simple_wordexp, split2_char,
-    split_char, starts_with, to_lower, to_upper, trim_leading, trim_trailing, unset_env, word_wrap,
-    word_wrap2,
+    diff_text_files, escape_json, escape_nonprinting_bytes, expand_local_glob, extract_c_string,
+    format_f64, format_i32, get_env, iequals, looks_like_json, normalize_longitude, parse_f64,
+    parse_i32, random, random_seed, replace_all, run_shell_command, set_env, simple_wordexp,
+    split2_char, split_char, starts_with, to_lower, to_upper, trim_leading, trim_trailing,
+    unset_env, word_wrap, word_wrap2,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -620,12 +620,12 @@ pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) 
 #[no_mangle]
 pub unsafe extern "C" fn pdal_file_utils_glob(pattern: *const c_char) -> *mut c_char {
     let pat = c_string(pattern);
-    match glob::glob(&pat) {
+    match expand_local_glob(&pat) {
         Ok(entries) => {
-            let mut paths = Vec::new();
-            for path in entries.flatten() {
-                paths.push(path.to_string_lossy().into_owned());
-            }
+            let paths = entries
+                .into_iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
             string_to_c(paths.join("\n"))
         }
         Err(_) => std::ptr::null_mut(),

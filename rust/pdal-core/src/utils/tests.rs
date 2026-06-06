@@ -183,6 +183,28 @@ fn expands_simple_shell_words_like_cpp_utils() {
 }
 
 #[test]
+fn expands_local_glob_final_component() {
+    let dir = std::env::temp_dir().join(format!("pdal-rust-glob-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("a.txt");
+    let b = dir.join("b.txt");
+    let c = dir.join("c.las");
+    std::fs::write(&a, "").unwrap();
+    std::fs::write(&b, "").unwrap();
+    std::fs::write(&c, "").unwrap();
+
+    let pattern = dir.join("?.txt").to_string_lossy().into_owned();
+    let files = expand_local_glob(&pattern).unwrap();
+    assert_eq!(files, vec![a, b]);
+
+    let missing = dir.join("*.laz").to_string_lossy().into_owned();
+    assert!(expand_local_glob(&missing)
+        .unwrap_err()
+        .contains("did not match"));
+}
+
+#[test]
 fn test_diff_files_and_diff_text_files() {
     use std::io::Write;
     let temp_dir = std::env::temp_dir();

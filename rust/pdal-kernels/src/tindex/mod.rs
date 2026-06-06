@@ -50,6 +50,7 @@ pub struct TindexCreateArgs {
     stdin_requested: bool,
     input_methods: u8,
     filelists: Vec<String>,
+    glob_patterns: Vec<String>,
     pub skip_different_srs: bool,
 }
 
@@ -73,6 +74,7 @@ impl Default for TindexCreateArgs {
             stdin_requested: false,
             input_methods: 0,
             filelists: Vec::new(),
+            glob_patterns: Vec::new(),
             skip_different_srs: false,
         }
     }

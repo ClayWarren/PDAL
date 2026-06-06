@@ -97,6 +97,25 @@ fn create_rejects_multiple_input_methods() {
 }
 
 #[test]
+fn create_rejects_multiple_input_methods_before_glob_expansion() {
+    let Err(err) = parse_tindex_create_args(&strings(&[
+        "--tindex",
+        "out.geojson",
+        "--stdin",
+        "--glob",
+        "/definitely/no/tindex/files/*.las",
+    ])) else {
+        panic!("expected multiple input methods to fail");
+    };
+    assert_eq!(
+        err,
+        TindexParseResult::Error(
+            "Can't specify more than one source of tindex input files.".to_string()
+        )
+    );
+}
+
+#[test]
 fn create_accepts_tindex_equals_form() {
     // `--tindex=PATH` must be equivalent to `--tindex PATH` (TIndexTest test4/7/8).
     let parsed =

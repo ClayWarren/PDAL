@@ -6,6 +6,7 @@ use crate::registry::create_writer;
 use pdal_core::options::Options;
 use pdal_core::point::PointView;
 use pdal_core::stage::Filter;
+use pdal_core::utils::{expand_local_glob, has_glob_pattern};
 use pdal_filters::reprojection::ReprojectionFilter;
 use pdal_filters::splitter::SplitterFilter;
 use std::ffi::CStr;
@@ -134,18 +135,18 @@ fn read_tile_input(
     path: &str,
     out_srs: Option<&str>,
 ) -> Result<PointView, pdal_core::stage::StageError> {
-    if !is_glob_pattern(path) {
+    if !has_glob_pattern(path) {
         let view = read_cloud(path)?;
         return reproject_tile_view(view, out_srs);
     }
 
     let mut output: Option<PointView> = None;
-    for entry in glob::glob(path).map_err(|err| {
-        pdal_core::stage::StageError(format!("tile: invalid glob '{path}': {err}"))
-    })? {
-        let file = entry
-            .map_err(|err| pdal_core::stage::StageError(format!("tile: glob error: {err}")))?;
-        let view = reproject_tile_view(read_cloud(&file.to_string_lossy())?, out_srs)?;
+    for file in expand_local_glob(path).map_err(pdal_core::stage::StageError)? {
+        let file = file.to_string_lossy();
+        let view = read_cloud(&file).map_err(|err| {
+            pdal_core::stage::StageError(format!("tile: failed to read '{file}': {err}"))
+        })?;
+        let view = reproject_tile_view(view, out_srs)?;
         append_tile_view(&mut output, &view, path)?;
     }
     output.ok_or_else(|| {
@@ -187,8 +188,4 @@ fn append_tile_view(
         merged.append_point(view, idx);
     }
     Ok(())
-}
-
-fn is_glob_pattern(value: &str) -> bool {
-    value.contains('*') || value.contains('?') || value.contains('[')
 }
