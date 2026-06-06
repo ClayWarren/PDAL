@@ -287,6 +287,20 @@ if(MSVC)
         "/EXPORT:pdal_writer_destroy"
         "/EXPORT:pdal_writer_write_view"
     )
+    file(STRINGS "${RUST_CAPI_HEADER_DIR}/pdal_capi.h"
+        RUST_CAPI_HEADER_DECLS
+        REGEX "^[ \t]*(const[ \t]+)?([A-Za-z_][A-Za-z0-9_ \t\\*]+)?pdal_[A-Za-z0-9_]+[ \t]*\\(")
+    foreach(_rust_capi_decl IN LISTS RUST_CAPI_HEADER_DECLS)
+        string(REGEX MATCH "pdal_[A-Za-z0-9_]+[ \t]*\\("
+            _rust_capi_match "${_rust_capi_decl}")
+        if(_rust_capi_match)
+            string(REGEX REPLACE "[ \t]*\\($" "" _rust_capi_name
+                "${_rust_capi_match}")
+            list(APPEND RUST_CAPI_MSVC_EXPORTS
+                "/EXPORT:${_rust_capi_name}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES RUST_CAPI_MSVC_EXPORTS)
     set(RUST_CAPI_MSVC_DEF_FILE
         "${CMAKE_CURRENT_BINARY_DIR}/pdal_rust_capi_exports.def")
     file(WRITE "${RUST_CAPI_MSVC_DEF_FILE}" "EXPORTS\n")
