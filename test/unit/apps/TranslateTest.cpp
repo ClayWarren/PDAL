@@ -53,6 +53,20 @@ static int runTranslate(std::string const& cmdline, std::string& output)
     return Utils::run_shell_command(cmd + " " + cmdline, output);
 }
 
+static std::string jsonOption(std::string json)
+{
+#ifdef _WIN32
+    json = Utils::replaceAll(json, "\\\"", "\"");
+    std::string filename = Support::temppath("translate-json.json");
+    std::ostream* out = FileUtils::createFile(filename);
+    *out << json;
+    FileUtils::closeFile(out);
+    return "--json=" + filename;
+#else
+    return "--json=\"" + json + "\"";
+#endif
+}
+
 TEST(TranslateTest, t1)
 {
     std::string output;
@@ -91,18 +105,17 @@ TEST(TranslateTest, t2)
         }";
 
     // Check that we work with just a bunch of filters.
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we fail with no input file.
     FileUtils::deleteFile("foo.las");
-    EXPECT_NE(
-        runTranslate("foo.las " + out + " --json=\"" + json + "\"", output), 0);
+    EXPECT_NE(runTranslate("foo.las " + out + " " + jsonOption(json), output),
+              0);
 
     // Check that we file with bad output file.
-    EXPECT_NE(
-        runTranslate(in + " foo.blam " + " --json=\"" + json + "\"", output),
-        0);
+    EXPECT_NE(runTranslate(in + " foo.blam " + " " + jsonOption(json), output),
+              0);
 
     // Check that we work with no stages.
     json = " \
@@ -110,8 +123,8 @@ TEST(TranslateTest, t2)
         \\\"pipeline\\\" : [ \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we work with only an input (not specified as such).
     json = " \
@@ -120,8 +133,8 @@ TEST(TranslateTest, t2)
           \\\"badinput.las\\\" \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we work with an input and an output.
     json = " \
@@ -131,8 +144,8 @@ TEST(TranslateTest, t2)
           \\\"badoutput.las\\\" \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we work with only an output.
     json = " \
@@ -144,8 +157,8 @@ TEST(TranslateTest, t2)
           } \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we work with only an input.
     json = " \
@@ -157,8 +170,8 @@ TEST(TranslateTest, t2)
           } \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we fail with unchanined multiple writers.
     json = " \
@@ -171,8 +184,8 @@ TEST(TranslateTest, t2)
           \\\"badoutput2.las\\\" \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 
     // Check that we can handle chained writers.
     json = " \
@@ -189,8 +202,8 @@ TEST(TranslateTest, t2)
           } \
         ] \
         }";
-    EXPECT_EQ(runTranslate(in + " " + out + " --json=\"" + json + "\"", output),
-              0);
+    EXPECT_EQ(runTranslate(in + " " + out + " " + jsonOption(json), output), 0)
+        << output;
 }
 
 TEST(TranslateTest, t3)

@@ -49,6 +49,12 @@ std::string appName()
 {
     return Support::shellQuote(Support::binpath(Support::exename("pdal")));
 }
+
+void runOk(std::string cmd, std::string& output)
+{
+    cmd += " 2>&1";
+    ASSERT_EQ(Utils::run_shell_command(cmd, output), 0) << output;
+}
 } // namespace
 
 void checkFile(int i, int j, int lines, double xoff = 0, double yoff = 0)
@@ -90,7 +96,7 @@ TEST(Tile, test1)
 
     std::string output;
     std::string cmd = baseCmd + " --origin_x=0 --origin_y=0 --length=10";
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     EXPECT_EQ(FileUtils::directoryList(Support::temppath("tile")).size(), 11U);
     for (int i = 0; i < 3; ++i)
@@ -112,21 +118,21 @@ TEST(Tile, test2)
     std::string tx1_cmd = appName() + " translate \"" + infile + "\" \"" +
                           file1 +
                           "\" --readers.text.override_srs=\"EPSG:2029\"";
-    Utils::run_shell_command(tx1_cmd, output);
+    runOk(tx1_cmd, output);
 
     std::string tx2_cmd = appName() + " translate \"" + infile + "\" \"" +
                           file2 +
                           "\" -f reprojection "
                           "--filters.reprojection.in_srs=\"EPSG:2029\" "
                           "--filters.reprojection.out_srs=\"EPSG:2031\"";
-    Utils::run_shell_command(tx2_cmd, output);
+    runOk(tx2_cmd, output);
 
     std::string tx3_cmd = appName() + " translate \"" + infile + "\" \"" +
                           file3 +
                           "\" -f reprojection "
                           "--filters.reprojection.in_srs=\"EPSG:2029\" "
                           "--filters.reprojection.out_srs=\"EPSG:2958\"";
-    Utils::run_shell_command(tx3_cmd, output);
+    runOk(tx3_cmd, output);
 
     std::string inSpec(Support::temppath("tile/file*.las"));
     std::string outSpec(Support::temppath("tile/out#.txt"));
@@ -138,7 +144,7 @@ TEST(Tile, test2)
         baseCmd + " --origin_x=500000 --origin_y=5000000 "
                   "--length=10 --out_srs=EPSG:2029 --writers.text.order=X,Y,Z "
                   "--writers.text.keep_unspecified=false";
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     auto files = FileUtils::directoryList(Support::temppath("tile/out*.txt"));
     for (int i = 0; i < 3; ++i)
@@ -195,7 +201,7 @@ TEST(Tile, test3)
 
     std::string cmd = baseCmd + "--length=30";
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     StringList files = FileUtils::directoryList(Support::temppath("tile"));
 

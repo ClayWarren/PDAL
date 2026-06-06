@@ -50,6 +50,18 @@ std::string appName()
 {
     return Support::shellQuote(Support::binpath(Support::exename("pdal")));
 }
+
+int runCommand(std::string cmd, std::string& output)
+{
+    if (cmd.find("2>&1") == std::string::npos)
+        cmd += " 2>&1";
+    return Utils::run_shell_command(cmd, output);
+}
+
+void runOk(std::string cmd, std::string& output)
+{
+    ASSERT_EQ(runCommand(cmd, output), 0) << output;
+}
 } // namespace
 
 TEST(TIndex, test1)
@@ -64,7 +76,7 @@ TEST(TIndex, test1)
     FileUtils::deleteFile(outSpec);
 
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
@@ -72,27 +84,27 @@ TEST(TIndex, test1)
           "--bounds=\"([1.25, 3],[1.25, 3])\"";
 
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     std::string::size_type pos = output.find("Merge filecount: 3");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
           " --log=stdout "
           "--bounds=\"([1.25, 2],[1.25, 2])\"";
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     pos = output.find("Merge filecount: 2");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
           " --log=stdout "
           "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     pos = output.find("Merge filecount: 1");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     FileUtils::deleteFile(outPoints);
     FileUtils::deleteFile(outSpec);
@@ -107,34 +119,34 @@ TEST(TIndex, test2)
                       inSpec + "\" -f GeoJSON 2>&1";
 
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     std::string::size_type pos = output.find("Can't specify more than one");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " tindex create --stdin " + outSpec +
           " -f GeoJSON --filespec=\"" + inSpec + "\" 2>&1";
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("Can't specify more than one");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " tindex create --filelist \"" + inSpec + "\" --stdin " +
           outSpec + " -f GeoJSON 2>&1";
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("Can't specify more than one");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " tindex create --glob \"" + inSpec + "\" --filelist \"" +
           inSpec + "\" --tindex=" + outSpec + " -f GeoJSON 2>&1";
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("Can't specify more than one");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " tindex create " + outSpec +
           " -f GeoJSON --path_prefix=\"a\" --write_absolute_path=true " +
           "--filespec=\"" + inSpec + "\" 2>&1";
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("Can't specify both");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     FileUtils::deleteFile(outSpec);
 }
@@ -153,7 +165,7 @@ TEST(TIndex, test3)
                       " -f GeoJSON --log=stdout";
 
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
@@ -161,27 +173,27 @@ TEST(TIndex, test3)
           "--bounds=\"([1.25, 3],[1.25, 3])\"";
 
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     std::string::size_type pos = output.find("Merge filecount: 3");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
           " --log=stdout "
           "--bounds=\"([1.25, 2],[1.25, 2])\"";
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     pos = output.find("Merge filecount: 2");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     cmd = appName() + " --verbose=info tindex merge " + outSpec + " " +
           outPoints +
           " --log=stdout "
           "--bounds=\"([1.25, 1.75],[1.25, 1.75])\"";
     FileUtils::deleteFile(outPoints);
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     pos = output.find("Merge filecount: 1");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     FileUtils::deleteFile(outPoints);
     FileUtils::deleteFile(outSpec);
@@ -214,7 +226,7 @@ TEST(TIndex, test4)
                       "--resolution=1.0 --simplify=\"false\" --filespec=\"" +
                       inSpec + "\"";
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     pdal::Polygon p(getGeometry(output)[0]);
     EXPECT_NEAR(7.79423, p.area(), 0.001);
@@ -223,7 +235,7 @@ TEST(TIndex, test4)
     cmd = appName() + " tindex create --tindex=\"/vsistdout/\"" +
           " -f \"GeoJSON\" --threshold=1 --resolution=1.0" + " --filespec=\"" +
           inSpec + "\"";
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     p = getGeometry(output)[0];
     EXPECT_NEAR(6.49519, p.area(), 0.001);
@@ -232,7 +244,7 @@ TEST(TIndex, test4)
     cmd = appName() + " tindex create --tindex=\"/vsistdout/\"" +
           " -f \"GeoJSON\" --threshold=1 --resolution=1.0" +
           " --where=\"X>1\" --simplify=\"false\" --filespec=\"" + inSpec + "\"";
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     p = getGeometry(output)[0];
     EXPECT_NEAR(2.59808, p.area(), 0.001);
@@ -248,20 +260,20 @@ TEST(TIndex, test5)
                       "\" -f GeoJSON --log=stdout --fast_boundary=true";
 
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     std::string::size_type pos =
         output.find("does not match the SRS of other files in the tileindex");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
     FileUtils::deleteFile(outSpec);
 
     cmd = appName() + " tindex create " + outSpec + " \"" + inSpec +
           "\" -f GeoJSON --log=stdout --fast_boundary=true " +
           "--skip_different_srs=true";
 
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("does not match the SRS of other files in the tileindex. "
                       "Skipping this file");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
     FileUtils::deleteFile(outSpec);
 
     // Testing rejection of long SRS w/ shapefile driver
@@ -271,9 +283,9 @@ TEST(TIndex, test5)
           "\" -f \"ESRI Shapefile\" --log=stdout " +
           "--fast_boundary=true 2>&1";
 
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
     pos = output.find("supports a maximum of 254");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
     FileUtils::deleteDirectory(outSpec);
 }
 
@@ -289,11 +301,11 @@ TEST(TIndex, test6)
 
     FileUtils::deleteFile(outSpec);
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runCommand(cmd, output);
 
     std::string::size_type pos =
         output.find("Argument references invalid/unused stage");
-    EXPECT_NE(pos, std::string::npos);
+    EXPECT_NE(pos, std::string::npos) << output;
 
     FileUtils::deleteFile(outSpec);
 }
@@ -308,12 +320,12 @@ TEST(TIndex, test7)
     std::string cmd =
         "find " + Support::datapath("tindex") + " -name \"*.txt\" > " + inList;
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     cmd = appName() + " tindex create --tindex=\"/vsistdout/\"" +
           " --filelist=\"" + inList +
           "\" -f GeoJSON --threshold=1 --resolution=1.0";
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
     StringList geoms = getGeometry(output);
 
     pdal::Polygon p1(geoms[0]);
@@ -336,7 +348,7 @@ TEST(TIndex, test8)
                       "--resolution=1.0 --lco=\"DESCRIPTION=foo\" " +
                       "--filespec=\"" + inSpec + "\"";
     std::string output;
-    Utils::run_shell_command(cmd, output);
+    runOk(cmd, output);
 
     NL::basic_json<> a = nlohmann::json::parse(output);
     auto it = a.find("description");
