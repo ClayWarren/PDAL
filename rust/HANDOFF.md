@@ -51,6 +51,10 @@ not stable byte contracts.
 - Platform confidence: local evidence is strongest on macOS. Linux, Windows,
   and package-manager CI should be treated as real handoff checks, especially
   Rust/CMake linkage and shared-library paths.
+- Windows STAC execution: Rust STAC preview/probing remains active, but full
+  STAC execution is currently held on the C++ native path after the nested Rust
+  reader path hit an MSVC stack overflow in CI. Non-Windows full STAC execution
+  stays Rust-backed.
 - Native adapters: GDAL/PROJ/GEOS/Nitro/Arrow/TileDB/etc. are not rewritten
   line-by-line. They remain native dependencies behind explicit adapter
   boundaries.
