@@ -14,6 +14,7 @@ required=(
     "rust/Cargo.toml"
     "rust/Cargo.lock"
     "rust/DECISIONS.md"
+    "rust/PARITY.md"
     "rust/PORTING.md"
     "rust/STATUS.md"
     "rust/VENDOR.md"

@@ -153,7 +153,8 @@ Current active milestone:
 1. Keep the two audits green, but do not mistake either for completion:
    `audit_cpp_test_parity.py` is currently `819 / 819`, and
    `audit_cpp_port_backlog.py --include-plugins` is currently `0`
-   port-candidate LOC. Those are guardrails, not the finish line.
+   port-candidate LOC. `rust/PARITY.md` owns the detailed accounting for both.
+   Those are guardrails, not the finish line.
 2. Do not reopen closed caveats in `rust/STATUS.md` as generic porting work.
    OGR/vector-source breadth, remote/STAC/schema breadth, optional plugins,
    and vendor-heavy behavior are accepted native-adapter/deferred boundaries
@@ -531,6 +532,8 @@ Current status:
 - Simple pipeline-shaped commands exist for Rust-backed local workflows.
 - Command-ready filters, implemented commands, and exact regression commands
   live in `rust/STATUS.md`.
+- C++ test-parity counting and implementation-replacement backlog accounting
+  live in `rust/PARITY.md`.
 - Do not add additional kernels unless their lower-layer behavior is already
   Rust-backed and they can be tested against installed PDAL for exit status,
   stdout/stderr shape, and output artifacts.
@@ -543,9 +546,10 @@ Done when:
 
 ## Current Status
 
-The live implementation inventory, status definitions, command-ready filters,
-remaining C++ filter families, and useful regression commands live in
-`rust/STATUS.md`. Keep this file as the roadmap and rules document.
+The live feature inventory, status definitions, command-ready filters,
+remaining C++ filter-family notes, and useful regression commands live in
+`rust/STATUS.md`. C++ parity and implementation-backlog accounting live in
+`rust/PARITY.md`. Keep this file as the roadmap and rules document.
 For draft-PR review, start with `rust/HANDOFF.md`; it is the compact evidence
 packet and points back to the detailed ledgers.
 

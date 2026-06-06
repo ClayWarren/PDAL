@@ -28,7 +28,7 @@ Each first-party C++ file under the mainline areas (`pdal/`, `filters/`, `io/`,
     categorized. This is the actionable backlog.
 
 LOC is non-blank/non-comment code, measured with `cloc` when available to match
-the wrapper-LOC methodology in `rust/STATUS.md`; otherwise a conservative local
+the wrapper-LOC methodology in `rust/PARITY.md`; otherwise a conservative local
 counter keeps the audit runnable on platforms where `cloc` is not packaged.
 
 Usage:

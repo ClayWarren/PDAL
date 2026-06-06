@@ -840,13 +840,21 @@ COVERED: dict[str, object] = {
 
 
 def list_tests(binary: Path, env: dict[str, str]) -> list[str]:
-    result = subprocess.run(
-        [str(binary), "--gtest_list_tests"],
-        check=True,
-        capture_output=True,
-        env=env,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [str(binary), "--gtest_list_tests"],
+            check=True,
+            capture_output=True,
+            env=env,
+            text=True,
+        )
+    except subprocess.CalledProcessError as err:
+        stderr = (err.stderr or "").strip()
+        stdout = (err.stdout or "").strip()
+        detail = stderr or stdout or f"exit status {err.returncode}"
+        raise SystemExit(
+            f"Failed to list GoogleTest cases from {binary}: {detail}"
+        ) from err
     tests: list[str] = []
     suite = ""
     for raw_line in result.stdout.splitlines():

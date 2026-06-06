@@ -70,8 +70,9 @@ not stable byte contracts.
 ## Where To Look
 
 - `PORTING.md`: migration rules and finish-line criteria.
-- `STATUS.md`: live status ledger, C++ parity accounting, and holdout/native
-  adapter classifications.
+- `STATUS.md`: live feature/platform status ledger and accepted-boundary notes.
+- `PARITY.md`: C++ test-parity accounting, implementation-replacement backlog,
+  mixed-test notes, and audit commands.
 - `DECISIONS.md`: settled architecture and release-gate decisions.
 - `VENDOR.md`: vendor/dependency policy.
 - `BENCHMARKS.md`: parity, performance, memory, binary footprint, and build-cost
