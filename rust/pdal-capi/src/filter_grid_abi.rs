@@ -10,7 +10,7 @@ use crate::error::string_to_c_ptr;
 /// # Safety
 ///
 /// `output_type` must be a valid NUL-terminated C-string when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_grid_decimation_validate(
     resolution: f64,
     output_type: *const c_char,
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn pdal_grid_decimation_validate(
 /// # Safety
 ///
 /// `view` and `output_type` must be valid.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_grid_decimation_get_kept_indices(
     view: *const PointView,
     resolution: f64,
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn pdal_grid_decimation_get_kept_indices(
 /// # Safety
 ///
 /// `ptr` must be a valid pointer returned by a pdal allocator or null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_free_u64_array(ptr: *mut u64, len: u64) {
     if !ptr.is_null() {
         let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len as usize));

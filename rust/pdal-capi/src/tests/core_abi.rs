@@ -286,7 +286,7 @@ fn config_helpers_roundtrip_through_c_abi() {
     unsafe {
         assert_eq!(pdal_capi_abi_version_major(), 0);
         assert_eq!(pdal_capi_abi_version_minor(), 2);
-        assert_eq!(pdal_capi_abi_version_patch(), 0);
+        assert_eq!(pdal_capi_abi_version_patch(), 1);
         assert_eq!(
             pdal_capi_abi_version(),
             pdal_capi_abi_version_major() * 1_000_000

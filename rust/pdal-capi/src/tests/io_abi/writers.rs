@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn writer_write_view_consumes_point_view_through_c_abi() {
+fn writer_write_view_borrows_point_view_through_c_abi() {
     unsafe {
         let mut filename = std::env::temp_dir();
         filename.push(format!(
@@ -44,6 +44,7 @@ fn writer_write_view_consumes_point_view_through_c_abi() {
             std::fs::read_to_string(&filename).unwrap(),
             "\"X\",\"Y\",\"Z\"\n1.2,2.5,3.8\n"
         );
+        assert_eq!(pdal_point_view_length(view), 1);
 
         let _ = std::fs::remove_file(&filename);
         pdal_writer_destroy(writer);
@@ -317,6 +318,18 @@ fn writer_write_views_passes_multiple_views_through_c_abi() {
         pdal_point_view_destroy(view_a);
         pdal_point_view_destroy(view_b);
         pdal_options_destroy(options);
+    }
+}
+
+#[test]
+fn writer_write_views_accepts_empty_null_view_array() {
+    unsafe {
+        let writer = pdal_writer_create_null(std::ptr::null());
+        assert!(!writer.is_null());
+
+        assert!(pdal_writer_write_views(writer, std::ptr::null(), 0));
+
+        pdal_writer_destroy(writer);
     }
 }
 

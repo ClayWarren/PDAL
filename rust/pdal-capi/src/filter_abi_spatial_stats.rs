@@ -7,7 +7,7 @@ use std::os::raw::{c_char, c_int};
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_voxeldownsize(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let filter = Box::new(VoxelDownsizeFilter::new(options));
@@ -22,7 +22,7 @@ pub unsafe extern "C" fn pdal_stage_create_voxeldownsize(ops: *const Options) ->
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         match SampleFilter::new(options) {
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn pdal_stage_create_sample(ops: *const Options) -> *mut S
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let edge = if options.has("edge_length") {
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn pdal_stage_create_hexbin(ops: *const Options) -> *mut S
 /// # Safety
 ///
 /// `hexes` must point to `pair_count * 2` valid `int32_t` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_hexgrid_wkt(
     height: f64,
     dense_limit: c_int,
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn pdal_hexgrid_wkt(
 /// # Safety
 ///
 /// `hexes` must point to `pair_count * 2` valid `int32_t` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_h3grid_wkt(
     resolution: u8,
     dense_limit: c_int,
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn pdal_h3grid_wkt(
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_faceraster(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let filter = Box::new(FaceRasterFilter::new(options));
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn pdal_stage_create_faceraster(ops: *const Options) -> *m
 ///
 /// This function is unsafe only to match the C ABI surface; it does not
 /// dereference caller-provided pointers.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut StageWrapper {
     let filter = Box::new(RadialDensityFilter::new(radius));
     Box::into_raw(Box::new(StageWrapper { filter }))
@@ -214,7 +214,7 @@ pub unsafe extern "C" fn pdal_stage_create_radialdensity(radius: f64) -> *mut St
 /// # Safety
 ///
 /// `mode` must either be null or point to a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_nndistance(
     k: u64,
     mode: *const c_char,
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn pdal_stage_create_nndistance(
 /// # Safety
 ///
 /// `dim_name` must be a valid NUL-terminated C-string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_zsmooth(
     radius: f64,
     position: f64,
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn pdal_stage_create_zsmooth(
 /// # Safety
 ///
 /// `method` must be a valid NUL-terminated C-string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_outlier(
     method: *const c_char,
     min_k: u64,
@@ -288,7 +288,7 @@ pub unsafe extern "C" fn pdal_stage_create_outlier(
 /// # Safety
 ///
 /// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_dbscan(
     min_points: u64,
     eps: f64,
@@ -311,14 +311,14 @@ pub unsafe extern "C" fn pdal_stage_create_dbscan(
 }
 
 /// Create a LOF filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_lof(minpts: u64) -> *mut StageWrapper {
     let filter = Box::new(LofFilter::new(minpts as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create an ELM filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_elm(
     cell: f64,
     class_label: u8,
@@ -349,7 +349,7 @@ pub struct pdal_dim_range_t {
 /// NUL-terminated C strings. `ignore` must either be null with a zero count or
 /// point to `ignore_count` `pdal_dim_range_t` whose `dim_name` are
 /// NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_stage_create_smrf(
     cell: f64,
@@ -422,7 +422,7 @@ pub unsafe extern "C" fn pdal_stage_create_smrf(
 ///
 /// `returns` must either be null with a zero count or point to `count`
 /// NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_pmf(
     cell_size: f64,
     exponential: bool,
@@ -471,7 +471,7 @@ pub unsafe extern "C" fn pdal_stage_create_pmf(
 }
 
 /// Create a Li tree filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_litree(
     min_points: u64,
     min_height: f64,
@@ -487,7 +487,7 @@ pub extern "C" fn pdal_stage_create_litree(
 ///
 /// `view1`, `view2`, and `cores` must be valid point-view pointers returned by
 /// the Rust C ABI.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_m3c2_compute(
     view1: *const PointView,
     view2: *const PointView,
@@ -535,7 +535,7 @@ pub unsafe extern "C" fn pdal_m3c2_compute(
 }
 
 /// Create a skewness balancing filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_skewnessbalancing(
     ground_class: u8,
     other_class: u8,
@@ -554,7 +554,7 @@ pub extern "C" fn pdal_stage_create_skewnessbalancing(
 /// # Safety
 ///
 /// `dim_name` must be a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_iqr(
     multiplier: f64,
     dim_name: *const c_char,
@@ -572,7 +572,7 @@ pub unsafe extern "C" fn pdal_stage_create_iqr(
 /// # Safety
 ///
 /// `dim_name` must be a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_mad(
     multiplier: f64,
     dim_name: *const c_char,
@@ -587,7 +587,7 @@ pub unsafe extern "C" fn pdal_stage_create_mad(
 }
 
 /// Create a HAG nearest-neighbor filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_hagnn(
     count: u64,
     max_distance: f64,
@@ -604,7 +604,7 @@ pub extern "C" fn pdal_stage_create_hagnn(
 }
 
 /// Create a HAG Delaunay filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_hag_delaunay(
     count: u64,
     allow_extrapolation: bool,
@@ -619,7 +619,7 @@ pub extern "C" fn pdal_stage_create_hag_delaunay(
 }
 
 /// Create a cluster filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_cluster(
     min_points: u64,
     max_points: u64,
@@ -636,14 +636,14 @@ pub extern "C" fn pdal_stage_create_cluster(
 }
 
 /// Create a supervoxel filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_supervoxel(knn: u64, resolution: f64) -> *mut StageWrapper {
     let filter = Box::new(SupervoxelFilter::new(knn as usize, resolution));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create a sparse surface filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_sparsesurface(
     radius: f64,
     ground_class: u8,
@@ -662,35 +662,35 @@ pub extern "C" fn pdal_stage_create_sparsesurface(
 }
 
 /// Create a voxel center nearest neighbor filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_voxelcenternearestneighbor(cell: f64) -> *mut StageWrapper {
     let filter = Box::new(VoxelCenterNearestNeighborFilter::new(cell));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create a voxel centroid nearest neighbor filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_voxelcentroidnearestneighbor(cell: f64) -> *mut StageWrapper {
     let filter = Box::new(VoxelCentroidNearestNeighborFilter::new(cell));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create a reciprocity filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_reciprocity(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(ReciprocityFilter::new(knn as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create an estimate rank filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_estimaterank(knn: u64, threshold: f64) -> *mut StageWrapper {
     let filter = Box::new(EstimateRankFilter::new(knn as usize, threshold));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create an approximate coplanar filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_approximatecoplanar(
     knn: u64,
     threshold1: f64,
@@ -705,21 +705,21 @@ pub extern "C" fn pdal_stage_create_approximatecoplanar(
 }
 
 /// Create a plane fit filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_planefit(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(PlaneFitFilter::new(knn as usize));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create a miniball filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_miniball(knn: u64) -> *mut StageWrapper {
     let filter = Box::new(MiniballFilter::new(knn));
     Box::into_raw(Box::new(StageWrapper { filter }))
 }
 
 /// Create an eigenvalues filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_eigenvalues(
     knn: u64,
     normalize: bool,
@@ -743,7 +743,7 @@ pub extern "C" fn pdal_stage_create_eigenvalues(
 /// # Safety
 /// `dims` must be a valid array of `dim_count` NUL-terminated C strings, or
 /// null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_covariancefeatures(
     knn: u64,
     has_radius: bool,
@@ -780,7 +780,7 @@ pub unsafe extern "C" fn pdal_stage_create_covariancefeatures(
 /// Create a normal-estimation filter stage.
 ///
 /// `knn` is the effective neighbor count (including the query point).
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_normal(
     knn: u64,
     has_radius: bool,
@@ -806,7 +806,7 @@ pub extern "C" fn pdal_stage_create_normal(
 ///
 /// `count` is the target output point count. When `has_seed` is false the
 /// shuffle is seeded from the wall clock, matching the C++ default.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_relaxationdartthrowing(
     decay: f64,
     radius: f64,
@@ -834,7 +834,7 @@ pub extern "C" fn pdal_stage_create_relaxationdartthrowing(
 /// # Safety
 ///
 /// `polyline` must be a valid NUL-terminated C string when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_straighten(
     polyline: *const c_char,
     reverse: bool,
@@ -859,7 +859,7 @@ pub unsafe extern "C" fn pdal_stage_create_straighten(
 ///
 /// `dims` must be null with `dim_count` zero, or point to `dim_count` valid
 /// C strings naming the clustering dimensions.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_lloydkmeans(
     k: u64,
     maxiters: u64,
@@ -885,7 +885,7 @@ pub unsafe extern "C" fn pdal_stage_create_lloydkmeans(
 }
 
 /// Create an optimal neighborhood filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_optimalneighborhood(
     min_k: u64,
     max_k: u64,

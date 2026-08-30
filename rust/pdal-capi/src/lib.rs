@@ -5,6 +5,9 @@
 
 #![allow(clippy::missing_safety_doc)]
 
+#[cfg(not(panic = "unwind"))]
+compile_error!("pdal-capi requires panic=unwind so C ABI boundaries can contain Rust panics");
+
 mod artifact_abi;
 mod color_ramps_abi;
 mod column_storage_abi;

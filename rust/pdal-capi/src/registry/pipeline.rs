@@ -240,7 +240,7 @@ fn add_explicit_inputs(
 ///
 /// # Safety
 /// `json` must be a valid null-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_create_json(json: *const c_char) -> *mut PipelineHandle {
     clear_last_error();
     if json.is_null() {

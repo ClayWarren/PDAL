@@ -8,7 +8,7 @@ use std::os::raw::c_char;
 // ---------------------------------------------------------------------------
 
 /// Create a new, empty options set. Returns an owned pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_options_create() -> *mut Options {
     Box::into_raw(Box::new(Options::new()))
 }
@@ -18,7 +18,7 @@ pub extern "C" fn pdal_options_create() -> *mut Options {
 /// # Safety
 ///
 /// `json` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_from_json_object_text(json: *const c_char) -> *mut Options {
     if json.is_null() {
         set_last_error("null JSON options text");
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn pdal_options_from_json_object_text(json: *const c_char)
 /// # Safety
 ///
 /// `text` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_from_command_line_text(text: *const c_char) -> *mut Options {
     if text.is_null() {
         set_last_error("null command-line options text");
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn pdal_options_from_command_line_text(text: *const c_char
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_add_f64(ops: *mut Options, key: *const c_char, value: f64) {
     if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
         let k = CStr::from_ptr(key).to_string_lossy();
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn pdal_options_add_f64(ops: *mut Options, key: *const c_c
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_add_u64(ops: *mut Options, key: *const c_char, value: u64) {
     if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
         let k = CStr::from_ptr(key).to_string_lossy();
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn pdal_options_add_u64(ops: *mut Options, key: *const c_c
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` and `value` must be valid, NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_add_str(
     ops: *mut Options,
     key: *const c_char,
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn pdal_options_add_str(
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` and `value` must be valid, NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_add_conditional_str(
     ops: *mut Options,
     key: *const c_char,
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn pdal_options_add_conditional_str(
 /// # Safety
 ///
 /// `ops` and `other` must be valid pointers returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_extend(ops: *mut Options, other: *const Options) {
     if let (Some(ops), Some(other)) = (ops.as_mut(), other.as_ref()) {
         ops.extend(other);
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn pdal_options_extend(ops: *mut Options, other: *const Op
 /// # Safety
 ///
 /// `ops` and `other` must be valid pointers returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_extend_conditional(ops: *mut Options, other: *const Options) {
     if let (Some(ops), Some(other)) = (ops.as_mut(), other.as_ref()) {
         ops.extend_conditional(other);
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn pdal_options_extend_conditional(ops: *mut Options, othe
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_remove(ops: *mut Options, key: *const c_char) {
     if let (Some(ops), false) = (ops.as_mut(), key.is_null()) {
         let k = CStr::from_ptr(key).to_string_lossy();
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn pdal_options_remove(ops: *mut Options, key: *const c_ch
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` and `value` must be valid, NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_replace_str(
     ops: *mut Options,
     key: *const c_char,
@@ -196,7 +196,7 @@ pub unsafe extern "C" fn pdal_options_replace_str(
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_has(ops: *const Options, key: *const c_char) -> bool {
     if ops.is_null() || key.is_null() {
         return false;
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn pdal_options_has(ops: *const Options, key: *const c_cha
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_count(ops: *const Options) -> u64 {
     ops.as_ref().map_or(0, |ops| ops.len() as u64)
 }
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn pdal_options_count(ops: *const Options) -> u64 {
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// The returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_key(ops: *const Options, index: u64) -> *mut c_char {
     let Some(ops) = ops.as_ref() else {
         return std::ptr::null_mut();
@@ -238,7 +238,7 @@ pub unsafe extern "C" fn pdal_options_key(ops: *const Options, index: u64) -> *m
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// The returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_entry_value(ops: *const Options, index: u64) -> *mut c_char {
     let Some(ops) = ops.as_ref() else {
         return std::ptr::null_mut();
@@ -255,7 +255,7 @@ pub unsafe extern "C" fn pdal_options_entry_value(ops: *const Options, index: u6
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `key` must be a valid, NUL-terminated C string.
 /// The returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_value(
     ops: *const Options,
     key: *const c_char,
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn pdal_options_value(
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// The returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_command_line_json(ops: *const Options) -> *mut c_char {
     let Some(ops) = ops.as_ref() else {
         return std::ptr::null_mut();
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn pdal_options_command_line_json(ops: *const Options) -> 
 /// # Safety
 ///
 /// `name` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_option_name_valid(name: *const c_char) -> bool {
     if name.is_null() {
         return false;
@@ -307,7 +307,7 @@ pub unsafe extern "C" fn pdal_option_name_valid(name: *const c_char) -> bool {
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`, or null.
 /// Must not be called twice on the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_options_destroy(ops: *mut Options) {
     if !ops.is_null() {
         drop(Box::from_raw(ops));

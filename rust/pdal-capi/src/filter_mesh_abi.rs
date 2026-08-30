@@ -11,7 +11,7 @@ use pdal_filters::greedyprojection;
 /// # Safety
 ///
 /// `view` and `out_len` must be valid pointers, or `view` may be null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_delaunay_triangulate(
     view: *const PointView,
     out_len: *mut u64,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn pdal_delaunay_triangulate(
 /// # Safety
 ///
 /// `view` and `out_len` must be valid pointers, or `view` may be null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_greedyprojection_triangulate(
     view: *const PointView,
     mu: f64,

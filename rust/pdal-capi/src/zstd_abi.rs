@@ -21,7 +21,7 @@ unsafe fn input_slice<'a>(buf: *const c_char, len: usize) -> &'a [u8] {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_zstd_compressor_create(level: i32) -> *mut ZstdCompressorHandle {
     match zstd::stream::write::Encoder::new(Vec::new(), level) {
         Ok(inner) => Box::into_raw(Box::new(ZstdCompressorHandle { inner: Some(inner) })),
@@ -32,7 +32,7 @@ pub extern "C" fn pdal_zstd_compressor_create(level: i32) -> *mut ZstdCompressor
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_compressor_update(
     handle: *mut ZstdCompressorHandle,
     buf: *const c_char,
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn pdal_zstd_compressor_update(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_compressor_finish(
     handle: *mut ZstdCompressorHandle,
     out_buf: *mut *mut u8,
@@ -82,14 +82,14 @@ pub unsafe extern "C" fn pdal_zstd_compressor_finish(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_compressor_destroy(handle: *mut ZstdCompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_zstd_decompressor_create() -> *mut ZstdDecompressorHandle {
     match zstd::stream::write::Decoder::new(Vec::new()) {
         Ok(inner) => Box::into_raw(Box::new(ZstdDecompressorHandle { inner: Some(inner) })),
@@ -100,7 +100,7 @@ pub extern "C" fn pdal_zstd_decompressor_create() -> *mut ZstdDecompressorHandle
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_decompressor_update(
     handle: *mut ZstdDecompressorHandle,
     buf: *const c_char,
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn pdal_zstd_decompressor_update(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_decompressor_finish(
     handle: *mut ZstdDecompressorHandle,
     out_buf: *mut *mut u8,
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn pdal_zstd_decompressor_finish(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_zstd_decompressor_destroy(handle: *mut ZstdDecompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));

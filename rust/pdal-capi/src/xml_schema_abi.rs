@@ -9,7 +9,7 @@ use std::os::raw::c_char;
 /// # Safety
 ///
 /// `name` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_xml_schema_remap_old_name(name: *const c_char) -> *mut c_char {
     string_to_c_ptr(remap_old_dimension_name(&c_string_lossy(name)))
 }

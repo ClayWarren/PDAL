@@ -85,7 +85,7 @@ pub(crate) fn dim_type_to_id(ty: DimType) -> i32 {
 // ---------------------------------------------------------------------------
 
 /// Create a new, empty point layout. Returns an owned pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_point_layout_create() -> *mut PointLayout {
     Box::into_raw(Box::new(PointLayout::new()))
 }
@@ -96,7 +96,7 @@ pub extern "C" fn pdal_point_layout_create() -> *mut PointLayout {
 ///
 /// `layout` must be a valid pointer returned by `pdal_point_layout_create`.
 /// `name` must be a valid, NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_layout_register_dim(
     layout: *mut PointLayout,
     name: *const c_char,
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn pdal_point_layout_register_dim(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_dimension_resolve_type(type1: i32, type2: i32) -> i32 {
     if type1 < 0 || type2 < 0 {
         return 0;
@@ -116,7 +116,7 @@ pub extern "C" fn pdal_dimension_resolve_type(type1: i32, type2: i32) -> i32 {
     resolve_pdal_dimension_type(type1 as u32, type2 as u32) as i32
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_dimension_interpretation_name(type_id: i32) -> *mut c_char {
     if type_id < 0 {
         return string_to_c_ptr("unknown".to_string());
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn pdal_dimension_interpretation_name(type_id: i32) -> *mu
     string_to_c_ptr(core_dimension_interpretation_name(type_id as u32).to_string())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_dimension_type_from_name(name: *const c_char) -> i32 {
     if name.is_null() {
         return 0;
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn pdal_dimension_type_from_name(name: *const c_char) -> i
     core_dimension_type_from_name(&name) as i32
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_dimension_type_from_base_and_size(
     base: *const c_char,
     size: u64,
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn pdal_dimension_type_from_base_and_size(
     core_dimension_type_from_base_and_size(&base, size as usize) as i32
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_dimension_fix_name(name: *const c_char) -> *mut c_char {
     let name = if name.is_null() {
         String::new()
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn pdal_dimension_fix_name(name: *const c_char) -> *mut c_
 /// `layout` must be a valid pointer returned by `pdal_point_layout_create`,
 /// or null. Must not be called twice on the same pointer. Must not be called
 /// after the layout has been consumed by `pdal_point_view_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_layout_destroy(layout: *mut PointLayout) {
     if !layout.is_null() {
         drop(Box::from_raw(layout));
@@ -180,7 +180,7 @@ pub unsafe extern "C" fn pdal_point_layout_destroy(layout: *mut PointLayout) {
 /// `layout` must be a valid pointer returned by `pdal_point_layout_create`.
 /// Ownership of the layout is transferred — the caller must **not** call
 /// `pdal_point_layout_destroy` on it after this call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_create(layout: *mut PointLayout) -> *mut PointView {
     if layout.is_null() {
         return std::ptr::null_mut();
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn pdal_point_view_create(layout: *mut PointLayout) -> *mu
 /// # Safety
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_add_point(view: *mut PointView) -> u64 {
     if let Some(view) = view.as_mut() {
         view.add_point()
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn pdal_point_view_add_point(view: *mut PointView) -> u64 
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
 /// `dim_name` must be a valid, NUL-terminated C string.
 /// `idx` must be less than the number of points in the view.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_set_f64(
     view: *mut PointView,
     idx: u64,
@@ -223,7 +223,7 @@ pub unsafe extern "C" fn pdal_point_view_set_f64(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_try_set_f64(
     view: *mut PointView,
     idx: u64,
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn pdal_point_view_try_set_f64(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
 /// `dim_name` must be a valid, NUL-terminated C string.
 /// `idx` must be less than the number of points in the view.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_set_u64(
     view: *mut PointView,
     idx: u64,
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn pdal_point_view_set_u64(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
 /// `dim_name` must be a valid, NUL-terminated C string.
 /// `idx` must be less than the number of points in the view.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_u64(
     view: *mut PointView,
     idx: u64,
@@ -299,7 +299,7 @@ pub unsafe extern "C" fn pdal_point_view_get_u64(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
 /// `dim_name` must be a valid, NUL-terminated C string.
 /// `idx` must be less than the number of points in the view.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_f64(
     view: *mut PointView,
     idx: u64,
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn pdal_point_view_get_f64(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_point_f64s(
     view: *const PointView,
     idx: u64,
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn pdal_point_view_get_point_f64s(
     count as u64
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_u8(
     view: *mut PointView,
     idx: u64,
@@ -360,7 +360,7 @@ pub unsafe extern "C" fn pdal_point_view_get_u8(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_i32(
     view: *mut PointView,
     idx: u64,
@@ -378,7 +378,7 @@ pub unsafe extern "C" fn pdal_point_view_get_i32(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_get_f32(
     view: *mut PointView,
     idx: u64,
@@ -402,7 +402,7 @@ pub unsafe extern "C" fn pdal_point_view_get_f32(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_dim_count(view: *const PointView) -> u64 {
     if let Some(view) = view.as_ref() {
         view.layout().dim_count() as u64
@@ -420,7 +420,7 @@ pub unsafe extern "C" fn pdal_point_view_dim_count(view: *const PointView) -> u6
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_dim_name(view: *const PointView, idx: u64) -> *mut c_char {
     if let Some(view) = view.as_ref() {
         if let Some((id, _)) = view.layout().dim_at(idx as usize) {
@@ -438,7 +438,7 @@ pub unsafe extern "C" fn pdal_point_view_dim_name(view: *const PointView, idx: u
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_point_view_dim_type(view: *const PointView, idx: u64) -> i32 {
     if let Some(view) = view.as_ref() {
         if let Some((_, ty)) = view.layout().dim_at(idx as usize) {
@@ -455,7 +455,7 @@ pub unsafe extern "C" fn pdal_point_view_dim_type(view: *const PointView, idx: u
 /// `view` must be a valid pointer returned by `pdal_point_view_create`.
 /// `srs` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_set_spatial_reference(
     view: *mut PointView,
     srs: *const SpatialReference,
@@ -472,7 +472,7 @@ pub unsafe extern "C" fn pdal_point_view_set_spatial_reference(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_spatial_reference(
     view: *const PointView,
 ) -> *mut SpatialReference {
@@ -489,7 +489,7 @@ pub unsafe extern "C" fn pdal_point_view_spatial_reference(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_id(view: *const PointView) -> u64 {
     if let Some(view) = view.as_ref() {
         view.id()
@@ -504,7 +504,7 @@ pub unsafe extern "C" fn pdal_point_view_id(view: *const PointView) -> u64 {
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_length(view: *mut PointView) -> u64 {
     if let Some(view) = view.as_ref() {
         view.len()
@@ -519,7 +519,7 @@ pub unsafe extern "C" fn pdal_point_view_length(view: *mut PointView) -> u64 {
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx: u64) -> u64 {
     if let Some(view) = view.as_ref() {
         view.source_index(idx)
@@ -534,7 +534,7 @@ pub unsafe extern "C" fn pdal_point_view_source_index(view: *mut PointView, idx:
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_swap_points(view: *mut PointView, a: u64, b: u64) -> bool {
     if let Some(view) = view.as_mut() {
         view.swap_points(a, b)
@@ -552,7 +552,7 @@ pub unsafe extern "C" fn pdal_point_view_swap_points(view: *mut PointView, a: u6
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `out_bounds` must point to writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_calculate_bounds_2d(
     view: *const PointView,
     out_bounds: *mut pdal_bounds2d_t,
@@ -585,7 +585,7 @@ pub unsafe extern "C" fn pdal_point_view_calculate_bounds_2d(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `out_bounds` must point to writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_calculate_bounds_3d(
     view: *const PointView,
     out_bounds: *mut pdal_bounds3d_t,

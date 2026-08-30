@@ -12,7 +12,7 @@ use std::os::raw::c_char;
 ///
 /// `path` must be null or a valid NUL-terminated C string. `out_offset` and
 /// `out_length` must be valid for writes (non-null).
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_nitf_lidar_segment(
     path: *const c_char,
     out_offset: *mut u64,
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn pdal_nitf_lidar_segment(
 ///
 /// `path` must be null or a valid NUL-terminated C string. `cb` must be a
 /// callable function pointer with the documented signature.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_nitf_read_metadata(
     path: *const c_char,
     cb: Option<
@@ -131,7 +131,7 @@ pub struct pdal_nitf_write_options_t {
 /// `input_path` and `output_path` must be valid NUL-terminated C strings.
 /// `opts` must point to a fully-initialized `pdal_nitf_write_options_t`. Any
 /// non-null `aimidb`/`acftb` entries must terminate with a null pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_nitf_write(
     input_path: *const c_char,
     output_path: *const c_char,

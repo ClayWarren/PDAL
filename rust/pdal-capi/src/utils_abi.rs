@@ -11,7 +11,7 @@ use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_is_json(value: *const c_char) -> bool {
     if value.is_null() {
         return false;
@@ -47,17 +47,17 @@ unsafe fn c_bytes(ptr: *const c_char) -> Vec<u8> {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_trim_leading(value: *const c_char) -> *mut c_char {
     string_to_c(trim_leading(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_trim_trailing(value: *const c_char) -> *mut c_char {
     string_to_c(trim_trailing(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_replace_all(
     value: *const c_char,
     replace_what: *const c_char,
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn pdal_utils_replace_all(
 ///
 /// `command` must be a valid NUL-terminated C string. `out_output`, when
 /// non-null, must be a valid pointer to write the output string handle to.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 1)]
 pub unsafe extern "C" fn pdal_utils_run_shell_command(
     command: *const c_char,
     out_output: *mut *mut c_char,
@@ -92,22 +92,22 @@ pub unsafe extern "C" fn pdal_utils_run_shell_command(
     status
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_to_lower(value: *const c_char) -> *mut c_char {
     string_to_c(to_lower(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_to_upper(value: *const c_char) -> *mut c_char {
     string_to_c(to_upper(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_iequals(left: *const c_char, right: *const c_char) -> bool {
     iequals(&c_string(left), &c_string(right))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_starts_with(
     value: *const c_char,
     prefix: *const c_char,
@@ -115,13 +115,13 @@ pub unsafe extern "C" fn pdal_utils_starts_with(
     starts_with(&c_string(value), &c_string(prefix))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_split_char(value: *const c_char, split: c_char) -> *mut c_char {
     let split = split.to_ne_bytes()[0] as char;
     string_list_to_c(split_char(&c_string(value), split))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_split2_char(
     value: *const c_char,
     split: c_char,
@@ -130,12 +130,12 @@ pub unsafe extern "C" fn pdal_utils_split2_char(
     string_list_to_c(split2_char(&c_string(value), split))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_escape_json(value: *const c_char) -> *mut c_char {
     string_to_c(escape_json(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_canonical_json(value: *const c_char) -> *mut c_char {
     if value.is_null() {
         return ptr::null_mut();
@@ -151,17 +151,17 @@ pub unsafe extern "C" fn pdal_utils_canonical_json(value: *const c_char) -> *mut
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_escape_nonprinting(value: *const c_char) -> *mut c_char {
     bytes_to_c(escape_nonprinting_bytes(&c_bytes(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_utils_normalize_longitude(longitude: f64) -> f64 {
     normalize_longitude(longitude)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_word_wrap(
     value: *const c_char,
     line_length: u64,
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn pdal_utils_word_wrap(
     ))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_word_wrap2(
     value: *const c_char,
     line_length: u64,
@@ -187,12 +187,12 @@ pub unsafe extern "C" fn pdal_utils_word_wrap2(
     ))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_simple_wordexp(value: *const c_char) -> *mut c_char {
     string_list_to_c(simple_wordexp(&c_string(value)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_base64_encode(bytes: *const u8, len: u64) -> *mut c_char {
     if len == 0 {
         return string_to_c(String::new());
@@ -204,7 +204,7 @@ pub unsafe extern "C" fn pdal_utils_base64_encode(bytes: *const u8, len: u64) ->
     string_to_c(base64_encode(bytes))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_base64_decode(
     value: *const c_char,
     out_len: *mut u64,
@@ -222,14 +222,14 @@ pub unsafe extern "C" fn pdal_utils_base64_decode(
     ptr
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_u8_array_free(ptr: *mut u8, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_extract_c_string(
     bytes: *const u8,
     len: u64,
@@ -247,12 +247,12 @@ pub unsafe extern "C" fn pdal_utils_extract_c_string(
     string_to_c(extract_c_string(bytes, offset as usize, count as usize))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub extern "C" fn pdal_charbuf_seekpos(pos: i64, offset: i64, len: i64, for_output: bool) -> i64 {
     charbuf_seekpos(pos, offset, len, for_output).unwrap_or(-1)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub extern "C" fn pdal_charbuf_seekoff(
     off: i64,
     dir: u8,
@@ -263,7 +263,7 @@ pub extern "C" fn pdal_charbuf_seekoff(
     charbuf_seekoff(off, dir, offset, len, current).unwrap_or(-1)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_getenv(name: *const c_char) -> *mut c_char {
     if name.is_null() {
         return ptr::null_mut();
@@ -274,7 +274,7 @@ pub unsafe extern "C" fn pdal_utils_getenv(name: *const c_char) -> *mut c_char {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_utils_setenv(name: *const c_char, value: *const c_char) -> i32 {
     if name.is_null() || value.is_null() {
         return -1;
@@ -282,7 +282,7 @@ pub unsafe extern "C" fn pdal_utils_setenv(name: *const c_char, value: *const c_
     set_env(&c_string(name), &c_string(value))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_utils_unsetenv(name: *const c_char) -> i32 {
     if name.is_null() {
         return -1;
@@ -290,32 +290,32 @@ pub unsafe extern "C" fn pdal_utils_unsetenv(name: *const c_char) -> i32 {
     unset_env(&c_string(name))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_utils_random_seed(seed: u32) {
     random_seed(seed);
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_utils_random(minimum: f64, maximum: f64) -> f64 {
     random(minimum, maximum)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_utils_compare_approx(v1: f64, v2: f64, tolerance: f64) -> bool {
     compare_approx(v1, v2, tolerance)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_to_string_f64(value: f64, precision: u32) -> *mut c_char {
     string_to_c(format_f64(value, precision))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_utils_to_string_i32(value: i32) -> *mut c_char {
     string_to_c(format_i32(value))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_utils_from_string_i32(value: *const c_char, out: *mut i32) -> i32 {
     if value.is_null() || out.is_null() {
         return -1;
@@ -332,7 +332,7 @@ pub unsafe extern "C" fn pdal_utils_from_string_i32(value: *const c_char, out: *
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_numeric_cast_f32_to_f64(value: f32, out: *mut f64) -> bool {
     if out.is_null() {
         return false;
@@ -345,7 +345,7 @@ pub unsafe extern "C" fn pdal_utils_numeric_cast_f32_to_f64(value: f32, out: *mu
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_utils_numeric_cast_f64_to_f32(value: f64, out: *mut f32) -> bool {
     if out.is_null() {
         return false;
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn pdal_utils_numeric_cast_f64_to_f32(value: f64, out: *mu
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_utils_from_string_f64(value: *const c_char, out: *mut f64) -> i32 {
     if value.is_null() || out.is_null() {
         return -1;
@@ -418,17 +418,17 @@ fn filename_string(path: &str) -> String {
         .unwrap_or_default()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_file_utils_getcwd() -> *mut c_char {
     string_to_c(current_dir_with_slash())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_to_absolute_path(filename: *const c_char) -> *mut c_char {
     string_to_c(path_string(absolute_path(&c_string(filename))))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_to_absolute_path_with_base(
     filename: *const c_char,
     base: *const c_char,
@@ -438,12 +438,12 @@ pub unsafe extern "C" fn pdal_file_utils_to_absolute_path_with_base(
     string_to_c(path_string(PathBuf::from(base).join(filename)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_get_filename(path: *const c_char) -> *mut c_char {
     string_to_c(filename_string(&c_string(path)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_get_directory(path: *const c_char) -> *mut c_char {
     let path = c_string(path);
     let directory = Path::new(&path)
@@ -453,7 +453,7 @@ pub unsafe extern "C" fn pdal_file_utils_get_directory(path: *const c_char) -> *
     string_to_c(add_trailing_slash(directory))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_stem(path: *const c_char) -> *mut c_char {
     let filename = filename_string(&c_string(path));
     if filename == "." || filename == ".." {
@@ -466,7 +466,7 @@ pub unsafe extern "C" fn pdal_file_utils_stem(path: *const c_char) -> *mut c_cha
     string_to_c(stem)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_extension(path: *const c_char) -> *mut c_char {
     let path = c_string(path);
     let extension = path
@@ -476,20 +476,20 @@ pub unsafe extern "C" fn pdal_file_utils_extension(path: *const c_char) -> *mut 
     string_to_c(extension)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_is_absolute_path(path: *const c_char) -> bool {
     let path = c_string(path);
     path.contains("://") || Path::new(&path).is_absolute()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_directory_exists(dirname: *const c_char) -> bool {
     let path_str = c_string(dirname);
     let path = Path::new(&path_str);
     path.is_dir()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_file_utils_create_directory(dirname: *const c_char) -> i32 {
     let path_str = c_string(dirname);
     let path = Path::new(&path_str);
@@ -506,7 +506,7 @@ pub unsafe extern "C" fn pdal_file_utils_create_directory(dirname: *const c_char
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_file_utils_create_directories(path: *const c_char) -> i32 {
     let path_str = c_string(path);
     let path = Path::new(&path_str);
@@ -526,34 +526,34 @@ pub unsafe extern "C" fn pdal_file_utils_create_directories(path: *const c_char)
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_delete_directory(dirname: *const c_char) {
     let path_str = c_string(dirname);
     let path = Path::new(&path_str);
     let _ = std::fs::remove_dir_all(path);
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_delete_file(filename: *const c_char) -> bool {
     let path_str = c_string(filename);
     let path = Path::new(&path_str);
     std::fs::remove_file(path).is_ok()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_rename_file(dest: *const c_char, src: *const c_char) {
     let dest_str = c_string(dest);
     let src_str = c_string(src);
     let _ = std::fs::rename(Path::new(&src_str), Path::new(&dest_str));
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_file_exists(filename: *const c_char) -> bool {
     let path_str = c_string(filename);
     Path::new(&path_str).exists()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_file_size(filename: *const c_char) -> u64 {
     let path_str = c_string(filename);
     std::fs::metadata(Path::new(&path_str))
@@ -572,7 +572,7 @@ pub unsafe extern "C" fn pdal_file_utils_file_size(filename: *const c_char) -> u
 ///
 /// `filename` must be null or a valid NUL-terminated C string. `out_len` must
 /// be null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(
     filename: *const c_char,
     out_len: *mut u64,
@@ -600,7 +600,7 @@ pub unsafe extern "C" fn pdal_file_utils_read_file_into_string(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) -> *mut c_char {
     let path_str = c_string(dirname);
     let path = Path::new(&path_str);
@@ -617,7 +617,7 @@ pub unsafe extern "C" fn pdal_file_utils_directory_list(dirname: *const c_char) 
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_utils_glob(pattern: *const c_char) -> *mut c_char {
     if pattern.is_null() {
         return string_to_c(String::new());
@@ -663,7 +663,15 @@ fn rotate(point: pdal_xyz_t, matrix: &pdal_rotation_matrix_t) -> pdal_xyz_t {
     }
 }
 
-#[no_mangle]
+/// Convert a scanner-relative measurement to WGS84 coordinates.
+///
+/// An internal panic returns an all-NaN coordinate and records the panic via
+/// `pdal_last_error`, so callers never mistake the fallback for a valid point.
+#[pdal_capi_macros::ffi_export(fallback = pdal_xyz_t {
+    x: f64::NAN,
+    y: f64::NAN,
+    z: f64::NAN,
+})]
 pub extern "C" fn pdal_georeference_wgs84(
     range: f64,
     scan_angle: f64,
@@ -702,7 +710,7 @@ fn mag2(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
     (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 #[allow(clippy::too_many_arguments)]
 pub extern "C" fn pdal_barycentric_interpolation(
     x1: f64,
@@ -755,7 +763,7 @@ pub extern "C" fn pdal_barycentric_interpolation(
     (area12 * z3 + area23 * z1 + area31 * z2) / area_total
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = u32::MAX)]
 pub unsafe extern "C" fn pdal_support_diff_files(
     file1: *const c_char,
     file2: *const c_char,
@@ -778,7 +786,7 @@ pub unsafe extern "C" fn pdal_support_diff_files(
     diff_files(&f1, &f2, starts, lengths)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = u32::MAX)]
 pub unsafe extern "C" fn pdal_support_diff_text_files(
     file1: *const c_char,
     file2: *const c_char,

@@ -25,7 +25,7 @@ use std::os::raw::c_char;
 /// # Safety
 ///
 /// `input_path` and `output_template` must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_tile(
     input_path: *const c_char,
     output_template: *const c_char,

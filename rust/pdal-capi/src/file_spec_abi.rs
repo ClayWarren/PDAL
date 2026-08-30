@@ -4,7 +4,7 @@ use serde_json::json;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_file_spec_parse_json(input: *const c_char) -> *mut c_char {
     let input = if input.is_null() {
         "null".to_string()

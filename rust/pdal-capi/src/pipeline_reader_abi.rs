@@ -12,7 +12,7 @@ use std::os::raw::c_char;
 ///
 /// # Safety
 /// `json` must be a valid null-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_reader_parse_json(json: *const c_char) -> *mut c_char {
     if json.is_null() {
         set_last_error("Pipeline: null pipeline JSON.");
@@ -36,7 +36,7 @@ pub unsafe extern "C" fn pdal_pipeline_reader_parse_json(json: *const c_char) ->
 ///
 /// # Safety
 /// `json` must be a valid null-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_serialize_json(json: *const c_char) -> *mut c_char {
     if json.is_null() {
         set_last_error("Pipeline: null pipeline JSON.");

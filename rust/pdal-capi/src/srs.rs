@@ -15,7 +15,7 @@ use std::os::raw::c_char;
 /// # Safety
 ///
 /// `text` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_create(
     text: *const c_char,
 ) -> *mut SpatialReference {
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_create(
 /// # Safety
 ///
 /// `text` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_create_with_epoch(
     text: *const c_char,
     epoch: f64,
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_create_with_epoch(
 ///
 /// `srs` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_empty(srs: *const SpatialReference) -> bool {
     srs.as_ref().map(|s| s.is_empty()).unwrap_or(true)
 }
@@ -62,7 +62,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_empty(srs: *const SpatialReferen
 ///
 /// `srs` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_text(srs: *const SpatialReference) -> *mut c_char {
     string_to_c_ptr(
         srs.as_ref()
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_text(srs: *const SpatialReferenc
 ///
 /// `srs` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_epoch(srs: *const SpatialReference) -> f64 {
     srs.as_ref().map(|s| s.epoch()).unwrap_or(0.0)
 }
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_epoch(srs: *const SpatialReferen
 /// # Safety
 ///
 /// `srs` must be a valid pointer returned by `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_set_epoch(srs: *mut SpatialReference, epoch: f64) {
     if let Some(srs) = srs.as_mut() {
         srs.set_epoch(epoch);
@@ -100,7 +100,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_set_epoch(srs: *mut SpatialRefer
 ///
 /// `srs` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_to_metadata(
     srs: *const SpatialReference,
 ) -> *mut MetadataNode {
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_to_metadata(
 }
 
 /// Create an empty spatial-reference list. Caller owns the returned pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_spatial_reference_list_create() -> *mut SpatialReferenceList {
     Box::into_raw(Box::new(SpatialReferenceList::new()))
 }
@@ -123,7 +123,7 @@ pub extern "C" fn pdal_spatial_reference_list_create() -> *mut SpatialReferenceL
 ///
 /// `list` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_list_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_clear(list: *mut SpatialReferenceList) {
     if let Some(list) = list.as_mut() {
         list.clear();
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_list_clear(list: *mut SpatialRef
 /// `list` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_list_create`. `srs` must be null or a valid pointer
 /// returned by `pdal_spatial_reference_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_add(
     list: *mut SpatialReferenceList,
     srs: *const SpatialReference,
@@ -153,7 +153,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_list_add(
 ///
 /// `list` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_list_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_unique(
     list: *const SpatialReferenceList,
 ) -> bool {
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_list_unique(
 ///
 /// `list` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_list_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_size(
     list: *const SpatialReferenceList,
 ) -> u64 {
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn pdal_spatial_reference_list_size(
 ///
 /// `list` must be null or a valid pointer returned by
 /// `pdal_spatial_reference_list_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_any(
     list: *const SpatialReferenceList,
 ) -> *mut SpatialReference {
@@ -197,19 +197,19 @@ pub unsafe extern "C" fn pdal_spatial_reference_list_any(
 /// `list` must be a valid pointer returned by
 /// `pdal_spatial_reference_list_create`, or null. Must not be called twice on
 /// the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_list_destroy(list: *mut SpatialReferenceList) {
     if !list.is_null() {
         drop(Box::from_raw(list));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_spatial_reference_calculate_zone(lon: f64, lat: f64) -> i32 {
     calculate_zone(lon, lat)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_spatial_reference_wgs84_code_from_zone(zone: i32) -> *mut c_char {
     string_to_c_ptr(wgs84_code_from_zone(zone).unwrap_or_default())
 }
@@ -220,7 +220,7 @@ pub extern "C" fn pdal_spatial_reference_wgs84_code_from_zone(zone: i32) -> *mut
 ///
 /// `srs` must be a valid pointer returned by `pdal_spatial_reference_create`,
 /// or null. Must not be called twice on the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_reference_destroy(srs: *mut SpatialReference) {
     if !srs.is_null() {
         drop(Box::from_raw(srs));

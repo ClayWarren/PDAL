@@ -3,7 +3,7 @@ use pdal_core::log;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_log_level_string(level: i32) -> *const c_char {
     match log::level_string(level) {
         "Error" => c"Error".as_ptr(),
@@ -18,8 +18,8 @@ pub extern "C" fn pdal_log_level_string(level: i32) -> *const c_char {
 ///
 /// `leader` may be null and is treated as an empty string. The caller takes
 /// ownership of the returned C string and must release it via
-/// `pdal_capi_free`.
-#[no_mangle]
+/// `pdal_string_free`.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_log_format_prefix(
     leader: *const c_char,
     level: i32,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn pdal_log_format_prefix(
 ///
 /// Returns an owned C string that must be released via `pdal_string_free`.
 /// A null or empty `command` produces an empty quoted name.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_app_unknown_command_message(command: *const c_char) -> *mut c_char {
     let command = if command.is_null() {
         String::new()

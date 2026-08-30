@@ -34,12 +34,12 @@ impl From<pdal_raster_limits_t> for RasterLimits {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_raster_limits_valid(limits: pdal_raster_limits_t) -> bool {
     limits.width > 0 && limits.height > 0
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_raster_limits_x_cell(
     limits: pdal_raster_limits_t,
     x: f64,
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn pdal_raster_limits_x_cell(
     raster_cell((x - limits.x_origin) / limits.edge_length, out_ok)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_raster_limits_y_cell(
     limits: pdal_raster_limits_t,
     y: f64,
@@ -57,12 +57,12 @@ pub unsafe extern "C" fn pdal_raster_limits_y_cell(
     raster_cell((y - limits.y_origin) / limits.edge_length, out_ok)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_raster_limits_x_cell_pos(limits: pdal_raster_limits_t, x: u64) -> f64 {
     limits.x_origin + (x as f64 + 0.5) * limits.edge_length
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_raster_limits_y_cell_pos(limits: pdal_raster_limits_t, y: u64) -> f64 {
     limits.y_origin + (y as f64 + 0.5) * limits.edge_length
 }

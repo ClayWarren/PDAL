@@ -5,7 +5,7 @@ use std::ffi::{c_char, CStr};
 /// # Safety
 /// `specs_json` and `args_json` must be valid NUL-terminated strings.
 /// The returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_program_args_parse_json(
     specs_json: *const c_char,
     args_json: *const c_char,

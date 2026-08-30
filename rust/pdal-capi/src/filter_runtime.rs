@@ -9,7 +9,7 @@ use pdal_core::point::{PointLayout, PointView};
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`, or null.
 /// Must not be called twice on the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_destroy(stage: *mut StageWrapper) {
     if !stage.is_null() {
         drop(Box::from_raw(stage));
@@ -21,7 +21,7 @@ pub unsafe extern "C" fn pdal_stage_destroy(stage: *mut StageWrapper) {
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_reset(stage: *mut StageWrapper) {
     if let Some(stage) = stage.as_mut() {
         stage.filter.reset();
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn pdal_stage_reset(stage: *mut StageWrapper) {
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> bool {
     ffi_catch(false, || {
         clear_last_error();
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn pdal_stage_process_one(stage: *mut StageWrapper) -> boo
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
 /// `view` must be a valid pointer returned by `pdal_point_view_create` or
 /// `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_process_one_at(
     stage: *mut StageWrapper,
     view: *mut PointView,
@@ -78,8 +78,9 @@ pub unsafe extern "C" fn pdal_stage_process_one_at(
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `input` must be a valid pointer returned by `pdal_point_view_create`.
-#[no_mangle]
+/// `input` must be a valid pointer returned by `pdal_point_view_create` and is
+/// borrowed for the duration of this call.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_run(
     stage: *mut StageWrapper,
     input: *mut PointView,
@@ -109,8 +110,8 @@ pub unsafe extern "C" fn pdal_stage_run(
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
 /// `input` and `reference` must be valid pointers returned by
-/// `pdal_point_view_create`.
-#[no_mangle]
+/// `pdal_point_view_create` and are borrowed for the duration of this call.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_run_with_reference(
     stage: *mut StageWrapper,
     input: *mut PointView,
@@ -142,9 +143,10 @@ pub unsafe extern "C" fn pdal_stage_run_with_reference(
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-/// `input` must be a valid pointer returned by `pdal_point_view_create`.
+/// `input` must be a valid pointer returned by `pdal_point_view_create` and is
+/// borrowed for the duration of this call.
 /// `outputs` must be a valid pointer to a buffer of size `max_outputs` pointer elements.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_run_multi(
     stage: *mut StageWrapper,
     input: *mut PointView,
@@ -179,7 +181,7 @@ pub unsafe extern "C" fn pdal_stage_run_multi(
 /// # Safety
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_metadata(stage: *const StageWrapper) -> *mut MetadataNode {
     if let Some(stage) = stage.as_ref() {
         Box::into_raw(Box::new(stage.filter.metadata()))

@@ -11,7 +11,7 @@ use std::ffi::{c_char, CStr};
 ///
 /// `name`, `out_data`, and `out_len` must be valid pointers. The returned
 /// data pointer is borrowed static storage and must not be freed.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_colorinterp_default_ramp(
     name: *const c_char,
     out_data: *mut *const u8,

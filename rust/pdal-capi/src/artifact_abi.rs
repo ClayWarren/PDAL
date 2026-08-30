@@ -12,7 +12,7 @@ struct ArtifactValue {
     value: String,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_artifact_manager_create() -> *mut ArtifactManagerHandle {
     Box::into_raw(Box::new(ArtifactManagerHandle {
         storage: BTreeMap::new(),
@@ -22,7 +22,7 @@ pub extern "C" fn pdal_artifact_manager_create() -> *mut ArtifactManagerHandle {
 /// # Safety
 /// `manager` must be null or a pointer returned by
 /// `pdal_artifact_manager_create`, and must not be destroyed twice.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_destroy(manager: *mut ArtifactManagerHandle) {
     if !manager.is_null() {
         drop(Box::from_raw(manager));
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_destroy(manager: *mut ArtifactMan
 /// # Safety
 /// `manager` must be valid. `name`, `type_name`, and `value` must be valid
 /// NUL-terminated strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_put(
     manager: *mut ArtifactManagerHandle,
     name: *const c_char,
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_put(
 /// `manager` must be valid. `name` and `type_name` must be valid
 /// NUL-terminated strings. Returned string must be freed with
 /// `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_get(
     manager: *const ArtifactManagerHandle,
     name: *const c_char,
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_get(
 /// # Safety
 /// `manager` must be valid. `name`, `type_name`, and `value` must be valid
 /// NUL-terminated strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_replace(
     manager: *mut ArtifactManagerHandle,
     name: *const c_char,
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_replace(
 /// # Safety
 /// `manager` must be valid. `name`, `type_name`, and `value` must be valid
 /// NUL-terminated strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_replace_or_put(
     manager: *mut ArtifactManagerHandle,
     name: *const c_char,
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_replace_or_put(
 
 /// # Safety
 /// `manager` must be valid and `name` must be a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_erase(
     manager: *mut ArtifactManagerHandle,
     name: *const c_char,
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_erase(
 
 /// # Safety
 /// `manager` must be valid and `name` must be a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_exists(
     manager: *const ArtifactManagerHandle,
     name: *const c_char,
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn pdal_artifact_manager_exists(
 /// # Safety
 /// `manager` must be valid. Returned string must be freed with
 /// `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_artifact_manager_keys_json(
     manager: *const ArtifactManagerHandle,
 ) -> *mut c_char {

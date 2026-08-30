@@ -28,7 +28,7 @@ pub struct pdal_scaling_t {
 ///
 /// `xs`, `ys`, and `zs` must each point to at least `count` doubles.
 /// `scaling` must be a valid mutable pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_scaling_set_auto_xform(
     xs: *const f64,
     ys: *const f64,

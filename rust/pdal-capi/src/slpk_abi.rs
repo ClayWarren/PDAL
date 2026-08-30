@@ -8,7 +8,7 @@ use std::path::Path;
 /// `filename` must be a valid NUL-terminated string. `dimensions_csv` may be
 /// null or a valid NUL-terminated string. The returned string must be freed
 /// with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_slpk_summary_json(
     filename: *const c_char,
     dimensions_csv: *const c_char,

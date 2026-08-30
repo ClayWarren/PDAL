@@ -73,7 +73,7 @@ unsafe fn input_slice<'a>(buf: *const c_char, len: usize) -> &'a [u8] {
 // Compressor
 // ---------------------------------------------------------------------------
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_deflate_compressor_create() -> *mut DeflateCompressorHandle {
     Box::into_raw(Box::new(DeflateCompressorHandle {
         inner: DeflateCompressor::new(),
@@ -87,7 +87,7 @@ pub extern "C" fn pdal_deflate_compressor_create() -> *mut DeflateCompressorHand
 /// # Safety
 /// `handle` must come from `pdal_deflate_compressor_create`. `buf` must be
 /// valid for `len` bytes. `out_buf`/`out_len` must be writable.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_compressor_update(
     handle: *mut DeflateCompressorHandle,
     buf: *const c_char,
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn pdal_deflate_compressor_update(
 ///
 /// # Safety
 /// See [`pdal_deflate_compressor_update`].
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_compressor_finish(
     handle: *mut DeflateCompressorHandle,
     out_buf: *mut *mut u8,
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn pdal_deflate_compressor_finish(
 ///
 /// # Safety
 /// `handle` must come from `pdal_deflate_compressor_create` and not be reused.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_compressor_destroy(handle: *mut DeflateCompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
@@ -152,14 +152,14 @@ pub unsafe extern "C" fn pdal_deflate_compressor_destroy(handle: *mut DeflateCom
 // Decompressor
 // ---------------------------------------------------------------------------
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_deflate_decompressor_create() -> *mut DeflateDecompressorHandle {
     Box::into_raw(Box::new(DeflateDecompressorHandle {
         inner: DecompressorKind::Zlib(DeflateDecompressor::new()),
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_deflate_auto_decompressor_create() -> *mut DeflateDecompressorHandle {
     Box::into_raw(Box::new(DeflateDecompressorHandle {
         inner: DecompressorKind::Auto(AutoDecompressor::new()),
@@ -171,7 +171,7 @@ pub extern "C" fn pdal_deflate_auto_decompressor_create() -> *mut DeflateDecompr
 ///
 /// # Safety
 /// See [`pdal_deflate_compressor_update`].
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_decompressor_update(
     handle: *mut DeflateDecompressorHandle,
     buf: *const c_char,
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn pdal_deflate_decompressor_update(
 ///
 /// # Safety
 /// See [`pdal_deflate_compressor_update`].
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_decompressor_finish(
     handle: *mut DeflateDecompressorHandle,
     out_buf: *mut *mut u8,
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn pdal_deflate_decompressor_finish(
 ///
 /// # Safety
 /// `handle` must come from `pdal_deflate_decompressor_create` and not be reused.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_deflate_decompressor_destroy(handle: *mut DeflateDecompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));

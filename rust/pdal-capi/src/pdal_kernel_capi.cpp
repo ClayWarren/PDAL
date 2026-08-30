@@ -42,7 +42,6 @@
 
 #include <pdal_capi.h>
 
-#include <cstring>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -52,6 +51,8 @@
 using namespace pdal;
 
 static std::once_flag s_pluginsLoaded;
+
+extern "C" char* rust_capi_string_copy(const char* value);
 
 static void ensurePluginsLoaded()
 {
@@ -65,10 +66,7 @@ static void ensurePluginsLoaded()
 
 static char* copyString(const std::string& value)
 {
-    char* buf = static_cast<char*>(malloc(value.size() + 1));
-    if (buf)
-        std::memcpy(buf, value.c_str(), value.size() + 1);
-    return buf;
+    return rust_capi_string_copy(value.c_str());
 }
 
 extern "C"
@@ -231,8 +229,7 @@ extern "C"
 
     PDAL_CAPI_EXPORT void pdal_capi_free(void* ptr)
     {
-        if (ptr)
-            free(ptr);
+        pdal_string_free(static_cast<char*>(ptr));
     }
 
 } // extern "C"

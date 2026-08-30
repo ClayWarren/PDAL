@@ -110,6 +110,21 @@ int main()
         return 11;
     pdal_pipeline_destroy(pipeline);
 
+    char* rust_string = pdal_config_full_version_string("2.10.1", "test");
+    if (!rust_string)
+        return 12;
+    pdal_string_free(rust_string);
+
+    char* bridge_string = pdal_stage_list_json();
+    if (!bridge_string)
+        return 13;
+    pdal_string_free(bridge_string);
+
+    char* legacy_string = pdal_stage_options_text("filters.head");
+    if (!legacy_string)
+        return 14;
+    pdal_capi_free(legacy_string);
+
     pdal_capi_free(nullptr);
     return version ? 0 : 1;
 }

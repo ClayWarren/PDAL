@@ -26,7 +26,7 @@ unsafe fn vec_into_raw(values: Vec<u64>) -> *mut u64 {
 /// # Safety
 /// `xyz` must be valid for `count * 3` `f64` values; the output pointers must
 /// be writable.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_segmentation_extract_clusters(
     xyz: *const f64,
     count: usize,
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn pdal_segmentation_extract_clusters(
 /// # Safety
 /// `return_number`, `number_of_returns`, and `out_to_first` must each be valid
 /// for `count` elements.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_segmentation_segment_returns(
     return_number: *const u8,
     number_of_returns: *const u8,

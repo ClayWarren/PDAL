@@ -40,7 +40,7 @@ fn parse_memoryview_shape(input: &str) -> Result<(u64, u64, u64), String> {
 /// # Safety
 ///
 /// Output pointers must be valid when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_memoryview_shape_parse(
     input: *const c_char,
     out_depth: *mut u64,
@@ -80,7 +80,7 @@ pub type MemoryViewIncrementer =
 /// `fields` must point to `field_count` valid field descriptors. `incrementer`
 /// must return either a valid point base pointer for the requested point or
 /// null to end the stream.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_memoryview_read(
     fields: *const pdal_memoryview_field_t,
     field_count: u64,

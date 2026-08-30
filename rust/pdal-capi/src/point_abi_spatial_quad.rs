@@ -3,7 +3,7 @@ use pdal_core::point::DimensionSummary;
 use pdal_core::spatial::{SpatialIndex2d, SpatialIndex3d};
 use serde_json::json;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_knn(
     view: *const PointView,
     dim_names: *const *const c_char,
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn pdal_point_view_knn(
     written as u64
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_radius(
     view: *const PointView,
     dim_names: *const *const c_char,
@@ -70,14 +70,14 @@ pub unsafe extern "C" fn pdal_point_view_radius(
     ptr
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_spatial_results_free(ptr: *mut pdal_spatial_result_t, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_create(
     xs: *const f64,
     ys: *const f64,
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn pdal_quad_index_create(
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_bounds(
     index: *const QuadIndexAbi,
     out_bounds: *mut pdal_bounds2d_t,
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn pdal_quad_index_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_depth(index: *const QuadIndexAbi) -> u64 {
     if index.as_ref().is_none_or(|index| index.points.is_empty()) {
         0
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn pdal_quad_index_depth(index: *const QuadIndexAbi) -> u6
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_fills(
     index: *const QuadIndexAbi,
     out_len: *mut u64,
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn pdal_quad_index_fills(
     leak_u64s(fills, out_len)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_points_by_depth(
     index: *const QuadIndexAbi,
     depth_begin: u64,
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn pdal_quad_index_points_by_depth(
     leak_u64s(index.points.iter().map(|point| point.id).collect(), out_len)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_points_in_bounds(
     index: *const QuadIndexAbi,
     x_min: f64,
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn pdal_quad_index_points_in_bounds(
     leak_u64s(ids, out_len)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_points_raster_level(
     index: *const QuadIndexAbi,
     rasterize: u64,
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn pdal_quad_index_points_raster_level(
     )
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_points_raster_bounds(
     index: *const QuadIndexAbi,
     x_begin: f64,
@@ -271,14 +271,14 @@ pub unsafe extern "C" fn pdal_quad_index_points_raster_bounds(
     )
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_u64_array_free(ptr: *mut u64, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_quad_index_destroy(index: *mut QuadIndexAbi) {
     if !index.is_null() {
         drop(Box::from_raw(index));
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn pdal_quad_index_destroy(index: *mut QuadIndexAbi) {
 ///
 /// `view` must be null or a valid pointer returned by
 /// `pdal_point_view_create`, or returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_dimension_summaries_json(
     view: *const PointView,
 ) -> *mut c_char {
@@ -316,7 +316,7 @@ pub unsafe extern "C" fn pdal_point_view_dimension_summaries_json(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create` or
 /// `pdal_stage_run`, or null. Must not be called twice on the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_destroy(view: *mut PointView) {
     if !view.is_null() {
         drop(Box::from_raw(view));

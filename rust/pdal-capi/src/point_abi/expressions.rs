@@ -12,7 +12,7 @@ use std::os::raw::c_char;
 /// returned by `pdal_stage_run`. `expression` must be a valid, NUL-terminated C
 /// string. `out_keep` and `out_skip` must be valid output pointers and each
 /// returned non-null view must be destroyed with `pdal_point_view_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_split_where(
     view: *const PointView,
     expression: *const c_char,
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn pdal_point_view_split_where(
 ///
 /// `expression` must be a valid, NUL-terminated C string. `layout` must be a
 /// valid point layout pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_expression_validate_with_layout(
     expression: *const c_char,
     layout: *const PointLayout,
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn pdal_expression_validate_with_layout(
 /// `view` must be valid, `expression` must be a valid NUL-terminated C string,
 /// and `out_len` must be a valid output pointer. The returned pointer must be
 /// freed with `pdal_u8_array_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_expression_mask(
     view: *const PointView,
     expression: *const c_char,

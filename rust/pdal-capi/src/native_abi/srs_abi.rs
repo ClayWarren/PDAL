@@ -11,7 +11,7 @@ use std::os::raw::c_char;
 ///
 /// `input` must be a valid NUL-terminated C string. `out_wkt`/`out_wkt2`/
 /// `out_epoch` must be null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_user_input_to_wkt(
     input: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn pdal_srs_user_input_to_wkt(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_proj4` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_wkt_to_proj4(
     wkt: *const c_char,
     out_proj4: *mut *mut c_char,
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_proj4(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_projjson` must
 /// be null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_wkt_to_projjson(
     wkt: *const c_char,
     epoch: f64,
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_projjson(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_wkt_to_wkt1(
     wkt: *const c_char,
     epoch: f64,
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_wkt1(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_wkt_to_wkt2(
     wkt: *const c_char,
     epoch: f64,
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn pdal_srs_wkt_to_wkt2(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_pretty_wkt(
     wkt: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn pdal_srs_pretty_wkt(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_is_geographic(
     wkt: *const c_char,
     epoch: f64,
@@ -209,7 +209,7 @@ pub unsafe extern "C" fn pdal_srs_is_geographic(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_is_geocentric(
     wkt: *const c_char,
     epoch: f64,
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn pdal_srs_is_geocentric(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_is_projected(
     wkt: *const c_char,
     epoch: f64,
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn pdal_srs_is_projected(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_len` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_axis_ordering(
     wkt: *const c_char,
     epoch: f64,
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn pdal_srs_axis_ordering(
 /// # Safety
 ///
 /// `ptr` must have been returned by this ABI with the same `len`, or null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_i32_array_free(ptr: *mut i32, len: u64) {
     if !ptr.is_null() {
         drop(Vec::from_raw_parts(ptr, len as usize, len as usize));
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn pdal_i32_array_free(ptr: *mut i32, len: u64) {
 ///
 /// `wkt_a` and `wkt_b` must be null or valid NUL-terminated C strings.
 /// `out_same` must be null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_is_same(
     wkt_a: *const c_char,
     wkt_b: *const c_char,
@@ -309,7 +309,7 @@ pub unsafe extern "C" fn pdal_srs_is_same(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_code` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_identify_horizontal_epsg(
     wkt: *const c_char,
     epoch: f64,
@@ -332,7 +332,7 @@ pub unsafe extern "C" fn pdal_srs_identify_horizontal_epsg(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_zone` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_get_utm_zone(wkt: *const c_char, out_zone: *mut i32) -> bool {
     ffi_catch(false, || match srs::get_utm_zone(&c_string_lossy(wkt)) {
         Ok(zone) => {
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn pdal_srs_get_utm_zone(wkt: *const c_char, out_zone: *mu
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_get_horizontal_wkt(
     wkt: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -377,7 +377,7 @@ pub unsafe extern "C" fn pdal_srs_get_horizontal_wkt(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_units` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_get_horizontal_units(
     wkt: *const c_char,
     out_units: *mut *mut c_char,
@@ -399,7 +399,7 @@ pub unsafe extern "C" fn pdal_srs_get_horizontal_units(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_get_vertical_wkt(
     wkt: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -421,7 +421,7 @@ pub unsafe extern "C" fn pdal_srs_get_vertical_wkt(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_units` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_get_vertical_units(
     wkt: *const c_char,
     out_units: *mut *mut c_char,
@@ -442,7 +442,7 @@ pub unsafe extern "C" fn pdal_srs_get_vertical_units(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_code` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_identify_vertical_epsg(
     wkt: *const c_char,
     epoch: f64,
@@ -463,7 +463,7 @@ pub unsafe extern "C" fn pdal_srs_identify_vertical_epsg(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_valid` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_valid(wkt: *const c_char, out_valid: *mut bool) -> bool {
     ffi_catch(false, || {
         let v = srs::srs_valid(&c_string_lossy(wkt));
@@ -493,7 +493,7 @@ pub struct pdal_srs_transform_t {
 /// `src_axis_order`/`dst_axis_order` must be valid for `_len` `int32_t`
 /// elements when `_len > 0`. The returned pointer is owned by the caller and
 /// must be released with `pdal_srs_transform_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_transform_create(
     src_wkt: *const c_char,
     src_epoch: f64,
@@ -539,7 +539,7 @@ pub unsafe extern "C" fn pdal_srs_transform_create(
 ///
 /// `handle` must have come from `pdal_srs_transform_create` and not been
 /// destroyed already.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_transform_destroy(handle: *mut pdal_srs_transform_t) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
@@ -562,7 +562,7 @@ pub struct pdal_topocentric_transform_t {
 ///
 /// The returned pointer is owned by the caller and must be released with
 /// `pdal_topocentric_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_topocentric_create(
     lat0: f64,
     lon0: f64,
@@ -586,7 +586,7 @@ pub unsafe extern "C" fn pdal_topocentric_create(
 ///
 /// `handle` must have come from `pdal_topocentric_create` and not been
 /// destroyed already.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_topocentric_destroy(handle: *mut pdal_topocentric_transform_t) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
@@ -600,7 +600,7 @@ pub unsafe extern "C" fn pdal_topocentric_destroy(handle: *mut pdal_topocentric_
 ///
 /// `handle` must come from `pdal_topocentric_create`. `x`/`y`/`z` must be
 /// non-null and valid for read+write.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_topocentric_forward(
     handle: *const pdal_topocentric_transform_t,
     x: *mut f64,
@@ -629,7 +629,7 @@ pub unsafe extern "C" fn pdal_topocentric_forward(
 ///
 /// `handle` must come from `pdal_topocentric_create`. `x`/`y`/`z` must be
 /// non-null and valid for read+write.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_topocentric_reverse(
     handle: *const pdal_topocentric_transform_t,
     x: *mut f64,
@@ -658,7 +658,7 @@ pub unsafe extern "C" fn pdal_topocentric_reverse(
 ///
 /// `handle` must come from `pdal_srs_transform_create`. `x`/`y`/`z` must be
 /// non-null and valid for read+write.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_transform_xyz(
     handle: *const pdal_srs_transform_t,
     x: *mut f64,
@@ -684,7 +684,7 @@ pub unsafe extern "C" fn pdal_srs_transform_xyz(
 ///
 /// `handle` must come from `pdal_srs_transform_create`. `xs`/`ys`/`zs` must
 /// be non-null and valid for `len` `f64` reads+writes when `len > 0`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_transform_xyz_array(
     handle: *const pdal_srs_transform_t,
     xs: *mut f64,

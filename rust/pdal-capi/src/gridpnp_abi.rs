@@ -21,7 +21,7 @@ pub struct pdal_gridpnp_t {
 /// `coords` must hold `2 * sum(ring_sizes)` f64s; `ring_sizes` must hold
 /// `ring_count` usizes. The returned pointer is owned by the caller and must be
 /// released with `pdal_gridpnp_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_gridpnp_create(
     coords: *const f64,
     ring_sizes: *const usize,
@@ -63,7 +63,7 @@ pub unsafe extern "C" fn pdal_gridpnp_create(
 /// # Safety
 ///
 /// `handle` must have come from `pdal_gridpnp_create` and not been freed.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_gridpnp_destroy(handle: *mut pdal_gridpnp_t) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn pdal_gridpnp_destroy(handle: *mut pdal_gridpnp_t) {
 /// # Safety
 ///
 /// `handle` must come from `pdal_gridpnp_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_gridpnp_inside(
     handle: *const pdal_gridpnp_t,
     x: f64,

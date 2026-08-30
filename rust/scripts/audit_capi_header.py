@@ -51,6 +51,25 @@ def rust_functions() -> set[str]:
     return functions
 
 
+def unguarded_rust_functions() -> set[str]:
+    """Return exported Rust ABI functions missing the shared panic boundary."""
+    functions: set[str] = set()
+    declaration = re.compile(
+        r"(?P<attrs>(?:(?:\s*#\[[^\]]+\]\s*)|(?:\s*///[^\n]*\n))*)"
+        r"pub\s+(?:unsafe\s+)?extern\s+\"C\"\s+fn\s+"
+        r"(?P<name>pdal_[A-Za-z0-9_]+)\s*\(",
+        flags=re.MULTILINE,
+    )
+    for path in RUST_SRC.rglob("*.rs"):
+        rel = path.relative_to(RUST_SRC)
+        if rel.parts[0] == "tests" or rel.name == "tests.rs":
+            continue
+        for match in declaration.finditer(read(path)):
+            if "pdal_capi_macros::ffi_export" not in match.group("attrs"):
+                functions.add(match.group("name"))
+    return functions
+
+
 def cpp_functions() -> set[str]:
     functions: set[str] = set()
     for path in RUST_SRC.rglob("*.cpp"):
@@ -103,6 +122,13 @@ def main() -> int:
         errors.append("Header declarations without implementation:\n  " + "\n  ".join(missing))
     if undocumented:
         errors.append("Implemented C ABI symbols missing from header:\n  " + "\n  ".join(undocumented))
+
+    unguarded = sorted(unguarded_rust_functions())
+    if unguarded:
+        errors.append(
+            "Rust C ABI symbols missing #[pdal_capi_macros::ffi_export]:\n  "
+            + "\n  ".join(unguarded)
+        )
 
     h_versions = header_versions()
     r_versions = rust_versions()

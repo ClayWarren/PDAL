@@ -17,12 +17,12 @@ mod split;
 mod tindex;
 mod translate;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_rust_kernel_list_json() -> *const c_char {
     KERNEL_LIST_JSON.as_ptr().cast()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 1)]
 pub unsafe extern "C" fn pdal_kernel_parse_stage_option(
     input: *const c_char,
     allow_stage_prefix: bool,
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn pdal_kernel_parse_stage_option(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 1)]
 pub unsafe extern "C" fn pdal_rust_kernel_run(
     kernel_name: *const c_char,
     argc: i32,

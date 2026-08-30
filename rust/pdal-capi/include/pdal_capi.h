@@ -8,7 +8,7 @@
 
 #define PDAL_CAPI_ABI_VERSION_MAJOR 0u
 #define PDAL_CAPI_ABI_VERSION_MINOR 2u
-#define PDAL_CAPI_ABI_VERSION_PATCH 0u
+#define PDAL_CAPI_ABI_VERSION_PATCH 1u
 #define PDAL_CAPI_ABI_VERSION                                                  \
     ((PDAL_CAPI_ABI_VERSION_MAJOR * 1000000u) +                                \
      (PDAL_CAPI_ABI_VERSION_MINOR * 1000u) + PDAL_CAPI_ABI_VERSION_PATCH)
@@ -56,6 +56,10 @@ extern "C"
 
     const char* pdal_last_error();
     void pdal_clear_error();
+    // String ownership: const char* results are borrowed. Unless a function
+    // documents another owner, textual char* results belong to the caller and
+    // must be released exactly once with pdal_string_free. Never pass them to
+    // libc free or C++ delete.
     void pdal_string_free(char* ptr);
 
     // Options
@@ -180,6 +184,8 @@ extern "C"
 
     // Log
     const char* pdal_log_level_string(int32_t level);
+    // Returned strings are owned by the caller and must be released with
+    // pdal_string_free.
     char* pdal_log_format_prefix(const char* leader, int32_t level, bool timing,
                                  double elapsed_seconds);
     char* pdal_app_unknown_command_message(const char* command);
@@ -368,6 +374,7 @@ extern "C"
         double m22;
     } pdal_rotation_matrix_t;
 
+    // Returns an all-NaN coordinate and sets pdal_last_error if Rust panics.
     pdal_xyz_t pdal_georeference_wgs84(double range, double scan_angle,
                                        pdal_rotation_matrix_t boresight,
                                        pdal_rotation_matrix_t imu,
@@ -695,6 +702,8 @@ extern "C"
     double pdal_raster_limits_y_cell_pos(pdal_raster_limits_t limits,
                                          uint64_t y);
 
+    // Takes ownership of layout when layout is non-null. The caller must not
+    // use or destroy the layout after a successful preflight.
     pdal_point_view_t* pdal_point_view_create(pdal_point_layout_t* layout);
     uint64_t pdal_point_view_add_point(pdal_point_view_t* view);
     void pdal_point_view_set_f64(pdal_point_view_t* view, uint64_t idx,
@@ -1088,6 +1097,8 @@ extern "C"
     bool pdal_stage_process_one(pdal_stage_t* stage);
     bool pdal_stage_process_one_at(pdal_stage_t* stage, pdal_point_view_t* view,
                                    uint64_t idx);
+    // Stage execution borrows all input views. Returned views are newly owned
+    // and must be destroyed with pdal_point_view_destroy.
     pdal_point_view_t* pdal_stage_run(pdal_stage_t* stage,
                                       pdal_point_view_t* input);
     pdal_point_view_t*
@@ -1595,6 +1606,8 @@ extern "C"
     char* pdal_ogr_writer_dim_not_found(const char* name);
     pdal_writer_t* pdal_writer_create_gdal(const pdal_options_t* ops);
     pdal_writer_t* pdal_writer_create_raster(const pdal_options_t* ops);
+    // Writer calls borrow their input view or views. The caller retains
+    // ownership and remains responsible for destroying them.
     bool pdal_writer_write_view(pdal_writer_t* writer,
                                 const pdal_point_view_t* view);
     bool pdal_writer_write_views(pdal_writer_t* writer,
@@ -1616,6 +1629,10 @@ extern "C"
     pdal_pipeline_t* pdal_pipeline_create();
     pdal_pipeline_t* pdal_pipeline_create_json(const char* json);
     void pdal_pipeline_destroy(pdal_pipeline_t* pipeline);
+    // On calls with valid required pointers, add/replace functions take
+    // ownership of the stage, reader, or writer handle. The caller must not
+    // use or destroy that handle afterward, including when a tagged add or
+    // replacement reports a logical error.
     int64_t pdal_pipeline_add_stage(pdal_pipeline_t* pipeline,
                                     pdal_stage_t* stage);
     int64_t pdal_pipeline_add_stage_tagged(pdal_pipeline_t* pipeline,
@@ -1633,17 +1650,20 @@ extern "C"
                                       uint64_t idx);
     int64_t pdal_pipeline_input(const pdal_pipeline_t* pipeline, uint64_t idx,
                                 uint64_t input_idx);
+    // Execution takes ownership of a non-null owned_input_view after the other
+    // required pointers are validated. The caller must not use or destroy the
+    // view afterward, whether execution succeeds or fails.
     pdal_point_view_t* pdal_pipeline_execute(pdal_pipeline_t* pipeline,
-                                             pdal_point_view_t* input_view);
+                                             pdal_point_view_t* owned_input_view);
     int64_t pdal_pipeline_execute_count(pdal_pipeline_t* pipeline,
-                                        pdal_point_view_t* input_view);
+                                        pdal_point_view_t* owned_input_view);
     int64_t pdal_pipeline_execute_streaming(pdal_pipeline_t* pipeline);
     bool pdal_pipeline_streamable(const pdal_pipeline_t* pipeline);
     int64_t pdal_pipeline_execute_result(pdal_pipeline_t* pipeline,
-                                         pdal_point_view_t* input_view,
+                                         pdal_point_view_t* owned_input_view,
                                          pdal_pipeline_result_t* out_result);
     char* pdal_pipeline_execute_summary_json(pdal_pipeline_t* pipeline,
-                                             pdal_point_view_t* input_view);
+                                             pdal_point_view_t* owned_input_view);
     uint64_t pdal_pipeline_stage_count(const pdal_pipeline_t* pipeline);
     pdal_metadata_node_t*
     pdal_pipeline_metadata(const pdal_pipeline_t* pipeline);
@@ -1658,6 +1678,8 @@ extern "C"
 
     // CLI / Kernel dispatch
     PDAL_CAPI_EXPORT const char* pdal_version_string(void);
+    // The following four owned strings must be released with
+    // pdal_string_free.
     PDAL_CAPI_EXPORT char* pdal_kernel_list_json(void);
     PDAL_CAPI_EXPORT char* pdal_stage_list_json(void);
     PDAL_CAPI_EXPORT char* pdal_stage_options_json(const char* stage_name);
@@ -1666,6 +1688,8 @@ extern "C"
                                          const char* const* argv,
                                          const char* log_name, int log_level,
                                          bool log_timing);
+    // Deprecated compatibility alias for pdal_string_free. New callers should
+    // use pdal_string_free directly.
     PDAL_CAPI_EXPORT void pdal_capi_free(void* ptr);
 
     // Standalone tools

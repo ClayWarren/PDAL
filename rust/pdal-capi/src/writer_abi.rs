@@ -24,7 +24,7 @@ pub const PDAL_WRITER_NO_TEMPLATE: usize = usize::MAX;
 /// # Safety
 /// `filename` must be a valid NUL-terminated C string. `out_pos` must be a
 /// valid, writable pointer to a `usize`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_handle_filename_template(
     filename: *const c_char,
     out_pos: *mut usize,
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn pdal_writer_handle_filename_template(
 ///
 /// # Safety
 /// `filename` must be a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_replace_tags(filename: *const c_char) -> *mut c_char {
     if filename.is_null() {
         return ptr::null_mut();

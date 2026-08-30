@@ -27,7 +27,20 @@ unsafe fn nullable_cstr_to_string(value: *const c_char) -> String {
     }
 }
 
-#[no_mangle]
+/// Take ownership of an optional point-view handle for pipeline execution.
+///
+/// Every non-null handle passed here is consumed. Keeping this conversion in
+/// one place makes the ownership transfer visible in each public execution
+/// entry point.
+unsafe fn take_owned_input_view(owned_input_view: *mut PointView) -> Vec<PointView> {
+    if owned_input_view.is_null() {
+        Vec::new()
+    } else {
+        vec![*Box::from_raw(owned_input_view)]
+    }
+}
+
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_generate_stage_tag(
     stage_name: *const c_char,
     explicit_tag: *const c_char,
@@ -68,7 +81,7 @@ pub struct pdal_pipeline_result_t {
 /// Create a new empty pipeline.
 ///
 /// Returns a handle that must be freed with `pdal_pipeline_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_pipeline_create() -> *mut PipelineHandle {
     Box::into_raw(Box::new(PipelineHandle {
         pipeline: Pipeline::new(),
@@ -80,7 +93,7 @@ pub extern "C" fn pdal_pipeline_create() -> *mut PipelineHandle {
 /// # Safety
 /// `pipeline` must be a valid pointer returned by `pdal_pipeline_create`,
 /// and must not be used after this call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_destroy(pipeline: *mut PipelineHandle) {
     if !pipeline.is_null() {
         drop(Box::from_raw(pipeline));
@@ -95,7 +108,7 @@ pub unsafe extern "C" fn pdal_pipeline_destroy(pipeline: *mut PipelineHandle) {
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
 /// `stage` must be a valid pointer returned by a `pdal_stage_create_*` function.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_add_stage(
     pipeline: *mut PipelineHandle,
     stage: *mut StageWrapper,
@@ -119,7 +132,7 @@ pub unsafe extern "C" fn pdal_pipeline_add_stage(
 /// `pipeline` must be a valid pipeline handle.
 /// `stage` must be a valid pointer returned by a `pdal_stage_create_*` function.
 /// `tag` must be a valid C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_add_stage_tagged(
     pipeline: *mut PipelineHandle,
     stage: *mut StageWrapper,
@@ -147,7 +160,7 @@ pub unsafe extern "C" fn pdal_pipeline_add_stage_tagged(
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_add_dependency(
     pipeline: *mut PipelineHandle,
     target: u64,
@@ -173,7 +186,7 @@ pub unsafe extern "C" fn pdal_pipeline_add_dependency(
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
 /// `stage` must be a valid pointer returned by a `pdal_stage_create_*` function.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_replace_stage(
     pipeline: *mut PipelineHandle,
     idx: u64,
@@ -198,7 +211,7 @@ pub unsafe extern "C" fn pdal_pipeline_replace_stage(
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_input_count(
     pipeline: *const PipelineHandle,
     idx: u64,
@@ -219,7 +232,7 @@ pub unsafe extern "C" fn pdal_pipeline_input_count(
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_input(
     pipeline: *const PipelineHandle,
     idx: u64,
@@ -245,7 +258,7 @@ pub unsafe extern "C" fn pdal_pipeline_input(
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
 /// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_add_reader(
     pipeline: *mut PipelineHandle,
     reader: *mut ReaderHandle,
@@ -268,7 +281,7 @@ pub unsafe extern "C" fn pdal_pipeline_add_reader(
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
 /// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_add_writer(
     pipeline: *mut PipelineHandle,
     writer: *mut WriterHandle,
@@ -287,14 +300,17 @@ pub unsafe extern "C" fn pdal_pipeline_add_writer(
 ///
 /// Returns a new `PointView` containing the pipeline output, or null on error.
 /// The returned view must be freed with `pdal_point_view_destroy`.
+/// A non-null `owned_input_view` is consumed once `pipeline` is validated,
+/// whether execution succeeds or fails, and must not be used or freed by the
+/// caller afterward.
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-/// `input_view` must be a valid point view handle.
-#[no_mangle]
+/// `owned_input_view` must be null or a valid point view handle.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_execute(
     pipeline: *mut PipelineHandle,
-    input_view: *mut PointView,
+    owned_input_view: *mut PointView,
 ) -> *mut PointView {
     if pipeline.is_null() {
         return std::ptr::null_mut();
@@ -302,12 +318,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute(
     clear_last_error();
     let p = &mut (*pipeline).pipeline;
 
-    let input_views = if input_view.is_null() {
-        Vec::new()
-    } else {
-        let input = Box::from_raw(input_view);
-        vec![*input]
-    };
+    let input_views = take_owned_input_view(owned_input_view);
 
     match p.execute(input_views) {
         Ok(views) => {
@@ -327,14 +338,17 @@ pub unsafe extern "C" fn pdal_pipeline_execute(
 /// Execute the pipeline and return the point count.
 ///
 /// Returns the total number of points in the output, or -1 on error.
+/// A non-null `owned_input_view` is consumed once `pipeline` is validated,
+/// whether execution succeeds or fails, and must not be used or freed by the
+/// caller afterward.
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-/// `input_view` must be a valid point view handle.
-#[no_mangle]
+/// `owned_input_view` must be null or a valid point view handle.
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_execute_count(
     pipeline: *mut PipelineHandle,
-    input_view: *mut PointView,
+    owned_input_view: *mut PointView,
 ) -> i64 {
     if pipeline.is_null() {
         return -1;
@@ -342,12 +356,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_count(
     clear_last_error();
     let p = &mut (*pipeline).pipeline;
 
-    let input_views = if input_view.is_null() {
-        Vec::new()
-    } else {
-        let input = Box::from_raw(input_view);
-        vec![*input]
-    };
+    let input_views = take_owned_input_view(owned_input_view);
 
     match p.execute_with_result(input_views) {
         Ok(result) => result.point_count as i64,
@@ -368,7 +377,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_count(
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_execute_streaming(pipeline: *mut PipelineHandle) -> i64 {
     if pipeline.is_null() {
         return -1;
@@ -389,7 +398,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_streaming(pipeline: *mut Pipeline
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_streamable(pipeline: *const PipelineHandle) -> bool {
     if pipeline.is_null() {
         return false;
@@ -400,15 +409,18 @@ pub unsafe extern "C" fn pdal_pipeline_streamable(pipeline: *const PipelineHandl
 /// Execute the pipeline and return a summary result.
 ///
 /// Returns 0 on success, -1 on error.
+/// A non-null `owned_input_view` is consumed after `pipeline` and `out_result`
+/// are validated, whether execution succeeds or fails, and must not be used or
+/// freed by the caller afterward.
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-/// `input_view` must be null or a valid point view handle.
+/// `owned_input_view` must be null or a valid point view handle.
 /// `out_result` must point to writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_execute_result(
     pipeline: *mut PipelineHandle,
-    input_view: *mut PointView,
+    owned_input_view: *mut PointView,
     out_result: *mut pdal_pipeline_result_t,
 ) -> i64 {
     if pipeline.is_null() || out_result.is_null() {
@@ -417,12 +429,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_result(
     clear_last_error();
     let p = &mut (*pipeline).pipeline;
 
-    let input_views = if input_view.is_null() {
-        Vec::new()
-    } else {
-        let input = Box::from_raw(input_view);
-        vec![*input]
-    };
+    let input_views = take_owned_input_view(owned_input_view);
 
     match p.execute_with_result(input_views) {
         Ok(result) => {
@@ -439,14 +446,17 @@ pub unsafe extern "C" fn pdal_pipeline_execute_result(
 /// Execute the pipeline and return a summary result as JSON.
 ///
 /// The returned string must be freed with `pdal_string_free`.
+/// A non-null `owned_input_view` is consumed once `pipeline` is validated,
+/// whether execution succeeds or fails, and must not be used or freed by the
+/// caller afterward.
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-/// `input_view` must be null or a valid point view handle.
-#[no_mangle]
+/// `owned_input_view` must be null or a valid point view handle.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_execute_summary_json(
     pipeline: *mut PipelineHandle,
-    input_view: *mut PointView,
+    owned_input_view: *mut PointView,
 ) -> *mut c_char {
     if pipeline.is_null() {
         return std::ptr::null_mut();
@@ -454,12 +464,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_summary_json(
     clear_last_error();
     let p = &mut (*pipeline).pipeline;
 
-    let input_views = if input_view.is_null() {
-        Vec::new()
-    } else {
-        let input = Box::from_raw(input_view);
-        vec![*input]
-    };
+    let input_views = take_owned_input_view(owned_input_view);
 
     match p.execute_with_result(input_views) {
         Ok(result) => string_to_c_ptr(
@@ -477,7 +482,7 @@ pub unsafe extern "C" fn pdal_pipeline_execute_summary_json(
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_stage_count(pipeline: *const PipelineHandle) -> u64 {
     if pipeline.is_null() {
         return 0;
@@ -491,7 +496,7 @@ pub unsafe extern "C" fn pdal_pipeline_stage_count(pipeline: *const PipelineHand
 ///
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pipeline_metadata(
     pipeline: *const PipelineHandle,
 ) -> *mut MetadataNode {
@@ -509,7 +514,7 @@ pub unsafe extern "C" fn pdal_pipeline_metadata(
 /// # Safety
 /// `pipeline` must be a valid pipeline handle.
 /// `tag` must be a valid C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_pipeline_find_by_tag(
     pipeline: *const PipelineHandle,
     tag: *const c_char,

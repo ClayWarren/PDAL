@@ -30,7 +30,7 @@ pub struct pdal_dim_stats_t {
 /// # Safety
 ///
 /// Pre-allocated arrays and bounds must be valid.
-#[unsafe(no_mangle)]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stats_compute(
     view: *mut PointView,
     dims: *const *const c_char,
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn pdal_stats_compute(
 /// # Safety
 ///
 /// Always safe if pointers match allocated memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_free_stats_arrays(ptr: *mut pdal_dim_stats_t, dims_count: u64) {
     if ptr.is_null() {
         return;
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn pdal_free_stats_arrays(ptr: *mut pdal_dim_stats_t, dims
 /// `view` must be a valid point view. `dim_name` must be a valid
 /// NUL-terminated C string. `expressions` must point to `count`
 /// NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_expressionstats_metadata(
     view: *mut PointView,
     dim_name: *const c_char,
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn pdal_expressionstats_metadata(
 /// # Safety
 ///
 /// `out_srs`, `in_srs` must be valid null-terminated C strings (in_srs can be null).
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_reprojection(
     out_srs: *const c_char,
     in_srs: *const c_char,
@@ -371,7 +371,7 @@ fn write_merge_state(summary: &stats::Summary, state: &mut pdal_summary_merge_st
 ///
 /// Both state pointers must be valid. Value and data buffers must be large
 /// enough to hold the merged result.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stats_summary_merge(
     target: *mut pdal_summary_merge_state_t,
     other: *const pdal_summary_merge_state_t,

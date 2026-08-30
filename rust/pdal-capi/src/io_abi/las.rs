@@ -6,7 +6,7 @@ pub struct LasSummaryHandle {
     summary: pdal_io::las_summary::LasSummary,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_summary_create() -> *mut LasSummaryHandle {
     Box::into_raw(Box::new(LasSummaryHandle {
         summary: pdal_io::las_summary::LasSummary::default(),
@@ -15,7 +15,7 @@ pub extern "C" fn pdal_las_summary_create() -> *mut LasSummaryHandle {
 
 /// # Safety
 /// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_destroy(summary: *mut LasSummaryHandle) {
     if !summary.is_null() {
         drop(Box::from_raw(summary));
@@ -24,7 +24,7 @@ pub unsafe extern "C" fn pdal_las_summary_destroy(summary: *mut LasSummaryHandle
 
 /// # Safety
 /// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_clear(summary: *mut LasSummaryHandle) {
     if let Some(summary) = summary.as_mut() {
         summary.summary.clear();
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn pdal_las_summary_clear(summary: *mut LasSummaryHandle) 
 
 /// # Safety
 /// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_add_point(
     summary: *mut LasSummaryHandle,
     x: f64,
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn pdal_las_summary_add_point(
 
 /// # Safety
 /// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_total_num_points(
     summary: *const LasSummaryHandle,
 ) -> u64 {
@@ -60,7 +60,7 @@ pub unsafe extern "C" fn pdal_las_summary_total_num_points(
 
 /// # Safety
 /// `summary` must be null or a pointer returned by `pdal_las_summary_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_return_count(
     summary: *const LasSummaryHandle,
     return_number: u64,
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn pdal_las_summary_return_count(
 /// # Safety
 /// `summary` must be a pointer returned by `pdal_las_summary_create` and
 /// `out_bounds` must point to writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_summary_bounds(
     summary: *const LasSummaryHandle,
     out_bounds: *mut pdal_bounds3d_t,
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn pdal_las_summary_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_base_count(format: i32) -> i32 {
     match format & 0x0f {
         0 => 20,
@@ -106,12 +106,12 @@ pub extern "C" fn pdal_las_base_count(format: i32) -> i32 {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_point_format_supported(format: i32) -> bool {
     matches!(format, 0 | 1 | 2 | 3 | 6 | 7 | 8)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_legacy_point_count(
     point_count: u64,
     version_minor: u8,
@@ -124,7 +124,7 @@ pub extern "C" fn pdal_las_legacy_point_count(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_legacy_points_by_return(
     point_count: u64,
     return_num: i32,
@@ -154,7 +154,7 @@ pub struct pdal_las_vlr_header_t {
     pub description: [c_char; 33],
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_vlr_header_parse(
     data: *const u8,
     data_len: u64,
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn pdal_las_vlr_header_parse(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_vlr_header_write(
     header: *const pdal_las_vlr_header_t,
     evlr: bool,
@@ -221,7 +221,7 @@ pub unsafe extern "C" fn pdal_las_vlr_header_write(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_vlr_text(data: *const u8, data_len: u64) -> *mut c_char {
     if data.is_null() && data_len != 0 {
         return string_to_c_ptr(String::new());
@@ -266,7 +266,7 @@ pub struct LasTileHandle {
     pos: usize,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_las_tile_create(chunk: u32, size: u64) -> *mut LasTileHandle {
     let Ok(size) = usize::try_from(size) else {
         set_last_error("LAS tile size exceeds platform capacity.");
@@ -279,35 +279,35 @@ pub extern "C" fn pdal_las_tile_create(chunk: u32, size: u64) -> *mut LasTileHan
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_destroy(tile: *mut LasTileHandle) {
     if !tile.is_null() {
         drop(Box::from_raw(tile));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_data_const(tile: *const LasTileHandle) -> *const c_char {
     tile.as_ref()
         .map(|tile| tile.data.as_ptr().cast::<c_char>())
         .unwrap_or(std::ptr::null())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_data(tile: *mut LasTileHandle) -> *mut c_char {
     tile.as_mut()
         .map(|tile| tile.data.as_mut_ptr().cast::<c_char>())
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_size(tile: *const LasTileHandle) -> u64 {
     tile.as_ref()
         .map(|tile| tile.data.len() as u64)
         .unwrap_or(0)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_pos(tile: *const LasTileHandle) -> *const c_char {
     let Some(tile) = tile.as_ref() else {
         return std::ptr::null();
@@ -318,12 +318,12 @@ pub unsafe extern "C" fn pdal_las_tile_pos(tile: *const LasTileHandle) -> *const
     tile.data[tile.pos..].as_ptr().cast::<c_char>()
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_chunk(tile: *const LasTileHandle) -> u32 {
     tile.as_ref().map(|tile| tile.chunk).unwrap_or(0)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_tile_advance(tile: *mut LasTileHandle, point_size: i32) -> bool {
     let Some(tile) = tile.as_mut() else {
         return false;

@@ -43,7 +43,7 @@ unsafe fn cstr_or_empty(ptr: *const c_char) -> String {
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_register(
     type_ns: *const c_char,
     name: *const c_char,
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_register(
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_lookup_creator(
     type_ns: *const c_char,
     name: *const c_char,
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_lookup_creator(
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_has(
     type_ns: *const c_char,
     name: *const c_char,
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_has(
 ///
 /// # Safety
 /// `type_ns` must be a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_names_json(type_ns: *const c_char) -> *mut c_char {
     let ns = cstr_or_empty(type_ns);
     let Ok(map) = registry().lock() else {
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_names_json(type_ns: *const c_char) 
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_description(
     type_ns: *const c_char,
     name: *const c_char,
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_description(
 ///
 /// # Safety
 /// All pointer arguments must be valid for the duration of the call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_runtime_plugin_link(
     type_ns: *const c_char,
     name: *const c_char,
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn pdal_runtime_plugin_link(
     )
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_plugin_valid_name(
     path: *const c_char,
     types: *const *const c_char,
@@ -205,7 +205,7 @@ pub unsafe extern "C" fn pdal_plugin_valid_name(
     string_to_c_ptr(valid_plugin_name(&path, &type_refs, &extension).unwrap_or_default())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_registry_has(stage_name: *const c_char) -> bool {
     if stage_name.is_null() {
         return false;

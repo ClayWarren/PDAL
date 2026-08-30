@@ -31,7 +31,7 @@ pub struct PdalEptRootBounds {
 
 /// # Safety
 /// `reader_name` must be a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_addon_validate_input(reader_name: *const c_char) -> bool {
     let Some(reader_name) = cstr(reader_name) else {
         return false;
@@ -60,7 +60,7 @@ unsafe fn cstr(ptr: *const c_char) -> Option<String> {
 /// # Safety
 /// All pointers must be valid for the duration of the call. `view` is borrowed
 /// (not consumed) and remains owned by the caller.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_ept_addon_write(
     view: *const PointView,
     node_id_dim: *const c_char,

@@ -69,7 +69,7 @@ fn ensure_same_layout(
 ///
 /// `path_a` and `path_b` must be valid NUL-terminated C strings.
 /// `hausdorff` and `modified_hausdorff` must be valid, writable `double`s.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_hausdorff(
     path_a: *const c_char,
     path_b: *const c_char,
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn pdal_hausdorff(
 ///
 /// `path_a` and `path_b` must be valid NUL-terminated C strings.
 /// `chamfer` must be a valid, writable `double`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_chamfer(
     path_a: *const c_char,
     path_b: *const c_char,
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn pdal_chamfer(
 /// # Safety
 ///
 /// `path_a` and `path_b` must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char) -> *mut c_char {
     pdal_delta_ex(path_a, path_b, false, false)
 }
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn pdal_delta(path_a: *const c_char, path_b: *const c_char
 /// # Safety
 ///
 /// `path_a` and `path_b` must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_delta_ex(
     path_a: *const c_char,
     path_b: *const c_char,
@@ -279,7 +279,7 @@ fn delta_dimensions(
 /// # Safety
 ///
 /// All pointer arguments must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_eval(
     predicted_path: *const c_char,
     truth_path: *const c_char,

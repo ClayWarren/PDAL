@@ -20,7 +20,7 @@ pub struct pdal_copc_info_t {
 /// # Safety
 /// `data` must point to `data_len` readable bytes and `out_info` must point to
 /// writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_info_parse(
     data: *const u8,
     data_len: u64,
@@ -105,7 +105,7 @@ pub struct pdal_copc_entry_t {
 /// `data` must point to `data_len` readable bytes. `out_entries` and
 /// `out_count` must point to writable memory. On success, free `out_entries`
 /// with `pdal_copc_entries_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_hierarchy_parse(
     data: *const u8,
     data_len: u64,
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn pdal_copc_hierarchy_parse(
 /// # Safety
 /// `entries` must be null or a pointer returned by
 /// `pdal_copc_hierarchy_parse` with the same `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_entries_free(entries: *mut pdal_copc_entry_t, count: u64) {
     if !entries.is_null() {
         drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(
@@ -184,7 +184,7 @@ pub struct pdal_copc_bounds3d_t {
     pub maxz: f64,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_key_parse(
     value: *const c_char,
     out_key: *mut pdal_copc_key_t,
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn pdal_copc_key_parse(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_key_to_string(key: *const pdal_copc_key_t) -> *mut c_char {
     let Some(key) = key.as_ref() else {
         return string_to_c_ptr(String::new());
@@ -207,7 +207,7 @@ pub unsafe extern "C" fn pdal_copc_key_to_string(key: *const pdal_copc_key_t) ->
     string_to_c_ptr(format!("{}-{}-{}-{}", key.d, key.x, key.y, key.z))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_key_child(
     key: *const pdal_copc_key_t,
     direction: i32,
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn pdal_copc_key_child(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_key_bounds(
     key: *const pdal_copc_key_t,
     root: *const pdal_copc_bounds3d_t,
@@ -235,7 +235,7 @@ pub unsafe extern "C" fn pdal_copc_key_bounds(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_copc_key_hash(key: *const pdal_copc_key_t) -> u64 {
     let Some(key) = key.as_ref() else {
         return 0;

@@ -5,7 +5,7 @@ use super::*;
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_head(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let count = options.get_u64("count", 10);
@@ -22,7 +22,7 @@ pub unsafe extern "C" fn pdal_stage_create_head(ops: *const Options) -> *mut Sta
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_tail(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let count = options.get_u64("count", 10);
@@ -39,7 +39,7 @@ pub unsafe extern "C" fn pdal_stage_create_tail(ops: *const Options) -> *mut Sta
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_locate(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let dim_name = options.get_str("dimension", "");
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn pdal_stage_create_locate(ops: *const Options) -> *mut S
 /// # Safety
 ///
 /// `from_dims` and `to_dims` must be valid arrays of null-terminated strings of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_ferry(
     from_dims: *const *const std::os::raw::c_char,
     to_dims: *const *const std::os::raw::c_char,
@@ -85,7 +85,7 @@ pub unsafe extern "C" fn pdal_stage_create_ferry(
 /// # Safety
 ///
 /// `specs` must be a valid array of null-terminated strings of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_ferry_specs(
     specs: *const *const std::os::raw::c_char,
     count: u64,
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn pdal_stage_create_ferry_specs(
 /// # Safety
 ///
 /// `statement` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_validate_assign_statement(
     statement: *const std::os::raw::c_char,
 ) -> bool {
@@ -143,7 +143,7 @@ pub unsafe extern "C" fn pdal_stage_validate_assign_statement(
 ///
 /// `statement` must be null or a valid NUL-terminated C string. `layout` must
 /// be a valid point layout pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_validate_assign_statement_with_layout(
     statement: *const std::os::raw::c_char,
     layout: *const PointLayout,
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn pdal_stage_validate_assign_statement_with_layout(
 ///
 /// `statement` must be null or a valid NUL-terminated C string. The returned
 /// string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_assign_statement_target_dim(
     statement: *const std::os::raw::c_char,
 ) -> *mut std::os::raw::c_char {
@@ -204,7 +204,7 @@ pub unsafe extern "C" fn pdal_assign_statement_target_dim(
 /// `view` must be a valid point view pointer. `statements` must be valid for
 /// `statement_count` entries. `indices` must be null with a zero count, or
 /// valid for `index_count` entries.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_apply_assign_statements(
     view: *mut PointView,
     statements: *const *const std::os::raw::c_char,
@@ -271,7 +271,7 @@ pub unsafe extern "C" fn pdal_point_view_apply_assign_statements(
 ///
 /// `stage` must be a valid pointer to a stage created with `pdal_stage_create_ferry`.
 /// `view` must be a valid pointer to a `PointView`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_ferry_point(
     stage: *mut StageWrapper,
     view: *mut PointView,
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn pdal_stage_ferry_point(
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_randomize(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let seed = if options.has("seed") {
@@ -321,7 +321,7 @@ pub struct pdal_range_limit_t {
 ///
 /// Output pointers must be valid when non-null. `out_dim_name` receives an
 /// allocated string that must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_range_limit_parse(
     input: *const c_char,
     out_dim_name: *mut *mut c_char,
@@ -370,7 +370,7 @@ pub unsafe extern "C" fn pdal_range_limit_parse(
 /// # Safety
 ///
 /// `limits` must be a valid pointer to an array of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_range(
     limits: *const pdal_range_limit_t,
     count: u64,
@@ -406,7 +406,7 @@ pub unsafe extern "C" fn pdal_stage_create_range(
 ///
 /// `stage` must be a valid pointer to a stage created with `pdal_stage_create_range`.
 /// `view` must be a valid pointer to a `PointView`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_range_point_passes(
     stage: *mut StageWrapper,
     view: *mut PointView,
@@ -426,7 +426,7 @@ pub unsafe extern "C" fn pdal_stage_range_point_passes(
 ///
 /// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
 /// `order` and `algorithm` must be valid NUL-terminated C-strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_sort(
     dims: *const *const c_char,
     count: u64,
@@ -474,7 +474,7 @@ pub unsafe extern "C" fn pdal_stage_create_sort(
 /// # Safety
 ///
 /// `groups` must be a valid pointer to a C-array of C-strings of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_returns(
     groups: *const *const c_char,
     count: u64,
@@ -499,7 +499,7 @@ pub unsafe extern "C" fn pdal_stage_create_returns(
 /// # Safety
 ///
 /// Safe to call with any u64 value.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_separatescanline(groupby: u64) -> *mut StageWrapper {
     let filter = Box::new(SeparateScanLineFilter::new(groupby));
     Box::into_raw(Box::new(StageWrapper { filter }))

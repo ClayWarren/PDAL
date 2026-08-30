@@ -67,7 +67,7 @@ std::string takeCapiString(char* ptr)
     if (!ptr)
         return "";
     std::string value(ptr);
-    pdal_capi_free(ptr);
+    pdal_string_free(ptr);
     return value;
 }
 

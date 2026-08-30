@@ -125,7 +125,7 @@ fn run_nitfwrap_args(args: &[String]) -> c_int {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 1)]
 pub unsafe extern "C" fn pdal_tool_lasdump_run(argc: c_int, argv: *const *const c_char) -> c_int {
     ffi_catch(1, || match argv_to_vec(argc, argv) {
         Ok(args) => run_lasdump_args(&args),
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn pdal_tool_lasdump_run(argc: c_int, argv: *const *const 
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 1)]
 pub unsafe extern "C" fn pdal_tool_nitfwrap_run(argc: c_int, argv: *const *const c_char) -> c_int {
     ffi_catch(1, || match argv_to_vec(argc, argv) {
         Ok(args) => run_nitfwrap_args(&args),

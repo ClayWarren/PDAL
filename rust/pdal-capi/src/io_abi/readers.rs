@@ -15,7 +15,7 @@ pub struct PointlessLasResult {
 ///
 /// # Safety
 /// `filename` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pointless_las_create(
     filename: *const c_char,
 ) -> *mut PointlessLasResult {
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn pdal_pointless_las_create(
 ///
 /// # Safety
 /// `result` must be null or a pointer returned by `pdal_pointless_las_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_pointless_las_destroy(result: *mut PointlessLasResult) {
     if !result.is_null() {
         let result = Box::from_raw(result);
@@ -67,7 +67,7 @@ pub struct ReaderHandle {
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_faux(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         match pdal_io::faux::FauxReader::new(options) {
@@ -88,7 +88,7 @@ pub unsafe extern "C" fn pdal_reader_create_faux(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_text(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::text::TextReader::new(options));
@@ -102,7 +102,7 @@ pub unsafe extern "C" fn pdal_reader_create_text(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_pcd(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::pcd::PcdReader::new(options));
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn pdal_reader_create_pcd(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_pts(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::pts::PtsReader::new(options));
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn pdal_reader_create_pts(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_ptx(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::ptx::PtxReader::new(options));
@@ -144,7 +144,7 @@ pub unsafe extern "C" fn pdal_reader_create_ptx(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_ilvis2(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::ilvis2::Ilvis2Reader::new(options));
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn pdal_reader_create_ilvis2(ops: *const Options) -> *mut 
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_obj(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::obj::ObjReader::new(options));
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn pdal_reader_create_obj(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_ply(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::ply::PlyReader::new(options));
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn pdal_reader_create_ply(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_qfit(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::qfit::QfitReader::new(options));
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn pdal_reader_create_qfit(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_sbet(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::sbet::SbetReader::new(options));
@@ -214,7 +214,7 @@ pub unsafe extern "C" fn pdal_reader_create_sbet(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_smrmsg(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::smrmsg::SmrmsgReader::new(options));
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn pdal_reader_create_smrmsg(ops: *const Options) -> *mut 
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_optech(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::optech::OptechReader::new(options));
@@ -242,7 +242,7 @@ pub unsafe extern "C" fn pdal_reader_create_optech(ops: *const Options) -> *mut 
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_terrasolid(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::terrasolid::TerrasolidReader::new(options));
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn pdal_reader_create_terrasolid(ops: *const Options) -> *
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_tindex(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::tindex::TindexReader::new(options));
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn pdal_reader_create_tindex(ops: *const Options) -> *mut 
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_fbi(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::fbi::FbiReader::new(options));
@@ -293,7 +293,7 @@ pub struct pdal_fbi_header_info_t {
 /// # Safety
 /// `filename` must be a valid NUL-terminated string and `out_info` must point
 /// to writable storage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_fbi_header_info(
     filename: *const c_char,
     out_info: *mut pdal_fbi_header_info_t,
@@ -325,7 +325,7 @@ pub unsafe extern "C" fn pdal_fbi_header_info(
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_bpf(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::bpf::BpfReader::new(options));
@@ -339,7 +339,7 @@ pub unsafe extern "C" fn pdal_reader_create_bpf(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_gdal(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::gdal_reader::GdalReader::new(options));
@@ -353,7 +353,7 @@ pub unsafe extern "C" fn pdal_reader_create_gdal(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_las(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::las::LasReader::new(options));
@@ -367,7 +367,7 @@ pub unsafe extern "C" fn pdal_reader_create_las(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `path` must be a valid null-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_las_detect_copc(path: *const c_char) -> bool {
     if path.is_null() {
         return false;
@@ -380,7 +380,7 @@ pub unsafe extern "C" fn pdal_las_detect_copc(path: *const c_char) -> bool {
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_laz(ops: *const Options) -> *mut ReaderHandle {
     pdal_reader_create_las(ops)
 }
@@ -389,7 +389,7 @@ pub unsafe extern "C" fn pdal_reader_create_laz(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_spz(ops: *const Options) -> *mut ReaderHandle {
     #[cfg(feature = "spz")]
     if let Some(options) = ops.as_ref() {
@@ -410,7 +410,7 @@ pub unsafe extern "C" fn pdal_reader_create_spz(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_stac(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::stac::StacReader::new(options));
@@ -424,7 +424,7 @@ pub unsafe extern "C" fn pdal_reader_create_stac(ops: *const Options) -> *mut Re
 ///
 /// # Safety
 /// `filename` must be null or a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stac_type_supported(filename: *const c_char) -> bool {
     clear_last_error();
     let filename = if filename.is_null() {
@@ -460,7 +460,7 @@ pub unsafe extern "C" fn pdal_stac_type_supported(filename: *const c_char) -> bo
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_copc(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::copc::CopcReader::new(options));
@@ -481,7 +481,7 @@ pub unsafe extern "C" fn pdal_reader_create_copc(ops: *const Options) -> *mut Re
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
 /// `out_point_count` and `out_bounds` must point to writable storage with
 /// space for `u64` and 6 `f64` respectively.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub unsafe extern "C" fn pdal_copc_preview(
     ops: *const Options,
     out_point_count: *mut u64,
@@ -520,7 +520,7 @@ pub unsafe extern "C" fn pdal_copc_preview(
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_create_ept(ops: *const Options) -> *mut ReaderHandle {
     if let Some(options) = ops.as_ref() {
         let reader = Box::new(pdal_io::ept::EptReader::new(options));
@@ -534,7 +534,7 @@ pub unsafe extern "C" fn pdal_reader_create_ept(ops: *const Options) -> *mut Rea
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stac_preview_json(ops: *const Options) -> *mut c_char {
     let Some(options) = ops.as_ref() else {
         set_last_error("Missing STAC preview options.");
@@ -562,7 +562,7 @@ pub unsafe extern "C" fn pdal_stac_preview_json(ops: *const Options) -> *mut c_c
 /// # Safety
 /// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
 /// The returned view must be freed with `pdal_point_view_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_read_first(reader: *mut ReaderHandle) -> *mut PointView {
     let Some(reader) = reader.as_mut() else {
         set_last_error("null reader");
@@ -589,7 +589,7 @@ pub unsafe extern "C" fn pdal_reader_read_first(reader: *mut ReaderHandle) -> *m
 ///
 /// # Safety
 /// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_metadata(reader: *const ReaderHandle) -> *mut MetadataNode {
     let Some(reader) = reader.as_ref() else {
         set_last_error("null reader");
@@ -604,7 +604,7 @@ pub unsafe extern "C" fn pdal_reader_metadata(reader: *const ReaderHandle) -> *m
 ///
 /// # Safety
 /// `filename` must be a valid NUL-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ilvis2_metadata_read(filename: *const c_char) -> *mut MetadataNode {
     if filename.is_null() {
         set_last_error("null metadata filename");
@@ -635,7 +635,7 @@ pub unsafe extern "C" fn pdal_ilvis2_metadata_read(filename: *const c_char) -> *
 ///
 /// # Safety
 /// `reader` must be a valid pointer returned by `pdal_reader_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_reader_destroy(reader: *mut ReaderHandle) {
     if !reader.is_null() {
         drop(Box::from_raw(reader));

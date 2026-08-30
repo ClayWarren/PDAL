@@ -107,7 +107,7 @@ unsafe fn c_string_array(values: *const *const c_char, count: u64) -> Result<Vec
 /// # Safety
 ///
 /// `wkt` and `dim_name` must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_geomdistance(
     wkt: *const c_char,
     dim_name: *const c_char,
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn pdal_stage_create_geomdistance(
 /// # Safety
 ///
 /// `out_srs` and `coord_op` must be valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_projpipeline(
     out_srs: *const c_char,
     coord_op: *const c_char,
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn pdal_stage_create_projpipeline(
 /// # Safety
 ///
 /// `dim_name` must be a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_groupby(dim_name: *const c_char) -> *mut StageWrapper {
     if dim_name.is_null() {
         return std::ptr::null_mut();
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn pdal_stage_create_groupby(dim_name: *const c_char) -> *
 /// # Safety
 ///
 /// `dims` must be a valid pointer to a C-array of C-strings of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
     dims: *const *const c_char,
     count: u64,
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn pdal_stage_create_labelduplicates(
 /// # Safety
 ///
 /// Always safe to call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_merge() -> *mut StageWrapper {
     let filter = Box::new(MergeFilter::new());
     Box::into_raw(Box::new(StageWrapper { filter }))
@@ -209,7 +209,7 @@ pub extern "C" fn pdal_stage_create_merge() -> *mut StageWrapper {
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_merge`.
 /// `view` must be a valid pointer to a `PointView`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_merge_append(stage: *mut StageWrapper, view: *mut PointView) {
     if let (Some(stage_wrapper), Some(pt_view)) = (stage.as_ref(), view.as_ref()) {
         if let Some(merge) = stage_wrapper.filter.as_any().downcast_ref::<MergeFilter>() {
@@ -223,7 +223,7 @@ pub unsafe extern "C" fn pdal_stage_merge_append(stage: *mut StageWrapper, view:
 /// # Safety
 ///
 /// Always safe to call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_mortonorder(reverse: bool) -> *mut StageWrapper {
     let filter = Box::new(MortonOrderFilter::new(reverse));
     Box::into_raw(Box::new(StageWrapper { filter }))
@@ -234,7 +234,7 @@ pub extern "C" fn pdal_stage_create_mortonorder(reverse: bool) -> *mut StageWrap
 /// # Safety
 ///
 /// `matrix` must be a valid pointer to a 16-element float64 array.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_transformation(matrix: *const f64) -> *mut StageWrapper {
     if matrix.is_null() {
         return std::ptr::null_mut();
@@ -251,7 +251,7 @@ pub unsafe extern "C" fn pdal_stage_create_transformation(matrix: *const f64) ->
 ///
 /// `stage` must be a valid pointer returned by `pdal_stage_create_transformation`.
 /// `view` must be a valid pointer to a `PointView`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_transformation_point(
     stage: *mut StageWrapper,
     view: *mut PointView,
@@ -273,7 +273,7 @@ pub unsafe extern "C" fn pdal_stage_transformation_point(
 /// # Safety
 ///
 /// `out_matrix` must point to at least 16 float64 values when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_transformation_matrix_parse(
     input: *const c_char,
     out_matrix: *mut f64,
@@ -297,7 +297,7 @@ pub unsafe extern "C" fn pdal_transformation_matrix_parse(
 /// # Safety
 ///
 /// `matrix` must point to at least 16 float64 values when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_transformation_matrix_format(matrix: *const f64) -> *mut c_char {
     if matrix.is_null() {
         return string_to_c_ptr(String::new());
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn pdal_transformation_matrix_format(matrix: *const f64) -
 /// # Safety
 ///
 /// `coordinate_system` must be a null-terminated string when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_georeference_validate_coordinate_system(
     coordinate_system: *const c_char,
 ) -> *mut c_char {
@@ -333,7 +333,7 @@ pub unsafe extern "C" fn pdal_georeference_validate_coordinate_system(
 /// # Safety
 ///
 /// `layout` must be a valid pointer when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_georeference_validate_transform_beam(
     layout: *const PointLayout,
     transform_beam: bool,
@@ -353,7 +353,7 @@ pub unsafe extern "C" fn pdal_georeference_validate_transform_beam(
 /// # Safety
 ///
 /// `evals` must be a valid pointer of length `evals_count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_divider(
     mode: i32,
     size_mode: i32,
@@ -389,7 +389,7 @@ pub unsafe extern "C" fn pdal_stage_create_divider(
 }
 
 /// Create a splitter filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_splitter(
     length: f64,
     origin_x: f64,
@@ -405,7 +405,7 @@ pub extern "C" fn pdal_stage_create_splitter(
 /// # Safety
 ///
 /// `ops` may be null or must point to a valid options object.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_gpstimeconvert(
     ops: *const Options,
 ) -> *mut StageWrapper {
@@ -422,7 +422,7 @@ pub unsafe extern "C" fn pdal_stage_create_gpstimeconvert(
 }
 
 /// Create a chipper filter stage.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_chipper(capacity: u64) -> *mut StageWrapper {
     let filter = Box::new(ChipperFilter::new(capacity));
     Box::into_raw(Box::new(StageWrapper { filter }))
@@ -433,7 +433,7 @@ pub extern "C" fn pdal_stage_create_chipper(capacity: u64) -> *mut StageWrapper 
 /// # Safety
 ///
 /// Always safe.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_farthestpointsampling(count: u64) -> *mut StageWrapper {
     let filter = Box::new(FarthestPointSamplingFilter::new(count));
     Box::into_raw(Box::new(StageWrapper { filter }))
@@ -456,7 +456,7 @@ pub struct pdal_assign_range_t {
 /// # Safety
 ///
 /// `cond_dim` must be null-terminated or null. `assignments` must be valid pointer of length `count`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_assign(
     has_condition: bool,
     cond_dim: *const c_char,
@@ -512,7 +512,7 @@ pub unsafe extern "C" fn pdal_stage_create_assign(
 ///
 /// Range and assignment pointers must be valid for their matching counts, or
 /// null with a zero count.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_radiusassign(
     src_limits: *const pdal_range_limit_t,
     src_count: u64,
@@ -607,7 +607,7 @@ pub unsafe extern "C" fn pdal_stage_create_radiusassign(
 ///
 /// Range pointers and assignment string pointers must be valid for their
 /// matching counts, or null with a zero count.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_radiusassign_expr(
     src_limits: *const pdal_range_limit_t,
     src_count: u64,
@@ -696,7 +696,7 @@ pub unsafe extern "C" fn pdal_stage_create_radiusassign_expr(
 ///
 /// `domain` must be valid for `domain_count` entries, or null with a zero
 /// count. `dim_name` must be null or a valid C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
     domain: *const pdal_range_limit_t,
     domain_count: u64,
@@ -749,7 +749,7 @@ pub unsafe extern "C" fn pdal_stage_create_neighborclassifier(
 /// # Safety
 /// `ignored_dims` must be null with a zero count or point to `count`
 /// NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_csf(
     ground_class: u8,
     other_class: u8,
@@ -785,7 +785,7 @@ pub unsafe extern "C" fn pdal_stage_create_csf(
 /// # Safety
 /// `xyz` must point to a readable buffer of `count * 3` `f64` values, and
 /// `out_ground` must point to a writable buffer of `count` `u8` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_filter_csf_classify(
     xyz: *const f64,
@@ -855,7 +855,7 @@ pub unsafe extern "C" fn pdal_filter_csf_classify(
 /// input layout is acceptable (either all three NormalX/Y/Z present, or none
 /// present so the filter can register them), and -1 with an error string when
 /// only some normals are present.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub extern "C" fn pdal_filter_poisson_validate_normals(
     has_normal_x: bool,
     has_normal_y: bool,
@@ -874,7 +874,7 @@ pub extern "C" fn pdal_filter_poisson_validate_normals(
 
 /// Whether `filters.poisson` must register NormalX/Y/Z given the input layout.
 /// True when none of the three normal dimensions are present.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_filter_poisson_needs_normal_dims(
     has_normal_x: bool,
     has_normal_y: bool,
@@ -886,7 +886,7 @@ pub extern "C" fn pdal_filter_poisson_needs_normal_dims(
 /// Validate `filters.greedyprojection` options. The C++ filter requires
 /// `multiplier > 0` and `radius > 0`. Returns 0 on success, -1 with an error
 /// string otherwise.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = -1)]
 pub extern "C" fn pdal_filter_greedyprojection_validate_options(
     multiplier: f64,
     radius: f64,

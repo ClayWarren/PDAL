@@ -85,14 +85,14 @@ impl From<Bounds3D> for pdal_bounds3d_t {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_clear(bounds: *mut pdal_bounds2d_t) {
     if let Some(bounds) = bounds.as_mut() {
         *bounds = Bounds2D::empty().into();
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_empty(bounds: *const pdal_bounds2d_t) -> bool {
     bounds
         .as_ref()
@@ -100,7 +100,7 @@ pub unsafe extern "C" fn pdal_bounds2d_empty(bounds: *const pdal_bounds2d_t) -> 
         .unwrap_or(true)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_grow_point(bounds: *mut pdal_bounds2d_t, x: f64, y: f64) {
     if let Some(bounds) = bounds.as_mut() {
         let mut rust_bounds = Bounds2D::from(*bounds);
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn pdal_bounds2d_grow_point(bounds: *mut pdal_bounds2d_t, 
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_grow_distance(bounds: *mut pdal_bounds2d_t, distance: f64) {
     if let Some(bounds) = bounds.as_mut() {
         let mut rust_bounds = Bounds2D::from(*bounds);
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn pdal_bounds2d_grow_distance(bounds: *mut pdal_bounds2d_
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_grow_bounds(
     bounds: *mut pdal_bounds2d_t,
     other: *const pdal_bounds2d_t,
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn pdal_bounds2d_grow_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_clip(
     bounds: *mut pdal_bounds2d_t,
     other: *const pdal_bounds2d_t,
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn pdal_bounds2d_clip(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_contains_point(
     bounds: *const pdal_bounds2d_t,
     x: f64,
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn pdal_bounds2d_contains_point(
         .unwrap_or(false)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_contains_bounds(
     bounds: *const pdal_bounds2d_t,
     other: *const pdal_bounds2d_t,
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn pdal_bounds2d_contains_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_overlaps(
     bounds: *const pdal_bounds2d_t,
     other: *const pdal_bounds2d_t,
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn pdal_bounds2d_overlaps(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_parse(
     input: *const c_char,
     pos: u64,
@@ -204,14 +204,14 @@ pub unsafe extern "C" fn pdal_bounds2d_parse(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_clear(bounds: *mut pdal_bounds3d_t) {
     if let Some(bounds) = bounds.as_mut() {
         *bounds = Bounds3D::empty().into();
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_empty(bounds: *const pdal_bounds3d_t) -> bool {
     bounds
         .as_ref()
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn pdal_bounds3d_empty(bounds: *const pdal_bounds3d_t) -> 
         .unwrap_or(true)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_grow_point(
     bounds: *mut pdal_bounds3d_t,
     x: f64,
@@ -233,7 +233,7 @@ pub unsafe extern "C" fn pdal_bounds3d_grow_point(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_grow_bounds(
     bounds: *mut pdal_bounds3d_t,
     other: *const pdal_bounds3d_t,
@@ -245,7 +245,7 @@ pub unsafe extern "C" fn pdal_bounds3d_grow_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_grow_distance(bounds: *mut pdal_bounds3d_t, distance: f64) {
     if let Some(bounds) = bounds.as_mut() {
         let mut rust_bounds = Bounds3D::from(*bounds);
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn pdal_bounds3d_grow_distance(bounds: *mut pdal_bounds3d_
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_clip(
     bounds: *mut pdal_bounds3d_t,
     other: *const pdal_bounds3d_t,
@@ -266,7 +266,7 @@ pub unsafe extern "C" fn pdal_bounds3d_clip(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_contains_point(
     bounds: *const pdal_bounds3d_t,
     x: f64,
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn pdal_bounds3d_contains_point(
         .unwrap_or(false)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_contains_bounds(
     bounds: *const pdal_bounds3d_t,
     other: *const pdal_bounds3d_t,
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn pdal_bounds3d_contains_bounds(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_overlaps(
     bounds: *const pdal_bounds3d_t,
     other: *const pdal_bounds3d_t,
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn pdal_bounds3d_overlaps(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_parse(
     input: *const c_char,
     pos: u64,
@@ -329,7 +329,7 @@ pub unsafe extern "C" fn pdal_bounds3d_parse(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_srs_bounds_parse(
     input: *const c_char,
     pos: u64,
@@ -349,7 +349,7 @@ pub unsafe extern "C" fn pdal_srs_bounds_parse(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_equal(
     left: *const pdal_bounds2d_t,
     right: *const pdal_bounds2d_t,
@@ -437,7 +437,7 @@ fn skip_ascii_whitespace(input: &str, mut pos: usize) -> usize {
     pos
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_equal(
     left: *const pdal_bounds3d_t,
     right: *const pdal_bounds3d_t,
@@ -450,21 +450,21 @@ pub unsafe extern "C" fn pdal_bounds3d_equal(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_default(out_bounds: *mut pdal_bounds2d_t) {
     if let Some(out_bounds) = out_bounds.as_mut() {
         *out_bounds = default_bounds2d().into();
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_default(out_bounds: *mut pdal_bounds3d_t) {
     if let Some(out_bounds) = out_bounds.as_mut() {
         *out_bounds = default_bounds3d().into();
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_format(
     bounds: *const pdal_bounds2d_t,
     precision: u32,
@@ -475,7 +475,7 @@ pub unsafe extern "C" fn pdal_bounds2d_format(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_format(
     bounds: *const pdal_bounds3d_t,
     precision: u32,
@@ -486,7 +486,7 @@ pub unsafe extern "C" fn pdal_bounds3d_format(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_to_wkt(
     bounds: *const pdal_bounds2d_t,
     precision: u32,
@@ -497,7 +497,7 @@ pub unsafe extern "C" fn pdal_bounds2d_to_wkt(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds3d_to_wkt(
     bounds: *const pdal_bounds3d_t,
     precision: u32,
@@ -508,7 +508,7 @@ pub unsafe extern "C" fn pdal_bounds3d_to_wkt(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_bounds2d_to_geojson(
     bounds: *const pdal_bounds2d_t,
     precision: u32,

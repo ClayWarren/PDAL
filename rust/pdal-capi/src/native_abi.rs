@@ -13,7 +13,7 @@ pub use srs_abi::*;
 /// Return native dependency diagnostics as JSON.
 ///
 /// Caller owns the returned string and must free it with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_native_dependencies_json() -> *mut c_char {
     ffi_catch(std::ptr::null_mut(), || {
         let dependencies: Vec<_> = pdal_native::built_dependencies()

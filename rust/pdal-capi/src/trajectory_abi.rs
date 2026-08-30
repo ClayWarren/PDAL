@@ -307,7 +307,7 @@ fn process_point(
 ///
 /// `traj` must come from `pdal_trajectory_create`. `scan2imu` must point to 16
 /// f64s. The mutable pointers must be non-null and valid for read+write.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_georeference_process_point(
     traj: *const pdal_trajectory_t,
@@ -383,7 +383,7 @@ pub unsafe extern "C" fn pdal_georeference_process_point(
 /// `filename`/`options_json` must be NUL-terminated C strings (or null). The
 /// returned pointer is owned by the caller; release with
 /// `pdal_trajectory_destroy`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_trajectory_create(
     filename: *const c_char,
     options_json: *const c_char,
@@ -404,7 +404,7 @@ pub unsafe extern "C" fn pdal_trajectory_create(
 /// # Safety
 ///
 /// `handle` must have come from `pdal_trajectory_create` and not been freed.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_trajectory_destroy(handle: *mut pdal_trajectory_t) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
@@ -419,7 +419,7 @@ pub unsafe extern "C" fn pdal_trajectory_destroy(handle: *mut pdal_trajectory_t)
 ///
 /// `handle` must come from `pdal_trajectory_create`. All out pointers must be
 /// non-null and valid for write.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_trajectory_get_point(
     handle: *const pdal_trajectory_t,

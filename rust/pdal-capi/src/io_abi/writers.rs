@@ -16,7 +16,7 @@ pub struct WriterHandle {
 ///
 /// # Safety
 /// `ops` must be a valid pointer (may be null).
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut WriterHandle {
     let options = Options::new();
     let writer = Box::new(pdal_io::nullwriter::NullWriter::new(if ops.is_null() {
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn pdal_writer_create_null(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_fbi(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::fbi_writer::FbiWriter::new(options));
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn pdal_writer_create_fbi(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_bpf(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::bpf::BpfWriter::new(options));
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn pdal_writer_create_bpf(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_text(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::text_writer::TextWriter::new(options));
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn pdal_writer_create_text(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_pcd(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::pcd::PcdWriter::new(options));
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn pdal_writer_create_pcd(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_ply(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         match pdal_io::ply::PlyWriter::new(options) {
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn pdal_writer_create_ply(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_gltf(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::gltf::GltfWriter::new(options));
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn pdal_writer_create_gltf(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_sbet(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::sbet_writer::SbetWriter::new(options));
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn pdal_writer_create_sbet(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_las(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::las_writer::LasWriter::new(options));
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn pdal_writer_create_las(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_laz(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::las_writer::LasWriter::new_laz(options));
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn pdal_writer_create_laz(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let mut opts = options.clone();
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn pdal_writer_create_copc(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_spz(ops: *const Options) -> *mut WriterHandle {
     #[cfg(feature = "spz")]
     if let Some(options) = ops.as_ref() {
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn pdal_writer_create_spz(ops: *const Options) -> *mut Wri
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_ogr(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::ogr_writer::OgrWriter::new(options));
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn pdal_writer_create_ogr(ops: *const Options) -> *mut Wri
 /// Validate the OGR writer multicount/attr_dims combination on behalf of the
 /// C++ wrapper. Returns null on success, otherwise an owned C string carrying
 /// the unprefixed error message. Caller frees with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_ogr_writer_validate(multicount: u64, attr_dim_count: u64) -> *mut c_char {
     match pdal_io::ogr_writer::validate_multicount_and_attrs(multicount, attr_dim_count) {
         Ok(()) => std::ptr::null_mut(),
@@ -230,7 +230,7 @@ pub extern "C" fn pdal_ogr_writer_validate(multicount: u64, attr_dim_count: u64)
 ///
 /// # Safety
 /// `name` must be a valid C string pointer or null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ogr_writer_dim_not_found(name: *const c_char) -> *mut c_char {
     if name.is_null() {
         return std::ptr::null_mut();
@@ -245,7 +245,7 @@ pub unsafe extern "C" fn pdal_ogr_writer_dim_not_found(name: *const c_char) -> *
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_gdal(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::gdal_writer::GdalWriter::new(options));
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn pdal_writer_create_gdal(ops: *const Options) -> *mut Wr
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_create_raster(ops: *const Options) -> *mut WriterHandle {
     if let Some(options) = ops.as_ref() {
         let writer = Box::new(pdal_io::raster_writer::RasterWriter::new(options));
@@ -274,8 +274,8 @@ pub unsafe extern "C" fn pdal_writer_create_raster(ops: *const Options) -> *mut 
 /// # Safety
 /// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
 /// `view` must be a valid pointer returned by `pdal_point_view_create` or
-/// `pdal_reader_read_first`.
-#[no_mangle]
+/// `pdal_reader_read_first` and is borrowed for the duration of this call.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_write_view(
     writer: *mut WriterHandle,
     view: *const PointView,
@@ -302,8 +302,9 @@ pub unsafe extern "C" fn pdal_writer_write_view(
 /// # Safety
 /// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
 /// `views` must point to `count` valid pointers returned by
-/// `pdal_point_view_create` or `pdal_reader_read_first`.
-#[no_mangle]
+/// `pdal_point_view_create` or `pdal_reader_read_first`. Every view is borrowed
+/// for the duration of this call.
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_write_views(
     writer: *mut WriterHandle,
     views: *const *const PointView,
@@ -318,7 +319,15 @@ pub unsafe extern "C" fn pdal_writer_write_views(
         return false;
     }
 
-    let raw_views = std::slice::from_raw_parts(views, count as usize);
+    let raw_views = if count == 0 {
+        &[]
+    } else {
+        let Ok(count) = usize::try_from(count) else {
+            set_last_error("view count overflow");
+            return false;
+        };
+        std::slice::from_raw_parts(views, count)
+    };
     let mut owned_views = Vec::with_capacity(raw_views.len());
     for view in raw_views {
         let Some(view) = view.as_ref() else {
@@ -344,7 +353,7 @@ pub unsafe extern "C" fn pdal_writer_write_views(
 ///
 /// # Safety
 /// `writer` must be a valid pointer returned by `pdal_writer_create_*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_writer_destroy(writer: *mut WriterHandle) {
     if !writer.is_null() {
         drop(Box::from_raw(writer));

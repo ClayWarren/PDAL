@@ -13,7 +13,7 @@ use pdal_filters::math;
 ///
 /// # Safety
 /// `data` and `out` must each be valid for `rows * cols` `f64` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_grad_x(
     data: *const f64,
     rows: usize,
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn pdal_math_grad_x(
 ///
 /// # Safety
 /// See [`pdal_math_grad_x`].
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_grad_y(
     data: *const f64,
     rows: usize,
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn pdal_math_grad_y(
 ///
 /// # Safety
 /// `data` must be valid for `rows * cols` `f64` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_dilate_diamond(
     data: *mut f64,
     rows: usize,
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn pdal_math_dilate_diamond(
 ///
 /// # Safety
 /// See [`pdal_math_dilate_diamond`].
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_erode_diamond(
     data: *mut f64,
     rows: usize,
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn pdal_math_erode_diamond(
 ///
 /// # Safety
 /// `xyz` must be valid for `count * 3` `f64` values and `out_xyz` for 3.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_compute_centroid(
     xyz: *const f64,
     count: usize,
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn pdal_math_compute_centroid(
 /// # Safety
 /// `view` must be a valid point view pointer. `out_xyz`, when non-null, must be
 /// valid for `out_len` `f64` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_math_point_view_to_xyz(
     view: *const PointView,
     out_xyz: *mut f64,

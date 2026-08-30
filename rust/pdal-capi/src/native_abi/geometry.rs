@@ -9,7 +9,7 @@ use std::os::raw::c_char;
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_is_valid(
     wkt: *const c_char,
     out_value: *mut bool,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_is_valid(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_distance_to_point(
     wkt: *const c_char,
     x: f64,
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_distance_to_point(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_contains_point(
     wkt: *const c_char,
     x: f64,
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_contains_point(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_covers_point(
     wkt: *const c_char,
     x: f64,
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_covers_point(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_area(wkt: *const c_char, out_value: *mut f64) -> bool {
     ffi_catch(false, || {
         let Ok(geometry) = Geometry::from_wkt(&c_string_lossy(wkt)) else {
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_area(wkt: *const c_char, out_value: *
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_simplify(
     wkt: *const c_char,
     tolerance: f64,
@@ -195,7 +195,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_simplify(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt(
     wkt: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_wkt` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt_precision(
     wkt: *const c_char,
     precision: u32,
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_to_wkt_precision(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_bounds` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_bounds(
     wkt: *const c_char,
     out_bounds: *mut crate::point_abi::pdal_bounds3d_t,
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn pdal_geometry_wkt_bounds(
 ///
 /// `json` must be null or a valid NUL-terminated C string. `out_value` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_json_is_valid(
     json: *const c_char,
     out_value: *mut bool,
@@ -321,7 +321,7 @@ pub unsafe extern "C" fn pdal_geometry_json_is_valid(
 ///
 /// `wkt` must be null or a valid NUL-terminated C string. `out_json` must be
 /// null or valid for writes.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_geometry_wkt_to_json(
     wkt: *const c_char,
     precision: u32,

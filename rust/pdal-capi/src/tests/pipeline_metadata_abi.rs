@@ -1,4 +1,13 @@
 use super::*;
+use pdal_core::point::{PointLayout, PointView};
+use std::rc::{Rc, Weak};
+
+fn tracked_input_view() -> (*mut PointView, Weak<PointLayout>) {
+    let layout = Rc::new(PointLayout::new());
+    let layout_lifetime = Rc::downgrade(&layout);
+    let view = Box::into_raw(Box::new(PointView::new(layout)));
+    (view, layout_lifetime)
+}
 
 #[test]
 fn pipeline_result_roundtrips_through_c_abi() {
@@ -115,6 +124,94 @@ fn pipeline_result_c_abi_rejects_missing_output() {
             pdal_pipeline_execute_result(pipeline, std::ptr::null_mut(), std::ptr::null_mut()),
             -1
         );
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
+fn pipeline_input_view_remains_owned_by_caller_when_preflight_rejects_call() {
+    unsafe {
+        let (view, layout_lifetime) = tracked_input_view();
+        assert_eq!(pdal_pipeline_execute_count(std::ptr::null_mut(), view), -1);
+        assert!(layout_lifetime.upgrade().is_some());
+        pdal_point_view_destroy(view);
+        assert!(layout_lifetime.upgrade().is_none());
+
+        let pipeline = pdal_pipeline_create();
+        let (view, layout_lifetime) = tracked_input_view();
+        assert_eq!(
+            pdal_pipeline_execute_result(pipeline, view, std::ptr::null_mut()),
+            -1
+        );
+        assert!(layout_lifetime.upgrade().is_some());
+        pdal_point_view_destroy(view);
+        assert!(layout_lifetime.upgrade().is_none());
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
+fn pipeline_execute_transfers_input_view_ownership_to_returned_view() {
+    unsafe {
+        let pipeline = pdal_pipeline_create();
+        let (input, layout_lifetime) = tracked_input_view();
+
+        let output = pdal_pipeline_execute(pipeline, input);
+        assert!(!output.is_null());
+        assert!(layout_lifetime.upgrade().is_some());
+
+        pdal_point_view_destroy(output);
+        assert!(layout_lifetime.upgrade().is_none());
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
+fn pipeline_non_view_results_consume_input_view_after_preflight() {
+    unsafe {
+        let pipeline = pdal_pipeline_create();
+
+        let (count_input, count_layout_lifetime) = tracked_input_view();
+        assert_eq!(pdal_pipeline_execute_count(pipeline, count_input), 0);
+        assert!(count_layout_lifetime.upgrade().is_none());
+
+        let (result_input, result_layout_lifetime) = tracked_input_view();
+        let mut result = empty_pipeline_result();
+        assert_eq!(
+            pdal_pipeline_execute_result(pipeline, result_input, &mut result),
+            0
+        );
+        assert!(result_layout_lifetime.upgrade().is_none());
+
+        let (json_input, json_layout_lifetime) = tracked_input_view();
+        let summary = pdal_pipeline_execute_summary_json(pipeline, json_input);
+        assert!(!summary.is_null());
+        assert!(json_layout_lifetime.upgrade().is_none());
+        pdal_string_free(summary);
+
+        pdal_pipeline_destroy(pipeline);
+    }
+}
+
+#[test]
+fn pipeline_execution_failure_still_consumes_input_view_after_preflight() {
+    unsafe {
+        let pipeline = pdal_pipeline_create();
+        let first = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+        let second = pdal_pipeline_add_stage(pipeline, pdal_stage_create_merge());
+        assert_eq!(
+            pdal_pipeline_add_dependency(pipeline, first as u64, second as u64),
+            0
+        );
+        assert_eq!(
+            pdal_pipeline_add_dependency(pipeline, second as u64, first as u64),
+            0
+        );
+
+        let (input, layout_lifetime) = tracked_input_view();
+        assert_eq!(pdal_pipeline_execute_count(pipeline, input), -1);
+        assert!(layout_lifetime.upgrade().is_none());
+
         pdal_pipeline_destroy(pipeline);
     }
 }

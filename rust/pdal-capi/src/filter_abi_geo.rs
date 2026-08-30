@@ -22,7 +22,7 @@ pub struct pdal_point3d_t {
 /// # Safety
 ///
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_decimation(ops: *const Options) -> *mut StageWrapper {
     if let Some(options) = ops.as_ref() {
         let filter = Box::new(DecimationFilter::new(options));
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn pdal_stage_create_decimation(ops: *const Options) -> *m
 ///
 /// Array pointers must either be null with a zero count or valid for their
 /// matching count.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_crop(
     outside: bool,
     bounds: *const pdal_box3d_t,
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn pdal_stage_create_crop(
 /// # Safety
 ///
 /// String pointers must be null-terminated.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_overlay(
     dim_name: *const c_char,
     datasource: *const c_char,
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn pdal_stage_create_overlay(
 /// # Safety
 ///
 /// String pointers must be null-terminated.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_overlay_with_options(
     dim_name: *const c_char,
     datasource: *const c_char,
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn pdal_stage_create_overlay_with_options(
 /// # Safety
 ///
 /// String pointers must be null-terminated.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_colorinterp(
     dim_name: *const c_char,
     ramp: *const c_char,
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn pdal_stage_create_colorinterp(
 /// # Safety
 ///
 /// `layout` must be a valid pointer when non-null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_colorinterp_validate_prepared(
     layout: *const PointLayout,
     dim_name: *const c_char,
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn pdal_colorinterp_validate_prepared(
 }
 
 /// Return whether a colorinterp stage can run in streaming mode.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_colorinterp_pipeline_streamable(min: f64, max: f64) -> bool {
     pipeline_streamable(min, max)
 }
@@ -249,7 +249,7 @@ pub struct pdal_band_info_t {
 ///
 /// `raster_path` and every band name must be null-terminated. `bands` must
 /// either be null with a zero count or valid for `count` entries.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_colorization(
     raster_path: *const c_char,
     bands: *const pdal_band_info_t,
@@ -287,7 +287,7 @@ pub unsafe extern "C" fn pdal_stage_create_colorization(
 /// # Safety
 ///
 /// `dim_name` and `raster_path` must be null-terminated strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_dem(
     dim_name: *const c_char,
     raster_path: *const c_char,
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn pdal_stage_create_dem(
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_stage_create_h3(resolution: u64) -> *mut StageWrapper {
     Box::into_raw(Box::new(StageWrapper {
         filter: Box::new(H3Filter::new(resolution as u8)),
@@ -325,7 +325,7 @@ pub extern "C" fn pdal_stage_create_h3(resolution: u64) -> *mut StageWrapper {
 /// # Safety
 ///
 /// `raster_path` must be a null-terminated string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_hag_dem(
     raster_path: *const c_char,
     band: i32,

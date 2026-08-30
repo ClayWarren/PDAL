@@ -16,7 +16,7 @@ use std::os::raw::c_char;
 /// # Safety
 ///
 /// `name` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_create(name: *const c_char) -> *mut MetadataNode {
     let name = if name.is_null() {
         String::new()
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn pdal_metadata_node_create(name: *const c_char) -> *mut 
     Box::into_raw(Box::new(MetadataNode::new(name)))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return a deep copy of a metadata node. Caller owns the returned pointer.
 ///
 /// # Safety
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn pdal_metadata_node_clone(node: *const MetadataNode) -> 
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_name(node: *const MetadataNode) -> *mut c_char {
     string_to_c_ptr(
         node.as_ref()
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn pdal_metadata_node_name(node: *const MetadataNode) -> *
     )
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return a node's type name. Caller must free with `pdal_string_free`.
 ///
 /// # Safety
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn pdal_metadata_node_type(node: *const MetadataNode) -> *
     )
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return a node's description. Caller must free with `pdal_string_free`.
 ///
 /// # Safety
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn pdal_metadata_node_description(node: *const MetadataNod
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
 /// `value` must be null or a valid NUL-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_string(
     node: *mut MetadataNode,
     value: *const c_char,
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_string(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Set a metadata node's type name.
 ///
 /// # Safety
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_type(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Set a metadata node's description.
 ///
 /// # Safety
@@ -146,7 +146,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_description(
 /// # Safety
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_i64(node: *mut MetadataNode, value: i64) {
     if let Some(node) = node.as_mut() {
         node.set_value(MetadataValue::I64(value));
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_i64(node: *mut MetadataNode, val
 /// # Safety
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_u64(node: *mut MetadataNode, value: u64) {
     if let Some(node) = node.as_mut() {
         node.set_value(MetadataValue::U64(value));
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_u64(node: *mut MetadataNode, val
 /// # Safety
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_f64(node: *mut MetadataNode, value: f64) {
     if let Some(node) = node.as_mut() {
         node.set_value(MetadataValue::F64(value));
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_f64(node: *mut MetadataNode, val
 /// # Safety
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_bool(node: *mut MetadataNode, value: bool) {
     if let Some(node) = node.as_mut() {
         node.set_value(MetadataValue::Bool(value));
@@ -195,7 +195,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_bool(node: *mut MetadataNode, va
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
 /// The pointed-to object remains owned by the caller.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_set_pointer(
     node: *mut MetadataNode,
     value: *mut c_void,
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn pdal_metadata_node_set_pointer(
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 255)]
 pub unsafe extern "C" fn pdal_metadata_node_value_kind(node: *const MetadataNode) -> u8 {
     node.as_ref()
         .and_then(MetadataNode::value)
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_kind(node: *const MetadataNode
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = 255)]
 pub unsafe extern "C" fn pdal_metadata_node_kind(node: *const MetadataNode) -> u8 {
     node.as_ref().map(|node| node.kind().as_u8()).unwrap_or(255)
 }
@@ -238,7 +238,7 @@ pub unsafe extern "C" fn pdal_metadata_node_kind(node: *const MetadataNode) -> u
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value(node: *const MetadataNode) -> *mut c_char {
     string_to_c_ptr(
         node.as_ref()
@@ -254,7 +254,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value(node: *const MetadataNode) -> 
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value_i64(node: *const MetadataNode) -> i64 {
     node.as_ref()
         .and_then(MetadataNode::value)
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_i64(node: *const MetadataNode)
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value_u64(node: *const MetadataNode) -> u64 {
     node.as_ref()
         .and_then(MetadataNode::value)
@@ -282,7 +282,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_u64(node: *const MetadataNode)
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value_f64(node: *const MetadataNode) -> f64 {
     node.as_ref()
         .and_then(MetadataNode::value)
@@ -296,7 +296,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_f64(node: *const MetadataNode)
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode) -> bool {
     node.as_ref()
         .and_then(MetadataNode::value)
@@ -310,7 +310,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_bool(node: *const MetadataNode
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_value_pointer(
     node: *const MetadataNode,
 ) -> *mut c_void {
@@ -326,7 +326,7 @@ pub unsafe extern "C" fn pdal_metadata_node_value_pointer(
 /// # Safety
 ///
 /// `type_name` and `value` must be null or valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_json_value(
     type_name: *const c_char,
     value: *const c_char,
@@ -336,7 +336,7 @@ pub unsafe extern "C" fn pdal_metadata_json_value(
     string_to_c_ptr(json_scalar_value(&type_name, &value))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Convert a scalar metadata value to a signed integer.
 ///
 /// # Safety
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn pdal_metadata_value_as_i64(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Convert a scalar metadata value to an unsigned integer.
 ///
 /// # Safety
@@ -380,7 +380,7 @@ pub unsafe extern "C" fn pdal_metadata_value_as_u64(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Convert a scalar metadata value to a double.
 ///
 /// # Safety
@@ -402,7 +402,7 @@ pub unsafe extern "C" fn pdal_metadata_value_as_f64(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Convert a scalar metadata value to a bool.
 ///
 /// # Safety
@@ -432,7 +432,7 @@ pub unsafe extern "C" fn pdal_metadata_value_as_bool(
 /// `child` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`. If non-null, it must not be used after this
 /// call.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_add_child(
     node: *mut MetadataNode,
     child: *mut MetadataNode,
@@ -442,7 +442,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_child(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Add a child as a metadata list/array entry, transferring ownership.
 ///
 /// # Safety
@@ -460,7 +460,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_list_child(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Add a cloned child to a node without transferring ownership.
 ///
 /// # Safety
@@ -477,7 +477,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_child_clone(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Add a cloned child as a metadata list/array entry without transferring
 /// ownership.
 ///
@@ -495,7 +495,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_list_child_clone(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Add or replace a child, transferring ownership of `child`.
 ///
 /// # Safety
@@ -513,7 +513,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_or_update_child(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Add or replace a cloned child without transferring ownership.
 ///
 /// # Safety
@@ -536,7 +536,7 @@ pub unsafe extern "C" fn pdal_metadata_node_add_or_update_child_clone(
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_child_count(node: *const MetadataNode) -> u64 {
     node.as_ref()
         .map(|node| node.children().len() as u64)
@@ -548,7 +548,7 @@ pub unsafe extern "C" fn pdal_metadata_node_child_count(node: *const MetadataNod
 /// # Safety
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_child(
     node: *const MetadataNode,
     idx: u64,
@@ -559,7 +559,7 @@ pub unsafe extern "C" fn pdal_metadata_node_child(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return the count of child nodes with `name`.
 ///
 /// # Safety
@@ -577,7 +577,7 @@ pub unsafe extern "C" fn pdal_metadata_node_child_named_count(
         .unwrap_or(0)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return a copy of the named child at `idx`. Caller owns the returned pointer.
 ///
 /// # Safety
@@ -597,7 +597,7 @@ pub unsafe extern "C" fn pdal_metadata_node_child_named(
         .unwrap_or(std::ptr::null_mut())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 /// Return a copy of the child selected by a colon-delimited path.
 /// Caller owns the returned pointer.
 ///
@@ -633,7 +633,7 @@ pub unsafe extern "C" fn pdal_metadata_node_find_child_path(
 ///
 /// `node` must be null or a valid pointer returned by
 /// `pdal_metadata_node_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_to_json(node: *const MetadataNode) -> *mut c_char {
     let value = node
         .as_ref()
@@ -648,7 +648,7 @@ pub unsafe extern "C" fn pdal_metadata_node_to_json(node: *const MetadataNode) -
 ///
 /// `node` must be a valid pointer returned by `pdal_metadata_node_create`, or
 /// null. Must not be called twice on the same pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_metadata_node_destroy(node: *mut MetadataNode) {
     if !node.is_null() {
         drop(Box::from_raw(node));

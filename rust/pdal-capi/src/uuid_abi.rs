@@ -4,7 +4,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::ptr;
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_uuid_parse(input: *const c_char, out_bytes: *mut u8) -> bool {
     if input.is_null() || out_bytes.is_null() {
         return false;
@@ -17,7 +17,7 @@ pub unsafe extern "C" fn pdal_uuid_parse(input: *const c_char, out_bytes: *mut u
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_uuid_unparse(bytes: *const u8) -> *mut c_char {
     if bytes.is_null() {
         return ptr::null_mut();
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn pdal_uuid_unparse(bytes: *const u8) -> *mut c_char {
     string_to_c_ptr(uuid::unparse_uuid(&bytes))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_uuid_random(out_bytes: *mut u8) -> bool {
     if out_bytes.is_null() {
         return false;
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn pdal_uuid_random(out_bytes: *mut u8) -> bool {
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_uuid_is_null(bytes: *const u8) -> bool {
     if bytes.is_null() {
         return true;

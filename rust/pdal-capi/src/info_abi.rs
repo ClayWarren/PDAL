@@ -8,7 +8,7 @@ use std::ffi::{c_char, CStr};
 /// # Safety
 /// `view` must be null or a valid pointer returned by this C ABI. `point_spec`
 /// and `query_spec` must be null or valid NUL-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_info_summary_json(
     view: *const PointView,
     point_spec: *const c_char,

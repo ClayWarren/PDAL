@@ -10,7 +10,7 @@ use std::os::raw::c_char;
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_mesh_triangle_count(view: *const PointView) -> u64 {
     view.as_ref()
         .and_then(PointView::mesh)
@@ -25,7 +25,7 @@ pub unsafe extern "C" fn pdal_point_view_mesh_triangle_count(view: *const PointV
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use the default mesh lookup.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_named_mesh_triangle_count(
     view: *const PointView,
     name: *const c_char,
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn pdal_point_view_named_mesh_triangle_count(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `a`, `b`, and `c` must point to writable
 /// memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_mesh_triangle(
     view: *const PointView,
     idx: u64,
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn pdal_point_view_mesh_triangle(
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use the default mesh lookup. `a`, `b`, and `c` must
 /// point to writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_named_mesh_triangle(
     view: *const PointView,
     name: *const c_char,
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn pdal_point_view_named_mesh_triangle(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_add_mesh_triangle(
     view: *mut PointView,
     a: u64,
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn pdal_point_view_add_mesh_triangle(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use the default mesh name.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_add_named_mesh_triangle(
     view: *mut PointView,
     name: *const c_char,
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn pdal_point_view_add_named_mesh_triangle(
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_raster_count(view: *const PointView) -> u64 {
     view.as_ref()
         .map(|view| view.rasters().len() as u64)
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn pdal_point_view_raster_count(view: *const PointView) ->
 ///
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_raster_name(
     view: *const PointView,
     idx: u64,
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn pdal_point_view_raster_name(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string. `limits` must point to readable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_create_raster(
     view: *mut PointView,
     name: *const c_char,
@@ -225,7 +225,7 @@ pub unsafe extern "C" fn pdal_point_view_create_raster(
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use default raster lookup. `out_limits` must point to
 /// writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_raster_limits(
     view: *const PointView,
     name: *const c_char,
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn pdal_point_view_raster_limits(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use default raster lookup.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export(fallback = f64::NAN)]
 pub unsafe extern "C" fn pdal_point_view_raster_initializer(
     view: *const PointView,
     name: *const c_char,
@@ -271,7 +271,7 @@ pub unsafe extern "C" fn pdal_point_view_raster_initializer(
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use default raster lookup. `out_value` must point to
 /// writable memory.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_raster_cell(
     view: *const PointView,
     name: *const c_char,
@@ -301,7 +301,7 @@ pub unsafe extern "C" fn pdal_point_view_raster_cell(
 /// `view` must be a valid pointer returned by `pdal_point_view_create`, or
 /// returned by `pdal_stage_run`. `name` must be a valid, NUL-terminated C
 /// string, or null to use default raster lookup.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_point_view_set_raster_cell(
     view: *mut PointView,
     name: *const c_char,

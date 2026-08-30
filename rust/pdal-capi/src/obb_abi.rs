@@ -24,7 +24,7 @@ unsafe fn read4(ptr: *const f64) -> [f64; 4] {
 /// # Safety
 /// `center_*` and `half_*` must each point to 3 `f64` values, and `quat_*` to
 /// 4 `f64` values.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_obb_intersect(
     center_a: *const f64,
     half_a: *const f64,

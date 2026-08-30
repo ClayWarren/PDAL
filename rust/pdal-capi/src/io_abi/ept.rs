@@ -14,7 +14,7 @@ pub struct pdal_ept_key_t {
     pub bounds: pdal_bounds3d_t,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_key_parse(
     value: *const c_char,
     out_key: *mut pdal_ept_key_t,
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn pdal_ept_key_parse(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_key_to_string(key: *const pdal_ept_key_t) -> *mut c_char {
     let Some(key) = key.as_ref() else {
         return string_to_c_ptr(String::new());
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn pdal_ept_key_to_string(key: *const pdal_ept_key_t) -> *
     string_to_c_ptr(format!("{}-{}-{}-{}", key.d, key.x, key.y, key.z))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_key_bisect(
     key: *const pdal_ept_key_t,
     direction: u64,
@@ -120,7 +120,7 @@ fn empty_abi_bounds3d() -> pdal_bounds3d_t {
 ///
 /// # Safety
 /// `filename` and `origin` must be valid null-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_validate_origin(
     filename: *const c_char,
     origin: *const c_char,
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn pdal_ept_validate_origin(
 ///
 /// # Safety
 /// `filename` and `bounds` must be valid null-terminated C strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_validate_bounds(
     filename: *const c_char,
     bounds: *const c_char,
@@ -181,7 +181,7 @@ pub unsafe extern "C" fn pdal_ept_validate_bounds(
 /// # Safety
 /// `info_json` must be a valid null-terminated C string and `out_wkt` a valid
 /// pointer to a `char*`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_srs_wkt_from_info(
     info_json: *const c_char,
     out_wkt: *mut *mut c_char,
@@ -228,7 +228,7 @@ pub struct EptReaderPreviewHandle {
 ///
 /// # Safety
 /// `filename` must be a valid NUL-terminated C string pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_create(
     filename: *const c_char,
 ) -> *mut EptReaderPreviewHandle {
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create(
 /// # Safety
 /// `filename` must be a valid NUL-terminated C string pointer. `resolution`
 /// may be null or a valid NUL-terminated C string pointer.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_options(
     filename: *const c_char,
     resolution: *const c_char,
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_options(
 /// # Safety
 /// `filename` must be a valid NUL-terminated C string pointer. `resolution`
 /// and `bounds` may be null or valid NUL-terminated C string pointers.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_bounds(
     filename: *const c_char,
     resolution: *const c_char,
@@ -304,7 +304,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_bounds(
 ///
 /// # Safety
 /// `ops` must be a valid pointer returned by `pdal_options_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_create_with_reader_options(
     ops: *const Options,
 ) -> *mut EptReaderPreviewHandle {
@@ -333,7 +333,7 @@ fn create_preview_from_options(options: &Options) -> *mut EptReaderPreviewHandle
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_point_count(
     handle: *const EptReaderPreviewHandle,
 ) -> u64 {
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_point_count(
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`. `out` must be writable.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_bounds(
     handle: *const EptReaderPreviewHandle,
     out_minx: *mut f64,
@@ -375,7 +375,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_bounds(
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_srs_wkt(
     handle: *const EptReaderPreviewHandle,
 ) -> *mut c_char {
@@ -390,7 +390,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_srs_wkt(
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_dim_count(
     handle: *const EptReaderPreviewHandle,
 ) -> u64 {
@@ -405,7 +405,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_dim_count(
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_dim_name(
     handle: *const EptReaderPreviewHandle,
     index: u64,
@@ -424,7 +424,7 @@ pub unsafe extern "C" fn pdal_ept_reader_preview_dim_name(
 /// # Safety
 /// `handle` must be a valid pointer returned by
 /// `pdal_ept_reader_preview_create`, or null.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_ept_reader_preview_destroy(handle: *mut EptReaderPreviewHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));

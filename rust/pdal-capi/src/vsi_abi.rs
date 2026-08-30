@@ -6,7 +6,7 @@ use std::path::Path;
 /// # Safety
 /// `filename` and `scenario` must be valid NUL-terminated strings. The
 /// returned string must be freed with `pdal_string_free`.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_vsi_local_io_scenario_json(
     filename: *const c_char,
     scenario: *const c_char,

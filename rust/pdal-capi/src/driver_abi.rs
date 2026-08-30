@@ -10,7 +10,7 @@ pub struct StageExtensionsHandle {
     writers: BTreeMap<String, String>,
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_infer_reader_driver(filename: *const c_char) -> *mut c_char {
     if filename.is_null() {
         return string_to_c_ptr(String::new());
@@ -19,7 +19,7 @@ pub unsafe extern "C" fn pdal_infer_reader_driver(filename: *const c_char) -> *m
     string_to_c_ptr(infer_reader_driver(&filename).unwrap_or("").to_string())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_infer_writer_driver(filename: *const c_char) -> *mut c_char {
     if filename.is_null() {
         return string_to_c_ptr(String::new());
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn pdal_infer_writer_driver(filename: *const c_char) -> *m
     string_to_c_ptr(infer_writer_driver(&filename).unwrap_or("").to_string())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_rust_stage_list_json() -> *mut c_char {
     let stages = READER_DRIVERS
         .iter()
@@ -39,7 +39,7 @@ pub extern "C" fn pdal_rust_stage_list_json() -> *mut c_char {
     string_to_c_ptr(serde_json::to_string(&stages).unwrap_or_else(|_| "[]".to_string()))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_extensions_create() -> *mut StageExtensionsHandle {
     Box::into_raw(Box::new(StageExtensionsHandle {
         readers: BTreeMap::new(),
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn pdal_stage_extensions_create() -> *mut StageExtensionsH
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_extensions_set(
     extensions: *mut StageExtensionsHandle,
     stage: *const c_char,
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn pdal_stage_extensions_set(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_extensions_default_reader(
     extensions: *const StageExtensionsHandle,
     extension: *const c_char,
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn pdal_stage_extensions_default_reader(
     stage_extension_default(extensions, extension, true)
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_extensions_default_writer(
     extensions: *const StageExtensionsHandle,
     extension: *const c_char,
@@ -125,7 +125,7 @@ unsafe fn stage_extension_default(
     string_to_c_ptr(inferred.unwrap_or("").to_string())
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_extensions_destroy(extensions: *mut StageExtensionsHandle) {
     if !extensions.is_null() {
         drop(Box::from_raw(extensions));

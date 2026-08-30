@@ -159,7 +159,7 @@ fn worker(inner: Arc<Inner>) {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_thread_pool_create(
     num_threads: usize,
     queue_size: i64,
@@ -169,7 +169,7 @@ pub extern "C" fn pdal_thread_pool_create(
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_destroy(handle: *mut pdal_thread_pool_t) {
     if !handle.is_null() {
         let mut pool = Box::from_raw(handle);
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn pdal_thread_pool_destroy(handle: *mut pdal_thread_pool_
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_go(handle: *mut pdal_thread_pool_t) {
     ffi_catch((), || {
         if let Some(pool) = handle.as_mut() {
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn pdal_thread_pool_go(handle: *mut pdal_thread_pool_t) {
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_join(handle: *mut pdal_thread_pool_t) {
     ffi_catch((), || {
         if let Some(pool) = handle.as_mut() {
@@ -195,7 +195,7 @@ pub unsafe extern "C" fn pdal_thread_pool_join(handle: *mut pdal_thread_pool_t) 
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_stop(handle: *mut pdal_thread_pool_t) {
     ffi_catch((), || {
         if let Some(pool) = handle.as_mut() {
@@ -204,7 +204,7 @@ pub unsafe extern "C" fn pdal_thread_pool_stop(handle: *mut pdal_thread_pool_t) 
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_clear_tasks(handle: *mut pdal_thread_pool_t) {
     ffi_catch((), || {
         if let Some(pool) = handle.as_mut() {
@@ -213,7 +213,7 @@ pub unsafe extern "C" fn pdal_thread_pool_clear_tasks(handle: *mut pdal_thread_p
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_await(handle: *const pdal_thread_pool_t) {
     ffi_catch((), || {
         if let Some(pool) = handle.as_ref() {
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn pdal_thread_pool_await(handle: *const pdal_thread_pool_
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_resize(
     handle: *mut pdal_thread_pool_t,
     num_threads: usize,
@@ -236,12 +236,12 @@ pub unsafe extern "C" fn pdal_thread_pool_resize(
     })
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_num_threads(handle: *const pdal_thread_pool_t) -> usize {
     ffi_catch(0, || handle.as_ref().map_or(0, |pool| pool.num_threads))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_thread_pool_add(
     handle: *const pdal_thread_pool_t,
     data: *mut c_void,

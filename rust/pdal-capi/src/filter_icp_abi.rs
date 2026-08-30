@@ -13,7 +13,7 @@ use pdal_filters::icp::{register, IcpParams};
 /// `fixed` and `moving` must be valid view pointers. `init` must point to 16
 /// `f64` values when `has_init` is true. Each non-null out-pointer must be
 /// valid and sized as documented (`out_transform`: 16, `out_centroid`: 3).
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pdal_icp_register(
     fixed: *const PointView,

@@ -10,7 +10,7 @@ use std::os::raw::c_char;
 ///
 /// `dim_name` must be a valid NUL-terminated C-string.
 /// `exprs` must be a valid pointer to a C-array of `count` C-strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_expressionstats(
     dim_name: *const c_char,
     exprs: *const *const c_char,
@@ -49,7 +49,7 @@ pub unsafe extern "C" fn pdal_stage_create_expressionstats(
 /// # Safety
 ///
 /// `expr` must be a valid null-terminated C string.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
     expr: *const c_char,
 ) -> *mut StageWrapper {
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn pdal_stage_create_mongoexpression(
 /// # Safety
 ///
 /// `exprs` must be a valid pointer to a C-array of `count` C-strings.
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_stage_create_expression(
     exprs: *const *const c_char,
     count: u64,

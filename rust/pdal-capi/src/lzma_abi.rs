@@ -21,14 +21,14 @@ unsafe fn input_slice<'a>(buf: *const c_char, len: usize) -> &'a [u8] {
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_lzma_compressor_create() -> *mut LzmaCompressorHandle {
     Box::into_raw(Box::new(LzmaCompressorHandle {
         inner: Some(xz2::write::XzEncoder::new(Vec::new(), 2)),
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_compressor_update(
     handle: *mut LzmaCompressorHandle,
     buf: *const c_char,
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn pdal_lzma_compressor_update(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_compressor_finish(
     handle: *mut LzmaCompressorHandle,
     out_buf: *mut *mut u8,
@@ -78,21 +78,21 @@ pub unsafe extern "C" fn pdal_lzma_compressor_finish(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_compressor_destroy(handle: *mut LzmaCompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub extern "C" fn pdal_lzma_decompressor_create() -> *mut LzmaDecompressorHandle {
     Box::into_raw(Box::new(LzmaDecompressorHandle {
         inner: Some(xz2::write::XzDecoder::new(Vec::new())),
     }))
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_decompressor_update(
     handle: *mut LzmaDecompressorHandle,
     buf: *const c_char,
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn pdal_lzma_decompressor_update(
     true
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_decompressor_finish(
     handle: *mut LzmaDecompressorHandle,
     out_buf: *mut *mut u8,
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn pdal_lzma_decompressor_finish(
     }
 }
 
-#[no_mangle]
+#[pdal_capi_macros::ffi_export]
 pub unsafe extern "C" fn pdal_lzma_decompressor_destroy(handle: *mut LzmaDecompressorHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
