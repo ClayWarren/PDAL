@@ -5,7 +5,7 @@
 set(RUST_CAPI_DIR "${ROOT_DIR}/rust")
 set(RUST_CAPI_HEADER_DIR "${RUST_CAPI_DIR}/pdal-capi/include")
 if(MSVC)
-    set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/pdal_capi.lib")
+    set(RUST_CAPI_ARCHIVE_NAME "pdal_capi.lib")
     set(RUST_CAPI_MSVC_EXPORTS
         "/EXPORT:pdal_app_unknown_command_message"
         "/EXPORT:pdal_artifact_manager_create"
@@ -312,8 +312,90 @@ if(MSVC)
     endforeach()
     set(RUST_CAPI_MSVC_EXPORT_OPTIONS "/DEF:${RUST_CAPI_MSVC_DEF_FILE}")
 else()
-    set(RUST_CAPI_LIB "${RUST_CAPI_DIR}/target/release/libpdal_capi.a")
+    set(RUST_CAPI_ARCHIVE_NAME "libpdal_capi.a")
 endif()
+
+set(PDAL_RUST_TARGET "" CACHE STRING
+    "Rust target triple for the PDAL C ABI (derived from the CMake target when empty)")
+
+# Cargo does not consume CMake's target architecture. Derive the corresponding
+# Rust target explicitly so native and cross builds cannot silently produce an
+# archive for the build host instead of the CMake target.
+if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    set(_pdal_rust_apple_arches ${CMAKE_OSX_ARCHITECTURES})
+    list(LENGTH _pdal_rust_apple_arches _pdal_rust_apple_arch_count)
+    if(NOT _pdal_rust_apple_arch_count EQUAL 1)
+        message(FATAL_ERROR
+            "The Rust C ABI does not support a universal macOS build in one "
+            "Cargo invocation. Build each architecture separately.")
+    endif()
+endif()
+
+if(PDAL_RUST_TARGET)
+    set(PDAL_RUST_TARGET_EFFECTIVE "${PDAL_RUST_TARGET}")
+else()
+    set(_pdal_rust_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    if(MSVC)
+        if(CMAKE_GENERATOR_PLATFORM)
+            set(_pdal_rust_arch "${CMAKE_GENERATOR_PLATFORM}")
+            string(REGEX REPLACE ",.*$" "" _pdal_rust_arch
+                "${_pdal_rust_arch}")
+        elseif(CMAKE_C_COMPILER_ARCHITECTURE_ID)
+            set(_pdal_rust_arch "${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
+        endif()
+    elseif(APPLE AND _pdal_rust_apple_arches)
+        list(GET _pdal_rust_apple_arches 0 _pdal_rust_arch)
+    elseif(CMAKE_C_COMPILER_ARCHITECTURE_ID)
+        set(_pdal_rust_arch "${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
+    endif()
+
+    string(TOLOWER "${_pdal_rust_arch}" _pdal_rust_arch)
+    if(MSVC)
+        if(_pdal_rust_arch MATCHES "^(arm64|aarch64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "aarch64-pc-windows-msvc")
+        elseif(_pdal_rust_arch MATCHES "^(amd64|x64|x86_64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "x86_64-pc-windows-msvc")
+        endif()
+    elseif(APPLE)
+        if(_pdal_rust_arch MATCHES "^(arm64|aarch64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "aarch64-apple-darwin")
+        elseif(_pdal_rust_arch MATCHES "^(amd64|x64|x86_64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "x86_64-apple-darwin")
+        endif()
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        if(_pdal_rust_arch MATCHES "^(arm64|aarch64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "aarch64-unknown-linux-gnu")
+        elseif(_pdal_rust_arch MATCHES "^(amd64|x64|x86_64)$")
+            set(PDAL_RUST_TARGET_EFFECTIVE "x86_64-unknown-linux-gnu")
+        endif()
+    endif()
+
+    if(NOT PDAL_RUST_TARGET_EFFECTIVE)
+        message(FATAL_ERROR
+            "Unable to derive a Rust target for ${CMAKE_SYSTEM_NAME}/"
+            "${_pdal_rust_arch}. Set PDAL_RUST_TARGET to the Cargo target triple.")
+    endif()
+endif()
+
+# CMAKE_CFG_INTDIR is intentionally used instead of a generator expression in
+# custom-command OUTPUT. It supports CMake 3.13 and expands per configuration
+# for Visual Studio and Xcode while remaining '.' for single-config generators.
+set(RUST_CARGO_TARGET_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/cargo/${CMAKE_CFG_INTDIR}")
+set(RUST_CARGO_RELEASE_CONFIG
+    "$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>")
+set(RUST_CARGO_PROFILE
+    "$<IF:${RUST_CARGO_RELEASE_CONFIG},release,dev>")
+set(RUST_CARGO_PROFILE_DIR
+    "$<IF:${RUST_CARGO_RELEASE_CONFIG},release,debug>")
+set(RUST_CARGO_OUTPUT_DIR
+    "${RUST_CARGO_TARGET_DIR}/${PDAL_RUST_TARGET_EFFECTIVE}/${RUST_CARGO_PROFILE_DIR}")
+set(RUST_CAPI_OUTPUT_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/rust/${CMAKE_CFG_INTDIR}")
+set(RUST_CAPI_CARGO_LIB
+    "${RUST_CARGO_OUTPUT_DIR}/${RUST_CAPI_ARCHIVE_NAME}")
+set(RUST_CAPI_LIB
+    "${RUST_CAPI_OUTPUT_DIR}/${RUST_CAPI_ARCHIVE_NAME}")
 
 file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
     "${RUST_CAPI_DIR}/Cargo.toml"
@@ -328,14 +410,71 @@ file(GLOB_RECURSE RUST_CAPI_SOURCES CONFIGURE_DEPENDS
     "${RUST_CAPI_DIR}/pdal-plugins/*"
 )
 
-set(RUST_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-if(APPLE AND NOT RUST_MACOSX_DEPLOYMENT_TARGET)
-    set(RUST_MACOSX_DEPLOYMENT_TARGET "16.0")
-endif()
-
 find_program(CARGO_EXECUTABLE cargo)
 if(NOT CARGO_EXECUTABLE)
     message(FATAL_ERROR "cargo (Rust) is required to build the PDAL Rust C ABI layer.")
+endif()
+
+# Keep Cargo's compiler, linker, profile, and output selection aligned with the
+# CMake target. The target-specific cc-rs variables use the underscore spelling
+# accepted by the `cc` crate, while Cargo's linker variable is uppercase.
+string(TOUPPER "${PDAL_RUST_TARGET_EFFECTIVE}" RUST_CARGO_TARGET_ENV)
+string(REPLACE "-" "_" RUST_CARGO_TARGET_ENV
+    "${RUST_CARGO_TARGET_ENV}")
+string(REPLACE "." "_" RUST_CARGO_TARGET_ENV
+    "${RUST_CARGO_TARGET_ENV}")
+string(TOLOWER "${PDAL_RUST_TARGET_EFFECTIVE}" RUST_CC_TARGET_ENV)
+string(REPLACE "-" "_" RUST_CC_TARGET_ENV "${RUST_CC_TARGET_ENV}")
+string(REPLACE "." "_" RUST_CC_TARGET_ENV "${RUST_CC_TARGET_ENV}")
+
+set(RUST_CARGO_BUILD_ENV
+    "CARGO_TARGET_DIR=${RUST_CARGO_TARGET_DIR}"
+    "CARGO_PROFILE_RELEASE_DEBUG=$<IF:$<CONFIG:RelWithDebInfo>,1,0>"
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL=$<IF:$<CONFIG:MinSizeRel>,s,3>"
+)
+if(CMAKE_C_COMPILER)
+    list(APPEND RUST_CARGO_BUILD_ENV
+        "CC_${RUST_CC_TARGET_ENV}=${CMAKE_C_COMPILER}")
+endif()
+if(CMAKE_CXX_COMPILER)
+    list(APPEND RUST_CARGO_BUILD_ENV
+        "CXX_${RUST_CC_TARGET_ENV}=${CMAKE_CXX_COMPILER}")
+endif()
+if(CMAKE_AR)
+    list(APPEND RUST_CARGO_BUILD_ENV
+        "AR_${RUST_CC_TARGET_ENV}=${CMAKE_AR}")
+endif()
+if(MSVC)
+    if(CMAKE_LINKER)
+        list(APPEND RUST_CARGO_BUILD_ENV
+            "CARGO_TARGET_${RUST_CARGO_TARGET_ENV}_LINKER=${CMAKE_LINKER}")
+    endif()
+    list(APPEND RUST_CARGO_BUILD_ENV "CXXSTDLIB=")
+
+    if(CMAKE_LIBRARY_PATH)
+        list(GET CMAKE_LIBRARY_PATH 0 RUST_CONDA_LIBRARY_DIR)
+        file(TO_CMAKE_PATH "${RUST_CONDA_LIBRARY_DIR}" RUST_CONDA_LIBRARY_DIR)
+        list(APPEND RUST_CARGO_BUILD_ENV
+            "PKG_CONFIG_PATH=${RUST_CONDA_LIBRARY_DIR}/pkgconfig"
+            "GDAL_DYNAMIC=1")
+    elseif(DEFINED ENV{CONDA_PREFIX})
+        file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" RUST_CONDA_PREFIX)
+        list(APPEND RUST_CARGO_BUILD_ENV
+            "PKG_CONFIG_PATH=${RUST_CONDA_PREFIX}/Library/lib/pkgconfig"
+            "GDAL_DYNAMIC=1")
+    endif()
+elseif(CMAKE_C_COMPILER)
+    list(APPEND RUST_CARGO_BUILD_ENV
+        "CARGO_TARGET_${RUST_CARGO_TARGET_ENV}_LINKER=${CMAKE_C_COMPILER}")
+endif()
+if(APPLE)
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        list(APPEND RUST_CARGO_BUILD_ENV
+            "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif()
+    if(IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
+        list(APPEND RUST_CARGO_BUILD_ENV "SDKROOT=${CMAKE_OSX_SYSROOT}")
+    endif()
 endif()
 
 # Build the pdal-capi static library with cargo and make the given PDAL library
@@ -343,39 +482,26 @@ endif()
 # then linked in alongside the other C++ dependencies). Keeping the cargo
 # invocation here groups it with the cargo discovery and source globbing above.
 macro(pdal_build_rust_capi _pdal_target)
-    set(RUST_CAPI_BUILD_ENV
-        MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
-    )
-    if (MSVC)
-        list(APPEND RUST_CAPI_BUILD_ENV
-            CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=${CMAKE_LINKER}
-            CXXSTDLIB=
-        )
-        if(CMAKE_LIBRARY_PATH)
-            list(GET CMAKE_LIBRARY_PATH 0 RUST_CONDA_LIBRARY_DIR)
-            file(TO_CMAKE_PATH "${RUST_CONDA_LIBRARY_DIR}" RUST_CONDA_LIBRARY_DIR)
-            list(APPEND RUST_CAPI_BUILD_ENV
-                PKG_CONFIG_PATH=${RUST_CONDA_LIBRARY_DIR}/pkgconfig
-                GDAL_DYNAMIC=1
-            )
-        elseif(DEFINED ENV{CONDA_PREFIX})
-            file(TO_CMAKE_PATH "$ENV{CONDA_PREFIX}" RUST_CONDA_PREFIX)
-            list(APPEND RUST_CAPI_BUILD_ENV
-                PKG_CONFIG_PATH=${RUST_CONDA_PREFIX}/Library/lib/pkgconfig
-                GDAL_DYNAMIC=1
-            )
-        endif()
-    endif()
     add_custom_command(
-        OUTPUT ${RUST_CAPI_LIB}
+        OUTPUT "${RUST_CAPI_LIB}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${RUST_CAPI_OUTPUT_DIR}"
         COMMAND ${CMAKE_COMMAND} -E env
-            ${RUST_CAPI_BUILD_ENV}
-            ${CARGO_EXECUTABLE} build --release -p pdal-capi ${RUST_CAPI_FEATURE_ARGS}
+            ${RUST_CARGO_BUILD_ENV}
+            ${CARGO_EXECUTABLE} build
+                -p pdal-capi
+                --target "${PDAL_RUST_TARGET_EFFECTIVE}"
+                --profile "${RUST_CARGO_PROFILE}"
+                ${RUST_CAPI_FEATURE_ARGS}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${RUST_CAPI_CARGO_LIB}" "${RUST_CAPI_LIB}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${RUST_CAPI_LIB}"
         DEPENDS ${RUST_CAPI_SOURCES}
-        WORKING_DIRECTORY ${RUST_CAPI_DIR}
+        WORKING_DIRECTORY "${RUST_CAPI_DIR}"
         COMMENT "Building Rust C ABI (pdal-capi) with cargo"
+        COMMAND_EXPAND_LISTS
+        VERBATIM
     )
-    add_custom_target(pdal_rust_capi DEPENDS ${RUST_CAPI_LIB})
+    add_custom_target(pdal_rust_capi DEPENDS "${RUST_CAPI_LIB}")
     add_dependencies(${_pdal_target} pdal_rust_capi)
 endmacro()
 
@@ -402,13 +528,6 @@ endif()
 if(RUST_CAPI_FEATURE_NAMES)
     list(JOIN RUST_CAPI_FEATURE_NAMES "," RUST_CAPI_FEATURES)
     list(APPEND RUST_CAPI_FEATURE_ARGS "--features" "${RUST_CAPI_FEATURES}")
-endif()
-add_definitions("-D_REENTRANT")
-if (WIN32)
-    add_definitions("-DSIZEOF_SIZE_T=4")
-    add_definitions("-DIMPORT_NITRO_API")
-else()
-    add_definitions("-D__POSIX")
 endif()
 
 # Link a target against the Rust C ABI archive and the native libraries that

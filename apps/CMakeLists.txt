@@ -55,25 +55,40 @@ if (BUILD_RUST_CLI)
     # Rust CLI binary (pdal-rs)
     #
     set(PDAL_RS_APP pdal-rs)
-    set(PDAL_RS_BIN "${RUST_CAPI_DIR}/target/release/pdal-rs")
+    set(PDAL_RS_BIN_NAME "pdal-rs${CMAKE_EXECUTABLE_SUFFIX}")
+    set(PDAL_RS_CARGO_BIN "${RUST_CARGO_OUTPUT_DIR}/${PDAL_RS_BIN_NAME}")
+    set(PDAL_RS_OUTPUT_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/rust/${CMAKE_CFG_INTDIR}")
+    set(PDAL_RS_BIN "${PDAL_RS_OUTPUT_DIR}/${PDAL_RS_BIN_NAME}")
 
     add_custom_command(
-        OUTPUT ${PDAL_RS_BIN}
+        OUTPUT "${PDAL_RS_BIN}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${PDAL_RS_OUTPUT_DIR}"
         COMMAND ${CMAKE_COMMAND} -E env
-            MACOSX_DEPLOYMENT_TARGET=${RUST_MACOSX_DEPLOYMENT_TARGET}
-            PDAL_LIB_DIR=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-            PDAL_KERNEL_CAPI_LIB=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpdal_kernel_capi.a
-            ${CARGO_EXECUTABLE} build -p pdal-cli --release
+            ${RUST_CARGO_BUILD_ENV}
+            "PDAL_LIB_DIR=$<TARGET_FILE_DIR:${PDAL_LIB_NAME}>"
+            "PDAL_KERNEL_CAPI_LIB=$<TARGET_FILE:pdal_kernel_capi>"
+            ${CARGO_EXECUTABLE} build
+                -p pdal-cli
+                --target "${PDAL_RUST_TARGET_EFFECTIVE}"
+                --profile "${RUST_CARGO_PROFILE}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PDAL_RS_CARGO_BIN}" "${PDAL_RS_BIN}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${PDAL_RS_BIN}"
         DEPENDS ${RUST_CAPI_SOURCES} ${PDAL_LIB_NAME} pdal_kernel_capi
-        WORKING_DIRECTORY ${RUST_CAPI_DIR}
+        WORKING_DIRECTORY "${RUST_CAPI_DIR}"
         COMMENT "Building Rust PDAL CLI (pdal-rs) with cargo"
+        COMMAND_EXPAND_LISTS
+        VERBATIM
     )
-    add_custom_target(${PDAL_RS_APP} DEPENDS ${PDAL_RS_BIN})
+    add_custom_target(${PDAL_RS_APP} DEPENDS "${PDAL_RS_BIN}")
 
     add_custom_command(
         TARGET ${PDAL_RS_APP} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${PDAL_RS_BIN} ${PDAL_OUTPUT_BIN_DIR}/pdal-rs
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PDAL_RS_BIN}" "${PDAL_OUTPUT_BIN_DIR}/${PDAL_RS_BIN_NAME}"
         COMMENT "Copying pdal-rs to output directory"
+        VERBATIM
     )
 endif()
 
