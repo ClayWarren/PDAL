@@ -484,6 +484,7 @@ endif()
 macro(pdal_build_rust_capi _pdal_target)
     add_custom_command(
         OUTPUT "${RUST_CAPI_LIB}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${RUST_CARGO_TARGET_DIR}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${RUST_CAPI_OUTPUT_DIR}"
         COMMAND ${CMAKE_COMMAND} -E env
             ${RUST_CARGO_BUILD_ENV}
