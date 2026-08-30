@@ -1021,6 +1021,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "glob",
+ "pdal-capi-macros",
  "pdal-core",
  "pdal-filters",
  "pdal-io",
@@ -1031,6 +1032,15 @@ dependencies = [
  "tempfile",
  "xz2",
  "zstd",
+]
+
+[[package]]
+name = "pdal-capi-macros"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

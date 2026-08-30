@@ -15,6 +15,7 @@ spz = ["pdal-io/spz"]
 
 [dependencies]
 chrono = "0.4.44"
+pdal-capi-macros = { path = "../pdal-capi-macros" }
 pdal-core = { path = "../pdal-core" }
 pdal-filters = { path = "../pdal-filters" }
 pdal-io = { path = "../pdal-io", default-features = false }
