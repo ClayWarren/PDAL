@@ -81,7 +81,7 @@ TEST(SampleFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.sample"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     SampleFilter s;
     EXPECT_EQ(s.getName(), "filters.sample");
 }

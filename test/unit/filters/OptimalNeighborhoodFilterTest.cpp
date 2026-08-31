@@ -79,7 +79,7 @@ TEST(OptimalNeighborhoodFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.optimalneighborhood"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     OptimalNeighborhood s;
     EXPECT_EQ(s.getName(), "filters.optimalneighborhood");
 }
@@ -112,6 +112,7 @@ TEST(OptimalNeighborhoodFilterTest, custom_k_window)
     opts.add("min_k", 5);
     opts.add("max_k", 8);
     PointViewPtr out = run(table, 60, opts);
+    ASSERT_EQ(out->size(), 60u);
 
     bool sawBelowDefault = false;
     for (PointId i = 0; i < out->size(); ++i)

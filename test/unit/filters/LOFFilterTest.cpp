@@ -80,7 +80,7 @@ TEST(LOFFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.lof"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     LOFFilter l;
     EXPECT_EQ(l.getName(), "filters.lof");
 }
@@ -121,6 +121,9 @@ TEST(LOFFilterTest, minpts_controls_k_distance)
         Options opts;
         opts.add("minpts", minpts);
         PointViewPtr out = run(table, opts);
+        EXPECT_EQ(out->size(), 26u);
+        if (out->size() <= 12)
+            return 0.0;
         return out->getFieldAs<double>(Dimension::Id::NNDistance, 12);
     };
 

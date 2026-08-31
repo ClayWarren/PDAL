@@ -84,7 +84,7 @@ TEST(ClusterFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.cluster"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     ClusterFilter c;
     EXPECT_EQ(c.getName(), "filters.cluster");
 }
@@ -137,6 +137,7 @@ TEST(ClusterFilterTest, min_points_threshold)
         Options opts;
         opts.add("min_points", minPoints);
         PointViewPtr out = run(table, pts, opts);
+        EXPECT_EQ(out->size(), 5u);
         size_t n = 0;
         for (PointId i = 0; i < out->size(); ++i)
             if (out->getFieldAs<int>(Dimension::Id::ClusterID, i) > 0)
@@ -158,6 +159,7 @@ TEST(ClusterFilterTest, is3d_toggle)
         Options opts;
         opts.add("is3d", is3d);
         PointViewPtr out = run(table, pts, opts);
+        EXPECT_EQ(out->size(), 2u);
         std::set<int> ids;
         for (PointId i = 0; i < out->size(); ++i)
             ids.insert(out->getFieldAs<int>(Dimension::Id::ClusterID, i));

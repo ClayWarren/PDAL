@@ -93,7 +93,7 @@ TEST(DBSCANFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.dbscan"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     DBSCANFilter d;
     EXPECT_EQ(d.getName(), "filters.dbscan");
 }
@@ -132,6 +132,7 @@ TEST(DBSCANFilterTest, min_points_threshold)
         opts.add("min_points", minPoints);
         opts.add("eps", 1.0);
         PointViewPtr out = run(table, cube(0.0, 0.0, 0.0), opts);
+        EXPECT_EQ(out->size(), 8u);
         bool noise = true;
         for (PointId i = 0; i < out->size(); ++i)
             if (out->getFieldAs<int>(Dimension::Id::ClusterID, i) != -1)
@@ -157,6 +158,7 @@ TEST(DBSCANFilterTest, dimensions_restrict_clustering)
         opts.add("eps", 1.0);
         opts.add("dimensions", dims);
         PointViewPtr out = run(table, pts, opts);
+        EXPECT_EQ(out->size(), 6u);
         for (PointId i = 0; i < out->size(); ++i)
             if (out->getFieldAs<int>(Dimension::Id::ClusterID, i) < 0)
                 return false;

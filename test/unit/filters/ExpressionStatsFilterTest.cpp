@@ -77,7 +77,7 @@ TEST(ExpressionStatsFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.expressionstats"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     ExpressionStatsFilter s;
     EXPECT_EQ(s.getName(), "filters.expressionstats");
 }

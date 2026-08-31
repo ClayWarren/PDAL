@@ -38,6 +38,9 @@
 #include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 
+#include <algorithm>
+#include <vector>
+
 using namespace pdal;
 
 namespace
@@ -75,7 +78,7 @@ TEST(FarthestPointSamplingFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.fps"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.fps");
 }
 
@@ -86,7 +89,14 @@ TEST(FarthestPointSamplingFilterTest, samples_to_count)
     opts.add("count", 10);
     PointViewPtr out = run(table, 50, opts);
 
-    EXPECT_EQ(out->size(), 10u);
+    ASSERT_EQ(out->size(), 10u);
+
+    std::vector<double> xs;
+    for (PointId i = 0; i < out->size(); ++i)
+        xs.push_back(out->getFieldAs<double>(Dimension::Id::X, i));
+    const auto range = std::minmax_element(xs.begin(), xs.end());
+    EXPECT_DOUBLE_EQ(*range.first, 0.0);
+    EXPECT_DOUBLE_EQ(*range.second, 49.0);
 }
 
 TEST(FarthestPointSamplingFilterTest, fewer_points_than_count)

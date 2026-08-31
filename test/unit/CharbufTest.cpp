@@ -35,6 +35,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <istream>
+#include <limits>
 #include <ostream>
 #include <vector>
 
@@ -42,6 +43,20 @@
 
 namespace pdal
 {
+
+namespace
+{
+
+class AsymmetricCharbuf : public Charbuf
+{
+public:
+    using Charbuf::Charbuf;
+
+    void setOutputBuffer(char* buf, size_t count)
+        { setp(buf, buf + count); }
+};
+
+} // unnamed namespace
 
 TEST(CharbufTest, read_and_seek)
 {
@@ -57,7 +72,9 @@ TEST(CharbufTest, read_and_seek)
     in.get(c);
     EXPECT_EQ(c, 'd');
 
+    c = '\0';
     in.seekg(-2, std::ios_base::end);
+    ASSERT_TRUE(in.good());
     in.get(c);
     EXPECT_EQ(c, 'd');
 
@@ -72,8 +89,19 @@ TEST(CharbufTest, read_and_seek)
     EXPECT_EQ(c, 'e');
 
     in.clear();
+    in.seekg(5);
+    EXPECT_TRUE(in.good());
+    EXPECT_EQ(in.tellg(), 5);
+
+    in.clear();
     in.seekg(6);
     EXPECT_TRUE(in.fail());
+
+    in.clear();
+    c = '\0';
+    in.seekg(1, std::ios_base::end);
+    EXPECT_TRUE(in.fail());
+    EXPECT_EQ(c, '\0');
 }
 
 TEST(CharbufTest, write_and_seek_with_offset)
@@ -102,13 +130,71 @@ TEST(CharbufTest, seekoff_honors_buffer_offset)
 
     char c;
     stream.seekg(12, std::ios_base::beg);
+    ASSERT_TRUE(stream.good());
+    EXPECT_EQ(stream.tellg(), 12);
     stream.get(c);
     EXPECT_EQ(c, 'c');
+
+    stream.clear();
+    stream.seekg(-2, std::ios_base::end);
+    ASSERT_TRUE(stream.good());
+    EXPECT_EQ(stream.tellg(), 13);
+    stream.get(c);
+    EXPECT_EQ(c, 'd');
 
     stream.seekp(13, std::ios_base::beg);
     stream.put('X');
     EXPECT_TRUE(stream.good());
     EXPECT_EQ(data[3], 'X');
+
+    stream.seekp(-1, std::ios_base::end);
+    ASSERT_TRUE(stream.good());
+    EXPECT_EQ(stream.tellp(), 14);
+    stream.put('Y');
+    EXPECT_EQ(data[4], 'Y');
+
+    stream.clear();
+    stream.seekg(9);
+    EXPECT_TRUE(stream.fail());
+
+    stream.clear();
+    stream.seekp(9, std::ios_base::beg);
+    EXPECT_TRUE(stream.fail());
+}
+
+TEST(CharbufTest, extreme_invalid_seek_fails)
+{
+    std::vector<char> data{'a', 'b', 'c', 'd', 'e'};
+    Charbuf buf(data, 10);
+    std::istream in(&buf);
+
+    const std::ios::pos_type extreme(
+        (std::numeric_limits<std::ios::off_type>::min)());
+    in.seekg(extreme);
+    EXPECT_TRUE(in.fail());
+
+    in.clear();
+    EXPECT_EQ(in.tellg(), 10);
+}
+
+TEST(CharbufTest, combined_seeks_are_atomic)
+{
+    std::vector<char> data{'a', 'b', 'c', 'd', 'e'};
+    AsymmetricCharbuf buf(data);
+    buf.setOutputBuffer(data.data(), 4);
+
+    const std::ios_base::openmode both =
+        std::ios_base::in | std::ios_base::out;
+    EXPECT_EQ(buf.pubseekpos(5, both), std::ios::pos_type(-1));
+    EXPECT_EQ(buf.pubseekoff(0, std::ios_base::cur, std::ios_base::in), 0);
+    EXPECT_EQ(buf.pubseekoff(0, std::ios_base::cur, std::ios_base::out), 0);
+
+    EXPECT_EQ(buf.pubseekpos(1, std::ios_base::in), 1);
+    EXPECT_EQ(buf.pubseekpos(3, std::ios_base::out), 3);
+    EXPECT_EQ(buf.pubseekoff(0, std::ios_base::cur, both),
+              std::ios::pos_type(-1));
+    EXPECT_EQ(buf.pubseekoff(0, std::ios_base::cur, std::ios_base::in), 1);
+    EXPECT_EQ(buf.pubseekoff(0, std::ios_base::cur, std::ios_base::out), 3);
 }
 
 } // namespace pdal

@@ -34,9 +34,46 @@
 
 #include <pdal/util/Charbuf.hpp>
 
+#include <limits>
+
 namespace pdal
 {
 
+namespace
+{
+
+bool relativeSeekPosition(std::ios::off_type off, std::ios_base::seekdir dir,
+                          std::ios::off_type current, std::ios::off_type end,
+                          std::ios::off_type bufferOffset,
+                          std::ios::off_type& position)
+{
+    if (bufferOffset < 0 || end < 0 ||
+        bufferOffset > (std::numeric_limits<std::ios::off_type>::max)() - end)
+        return false;
+
+    switch (dir)
+    {
+    case std::ios::beg:
+        if (off < bufferOffset || off > bufferOffset + end)
+            return false;
+        position = off - bufferOffset;
+        return true;
+    case std::ios::cur:
+        if (off < -current || off > end - current)
+            return false;
+        position = current + off;
+        return true;
+    case std::ios::end:
+        if (off < -end || off > 0)
+            return false;
+        position = end + off;
+        return true;
+    default:
+        return false;
+    }
+}
+
+} // unnamed namespace
 
 void Charbuf::initialize(char *buf, size_t count, std::ios::pos_type bufOffset)
 {
@@ -50,21 +87,29 @@ void Charbuf::initialize(char *buf, size_t count, std::ios::pos_type bufOffset)
 std::ios::pos_type Charbuf::seekpos(std::ios::pos_type pos,
     std::ios_base::openmode which)
 {
-    pos -= m_bufOffset;
-    if (which & std::ios_base::in)
-    {
-        if (pos >= egptr() - eback())
-            return -1;
-        char *cpos = eback() + pos;
-        setg(eback(), cpos, egptr());
-    }
-    if (which & std::ios_base::out)
-    {
-        if (pos > epptr() - m_buf)
-            return -1;
-        char *cpos = m_buf + pos;
-        setp(cpos, epptr());
-    }
+    const bool input = (which & std::ios_base::in) != 0;
+    const bool output = (which & std::ios_base::out) != 0;
+    if (!input && !output)
+        return -1;
+
+    const std::ios::off_type absolute = static_cast<std::ios::off_type>(pos);
+    const std::ios::off_type bufferOffset =
+        static_cast<std::ios::off_type>(m_bufOffset);
+    std::ios::off_type inputPos = -1;
+    std::ios::off_type outputPos = -1;
+    if (input &&
+        !relativeSeekPosition(absolute, std::ios::beg, gptr() - eback(),
+                              egptr() - eback(), bufferOffset, inputPos))
+        return -1;
+    if (output &&
+        !relativeSeekPosition(absolute, std::ios::beg, pptr() - m_buf,
+                              epptr() - m_buf, bufferOffset, outputPos))
+        return -1;
+
+    if (input)
+        setg(eback(), eback() + inputPos, egptr());
+    if (output)
+        setp(m_buf + outputPos, epptr());
     return pos;
 }
 
@@ -72,51 +117,39 @@ std::ios::pos_type
 Charbuf::seekoff(std::ios::off_type off, std::ios_base::seekdir dir,
     std::ios_base::openmode which)
 {
-    std::ios::pos_type pos;
-    char *cpos = nullptr;
-    if (which & std::ios_base::in)
-    {
-        switch (dir)
-        {
-        case std::ios::beg:
-            cpos = eback() + off - m_bufOffset;
-            break;
-        case std::ios::cur:
-            cpos = gptr() + off;
-            break;
-        case std::ios::end:
-            cpos = egptr() - off;
-            break;
-        default:
-            break;  // Should never happen.
-        }
-        if (cpos < eback() || cpos > egptr())
-            return -1;
-        setg(eback(), cpos, egptr());
-        pos = cpos - eback();
-    }
-    if (which & std::ios_base::out)
-    {
-        switch (dir)
-        {
-        case std::ios::beg:
-            cpos = m_buf + off - m_bufOffset;
-            break;
-        case std::ios::cur:
-            cpos = pptr() + off;
-            break;
-        case std::ios::end:
-            cpos = egptr() - off;
-            break;
-        default:
-            break;  // Should never happen.
-        }
-        if (cpos < m_buf || cpos > epptr())
-            return -1;
-        setp(cpos, epptr());
-        pos = cpos - m_buf;
-    }
-    return pos;
+    const bool input = (which & std::ios_base::in) != 0;
+    const bool output = (which & std::ios_base::out) != 0;
+    if (!input && !output)
+        return -1;
+
+    const std::ios::off_type inputCurrent = input ? gptr() - eback() : 0;
+    const std::ios::off_type outputCurrent = output ? pptr() - m_buf : 0;
+    if (input && output && dir == std::ios::cur &&
+        inputCurrent != outputCurrent)
+        return -1;
+
+    const std::ios::off_type bufferOffset =
+        static_cast<std::ios::off_type>(m_bufOffset);
+    std::ios::off_type inputPos = -1;
+    std::ios::off_type outputPos = -1;
+    if (input &&
+        !relativeSeekPosition(off, dir, inputCurrent, egptr() - eback(),
+                              bufferOffset, inputPos))
+        return -1;
+    if (output &&
+        !relativeSeekPosition(off, dir, outputCurrent, epptr() - m_buf,
+                              bufferOffset, outputPos))
+        return -1;
+    if (input && output && inputPos != outputPos)
+        return -1;
+
+    if (input)
+        setg(eback(), eback() + inputPos, egptr());
+    if (output)
+        setp(m_buf + outputPos, epptr());
+
+    const std::ios::off_type relative = input ? inputPos : outputPos;
+    return std::ios::pos_type(bufferOffset + relative);
 }
 
 } //namespace

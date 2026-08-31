@@ -54,7 +54,7 @@ TEST(EstimateRankFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.estimaterank"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
 }
 
 TEST(EstimateRankFilterTest, planar)

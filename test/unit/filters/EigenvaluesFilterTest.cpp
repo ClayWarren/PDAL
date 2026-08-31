@@ -78,7 +78,7 @@ TEST(EigenvaluesFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.eigenvalues"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.eigenvalues");
 }
 
@@ -88,6 +88,7 @@ TEST(EigenvaluesFilterTest, planar_neighborhood)
     Options opts;
     opts.add("knn", 8);
     PointViewPtr out = run(table, opts);
+    ASSERT_EQ(out->size(), 9u);
 
     for (PointId i = 0; i < out->size(); ++i)
     {
@@ -105,6 +106,7 @@ TEST(EigenvaluesFilterTest, normalized_eigenvalues_sum_to_one)
     opts.add("knn", 8);
     opts.add("normalize", true);
     PointViewPtr out = run(table, opts);
+    ASSERT_EQ(out->size(), 9u);
 
     for (PointId i = 0; i < out->size(); ++i)
     {

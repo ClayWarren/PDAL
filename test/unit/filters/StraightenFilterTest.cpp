@@ -89,7 +89,7 @@ TEST(StraightenFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.straighten"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.straighten");
 }
 

@@ -77,7 +77,7 @@ TEST(ZsmoothFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.zsmooth"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.zsmooth");
 }
 
@@ -98,6 +98,10 @@ TEST(ZsmoothFilterTest, medianpercent_selects_neighbor_z)
         opts.add("medianpercent", percent);
         PointViewPtr out = run(table, pts, opts);
         Dimension::Id d = table.layout()->findDim("Zsmoothed");
+        EXPECT_EQ(out->size(), pts.size());
+        EXPECT_NE(d, Dimension::Id::Unknown);
+        if (out->empty() || d == Dimension::Id::Unknown)
+            return 0.0;
         return out->getFieldAs<double>(d, 0);
     };
 

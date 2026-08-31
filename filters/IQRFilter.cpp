@@ -103,12 +103,12 @@ PointViewSet IQRFilter::run(PointViewPtr view)
     for (PointId j = 0; j < view->size(); ++j)
     {
         double val = view->getFieldAs<double>(m_dimId, j);
-        if (val > low_fence && val < hi_fence)
+        if (val >= low_fence && val <= hi_fence)
             output->appendPoint(*view, j);
     }
-    log()->get(LogLevel::Debug) << "Cropping " << m_dimName
-                                << " in the range (" << low_fence
-                                << "," << hi_fence << ")" << std::endl;
+    log()->get(LogLevel::Debug)
+        << "Cropping " << m_dimName << " in the range [" << low_fence << ","
+        << hi_fence << "]" << std::endl;
 
     PointViewSet viewSet;
     viewSet.insert(output);

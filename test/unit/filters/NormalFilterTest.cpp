@@ -66,6 +66,7 @@ TEST(NormalFilterTest, XYPlane)
 
     PointViewSet viewSet = filter.execute(table);
     PointViewPtr outView = *viewSet.begin();
+    ASSERT_EQ(outView->size(), 4u);
 
     Dimension::Id nx = table.layout()->findDim("NormalX");
     Dimension::Id ny = table.layout()->findDim("NormalY");
@@ -104,6 +105,7 @@ TEST(NormalFilterTest, ViewpointOverridesAlwaysUp)
 
     PointViewSet viewSet = filter.execute(table);
     PointViewPtr outView = *viewSet.begin();
+    ASSERT_EQ(outView->size(), 4u);
 
     Dimension::Id nx = table.layout()->findDim("NormalX");
     Dimension::Id ny = table.layout()->findDim("NormalY");

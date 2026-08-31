@@ -85,6 +85,7 @@ TEST(OutlierFilterTest, noise_class)
     opts.add("radius", 1.0);
     opts.add("class", 18);
     PointViewPtr out = run(table, opts);
+    ASSERT_EQ(out->size(), 26u);
 
     for (PointId i = 0; i < 25; ++i)
         EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::Classification, i), 0);

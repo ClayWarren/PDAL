@@ -81,7 +81,7 @@ TEST(IQRFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.iqr"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     IQRFilter i;
     EXPECT_EQ(i.getName(), "filters.iqr");
 }
@@ -112,7 +112,7 @@ TEST(IQRFilterTest, drops_low_outlier)
         EXPECT_GE(out->getFieldAs<double>(Dimension::Id::X, i), 1.0);
 }
 
-TEST(IQRFilterTest, fence_boundary_is_strict)
+TEST(IQRFilterTest, fence_boundary_is_inclusive)
 {
     auto sizeWithLast = [](double last)
     {
@@ -125,7 +125,7 @@ TEST(IQRFilterTest, fence_boundary_is_strict)
     };
 
     EXPECT_EQ(sizeWithLast(30.0), 21u);
-    EXPECT_EQ(sizeWithLast(31.0), 20u);
+    EXPECT_EQ(sizeWithLast(31.0), 21u);
 }
 
 TEST(IQRFilterTest, multiplier_widens_fence)

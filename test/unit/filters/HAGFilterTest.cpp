@@ -39,7 +39,6 @@
 
 #include "Support.hpp"
 
-#include <algorithm>
 #include <vector>
 
 // NOTE: The test data has an accompanying jpg that depicts the points,
@@ -51,14 +50,23 @@ namespace pdal
 namespace
 {
 
-std::vector<double> hags(const PointViewSet& views)
+struct HagPoint
 {
-    std::vector<double> output;
+    double z;
+    uint8_t classification;
+    double hag;
+};
+
+std::vector<HagPoint> hagPoints(const PointViewSet& views)
+{
+    std::vector<HagPoint> output;
     for (PointViewPtr view : views)
         for (PointId i = 0; i < view->size(); ++i)
             output.push_back(
-                view->getFieldAs<double>(Dimension::Id::HeightAboveGround, i));
-    std::sort(output.begin(), output.end());
+                {view->getFieldAs<double>(Dimension::Id::Z, i),
+                 view->getFieldAs<uint8_t>(Dimension::Id::Classification, i),
+                 view->getFieldAs<double>(Dimension::Id::HeightAboveGround,
+                                          i)});
     return output;
 }
 
@@ -218,6 +226,15 @@ TEST(HAGFilterTest, dem)
                                   Dimension::Id::Z,
                                   Dimension::Id::Classification});
 
+    BufferReader reader;
+    StageFactory factory;
+    Stage& f = *(factory.createStage("filters.hag_dem"));
+    Options opts;
+    opts.add("raster", Support::datapath("gdal/float32.tif"));
+    f.setInput(reader);
+    f.setOptions(opts);
+    f.prepare(table);
+
     PointViewPtr view(new PointView(table));
     view->setField(Dimension::Id::X, 0, 440750.0);
     view->setField(Dimension::Id::Y, 0, 3751290.0);
@@ -228,23 +245,30 @@ TEST(HAGFilterTest, dem)
     view->setField(Dimension::Id::Z, 1, 200.0);
     view->setField(Dimension::Id::Classification, 1, ClassLabel::Unclassified);
 
-    BufferReader reader;
     reader.addView(view);
-
-    StageFactory factory;
-    Stage& f = *(factory.createStage("filters.hag_dem"));
-    Options opts;
-    opts.add("raster", Support::datapath("gdal/float32.tif"));
-    f.setInput(reader);
-    f.setOptions(opts);
-
-    f.prepare(table);
     PointViewSet s = f.execute(table);
-    std::vector<double> values = hags(s);
+    std::vector<HagPoint> points = hagPoints(s);
 
-    ASSERT_EQ(values.size(), 2u);
-    EXPECT_DOUBLE_EQ(values[0], 0.0);
-    EXPECT_DOUBLE_EQ(values[1], 93.0);
+    ASSERT_EQ(points.size(), 2u);
+    bool sawGround = false;
+    bool sawUnclassified = false;
+    for (const HagPoint& point : points)
+    {
+        EXPECT_DOUBLE_EQ(point.z, 200.0);
+        if (point.classification == ClassLabel::Ground)
+        {
+            sawGround = true;
+            EXPECT_DOUBLE_EQ(point.hag, 0.0);
+        }
+        else
+        {
+            EXPECT_EQ(point.classification, ClassLabel::Unclassified);
+            sawUnclassified = true;
+            EXPECT_DOUBLE_EQ(point.hag, 93.0);
+        }
+    }
+    EXPECT_TRUE(sawGround);
+    EXPECT_TRUE(sawUnclassified);
 }
 
 TEST(HAGFilterTest, dem_clamps)
@@ -254,15 +278,7 @@ TEST(HAGFilterTest, dem_clamps)
                                   Dimension::Id::Z,
                                   Dimension::Id::Classification});
 
-    PointViewPtr view(new PointView(table));
-    view->setField(Dimension::Id::X, 0, 440750.0);
-    view->setField(Dimension::Id::Y, 0, 3751290.0);
-    view->setField(Dimension::Id::Z, 0, 140.0);
-    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
-
     BufferReader reader;
-    reader.addView(view);
-
     StageFactory factory;
     Stage& f = *(factory.createStage("filters.hag_dem"));
     Options opts;
@@ -271,13 +287,42 @@ TEST(HAGFilterTest, dem_clamps)
     opts.add("max_clamp", 10.0);
     f.setInput(reader);
     f.setOptions(opts);
-
     f.prepare(table);
-    PointViewSet s = f.execute(table);
-    std::vector<double> values = hags(s);
 
-    ASSERT_EQ(values.size(), 1u);
-    EXPECT_DOUBLE_EQ(values[0], 10.0);
+    PointViewPtr view(new PointView(table));
+    view->setField(Dimension::Id::X, 0, 440750.0);
+    view->setField(Dimension::Id::Y, 0, 3751290.0);
+    view->setField(Dimension::Id::Z, 0, 140.0);
+    view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
+    view->setField(Dimension::Id::X, 1, 440750.0);
+    view->setField(Dimension::Id::Y, 1, 3751290.0);
+    view->setField(Dimension::Id::Z, 1, 100.0);
+    view->setField(Dimension::Id::Classification, 1, ClassLabel::Unclassified);
+
+    reader.addView(view);
+    PointViewSet s = f.execute(table);
+    std::vector<HagPoint> points = hagPoints(s);
+
+    ASSERT_EQ(points.size(), 2u);
+    bool sawMaxClamp = false;
+    bool sawMinClamp = false;
+    for (const HagPoint& point : points)
+    {
+        EXPECT_EQ(point.classification, ClassLabel::Unclassified);
+        if (point.z == 140.0)
+        {
+            sawMaxClamp = true;
+            EXPECT_DOUBLE_EQ(point.hag, 10.0);
+        }
+        else
+        {
+            EXPECT_DOUBLE_EQ(point.z, 100.0);
+            sawMinClamp = true;
+            EXPECT_DOUBLE_EQ(point.hag, -5.0);
+        }
+    }
+    EXPECT_TRUE(sawMaxClamp);
+    EXPECT_TRUE(sawMinClamp);
 }
 
 // Should add tests for exact match in neighbors case and for

@@ -44,7 +44,7 @@ TEST(LiTreeFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.litree"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.litree");
 }
 

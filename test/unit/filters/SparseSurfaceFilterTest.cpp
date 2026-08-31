@@ -78,7 +78,7 @@ TEST(SparseSurfaceFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.sparsesurface"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     EXPECT_EQ(filter->getName(), "filters.sparsesurface");
 }
 

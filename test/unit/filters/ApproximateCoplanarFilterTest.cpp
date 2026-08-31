@@ -99,7 +99,7 @@ TEST(ApproximateCoplanarFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.approximatecoplanar"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     ApproximateCoplanarFilter c;
     EXPECT_EQ(c.getName(), "filters.approximatecoplanar");
 }
@@ -108,6 +108,7 @@ TEST(ApproximateCoplanarFilterTest, labels_plane)
 {
     PointTable table;
     PointViewPtr out = run(table, makePlane);
+    ASSERT_EQ(out->size(), 25u);
 
     PointId coplanar = 0;
     for (PointId i = 0; i < out->size(); ++i)
@@ -115,10 +116,11 @@ TEST(ApproximateCoplanarFilterTest, labels_plane)
     EXPECT_GE(coplanar, 20u);
 }
 
-TEST(ApproximateCoplanarFilterTest, rejects_volume)
+TEST(ApproximateCoplanarFilterTest, labels_volume_non_coplanar)
 {
     PointTable table;
     PointViewPtr out = run(table, makeVolume);
+    ASSERT_EQ(out->size(), 27u);
 
     for (PointId i = 0; i < out->size(); ++i)
         EXPECT_EQ(out->getFieldAs<unsigned>(Dimension::Id::Coplanar, i), 0u);

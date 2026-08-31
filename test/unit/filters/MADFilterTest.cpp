@@ -72,7 +72,7 @@ TEST(MADFilterTest, create)
 {
     StageFactory f;
     Stage* filter(f.createStage("filters.mad"));
-    EXPECT_TRUE(filter);
+    ASSERT_NE(filter, nullptr);
     MADFilter m;
     EXPECT_EQ(m.getName(), "filters.mad");
 }
@@ -142,4 +142,5 @@ TEST(MADFilterTest, parameters_affect_fence)
     EXPECT_LE(sizeWith(1.0, 1.4862), sizeWith(8.0, 1.4862));
     EXPECT_LT(sizeWith(1.0, 1.4862), 20u);
     EXPECT_EQ(sizeWith(50.0, 1.4862), 20u);
+    EXPECT_LT(sizeWith(2.0, 1.0), sizeWith(2.0, 2.0));
 }
