@@ -714,7 +714,10 @@ void CopcReader::loadHierarchy()
     copc::Entry entry = page.find(key);
     if (!entry.valid())
         throwError("Root hierarchy page missing root entry.");
-    loadHierarchy(m_p->hierarchy, page, entry);
+    HierarchyPagePath pagePath {{
+        m_p->copc_info.root_hier_offset,
+        static_cast<int32_t>(m_p->copc_info.root_hier_size)}};
+    loadHierarchy(m_p->hierarchy, page, entry, pagePath);
     m_p->pool->await();
 
     std::exception_ptr hierarchyError;
@@ -728,7 +731,7 @@ void CopcReader::loadHierarchy()
 
 
 void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::HierarchyPage& page,
-    const copc::Entry& entry)
+    const copc::Entry& entry, const HierarchyPagePath& pagePath)
 {
     if (entry.isDataEntry())
     {
@@ -751,14 +754,23 @@ void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::Hierarchy
             {
                 copc::Entry entry = page.find(k);
                 if (entry.valid())
-                    loadHierarchy(hierarchy, page, entry);
+                    loadHierarchy(hierarchy, page, entry, pagePath);
             }
         }
     }
     else // New page
     {
+        const auto pageId = std::make_pair(entry.m_offset, entry.m_byteSize);
+        if (std::find(pagePath.begin(), pagePath.end(), pageId) !=
+            pagePath.end())
+            throwError("Cyclic COPC hierarchy page reference for key " +
+                entry.m_key.toString() + ".");
+
+        HierarchyPagePath childPagePath(pagePath);
+        childPagePath.push_back(pageId);
         m_p->pool->add(
-            [this, &hierarchy, entry]()
+            [this, &hierarchy, entry,
+                childPagePath = std::move(childPagePath)]()
             {
                 try
                 {
@@ -768,7 +780,8 @@ void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::Hierarchy
                     if (!rootDataEntry.valid())
                         throwError("Hierarchy page " + entry.m_key.toString() +
                                    " missing root entry.");
-                    loadHierarchy(hierarchy, page, rootDataEntry);
+                    loadHierarchy(hierarchy, page, rootDataEntry,
+                        childPagePath);
                 }
                 catch (...)
                 {
@@ -852,6 +865,8 @@ void CopcReader::load(const copc::Entry& entry)
             m_p->consumedCv.wait(l, [this] {
                 return (m_p->done ||
                     m_p->contents.size() < (size_t)m_args->keepAliveChunkCount);});
+            if (m_p->done)
+                return;
             m_p->contents.push(std::move(tile));
             l.unlock();
             m_p->contentsCv.notify_one();
@@ -947,7 +962,7 @@ void CopcReader::checkTile(const copc::Tile& tile)
 {
     if (tile.error().size())
     {
-        m_p->pool->stop();
+        done(true);
         throwError("Error reading tile: " + tile.error());
     }
 }
@@ -1023,12 +1038,17 @@ void CopcReader::done(PointTableRef)
     done();
 }
 
-void CopcReader::done()
+void CopcReader::done(bool discardQueuedTasks)
 {
     if (m_p->pool)
     {
-        m_p->done = true;
+        {
+            std::lock_guard<std::mutex> lock(m_p->mutex);
+            m_p->done = true;
+        }
         m_p->consumedCv.notify_all();
+        if (discardQueuedTasks)
+            m_p->pool->clearTasks();
         m_p->pool->stop();
         m_p->connector.reset();
     }

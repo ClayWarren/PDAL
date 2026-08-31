@@ -208,6 +208,13 @@ PDAL_ADD_TEST(pdal_io_copc_reader_test
     INCLUDES
         ${NLOHMANN_INCLUDE_DIR}
 )
+PDAL_ADD_TEST(pdal_io_vlr_test
+    FILES
+        io/VlrTest.cpp
+        ${ROOT_DIR}/io/private/las/Vlr.cpp
+    INCLUDES
+        ${NLOHMANN_INCLUDE_DIR}
+)
 PDAL_ADD_TEST(pdal_io_copc_remote_reader_test
     FILES
         io/CopcRemoteReaderTest.cpp

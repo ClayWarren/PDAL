@@ -37,7 +37,9 @@
 #include <map>
 #include <string>
 #include <memory>
+#include <utility>
 #include <unordered_set>
+#include <vector>
 
 #include <pdal/Reader.hpp>
 #include <pdal/Streamable.hpp>
@@ -90,10 +92,12 @@ private:
     void validateVlrInfo(const las::Vlr& v, const copc::Info& i);
     void createSpatialFilters();
 
-    void done();
+    void done(bool discardQueuedTasks = false);
     void loadHierarchy();
+    using HierarchyPagePath =
+        std::vector<std::pair<uint64_t, int32_t>>;
     void loadHierarchy(copc::Hierarchy& hierarchy, const copc::HierarchyPage& page,
-        const copc::Entry& entry);
+        const copc::Entry& entry, const HierarchyPagePath& pagePath);
     bool hasSpatialFilter() const;
     bool passesFilter(const copc::Key& key) const;
     bool passesSpatialFilter(const copc::Key& key) const;

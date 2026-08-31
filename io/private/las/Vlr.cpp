@@ -34,6 +34,9 @@
 
 #include "Vlr.hpp"
 
+#include <exception>
+#include <mutex>
+
 #include <nlohmann/json.hpp>
 #include <pdal/util/FileUtils.hpp>
 #include <pdal/util/Inserter.hpp>
@@ -364,16 +367,45 @@ VlrCatalog::VlrCatalog(uint64_t vlrOffset, uint32_t vlrCount,
 void VlrCatalog::load(uint64_t vlrOffset, uint32_t vlrCount,
     uint64_t evlrOffset, uint32_t evlrCount)
 {
-    auto vlrWalker = std::bind(&VlrCatalog::walkVlrs, this, vlrOffset, vlrCount);
-    auto evlrWalker = std::bind(&VlrCatalog::walkEvlrs, this, evlrOffset, evlrCount);
-
     ThreadPool pool(2);
+    std::exception_ptr error;
+    std::mutex errorMutex;
+
+    auto captureError = [&error, &errorMutex]()
+    {
+        std::lock_guard<std::mutex> lock(errorMutex);
+        if (!error)
+            error = std::current_exception();
+    };
 
     if (vlrCount)
-        pool.add(vlrWalker);
+        pool.add([this, vlrOffset, vlrCount, &captureError]()
+        {
+            try
+            {
+                walkVlrs(vlrOffset, vlrCount);
+            }
+            catch (...)
+            {
+                captureError();
+            }
+        });
     if (evlrCount)
-        pool.add(evlrWalker);
+        pool.add([this, evlrOffset, evlrCount, &captureError]()
+        {
+            try
+            {
+                walkEvlrs(evlrOffset, evlrCount);
+            }
+            catch (...)
+            {
+                captureError();
+            }
+        });
     pool.await();
+
+    if (error)
+        std::rethrow_exception(error);
 }
 
 void VlrCatalog::walkVlrs(uint64_t vlrOffset, uint32_t vlrCount)
@@ -417,7 +449,7 @@ void VlrCatalog::insert(const VlrCatalog::Entry& entry)
 std::vector<char> VlrCatalog::fetch(const std::string& userId, uint16_t recordId) const
 {
     uint64_t offset = 0;
-    uint32_t length = 0;
+    int32_t length = 0;
 
     // We don't lock m_entries because we assume that the load has already occurred at the
     // time you want to fetch.
@@ -425,12 +457,13 @@ std::vector<char> VlrCatalog::fetch(const std::string& userId, uint16_t recordId
     for (const Entry& e : m_entries)
         if (e.userId == userId && e.recordId == recordId)
         {
-            // We don't support VLRs with size > 4GB)
-            if (e.length > (std::numeric_limits<uint32_t>::max)())
+            // The fetch callback takes a signed 32-bit size.
+            if (e.length >
+                static_cast<uint64_t>((std::numeric_limits<int32_t>::max)()))
                 return vlrdata;
 
             offset = e.offset;
-            length = (uint32_t)e.length;
+            length = static_cast<int32_t>(e.length);
             break;
         }
 
@@ -456,18 +489,24 @@ std::vector<char> VlrCatalog::fetchWithDescription(const std::string& userId, ui
     std::vector<char> vlrdata;
     const Entry& e = find(userId, recordId);
 
-    // We don't support VLRs with size > 4GB
-    if (e.length == 0 || e.length > (std::numeric_limits<uint32_t>::max)())
+    // The fetch callback takes a signed 32-bit size, including the 32-byte
+    // description that precedes the data.
+    const int32_t DescripLen = 32;
+    const uint64_t MaxDataLen = static_cast<uint64_t>(
+        (std::numeric_limits<int32_t>::max)() - DescripLen);
+    if (e.length == 0 || e.length > MaxDataLen)
         return vlrdata;
 
     uint64_t offset = e.offset;
-    uint32_t length = (uint32_t)e.length;
+    int32_t length = static_cast<int32_t>(e.length);
 
     // Load the data plus the description.
-    const int DescripLen = 32;
-    assert(offset > DescripLen);
+    if (offset <= static_cast<uint64_t>(DescripLen))
+        throw pdal_error("Invalid VLR data offset.");
     // Add space for the description that precedes the data
     std::vector<char> v = m_fetch(offset - DescripLen, length + DescripLen);
+    if (v.size() != static_cast<size_t>(length + DescripLen))
+        throw pdal_error("Invalid VLR data fetch size.");
 
     // Only make the string with non-null characters.
     int len = DescripLen - 1;

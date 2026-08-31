@@ -71,10 +71,14 @@ namespace
 
     const size_t HierarchyEntrySize = 32;
     const size_t LasHeaderSizeOffset = 94;
+    const size_t VlrCountOffset = 100;
     const size_t PointFormatOffset = 104;
     const size_t PointSizeOffset = 105;
+    const size_t EvlrOffsetOffset = 235;
+    const size_t EvlrCountOffset = 243;
     const size_t ExtendedPointCountOffset = 247;
     const size_t VlrHeaderSize = 54;
+    const size_t CopcHeaderFetchSize = 589;
     const size_t CopcRootOffsetOffset = 40;
     const size_t CopcRootSizeOffset = 48;
 
@@ -174,6 +178,12 @@ namespace
         out << value;
     }
 
+    void writeUint32(std::vector<char>& data, size_t pos, uint32_t value)
+    {
+        LeInserter out(data.data() + pos, sizeof(value));
+        out << value;
+    }
+
     void writeUint64(std::vector<char>& data, size_t pos, uint64_t value)
     {
         LeInserter out(data.data() + pos, sizeof(value));
@@ -186,13 +196,27 @@ namespace
         out << value;
     }
 
+    void writeHierarchyEntry(std::vector<char>& data, size_t pos,
+        const copc::Key& key, uint64_t offset, int32_t byteSize,
+        int32_t pointCount)
+    {
+        LeInserter out(data.data() + pos, HierarchyEntrySize);
+        out << key.d << key.x << key.y << key.z << offset << byteSize <<
+            pointCount;
+    }
+
     void expectReaderError(const std::string& filename,
-                           const std::string& expected, point_count_t count = 0)
+        const std::string& expected, point_count_t count = 0,
+        size_t requests = 0, int keepAlive = 0)
     {
         Options options;
         options.add("filename", filename);
         if (count)
             options.add("count", count);
+        if (requests)
+            options.add("requests", requests);
+        if (keepAlive)
+            options.add("keep_alive", keepAlive);
 
         CopcReader reader;
         reader.setOptions(options);
@@ -906,6 +930,43 @@ TEST(CopcReaderTest, malformedChildHierarchy)
     expectReaderError(temp.filename(), "negative point count");
 }
 
+TEST(CopcReaderTest, cyclicHierarchyPage)
+{
+    CopcFile file(copcPath);
+    const size_t root = findEntry(file, copc::Key("0-0-0-0"));
+    writeUint64(file.data, root + 16, file.rootOffset);
+    writeInt32(file.data, root + 24, static_cast<int32_t>(file.rootSize));
+    writeInt32(file.data, root + 28, -1);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(),
+        "Cyclic COPC hierarchy page reference");
+}
+
+TEST(CopcReaderTest, truncatedVlrHeader)
+{
+    CopcFile file(copcPath);
+    writeUint32(file.data, VlrCountOffset, 2);
+    writeUint32(file.data, EvlrCountOffset, 0);
+    file.data.resize(CopcHeaderFetchSize + 10);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Short binary fetch");
+}
+
+TEST(CopcReaderTest, truncatedEvlrHeader)
+{
+    CopcFile file(copcPath);
+    writeUint64(file.data, EvlrOffsetOffset, file.data.size() - 30);
+    writeUint32(file.data, EvlrCountOffset, 1);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Short binary fetch");
+}
+
 TEST(CopcReaderTest, invalidPointSize)
 {
     CopcFile file(copcPath);
@@ -949,6 +1010,30 @@ TEST(CopcReaderTest, truncatedTileData)
     Support::Tempfile temp;
     writeFile(temp.filename(), file.data);
     expectReaderError(temp.filename(), "truncated COPC tile data", 1);
+}
+
+TEST(CopcReaderTest, malformedTileBackpressure)
+{
+    CopcFile file(copcPath);
+    const size_t infoOffset = file.headerSize + VlrHeaderSize;
+    const size_t pageOffset = file.data.size();
+    const copc::Key root("0-0-0-0");
+    std::vector<copc::Key> keys {root};
+    for (int i = 0; i < 8; ++i)
+        keys.push_back(root.child(i));
+
+    file.data.resize(pageOffset + keys.size() * HierarchyEntrySize);
+    const uint64_t tileOffset = file.data.size();
+    for (size_t i = 0; i < keys.size(); ++i)
+        writeHierarchyEntry(file.data,
+            pageOffset + i * HierarchyEntrySize, keys[i], tileOffset, 64, 1);
+    writeUint64(file.data, infoOffset + CopcRootOffsetOffset, pageOffset);
+    writeUint64(file.data, infoOffset + CopcRootSizeOffset,
+        keys.size() * HierarchyEntrySize);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Short binary fetch", 0, 1, 1);
 }
 
 } // namespace pdal
