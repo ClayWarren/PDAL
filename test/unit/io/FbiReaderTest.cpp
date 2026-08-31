@@ -38,6 +38,12 @@
 #include <io/FbiReader.hpp>
 #include "Support.hpp"
 
+#include <array>
+#include <cstddef>
+#include <fstream>
+#include <stdexcept>
+#include <vector>
+
 namespace pdal
 {
 
@@ -48,6 +54,101 @@ namespace
 std::string getTestfilePath()
 {
     return Support::datapath("fbi/1.2-with-color.fbi");
+}
+
+void copyTestFile(const std::string& destination)
+{
+    std::ifstream input(getTestfilePath(), std::ios::binary);
+    std::ofstream output(destination, std::ios::binary);
+    output << input.rdbuf();
+    if (!input || !output)
+        throw std::runtime_error("Unable to copy FBI test file.");
+}
+
+void copyTestFilePrefix(const std::string& destination, size_t size)
+{
+    std::ifstream input(getTestfilePath(), std::ios::binary);
+    std::ofstream output(destination, std::ios::binary);
+    std::vector<char> bytes(size);
+    input.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    output.write(bytes.data(), input.gcount());
+    if (input.gcount() != static_cast<std::streamsize>(bytes.size()) || !output)
+        throw std::runtime_error("Unable to truncate FBI test file.");
+}
+
+template <typename T>
+void patchHeader(const std::string& filename, size_t position, T value)
+{
+    std::fstream stream(filename,
+                        std::ios::in | std::ios::out | std::ios::binary);
+    stream.seekp(static_cast<std::streamoff>(position), std::ios::beg);
+    stream.write(reinterpret_cast<const char*>(&value), sizeof(value));
+    if (!stream)
+        throw std::runtime_error("Unable to patch FBI test header.");
+}
+
+void setFilename(FbiReader& reader, const std::string& filename)
+{
+    Options options;
+    options.add("filename", filename);
+    reader.setOptions(options);
+}
+
+fbi::UINT64 appendColor48Stream(const std::string& filename,
+                                fbi::UINT64 pointCount)
+{
+    std::ofstream stream(filename, std::ios::binary | std::ios::app);
+    const fbi::UINT64 position = static_cast<fbi::UINT64>(stream.tellp());
+    for (fbi::UINT64 i = 0; i < pointCount; ++i)
+    {
+        const uint16_t red = 1000;
+        const uint16_t green = 2000;
+        const uint16_t blue = 3000;
+        stream.write(reinterpret_cast<const char*>(&red), sizeof(red));
+        stream.write(reinterpret_cast<const char*>(&green), sizeof(green));
+        stream.write(reinterpret_cast<const char*>(&blue), sizeof(blue));
+    }
+    if (!stream)
+        throw std::runtime_error("Unable to append FBI color stream.");
+    return position;
+}
+
+fbi::UINT64 appendUint16Stream(const std::string& filename,
+                               fbi::UINT64 pointCount, uint16_t value)
+{
+    std::ofstream stream(filename, std::ios::binary | std::ios::app);
+    const fbi::UINT64 position = static_cast<fbi::UINT64>(stream.tellp());
+    for (fbi::UINT64 i = 0; i < pointCount; ++i)
+        stream.write(reinterpret_cast<const char*>(&value), sizeof(value));
+    if (!stream)
+        throw std::runtime_error("Unable to append FBI 16-bit stream.");
+    return position;
+}
+
+struct ImageStreams
+{
+    fbi::UINT64 indexPosition;
+    fbi::UINT64 numberPosition;
+};
+
+ImageStreams appendImageStreams(const std::string& filename,
+                                fbi::UINT64 pointCount, uint16_t firstIndex)
+{
+    std::ofstream stream(filename, std::ios::binary | std::ios::app);
+    ImageStreams positions;
+    positions.indexPosition = static_cast<fbi::UINT64>(stream.tellp());
+    for (fbi::UINT64 i = 0; i < pointCount; ++i)
+    {
+        const uint16_t index = i ? 0 : firstIndex;
+        stream.write(reinterpret_cast<const char*>(&index), sizeof(index));
+    }
+    positions.numberPosition = static_cast<fbi::UINT64>(stream.tellp());
+    const fbi::UINT64 imageNumber = 42;
+    stream.write(reinterpret_cast<const char*>(&imageNumber),
+                 sizeof(imageNumber));
+    if (!stream)
+        throw std::runtime_error("Unable to append FBI image streams.");
+    return positions;
 }
 
 class FbiReaderTest : public ::testing::Test
@@ -105,9 +206,173 @@ TEST_F(FbiReaderTest, ReadingPoints)
     EXPECT_NEAR(405.59, view->getFieldAs<double>(Dimension::Id::Z, 0),1e-4);
     EXPECT_DOUBLE_EQ(0, view->getFieldAs<double>(Dimension::Id::OffsetTime, 0));
     EXPECT_EQ(55040, view->getFieldAs<uint16_t>(Dimension::Id::Intensity, 0));
-    EXPECT_EQ(0, view->getFieldAs<uint16_t>(Dimension::Id::PointSourceId, 0));
+    EXPECT_EQ(45056,
+              view->getFieldAs<uint16_t>(Dimension::Id::PointSourceId, 0));
     EXPECT_EQ(1, view->getFieldAs<uint8_t>(Dimension::Id::ReturnNumber, 0));
     EXPECT_EQ(0, view->getFieldAs<uint8_t>(Dimension::Id::NumberOfReturns, 0));
     EXPECT_EQ(20, view->getFieldAs<uint8_t>(Dimension::Id::Classification, 0));
+}
+
+TEST(FbiReaderValidationTest, rejectsUnsupportedBitWidths)
+{
+    const std::array<size_t, 22> offsets = {
+        offsetof(fbi::FbiHdr, BitsX),
+        offsetof(fbi::FbiHdr, BitsY),
+        offsetof(fbi::FbiHdr, BitsZ),
+        offsetof(fbi::FbiHdr, BitsTime),
+        offsetof(fbi::FbiHdr, BitsDistance),
+        offsetof(fbi::FbiHdr, BitsGroup),
+        offsetof(fbi::FbiHdr, BitsNormal),
+        offsetof(fbi::FbiHdr, BitsColor),
+        offsetof(fbi::FbiHdr, BitsIntensity),
+        offsetof(fbi::FbiHdr, BitsLine),
+        offsetof(fbi::FbiHdr, BitsEchoLen),
+        offsetof(fbi::FbiHdr, BitsAmplitude),
+        offsetof(fbi::FbiHdr, BitsScanner),
+        offsetof(fbi::FbiHdr, BitsEcho),
+        offsetof(fbi::FbiHdr, BitsAngle),
+        offsetof(fbi::FbiHdr, BitsEchoNorm),
+        offsetof(fbi::FbiHdr, BitsClass),
+        offsetof(fbi::FbiHdr, BitsEchoPos),
+        offsetof(fbi::FbiHdr, BitsImage),
+        offsetof(fbi::FbiHdr, BitsReflect),
+        offsetof(fbi::FbiHdr, BitsDeviation),
+        offsetof(fbi::FbiHdr, BitsReliab)};
+
+    for (size_t offset : offsets)
+    {
+        SCOPED_TRACE(offset);
+        Support::Tempfile file;
+        copyTestFile(file.filename());
+        patchHeader(file.filename(), offset, fbi::UINT(7));
+
+        FbiReader reader;
+        setFilename(reader, file.filename());
+        PointTable table;
+        EXPECT_THROW(reader.prepare(table), pdal_error);
+    }
+}
+
+TEST(FbiReaderValidationTest, rejectsTruncatedStream)
+{
+    Support::Tempfile file;
+    constexpr size_t TruncatedXyzSize = 1808 + 1065 * 3 * 4 - 1;
+    copyTestFilePrefix(file.filename(), TruncatedXyzSize);
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    EXPECT_THROW(reader.prepare(table), pdal_error);
+}
+
+TEST(FbiReaderValidationTest, preserves16BitFields)
+{
+    Support::Tempfile file;
+    copyTestFile(file.filename());
+    const fbi::UINT64 linePosition =
+        appendUint16Stream(file.filename(), 1065, 321);
+    const fbi::UINT64 echoLengthPosition =
+        appendUint16Stream(file.filename(), 1065, 654);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsLine),
+                fbi::UINT(16));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosLine), linePosition);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsEchoLen),
+                fbi::UINT(16));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosEchoLen),
+                echoLengthPosition);
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    reader.prepare(table);
+    PointViewSet viewSet = reader.execute(table);
+    PointViewPtr view = *viewSet.begin();
+    EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::PointSourceId, 0),
+              321);
+    EXPECT_FLOAT_EQ(view->getFieldAs<float>(Dimension::Id::PulseWidth, 0),
+                    654.0f);
+}
+
+TEST(FbiReaderValidationTest, reads48BitColorComponents)
+{
+    Support::Tempfile file;
+    copyTestFile(file.filename());
+    const fbi::UINT64 position = appendColor48Stream(file.filename(), 1065);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsColor),
+                fbi::UINT(48));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosColor), position);
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    reader.prepare(table);
+    PointViewSet viewSet = reader.execute(table);
+    PointViewPtr view = *viewSet.begin();
+    EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::Red, 0), 1000);
+    EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::Green, 0), 2000);
+    EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::Blue, 0), 3000);
+}
+
+TEST(FbiReaderValidationTest, readsReflectanceStream)
+{
+    Support::Tempfile file;
+    copyTestFile(file.filename());
+    const fbi::UINT64 position = appendUint16Stream(file.filename(), 1065, 321);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsReflect),
+                fbi::UINT(16));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosReflect), position);
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    reader.prepare(table);
+    PointViewSet viewSet = reader.execute(table);
+    PointViewPtr view = *viewSet.begin();
+    EXPECT_FLOAT_EQ(view->getFieldAs<float>(Dimension::Id::Reflectance, 0),
+                    321.0f);
+}
+
+TEST(FbiReaderValidationTest, resolvesImageIndexes)
+{
+    Support::Tempfile file;
+    copyTestFile(file.filename());
+    const ImageStreams positions = appendImageStreams(file.filename(), 1065, 0);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsImage),
+                fbi::UINT(16));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosImage),
+                positions.indexPosition);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosImgNbr),
+                positions.numberPosition);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, ImgNbrCnt),
+                fbi::UINT(1));
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    reader.prepare(table);
+    PointViewSet viewSet = reader.execute(table);
+    PointViewPtr view = *viewSet.begin();
+    EXPECT_EQ(view->getFieldAs<uint16_t>(Dimension::Id::Image, 0), 42);
+}
+
+TEST(FbiReaderValidationTest, rejectsOutOfRangeImageIndex)
+{
+    Support::Tempfile file;
+    copyTestFile(file.filename());
+    const ImageStreams positions = appendImageStreams(file.filename(), 1065, 1);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, BitsImage),
+                fbi::UINT(16));
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosImage),
+                positions.indexPosition);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, PosImgNbr),
+                positions.numberPosition);
+    patchHeader(file.filename(), offsetof(fbi::FbiHdr, ImgNbrCnt),
+                fbi::UINT(1));
+
+    FbiReader reader;
+    setFilename(reader, file.filename());
+    PointTable table;
+    reader.prepare(table);
+    EXPECT_THROW(reader.execute(table), pdal_error);
 }
 }

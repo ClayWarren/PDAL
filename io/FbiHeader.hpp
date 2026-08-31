@@ -98,7 +98,7 @@ struct FbiHdr {
     UINT BitsDistance ; // Number of bits for distance (0 or 32)
     UINT BitsGroup ; // Number of bits for group (0 or 32)
     UINT BitsNormal ; // Number of bits for normal vectors (0 or 32)
-    UINT BitsColor ; // Number of bits for color (0, 48 or 64)
+    UINT BitsColor ; // Number of bits for color (0, 24, 32, 48 or 64)
     UINT BitsIntensity ; // Number of bits for intensity (0 or 16)
     UINT BitsLine ; // Number of bits for line (0 or 16)
     UINT BitsEchoLen ; // Number of bits for echo length (0 or 16)

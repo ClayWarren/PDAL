@@ -61,22 +61,17 @@ public:
 
 private:
     std::unique_ptr<fbi::FbiHdr> hdr;
-    std::istream *m_istreamPtr;
-    
+    std::unique_ptr<std::istream> m_istreamPtr;
+
     virtual void initialize();
     virtual void addDimensions(PointLayoutPtr layout);
     virtual void ready(PointTableRef table);
     virtual point_count_t read(PointViewPtr view, point_count_t count);
     virtual void done(PointTableRef table);
     virtual void addArgs(ProgramArgs& args);
-    
+
     FbiReader& operator=(const FbiReader&); // not implemented
     FbiReader(const FbiReader&); // not implemented
-
-private:
-    int NbBytesColor; // deduce from BitsColor
-    std::vector<fbi::UINT64> indexNameImages;
-    
 };
 
 } // namespace pdal
