@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <exception>
 #include <functional>
 #include <limits>
 
@@ -255,6 +256,7 @@ public:
     las::Header header;
     copc::Info copc_info;
     point_count_t hierarchyPointCount;
+    std::exception_ptr hierarchyError;
     std::atomic<bool> done;
     SrsTransform llToBcbfTransform;
 };
@@ -504,6 +506,9 @@ void CopcReader::validateHeader(const las::Header& h)
     if (pdrf < 6 || pdrf > 8)
         throwError("COPC file has invalid point format '" + std::to_string(pdrf) +
             "'. Must be 6-8.");
+    if (h.pointSize < h.baseCount())
+        throwError("COPC file has invalid point size '" +
+                   std::to_string(h.pointSize) + "'.");
 }
 
 
@@ -513,6 +518,11 @@ void CopcReader::validateVlrInfo(const las::Vlr& v, const copc::Info& i)
         throwError("COPC VLR invalid. Found user ID '" + v.userId + "' and record ID '" +
             std::to_string(v.recordId) + "'. Expected '" + las::CopcUserId +"' and '" +
             std::to_string(las::CopcInfoRecordId) + "'.");
+    if (i.root_hier_size == 0 || i.root_hier_size % copc::Hierarchy::EntrySize)
+        throwError("Invalid COPC hierarchy page size.");
+    if (i.root_hier_size >
+        static_cast<uint64_t>((std::numeric_limits<int32_t>::max)()))
+        throwError("COPC root hierarchy page is too large.");
 }
 
 
@@ -687,19 +697,33 @@ void CopcReader::loadHierarchy()
     // hierarchy:
     copc::Key key;
 
+    {
+        std::lock_guard<std::mutex> lock(m_p->mutex);
+        m_p->hierarchyError = nullptr;
+    }
+
     // In case a point count was specified, don't fetch more hierarchy than necessary.
     m_p->hierarchyPointCount = count();
     if (!passesFilter(key))
         return;
 
-    copc::HierarchyPage page(fetch(m_p->copc_info.root_hier_offset,
-        (uint32_t)m_p->copc_info.root_hier_size));
+    copc::HierarchyPage page(
+        fetch(m_p->copc_info.root_hier_offset,
+              static_cast<int32_t>(m_p->copc_info.root_hier_size)));
 
     copc::Entry entry = page.find(key);
     if (!entry.valid())
         throwError("Root hierarchy page missing root entry.");
     loadHierarchy(m_p->hierarchy, page, entry);
     m_p->pool->await();
+
+    std::exception_ptr hierarchyError;
+    {
+        std::lock_guard<std::mutex> lock(m_p->mutex);
+        hierarchyError = m_p->hierarchyError;
+    }
+    if (hierarchyError)
+        std::rethrow_exception(hierarchyError);
 }
 
 
@@ -733,14 +757,26 @@ void CopcReader::loadHierarchy(copc::Hierarchy& hierarchy, const copc::Hierarchy
     }
     else // New page
     {
-        m_p->pool->add([this, &hierarchy, entry]()
-        {
-            copc::HierarchyPage page(fetch(entry.m_offset, entry.m_byteSize));
-            copc::Entry rootDataEntry = page.find(entry.m_key);
-            if (!rootDataEntry.valid())
-                throwError("Hierarchy page " + entry.m_key.toString() + " missing root entry.");
-            loadHierarchy(hierarchy, page, rootDataEntry);
-        });
+        m_p->pool->add(
+            [this, &hierarchy, entry]()
+            {
+                try
+                {
+                    copc::HierarchyPage page(
+                        fetch(entry.m_offset, entry.m_byteSize));
+                    copc::Entry rootDataEntry = page.find(entry.m_key);
+                    if (!rootDataEntry.valid())
+                        throwError("Hierarchy page " + entry.m_key.toString() +
+                                   " missing root entry.");
+                    loadHierarchy(hierarchy, page, rootDataEntry);
+                }
+                catch (...)
+                {
+                    std::lock_guard<std::mutex> lock(m_p->mutex);
+                    if (!m_p->hierarchyError)
+                        m_p->hierarchyError = std::current_exception();
+                }
+            });
     }
 }
 

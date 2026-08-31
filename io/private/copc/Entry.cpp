@@ -41,11 +41,24 @@ namespace copc
 
 Hierarchy::Hierarchy(const std::vector<char>& data)
 {
-    LeExtractor in(data.data(), data.size());
-    while (in)
+    if (data.size() % EntrySize)
+        throw pdal_error("Invalid COPC hierarchy page size.");
+
+    for (size_t pos = 0; pos < data.size(); pos += EntrySize)
     {
+        LeExtractor in(data.data() + pos, EntrySize);
         Entry e;
         in >> e.m_key >> e.m_offset >> e.m_byteSize >> e.m_pointCount;
+
+        if (e.m_byteSize < 0)
+            throw pdal_error(
+                "Invalid COPC hierarchy entry with negative byte size.");
+        if (e.m_pointCount < -1)
+            throw pdal_error(
+                "Invalid COPC hierarchy entry with negative point count.");
+        if (e.m_pointCount == -1 &&
+            (e.m_byteSize == 0 || e.m_byteSize % EntrySize))
+            throw pdal_error("Invalid COPC hierarchy page entry byte size.");
         m_entries.insert(e);
     }
 }

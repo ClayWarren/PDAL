@@ -33,22 +33,28 @@
  ****************************************************************************/
 
 #include <algorithm>
+#include <fstream>
+#include <stdexcept>
 
 #include <nlohmann/json.hpp>
 
 #include <pdal/pdal_test_main.hpp>
 
+#include <filters/CropFilter.hpp>
+#include <filters/MergeFilter.hpp>
+#include <filters/ReprojectionFilter.hpp>
+#include <filters/SortFilter.hpp>
 #include <io/CopcReader.hpp>
 #include <io/LasReader.hpp>
 #include <io/NullWriter.hpp>
-#include <filters/CropFilter.hpp>
-#include <filters/ReprojectionFilter.hpp>
-#include <filters/SortFilter.hpp>
-#include <filters/MergeFilter.hpp>
 #include <pdal/SrsBounds.hpp>
 #include <pdal/private/OGRSpec.hpp>
-#include <pdal/util/FileUtils.hpp>
 #include <pdal/private/gdal/GDALUtils.hpp>
+#include <pdal/util/Extractor.hpp>
+#include <pdal/util/FileUtils.hpp>
+#include <pdal/util/Inserter.hpp>
+
+#include <io/private/copc/Entry.hpp>
 
 #include "Support.hpp"
 
@@ -62,6 +68,147 @@ namespace
     const BOX3D pointBounds(515368.60225, 4918340.364, 2322.89625,
         515401.043, 4918381.12375, 2338.5755);
     const point_count_t numPoints(518862);
+
+    const size_t HierarchyEntrySize = 32;
+    const size_t LasHeaderSizeOffset = 94;
+    const size_t PointFormatOffset = 104;
+    const size_t PointSizeOffset = 105;
+    const size_t ExtendedPointCountOffset = 247;
+    const size_t VlrHeaderSize = 54;
+    const size_t CopcRootOffsetOffset = 40;
+    const size_t CopcRootSizeOffset = 48;
+
+    uint16_t readUint16(const std::vector<char>& data, size_t pos)
+    {
+        LeExtractor in(data.data() + pos, sizeof(uint16_t));
+        uint16_t value;
+        in >> value;
+        return value;
+    }
+
+    uint64_t readUint64(const std::vector<char>& data, size_t pos)
+    {
+        LeExtractor in(data.data() + pos, sizeof(uint64_t));
+        uint64_t value;
+        in >> value;
+        return value;
+    }
+
+    struct CopcFile
+    {
+        explicit CopcFile(const std::string& filename)
+        {
+            std::ifstream in(filename, std::ios::binary | std::ios::ate);
+            if (!in)
+                throw std::runtime_error("Unable to open COPC test input.");
+
+            const std::streampos end = in.tellg();
+            if (end < 0)
+                throw std::runtime_error(
+                    "Unable to determine COPC test input size.");
+            data.resize(static_cast<size_t>(end));
+            in.seekg(0);
+            in.read(data.data(), static_cast<std::streamsize>(data.size()));
+            if (!in)
+                throw std::runtime_error("Unable to read COPC test input.");
+
+            headerSize = readUint16(data, LasHeaderSizeOffset);
+            pointFormat = data[PointFormatOffset] & 0x0f;
+            pointSize = readUint16(data, PointSizeOffset);
+            pointCount = readUint64(data, ExtendedPointCountOffset);
+            const size_t infoOffset = headerSize + VlrHeaderSize;
+            rootOffset = readUint64(data, infoOffset + CopcRootOffsetOffset);
+            rootSize = readUint64(data, infoOffset + CopcRootSizeOffset);
+        }
+
+        int basePointSize() const
+        {
+            if (pointFormat == 6)
+                return 30;
+            if (pointFormat == 7)
+                return 36;
+            if (pointFormat == 8)
+                return 38;
+            throw std::runtime_error("Unexpected COPC point format.");
+        }
+
+        std::vector<char> data;
+        uint16_t headerSize;
+        uint8_t pointFormat;
+        uint16_t pointSize;
+        uint64_t pointCount;
+        uint64_t rootOffset;
+        uint64_t rootSize;
+    };
+
+    void writeFile(const std::string& filename, const std::vector<char>& data)
+    {
+        std::ofstream out(filename, std::ios::binary | std::ios::trunc);
+        if (!out)
+            throw std::runtime_error("Unable to open COPC test output.");
+        out.write(data.data(), static_cast<std::streamsize>(data.size()));
+        if (!out)
+            throw std::runtime_error("Unable to write COPC test output.");
+    }
+
+    size_t findEntry(const CopcFile& file, const copc::Key& key)
+    {
+        const size_t begin = static_cast<size_t>(file.rootOffset);
+        const size_t end = begin + static_cast<size_t>(file.rootSize);
+        for (size_t pos = begin; pos + HierarchyEntrySize <= end;
+             pos += HierarchyEntrySize)
+        {
+            LeExtractor in(file.data.data() + pos, HierarchyEntrySize);
+            copc::Entry entry;
+            in >> entry.m_key >> entry.m_offset >> entry.m_byteSize >>
+                entry.m_pointCount;
+            if (entry.m_key == key)
+                return pos;
+        }
+        throw std::runtime_error("Unable to find COPC hierarchy entry.");
+    }
+
+    void writeUint16(std::vector<char>& data, size_t pos, uint16_t value)
+    {
+        LeInserter out(data.data() + pos, sizeof(value));
+        out << value;
+    }
+
+    void writeUint64(std::vector<char>& data, size_t pos, uint64_t value)
+    {
+        LeInserter out(data.data() + pos, sizeof(value));
+        out << value;
+    }
+
+    void writeInt32(std::vector<char>& data, size_t pos, int32_t value)
+    {
+        LeInserter out(data.data() + pos, sizeof(value));
+        out << value;
+    }
+
+    void expectReaderError(const std::string& filename,
+                           const std::string& expected, point_count_t count = 0)
+    {
+        Options options;
+        options.add("filename", filename);
+        if (count)
+            options.add("count", count);
+
+        CopcReader reader;
+        reader.setOptions(options);
+        PointTable table;
+        try
+        {
+            reader.prepare(table);
+            reader.execute(table);
+            FAIL() << "Expected COPC read to fail.";
+        }
+        catch (const pdal_error& e)
+        {
+            EXPECT_NE(std::string(e.what()).find(expected), std::string::npos)
+                << e.what();
+        }
+    }
 }
 
 TEST(CopcReaderTest, inspect)
@@ -728,6 +875,80 @@ TEST(CopcReaderTest, multipleInputs)
     PointViewSet s = f.execute(table);
     PointViewPtr v = *s.begin();
     EXPECT_EQ(v->size(), 1037724u);
+}
+
+TEST(CopcReaderTest, malformedRootHierarchy)
+{
+    CopcFile file(copcPath);
+    const size_t rootSizeOffset =
+        file.headerSize + VlrHeaderSize + CopcRootSizeOffset;
+    writeUint64(file.data, rootSizeOffset, file.rootSize - 1);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Invalid COPC hierarchy page size");
+}
+
+TEST(CopcReaderTest, malformedChildHierarchy)
+{
+    CopcFile file(copcPath);
+    const size_t child = findEntry(file, copc::Key("1-0-0-0"));
+    const uint64_t childOffset = file.data.size();
+    writeUint64(file.data, child + 16, childOffset);
+    writeInt32(file.data, child + 24, HierarchyEntrySize);
+    writeInt32(file.data, child + 28, -1);
+    file.data.resize(file.data.size() + HierarchyEntrySize);
+    writeInt32(file.data, childOffset, 1);
+    writeInt32(file.data, childOffset + 28, -2);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "negative point count");
+}
+
+TEST(CopcReaderTest, invalidPointSize)
+{
+    CopcFile file(copcPath);
+    writeUint16(file.data, PointSizeOffset,
+                static_cast<uint16_t>(file.basePointSize() - 1));
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "invalid point size");
+}
+
+TEST(CopcReaderTest, invalidTilePointCount)
+{
+    CopcFile file(copcPath);
+    const size_t root = findEntry(file, copc::Key("0-0-0-0"));
+    writeInt32(file.data, root + 28, static_cast<int32_t>(file.pointCount + 1));
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Invalid COPC tile point count", 1);
+}
+
+TEST(CopcReaderTest, shortTileFetch)
+{
+    CopcFile file(copcPath);
+    const size_t root = findEntry(file, copc::Key("0-0-0-0"));
+    writeUint64(file.data, root + 16, file.data.size() - 8);
+    writeInt32(file.data, root + 24, 64);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "Short binary fetch", 1);
+}
+
+TEST(CopcReaderTest, truncatedTileData)
+{
+    CopcFile file(copcPath);
+    const size_t root = findEntry(file, copc::Key("0-0-0-0"));
+    writeInt32(file.data, root + 24, 1);
+
+    Support::Tempfile temp;
+    writeFile(temp.filename(), file.data);
+    expectReaderError(temp.filename(), "truncated COPC tile data", 1);
 }
 
 } // namespace pdal

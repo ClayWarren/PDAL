@@ -34,6 +34,9 @@
 
 #include "Connector.hpp"
 
+#include <limits>
+#include <memory>
+
 #include <pdal/pdal_types.hpp>
 #include <pdal/pdal_config.hpp>
 #include <curl/curl.h>
@@ -178,12 +181,14 @@ StringMap Connector::headRequest(const std::string& path) const
 std::vector<char> Connector::getBinary(uint64_t offset, int32_t size) const
 {
     if (size <= 0)
-        return std::vector<char>();
+        throw pdal_error("Invalid binary fetch size.");
+    if (offset > (std::numeric_limits<uint64_t>::max)() -
+                     static_cast<uint64_t>(size - 1))
+        throw pdal_error("Invalid binary fetch range.");
 
     if (Utils::startsWith(Utils::toupper(m_filename), "/VSI") || m_arbiter->isLocal(m_filename))
     {
-        std::vector<char> buf(size);
-        std::istream* in = FileUtils::openFile(m_filename);
+        std::unique_ptr<std::istream> in(FileUtils::openFile(m_filename));
         if (!in || in->fail())
         {
             std::string message = "Unable to open '" + m_filename + "'.";
@@ -191,9 +196,20 @@ std::vector<char> Connector::getBinary(uint64_t offset, int32_t size) const
                 message += " File does not exist.";
             throw pdal_error(message);
         }
+        if (offset >
+            static_cast<uint64_t>((std::numeric_limits<std::streamoff>::max)()))
+            throw pdal_error("Invalid binary fetch offset.");
         in->seekg(offset);
+        if (in->fail())
+            throw pdal_error("Unable to seek in '" + m_filename + "'.");
+
+        std::vector<char> buf(size);
         in->read(buf.data(), size);
-        delete in;
+        if (in->gcount() != size)
+            throw pdal_error("Short binary fetch from '" + m_filename +
+                             "'. Expected " + std::to_string(size) +
+                             " bytes and received " +
+                             std::to_string(in->gcount()) + ".");
         return buf;
     }
     else
@@ -201,7 +217,14 @@ std::vector<char> Connector::getBinary(uint64_t offset, int32_t size) const
         StringMap headers(m_headers);
         headers["Range"] = "bytes=" + std::to_string(offset) + "-" +
             std::to_string(offset + size - 1);
-        return m_arbiter->getBinary(m_filename, headers, m_query);
+        std::vector<char> buf =
+            m_arbiter->getBinary(m_filename, headers, m_query);
+        if (buf.size() != static_cast<size_t>(size))
+            throw pdal_error("Short binary fetch from '" + m_filename +
+                             "'. Expected " + std::to_string(size) +
+                             " bytes and received " +
+                             std::to_string(buf.size()) + ".");
+        return buf;
     }
 }
 

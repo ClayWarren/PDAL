@@ -96,6 +96,8 @@ namespace copc
 class Hierarchy
 {
 public:
+    static constexpr size_t EntrySize = 32;
+
     Hierarchy() = default;
     Hierarchy(const std::vector<char>& data);
 

@@ -37,11 +37,14 @@
 #pragma warning (disable: 4251)
 #endif
 
-#include <lazperf/readers.hpp>
+#include <lazperf/lazperf.hpp>
 
 #ifdef _MSC_VER
 #pragma warning (pop)
 #endif
+
+#include <cstring>
+#include <limits>
 
 #include <io/LasReader.hpp>
 #include <io/private/las/Header.hpp>
@@ -58,19 +61,45 @@ void Tile::read()
 {
     try
     {
-        std::vector<char> buf = m_connector.getBinary(m_entry.m_offset, m_entry.m_byteSize);
-        lazperf::reader::chunk_decompressor d(m_header.pointFormat(), m_header.ebCount(),
-            buf.data());
+        if (m_entry.m_byteSize <= 0)
+            throw pdal_error("Invalid COPC tile byte size.");
+        if (m_entry.m_pointCount <= 0 ||
+            static_cast<uint64_t>(m_entry.m_pointCount) > m_header.pointCount())
+            throw pdal_error("Invalid COPC tile point count.");
+
+        const int basePointSize = m_header.baseCount();
+        if (basePointSize <= 0 || m_header.pointSize < basePointSize)
+            throw pdal_error("Invalid COPC point size.");
+
+        const size_t pointSize = m_header.pointSize;
+        const size_t pointCount = static_cast<size_t>(m_entry.m_pointCount);
+        if (pointCount > (std::numeric_limits<size_t>::max)() / pointSize)
+            throw pdal_error("Invalid COPC tile size.");
+
+        std::vector<char> buf =
+            m_connector.getBinary(m_entry.m_offset, m_entry.m_byteSize);
+        size_t pos = 0;
+        lazperf::InputCb cb = [&buf, &pos](unsigned char* dest, size_t size)
+        {
+            if (size > buf.size() - pos)
+                throw pdal_error("Invalid or truncated COPC tile data.");
+            std::memcpy(dest, buf.data() + pos, size);
+            pos += size;
+        };
+        lazperf::las_decompressor::ptr d = lazperf::build_las_decompressor(
+            cb, m_header.pointFormat(), m_header.ebCount());
+        if (!d)
+            throw pdal_error("Invalid COPC point format.");
 
         // Resize our vector to accommodate the decompressed data.
-        m_data.resize(m_entry.m_pointCount * m_header.pointSize);
+        m_data.resize(pointCount * pointSize);
 
         int32_t cnt = m_entry.m_pointCount;
         char *p = m_data.data();
         while (cnt--)
         {
-            d.decompress(p);
-            p += m_header.pointSize;
+            d->decompress(p);
+            p += pointSize;
         }
     }
     catch (const std::exception& ex)
@@ -85,4 +114,3 @@ void Tile::read()
 
 } // namespace copc
 } // namespace pdal
-
