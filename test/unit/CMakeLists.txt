@@ -164,7 +164,7 @@ PDAL_ADD_TEST(pdal_support_test FILES SupportTest.cpp)
 PDAL_ADD_TEST(pdal_thread_pool_test FILES ThreadPoolTest.cpp)
 PDAL_ADD_TEST(pdal_utils_test FILES UtilsTest.cpp)
 PDAL_ADD_TEST(pdal_uuid_test FILES UuidTest.cpp)
-if(PDAL_HAVE_LIBXML2)
+if (PDAL_HAVE_LIBXML2)
     PDAL_ADD_TEST(pdal_xml_schema_test
         FILES
             XMLSchemaTest.cpp
