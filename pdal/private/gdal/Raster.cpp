@@ -40,6 +40,9 @@
 #include <gdal.h>
 #include <gdal_priv.h>
 
+#include <algorithm>
+#include <limits>
+
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -576,30 +579,73 @@ GDALError Raster::read(double x,
     return GDALError::None;
 }
 
-GDALError Raster::read(int band, int x, int y, int width, int height, std::vector<double>& data) {
+GDALError Raster::read(int band, int x, int y, int width, int height,
+                       std::vector<double>& data)
+{
     if (!m_ds)
     {
         m_errorMsg = "Raster not open.";
         return GDALError::NotOpen;
     }
 
-    data.resize(width * height);
-
-    int validHeight = height;
-    if (y + height > this->height()) {
-        validHeight = this->height() - y;
+    if (band < 0 || band >= m_numBands)
+    {
+        m_errorMsg = "Requested band is invalid.";
+        return GDALError::InvalidBand;
     }
 
-    int validWidth = width;
-    if (x + width > this->width()) {
-        validWidth = this->width() - x;
+    if (width <= 0 || height <= 0)
+    {
+        m_errorMsg = "Requested block dimensions are invalid.";
+        return GDALError::InvalidOption;
     }
 
-    int nPixelSpace = 0;
-    int nLineSpace = sizeof(double) * width;
+    const int rasterWidth = this->width();
+    const int rasterHeight = this->height();
+    if (x < 0 || y < 0 || x >= rasterWidth || y >= rasterHeight)
+    {
+        m_errorMsg = "Requested block origin is outside the raster.";
+        return GDALError::NoData;
+    }
+
+    const size_t widthSize = static_cast<size_t>(width);
+    const size_t heightSize = static_cast<size_t>(height);
+    if (heightSize > data.max_size() / widthSize)
+    {
+        m_errorMsg = "Requested block dimensions overflow buffer size.";
+        return GDALError::InvalidOption;
+    }
+
+    if (width >
+        (std::numeric_limits<int>::max)() / static_cast<int>(sizeof(double)))
+    {
+        m_errorMsg = "Requested block width overflows the line stride.";
+        return GDALError::InvalidOption;
+    }
+
+    if (width > rasterWidth || height > rasterHeight)
+    {
+        m_errorMsg = "Requested block dimensions exceed the raster size.";
+        return GDALError::InvalidOption;
+    }
+
+    data.resize(widthSize * heightSize);
+
+    const int validHeight = (std::min)(height, rasterHeight - y);
+    const int validWidth = (std::min)(width, rasterWidth - x);
+
+    const int nPixelSpace = 0;
+    const int nLineSpace = static_cast<int>(sizeof(double)) * width;
     GDALRasterBandH b = GDALGetRasterBand(m_ds, band + 1);
     CPLErr readResult = GDALRasterIO(b, GF_Read, x, y, validWidth, validHeight,
-        data.data(), validWidth, validHeight, GDT_Float64, nPixelSpace, nLineSpace);
+                                     data.data(), validWidth, validHeight,
+                                     GDT_Float64, nPixelSpace, nLineSpace);
+    if (readResult != CE_None)
+    {
+        m_errorMsg = "Unable to read raster block from '" + m_filename +
+            "'.";
+        return GDALError::CantReadBlock;
+    }
 
     return GDALError::None;
 }

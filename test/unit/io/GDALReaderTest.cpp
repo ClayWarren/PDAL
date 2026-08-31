@@ -34,8 +34,10 @@
 
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 #include <pdal/pdal_test_main.hpp>
+#include <pdal/private/gdal/Raster.hpp>
 
 #include <io/GDALReader.hpp>
 #include "Support.hpp"
@@ -94,6 +96,82 @@ TEST(GDALReaderTest, simple)
     verify(120000, 195.5, 163.5, 255, 213, 0);
     verify(290000, 410.5, 394.5, 0, 255, 206);
     verify(715154, 734.5, 972.5, 0, 0, 0);
+}
+
+TEST(GDALReaderTest, blockReadValidatesArguments)
+{
+    gdal::Raster raster(Support::datapath("gdal/byte.tif"));
+    ASSERT_EQ(raster.open(), gdal::GDALError::None);
+
+    std::vector<double> data;
+    EXPECT_EQ(raster.read(-1, 0, 0, 1, 1, data), gdal::GDALError::InvalidBand);
+    EXPECT_EQ(raster.read(raster.bandCount(), 0, 0, 1, 1, data),
+              gdal::GDALError::InvalidBand);
+
+    EXPECT_EQ(raster.read(0, 0, 0, 0, 1, data), gdal::GDALError::InvalidOption);
+    EXPECT_EQ(raster.read(0, 0, 0, 1, -1, data),
+              gdal::GDALError::InvalidOption);
+
+    EXPECT_EQ(raster.read(0, -1, 0, 1, 1, data), gdal::GDALError::NoData);
+    EXPECT_EQ(raster.read(0, 0, -1, 1, 1, data), gdal::GDALError::NoData);
+    EXPECT_EQ(raster.read(0, raster.width(), 0, 1, 1, data),
+              gdal::GDALError::NoData);
+    EXPECT_EQ(raster.read(0, 0, raster.height(), 1, 1, data),
+              gdal::GDALError::NoData);
+}
+
+TEST(GDALReaderTest, blockReadRejectsOverflow)
+{
+    gdal::Raster raster(Support::datapath("gdal/byte.tif"));
+    ASSERT_EQ(raster.open(), gdal::GDALError::None);
+
+    const int maxInt = (std::numeric_limits<int>::max)();
+    std::vector<double> data;
+    EXPECT_EQ(raster.read(0, 0, 0, maxInt, maxInt, data),
+              gdal::GDALError::InvalidOption);
+    EXPECT_EQ(raster.read(0, 0, 0, maxInt, 1, data),
+              gdal::GDALError::InvalidOption);
+    EXPECT_EQ(raster.read(0, 0, 0, 1, maxInt, data),
+              gdal::GDALError::InvalidOption);
+}
+
+TEST(GDALReaderTest, blockReadClipsWithoutSignedOverflow)
+{
+    gdal::Raster raster(Support::datapath("gdal/byte.tif"));
+    ASSERT_EQ(raster.open(), gdal::GDALError::None);
+
+    std::vector<double> data;
+    EXPECT_EQ(
+        raster.read(0, raster.width() - 1, raster.height() - 1, 2, 2, data),
+        gdal::GDALError::None);
+    EXPECT_EQ(data.size(), 4U);
+}
+
+TEST(GDALReaderTest, blockReadReportsGdalFailure)
+{
+    Support::Tempfile vrtFile;
+    std::ofstream out(vrtFile.filename());
+    out << R"(<VRTDataset rasterXSize="1" rasterYSize="1">
+  <GeoTransform>0, 1, 0, 0, 0, -1</GeoTransform>
+  <VRTRasterBand dataType="Byte" band="1">
+    <SimpleSource>
+      <SourceFilename relativeToVRT="0">missing-source.tif</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="1" RasterYSize="1" DataType="Byte"
+                        BlockXSize="1" BlockYSize="1" />
+      <SrcRect xOff="0" yOff="0" xSize="1" ySize="1" />
+      <DstRect xOff="0" yOff="0" xSize="1" ySize="1" />
+    </SimpleSource>
+  </VRTRasterBand>
+</VRTDataset>)";
+    out.close();
+
+    gdal::Raster raster(vrtFile.filename());
+    ASSERT_EQ(raster.open(), gdal::GDALError::None);
+
+    std::vector<double> data;
+    EXPECT_EQ(raster.read(0, 0, 0, 1, 1, data),
+              gdal::GDALError::CantReadBlock);
 }
 
 struct Point
