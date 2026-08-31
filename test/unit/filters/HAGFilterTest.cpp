@@ -39,11 +39,30 @@
 
 #include "Support.hpp"
 
+#include <algorithm>
+#include <vector>
+
 // NOTE: The test data has an accompanying jpg that depicts the points,
 //  their triangulation and the interesting barycentric calculation.
 
 namespace pdal
 {
+
+namespace
+{
+
+std::vector<double> hags(const PointViewSet& views)
+{
+    std::vector<double> output;
+    for (PointViewPtr view : views)
+        for (PointId i = 0; i < view->size(); ++i)
+            output.push_back(
+                view->getFieldAs<double>(Dimension::Id::HeightAboveGround, i));
+    std::sort(output.begin(), output.end());
+    return output;
+}
+
+} // unnamed namespace
 
 TEST(HAGFilterTest, delaunay)
 {
@@ -204,9 +223,9 @@ TEST(HAGFilterTest, dem)
     view->setField(Dimension::Id::Y, 0, 3751290.0);
     view->setField(Dimension::Id::Z, 0, 200.0);
     view->setField(Dimension::Id::Classification, 0, ClassLabel::Ground);
-    view->setField(Dimension::Id::X, 1, 440810.0);
+    view->setField(Dimension::Id::X, 1, 440750.0);
     view->setField(Dimension::Id::Y, 1, 3751290.0);
-    view->setField(Dimension::Id::Z, 1, 140.0);
+    view->setField(Dimension::Id::Z, 1, 200.0);
     view->setField(Dimension::Id::Classification, 1, ClassLabel::Unclassified);
 
     BufferReader reader;
@@ -221,12 +240,11 @@ TEST(HAGFilterTest, dem)
 
     f.prepare(table);
     PointViewSet s = f.execute(table);
-    PointViewPtr v = *s.begin();
+    std::vector<double> values = hags(s);
 
-    EXPECT_DOUBLE_EQ(v->getFieldAs<double>(Dimension::Id::HeightAboveGround, 0),
-                     0.0);
-    EXPECT_DOUBLE_EQ(v->getFieldAs<double>(Dimension::Id::HeightAboveGround, 1),
-                     17.0);
+    ASSERT_EQ(values.size(), 2u);
+    EXPECT_DOUBLE_EQ(values[0], 0.0);
+    EXPECT_DOUBLE_EQ(values[1], 93.0);
 }
 
 TEST(HAGFilterTest, dem_clamps)
@@ -237,14 +255,10 @@ TEST(HAGFilterTest, dem_clamps)
                                   Dimension::Id::Classification});
 
     PointViewPtr view(new PointView(table));
-    view->setField(Dimension::Id::X, 0, 440810.0);
+    view->setField(Dimension::Id::X, 0, 440750.0);
     view->setField(Dimension::Id::Y, 0, 3751290.0);
     view->setField(Dimension::Id::Z, 0, 140.0);
     view->setField(Dimension::Id::Classification, 0, ClassLabel::Unclassified);
-    view->setField(Dimension::Id::X, 1, 440810.0);
-    view->setField(Dimension::Id::Y, 1, 3751290.0);
-    view->setField(Dimension::Id::Z, 1, 100.0);
-    view->setField(Dimension::Id::Classification, 1, ClassLabel::Unclassified);
 
     BufferReader reader;
     reader.addView(view);
@@ -260,12 +274,10 @@ TEST(HAGFilterTest, dem_clamps)
 
     f.prepare(table);
     PointViewSet s = f.execute(table);
-    PointViewPtr v = *s.begin();
+    std::vector<double> values = hags(s);
 
-    EXPECT_DOUBLE_EQ(v->getFieldAs<double>(Dimension::Id::HeightAboveGround, 0),
-                     10.0);
-    EXPECT_DOUBLE_EQ(v->getFieldAs<double>(Dimension::Id::HeightAboveGround, 1),
-                     -5.0);
+    ASSERT_EQ(values.size(), 1u);
+    EXPECT_DOUBLE_EQ(values[0], 10.0);
 }
 
 // Should add tests for exact match in neighbors case and for

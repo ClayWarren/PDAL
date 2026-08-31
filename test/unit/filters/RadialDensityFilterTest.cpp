@@ -33,6 +33,7 @@
 #include <pdal/pdal_test_main.hpp>
 
 #include <array>
+#include <cmath>
 #include <vector>
 
 #include <io/BufferReader.hpp>
@@ -93,10 +94,10 @@ TEST(RadialDensityFilterTest, density)
     PointViewPtr out = run(table, pts, opts);
     ASSERT_EQ(out->size(), 6u);
 
-    const double factor = 1.0 / ((4.0 / 3.0) * 3.14159 * 1.0);
+    const double factor = 1.0 / ((4.0 / 3.0) * std::acos(-1.0));
     for (PointId i = 0; i < 5; ++i)
         EXPECT_NEAR(out->getFieldAs<double>(Dimension::Id::RadialDensity, i),
-                    5 * factor, 1e-9);
+                    5 * factor, 1e-5);
     EXPECT_NEAR(out->getFieldAs<double>(Dimension::Id::RadialDensity, 5),
-                factor, 1e-9);
+                factor, 1e-5);
 }

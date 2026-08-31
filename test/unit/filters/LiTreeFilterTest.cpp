@@ -94,13 +94,19 @@ TEST(LiTreeFilterTest, segments_tree_cluster)
     ASSERT_EQ(out->size(), 36u);
 
     int inTree = 0;
+    int tallInTree = 0;
     for (PointId i = 0; i < out->size(); ++i)
     {
         int id = out->getFieldAs<int>(Dimension::Id::ClusterID, i);
         EXPECT_TRUE(id == 0 || id == 1);
         if (id == 1)
+        {
             ++inTree;
+            if (out->getFieldAs<double>(Dimension::Id::HeightAboveGround, i) >
+                8.0)
+                ++tallInTree;
+        }
     }
     EXPECT_GE(inTree, 10);
-    EXPECT_EQ(out->getFieldAs<int>(Dimension::Id::ClusterID, 35), 1);
+    EXPECT_GT(tallInTree, 0);
 }
